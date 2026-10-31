@@ -225,7 +225,25 @@ CREATE TABLE turn_dispatch_intents (
 CREATE INDEX pending_turn_dispatches ON turn_dispatch_intents(
     repository_id, state, created_at
 );
-PRAGMA user_version = 11;
+CREATE TABLE job_action_intents (
+    action_id TEXT PRIMARY KEY,
+    repository_id TEXT NOT NULL,
+    job_id TEXT NOT NULL REFERENCES jobs(job_id),
+    action TEXT NOT NULL CHECK (action IN ('start','cancel','retry','resume')),
+    state TEXT NOT NULL CHECK (
+        state IN ('pending','claimed','completed','failed','cancelled')
+    ),
+    expected_revision INTEGER NOT NULL,
+    request_id TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE UNIQUE INDEX one_active_job_action ON job_action_intents(job_id)
+    WHERE state IN ('pending','claimed');
+CREATE INDEX pending_job_action_intents ON job_action_intents(
+    repository_id,state,created_at
+);
+PRAGMA user_version = 12;
 """
 
 _REPOSITORY_TABLE = (
@@ -473,7 +491,7 @@ class WorkspaceStore:
                 if db.execute("PRAGMA user_version").fetchone()[0] == 3:
                     db.execute(_REPOSITORY_TABLE)
                     db.execute("PRAGMA user_version = 4")
-            elif version not in {4, 5, 6, 7, 8, 9, 10, 11}:
+            elif version not in {4, 5, 6, 7, 8, 9, 10, 11, 12}:
                 raise ValueError(f"Unsupported workspace schema version: {version}")
             current_version = db.execute("PRAGMA user_version").fetchone()[0]
             if current_version == 4:
@@ -483,7 +501,7 @@ class WorkspaceStore:
                     for statement in _TURN_TABLES:
                         db.execute(statement)
                     db.execute("PRAGMA user_version = 5")
-            elif current_version not in {5, 6, 7, 8, 9, 10, 11}:
+            elif current_version not in {5, 6, 7, 8, 9, 10, 11, 12}:
                 raise ValueError(
                     f"Unsupported workspace schema version: {current_version}"
                 )
@@ -495,7 +513,7 @@ class WorkspaceStore:
                     for statement in _JOB_OPERATION_TABLES:
                         db.execute(statement)
                     db.execute("PRAGMA user_version = 6")
-            elif current_version not in {6, 7, 8, 9, 10, 11}:
+            elif current_version not in {6, 7, 8, 9, 10, 11, 12}:
                 raise ValueError(
                     f"Unsupported workspace schema version: {current_version}"
                 )
@@ -507,7 +525,7 @@ class WorkspaceStore:
                     for statement in _SUPERVISOR_TABLES:
                         db.execute(statement)
                     db.execute("PRAGMA user_version = 7")
-            elif current_version not in {7, 8, 9, 10, 11}:
+            elif current_version not in {7, 8, 9, 10, 11, 12}:
                 raise ValueError(
                     f"Unsupported workspace schema version: {current_version}"
                 )
@@ -537,7 +555,7 @@ class WorkspaceStore:
                         db.execute("ALTER TABLE events ADD COLUMN attempt_id TEXT")
                         db.execute("ALTER TABLE events ADD COLUMN revision INTEGER")
                     db.execute("PRAGMA user_version = 8")
-            elif current_version not in {8, 9, 10, 11}:
+            elif current_version not in {8, 9, 10, 11, 12}:
                 raise ValueError(
                     f"Unsupported workspace schema version: {current_version}"
                 )
@@ -559,7 +577,7 @@ class WorkspaceStore:
                         "CREATE INDEX api_session_expiry ON api_sessions(expires_at)"
                     )
                     db.execute("PRAGMA user_version = 9")
-            elif current_version not in {9, 10, 11}:
+            elif current_version not in {9, 10, 11, 12}:
                 raise ValueError(
                     f"Unsupported workspace schema version: {current_version}"
                 )
@@ -581,7 +599,7 @@ class WorkspaceStore:
                         "turn_dispatch_intents(repository_id, state, created_at)"
                     )
                     db.execute("PRAGMA user_version = 10")
-            elif current_version not in {10, 11}:
+            elif current_version not in {10, 11, 12}:
                 raise ValueError(
                     f"Unsupported workspace schema version: {current_version}"
                 )
@@ -599,7 +617,34 @@ class WorkspaceStore:
                         "created_at TEXT NOT NULL)"
                     )
                     db.execute("PRAGMA user_version = 11")
-            elif current_version != 11:
+            current_version = db.execute("PRAGMA user_version").fetchone()[0]
+            if current_version == 11:
+                if not db.in_transaction:
+                    db.execute("BEGIN IMMEDIATE")
+                if db.execute("PRAGMA user_version").fetchone()[0] == 11:
+                    db.execute(
+                        "CREATE TABLE job_action_intents ("
+                        "action_id TEXT PRIMARY KEY, repository_id TEXT NOT NULL, "
+                        "job_id TEXT NOT NULL REFERENCES jobs(job_id), "
+                        "action TEXT NOT NULL CHECK (action IN "
+                        "('start','cancel','retry','resume')), "
+                        "state TEXT NOT NULL CHECK (state IN "
+                        "('pending','claimed','completed','failed','cancelled')), "
+                        "expected_revision INTEGER NOT NULL, request_id TEXT NOT NULL, "
+                        "created_at TEXT NOT NULL, updated_at TEXT NOT NULL)"
+                    )
+                    db.execute(
+                        "CREATE UNIQUE INDEX one_active_job_action "
+                        "ON job_action_intents(job_id) "
+                        "WHERE state IN ('pending','claimed')"
+                    )
+                    db.execute(
+                        "CREATE INDEX pending_job_action_intents ON "
+                        "job_action_intents(repository_id,state,created_at)"
+                    )
+                    db.execute("PRAGMA user_version = 12")
+            current_version = db.execute("PRAGMA user_version").fetchone()[0]
+            if current_version != 12:
                 raise ValueError(
                     f"Unsupported workspace schema version: {current_version}"
                 )
@@ -2970,6 +3015,113 @@ class WorkspaceStore:
         with self._connection() as db:
             return self._job(db, job_id)
 
+    def accept_job_action(
+        self,
+        repository_id: str,
+        job_id: str,
+        action: JobAction,
+        *,
+        expected_revision: int,
+        request_id: str,
+    ) -> dict[str, Any]:
+        """Durably accept a job action without running workflow code."""
+        action = JobAction(action)
+        _required(repository_id, "repository_id")
+        _required(job_id, "job_id")
+        _required(request_id, "request_id")
+        command = {
+            "operation": "job.action",
+            "job_id": job_id,
+            "action": action.value,
+            "expected_revision": expected_revision,
+        }
+        with self._connection() as db:
+            db.execute("BEGIN IMMEDIATE")
+            job = self._job(db, job_id)
+            if job.repository_id != repository_id:
+                raise KeyError("Job does not exist")
+            replay = self._replay_request(
+                db, repository_id, request_id, command, "job_action"
+            )
+            if replay is not None:
+                return replay
+            if job.revision != expected_revision:
+                raise WorkspaceConflict("Job revision has changed")
+            if action not in _JOB_ACTIONS_BY_STATE[job.state]:
+                raise ValueError(f"Action {action.value} is unavailable for this job")
+
+            active = db.execute(
+                "SELECT action_id,action,state FROM job_action_intents "
+                "WHERE job_id=? AND state IN ('pending','claimed')",
+                (job_id,),
+            ).fetchone()
+            if active is not None:
+                if (
+                    action == JobAction.CANCEL
+                    and active["state"] == "pending"
+                    and active["action"] != JobAction.CANCEL.value
+                ):
+                    db.execute(
+                        "UPDATE job_action_intents SET state='cancelled',updated_at=? "
+                        "WHERE action_id=?",
+                        (_now(), active["action_id"]),
+                    )
+                else:
+                    raise WorkspaceConflict("A job action is already pending")
+
+            timestamp = _now()
+            action_id = uuid4().hex
+            db.execute(
+                "INSERT INTO job_action_intents(action_id,repository_id,job_id,"
+                "action,state,expected_revision,request_id,created_at,updated_at) "
+                "VALUES (?,?,?,?, 'pending',?,?,?,?)",
+                (
+                    action_id,
+                    repository_id,
+                    job_id,
+                    action.value,
+                    expected_revision,
+                    request_id,
+                    timestamp,
+                    timestamp,
+                ),
+            )
+            db.execute(
+                "UPDATE jobs SET revision=revision+1,updated_at=? WHERE job_id=?",
+                (timestamp, job_id),
+            )
+            result = {
+                "action_id": action_id,
+                "job_id": job_id,
+                "action": action.value,
+                "state": "accepted",
+                "job_revision": job.revision + 1,
+            }
+            self._event(
+                db,
+                repository_id,
+                "job",
+                job_id,
+                EventType.JOB_ACTION_ACCEPTED,
+                {
+                    "action_id": action_id,
+                    "action": action.value,
+                    "state": "pending",
+                    "revision": job.revision + 1,
+                },
+                timestamp,
+            )
+            self._record_request(
+                db,
+                repository_id,
+                request_id,
+                command,
+                "job_action",
+                result,
+                timestamp,
+            )
+            return result
+
     def read_job_detail(self, repository_id: str, job_id: str) -> WorkspaceJobDetail:
         """Read one bounded, repository-scoped job detail projection atomically."""
         with self._connection() as db:
@@ -3005,6 +3157,22 @@ class WorkspaceStore:
                 )
                 for item in operations
             )
+            active_action = db.execute(
+                "SELECT action FROM job_action_intents "
+                "WHERE job_id=? AND state IN ('pending','claimed')",
+                (job_id,),
+            ).fetchone()
+            allowed_actions = _JOB_ACTIONS_BY_STATE[job.state]
+            if active_action is not None:
+                if active_action["action"] == JobAction.CANCEL.value:
+                    allowed_actions = ()
+                else:
+                    accepted_action = JobAction(active_action["action"])
+                    allowed_actions = tuple(
+                        action
+                        for action in allowed_actions
+                        if action != accepted_action
+                    )
             return WorkspaceJobDetail(
                 job=job,
                 attempts=attempts,
@@ -3012,7 +3180,7 @@ class WorkspaceStore:
                 blockers=blockers,
                 question=None,
                 outputs=job.artifact_refs,
-                allowed_actions=_JOB_ACTIONS_BY_STATE[job.state],
+                allowed_actions=allowed_actions,
             )
 
     def list_jobs(

@@ -15,6 +15,7 @@ from uuid import NAMESPACE_URL, uuid5
 from fastapi import APIRouter, Depends, FastAPI, Header, Query, Request
 from powdrr_contracts.workspace import (
     Conversation,
+    JobAction,
     JobState,
     WorkspaceApiError,
     WorkspaceApiErrorResponse,
@@ -87,6 +88,12 @@ class JobCreateRequest(WorkspaceApiRequest):
     source_refs: list[str] = Field(min_length=1, max_length=100)
     source_spec_revision: str | None = Field(default=None, max_length=256)
     provider_config_refs: list[str] = Field(min_length=1, max_length=100)
+
+
+class JobActionRequest(WorkspaceApiRequest):
+    request_id: str = Field(min_length=1, max_length=128)
+    expected_revision: int = Field(ge=1)
+    action: Literal["start", "cancel", "retry", "resume"]
 
 
 class WorkspaceApiException(Exception):
@@ -386,6 +393,46 @@ def install_workspace_routes(
                 404, "not_found", "Job was not found."
             ) from error
         return detail.to_dict()
+
+    @router.post("/repositories/{repository_id}/jobs/{job_id}/actions", status_code=202)
+    async def accept_job_action(
+        repository_id: str,
+        job_id: str,
+        payload: JobActionRequest,
+        _: None = Depends(require_session(mutating=True)),
+    ) -> dict[str, Any]:
+        await _get_repository(repository_registry, repository_id)
+        try:
+            result = await run_in_threadpool(
+                store.accept_job_action,
+                repository_id,
+                job_id,
+                JobAction(payload.action),
+                expected_revision=payload.expected_revision,
+                request_id=payload.request_id,
+            )
+        except KeyError as error:
+            raise WorkspaceApiException(
+                404, "not_found", "Job was not found."
+            ) from error
+        except WorkspaceConflict as error:
+            message = str(error)
+            code = (
+                "stale_revision"
+                if message == "Job revision has changed"
+                else "request_conflict"
+            )
+            raise WorkspaceApiException(
+                409,
+                code,
+                "The job changed in another window."
+                if code == "stale_revision"
+                else "The request conflicts with saved data.",
+            ) from error
+        except ValueError as error:
+            raise WorkspaceApiException(422, "invalid_action", str(error)) from error
+        await _notify(event_source, repository_id)
+        return result
 
     @router.get("/repositories/{repository_id}/conversations")
     async def list_conversations(

@@ -38,7 +38,7 @@ def test_health_is_public_and_session_bootstrap_is_single_use(tmp_path: Path) ->
     client, store, _, secret = _client(tmp_path)
     assert client.get("/api/v1/health").json() == {
         "status": "ok",
-        "schema_version": 11,
+        "schema_version": 12,
         "scheduler": {"status": "not_configured"},
     }
 
@@ -362,6 +362,116 @@ def test_job_detail_reports_dependency_blockers_and_allowed_actions(
     assert detail["stage"] is None
     assert detail["question"] is None
     assert detail["allowed_actions"] == ["cancel"]
+
+
+def test_job_action_is_durable_revision_checked_and_idempotent(
+    tmp_path: Path,
+) -> None:
+    client, store, repository_id, secret = _client(tmp_path)
+    csrf = _sign_in(client, secret)
+    headers = {
+        "Origin": "http://127.0.0.1:8765",
+        "X-CSRF-Token": csrf,
+    }
+    job = store.create_job(
+        repository_id,
+        kind="planning",
+        title="Plan search",
+        request_id="create-plan-action",
+    )
+    path = f"/api/v1/repositories/{repository_id}/jobs/{job.job_id}/actions"
+    payload = {
+        "request_id": "start-plan-action",
+        "expected_revision": job.revision,
+        "action": "start",
+    }
+
+    accepted = client.post(path, headers=headers, json=payload)
+    retried = client.post(path, headers=headers, json=payload)
+
+    assert accepted.status_code == retried.status_code == 202
+    assert retried.json() == accepted.json()
+    assert accepted.json()["action"] == "start"
+    assert accepted.json()["state"] == "accepted"
+    assert store.get_job(job.job_id).revision == job.revision + 1
+    detail = client.get(f"/api/v1/repositories/{repository_id}/jobs/{job.job_id}")
+    assert detail.json()["allowed_actions"] == ["cancel"]
+    reopened = WorkspaceStore(store.path)
+    with reopened._connection() as db:
+        intents = db.execute(
+            "SELECT action_id,action,state FROM job_action_intents WHERE job_id=?",
+            (job.job_id,),
+        ).fetchall()
+    assert len(intents) == 1
+    assert tuple(intents[0]) == (accepted.json()["action_id"], "start", "pending")
+
+    stale = client.post(
+        path,
+        headers=headers,
+        json={
+            "request_id": "stale-plan-action",
+            "expected_revision": job.revision,
+            "action": "cancel",
+        },
+    )
+    assert stale.status_code == 409
+    assert stale.json()["error"]["code"] == "stale_revision"
+
+
+def test_job_actions_reject_unavailable_or_duplicate_actions(tmp_path: Path) -> None:
+    client, store, repository_id, secret = _client(tmp_path)
+    csrf = _sign_in(client, secret)
+    headers = {
+        "Origin": "http://127.0.0.1:8765",
+        "X-CSRF-Token": csrf,
+    }
+    job = store.create_job(
+        repository_id,
+        kind="planning",
+        title="Plan search",
+        dependency_ids=[
+            store.create_job(
+                repository_id,
+                kind="planning",
+                title="Prerequisite",
+                request_id="action-prerequisite",
+            ).job_id
+        ],
+        request_id="create-blocked-action",
+    )
+    path = f"/api/v1/repositories/{repository_id}/jobs/{job.job_id}/actions"
+    unavailable = client.post(
+        path,
+        headers=headers,
+        json={
+            "request_id": "unavailable-start",
+            "expected_revision": 1,
+            "action": "start",
+        },
+    )
+    assert unavailable.status_code == 422
+
+    cancellation = client.post(
+        path,
+        headers=headers,
+        json={
+            "request_id": "cancel-blocked",
+            "expected_revision": 1,
+            "action": "cancel",
+        },
+    )
+    duplicate = client.post(
+        path,
+        headers=headers,
+        json={
+            "request_id": "cancel-blocked-2",
+            "expected_revision": 2,
+            "action": "cancel",
+        },
+    )
+    assert cancellation.status_code == 202
+    assert duplicate.status_code == 409
+    assert duplicate.json()["error"]["code"] == "request_conflict"
 
 
 def test_event_stream_formats_durable_replay_events(tmp_path: Path) -> None:

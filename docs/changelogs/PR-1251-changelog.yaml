@@ -1,5 +1,5 @@
 schema: https://powdrr.io/schema/changelog-v2
-change_id: 1250
+change_id: 1251
 title: Accept durable workspace job actions
 intent:
   problem: The browser workspace can show job actions but has no safe API for accepting them across service processes.

@@ -3213,12 +3213,12 @@
       "reviewed": false
     },
     {
-      "extraction_pr": "6",
+      "extraction_pr": "1245",
       "internal_imports": [],
       "kind": "python_module",
       "owner": "service",
-      "path": "src/powdrr_lift/workrr/semantic_classifier.py",
-      "rationale": "provider access, model routing, and inference policy",
+      "path": "packages/service/src/powdrr_service/semantic_classifier.py",
+      "rationale": "deterministic interpretation of source-language semantic markers",
       "reviewed": false
     },
     {
@@ -3228,7 +3228,7 @@
         "powdrr_service.planning.semantic_contract",
         "powdrr_service.planning.semantic_decision",
         "powdrr_lift.core.semantic_faithfulness",
-        "powdrr_lift.workrr.semantic_classifier"
+        "powdrr_service.semantic_classifier"
       ],
       "kind": "python_module",
       "owner": "split",

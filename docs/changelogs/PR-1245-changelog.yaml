@@ -1,0 +1,53 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1245
+title: Move deterministic semantic classification into service
+intent:
+  problem: Deterministic interpretation of source semantic markers still lived in the agent package, alongside orchestration code.
+  goal: Move this pure source-language policy into the service package and have semantic contract compilation consume it directly.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 3216, end_line: 3216}
+  summary: Record the extraction PR for deterministic source semantic classification.
+  rationale: Link the service ownership record to the PR that establishes it.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 3220, end_line: 3221}
+  summary: Assign the deterministic source semantic classifier to service.
+  rationale: Record the authoritative module path and its source-language responsibility.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 3231, end_line: 3231}
+  summary: Update semantic contract compiler dependency to the service classifier.
+  rationale: Keep the ownership inventory aligned with the actual import graph.
+- path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+  type: modified
+  span: {start_line: 25, end_line: 28}
+  summary: Import deterministic source decisions from service.
+  rationale: Keep semantic decision policy outside the agent orchestration package.
+- path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+  type: modified
+  span: {start_line: 39, end_line: 42}
+  summary: Remove the legacy agent-side classifier import.
+  rationale: Eliminate the obsolete package dependency after moving the classifier.
+- path: tests/test_semantic_decision.py
+  type: modified
+  span: {start_line: 3, end_line: 4}
+  summary: Add module lookup for the legacy path regression.
+  rationale: Verify the moved classifier has no lingering agent-side module path.
+- path: tests/test_semantic_decision.py
+  type: modified
+  span: {start_line: 15, end_line: 15}
+  summary: Import the service-owned deterministic classifier.
+  rationale: Exercise the classifier from its authoritative package.
+- path: tests/test_semantic_decision.py
+  type: modified
+  span: {start_line: 20, end_line: 23}
+  summary: Assert the legacy classifier module path is absent.
+  rationale: Exercise the owning package and protect the package boundary.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []

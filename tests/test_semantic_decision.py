@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import importlib.util
+
 import pytest
 from powdrr_service.planning.semantic_decision import (
     DECISION_VALUES,
@@ -10,10 +12,13 @@ from powdrr_service.planning.semantic_decision import (
     SemanticDecisionSpec,
     resolve_exact_source_span,
 )
-
-from powdrr_lift.workrr.semantic_classifier import (
+from powdrr_service.semantic_classifier import (
     resolve_deterministic_source_decision,
 )
+
+
+def test_deterministic_source_classifier_is_service_owned() -> None:
+    assert importlib.util.find_spec("powdrr_lift.workrr.semantic_classifier") is None
 
 
 def _spec(

@@ -275,6 +275,132 @@ def test_structural_subject_answer_is_reasked_when_projected_context_changes() -
     assert machine._request_is_pending(requests[0], {question_id: stale_answer})
 
 
+def test_subject_enumeration_uses_unique_refs_for_repeated_planned_write_paths() -> (
+    None
+):
+    text = "# Plan\n\nImplement the requested behavior.\n"
+    source = segment_markdown_source(
+        PinnedSourceDocument(
+            repository="owner/repo",
+            commit_sha="a" * 40,
+            path="docs/plan.md",
+            blob_sha="b" * 40,
+            content_sha256=hashlib.sha256(text.encode()).hexdigest(),
+            text=text,
+        )
+    )
+    source_ref = source.anchors[0].id
+    repeated_write = PlannedWrite(
+        "src/new.py", "implementation", "python", (source_ref,), ()
+    )
+    unit = _unit(writes=(repeated_write, repeated_write))
+
+    request = build_subject_enumeration_request(
+        plan_id="plan-01",
+        item_id="item-0001",
+        units=(unit,),
+        source=source,
+        source_refs=(source_ref,),
+        projected_baseline={"entities": [], "entity_relationships": [], "files": []},
+    )
+
+    request.validate()
+    assert (
+        request.question.context_ref_ids.count(f"planned-write:{unit.id}:src/new.py")
+        == 1
+    )
+    assert f"planned-write:{unit.id}:src/new.py:duplicate-2" in (
+        request.question.context_ref_ids
+    )
+
+
+def test_planned_file_mislabeled_as_entity_is_recovered_deterministically() -> None:
+    path = "scripts/install.sh"
+    unit = _unit(writes=(PlannedWrite(path, "implementation", "neutral", (), ()),))
+
+    page = parse_structural_subject_page(
+        {
+            "records": [
+                {
+                    "section": "entities",
+                    "subject_ref": f"path::{path}",
+                    "new_identity_description": None,
+                    "action": "changed",
+                    "requirement_ids": ["req-01"],
+                    "unit_ids": [unit.id],
+                    "source_refs": ["anchor-01"],
+                }
+            ],
+            "has_more": False,
+            "next_anchor": None,
+        },
+        plan_id="plan-01",
+        item_id="item-0001",
+        requirement_ids={"req-01"},
+        units=(unit,),
+        source_ids={"anchor-01"},
+        projected_baseline={
+            "entities": [],
+            "entity_relationships": [],
+            "files": [],
+            "source_subjects": [],
+        },
+    )
+
+    assert len(page.records) == 1
+    subject = page.records[0]
+    assert subject.section == "files"
+    assert subject.subject_id == f"path::{path}"
+    assert subject.action == "added"
+    assert subject.is_new is True
+
+
+def test_accepted_assembly_cache_survives_structural_answers(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    text = "# Plan\n\nImplement the requested behavior.\n"
+    source = segment_markdown_source(
+        PinnedSourceDocument(
+            repository="owner/repo",
+            commit_sha="a" * 40,
+            path="docs/plan.md",
+            blob_sha="b" * 40,
+            content_sha256=hashlib.sha256(text.encode()).hexdigest(),
+            text=text,
+        )
+    )
+    machine = SourceLedgerQuestionMachine(source, plan_id="plan-01")
+    assembly = object()
+    calls = 0
+
+    def compile_assembly(
+        _answers: Any, *, plan_id: str, workflow_directory: Any
+    ) -> Any:
+        nonlocal calls
+        assert plan_id == "plan-01"
+        assert workflow_directory == "docs/workflows"
+        calls += 1
+        return assembly
+
+    monkeypatch.setattr(machine, "_compile_accepted_assembly", compile_assembly)
+    answers: dict[str, dict[str, Any]] = {"work-units-0001": {"records": []}}
+
+    first = machine.accepted_assembly(answers, plan_id="plan-01")
+    after_structural_answer = machine.accepted_assembly(
+        {**answers, "structural-subjects-item-0001-0001": {"records": []}},
+        plan_id="plan-01",
+    )
+    after_upstream_answer_change = machine.accepted_assembly(
+        {**answers, "work-units-0001": {"records": [{"changed": True}]}},
+        plan_id="plan-01",
+    )
+
+    assert first is assembly
+    assert after_structural_answer is first
+    assert after_upstream_answer_change is assembly
+    assert calls == 2
+
+
 def test_explicit_human_setup_requirement_becomes_an_item_prerequisite() -> None:
     text = "# Plan\n\nA maintainer must install the signed provider.\n"
     source = segment_markdown_source(

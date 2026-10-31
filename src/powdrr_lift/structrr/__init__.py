@@ -86,15 +86,6 @@ from powdrr_lift.structrr.source_manifest import (
     compare_source_manifests,
     compile_source_manifest,
 )
-from powdrr_lift.structrr.validation_models import (
-    LEGACY_VALIDATION_INVENTORY_SCHEMA_VERSION,
-    VALIDATION_CONTEXT_SCHEMA_VERSION,
-    VALIDATION_INVENTORY_SCHEMA_VERSION,
-    ValidationCheck,
-    ValidationContext,
-    ValidationModelIssue,
-    validate_validation_records,
-)
 from powdrr_lift.structrr.verification_obligations import (
     VERIFICATION_OBLIGATION_SCHEMA_VERSION,
     AffectedIntentClosure,
@@ -167,11 +158,4 @@ __all__ = [
     "VerificationObligation",
     "VerificationObligationCompilation",
     "compile_verification_obligations",
-    "LEGACY_VALIDATION_INVENTORY_SCHEMA_VERSION",
-    "VALIDATION_CONTEXT_SCHEMA_VERSION",
-    "VALIDATION_INVENTORY_SCHEMA_VERSION",
-    "ValidationCheck",
-    "ValidationContext",
-    "ValidationModelIssue",
-    "validate_validation_records",
 ]

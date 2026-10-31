@@ -13,13 +13,13 @@ from pathlib import Path
 from typing import cast
 
 import yaml
-
-from powdrr_lift.structrr.python_topology import PythonTopology
-from powdrr_lift.structrr.validation_models import (
+from powdrr_service.structrr.validation_models import (
     VALIDATION_INVENTORY_SCHEMA_VERSION,
     ValidationCheck,
     ValidationContext,
 )
+
+from powdrr_lift.structrr.python_topology import PythonTopology
 from powdrr_lift.structrr.validation_tasks import (
     HatchConfiguration,
     MakeConfiguration,

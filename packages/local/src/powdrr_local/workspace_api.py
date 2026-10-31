@@ -7,7 +7,7 @@ import inspect
 import json
 import re
 import time
-from collections.abc import AsyncIterator, Mapping
+from collections.abc import AsyncGenerator, Mapping
 from pathlib import Path
 from typing import Annotated, Any, Protocol
 
@@ -139,7 +139,7 @@ async def _event_stream(
     repository_id: str,
     after: int,
     request: Request,
-) -> AsyncIterator[str]:
+) -> AsyncGenerator[str, None]:
     cursor = after
     last_heartbeat = time.monotonic()
     while not await request.is_disconnected():
@@ -264,7 +264,8 @@ def install_workspace_routes(
             raise WorkspaceApiException(
                 409,
                 "resync_required",
-                "The event cursor is ahead of this repository. Fetch a fresh snapshot and reconnect from its event cursor.",
+                "The event cursor is ahead of this repository. Fetch a fresh "
+                "snapshot and reconnect from its event cursor.",
                 current_event_cursor=current_cursor,
             )
 

@@ -4,11 +4,10 @@ import subprocess
 from pathlib import Path
 
 from fastapi.testclient import TestClient
-from starlette.requests import Request
-
 from powdrr_local.web import create_app
 from powdrr_local.workspace import WorkspaceStore
 from powdrr_local.workspace_api import _event_stream
+from starlette.requests import Request
 
 
 def _client(tmp_path: Path) -> tuple[TestClient, WorkspaceStore, str, str]:

@@ -1,0 +1,69 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1242
+title: Read checkpoint archives from newest issue comments
+intent:
+  problem: "GitHub's issue-comment endpoint always orders comments by ascending ID, so fetching page 1 first reads the oldest checkpoint history and misses the archive until the final page."
+  goal: "Start checkpoint reads from the latest comment page and walk backward only until a complete archive is restored."
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 381, end_line: 381}
+    summary: Describe checkpoint comment reads in descending page order.
+    rationale: Reflect the actual ordering supported by GitHub's issue-comment endpoint.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 383, end_line: 403}
+    summary: Read the issue comment count and calculate the newest page index.
+    rationale: GitHub returns comments in ascending ID order and does not support a direction parameter.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 408, end_line: 408}
+    summary: Request issue-comment pages without unsupported sort parameters.
+    rationale: Use the endpoint's supported pagination contract.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 422, end_line: 423}
+    summary: Accumulate each page while checking for a complete archive.
+    rationale: Stop as soon as the newest archive can restore the journal.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 425, end_line: 432}
+    summary: Return collected comments in chronological order after reading backward.
+    rationale: Preserve deterministic reducer input order while avoiding old pages when an archive is present.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 631, end_line: 644}
+    summary: Verify checkpoint loading starts at the newest page and stops at a complete archive.
+    rationale: Catch the endpoint-ordering behavior against which the previous pagination was wrong.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 662, end_line: 664}
+    summary: Assert metadata and newest-page requests are used.
+    rationale: Ensure the reader does not scan old pages first.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 671, end_line: 671}
+    summary: Keep the legacy newest-page fixture in chronological sequence.
+    rationale: Verify pages are returned in chronological order after backward traversal.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 678, end_line: 681}
+    summary: Provide issue metadata for full legacy-history pagination.
+    rationale: Confirm issues without archives still read all comments.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 692, end_line: 695}
+    summary: Assert all legacy pages are returned in chronological order.
+    rationale: Preserve existing checkpoint reducer behavior for unarchived history.
+entities: []
+entity_relationships: []
+invariants:
+  - id: checkpoint-comment-pagination-starts-at-newest-page
+    description: The issue-comment reader starts at the page containing the highest comment IDs and walks toward older pages.
+    action: altered
+  - id: checkpoint-comment-reading-stops-at-complete-archive
+    description: Once an archive restores the journal, older event pages are not fetched.
+    action: altered
+guidance: []

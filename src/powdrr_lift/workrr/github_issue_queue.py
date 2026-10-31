@@ -378,16 +378,34 @@ class GitHubIssueClient:
     def list_checkpoint_comments(
         self, issue_number: int, *, session_id: str
     ) -> tuple[Mapping[str, Any], ...]:
-        """Read newest comments until a complete compressed journal is found."""
-        comments: list[Mapping[str, Any]] = []
-        page = 1
+        """Read issue comments backward until a complete archive is found."""
         operation = f"GET repos/{self.repository}/issues/{issue_number}/comments"
-        while True:
+        issue_result = self._invoke_comment_api(
+            ["api", f"repos/{self.repository}/issues/{issue_number}"],
+            operation=f"GET repos/{self.repository}/issues/{issue_number}",
+        )
+        try:
+            issue = json.loads(issue_result.stdout)
+        except json.JSONDecodeError as error:
+            raise GitHubIssueQueueError(
+                "gh returned malformed issue metadata"
+            ) from error
+        count = issue.get("comments") if isinstance(issue, Mapping) else None
+        if isinstance(count, bool) or not isinstance(count, int) or count < 0:
+            raise GitHubIssueQueueError(
+                "gh returned issue metadata without a valid comment count"
+            )
+        if count == 0:
+            return ()
+
+        pages: list[list[Mapping[str, Any]]] = []
+        last_page = (count + 99) // 100
+        for page in range(last_page, 0, -1):
             result = self._invoke_comment_api(
                 [
                     "api",
                     f"repos/{self.repository}/issues/{issue_number}/comments"
-                    f"?per_page=100&sort=created&direction=desc&page={page}",
+                    f"?per_page=100&page={page}",
                 ],
                 operation=operation,
             )
@@ -401,12 +419,17 @@ class GitHubIssueClient:
                 raise GitHubIssueQueueError(
                     "gh returned a non-array issue-comment page"
                 )
-            comments.extend(value for value in values if isinstance(value, Mapping))
+            pages.append([value for value in values if isinstance(value, Mapping)])
+            comments = [comment for page_values in pages for comment in page_values]
             if has_complete_checkpoint_archive(comments, session_id=session_id):
-                return tuple(comments)
-            if len(values) < 100:
-                return tuple(comments)
-            page += 1
+                return tuple(
+                    comment
+                    for page_values in reversed(pages)
+                    for comment in page_values
+                )
+        return tuple(
+            comment for page_values in reversed(pages) for comment in page_values
+        )
 
     def _invoke_comment_api(
         self, arguments: Sequence[str], *, operation: str

@@ -628,6 +628,20 @@ def test_checkpoint_comment_listing_stops_at_a_complete_archive() -> None:
         arguments: list[str], **_kwargs: object
     ) -> subprocess.CompletedProcess[str]:
         commands.append(arguments)
+        if arguments[-1] == "repos/example/project/issues/42":
+            return subprocess.CompletedProcess(
+                arguments, 0, json.dumps({"comments": 150}), ""
+            )
+        page = int(arguments[-1].rsplit("page=", 1)[1])
+        if page == 1:
+            return subprocess.CompletedProcess(
+                arguments,
+                0,
+                json.dumps(
+                    [{"id": index, "body": "old checkpoint"} for index in range(1, 101)]
+                ),
+                "",
+            )
         return subprocess.CompletedProcess(
             arguments,
             0,
@@ -645,21 +659,26 @@ def test_checkpoint_comment_listing_stops_at_a_complete_archive() -> None:
     )
 
     assert len(comments) == len(archive_comments)
-    assert len(commands) == 1
-    assert "direction=desc" in commands[0][-1]
+    assert len(commands) == 2
+    assert commands[0][-1] == "repos/example/project/issues/42"
+    assert "page=2" in commands[1][-1]
 
 
 def test_checkpoint_comment_listing_reads_legacy_pages_without_an_archive() -> None:
     commands: list[list[str]] = []
     pages = [
         [{"id": index, "body": "legacy checkpoint"} for index in range(100)],
-        [{"id": 101, "body": "legacy checkpoint"}],
+        [{"id": 100, "body": "legacy checkpoint"}],
     ]
 
     def run(
         arguments: list[str], **_kwargs: object
     ) -> subprocess.CompletedProcess[str]:
         commands.append(arguments)
+        if arguments[-1] == "repos/example/project/issues/42":
+            return subprocess.CompletedProcess(
+                arguments, 0, json.dumps({"comments": 101}), ""
+            )
         page_number = int(arguments[-1].rsplit("page=", 1)[1])
         return subprocess.CompletedProcess(
             arguments, 0, json.dumps(pages[page_number - 1]), ""
@@ -670,7 +689,10 @@ def test_checkpoint_comment_listing_reads_legacy_pages_without_an_archive() -> N
     )
 
     assert len(comments) == 101
-    assert len(commands) == 2
+    assert [comment["id"] for comment in comments] == list(range(101))
+    assert len(commands) == 3
+    assert "page=2" in commands[1][-1]
+    assert "page=1" in commands[2][-1]
 
 
 def test_github_issue_client_closes_fulfilled_issue_with_completed_reason() -> None:

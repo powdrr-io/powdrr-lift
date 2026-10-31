@@ -6,6 +6,8 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
+from powdrr_service.structrr.obligation_evidence import ObligationEvidenceContract
+
 from powdrr_lift.core.behavior_contract import (
     BehaviorScenario,
     _worker_text,
@@ -14,7 +16,6 @@ from powdrr_lift.core.behavior_contract import (
     render_behavior_matrix,
 )
 from powdrr_lift.core.contract_closure import render_contract_closure
-from powdrr_lift.structrr.obligation_evidence import ObligationEvidenceContract
 
 
 @dataclass(frozen=True, slots=True)

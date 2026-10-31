@@ -20,6 +20,7 @@ from powdrr_service.structrr.active_intent import (
     ActiveIntentResolutionError,
     resolve_active_intent,
 )
+from powdrr_service.structrr.obligation_evidence import ObligationEvidenceContract
 from powdrr_service.structrr.snapshot import snapshot_digest
 
 from powdrr_lift.change_log_parser import parse_change_log
@@ -69,7 +70,6 @@ from powdrr_lift.structrr.gate_compiler import (
     compile_proposal_worklist,
     evaluate_structural_proposal_gate,
 )
-from powdrr_lift.structrr.obligation_evidence import ObligationEvidenceContract
 from powdrr_lift.structrr.proposal import (
     ProposalRevision,
     compile_proposal_revision,

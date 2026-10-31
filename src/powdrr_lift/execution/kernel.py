@@ -7,7 +7,8 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
 
-from powdrr_lift.core.action_relationship import BUILTIN_ACTION_RELATIONSHIPS
+from powdrr_service.action_relationship import BUILTIN_ACTION_RELATIONSHIPS
+
 from powdrr_lift.core.execution_state import (
     ExecutionEvent,
     ExecutionEventType,

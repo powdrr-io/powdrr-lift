@@ -1030,7 +1030,6 @@
     {
       "extraction_pr": "3/8",
       "internal_imports": [
-        "powdrr_lift.core.action_relationship",
         "powdrr_lift.core.architecture_specification",
         "powdrr_lift.core.behavior_rule",
         "powdrr_lift.core.blame_view",
@@ -1065,13 +1064,13 @@
       "reviewed": false
     },
     {
-      "extraction_pr": "3/8",
+      "extraction_pr": "1240",
       "internal_imports": [],
       "kind": "python_module",
-      "owner": "split",
-      "path": "src/powdrr_lift/core/action_relationship.py",
-      "rationale": "classify each symbol as service policy or public exchanged data",
-      "reviewed": false
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/action_relationship.py",
+      "rationale": "Service-owned semantic action relationship rules, obligation expansion, and cycle validation.",
+      "reviewed": true
     },
     {
       "extraction_pr": "3/8",
@@ -1747,7 +1746,7 @@
     {
       "extraction_pr": "3/7",
       "internal_imports": [
-        "powdrr_lift.core.action_relationship",
+        "powdrr_service.action_relationship",
         "powdrr_lift.core.execution_state",
         "powdrr_lift.execution.relationships"
       ],
@@ -1786,7 +1785,7 @@
     {
       "extraction_pr": "3/7",
       "internal_imports": [
-        "powdrr_lift.core.action_relationship",
+        "powdrr_service.action_relationship",
         "powdrr_lift.core.execution_state"
       ],
       "kind": "python_module",

@@ -34,8 +34,13 @@ files:
   rationale: Reflect direct use of service-owned research APIs.
 - path: docs/architecture/agent-service-module-ownership.json
   type: modified
-  span: {start_line: 2876, end_line: 2881}
-  summary: Assign HTTP retry policy to service and record this extraction.
+  span: {start_line: 2876, end_line: 2876}
+  summary: Record the extraction PR for HTTP retry policy.
+  rationale: Link the service ownership record to its implementation PR.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 2879, end_line: 2881}
+  summary: Assign the shared retry policy to service.
   rationale: Track the owner, module path, and bounded retry responsibility.
 - path: docs/architecture/agent-service-module-ownership.json
   type: modified
@@ -43,10 +48,10 @@ files:
   summary: Update the Jev classifier retry dependency.
   rationale: Keep shared service retry ownership accurate.
 - path: packages/service/src/powdrr_service/external_contract_research.py
-  type: modified
-  span: {start_line: 26, end_line: 26}
-  summary: Import retry behavior from service.
-  rationale: Keep the service implementation independent of the agent package.
+  type: added
+  span: {start_line: 1, end_line: 1309}
+  summary: Add the service-owned external research implementation.
+  rationale: Keep bounded retrieval, search caching, evidence extraction, and contract projection on the service side.
 - path: src/powdrr_lift/workrr/command_catalog.py
   type: modified
   span: {start_line: 21, end_line: 31}
@@ -54,7 +59,7 @@ files:
   rationale: Keep command execution on the owning package's API.
 - path: src/powdrr_lift/workrr/command_catalog.py
   type: modified
-  span: {start_line: 77, end_line: 77}
+  span: {start_line: 67, end_line: 77}
   summary: Remove the legacy agent research import.
   rationale: Eliminate the old module dependency.
 - path: src/powdrr_lift/workrr/feature_endpoint.py
@@ -64,7 +69,7 @@ files:
   rationale: Keep research policy in the owning package.
 - path: src/powdrr_lift/workrr/feature_endpoint.py
   type: modified
-  span: {start_line: 129, end_line: 129}
+  span: {start_line: 127, end_line: 129}
   summary: Remove the legacy agent research import.
   rationale: Eliminate the obsolete local module path.
 - path: src/powdrr_lift/workrr/jev_classifier.py
@@ -74,27 +79,32 @@ files:
   rationale: Share one bounded retry implementation across service HTTP calls.
 - path: tests/test_external_contract_research.py
   type: modified
-  span: {start_line: 9, end_line: 10}
+  span: {start_line: 9, end_line: 9}
   summary: Import external research tests from the service module.
   rationale: Exercise the authoritative implementation.
 - path: tests/test_external_contract_research.py
   type: modified
-  span: {start_line: 11, end_line: 23}
+  span: {start_line: 11, end_line: 11}
   summary: Use service-owned external research APIs in tests.
   rationale: Keep the tests aligned with the package boundary.
 - path: tests/test_external_contract_research.py
   type: modified
-  span: {start_line: 31, end_line: 37}
+  span: {start_line: 23, end_line: 24}
+  summary: Keep local command catalog imports grouped separately.
+  rationale: Make the service and agent test dependencies explicit.
+- path: tests/test_external_contract_research.py
+  type: modified
+  span: {start_line: 31, end_line: 39}
   summary: Assert the old external research module path is absent.
   rationale: Prevent a compatibility module from reappearing.
 - path: tests/test_http_retry.py
   type: modified
-  span: {start_line: 7, end_line: 8}
+  span: {start_line: 7, end_line: 7}
   summary: Import the service-owned retry utility in tests.
   rationale: Exercise retry behavior through the owning package.
 - path: tests/test_http_retry.py
   type: modified
-  span: {start_line: 10, end_line: 14}
+  span: {start_line: 9, end_line: 13}
   summary: Assert the old HTTP retry module path is absent.
   rationale: Protect the service ownership boundary.
 entities: []

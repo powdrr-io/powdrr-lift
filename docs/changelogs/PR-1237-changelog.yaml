@@ -1,0 +1,53 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1237
+title: Move bounded obligation review policy into service
+intent:
+  problem: Obligation review packets, result binding, and targeted repair rules still lived in the legacy agent package.
+  goal: Move this deterministic review policy into service and update workflow composition to call the service module directly.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 1339, end_line: 1339}
+  summary: Record the extraction PR for bounded obligation review.
+  rationale: Link the service ownership record to the PR that establishes it.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 1342, end_line: 1345}
+  summary: Assign bounded obligation review policy to service.
+  rationale: Document service ownership of packet compilation, result binding, and repair scoping.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 2777, end_line: 2777}
+  summary: Record the service dependency for feature orchestration.
+  rationale: Reflect direct use of the service-owned review APIs.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span: {start_line: 24, end_line: 31}
+  summary: Import bounded review APIs from service.
+  rationale: Keep policy and result validation in service while the endpoint orchestrates workflow.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span: {start_line: 47, end_line: 54}
+  summary: Remove the legacy obligation review import.
+  rationale: Eliminate the obsolete agent-side module dependency.
+- path: tests/test_obligation_review.py
+  type: modified
+  span: {start_line: 3, end_line: 3}
+  summary: Import module lookup for the removed-path regression test.
+  rationale: Verify the legacy module does not remain as a compatibility shim.
+- path: tests/test_obligation_review.py
+  type: modified
+  span: {start_line: 5, end_line: 6}
+  summary: Import review APIs from service.
+  rationale: Exercise the owning package directly.
+- path: tests/test_obligation_review.py
+  type: modified
+  span: {start_line: 16, end_line: 19}
+  summary: Assert the legacy agent obligation review module is absent.
+  rationale: Protect the service ownership boundary.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []

@@ -275,6 +275,45 @@ def test_structural_subject_answer_is_reasked_when_projected_context_changes() -
     assert machine._request_is_pending(requests[0], {question_id: stale_answer})
 
 
+def test_subject_enumeration_uses_unique_refs_for_repeated_planned_write_paths() -> (
+    None
+):
+    text = "# Plan\n\nImplement the requested behavior.\n"
+    source = segment_markdown_source(
+        PinnedSourceDocument(
+            repository="owner/repo",
+            commit_sha="a" * 40,
+            path="docs/plan.md",
+            blob_sha="b" * 40,
+            content_sha256=hashlib.sha256(text.encode()).hexdigest(),
+            text=text,
+        )
+    )
+    source_ref = source.anchors[0].id
+    repeated_write = PlannedWrite(
+        "src/new.py", "implementation", "python", (source_ref,), ()
+    )
+    unit = _unit(writes=(repeated_write, repeated_write))
+
+    request = build_subject_enumeration_request(
+        plan_id="plan-01",
+        item_id="item-0001",
+        units=(unit,),
+        source=source,
+        source_refs=(source_ref,),
+        projected_baseline={"entities": [], "entity_relationships": [], "files": []},
+    )
+
+    request.validate()
+    assert (
+        request.question.context_ref_ids.count(f"planned-write:{unit.id}:src/new.py")
+        == 1
+    )
+    assert f"planned-write:{unit.id}:src/new.py:duplicate-2" in (
+        request.question.context_ref_ids
+    )
+
+
 def test_explicit_human_setup_requirement_becomes_an_item_prerequisite() -> None:
     text = "# Plan\n\nA maintainer must install the signed provider.\n"
     source = segment_markdown_source(

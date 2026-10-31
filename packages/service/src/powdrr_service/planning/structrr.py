@@ -462,14 +462,22 @@ def build_subject_enumeration_request(
 ) -> QuestionRequest[StructuralSubjectPage]:
     unit_ids = {unit.id for unit in units}
     requirement_ids = {req for unit in units for req in unit.requirement_ids}
-    path_refs = tuple(
-        ContextRecord(
-            f"planned-write:{unit.id}:{write.path}",
-            {"unit_id": unit.id, **write.to_data()},
-        )
-        for unit in units
-        for write in unit.planned_writes
-    )
+    path_refs_list: list[ContextRecord] = []
+    path_ref_counts: dict[str, int] = {}
+    for unit in units:
+        for write in unit.planned_writes:
+            base_ref_id = f"planned-write:{unit.id}:{write.path}"
+            occurrence = path_ref_counts.get(base_ref_id, 0) + 1
+            path_ref_counts[base_ref_id] = occurrence
+            ref_id = (
+                base_ref_id
+                if occurrence == 1
+                else f"{base_ref_id}:duplicate-{occurrence}"
+            )
+            path_refs_list.append(
+                ContextRecord(ref_id, {"unit_id": unit.id, **write.to_data()})
+            )
+    path_refs = tuple(path_refs_list)
     excerpt_map = _source_excerpts(source, source_refs)
     unit_facts = tuple(
         ContextRecord(f"unit:{unit.id}", unit.to_data()) for unit in units

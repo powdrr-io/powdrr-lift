@@ -12,7 +12,7 @@ from typing import Any, cast
 
 import pytest
 
-from powdrr_lift.workrr.provider_config import DEEPINFRA_CHEAP_MODEL
+from powdrr_service.providers.config import DEEPINFRA_CHEAP_MODEL
 from powdrr_lift.workrr.procedrr import StructuredToolExecutor
 from powdrr_lift.workrr.task_agent import _normalize_execute_pr_coding_attempt
 from procedrr_evaluator import EvaluationError, Evaluator

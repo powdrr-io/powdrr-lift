@@ -12,9 +12,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TextIO
 
+from powdrr_service.providers.config import LLMModelLimits
+
 from powdrr_lift.workrr.exchanges import ExchangeRecordingClient
 from powdrr_lift.workrr.llm import WorkflowLLMClient, complete_json
-from powdrr_lift.workrr.provider_config import LLMModelLimits
 from powdrr_lift.workrr.providers import (
     ProviderCredentials,
     build_workflow_client,

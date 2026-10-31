@@ -6,7 +6,9 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Literal
 
-from powdrr_lift.errors import PowdrrExecutionError
+
+class ProviderConfigurationError(RuntimeError):
+    """Provider configuration is invalid or names an unsupported provider."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -238,7 +240,9 @@ def provider_definition(provider: str) -> LLMProviderDefinition:
     try:
         return LLM_PROVIDERS[provider]
     except KeyError as exc:
-        raise PowdrrExecutionError(f"Unsupported LLM provider {provider!r}.") from exc
+        raise ProviderConfigurationError(
+            f"Unsupported LLM provider {provider!r}."
+        ) from exc
 
 
 def default_llm_mappings(provider: str) -> Mapping[str, LLMModelMapping]:

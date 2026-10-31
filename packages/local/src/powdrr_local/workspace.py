@@ -23,6 +23,7 @@ from powdrr_contracts.workspace import (
     EventType,
     Job,
     JobKind,
+    JobOperation,
     JobState,
     Message,
     MessageRole,
@@ -147,7 +148,18 @@ CREATE UNIQUE INDEX one_active_turn_per_conversation ON turns(conversation_id)
 WHERE state IN ('accepted','running','waiting_for_input');
 CREATE UNIQUE INDEX one_unresolved_question_per_turn ON questions(turn_id)
 WHERE state IN ('open','answered');
-PRAGMA user_version = 5;
+CREATE TABLE job_operations (
+    operation_id TEXT PRIMARY KEY,
+    job_id TEXT NOT NULL REFERENCES jobs(job_id),
+    run_id TEXT NOT NULL, attempt_id TEXT NOT NULL,
+    workflow_directory TEXT NOT NULL, checkpoint_ref TEXT NOT NULL,
+    source_spec_revision TEXT, source_refs TEXT NOT NULL,
+    job_inputs TEXT NOT NULL, provider_config_refs TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE(job_id, attempt_id), UNIQUE(run_id, attempt_id)
+);
+CREATE INDEX job_operation_history ON job_operations(job_id, created_at);
+PRAGMA user_version = 6;
 """
 
 _REPOSITORY_TABLE = (
@@ -179,6 +191,17 @@ _TURN_TABLES = (
     "WHERE state IN ('open','answered')",
 )
 
+_JOB_OPERATION_TABLES = (
+    "CREATE TABLE job_operations ("
+    "operation_id TEXT PRIMARY KEY, job_id TEXT NOT NULL REFERENCES jobs(job_id), "
+    "run_id TEXT NOT NULL, attempt_id TEXT NOT NULL, "
+    "workflow_directory TEXT NOT NULL, checkpoint_ref TEXT NOT NULL, "
+    "source_spec_revision TEXT, source_refs TEXT NOT NULL, job_inputs TEXT NOT NULL, "
+    "provider_config_refs TEXT NOT NULL, created_at TEXT NOT NULL, "
+    "UNIQUE(job_id, attempt_id), UNIQUE(run_id, attempt_id))",
+    "CREATE INDEX job_operation_history ON job_operations(job_id, created_at)",
+)
+
 
 def _required(value: str, name: str) -> str:
     if not isinstance(value, str) or not value.strip():
@@ -202,6 +225,50 @@ def _validate_json_value(value: Any) -> None:
         json.dumps(value, allow_nan=False)
     except (TypeError, ValueError) as error:
         raise ValueError("Value must contain finite JSON data") from error
+
+
+_SECRET_INPUT_KEYS = {
+    "apikey",
+    "apitoken",
+    "accesstoken",
+    "refreshtoken",
+    "token",
+    "secret",
+    "password",
+    "credential",
+    "authorization",
+    "privatekey",
+}
+
+
+def _reject_secret_input_fields(value: Any, path: str = "job_inputs") -> None:
+    if isinstance(value, dict):
+        for key, child in value.items():
+            if not isinstance(key, str):
+                raise ValueError(f"{path} keys must be strings")
+            normalized = "".join(
+                character for character in key.lower() if character.isalnum()
+            )
+            if (
+                normalized in _SECRET_INPUT_KEYS
+                or any(
+                    marker in normalized
+                    for marker in (
+                        "apikey",
+                        "secret",
+                        "password",
+                        "credential",
+                        "authorization",
+                        "privatekey",
+                    )
+                )
+                or normalized.endswith("token")
+            ):
+                raise ValueError(f"{path} must not contain secret field {key!r}")
+            _reject_secret_input_fields(child, f"{path}.{key}")
+    elif isinstance(value, list):
+        for index, child in enumerate(value):
+            _reject_secret_input_fields(child, f"{path}[{index}]")
 
 
 class WorkspaceStore:
@@ -253,7 +320,7 @@ class WorkspaceStore:
                 if db.execute("PRAGMA user_version").fetchone()[0] == 3:
                     db.execute(_REPOSITORY_TABLE)
                     db.execute("PRAGMA user_version = 4")
-            elif version not in {4, 5}:
+            elif version not in {4, 5, 6}:
                 raise ValueError(f"Unsupported workspace schema version: {version}")
             current_version = db.execute("PRAGMA user_version").fetchone()[0]
             if current_version == 4:
@@ -263,7 +330,19 @@ class WorkspaceStore:
                     for statement in _TURN_TABLES:
                         db.execute(statement)
                     db.execute("PRAGMA user_version = 5")
-            elif current_version != 5:
+            elif current_version not in {5, 6}:
+                raise ValueError(
+                    f"Unsupported workspace schema version: {current_version}"
+                )
+            current_version = db.execute("PRAGMA user_version").fetchone()[0]
+            if current_version == 5:
+                if not db.in_transaction:
+                    db.execute("BEGIN IMMEDIATE")
+                if db.execute("PRAGMA user_version").fetchone()[0] == 5:
+                    for statement in _JOB_OPERATION_TABLES:
+                        db.execute(statement)
+                    db.execute("PRAGMA user_version = 6")
+            elif current_version != 6:
                 raise ValueError(
                     f"Unsupported workspace schema version: {current_version}"
                 )
@@ -1509,6 +1588,221 @@ class WorkspaceStore:
             row["created_at"],
             row["updated_at"],
         )
+
+    @staticmethod
+    def _operation(db: sqlite3.Connection, operation_id: str) -> JobOperation:
+        row = db.execute(
+            "SELECT * FROM job_operations WHERE operation_id=?", (operation_id,)
+        ).fetchone()
+        if row is None:
+            raise KeyError("Job operation does not exist")
+        return JobOperation(
+            row["operation_id"],
+            row["job_id"],
+            row["run_id"],
+            row["attempt_id"],
+            row["workflow_directory"],
+            row["checkpoint_ref"],
+            row["source_spec_revision"],
+            tuple(json.loads(row["source_refs"])),
+            json.loads(row["job_inputs"]),
+            tuple(json.loads(row["provider_config_refs"])),
+            row["created_at"],
+        )
+
+    def start_job_operation(
+        self,
+        job_id: str,
+        *,
+        expected_revision: int,
+        run_id: str,
+        attempt_id: str,
+        workflow_directory: str | Path,
+        checkpoint_ref: str,
+        job_inputs: dict[str, Any],
+        source_refs: Sequence[str],
+        provider_config_refs: Sequence[str] = (),
+        source_spec_revision: str | None = None,
+        request_id: str | None = None,
+    ) -> JobOperation:
+        """Durably bind pinned inputs and attempt identity before dispatch."""
+        for value, name in (
+            (run_id, "run_id"),
+            (attempt_id, "attempt_id"),
+            (checkpoint_ref, "checkpoint_ref"),
+        ):
+            _required(value, name)
+        if not isinstance(job_inputs, dict):
+            raise ValueError("job_inputs must be an object")
+        _validate_json_value(job_inputs)
+        _reject_secret_input_fields(job_inputs)
+        refs = tuple(dict.fromkeys(_required(ref, "source_ref") for ref in source_refs))
+        if not refs:
+            raise ValueError("At least one immutable source reference is required")
+        provider_refs = tuple(
+            dict.fromkeys(
+                _required(ref, "provider_config_ref") for ref in provider_config_refs
+            )
+        )
+        if not provider_refs:
+            raise ValueError(
+                "At least one provider configuration reference is required"
+            )
+        try:
+            workdir = str(Path(workflow_directory).expanduser().resolve())
+        except (OSError, RuntimeError) as error:
+            raise ValueError("workflow_directory cannot be resolved") from error
+        _required(workdir, "workflow_directory")
+        if source_spec_revision is not None:
+            _required(source_spec_revision, "source_spec_revision")
+
+        command = {
+            "operation": "job.start_operation",
+            "job_id": job_id,
+            "expected_revision": expected_revision,
+            "run_id": run_id,
+            "attempt_id": attempt_id,
+            "workflow_directory": workdir,
+            "checkpoint_ref": checkpoint_ref,
+            "job_inputs": job_inputs,
+            "source_refs": list(refs),
+            "provider_config_refs": list(provider_refs),
+            "source_spec_revision": source_spec_revision,
+        }
+        with self._connection() as db:
+            db.execute("BEGIN IMMEDIATE")
+            job = self._job(db, job_id)
+            replay = self._replay_request(
+                db, job.repository_id, request_id, command, "job_operation"
+            )
+            if replay is not None:
+                return JobOperation.from_dict(replay)
+            if job.revision != expected_revision:
+                raise WorkspaceConflict("Job revision has changed")
+            if job.state != JobState.READY:
+                raise WorkspaceConflict("Only a ready job can start a new operation")
+            if any(
+                self._job(db, dependency).state != JobState.SUCCEEDED
+                for dependency in job.dependency_ids
+            ):
+                raise ValueError("Job dependencies are incomplete")
+            if job.kind == JobKind.PLANNING:
+                pinned_spec_ref = job_inputs.get("pinned_spec_ref")
+                if not isinstance(pinned_spec_ref, str) or not pinned_spec_ref.strip():
+                    raise ValueError("Planning inputs require pinned_spec_ref")
+                if pinned_spec_ref not in refs or source_spec_revision is None:
+                    raise ValueError(
+                        "Planning operations require the pinned spec and its revision"
+                    )
+            elif job.kind == JobKind.PR_EXECUTION:
+                approved_ref = job_inputs.get("approved_change_ref")
+                if not isinstance(approved_ref, str) or not approved_ref.strip():
+                    raise ValueError("PR execution inputs require approved_change_ref")
+                if approved_ref not in refs:
+                    raise ValueError("Approved change must be included in source_refs")
+            if (
+                db.execute(
+                    "SELECT 1 FROM job_operations WHERE job_id=? AND attempt_id=?",
+                    (job_id, attempt_id),
+                ).fetchone()
+                is not None
+                or db.execute(
+                    "SELECT 1 FROM job_operations WHERE run_id=? AND attempt_id=?",
+                    (run_id, attempt_id),
+                ).fetchone()
+                is not None
+            ):
+                raise WorkspaceConflict("Run attempt already has an operation binding")
+
+            timestamp = _now()
+            operation_id = uuid4().hex
+            db.execute(
+                "INSERT INTO job_operations VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                (
+                    operation_id,
+                    job_id,
+                    run_id,
+                    attempt_id,
+                    workdir,
+                    checkpoint_ref,
+                    source_spec_revision,
+                    json.dumps(refs),
+                    json.dumps(job_inputs, sort_keys=True, allow_nan=False),
+                    json.dumps(provider_refs),
+                    timestamp,
+                ),
+            )
+            next_revision = job.revision + 1
+            db.execute(
+                "UPDATE jobs SET state=?,detail=?,revision=?,updated_at=? "
+                "WHERE job_id=?",
+                (
+                    JobState.RUNNING.value,
+                    f"Run {run_id}, attempt {attempt_id}",
+                    next_revision,
+                    timestamp,
+                    job_id,
+                ),
+            )
+            self._event(
+                db,
+                job.repository_id,
+                "job_operation",
+                operation_id,
+                EventType.JOB_OPERATION_BOUND,
+                {
+                    "job_id": job_id,
+                    "run_id": run_id,
+                    "attempt_id": attempt_id,
+                    "revision": next_revision,
+                },
+                timestamp,
+            )
+            self._event(
+                db,
+                job.repository_id,
+                "job",
+                job_id,
+                EventType.JOB_UPDATED,
+                {
+                    "state": JobState.RUNNING.value,
+                    "detail": f"Run {run_id}, attempt {attempt_id}",
+                    "revision": next_revision,
+                    "operation_id": operation_id,
+                },
+                timestamp,
+            )
+            result = self._operation(db, operation_id)
+            self._record_request(
+                db,
+                job.repository_id,
+                request_id,
+                command,
+                "job_operation",
+                result.to_dict(),
+                timestamp,
+            )
+            return result
+
+    def get_job_operation(self, job_id: str, attempt_id: str) -> JobOperation:
+        with self._connection() as db:
+            row = db.execute(
+                "SELECT operation_id FROM job_operations "
+                "WHERE job_id=? AND attempt_id=?",
+                (job_id, attempt_id),
+            ).fetchone()
+            if row is None:
+                raise KeyError("Job operation does not exist")
+            return self._operation(db, row["operation_id"])
+
+    def list_job_operations(self, job_id: str) -> tuple[JobOperation, ...]:
+        with self._connection() as db:
+            rows = db.execute(
+                "SELECT operation_id FROM job_operations WHERE job_id=? "
+                "ORDER BY created_at,attempt_id",
+                (job_id,),
+            ).fetchall()
+            return tuple(self._operation(db, row["operation_id"]) for row in rows)
 
     def create_job(
         self,

@@ -9,6 +9,7 @@ from powdrr_contracts.workspace import (
     Conversation,
     EventType,
     Job,
+    JobOperation,
     JobState,
     Message,
     MessageRole,
@@ -254,7 +255,7 @@ def test_version_one_database_migrates_without_changing_existing_records(
     with sqlite3.connect(path) as db:
         version = db.execute("PRAGMA user_version").fetchone()[0]
         sequence = db.execute("SELECT sequence FROM events").fetchone()[0]
-    assert version == 5
+    assert version == 6
     assert sequence == 7
     assert conversation.revision == 1
     assert conversation.specification_refs == ("docs/old.yaml",)
@@ -452,7 +453,7 @@ def test_schema_v3_migrates_to_durable_turns(tmp_path: Path) -> None:
             row[0]
             for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")
         }
-    assert version == 5
+    assert version == 6
     assert "repositories" in tables
     assert "turns" in tables
     assert "questions" in tables
@@ -607,3 +608,128 @@ def test_question_answers_validate_and_recover_until_delivered(
     )
     assert finished.state == TurnState.SUCCEEDED
     assert finished.final_message_id == assistant_message.message_id
+
+
+def test_start_job_operation_persists_inputs_before_marking_job_running(
+    tmp_path: Path,
+) -> None:
+    store = WorkspaceStore(tmp_path / "workspace.db")
+    job = store.create_job("repo", kind="planning", title="Plan search")
+    workdir = tmp_path / "feature worktree"
+    operation = store.start_job_operation(
+        job.job_id,
+        expected_revision=job.revision,
+        run_id="run-plan-1",
+        attempt_id="attempt-plan-1",
+        workflow_directory=workdir,
+        checkpoint_ref="checkpoint:planning/run-plan-1",
+        job_inputs={"pinned_spec_ref": "spec:search-v2", "include_tests": True},
+        source_refs=["spec:search-v2"],
+        source_spec_revision="revision-7",
+        provider_config_refs=["provider:deepinfra-flash"],
+        request_id="start-plan",
+    )
+    assert store.get_job(job.job_id).state == JobState.RUNNING
+    assert operation.workflow_directory == str(workdir.resolve())
+    assert operation.source_spec_revision == "revision-7"
+    assert operation.source_refs == ("spec:search-v2",)
+    assert JobOperation.from_dict(operation.to_dict()) == operation
+    assert store.get_job_operation(job.job_id, "attempt-plan-1") == operation
+    assert store.list_job_operations(job.job_id) == (operation,)
+    assert (
+        store.start_job_operation(
+            job.job_id,
+            expected_revision=job.revision,
+            run_id="run-plan-1",
+            attempt_id="attempt-plan-1",
+            workflow_directory=workdir,
+            checkpoint_ref="checkpoint:planning/run-plan-1",
+            job_inputs={"pinned_spec_ref": "spec:search-v2", "include_tests": True},
+            source_refs=["spec:search-v2"],
+            source_spec_revision="revision-7",
+            provider_config_refs=["provider:deepinfra-flash"],
+            request_id="start-plan",
+        )
+        == operation
+    )
+    with pytest.raises(WorkspaceConflict, match="different content"):
+        store.start_job_operation(
+            job.job_id,
+            expected_revision=job.revision,
+            run_id="run-plan-1",
+            attempt_id="attempt-plan-1",
+            workflow_directory=workdir,
+            checkpoint_ref="checkpoint:planning/run-plan-1",
+            job_inputs={"pinned_spec_ref": "spec:search-v3"},
+            source_refs=["spec:search-v3"],
+            source_spec_revision="revision-8",
+            provider_config_refs=["provider:deepinfra-flash"],
+            request_id="start-plan",
+        )
+
+
+def test_operation_binding_rejects_secret_fields_and_unpinned_execution(
+    tmp_path: Path,
+) -> None:
+    store = WorkspaceStore(tmp_path / "workspace.db")
+    planning = store.create_job("repo", kind="planning", title="Plan")
+    with pytest.raises(ValueError, match="secret field"):
+        store.start_job_operation(
+            planning.job_id,
+            expected_revision=planning.revision,
+            run_id="run-1",
+            attempt_id="attempt-1",
+            workflow_directory=tmp_path / "worktree",
+            checkpoint_ref="checkpoint:1",
+            job_inputs={
+                "pinned_spec_ref": "spec:1",
+                "openai_api_key": "never-persist-this",
+            },
+            source_refs=["spec:1"],
+            source_spec_revision="revision-1",
+        )
+    assert store.get_job(planning.job_id).state == JobState.READY
+    assert store.list_job_operations(planning.job_id) == ()
+
+    execution = store.create_job("repo", kind="pr_execution", title="Implement")
+    with pytest.raises(ValueError, match="approved_change_ref"):
+        store.start_job_operation(
+            execution.job_id,
+            expected_revision=execution.revision,
+            run_id="run-2",
+            attempt_id="attempt-2",
+            workflow_directory=tmp_path / "worktree",
+            checkpoint_ref="checkpoint:2",
+            job_inputs={"issue_id": 41},
+            source_refs=["issue:41"],
+            provider_config_refs=["provider:deepinfra-flash"],
+        )
+    assert store.get_job(execution.job_id).state == JobState.READY
+    approved_operation = store.start_job_operation(
+        execution.job_id,
+        expected_revision=execution.revision,
+        run_id="run-2",
+        attempt_id="attempt-3",
+        workflow_directory=tmp_path / "worktree",
+        checkpoint_ref="checkpoint:2",
+        job_inputs={"approved_change_ref": "proposal:search-part-1"},
+        source_refs=["proposal:search-part-1"],
+        provider_config_refs=["provider:deepinfra-flash"],
+    )
+    assert approved_operation.source_refs == ("proposal:search-part-1",)
+    assert store.get_job(execution.job_id).state == JobState.RUNNING
+
+
+def test_schema_v5_migrates_to_job_operation_bindings(tmp_path: Path) -> None:
+    path = tmp_path / "workspace-v5.db"
+    with sqlite3.connect(path) as db:
+        db.execute("PRAGMA user_version = 5")
+    WorkspaceStore(path)
+    with sqlite3.connect(path) as db:
+        version = db.execute("PRAGMA user_version").fetchone()[0]
+        tables = {
+            row[0]
+            for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        }
+    assert version == 6
+    assert "job_operations" in tables

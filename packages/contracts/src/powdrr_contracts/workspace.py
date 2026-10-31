@@ -63,6 +63,7 @@ class EventType(StrEnum):
     TURN_UPDATED = "turn.updated"
     QUESTION_CREATED = "question.created"
     QUESTION_UPDATED = "question.updated"
+    JOB_OPERATION_BOUND = "job.operation_bound"
 
 
 _SCHEMA_VERSION = 1
@@ -554,4 +555,73 @@ class WorkspaceQuestion:
             revision,
             _validate_text(data["created_at"], "created_at"),
             _validate_text(data["updated_at"], "updated_at"),
+        )
+
+
+@dataclass(frozen=True)
+class JobOperation:
+    operation_id: str
+    job_id: str
+    run_id: str
+    attempt_id: str
+    workflow_directory: str
+    checkpoint_ref: str
+    source_spec_revision: str | None
+    source_refs: tuple[str, ...]
+    job_inputs: dict[str, Any]
+    provider_config_refs: tuple[str, ...]
+    created_at: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": _SCHEMA_VERSION,
+            "operation_id": self.operation_id,
+            "job_id": self.job_id,
+            "run_id": self.run_id,
+            "attempt_id": self.attempt_id,
+            "workflow_directory": self.workflow_directory,
+            "checkpoint_ref": self.checkpoint_ref,
+            "source_spec_revision": self.source_spec_revision,
+            "source_refs": list(self.source_refs),
+            "job_inputs": self.job_inputs,
+            "provider_config_refs": list(self.provider_config_refs),
+            "created_at": self.created_at,
+        }
+
+    @classmethod
+    def from_dict(cls, value: Any) -> Self:
+        data = _record(
+            value,
+            {
+                "operation_id",
+                "job_id",
+                "run_id",
+                "attempt_id",
+                "workflow_directory",
+                "checkpoint_ref",
+                "source_spec_revision",
+                "source_refs",
+                "job_inputs",
+                "provider_config_refs",
+                "created_at",
+            },
+            "job operation",
+        )
+        if not isinstance(data["job_inputs"], dict):
+            raise WorkspaceContractError("job_inputs must be an object")
+        revision = data["source_spec_revision"]
+        return cls(
+            _validate_id(data["operation_id"], "operation_id"),
+            _validate_id(data["job_id"], "job_id"),
+            _validate_id(data["run_id"], "run_id"),
+            _validate_id(data["attempt_id"], "attempt_id"),
+            _validate_text(data["workflow_directory"], "workflow_directory"),
+            _validate_text(data["checkpoint_ref"], "checkpoint_ref"),
+            None
+            if revision is None
+            else _validate_text(revision, "source_spec_revision"),
+            _tuple_of_text(data["source_refs"], "source_refs"),
+            data["job_inputs"],
+            _tuple_of_text(data["provider_config_refs"], "provider_config_refs"),
+            _validate_text(data["created_at"], "created_at"),
         )

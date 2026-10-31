@@ -24,6 +24,7 @@ from powdrr_contracts.workspace import (
     EventType,
     Job,
     JobAction,
+    JobActionIntentState,
     JobAttemptSummary,
     JobBlocker,
     JobKind,
@@ -37,6 +38,7 @@ from powdrr_contracts.workspace import (
     WorkerOwnership,
     WorkerState,
     WorkspaceEvent,
+    WorkspaceJobActionIntent,
     WorkspaceJobDetail,
     WorkspaceQuestion,
     WorkspaceRepository,
@@ -3121,6 +3123,34 @@ class WorkspaceStore:
                 timestamp,
             )
             return result
+
+    def list_pending_job_actions(
+        self, repository_id: str, *, limit: int = 100
+    ) -> tuple[WorkspaceJobActionIntent, ...]:
+        """Read bounded durable action intents for the owning supervisor."""
+        _required(repository_id, "repository_id")
+        if not 1 <= limit <= 1000:
+            raise ValueError("limit must be between 1 and 1000")
+        with self._connection() as db:
+            rows = db.execute(
+                "SELECT * FROM job_action_intents WHERE repository_id=? "
+                "AND state=? ORDER BY created_at,action_id LIMIT ?",
+                (repository_id, JobActionIntentState.PENDING.value, limit),
+            ).fetchall()
+            return tuple(
+                WorkspaceJobActionIntent(
+                    action_id=row["action_id"],
+                    repository_id=row["repository_id"],
+                    job_id=row["job_id"],
+                    action=JobAction(row["action"]),
+                    state=JobActionIntentState(row["state"]),
+                    expected_revision=row["expected_revision"],
+                    request_id=row["request_id"],
+                    created_at=row["created_at"],
+                    updated_at=row["updated_at"],
+                )
+                for row in rows
+            )
 
     def read_job_detail(self, repository_id: str, job_id: str) -> WorkspaceJobDetail:
         """Read one bounded, repository-scoped job detail projection atomically."""

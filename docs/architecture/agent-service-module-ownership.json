@@ -1045,7 +1045,6 @@
         "powdrr_lift.core.feature_planning_specification",
         "powdrr_lift.core.implementation_specification",
         "powdrr_lift.core.index",
-        "powdrr_lift.core.intent_packet",
         "powdrr_lift.core.plan_diff_specification",
         "powdrr_lift.core.pr_analysis",
         "powdrr_lift.core.pr_specification",
@@ -1326,13 +1325,13 @@
       "reviewed": false
     },
     {
-      "extraction_pr": "3/8",
+      "extraction_pr": "1242",
       "internal_imports": [],
       "kind": "python_module",
-      "owner": "split",
-      "path": "src/powdrr_lift/core/intent_packet.py",
-      "rationale": "classify each symbol as service policy or public exchanged data",
-      "reviewed": false
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/intent_packet.py",
+      "rationale": "Service-owned operation-scoped intent packet schema, fingerprinting, and coding context renderer.",
+      "reviewed": true
     },
     {
       "extraction_pr": "1237",
@@ -2540,7 +2539,7 @@
         "powdrr_lift.core.behavior_contract",
         "powdrr_lift.core.execution_plan",
         "powdrr_lift.core.implementation_packet",
-        "powdrr_lift.core.intent_packet",
+        "powdrr_service.intent_packet",
         "powdrr_lift.minisweagent_monitor",
         "powdrr_lift.opencode_monitor",
         "powdrr_lift.workrr.coding_agent_validation"

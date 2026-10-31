@@ -439,7 +439,7 @@ def compile_structrr_plan(
     ):
         raise StructrrPlanningError("item_order must place every dependency first")
     ordered_items = [item_by_id[item_id] for item_id in item_order]
-    _reject_unordered_subject_conflicts(operations, dependency_map)
+    reject_unordered_subject_conflicts(operations, dependency_map)
     return compile_multi_pr_proposal(
         plan_id=plan_id,
         baseline_snapshot=baseline_snapshot,
@@ -1290,7 +1290,7 @@ def _source_excerpts(
     return tuple(result)
 
 
-def _reject_unordered_subject_conflicts(
+def reject_unordered_subject_conflicts(
     operations: Sequence[Mapping[str, Any]], dependencies: Mapping[str, set[str]]
 ) -> None:
     by_subject: dict[tuple[str, str], list[Mapping[str, Any]]] = {}
@@ -1462,4 +1462,5 @@ __all__ = [
     "compile_structrr_plan",
     "parse_structural_change",
     "parse_structural_subject_page",
+    "reject_unordered_subject_conflicts",
 ]

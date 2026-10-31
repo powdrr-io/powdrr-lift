@@ -1,12 +1,14 @@
 import sqlite3
 import subprocess
 from concurrent.futures import ThreadPoolExecutor
+from datetime import UTC, datetime, timedelta
 from math import nan
 from pathlib import Path
 
 import pytest
 from powdrr_contracts.workspace import (
     Conversation,
+    DispatchIntent,
     EventType,
     Job,
     JobOperation,
@@ -14,7 +16,10 @@ from powdrr_contracts.workspace import (
     Message,
     MessageRole,
     QuestionState,
+    SupervisorLease,
     TurnState,
+    WorkerOwnership,
+    WorkerState,
     WorkspaceContractError,
     WorkspaceEvent,
     WorkspaceQuestion,
@@ -255,7 +260,7 @@ def test_version_one_database_migrates_without_changing_existing_records(
     with sqlite3.connect(path) as db:
         version = db.execute("PRAGMA user_version").fetchone()[0]
         sequence = db.execute("SELECT sequence FROM events").fetchone()[0]
-    assert version == 6
+    assert version == 7
     assert sequence == 7
     assert conversation.revision == 1
     assert conversation.specification_refs == ("docs/old.yaml",)
@@ -453,7 +458,7 @@ def test_schema_v3_migrates_to_durable_turns(tmp_path: Path) -> None:
             row[0]
             for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")
         }
-    assert version == 6
+    assert version == 7
     assert "repositories" in tables
     assert "turns" in tables
     assert "questions" in tables
@@ -731,5 +736,272 @@ def test_schema_v5_migrates_to_job_operation_bindings(tmp_path: Path) -> None:
             row[0]
             for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")
         }
-    assert version == 6
+    assert version == 7
     assert "job_operations" in tables
+
+
+def test_schema_v6_migrates_to_supervisor_and_worker_ownership(tmp_path: Path) -> None:
+    path = tmp_path / "workspace-v6.db"
+    with sqlite3.connect(path) as db:
+        db.execute("PRAGMA user_version = 6")
+    WorkspaceStore(path)
+    with sqlite3.connect(path) as db:
+        version = db.execute("PRAGMA user_version").fetchone()[0]
+        tables = {
+            row[0]
+            for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        }
+    assert version == 7
+    assert "supervisor_lease" in tables
+    assert "worker_ownership" in tables
+
+
+def test_supervisor_lease_excludes_second_launcher_and_fences_old_generation(
+    tmp_path: Path,
+) -> None:
+    store = WorkspaceStore(tmp_path / "workspace.db")
+    instant = datetime(2026, 10, 31, tzinfo=UTC)
+    first = store.acquire_supervisor_lease(
+        "supervisor-a",
+        process_id=100,
+        process_started_at="process-start-a",
+        lease_seconds=30,
+        now=instant,
+    )
+    assert first.generation == 1
+    with pytest.raises(WorkspaceConflict, match="Another supervisor"):
+        store.acquire_supervisor_lease(
+            "supervisor-b",
+            process_id=200,
+            process_started_at="process-start-b",
+            now=instant + timedelta(seconds=1),
+        )
+    renewed = store.renew_supervisor_lease(
+        first.supervisor_id,
+        first.generation,
+        lease_seconds=30,
+        now=instant + timedelta(seconds=10),
+    )
+    assert renewed.generation == first.generation
+    released = store.release_supervisor_lease(
+        first.supervisor_id,
+        first.generation,
+        now=instant + timedelta(seconds=11),
+    )
+    assert released.generation == first.generation
+    second = store.acquire_supervisor_lease(
+        "supervisor-b",
+        process_id=200,
+        process_started_at="process-start-b",
+        now=instant + timedelta(seconds=12),
+    )
+    assert second.generation == 2
+    assert SupervisorLease.from_dict(second.to_dict()) == second
+    with pytest.raises(WorkspaceConflict, match="stale or expired"):
+        store.renew_supervisor_lease(
+            first.supervisor_id,
+            first.generation,
+            now=instant + timedelta(seconds=13),
+        )
+
+
+def test_worker_lease_heartbeat_cancellation_and_exit_are_durable(
+    tmp_path: Path,
+) -> None:
+    store = WorkspaceStore(tmp_path / "workspace.db")
+    instant = datetime(2026, 10, 31, tzinfo=UTC)
+    job = store.create_job("repo", kind="planning", title="Plan")
+    store.start_job_operation(
+        job.job_id,
+        expected_revision=job.revision,
+        run_id="run-1",
+        attempt_id="attempt-1",
+        workflow_directory=tmp_path / "worktree",
+        checkpoint_ref="checkpoint:run-1",
+        job_inputs={"pinned_spec_ref": "spec:1"},
+        source_refs=["spec:1"],
+        source_spec_revision="revision-1",
+        provider_config_refs=["provider:deepinfra"],
+    )
+    supervisor = store.acquire_supervisor_lease(
+        "supervisor-a",
+        process_id=100,
+        process_started_at="supervisor-start",
+        lease_seconds=20,
+        now=instant,
+    )
+    worker = store.claim_job_worker(
+        job.job_id,
+        "attempt-1",
+        worker_id="worker-1",
+        supervisor_id=supervisor.supervisor_id,
+        supervisor_generation=supervisor.generation,
+        process_id=101,
+        process_started_at="worker-start",
+        dispatch_intent=DispatchIntent.START,
+        lease_seconds=8,
+        now=instant + timedelta(seconds=1),
+    )
+    assert worker.state == WorkerState.CLAIMED
+    assert WorkerOwnership.from_dict(worker.to_dict()) == worker
+    assert (
+        store.claim_job_worker(
+            job.job_id,
+            "attempt-1",
+            worker_id="worker-1",
+            supervisor_id=supervisor.supervisor_id,
+            supervisor_generation=supervisor.generation,
+            process_id=101,
+            process_started_at="worker-start",
+            dispatch_intent=DispatchIntent.START,
+            lease_seconds=8,
+            now=instant + timedelta(seconds=1),
+        )
+        == worker
+    )
+
+    heartbeat = store.heartbeat_job_worker(
+        job.job_id,
+        "attempt-1",
+        worker_id="worker-1",
+        supervisor_id=supervisor.supervisor_id,
+        supervisor_generation=supervisor.generation,
+        process_id=101,
+        process_started_at="worker-start",
+        lease_seconds=8,
+        now=instant + timedelta(seconds=2),
+    )
+    assert heartbeat.state == WorkerState.RUNNING
+    cancellation = store.request_job_worker_cancellation(
+        job.job_id,
+        "attempt-1",
+        expected_revision=heartbeat.revision,
+        request_id="cancel-worker",
+    )
+    assert cancellation.cancellation_requested
+    assert (
+        store.request_job_worker_cancellation(
+            job.job_id,
+            "attempt-1",
+            expected_revision=heartbeat.revision,
+            request_id="cancel-worker",
+        )
+        == cancellation
+    )
+    refreshed = store.heartbeat_job_worker(
+        job.job_id,
+        "attempt-1",
+        worker_id="worker-1",
+        supervisor_id=supervisor.supervisor_id,
+        supervisor_generation=supervisor.generation,
+        process_id=101,
+        process_started_at="worker-start",
+        lease_seconds=8,
+        now=instant + timedelta(seconds=3),
+    )
+    assert refreshed.cancellation_requested
+    exited = store.mark_job_worker_exited(
+        job.job_id,
+        "attempt-1",
+        expected_revision=refreshed.revision,
+        worker_id="worker-1",
+        supervisor_id=supervisor.supervisor_id,
+        supervisor_generation=supervisor.generation,
+        process_id=101,
+        process_started_at="worker-start",
+        now=instant + timedelta(seconds=4),
+    )
+    assert exited.state == WorkerState.EXITED
+    assert (
+        store.mark_job_worker_exited(
+            job.job_id,
+            "attempt-1",
+            expected_revision=refreshed.revision,
+            worker_id="worker-1",
+            supervisor_id=supervisor.supervisor_id,
+            supervisor_generation=supervisor.generation,
+            process_id=101,
+            process_started_at="worker-start",
+            now=instant + timedelta(seconds=5),
+        )
+        == exited
+    )
+    assert (
+        store.list_expired_job_workers("repo", now=instant + timedelta(seconds=30))
+        == ()
+    )
+
+
+def test_expired_worker_can_be_reclaimed_only_by_current_supervisor_generation(
+    tmp_path: Path,
+) -> None:
+    store = WorkspaceStore(tmp_path / "workspace.db")
+    instant = datetime(2026, 10, 31, tzinfo=UTC)
+    job = store.create_job("repo", kind="planning", title="Plan")
+    store.start_job_operation(
+        job.job_id,
+        expected_revision=job.revision,
+        run_id="run-1",
+        attempt_id="attempt-1",
+        workflow_directory=tmp_path / "worktree",
+        checkpoint_ref="checkpoint:run-1",
+        job_inputs={"pinned_spec_ref": "spec:1"},
+        source_refs=["spec:1"],
+        source_spec_revision="revision-1",
+        provider_config_refs=["provider:deepinfra"],
+    )
+    first_supervisor = store.acquire_supervisor_lease(
+        "supervisor-a",
+        process_id=100,
+        process_started_at="supervisor-start-a",
+        lease_seconds=5,
+        now=instant,
+    )
+    first_worker = store.claim_job_worker(
+        job.job_id,
+        "attempt-1",
+        worker_id="worker-1",
+        supervisor_id=first_supervisor.supervisor_id,
+        supervisor_generation=first_supervisor.generation,
+        process_id=101,
+        process_started_at="worker-start-a",
+        dispatch_intent=DispatchIntent.START,
+        lease_seconds=5,
+        now=instant,
+    )
+    assert store.list_expired_job_workers(
+        "repo", now=instant + timedelta(seconds=6)
+    ) == (first_worker,)
+    second_supervisor = store.acquire_supervisor_lease(
+        "supervisor-b",
+        process_id=200,
+        process_started_at="supervisor-start-b",
+        lease_seconds=10,
+        now=instant + timedelta(seconds=6),
+    )
+    assert second_supervisor.generation == first_supervisor.generation + 1
+    replacement = store.claim_job_worker(
+        job.job_id,
+        "attempt-1",
+        worker_id="worker-2",
+        supervisor_id=second_supervisor.supervisor_id,
+        supervisor_generation=second_supervisor.generation,
+        process_id=201,
+        process_started_at="worker-start-b",
+        dispatch_intent=DispatchIntent.RESUME,
+        lease_seconds=5,
+        now=instant + timedelta(seconds=6),
+    )
+    assert replacement.state == WorkerState.CLAIMED
+    assert replacement.supervisor_generation == 2
+    with pytest.raises(WorkspaceConflict, match="Supervisor lease is stale"):
+        store.heartbeat_job_worker(
+            job.job_id,
+            "attempt-1",
+            worker_id="worker-1",
+            supervisor_id=first_supervisor.supervisor_id,
+            supervisor_generation=first_supervisor.generation,
+            process_id=101,
+            process_started_at="worker-start-a",
+            now=instant + timedelta(seconds=7),
+        )

@@ -64,6 +64,20 @@ class EventType(StrEnum):
     QUESTION_CREATED = "question.created"
     QUESTION_UPDATED = "question.updated"
     JOB_OPERATION_BOUND = "job.operation_bound"
+    SUPERVISOR_LEASE_UPDATED = "supervisor_lease.updated"
+    WORKER_OWNERSHIP_UPDATED = "worker_ownership.updated"
+
+
+class DispatchIntent(StrEnum):
+    START = "start"
+    RESUME = "resume"
+    RETRY = "retry"
+
+
+class WorkerState(StrEnum):
+    CLAIMED = "claimed"
+    RUNNING = "running"
+    EXITED = "exited"
 
 
 _SCHEMA_VERSION = 1
@@ -624,4 +638,154 @@ class JobOperation:
             data["job_inputs"],
             _tuple_of_text(data["provider_config_refs"], "provider_config_refs"),
             _validate_text(data["created_at"], "created_at"),
+        )
+
+
+@dataclass(frozen=True)
+class SupervisorLease:
+    supervisor_id: str
+    generation: int
+    process_id: int
+    process_started_at: str
+    lease_expires_at: str
+    updated_at: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": _SCHEMA_VERSION,
+            "supervisor_id": self.supervisor_id,
+            "generation": self.generation,
+            "process_id": self.process_id,
+            "process_started_at": self.process_started_at,
+            "lease_expires_at": self.lease_expires_at,
+            "updated_at": self.updated_at,
+        }
+
+    @classmethod
+    def from_dict(cls, value: Any) -> Self:
+        data = _record(
+            value,
+            {
+                "supervisor_id",
+                "generation",
+                "process_id",
+                "process_started_at",
+                "lease_expires_at",
+                "updated_at",
+            },
+            "supervisor lease",
+        )
+        generation, process_id = data["generation"], data["process_id"]
+        if (
+            not isinstance(generation, int)
+            or isinstance(generation, bool)
+            or generation < 1
+        ):
+            raise WorkspaceContractError("generation must be a positive integer")
+        if (
+            not isinstance(process_id, int)
+            or isinstance(process_id, bool)
+            or process_id < 1
+        ):
+            raise WorkspaceContractError("process_id must be a positive integer")
+        return cls(
+            _validate_id(data["supervisor_id"], "supervisor_id"),
+            generation,
+            process_id,
+            _validate_text(data["process_started_at"], "process_started_at"),
+            _validate_text(data["lease_expires_at"], "lease_expires_at"),
+            _validate_text(data["updated_at"], "updated_at"),
+        )
+
+
+@dataclass(frozen=True)
+class WorkerOwnership:
+    worker_id: str
+    job_id: str
+    run_id: str
+    attempt_id: str
+    supervisor_id: str
+    supervisor_generation: int
+    process_id: int
+    process_started_at: str
+    heartbeat_at: str
+    lease_expires_at: str
+    cancellation_requested: bool
+    dispatch_intent: DispatchIntent
+    state: WorkerState
+    revision: int
+    updated_at: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": _SCHEMA_VERSION,
+            "worker_id": self.worker_id,
+            "job_id": self.job_id,
+            "run_id": self.run_id,
+            "attempt_id": self.attempt_id,
+            "supervisor_id": self.supervisor_id,
+            "supervisor_generation": self.supervisor_generation,
+            "process_id": self.process_id,
+            "process_started_at": self.process_started_at,
+            "heartbeat_at": self.heartbeat_at,
+            "lease_expires_at": self.lease_expires_at,
+            "cancellation_requested": self.cancellation_requested,
+            "dispatch_intent": self.dispatch_intent.value,
+            "state": self.state.value,
+            "revision": self.revision,
+            "updated_at": self.updated_at,
+        }
+
+    @classmethod
+    def from_dict(cls, value: Any) -> Self:
+        data = _record(
+            value,
+            {
+                "worker_id",
+                "job_id",
+                "run_id",
+                "attempt_id",
+                "supervisor_id",
+                "supervisor_generation",
+                "process_id",
+                "process_started_at",
+                "heartbeat_at",
+                "lease_expires_at",
+                "cancellation_requested",
+                "dispatch_intent",
+                "state",
+                "revision",
+                "updated_at",
+            },
+            "worker ownership",
+        )
+        for name in ("supervisor_generation", "process_id", "revision"):
+            number = data[name]
+            if not isinstance(number, int) or isinstance(number, bool) or number < 1:
+                raise WorkspaceContractError(f"{name} must be a positive integer")
+        if not isinstance(data["cancellation_requested"], bool):
+            raise WorkspaceContractError("cancellation_requested must be a boolean")
+        try:
+            intent = DispatchIntent(data["dispatch_intent"])
+            state = WorkerState(data["state"])
+        except (TypeError, ValueError) as error:
+            raise WorkspaceContractError(
+                "Unsupported worker intent or state"
+            ) from error
+        return cls(
+            _validate_id(data["worker_id"], "worker_id"),
+            _validate_id(data["job_id"], "job_id"),
+            _validate_id(data["run_id"], "run_id"),
+            _validate_id(data["attempt_id"], "attempt_id"),
+            _validate_id(data["supervisor_id"], "supervisor_id"),
+            data["supervisor_generation"],
+            data["process_id"],
+            _validate_text(data["process_started_at"], "process_started_at"),
+            _validate_text(data["heartbeat_at"], "heartbeat_at"),
+            _validate_text(data["lease_expires_at"], "lease_expires_at"),
+            data["cancellation_requested"],
+            intent,
+            state,
+            data["revision"],
+            _validate_text(data["updated_at"], "updated_at"),
         )

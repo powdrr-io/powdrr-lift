@@ -1,0 +1,278 @@
+{
+  "schema": "https://powdrr.io/schema/changelog-v2",
+  "change_id": 1225,
+  "title": "Add supervisor leases and worker ownership",
+  "intent": {
+    "problem": "Multiple local launchers or a delayed worker can otherwise run the same job attempt concurrently, and a restart cannot reliably identify stale ownership or pending cancellation.",
+    "goal": "Persist one supervisor lease per workspace and generation-fence worker claims, heartbeats, cancellation, and dispatch intent for each job attempt."
+  },
+  "human-decisions": [],
+  "structured_files": [],
+  "files": [
+    {
+      "path": "packages/contracts/src/powdrr_contracts/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 67,
+        "end_line": 80
+      },
+      "summary": "Define typed supervisor leases, worker ownership, and dispatch intent records.",
+      "rationale": "Represent process identity, fencing generations, heartbeats, cancellation, and dispatch lifecycle as transport-independent records."
+    },
+    {
+      "path": "packages/contracts/src/powdrr_contracts/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 642,
+        "end_line": 791
+      },
+      "summary": "Define typed supervisor leases, worker ownership, and dispatch intent records.",
+      "rationale": "Represent process identity, fencing generations, heartbeats, cancellation, and dispatch lifecycle as transport-independent records."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 15,
+        "end_line": 15
+      },
+      "summary": "Persist supervisor leases and worker ownership with generation fencing.",
+      "rationale": "Prevent multiple schedulers and stale workers from controlling the same job attempt while retaining recoverable cancellation and dispatch state."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 23,
+        "end_line": 23
+      },
+      "summary": "Persist supervisor leases and worker ownership with generation fencing.",
+      "rationale": "Prevent multiple schedulers and stale workers from controlling the same job attempt while retaining recoverable cancellation and dispatch state."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 32,
+        "end_line": 32
+      },
+      "summary": "Persist supervisor leases and worker ownership with generation fencing.",
+      "rationale": "Prevent multiple schedulers and stale workers from controlling the same job attempt while retaining recoverable cancellation and dispatch state."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 34,
+        "end_line": 35
+      },
+      "summary": "Persist supervisor leases and worker ownership with generation fencing.",
+      "rationale": "Prevent multiple schedulers and stale workers from controlling the same job attempt while retaining recoverable cancellation and dispatch state."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 166,
+        "end_line": 185
+      },
+      "summary": "Persist supervisor leases and worker ownership with generation fencing.",
+      "rationale": "Prevent multiple schedulers and stale workers from controlling the same job attempt while retaining recoverable cancellation and dispatch state."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 228,
+        "end_line": 247
+      },
+      "summary": "Persist supervisor leases and worker ownership with generation fencing.",
+      "rationale": "Prevent multiple schedulers and stale workers from controlling the same job attempt while retaining recoverable cancellation and dispatch state."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 259,
+        "end_line": 286
+      },
+      "summary": "Persist supervisor leases and worker ownership with generation fencing.",
+      "rationale": "Prevent multiple schedulers and stale workers from controlling the same job attempt while retaining recoverable cancellation and dispatch state."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 394,
+        "end_line": 394
+      },
+      "summary": "Persist supervisor leases and worker ownership with generation fencing.",
+      "rationale": "Prevent multiple schedulers and stale workers from controlling the same job attempt while retaining recoverable cancellation and dispatch state."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 404,
+        "end_line": 404
+      },
+      "summary": "Persist supervisor leases and worker ownership with generation fencing.",
+      "rationale": "Prevent multiple schedulers and stale workers from controlling the same job attempt while retaining recoverable cancellation and dispatch state."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 416,
+        "end_line": 428
+      },
+      "summary": "Persist supervisor leases and worker ownership with generation fencing.",
+      "rationale": "Prevent multiple schedulers and stale workers from controlling the same job attempt while retaining recoverable cancellation and dispatch state."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 1890,
+        "end_line": 2446
+      },
+      "summary": "Persist supervisor leases and worker ownership with generation fencing.",
+      "rationale": "Prevent multiple schedulers and stale workers from controlling the same job attempt while retaining recoverable cancellation and dispatch state."
+    },
+    {
+      "path": "tests/test_ui_workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 4,
+        "end_line": 4
+      },
+      "summary": "Verify lease exclusion, generation fencing, recovery, cancellation, and migration.",
+      "rationale": "Protect concurrency guarantees and crash recovery behavior for local supervisors and workers."
+    },
+    {
+      "path": "tests/test_ui_workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 11,
+        "end_line": 11
+      },
+      "summary": "Verify lease exclusion, generation fencing, recovery, cancellation, and migration.",
+      "rationale": "Protect concurrency guarantees and crash recovery behavior for local supervisors and workers."
+    },
+    {
+      "path": "tests/test_ui_workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 19,
+        "end_line": 19
+      },
+      "summary": "Verify lease exclusion, generation fencing, recovery, cancellation, and migration.",
+      "rationale": "Protect concurrency guarantees and crash recovery behavior for local supervisors and workers."
+    },
+    {
+      "path": "tests/test_ui_workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 21,
+        "end_line": 22
+      },
+      "summary": "Verify lease exclusion, generation fencing, recovery, cancellation, and migration.",
+      "rationale": "Protect concurrency guarantees and crash recovery behavior for local supervisors and workers."
+    },
+    {
+      "path": "tests/test_ui_workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 263,
+        "end_line": 263
+      },
+      "summary": "Verify lease exclusion, generation fencing, recovery, cancellation, and migration.",
+      "rationale": "Protect concurrency guarantees and crash recovery behavior for local supervisors and workers."
+    },
+    {
+      "path": "tests/test_ui_workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 461,
+        "end_line": 461
+      },
+      "summary": "Verify lease exclusion, generation fencing, recovery, cancellation, and migration.",
+      "rationale": "Protect concurrency guarantees and crash recovery behavior for local supervisors and workers."
+    },
+    {
+      "path": "tests/test_ui_workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 739,
+        "end_line": 739
+      },
+      "summary": "Verify lease exclusion, generation fencing, recovery, cancellation, and migration.",
+      "rationale": "Protect concurrency guarantees and crash recovery behavior for local supervisors and workers."
+    },
+    {
+      "path": "tests/test_ui_workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 741,
+        "end_line": 1007
+      },
+      "summary": "Verify lease exclusion, generation fencing, recovery, cancellation, and migration.",
+      "rationale": "Protect concurrency guarantees and crash recovery behavior for local supervisors and workers."
+    }
+  ],
+  "entities": [
+    {
+      "id": "ui-workspace-records",
+      "type": "Module",
+      "action": "modified"
+    },
+    {
+      "id": "workspace-supervisor-lease-record",
+      "type": "Class",
+      "action": "added"
+    },
+    {
+      "id": "workspace-worker-ownership-record",
+      "type": "Class",
+      "action": "added"
+    },
+    {
+      "id": "workspace-dispatch-intent",
+      "type": "Enum",
+      "action": "added"
+    },
+    {
+      "id": "workspace-worker-state",
+      "type": "Enum",
+      "action": "added"
+    },
+    {
+      "id": "local-ui-workspace-store",
+      "type": "Class",
+      "action": "modified"
+    },
+    {
+      "id": "workspace-supervisor-lease-table",
+      "type": "Table",
+      "action": "added"
+    },
+    {
+      "id": "workspace-worker-ownership-table",
+      "type": "Table",
+      "action": "added"
+    },
+    {
+      "id": "workspace-schema-v7-migration",
+      "type": "Migration",
+      "action": "added"
+    },
+    {
+      "id": "workspace-event-type",
+      "type": "Enum",
+      "action": "modified"
+    }
+  ],
+  "entity_relationships": [],
+  "invariants": [],
+  "guidance": []
+}

@@ -486,13 +486,27 @@ class GitHubCommentCheckpointStore:
             raise JournalForkError(
                 "cannot publish an archive over a conflicted planning journal"
             )
-        archive_digests = {event.digest for event in candidate.events}
-        if current.head is not None and current.head.digest not in archive_digests:
-            raise JournalForkError(
-                "current issue checkpoint is not in the archive history"
+        archive_events = candidate.events
+        if current.head is not None:
+            current_index = next(
+                (
+                    index
+                    for index, event in enumerate(candidate.events)
+                    if event.digest == current.head.digest
+                ),
+                None,
             )
+            if current_index is None:
+                raise JournalForkError(
+                    "current issue checkpoint is not in the archive history"
+                )
+            archive_events = candidate.events[current_index + 1 :]
+            if not archive_events:
+                raise JournalForkError(
+                    "issue checkpoint does not precede the requested archive head"
+                )
         for body in render_checkpoint_archive_comments(
-            events, session_id=self.session_id
+            archive_events, session_id=self.session_id
         ):
             self.client.add_issue_comment(self.issue_number, body)
         archived = self.load()

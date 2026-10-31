@@ -1,0 +1,218 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1231
+title: Replace POSIX-only file locks with portable process locks
+intent:
+  problem: Five execution and persistence modules import fcntl directly, preventing
+    them from loading on Windows.
+  goal: Share a native cross-platform exclusive file-lock adapter that preserves blocking
+    and nonblocking behavior and releases locks when a process exits.
+human-decisions: []
+structured_files: []
+files:
+- path: .github/workflows/ci.yml
+  type: modified
+  span:
+    start_line: 23
+    end_line: 44
+  summary: Run portable lock tests on Windows.
+  rationale: Verify file-lock contention, crash release, and imports of affected workflow
+    modules on Windows CI.
+- path: packages/local/pyproject.toml
+  type: modified
+  span:
+    start_line: 7
+    end_line: 7
+  summary: Declare the shared file-lock dependency.
+  rationale: Ensure installations receive the dependency through the local persistence
+    package.
+- path: packages/local/src/powdrr_local/file_lock.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 38
+  summary: Provide the shared native process-lock adapter.
+  rationale: Use platform-native exclusive locks and fail when hard-lock support is
+    unavailable.
+- path: packages/local/src/powdrr_local/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 5
+    end_line: 5
+  summary: Use the shared lock for planning checkpoint journals.
+  rationale: Preserve exclusive access and mode 0600 for durable checkpoint updates.
+- path: packages/local/src/powdrr_local/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 27
+    end_line: 28
+  summary: Use the shared lock for planning checkpoint journals.
+  rationale: Preserve exclusive access and mode 0600 for durable checkpoint updates.
+- path: packages/local/src/powdrr_local/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 230
+    end_line: 230
+  summary: Use the shared lock for planning checkpoint journals.
+  rationale: Preserve exclusive access and mode 0600 for durable checkpoint updates.
+- path: packages/local/src/powdrr_local/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 281
+    end_line: 283
+  summary: Use the shared lock for planning checkpoint journals.
+  rationale: Preserve exclusive access and mode 0600 for durable checkpoint updates.
+- path: src/powdrr_lift/core/behavior_rule.py
+  type: modified
+  span:
+    start_line: 5
+    end_line: 5
+  summary: Use the shared lock for behavior rule persistence.
+  rationale: Keep concurrent rule reads and writes mutually exclusive.
+- path: src/powdrr_lift/core/behavior_rule.py
+  type: modified
+  span:
+    start_line: 15
+    end_line: 16
+  summary: Use the shared lock for behavior rule persistence.
+  rationale: Keep concurrent rule reads and writes mutually exclusive.
+- path: src/powdrr_lift/core/behavior_rule.py
+  type: modified
+  span:
+    start_line: 111
+    end_line: 112
+  summary: Use the shared lock for behavior rule persistence.
+  rationale: Keep concurrent rule reads and writes mutually exclusive.
+- path: src/powdrr_lift/execution/store.py
+  type: modified
+  span:
+    start_line: 5
+    end_line: 5
+  summary: Use the shared lock for execution state persistence.
+  rationale: Keep state replacement and event updates within the same exclusive lock
+    scope.
+- path: src/powdrr_lift/execution/store.py
+  type: modified
+  span:
+    start_line: 13
+    end_line: 14
+  summary: Use the shared lock for execution state persistence.
+  rationale: Keep state replacement and event updates within the same exclusive lock
+    scope.
+- path: src/powdrr_lift/execution/store.py
+  type: modified
+  span:
+    start_line: 241
+    end_line: 241
+  summary: Use the shared lock for execution state persistence.
+  rationale: Keep state replacement and event updates within the same exclusive lock
+    scope.
+- path: src/powdrr_lift/execution/store.py
+  type: modified
+  span:
+    start_line: 244
+    end_line: 246
+  summary: Use the shared lock for execution state persistence.
+  rationale: Keep state replacement and event updates within the same exclusive lock
+    scope.
+- path: src/powdrr_lift/structrr/intent.py
+  type: modified
+  span:
+    start_line: 5
+    end_line: 5
+  summary: Use the shared lock for intent persistence.
+  rationale: Keep concurrent intent updates mutually exclusive.
+- path: src/powdrr_lift/structrr/intent.py
+  type: modified
+  span:
+    start_line: 17
+    end_line: 18
+  summary: Use the shared lock for intent persistence.
+  rationale: Keep concurrent intent updates mutually exclusive.
+- path: src/powdrr_lift/structrr/intent.py
+  type: modified
+  span:
+    start_line: 260
+    end_line: 261
+  summary: Use the shared lock for intent persistence.
+  rationale: Keep concurrent intent updates mutually exclusive.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span:
+    start_line: 9
+    end_line: 9
+  summary: Preserve nonblocking issue-worker exclusion.
+  rationale: Map lock contention to the existing busy-worker error without waiting.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span:
+    start_line: 24
+    end_line: 24
+  summary: Preserve nonblocking issue-worker exclusion.
+  rationale: Map lock contention to the existing busy-worker error without waiting.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span:
+    start_line: 2465
+    end_line: 2466
+  summary: Preserve nonblocking issue-worker exclusion.
+  rationale: Map lock contention to the existing busy-worker error without waiting.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span:
+    start_line: 2468
+    end_line: 2471
+  summary: Preserve nonblocking issue-worker exclusion.
+  rationale: Map lock contention to the existing busy-worker error without waiting.
+- path: tests/test_file_lock.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 68
+  summary: Verify process exclusion, crash release, and portable imports.
+  rationale: Protect native lock behavior on POSIX and Windows CI.
+entities:
+- id: portable-file-lock-adapter
+  type: Module
+  action: added
+- id: portable-file-lock-context-manager
+  type: Function
+  action: added
+- id: filelock-library-dependency
+  type: Library
+  action: added
+- id: portable-file-lock-tests
+  type: Unit test
+  action: added
+- id: portable-lock-ci-workflow
+  type: GitHub Action workflow file
+  action: added
+- id: file-execution-state-store
+  type: Module
+  action: added
+- id: planning-checkpoint-store
+  type: Module
+  action: added
+- id: behavior-rule-store
+  type: Module
+  action: added
+- id: intent-store
+  type: Module
+  action: added
+- id: github-issue-worker-lock
+  type: Function
+  action: added
+entity_relationships: []
+invariants:
+- id: portable-exclusive-file-locking
+  description: All affected persistence and workflow modules use the shared native
+    OS lock adapter with soft-lock fallback disabled.
+  action: added
+- id: process-exit-releases-file-lock
+  description: Terminating a process that owns a lock releases the native lock so
+    another process can acquire it.
+  action: added
+- id: issue-worker-lock-is-nonblocking
+  description: A second issue worker fails immediately with the existing busy-worker
+    error while another worker owns the lock.
+  action: altered
+guidance: []

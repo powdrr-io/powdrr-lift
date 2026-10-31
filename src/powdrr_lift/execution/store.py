@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import fcntl
 import json
 import os
 import tempfile
@@ -10,6 +9,8 @@ from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Protocol
+
+from powdrr_local.file_lock import file_lock
 
 from powdrr_lift.core.delivery_profile import PhaseType
 from powdrr_lift.core.execution_state import (
@@ -237,10 +238,5 @@ class FileExecutionStateStore:
     @staticmethod
     @contextmanager
     def _lock(path: Path) -> Iterator[None]:
-        descriptor = os.open(path, os.O_CREAT | os.O_RDWR, 0o600)
-        try:
-            fcntl.flock(descriptor, fcntl.LOCK_EX)
+        with file_lock(path):
             yield
-        finally:
-            fcntl.flock(descriptor, fcntl.LOCK_UN)
-            os.close(descriptor)

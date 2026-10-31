@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import fcntl
 import json
 import os
 import tempfile
@@ -12,6 +11,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+
+from powdrr_local.file_lock import file_lock
 
 BEHAVIOR_RULE_SCHEMA_VERSION = "behavior-rule-v1"
 
@@ -107,12 +108,8 @@ class FileBehaviorRuleStore:
     @contextmanager
     def _locked(self) -> Generator[None, None, None]:
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        with self.lock_path.open("a+", encoding="utf-8") as lock:
-            fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
-            try:
-                yield
-            finally:
-                fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+        with file_lock(self.lock_path):
+            yield
 
     def _list_unlocked(
         self, *, include_inactive: bool = False

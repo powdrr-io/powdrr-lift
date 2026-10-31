@@ -1,5 +1,5 @@
 schema: https://powdrr.io/schema/changelog-v2
-change_id: 1248
+change_id: 1249
 title: Return actionable workspace job details
 intent:
   problem: The job detail endpoint returns attempts but omits blockers, outputs, and actions available for the current state.

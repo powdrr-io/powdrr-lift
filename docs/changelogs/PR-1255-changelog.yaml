@@ -1,0 +1,183 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1255
+title: Fence job action claims by supervisor generation
+intent:
+  problem: Pending job action intents can be read, but supervisors cannot claim or finish them safely across multiple processes and restarts.
+  goal: Add lease-fenced claim, release, and completion operations that allow a new supervisor generation to recover stale claims.
+human-decisions: []
+structured_files: []
+files:
+- path: packages/contracts/src/powdrr_contracts/workspace.py
+  type: modified
+  span:
+    start_line: 83
+    end_line: 83
+  summary: Add a job action lifecycle update event.
+  rationale: Publish claim and outcome changes to workspace subscribers.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 240
+    end_line: 241
+  summary: Store the claiming token and supervisor generation with each action intent.
+  rationale: Fence concurrent and obsolete supervisors from finishing a claim.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 250
+    end_line: 250
+  summary: Advance fresh workspace databases to schema version 13.
+  rationale: Identify databases with generation-fenced job action claims.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 498
+    end_line: 498
+  summary: Allow schema version 13 through the initial migration guard.
+  rationale: Preserve compatibility for databases already at the newest schema.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 508
+    end_line: 508
+  summary: Allow schema version 13 through the schema 4 migration guard.
+  rationale: Preserve compatibility for databases already at the newest schema.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 520
+    end_line: 520
+  summary: Allow schema version 13 through the schema 5 migration guard.
+  rationale: Preserve compatibility for databases already at the newest schema.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 532
+    end_line: 532
+  summary: Allow schema version 13 through the schema 6 migration guard.
+  rationale: Preserve compatibility for databases already at the newest schema.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 562
+    end_line: 562
+  summary: Allow schema version 13 through the schema 7 migration guard.
+  rationale: Preserve compatibility for databases already at the newest schema.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 584
+    end_line: 584
+  summary: Allow schema version 13 through the schema 8 migration guard.
+  rationale: Preserve compatibility for databases already at the newest schema.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 606
+    end_line: 606
+  summary: Allow schema version 13 through the schema 9 migration guard.
+  rationale: Preserve compatibility for databases already at the newest schema.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 651
+    end_line: 664
+  summary: Migrate schema version 12 with the action claim owner and generation columns.
+  rationale: Preserve existing actions while enabling supervisor generation fencing.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 3170
+    end_line: 3332
+  summary: Claim, release, complete, or fail action intents under the active supervisor lease.
+  rationale: Prevent simultaneous supervisors from claiming work and let a new generation recover stale claims.
+- path: tests/test_ui_workspace.py
+  type: modified
+  span:
+    start_line: 345
+    end_line: 345
+  summary: Expect schema version 13 after a version 1 migration.
+  rationale: Verify historical databases reach the current schema.
+- path: tests/test_ui_workspace.py
+  type: modified
+  span:
+    start_line: 645
+    end_line: 645
+  summary: Expect schema version 13 after a version 3 migration.
+  rationale: Verify historical databases reach the current schema.
+- path: tests/test_ui_workspace.py
+  type: modified
+  span:
+    start_line: 977
+    end_line: 977
+  summary: Expect schema version 13 after a version 5 migration.
+  rationale: Verify historical databases reach the current schema.
+- path: tests/test_ui_workspace.py
+  type: modified
+  span:
+    start_line: 992
+    end_line: 992
+  summary: Expect schema version 13 after a version 6 migration.
+  rationale: Verify historical databases reach the current schema.
+- path: tests/test_ui_workspace.py
+  type: modified
+  span:
+    start_line: 1002
+    end_line: 1002
+  summary: Expect schema version 13 after a version 8 migration.
+  rationale: Verify API session migrations include claim fencing columns.
+- path: tests/test_ui_workspace.py
+  type: modified
+  span:
+    start_line: 1060
+    end_line: 1184
+  summary: Verify current claims block duplicate claims, stale generations are fenced, and new generations recover actions.
+  rationale: Protect the claim lifecycle across multiple service processes and restarts.
+- path: tests/test_ui_workspace.py
+  type: modified
+  span:
+    start_line: 1406
+    end_line: 1406
+  summary: Expect schema version 13 across store instances.
+  rationale: Verify concurrent store initialization sees the current schema.
+- path: tests/test_workspace_api.py
+  type: modified
+  span:
+    start_line: 41
+    end_line: 41
+  summary: Expect schema version 13 in the API health response.
+  rationale: Keep the health contract aligned with the latest workspace schema.
+entities:
+- id: workspace-job-action-claim-event
+  type: Event schema
+  action: added
+- id: workspace-job-action-claim-method
+  type: Method
+  action: added
+- id: workspace-job-action-finish-method
+  type: Method
+  action: added
+- id: workspace-job-action-claim-tests
+  type: Integration test
+  action: added
+entity_relationships:
+- id: job-action-claim-tests-verify-fencing
+  type: verifies
+  source: workspace-job-action-claim-tests
+  target: workspace-job-action-claim-method
+  action: added
+  description: Tests verify single-generation ownership and recovery under a replacement generation.
+invariants:
+- id: only-active-supervisor-generation-can-finish-action-claim
+  description: Claim completion, failure, and release require the current supervisor lease and the exact claim token and generation.
+  action: added
+- id: stale-supervisor-claims-are-recoverable
+  description: A replacement supervisor generation can reclaim an intent left claimed by an older generation.
+  action: added
+- id: action-finish-is-idempotent-for-the-owning-claim
+  description: Repeating the same terminal outcome with the same claim token returns the saved action result.
+  action: added
+guidance:
+- id: keep-action-effects-deduplicated-by-action-id
+  description: Supervisor adapters must use action IDs to deduplicate effects when recovering intents after a crash.
+  action: added

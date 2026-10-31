@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from powdrr_lift.structrr.validation_models import (
+import importlib.util
+
+from powdrr_service.structrr.validation_models import (
     LEGACY_VALIDATION_INVENTORY_SCHEMA_VERSION,
     VALIDATION_CONTEXT_SCHEMA_VERSION,
     VALIDATION_INVENTORY_SCHEMA_VERSION,
@@ -8,6 +10,10 @@ from powdrr_lift.structrr.validation_models import (
     ValidationContext,
     validate_validation_records,
 )
+
+
+def test_legacy_agent_validation_models_module_is_removed() -> None:
+    assert importlib.util.find_spec("powdrr_lift.structrr.validation_models") is None
 
 
 def _check_data(

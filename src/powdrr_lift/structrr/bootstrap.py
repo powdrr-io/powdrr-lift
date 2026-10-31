@@ -13,6 +13,9 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from powdrr_service.structrr.validation_models import (
+    validate_validation_records,
+)
 
 from powdrr_lift.change_log_parser import parse_change_log
 from powdrr_lift.core.decision_obligation import content_fingerprint
@@ -23,9 +26,6 @@ from powdrr_lift.structrr.source_manifest import (
     compile_source_manifest,
 )
 from powdrr_lift.structrr.validation import validation_context
-from powdrr_lift.structrr.validation_models import (
-    validate_validation_records,
-)
 
 _SCHEMA = "https://powdrr.io/schema/changelog-v2"
 _BOOTSTRAP_SCHEMA = "https://powdrr.io/schema/structrr-bootstrap-v1"

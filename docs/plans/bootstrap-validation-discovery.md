@@ -94,7 +94,7 @@ existing equivalents if they have already been implemented.
 
 | File | Responsibility |
 | --- | --- |
-| `src/powdrr_lift/structrr/validation_models.py` | Typed records, serialization, validation, stable identities, v1 reader |
+| `packages/service/src/powdrr_service/structrr/validation_models.py` | Typed records, serialization, validation, stable identities, v1 reader |
 | `src/powdrr_lift/structrr/validation_discovery.py` | Discovery orchestration, evidence index, dependency graph, completeness |
 | `src/powdrr_lift/structrr/validation_adapters/` | Registered component, environment, runner, and validator adapters |
 | `src/powdrr_lift/structrr/github_validation.py` | Workflow parsing, contexts, matrices, actions, reusable-workflow declarations |

@@ -26,6 +26,16 @@ from powdrr_service.planning.checkpoints import (
 )
 
 
+def _compact_json(value: Mapping[str, Any]) -> str:
+    return json.dumps(
+        value,
+        ensure_ascii=False,
+        allow_nan=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    )
+
+
 class LocalCheckpointStore:
     """Durable, hash-linked planning journal stored in Git metadata."""
 
@@ -57,15 +67,45 @@ class LocalCheckpointStore:
         )
         self.path = self.directory / f"{session_id}.json"
         self.lock_path = self.directory / f"{session_id}.lock"
+        self._cached_state: JournalState | None = None
+        self._cached_signature: tuple[int, int, int] | None = None
 
     def load(self, *, selected_checkpoint_digest: str | None = None) -> JournalState:
         if not self.path.exists():
-            return reduce_checkpoint_comments(
+            state = reduce_checkpoint_comments(
                 (),
                 session_id=self.session_id,
                 selected_checkpoint_digest=selected_checkpoint_digest,
             )
+            self._remember(state)
+            return state
         try:
+            signature = self._signature()
+            if (
+                selected_checkpoint_digest is None
+                and self._cached_state is not None
+                and signature == self._cached_signature
+            ):
+                return self._cached_state
+            with self.path.open("r", encoding="utf-8") as stream:
+                first_line = stream.readline()
+                try:
+                    first_record = json.loads(first_line)
+                except json.JSONDecodeError:
+                    first_record = None
+                if (
+                    isinstance(first_record, Mapping)
+                    and first_record.get("schema") == "planning-checkpoint-journal-v2"
+                ):
+                    state = self._load_jsonl(
+                        stream,
+                        first_record,
+                        selected_checkpoint_digest=selected_checkpoint_digest,
+                    )
+                    self._remember(state, cacheable=selected_checkpoint_digest is None)
+                    return state
+            # Version 1 is a pretty-printed JSON object. Keep this migration
+            # reader until existing worktrees have been upgraded by one append.
             raw = json.loads(self.path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as error:
             raise PlanningJournalError(
@@ -84,11 +124,13 @@ class LocalCheckpointStore:
                 "local planning journal legacy data is malformed"
             )
         if legacy_comments:
-            return reduce_checkpoint_comments(
+            state = reduce_checkpoint_comments(
                 legacy_comments,
                 session_id=self.session_id,
                 selected_checkpoint_digest=selected_checkpoint_digest,
             )
+            self._remember(state, cacheable=selected_checkpoint_digest is None)
+            return state
         events: list[PlanningCheckpoint] = []
         for event_data in raw["events"]:
             if not isinstance(event_data, Mapping):
@@ -97,11 +139,64 @@ class LocalCheckpointStore:
             if event.session_id != self.session_id:
                 raise PlanningJournalError("local planning journal has a foreign event")
             events.append(event)
+        state = reduce_checkpoint_events(
+            tuple(events),
+            selected_checkpoint_digest=selected_checkpoint_digest,
+            incomplete_manifest_digests=(),
+        )
+        self._remember(state, cacheable=selected_checkpoint_digest is None)
+        return state
+
+    def _load_jsonl(
+        self,
+        stream: Any,
+        header: Mapping[str, Any],
+        *,
+        selected_checkpoint_digest: str | None,
+    ) -> JournalState:
+        if header.get("session_id") != self.session_id:
+            raise PlanningJournalError("local planning journal has a foreign session")
+        events: list[PlanningCheckpoint] = []
+        for line in stream:
+            # A process can stop between writing an event and its newline. That
+            # final record was never acknowledged; ignore it and let the next
+            # append truncate it before writing a replacement.
+            if not line.endswith("\n"):
+                break
+            if not line.strip():
+                continue
+            try:
+                value = json.loads(line)
+            except json.JSONDecodeError as error:
+                raise PlanningJournalError(
+                    "local planning journal contains an invalid event"
+                ) from error
+            if not isinstance(value, Mapping):
+                raise PlanningJournalError("local planning journal event is malformed")
+            event = PlanningCheckpoint.from_data(value)
+            if event.session_id != self.session_id:
+                raise PlanningJournalError("local planning journal has a foreign event")
+            events.append(event)
         return reduce_checkpoint_events(
             tuple(events),
             selected_checkpoint_digest=selected_checkpoint_digest,
             incomplete_manifest_digests=(),
         )
+
+    def _signature(self) -> tuple[int, int, int] | None:
+        try:
+            info = self.path.stat()
+        except FileNotFoundError:
+            return None
+        return (info.st_ino, info.st_size, info.st_mtime_ns)
+
+    def _remember(self, state: JournalState, *, cacheable: bool = True) -> None:
+        if not cacheable:
+            self._cached_state = None
+            self._cached_signature = None
+            return
+        self._cached_state = state
+        self._cached_signature = self._signature()
 
     def import_legacy_comments(
         self, comments: Sequence[Mapping[str, Any]]
@@ -160,30 +255,90 @@ class LocalCheckpointStore:
                     "new checkpoint sequence does not follow its parent"
                 )
             events = (*current.events, checkpoint)
-            self._write(events)
-            updated = self.load(
-                selected_checkpoint_digest=(
-                    checkpoint.digest
-                    if selected_checkpoint_digest is not None
-                    else None
-                )
+            if (
+                selected_checkpoint_digest is None
+                and current.status == "active"
+                and not current.fork_parent_digests
+                and not current.stale_event_digests
+                and self._is_jsonl()
+            ):
+                self._append_event(checkpoint)
+            else:
+                # Upgrade v1 journals and compact an explicitly selected
+                # branch into the canonical append-only representation.
+                self._write(events)
+            updated = JournalState(
+                status="active",
+                head=checkpoint,
+                events=events,
+                fork_parent_digests=(),
+                stale_event_digests=(),
+                incomplete_manifest_digests=(),
+                selected_checkpoint_digest=selected_checkpoint_digest,
             )
-            if updated.head is None or updated.head.digest != checkpoint.digest:
-                raise JournalForkError(
-                    "local checkpoint append did not produce a unique canonical head"
-                )
+            self._remember(updated)
             return updated
         finally:
             fcntl.flock(lock_descriptor, fcntl.LOCK_UN)
             os.close(lock_descriptor)
 
     def _write(self, events: Sequence[PlanningCheckpoint]) -> None:
-        self._write_raw(
-            {
-                "schema": "planning-checkpoint-journal-v1",
-                "session_id": self.session_id,
-                "events": [event.to_data() for event in events],
-            }
+        self.directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+        os.chmod(self.directory, 0o700)
+        descriptor, temporary_name = tempfile.mkstemp(
+            prefix=f".{self.session_id}-", suffix=".tmp", dir=self.directory
+        )
+        temporary_path = Path(temporary_name)
+        try:
+            os.fchmod(descriptor, 0o600)
+            with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+                header = {
+                    "schema": "planning-checkpoint-journal-v2",
+                    "session_id": self.session_id,
+                }
+                stream.write(_compact_json(header) + "\n")
+                for event in events:
+                    stream.write(_compact_json(event.to_data()) + "\n")
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.replace(temporary_path, self.path)
+        finally:
+            temporary_path.unlink(missing_ok=True)
+        self._cached_state = None
+        self._cached_signature = None
+
+    def _append_event(self, event: PlanningCheckpoint) -> None:
+        # Remove an unacknowledged partial tail left by process termination.
+        with self.path.open("r+b") as stream:
+            stream.seek(0, os.SEEK_END)
+            end = stream.tell()
+            if end:
+                stream.seek(end - 1)
+                if stream.read(1) != b"\n":
+                    stream.seek(0)
+                    content = stream.read()
+                    last_newline = content.rfind(b"\n")
+                    if last_newline < 0:
+                        raise PlanningJournalError(
+                            "local planning journal header is incomplete"
+                        )
+                    stream.truncate(last_newline + 1)
+                    stream.seek(0, os.SEEK_END)
+            stream.write((_compact_json(event.to_data()) + "\n").encode("utf-8"))
+            stream.flush()
+            os.fsync(stream.fileno())
+        self._cached_state = None
+        self._cached_signature = None
+
+    def _is_jsonl(self) -> bool:
+        try:
+            with self.path.open("r", encoding="utf-8") as stream:
+                header = json.loads(stream.readline())
+        except (OSError, json.JSONDecodeError):
+            return False
+        return (
+            isinstance(header, Mapping)
+            and header.get("schema") == "planning-checkpoint-journal-v2"
         )
 
     def _write_raw(self, record: Mapping[str, Any]) -> None:
@@ -207,6 +362,8 @@ class LocalCheckpointStore:
             os.replace(temporary_path, self.path)
         finally:
             temporary_path.unlink(missing_ok=True)
+        self._cached_state = None
+        self._cached_signature = None
 
 
 class LocalDiagnosticCache:

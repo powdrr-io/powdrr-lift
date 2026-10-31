@@ -1,0 +1,109 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1253
+title: Expose pending job actions to the supervisor
+intent:
+  problem: Durable job action requests have no typed repository-scoped read for the supervisor.
+  goal: Provide a bounded read model for pending intents so a supervisor can consume accepted work after restart.
+human-decisions: []
+structured_files: []
+files:
+- path: packages/contracts/src/powdrr_contracts/workspace.py
+  type: modified
+  span:
+    start_line: 40
+    end_line: 47
+  summary: Define the lifecycle states for durable job action intents.
+  rationale: Share a validated state vocabulary between persistence and supervisor adapters.
+- path: packages/contracts/src/powdrr_contracts/workspace.py
+  type: modified
+  span:
+    start_line: 679
+    end_line: 746
+  summary: Add a typed serializable job action intent record.
+  rationale: Give supervisor consumers a stable contract without exposing storage rows.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 27
+    end_line: 27
+  summary: Import the durable action state enum.
+  rationale: Filter pending intents using the shared contract.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 41
+    end_line: 41
+  summary: Import the typed job action intent record.
+  rationale: Return validated records from workspace storage.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 3127
+    end_line: 3154
+  summary: List pending job actions in a bounded, repository-scoped query.
+  rationale: Let the supervisor discover durable requests without polling GitHub or reading unrelated repositories.
+- path: tests/test_ui_workspace.py
+  type: modified
+  span:
+    start_line: 15
+    end_line: 15
+  summary: Import the action intent state for persistence tests.
+  rationale: Assert pending state with the shared contract enum.
+- path: tests/test_ui_workspace.py
+  type: modified
+  span:
+    start_line: 32
+    end_line: 32
+  summary: Import the typed action intent contract for round-trip coverage.
+  rationale: Verify supervisor-facing records serialize and validate consistently.
+- path: tests/test_ui_workspace.py
+  type: modified
+  span:
+    start_line: 382
+    end_line: 393
+  summary: Verify the job action intent contract round-trips.
+  rationale: Ensure the supervisor record has a stable validated representation.
+- path: tests/test_ui_workspace.py
+  type: modified
+  span:
+    start_line: 429
+    end_line: 472
+  summary: Verify pending intent reads are bounded and scoped to one repository.
+  rationale: Ensure a supervisor cannot receive other repositories' actions or unbounded results.
+entities:
+- id: workspace-job-action-intent-state
+  type: Enum
+  action: added
+- id: workspace-job-action-intent-contract
+  type: Struct
+  action: added
+- id: workspace-pending-job-actions-reader
+  type: Method
+  action: added
+- id: workspace-pending-job-actions-tests
+  type: Integration test
+  action: added
+entity_relationships:
+- id: pending-actions-reader-returns-contract-records
+  type: returns
+  source: workspace-pending-job-actions-reader
+  target: workspace-job-action-intent-contract
+  action: added
+  description: The repository-scoped query returns validated intent records in bounded batches.
+- id: pending-actions-tests-verify-reader
+  type: verifies
+  source: workspace-pending-job-actions-tests
+  target: workspace-pending-job-actions-reader
+  action: added
+  description: Tests verify result bounds, repository scope, and pending intent state.
+invariants:
+- id: supervisor-action-read-is-bounded-and-repository-scoped
+  description: Pending action reads return at most the requested bounded number of intents for one repository.
+  action: added
+- id: action-intent-contract-preserves-request-identity
+  description: Each supervisor-facing record carries the action ID, original request ID, expected revision, action, and state.
+  action: added
+guidance:
+- id: supervisor-consumes-actions-outside-http
+  description: Consume intents through the supervisor using action IDs for deduplication; keep the API handler limited to durable acceptance.
+  action: added

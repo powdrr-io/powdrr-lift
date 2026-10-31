@@ -292,12 +292,19 @@ def test_job_detail_hides_local_paths_and_checks_repository_association(
     operation = store.get_job_operation(job.job_id, "attempt-plan")
     assert detail.json()["attempts"] == [
         {
+            "schema_version": 1,
             "attempt_id": "attempt-plan",
             "run_id": "run-plan",
             "source_spec_revision": "revision-1",
             "created_at": operation.created_at,
         }
     ]
+    assert detail.json()["latest_attempt"] == detail.json()["attempts"][0]
+    assert detail.json()["stage"] is None
+    assert detail.json()["blockers"] == []
+    assert detail.json()["question"] is None
+    assert detail.json()["outputs"] == []
+    assert detail.json()["allowed_actions"] == ["cancel"]
     assert str(worktree) not in detail.text
     assert "workflow_directory" not in detail.text
 
@@ -314,6 +321,47 @@ def test_job_detail_hides_local_paths_and_checks_repository_association(
     )
     assert response.status_code == 404
     assert response.json()["error"]["code"] == "not_found"
+
+
+def test_job_detail_reports_dependency_blockers_and_allowed_actions(
+    tmp_path: Path,
+) -> None:
+    client, store, repository_id, secret = _client(tmp_path)
+    _sign_in(client, secret)
+    prerequisite = store.create_job(
+        repository_id,
+        kind="planning",
+        title="Plan prerequisite",
+        request_id="job-prerequisite",
+    )
+    dependent = store.create_job(
+        repository_id,
+        kind="pr_execution",
+        title="Execute plan",
+        dependency_ids=[prerequisite.job_id],
+        request_id="job-dependent",
+    )
+
+    response = client.get(
+        f"/api/v1/repositories/{repository_id}/jobs/{dependent.job_id}"
+    )
+
+    assert response.status_code == 200
+    detail = response.json()
+    assert detail["job"]["state"] == "pending"
+    assert detail["blockers"] == [
+        {
+            "schema_version": 1,
+            "job_id": prerequisite.job_id,
+            "title": "Plan prerequisite",
+            "state": "ready",
+        }
+    ]
+    assert detail["latest_attempt"] is None
+    assert detail["attempts"] == []
+    assert detail["stage"] is None
+    assert detail["question"] is None
+    assert detail["allowed_actions"] == ["cancel"]
 
 
 def test_event_stream_formats_durable_replay_events(tmp_path: Path) -> None:

@@ -11,6 +11,10 @@ from powdrr_contracts.workspace import (
     DispatchIntent,
     EventType,
     Job,
+    JobAction,
+    JobAttemptSummary,
+    JobBlocker,
+    JobKind,
     JobOperation,
     JobState,
     Message,
@@ -24,6 +28,7 @@ from powdrr_contracts.workspace import (
     WorkspaceApiErrorResponse,
     WorkspaceContractError,
     WorkspaceEvent,
+    WorkspaceJobDetail,
     WorkspaceQuestion,
     WorkspaceRepository,
     WorkspaceSnapshot,
@@ -347,6 +352,31 @@ def test_workspace_contracts_round_trip_and_reject_unknown_fields() -> None:
         "msg-1", "chat-1", MessageRole.USER, "Build search", "2026-01-01T00:00:00Z", 1
     )
     assert Message.from_dict(message.to_dict()) == message
+    job = Job(
+        "job-1",
+        "repo-a",
+        JobKind.PLANNING,
+        "Plan search",
+        JobState.PENDING,
+        None,
+        ("job-2",),
+        ("artifact:plan",),
+        "Waiting for dependency",
+        3,
+        "2026-01-01T00:00:00Z",
+        "2026-01-01T00:00:00Z",
+    )
+    attempt = JobAttemptSummary("attempt-1", "run-1", "revision-1", "created")
+    detail = WorkspaceJobDetail(
+        job=job,
+        attempts=(attempt,),
+        stage="waiting",
+        blockers=(JobBlocker("job-2", "Prerequisite", JobState.READY),),
+        question=None,
+        outputs=("artifact:plan",),
+        allowed_actions=(JobAction.CANCEL,),
+    )
+    assert WorkspaceJobDetail.from_dict(detail.to_dict()) == detail
     conversation = Conversation(
         "chat-1",
         "repo-a",

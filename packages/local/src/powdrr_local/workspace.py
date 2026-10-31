@@ -23,6 +23,9 @@ from powdrr_contracts.workspace import (
     DispatchIntent,
     EventType,
     Job,
+    JobAction,
+    JobAttemptSummary,
+    JobBlocker,
     JobKind,
     JobOperation,
     JobState,
@@ -34,6 +37,7 @@ from powdrr_contracts.workspace import (
     WorkerOwnership,
     WorkerState,
     WorkspaceEvent,
+    WorkspaceJobDetail,
     WorkspaceQuestion,
     WorkspaceRepository,
     WorkspaceSnapshot,
@@ -84,6 +88,18 @@ _TURN_TRANSITIONS = {
     TurnState.SUCCEEDED: set(),
     TurnState.FAILED: set(),
     TurnState.CANCELLED: set(),
+}
+
+_JOB_ACTIONS_BY_STATE = {
+    JobState.PENDING: (JobAction.CANCEL,),
+    JobState.READY: (JobAction.START, JobAction.CANCEL),
+    JobState.RUNNING: (JobAction.CANCEL,),
+    JobState.WAITING_FOR_INPUT: (JobAction.CANCEL,),
+    JobState.WAITING_FOR_EXTERNAL: (JobAction.CANCEL,),
+    JobState.INTERRUPTED: (JobAction.RETRY, JobAction.CANCEL),
+    JobState.FAILED: (JobAction.RETRY, JobAction.CANCEL),
+    JobState.SUCCEEDED: (),
+    JobState.CANCELLED: (),
 }
 
 _SCHEMA = """
@@ -2953,6 +2969,51 @@ class WorkspaceStore:
     def get_job(self, job_id: str) -> Job:
         with self._connection() as db:
             return self._job(db, job_id)
+
+    def read_job_detail(self, repository_id: str, job_id: str) -> WorkspaceJobDetail:
+        """Read one bounded, repository-scoped job detail projection atomically."""
+        with self._connection() as db:
+            db.execute("BEGIN")
+            job = self._job(db, job_id)
+            if job.repository_id != repository_id:
+                raise KeyError("Job does not exist")
+            operation_rows = db.execute(
+                "SELECT operation_id FROM job_operations WHERE job_id=? "
+                "ORDER BY created_at DESC,attempt_id DESC LIMIT 100",
+                (job_id,),
+            ).fetchall()
+            operations = tuple(
+                self._operation(db, row["operation_id"])
+                for row in reversed(operation_rows)
+            )
+            blockers = tuple(
+                JobBlocker(row["job_id"], row["title"], JobState(row["state"]))
+                for row in db.execute(
+                    "SELECT j.job_id,j.title,j.state FROM dependencies d "
+                    "JOIN jobs j ON j.job_id=d.dependency_id "
+                    "WHERE d.job_id=? AND j.state!='succeeded' "
+                    "ORDER BY j.job_id",
+                    (job_id,),
+                )
+            )
+            attempts = tuple(
+                JobAttemptSummary(
+                    item.attempt_id,
+                    item.run_id,
+                    item.source_spec_revision,
+                    item.created_at,
+                )
+                for item in operations
+            )
+            return WorkspaceJobDetail(
+                job=job,
+                attempts=attempts,
+                stage=None,
+                blockers=blockers,
+                question=None,
+                outputs=job.artifact_refs,
+                allowed_actions=_JOB_ACTIONS_BY_STATE[job.state],
+            )
 
     def list_jobs(
         self,

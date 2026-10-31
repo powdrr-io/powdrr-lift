@@ -1,26 +1,57 @@
 schema: https://powdrr.io/schema/changelog-v2
 change_id: 1232
-title: Keep planned-write context references unique
+title: Make plan resume recover structural answers
 intent:
-  problem: "Planning can emit multiple writes to the same path in one work unit, which produced duplicate context reference IDs and stopped issue-session resume."
-  goal: "Assign every planned-write context record a deterministic unique reference so structural questions validate and planning can continue."
+  problem: "Large resumed plans can stop on malformed structural answers or repeatedly recompute the accepted work-unit assembly."
+  goal: "Recover planned-file references deterministically and avoid recomputing stable planning state as structural answers accumulate."
 human-decisions: []
 structured_files: []
 files:
   - path: packages/service/src/powdrr_service/planning/structrr.py
     type: modified
-    span: {start_line: 465, end_line: 480}
+    span: {start_line: 476, end_line: 491}
     summary: Add an occurrence suffix to repeated planned-write references within one unit.
     rationale: Keep every planned-write context record addressable while satisfying question reference uniqueness.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 160, end_line: 160}
+    summary: Track when an entity reference is recoverable as a planned new file.
+    rationale: Avoid retrying an answer that refers to a planned path absent from the projected baseline.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 177, end_line: 184}
+    summary: Resolve a baseline-absent planned file mislabeled as an entity.
+    rationale: Convert the model's path reference into the canonical new file subject deterministically.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 196, end_line: 197}
+    summary: Normalize recovered planned files to the added action.
+    rationale: Keep the action consistent with a new file identity.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 138, end_line: 139}
+    summary: Store the accepted assembly cache key and value on the question machine.
+    rationale: Reuse immutable assembly work as structural answers accumulate.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 785, end_line: 837}
+    summary: Reuse the accepted assembly when only structural answers change.
+    rationale: Avoid rerunning work-unit allocation and dependency compilation for every structural checkpoint.
   - path: tests/test_planning_structrr.py
     type: modified
-    span: {start_line: 278, end_line: 316}
-    summary: Cover enumeration requests with repeated planned-write paths.
-    rationale: Ensure duplicate write paths no longer prevent a planning question from validating.
+    span: {start_line: 278, end_line: 403}
+    summary: Cover duplicate planned writes, planned-file reference recovery, and assembly-cache invalidation.
+    rationale: Ensure structural questions remain valid and stable accepted planning state is reused during resume.
 entities: []
 entity_relationships: []
 invariants:
   - id: planning-context-reference-ids-are-unique
     description: Context references for repeated planned writes use stable, unique IDs within each question.
+    action: altered
+  - id: planning-assembly-reused-for-structural-answers
+    description: Changes to structural answers do not invalidate the accepted work-unit and dependency assembly.
+    action: altered
+  - id: planned-file-reference-recovery
+    description: A planned baseline-absent file mistakenly returned as an entity reference is normalized to a new file subject.
     action: altered
 guidance: []

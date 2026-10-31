@@ -1,12 +1,20 @@
 from __future__ import annotations
 
+import importlib.util
 from dataclasses import replace
 
 import pytest
+from powdrr_service.intent_packet import IntentPacket
 
 from powdrr_lift.core.execution_plan import ExecutionUnit
 from powdrr_lift.core.implementation_packet import compile_implementation_packet
-from powdrr_lift.core.intent_packet import IntentPacket
+
+
+def test_legacy_agent_intent_packet_module_is_removed() -> None:
+    import powdrr_lift.core as agent_core
+
+    assert importlib.util.find_spec("powdrr_lift.core.intent_packet") is None
+    assert not hasattr(agent_core, "IntentPacket")
 
 
 def test_packet_fingerprint_is_independent_of_mapping_order() -> None:

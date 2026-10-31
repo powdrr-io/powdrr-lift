@@ -20,10 +20,11 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any, Protocol, cast
 
+from powdrr_service.intent_packet import IntentPacket
+
 from powdrr_lift.core.behavior_contract import BehaviorScenario
 from powdrr_lift.core.execution_plan import ExecutionPlan, ExecutionUnit
 from powdrr_lift.core.implementation_packet import ImplementationPacket
-from powdrr_lift.core.intent_packet import IntentPacket
 from powdrr_lift.minisweagent_monitor import MiniSWEAgentSnapshot, run_minisweagent
 from powdrr_lift.opencode_monitor import run_opencode
 

@@ -1,0 +1,73 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1244
+title: Move intent packet policy into service
+intent:
+  problem: The operation-scoped intent packet schema, stable fingerprint, and coding-context renderer still lived in the legacy agent package.
+  goal: Move the packet contract and model-facing rendering into service and have the coding agent consume it directly.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 1048, end_line: 1048}
+  summary: Remove the legacy core package dependency on intent packets.
+  rationale: Keep agent core exports accurate after removing the old re-export.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 1328, end_line: 1328}
+  summary: Record the extraction PR for intent packets.
+  rationale: Link the service ownership entry to the PR that establishes it.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 1331, end_line: 1334}
+  summary: Assign intent packet policy to service.
+  rationale: Document service ownership of the packet schema, fingerprint, and renderer.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 2542, end_line: 2542}
+  summary: Record the service dependency for coding agent packet handling.
+  rationale: Reflect its direct import of the service-owned packet type.
+- path: src/powdrr_lift/core/__init__.py
+  type: modified
+  span: {start_line: 35, end_line: 38}
+  summary: Remove direct intent packet exports from agent core.
+  rationale: Avoid a compatibility surface after moving the contract to service.
+- path: src/powdrr_lift/core/__init__.py
+  type: modified
+  span: {start_line: 269, end_line: 269}
+  summary: Remove the legacy module alias.
+  rationale: Keep lazy core exports free of the removed module path.
+- path: src/powdrr_lift/core/__init__.py
+  type: modified
+  span: {start_line: 291, end_line: 292}
+  summary: Remove intent packet symbols from the lazy core export map.
+  rationale: Require consumers to import the owning service module.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span: {start_line: 23, end_line: 24}
+  summary: Import the intent packet contract from service.
+  rationale: Keep coding-agent orchestration on the owning package's API.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span: {start_line: 26, end_line: 26}
+  summary: Remove the legacy intent packet import.
+  rationale: Eliminate the obsolete agent package dependency.
+- path: tests/test_intent_packet.py
+  type: modified
+  span: {start_line: 3, end_line: 3}
+  summary: Import module lookup for the removed-path regression test.
+  rationale: Verify the old module does not remain as a compatibility shim.
+- path: tests/test_intent_packet.py
+  type: modified
+  span: {start_line: 7, end_line: 7}
+  summary: Import the packet type from service.
+  rationale: Exercise the owning package directly.
+- path: tests/test_intent_packet.py
+  type: modified
+  span: {start_line: 11, end_line: 17}
+  summary: Assert the legacy module and core export are absent.
+  rationale: Protect the package boundary and ensure no compatibility path remains.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []

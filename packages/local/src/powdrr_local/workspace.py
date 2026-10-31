@@ -12,7 +12,7 @@ import sqlite3
 import subprocess
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -20,6 +20,7 @@ from uuid import uuid4
 from jsonschema import Draft202012Validator, SchemaError, ValidationError
 from powdrr_contracts.workspace import (
     Conversation,
+    DispatchIntent,
     EventType,
     Job,
     JobKind,
@@ -28,7 +29,10 @@ from powdrr_contracts.workspace import (
     Message,
     MessageRole,
     QuestionState,
+    SupervisorLease,
     TurnState,
+    WorkerOwnership,
+    WorkerState,
     WorkspaceEvent,
     WorkspaceQuestion,
     WorkspaceRepository,
@@ -159,7 +163,26 @@ CREATE TABLE job_operations (
     UNIQUE(job_id, attempt_id), UNIQUE(run_id, attempt_id)
 );
 CREATE INDEX job_operation_history ON job_operations(job_id, created_at);
-PRAGMA user_version = 6;
+CREATE TABLE supervisor_lease (
+    lease_key INTEGER PRIMARY KEY CHECK (lease_key=1),
+    supervisor_id TEXT NOT NULL, generation INTEGER NOT NULL,
+    process_id INTEGER NOT NULL, process_started_at TEXT NOT NULL,
+    lease_expires_at TEXT NOT NULL, updated_at TEXT NOT NULL
+);
+CREATE TABLE worker_ownership (
+    worker_id TEXT PRIMARY KEY,
+    job_id TEXT NOT NULL, run_id TEXT NOT NULL, attempt_id TEXT NOT NULL,
+    supervisor_id TEXT NOT NULL, supervisor_generation INTEGER NOT NULL,
+    process_id INTEGER NOT NULL, process_started_at TEXT NOT NULL,
+    heartbeat_at TEXT NOT NULL, lease_expires_at TEXT NOT NULL,
+    cancellation_requested INTEGER NOT NULL CHECK (cancellation_requested IN (0,1)),
+    dispatch_intent TEXT NOT NULL,
+    state TEXT NOT NULL, revision INTEGER NOT NULL, updated_at TEXT NOT NULL,
+    UNIQUE(job_id, attempt_id),
+    FOREIGN KEY(job_id, attempt_id) REFERENCES job_operations(job_id, attempt_id)
+);
+CREATE INDEX worker_lease_expiry ON worker_ownership(lease_expires_at);
+PRAGMA user_version = 7;
 """
 
 _REPOSITORY_TABLE = (
@@ -202,6 +225,26 @@ _JOB_OPERATION_TABLES = (
     "CREATE INDEX job_operation_history ON job_operations(job_id, created_at)",
 )
 
+_SUPERVISOR_TABLES = (
+    "CREATE TABLE supervisor_lease ("
+    "lease_key INTEGER PRIMARY KEY CHECK (lease_key=1), "
+    "supervisor_id TEXT NOT NULL, generation INTEGER NOT NULL, "
+    "process_id INTEGER NOT NULL, process_started_at TEXT NOT NULL, "
+    "lease_expires_at TEXT NOT NULL, updated_at TEXT NOT NULL)",
+    "CREATE TABLE worker_ownership ("
+    "worker_id TEXT PRIMARY KEY, job_id TEXT NOT NULL, run_id TEXT NOT NULL, "
+    "attempt_id TEXT NOT NULL, supervisor_id TEXT NOT NULL, "
+    "supervisor_generation INTEGER NOT NULL, process_id INTEGER NOT NULL, "
+    "process_started_at TEXT NOT NULL, heartbeat_at TEXT NOT NULL, "
+    "lease_expires_at TEXT NOT NULL, cancellation_requested INTEGER NOT NULL "
+    "CHECK (cancellation_requested IN (0,1)), "
+    "dispatch_intent TEXT NOT NULL, state TEXT NOT NULL, revision INTEGER NOT NULL, "
+    "updated_at TEXT NOT NULL, UNIQUE(job_id, attempt_id), "
+    "FOREIGN KEY(job_id, attempt_id) REFERENCES "
+    "job_operations(job_id, attempt_id))",
+    "CREATE INDEX worker_lease_expiry ON worker_ownership(lease_expires_at)",
+)
+
 
 def _required(value: str, name: str) -> str:
     if not isinstance(value, str) or not value.strip():
@@ -211,6 +254,34 @@ def _required(value: str, name: str) -> str:
 
 def _now() -> str:
     return datetime.now(UTC).isoformat()
+
+
+def _utc_datetime(value: datetime | None = None) -> datetime:
+    result = datetime.now(UTC) if value is None else value
+    if result.tzinfo is None or result.utcoffset() is None:
+        raise ValueError("Lease timestamps must include a timezone")
+    return result.astimezone(UTC)
+
+
+def _lease_expiry(now: datetime, lease_seconds: int) -> str:
+    if (
+        not isinstance(lease_seconds, int)
+        or isinstance(lease_seconds, bool)
+        or not 1 <= lease_seconds <= 3600
+    ):
+        raise ValueError("lease_seconds must be between 1 and 3600")
+    return (now + timedelta(seconds=lease_seconds)).isoformat()
+
+
+def _timestamp(value: datetime) -> str:
+    return value.isoformat()
+
+
+def _parse_timestamp(value: str) -> datetime:
+    parsed = datetime.fromisoformat(value)
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise ValueError("Stored lease timestamps must include a timezone")
+    return parsed.astimezone(UTC)
 
 
 def _request_digest(command: dict[str, Any]) -> str:
@@ -320,7 +391,7 @@ class WorkspaceStore:
                 if db.execute("PRAGMA user_version").fetchone()[0] == 3:
                     db.execute(_REPOSITORY_TABLE)
                     db.execute("PRAGMA user_version = 4")
-            elif version not in {4, 5, 6}:
+            elif version not in {4, 5, 6, 7}:
                 raise ValueError(f"Unsupported workspace schema version: {version}")
             current_version = db.execute("PRAGMA user_version").fetchone()[0]
             if current_version == 4:
@@ -330,7 +401,7 @@ class WorkspaceStore:
                     for statement in _TURN_TABLES:
                         db.execute(statement)
                     db.execute("PRAGMA user_version = 5")
-            elif current_version not in {5, 6}:
+            elif current_version not in {5, 6, 7}:
                 raise ValueError(
                     f"Unsupported workspace schema version: {current_version}"
                 )
@@ -342,7 +413,19 @@ class WorkspaceStore:
                     for statement in _JOB_OPERATION_TABLES:
                         db.execute(statement)
                     db.execute("PRAGMA user_version = 6")
-            elif current_version != 6:
+            elif current_version not in {6, 7}:
+                raise ValueError(
+                    f"Unsupported workspace schema version: {current_version}"
+                )
+            current_version = db.execute("PRAGMA user_version").fetchone()[0]
+            if current_version == 6:
+                if not db.in_transaction:
+                    db.execute("BEGIN IMMEDIATE")
+                if db.execute("PRAGMA user_version").fetchone()[0] == 6:
+                    for statement in _SUPERVISOR_TABLES:
+                        db.execute(statement)
+                    db.execute("PRAGMA user_version = 7")
+            elif current_version != 7:
                 raise ValueError(
                     f"Unsupported workspace schema version: {current_version}"
                 )
@@ -1803,6 +1886,563 @@ class WorkspaceStore:
                 (job_id,),
             ).fetchall()
             return tuple(self._operation(db, row["operation_id"]) for row in rows)
+
+    @staticmethod
+    def _supervisor_lease(db: sqlite3.Connection) -> SupervisorLease:
+        row = db.execute("SELECT * FROM supervisor_lease WHERE lease_key=1").fetchone()
+        if row is None:
+            raise KeyError("No supervisor lease has been acquired")
+        return SupervisorLease(
+            row["supervisor_id"],
+            row["generation"],
+            row["process_id"],
+            row["process_started_at"],
+            row["lease_expires_at"],
+            row["updated_at"],
+        )
+
+    @staticmethod
+    def _worker_ownership(row: sqlite3.Row | None) -> WorkerOwnership:
+        if row is None:
+            raise KeyError("Worker ownership does not exist")
+        return WorkerOwnership(
+            row["worker_id"],
+            row["job_id"],
+            row["run_id"],
+            row["attempt_id"],
+            row["supervisor_id"],
+            row["supervisor_generation"],
+            row["process_id"],
+            row["process_started_at"],
+            row["heartbeat_at"],
+            row["lease_expires_at"],
+            bool(row["cancellation_requested"]),
+            DispatchIntent(row["dispatch_intent"]),
+            WorkerState(row["state"]),
+            row["revision"],
+            row["updated_at"],
+        )
+
+    def acquire_supervisor_lease(
+        self,
+        supervisor_id: str,
+        *,
+        process_id: int,
+        process_started_at: str,
+        lease_seconds: int = 30,
+        now: datetime | None = None,
+    ) -> SupervisorLease:
+        _required(supervisor_id, "supervisor_id")
+        _required(process_started_at, "process_started_at")
+        if (
+            not isinstance(process_id, int)
+            or isinstance(process_id, bool)
+            or process_id < 1
+        ):
+            raise ValueError("process_id must be a positive integer")
+        instant = _utc_datetime(now)
+        expires_at = _lease_expiry(instant, lease_seconds)
+        timestamp = _timestamp(instant)
+        with self._connection() as db:
+            db.execute("BEGIN IMMEDIATE")
+            row = db.execute(
+                "SELECT * FROM supervisor_lease WHERE lease_key=1"
+            ).fetchone()
+            if row is None:
+                generation = 1
+                db.execute(
+                    "INSERT INTO supervisor_lease VALUES (1,?,?,?,?,?,?)",
+                    (
+                        supervisor_id,
+                        generation,
+                        process_id,
+                        process_started_at,
+                        expires_at,
+                        timestamp,
+                    ),
+                )
+            else:
+                current_expiry = _parse_timestamp(row["lease_expires_at"])
+                active = current_expiry > instant
+                same_process = (
+                    row["supervisor_id"] == supervisor_id
+                    and row["process_id"] == process_id
+                    and row["process_started_at"] == process_started_at
+                )
+                if active and not same_process:
+                    raise WorkspaceConflict(
+                        "Another supervisor holds the workspace lease"
+                    )
+                generation = row["generation"] if active else row["generation"] + 1
+                db.execute(
+                    "UPDATE supervisor_lease SET supervisor_id=?,generation=?,"
+                    "process_id=?,process_started_at=?,lease_expires_at=?,updated_at=? "
+                    "WHERE lease_key=1",
+                    (
+                        supervisor_id,
+                        generation,
+                        process_id,
+                        process_started_at,
+                        expires_at,
+                        timestamp,
+                    ),
+                )
+            return self._supervisor_lease(db)
+
+    def get_supervisor_lease(self) -> SupervisorLease:
+        with self._connection() as db:
+            return self._supervisor_lease(db)
+
+    def renew_supervisor_lease(
+        self,
+        supervisor_id: str,
+        generation: int,
+        *,
+        lease_seconds: int = 30,
+        now: datetime | None = None,
+    ) -> SupervisorLease:
+        instant = _utc_datetime(now)
+        expires_at = _lease_expiry(instant, lease_seconds)
+        timestamp = _timestamp(instant)
+        with self._connection() as db:
+            db.execute("BEGIN IMMEDIATE")
+            lease = self._supervisor_lease(db)
+            if (
+                lease.supervisor_id != supervisor_id
+                or lease.generation != generation
+                or _parse_timestamp(lease.lease_expires_at) <= instant
+            ):
+                raise WorkspaceConflict("Supervisor lease is stale or expired")
+            db.execute(
+                "UPDATE supervisor_lease SET lease_expires_at=?,updated_at=? "
+                "WHERE lease_key=1",
+                (expires_at, timestamp),
+            )
+            return self._supervisor_lease(db)
+
+    def release_supervisor_lease(
+        self,
+        supervisor_id: str,
+        generation: int,
+        *,
+        now: datetime | None = None,
+    ) -> SupervisorLease:
+        instant = _utc_datetime(now)
+        timestamp = _timestamp(instant)
+        with self._connection() as db:
+            db.execute("BEGIN IMMEDIATE")
+            lease = self._supervisor_lease(db)
+            if (lease.supervisor_id, lease.generation) != (
+                supervisor_id,
+                generation,
+            ):
+                raise WorkspaceConflict(
+                    "Supervisor lease is owned by another generation"
+                )
+            db.execute(
+                "UPDATE supervisor_lease SET lease_expires_at=?,updated_at=? "
+                "WHERE lease_key=1",
+                (timestamp, timestamp),
+            )
+            return self._supervisor_lease(db)
+
+    def claim_job_worker(
+        self,
+        job_id: str,
+        attempt_id: str,
+        *,
+        worker_id: str,
+        supervisor_id: str,
+        supervisor_generation: int,
+        process_id: int,
+        process_started_at: str,
+        dispatch_intent: DispatchIntent,
+        lease_seconds: int = 30,
+        now: datetime | None = None,
+    ) -> WorkerOwnership:
+        for value, name in (
+            (worker_id, "worker_id"),
+            (supervisor_id, "supervisor_id"),
+            (attempt_id, "attempt_id"),
+            (process_started_at, "process_started_at"),
+        ):
+            _required(value, name)
+        if (
+            not isinstance(process_id, int)
+            or isinstance(process_id, bool)
+            or process_id < 1
+        ):
+            raise ValueError("process_id must be a positive integer")
+        intent = DispatchIntent(dispatch_intent)
+        instant = _utc_datetime(now)
+        timestamp = _timestamp(instant)
+        expires_at = _lease_expiry(instant, lease_seconds)
+        with self._connection() as db:
+            db.execute("BEGIN IMMEDIATE")
+            supervisor = self._supervisor_lease(db)
+            if (
+                supervisor.supervisor_id != supervisor_id
+                or supervisor.generation != supervisor_generation
+                or _parse_timestamp(supervisor.lease_expires_at) <= instant
+            ):
+                raise WorkspaceConflict("Supervisor lease is stale or expired")
+            expires_at = min(
+                _parse_timestamp(expires_at),
+                _parse_timestamp(supervisor.lease_expires_at),
+            ).isoformat()
+            job = self._job(db, job_id)
+            operation_row = db.execute(
+                "SELECT run_id FROM job_operations WHERE job_id=? AND attempt_id=?",
+                (job_id, attempt_id),
+            ).fetchone()
+            if operation_row is None:
+                raise KeyError("Job attempt has no durable operation binding")
+            if job.state != JobState.RUNNING:
+                raise WorkspaceConflict("Only a running job attempt can be claimed")
+            existing_row = db.execute(
+                "SELECT * FROM worker_ownership WHERE job_id=? AND attempt_id=?",
+                (job_id, attempt_id),
+            ).fetchone()
+            if existing_row is not None:
+                existing = self._worker_ownership(existing_row)
+                existing_expiry = _parse_timestamp(existing.lease_expires_at)
+                if existing_expiry > instant:
+                    same_owner = (
+                        existing.worker_id == worker_id
+                        and existing.supervisor_id == supervisor_id
+                        and existing.supervisor_generation == supervisor_generation
+                        and existing.process_id == process_id
+                        and existing.process_started_at == process_started_at
+                        and existing.dispatch_intent == intent
+                    )
+                    if same_owner:
+                        return existing
+                    raise WorkspaceConflict("Job attempt already has a live worker")
+                if existing.cancellation_requested:
+                    raise WorkspaceConflict(
+                        "Cancelled worker attempt cannot be reclaimed"
+                    )
+                revision = existing.revision + 1
+                db.execute(
+                    "UPDATE worker_ownership SET worker_id=?,run_id=?,supervisor_id=?,"
+                    "supervisor_generation=?,process_id=?,process_started_at=?,"
+                    "heartbeat_at=?,lease_expires_at=?,dispatch_intent=?,state=?,"
+                    "revision=?,updated_at=? WHERE job_id=? AND attempt_id=?",
+                    (
+                        worker_id,
+                        operation_row["run_id"],
+                        supervisor_id,
+                        supervisor_generation,
+                        process_id,
+                        process_started_at,
+                        timestamp,
+                        expires_at,
+                        intent.value,
+                        WorkerState.CLAIMED.value,
+                        revision,
+                        timestamp,
+                        job_id,
+                        attempt_id,
+                    ),
+                )
+            else:
+                revision = 1
+                db.execute(
+                    "INSERT INTO worker_ownership "
+                    "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                    (
+                        worker_id,
+                        job_id,
+                        operation_row["run_id"],
+                        attempt_id,
+                        supervisor_id,
+                        supervisor_generation,
+                        process_id,
+                        process_started_at,
+                        timestamp,
+                        expires_at,
+                        0,
+                        intent.value,
+                        WorkerState.CLAIMED.value,
+                        revision,
+                        timestamp,
+                    ),
+                )
+            ownership = self._worker_ownership(
+                db.execute(
+                    "SELECT * FROM worker_ownership WHERE job_id=? AND attempt_id=?",
+                    (job_id, attempt_id),
+                ).fetchone()
+            )
+            self._event(
+                db,
+                job.repository_id,
+                "worker_ownership",
+                worker_id,
+                EventType.WORKER_OWNERSHIP_UPDATED,
+                {
+                    "job_id": job_id,
+                    "run_id": ownership.run_id,
+                    "attempt_id": attempt_id,
+                    "supervisor_generation": supervisor_generation,
+                    "dispatch_intent": intent.value,
+                    "state": WorkerState.CLAIMED.value,
+                    "revision": revision,
+                },
+                timestamp,
+            )
+            return ownership
+
+    def heartbeat_job_worker(
+        self,
+        job_id: str,
+        attempt_id: str,
+        *,
+        worker_id: str,
+        supervisor_id: str,
+        supervisor_generation: int,
+        process_id: int,
+        process_started_at: str,
+        lease_seconds: int = 30,
+        now: datetime | None = None,
+    ) -> WorkerOwnership:
+        instant = _utc_datetime(now)
+        timestamp = _timestamp(instant)
+        expires_at = _lease_expiry(instant, lease_seconds)
+        with self._connection() as db:
+            db.execute("BEGIN IMMEDIATE")
+            supervisor = self._supervisor_lease(db)
+            if (
+                supervisor.supervisor_id != supervisor_id
+                or supervisor.generation != supervisor_generation
+                or _parse_timestamp(supervisor.lease_expires_at) <= instant
+            ):
+                raise WorkspaceConflict("Supervisor lease is stale or expired")
+            expires_at = min(
+                _parse_timestamp(expires_at),
+                _parse_timestamp(supervisor.lease_expires_at),
+            ).isoformat()
+            row = db.execute(
+                "SELECT * FROM worker_ownership WHERE job_id=? AND attempt_id=?",
+                (job_id, attempt_id),
+            ).fetchone()
+            ownership = self._worker_ownership(row)
+            matches = (
+                ownership.worker_id == worker_id
+                and ownership.supervisor_id == supervisor_id
+                and ownership.supervisor_generation == supervisor_generation
+                and ownership.process_id == process_id
+                and ownership.process_started_at == process_started_at
+            )
+            if not matches or _parse_timestamp(ownership.lease_expires_at) <= instant:
+                raise WorkspaceConflict("Worker ownership is stale or expired")
+            if ownership.state == WorkerState.EXITED:
+                raise WorkspaceConflict("Exited worker cannot renew its lease")
+            db.execute(
+                "UPDATE worker_ownership SET heartbeat_at=?,lease_expires_at=?,"
+                "state=?,revision=revision+1,updated_at=? "
+                "WHERE job_id=? AND attempt_id=?",
+                (
+                    timestamp,
+                    expires_at,
+                    WorkerState.RUNNING.value,
+                    timestamp,
+                    job_id,
+                    attempt_id,
+                ),
+            )
+            updated = self._worker_ownership(
+                db.execute(
+                    "SELECT * FROM worker_ownership WHERE job_id=? AND attempt_id=?",
+                    (job_id, attempt_id),
+                ).fetchone()
+            )
+            return updated
+
+    def get_job_worker_ownership(self, job_id: str, attempt_id: str) -> WorkerOwnership:
+        with self._connection() as db:
+            return self._worker_ownership(
+                db.execute(
+                    "SELECT * FROM worker_ownership WHERE job_id=? AND attempt_id=?",
+                    (job_id, attempt_id),
+                ).fetchone()
+            )
+
+    def mark_job_worker_exited(
+        self,
+        job_id: str,
+        attempt_id: str,
+        *,
+        expected_revision: int,
+        worker_id: str,
+        supervisor_id: str,
+        supervisor_generation: int,
+        process_id: int,
+        process_started_at: str,
+        now: datetime | None = None,
+    ) -> WorkerOwnership:
+        instant = _utc_datetime(now)
+        timestamp = _timestamp(instant)
+        with self._connection() as db:
+            db.execute("BEGIN IMMEDIATE")
+            supervisor = self._supervisor_lease(db)
+            if (
+                supervisor.supervisor_id != supervisor_id
+                or supervisor.generation != supervisor_generation
+                or _parse_timestamp(supervisor.lease_expires_at) <= instant
+            ):
+                raise WorkspaceConflict("Supervisor lease is stale or expired")
+            row = db.execute(
+                "SELECT * FROM worker_ownership WHERE job_id=? AND attempt_id=?",
+                (job_id, attempt_id),
+            ).fetchone()
+            ownership = self._worker_ownership(row)
+            same_process = (
+                ownership.worker_id == worker_id
+                and ownership.supervisor_id == supervisor_id
+                and ownership.supervisor_generation == supervisor_generation
+                and ownership.process_id == process_id
+                and ownership.process_started_at == process_started_at
+            )
+            if same_process and ownership.state == WorkerState.EXITED:
+                return ownership
+            if ownership.revision != expected_revision:
+                raise WorkspaceConflict("Worker ownership revision has changed")
+            if (
+                not same_process
+                or _parse_timestamp(ownership.lease_expires_at) <= instant
+            ):
+                raise WorkspaceConflict("Worker ownership is stale or expired")
+            db.execute(
+                "UPDATE worker_ownership SET state=?,lease_expires_at=?,"
+                "revision=revision+1,updated_at=? WHERE job_id=? AND attempt_id=?",
+                (
+                    WorkerState.EXITED.value,
+                    timestamp,
+                    timestamp,
+                    job_id,
+                    attempt_id,
+                ),
+            )
+            job = self._job(db, job_id)
+            self._event(
+                db,
+                job.repository_id,
+                "worker_ownership",
+                worker_id,
+                EventType.WORKER_OWNERSHIP_UPDATED,
+                {
+                    "job_id": job_id,
+                    "attempt_id": attempt_id,
+                    "state": WorkerState.EXITED.value,
+                    "revision": ownership.revision + 1,
+                },
+                timestamp,
+            )
+            return self._worker_ownership(
+                db.execute(
+                    "SELECT * FROM worker_ownership WHERE job_id=? AND attempt_id=?",
+                    (job_id, attempt_id),
+                ).fetchone()
+            )
+
+    def request_job_worker_cancellation(
+        self,
+        job_id: str,
+        attempt_id: str,
+        *,
+        expected_revision: int,
+        request_id: str | None = None,
+    ) -> WorkerOwnership:
+        with self._connection() as db:
+            db.execute("BEGIN IMMEDIATE")
+            row = db.execute(
+                "SELECT * FROM worker_ownership WHERE job_id=? AND attempt_id=?",
+                (job_id, attempt_id),
+            ).fetchone()
+            ownership = self._worker_ownership(row)
+            job = self._job(db, job_id)
+            command = {
+                "operation": "worker.cancel",
+                "job_id": job_id,
+                "attempt_id": attempt_id,
+                "expected_revision": expected_revision,
+            }
+            replay = self._replay_request(
+                db, job.repository_id, request_id, command, "worker_ownership"
+            )
+            if replay is not None:
+                return WorkerOwnership.from_dict(replay)
+            if ownership.revision != expected_revision:
+                raise WorkspaceConflict("Worker ownership revision has changed")
+            if ownership.state == WorkerState.EXITED:
+                raise WorkspaceConflict("Exited worker cannot be cancelled")
+            timestamp = _now()
+            if not ownership.cancellation_requested:
+                db.execute(
+                    "UPDATE worker_ownership SET cancellation_requested=1,"
+                    "revision=revision+1,updated_at=? WHERE job_id=? AND attempt_id=?",
+                    (timestamp, job_id, attempt_id),
+                )
+                self._event(
+                    db,
+                    job.repository_id,
+                    "worker_ownership",
+                    ownership.worker_id,
+                    EventType.WORKER_OWNERSHIP_UPDATED,
+                    {
+                        "job_id": job_id,
+                        "attempt_id": attempt_id,
+                        "cancellation_requested": True,
+                        "revision": ownership.revision + 1,
+                    },
+                    timestamp,
+                )
+            updated = self._worker_ownership(
+                db.execute(
+                    "SELECT * FROM worker_ownership WHERE job_id=? AND attempt_id=?",
+                    (job_id, attempt_id),
+                ).fetchone()
+            )
+            self._record_request(
+                db,
+                job.repository_id,
+                request_id,
+                command,
+                "worker_ownership",
+                updated.to_dict(),
+                timestamp,
+            )
+            return updated
+
+    def list_expired_job_workers(
+        self,
+        repository_id: str,
+        *,
+        limit: int = 100,
+        now: datetime | None = None,
+    ) -> tuple[WorkerOwnership, ...]:
+        if not 1 <= limit <= 1000:
+            raise ValueError("Invalid worker page size")
+        cutoff = _timestamp(_utc_datetime(now))
+        with self._connection() as db:
+            rows = db.execute(
+                "SELECT w.job_id,w.attempt_id FROM worker_ownership w "
+                "JOIN jobs j ON j.job_id=w.job_id WHERE j.repository_id=? "
+                "AND w.lease_expires_at<=? AND w.state!='exited' "
+                "ORDER BY w.lease_expires_at LIMIT ?",
+                (repository_id, cutoff, limit),
+            ).fetchall()
+            return tuple(
+                self._worker_ownership(
+                    db.execute(
+                        "SELECT * FROM worker_ownership "
+                        "WHERE job_id=? AND attempt_id=?",
+                        (row["job_id"], row["attempt_id"]),
+                    ).fetchone()
+                )
+                for row in rows
+            )
 
     def create_job(
         self,

@@ -774,6 +774,57 @@ def test_new_file_subject_is_bound_to_a_planned_path() -> None:
     assert operation["content"]["id"] == "file:src/new.py"
 
 
+def test_new_file_subject_extracts_one_planned_path_from_description() -> None:
+    path = "docs/setup.md"
+    unit = _unit(
+        writes=(PlannedWrite(path, "documentation", "markdown", ("anchor-01",), ()),)
+    )
+    candidate = {
+        "section": "files",
+        "subject_ref": None,
+        "new_identity_description": f"Documentation file at {path}.",
+        "action": "added",
+        "requirement_ids": ["req-01"],
+        "unit_ids": [unit.id],
+        "source_refs": ["anchor-01"],
+    }
+
+    page = _parse_page(
+        _candidate_page([candidate], has_more=False, next_anchor=None),
+        units=(unit,),
+        baseline={"files": [], "source_subjects": []},
+    )
+
+    assert page.records[0].subject_id == f"path::{path}"
+    assert page.records[0].planned_path == path
+
+
+def test_new_file_subject_rejects_multiple_planned_paths_in_description() -> None:
+    paths = ("docs/setup.md", "docs/privacy.md")
+    unit = _unit(
+        writes=tuple(
+            PlannedWrite(path, "documentation", "markdown", ("anchor-01",), ())
+            for path in paths
+        )
+    )
+    candidate = {
+        "section": "files",
+        "subject_ref": None,
+        "new_identity_description": "Documentation files at docs/setup.md and docs/privacy.md",
+        "action": "added",
+        "requirement_ids": ["req-01"],
+        "unit_ids": [unit.id],
+        "source_refs": ["anchor-01"],
+    }
+
+    with pytest.raises(PlanningContractError, match="multiple planned write paths"):
+        _parse_page(
+            _candidate_page([candidate], has_more=False, next_anchor=None),
+            units=(unit,),
+            baseline={"files": [], "source_subjects": []},
+        )
+
+
 @pytest.mark.parametrize("description_prefix", ["path::", "file:"])
 def test_prefixed_new_file_description_resolves_to_planned_path(
     description_prefix: str,

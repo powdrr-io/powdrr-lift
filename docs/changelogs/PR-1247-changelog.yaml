@@ -1,5 +1,5 @@
 schema: https://powdrr.io/schema/changelog-v2
-change_id: 1246
+change_id: 1247
 title: Normalize planned file subjects from descriptions
 intent:
   problem: "Structural subject planning can describe a new planned file in prose, causing deterministic path validation to reject the answer after repeated model retries."

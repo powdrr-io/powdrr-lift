@@ -71,6 +71,7 @@ class EventType(StrEnum):
     QUESTION_CREATED = "question.created"
     QUESTION_UPDATED = "question.updated"
     JOB_OPERATION_BOUND = "job.operation_bound"
+    JOB_ACTION_ACCEPTED = "job.action_accepted"
     SUPERVISOR_LEASE_UPDATED = "supervisor_lease.updated"
     WORKER_OWNERSHIP_UPDATED = "worker_ownership.updated"
 

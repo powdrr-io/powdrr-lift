@@ -99,6 +99,24 @@ the workflow adapter records structured stage or job-specific question data.
 Attempt details omit local worktree paths, checkpoint paths, and provider
 configuration data. The detail projection is read in one SQLite transaction.
 
+Request an allowed job action with `POST /api/v1/repositories/{repository_id}/jobs/{job_id}/actions`, including the current job revision and a stable request ID:
+
+```http
+POST /api/v1/repositories/repo-1/jobs/job-1/actions
+Origin: http://127.0.0.1:8765
+X-CSRF-Token: <csrf-token>
+Content-Type: application/json
+
+{"request_id":"<uuid>","expected_revision":1,"action":"start"}
+```
+
+The endpoint returns HTTP 202 after saving the action intent, job event, and
+idempotency result in one SQLite transaction. Repeating the identical command
+returns the original action ID; a stale revision or conflicting pending action
+returns HTTP 409. The job remains in its current state until a supervisor
+consumes and applies the intent. The request handler never starts or cancels
+workflow code itself.
+
 ```json
 {"schema_version":1,"job":{"schema_version":1,"job_id":"job-1","repository_id":"repo-1","kind":"planning","title":"Implement search","state":"pending","conversation_id":null,"dependency_ids":["job-2"],"artifact_refs":[],"detail":"","revision":1,"created_at":"<timestamp>","updated_at":"<timestamp>"},"latest_attempt":null,"attempts":[],"stage":null,"blockers":[{"schema_version":1,"job_id":"job-2","title":"Plan search","state":"ready"}],"question":null,"outputs":[],"allowed_actions":["cancel"]}
 ```

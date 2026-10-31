@@ -2741,7 +2741,7 @@
       "reviewed": false
     },
     {
-      "extraction_pr": "6",
+      "extraction_pr": "1250",
       "internal_imports": [
         "powdrr_service.behavior_contract",
         "powdrr_service.http_retry"
@@ -2873,7 +2873,7 @@
       "reviewed": false
     },
     {
-      "extraction_pr": "5/7",
+      "extraction_pr": "1250",
       "internal_imports": [],
       "kind": "python_module",
       "owner": "service",

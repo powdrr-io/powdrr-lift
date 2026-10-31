@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import stat
 import subprocess
 from collections.abc import Mapping
@@ -126,6 +127,89 @@ def test_local_checkpoint_store_recovers_events_with_private_atomic_journal(
     assert store.directory.stat().st_mode & 0o777 == 0o700
 
 
+def test_local_checkpoint_store_appends_compact_events_without_rewriting_history(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _initialize_git_repository(tmp_path)
+    store = LocalCheckpointStore(tmp_path, session_id="planning-session-1")
+    question = Question.from_mapping(_question())
+    started = PlanningCheckpoint.question_started(
+        session_id="planning-session-1",
+        event_id="event-start-1",
+        sequence=1,
+        parent_digest=None,
+        question=question,
+        id_counters={"anchor": 1, "requirement": 0},
+    )
+    accepted = PlanningCheckpoint.answer_accepted(
+        session_id="planning-session-1",
+        event_id="event-answer-1",
+        sequence=2,
+        parent_digest=started.digest,
+        question=question,
+        accepted_answer={"records": [], "has_more": False, "next_anchor": None},
+        validation_result={"valid": True},
+        id_counters={"anchor": 1, "requirement": 0},
+    )
+    store.append(started, expected_parent_digest=None)
+
+    def fail_if_rewritten(_events: Any) -> None:
+        pytest.fail("append rewrote the existing journal")
+
+    monkeypatch.setattr(store, "_write", fail_if_rewritten)
+    updated = store.append(accepted, expected_parent_digest=started.digest)
+
+    lines = store.path.read_text(encoding="utf-8").splitlines()
+    assert json.loads(lines[0]) == {
+        "schema": "planning-checkpoint-journal-v2",
+        "session_id": "planning-session-1",
+    }
+    assert len(lines) == 3
+    assert updated.events == (started, accepted)
+    assert LocalCheckpointStore(
+        tmp_path, session_id="planning-session-1"
+    ).load().events == (
+        started,
+        accepted,
+    )
+
+
+def test_local_checkpoint_store_truncates_an_unacknowledged_partial_event(
+    tmp_path: Path,
+) -> None:
+    _initialize_git_repository(tmp_path)
+    store = LocalCheckpointStore(tmp_path, session_id="planning-session-1")
+    question = Question.from_mapping(_question())
+    started = PlanningCheckpoint.question_started(
+        session_id="planning-session-1",
+        event_id="event-start-1",
+        sequence=1,
+        parent_digest=None,
+        question=question,
+        id_counters={"anchor": 1, "requirement": 0},
+    )
+    store.append(started, expected_parent_digest=None)
+    with store.path.open("ab") as stream:
+        stream.write(b'{"partial":')
+
+    resumed = LocalCheckpointStore(tmp_path, session_id="planning-session-1")
+    assert resumed.load().events == (started,)
+    accepted = PlanningCheckpoint.answer_accepted(
+        session_id="planning-session-1",
+        event_id="event-answer-1",
+        sequence=2,
+        parent_digest=started.digest,
+        question=question,
+        accepted_answer={"records": [], "has_more": False, "next_anchor": None},
+        validation_result={"valid": True},
+        id_counters={"anchor": 1, "requirement": 0},
+    )
+
+    resumed.append(accepted, expected_parent_digest=started.digest)
+
+    assert resumed.load().events == (started, accepted)
+
+
 def test_local_checkpoint_store_rejects_stale_parent(tmp_path: Path) -> None:
     _initialize_git_repository(tmp_path)
     store = LocalCheckpointStore(tmp_path, session_id="planning-session-1")
@@ -162,6 +246,25 @@ def test_local_checkpoint_store_imports_legacy_issue_comments(tmp_path: Path) ->
 
     assert migrated.events == (checkpoint,)
     assert local_store.load().pending_question == _question()
+    accepted = _checkpoint(
+        event_id="event-answer-1",
+        sequence=2,
+        parent=checkpoint.digest,
+        event_type="answer_accepted",
+        payload={"question": _question(), "accepted_answer": {"records": []}},
+    )
+
+    local_store.append(accepted, expected_parent_digest=checkpoint.digest)
+
+    assert (
+        json.loads(local_store.path.read_text(encoding="utf-8").splitlines()[0])[
+            "schema"
+        ]
+        == "planning-checkpoint-journal-v2"
+    )
+    assert LocalCheckpointStore(
+        tmp_path, session_id="planning-session-1"
+    ).load().events == (checkpoint, accepted)
 
 
 def test_local_checkpoint_journal_does_not_dirty_pinned_checkout(

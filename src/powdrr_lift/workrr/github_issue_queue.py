@@ -22,6 +22,7 @@ from typing import Any
 from urllib.parse import quote
 
 from powdrr_local.file_lock import Timeout, file_lock
+from powdrr_service.planning.checkpoints import has_complete_checkpoint_archive
 from powdrr_service.planning.plan_document import (
     MANUAL_PREREQUISITE_TRIGGER,  # noqa: F401 - legacy public re-export
     QUEUE_SCHEMA,  # noqa: F401 - legacy public re-export
@@ -373,6 +374,39 @@ class GitHubIssueClient:
         return tuple(
             value for value in _flatten_pages(pages) if isinstance(value, Mapping)
         )
+
+    def list_checkpoint_comments(
+        self, issue_number: int, *, session_id: str
+    ) -> tuple[Mapping[str, Any], ...]:
+        """Read newest comments until a complete compressed journal is found."""
+        comments: list[Mapping[str, Any]] = []
+        page = 1
+        operation = f"GET repos/{self.repository}/issues/{issue_number}/comments"
+        while True:
+            result = self._invoke_comment_api(
+                [
+                    "api",
+                    f"repos/{self.repository}/issues/{issue_number}/comments"
+                    f"?per_page=100&sort=created&direction=desc&page={page}",
+                ],
+                operation=operation,
+            )
+            try:
+                values = json.loads(result.stdout)
+            except json.JSONDecodeError as error:
+                raise GitHubIssueQueueError(
+                    "gh returned malformed issue comments"
+                ) from error
+            if not isinstance(values, list):
+                raise GitHubIssueQueueError(
+                    "gh returned a non-array issue-comment page"
+                )
+            comments.extend(value for value in values if isinstance(value, Mapping))
+            if has_complete_checkpoint_archive(comments, session_id=session_id):
+                return tuple(comments)
+            if len(values) < 100:
+                return tuple(comments)
+            page += 1
 
     def _invoke_comment_api(
         self, arguments: Sequence[str], *, operation: str

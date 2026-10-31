@@ -1,0 +1,69 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1239
+title: Archive planning checkpoint history for fast resume
+intent:
+  problem: "Planning resume imported every issue comment and replayed the full legacy event stream, making large sessions slow to restore."
+  goal: "Store a lossless compressed journal archive in the issue and stop loading older comments once a complete archive is available."
+human-decisions: []
+structured_files: []
+files:
+  - path: packages/service/src/powdrr_service/planning/checkpoints.py
+    type: modified
+    span: {start_line: 445, end_line: 445}
+    summary: Render the complete checkpoint chain as digest-checked compressed comment chunks.
+    rationale: Preserve every immutable event while making the issue archive much smaller than its expanded event stream.
+  - path: packages/service/src/powdrr_service/planning/checkpoints.py
+    type: modified
+    span: {start_line: 577, end_line: 760}
+    summary: Restore event chains from validated archive chunks and manifests.
+    rationale: Resume from a compact archive without changing the existing checkpoint semantics.
+  - path: packages/service/src/powdrr_service/planning/checkpoints.py
+    type: modified
+    span: {start_line: 790, end_line: 795}
+    summary: Detect when recent issue comments contain a complete checkpoint archive.
+    rationale: Let the GitHub adapter stop pagination at the newest recoverable history boundary.
+  - path: packages/local/src/powdrr_local/planning/checkpoints.py
+    type: modified
+    span: {start_line: 454, end_line: 503}
+    summary: Publish a compressed archive and verify its restored head.
+    rationale: Keep the full planning journal available from the issue for a fresh checkout.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 370, end_line: 407}
+    summary: Fetch newest issue comments page by page until an archive is complete.
+    rationale: Avoid downloading and reducing all earlier checkpoint comments on every resume.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 30, end_line: 34}
+    summary: Import the GitHub checkpoint archive adapter into the plan command.
+    rationale: Allow plan resume to store a compact issue-side journal.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 2890, end_line: 2892}
+    summary: Initialize the issue archive adapter alongside the local checkpoint journal.
+    rationale: Keep planning issue state recoverable from GitHub.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 2985, end_line: 3000}
+    summary: Import recent archived comments and publish the current journal at resume boundaries.
+    rationale: Bring legacy issues forward and make the latest recovered or terminal state available in GitHub.
+  - path: tests/test_planning_checkpoints.py
+    type: modified
+    span: {start_line: 432, end_line: 528}
+    summary: Cover archive round trips, archive publication, and the legacy event tail.
+    rationale: Verify compressed history restores the same chain and accepted answers.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 612, end_line: 675}
+    summary: Cover bounded reads with archives and complete reads for legacy journals.
+    rationale: Ensure pagination stops only after the archive is actually recoverable.
+entities: []
+entity_relationships: []
+invariants:
+  - id: planning-checkpoint-archives-are-lossless
+    description: An archive reproduces the original hash-linked event chain and its current head.
+    action: altered
+  - id: planning-resume-loads-through-latest-complete-archive
+    description: Resume reads recent comments through a complete archive before considering older history.
+    action: altered
+guidance: []

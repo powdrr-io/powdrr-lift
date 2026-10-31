@@ -20,6 +20,7 @@ from powdrr_service.planning.checkpoints import (
     prepare_checkpoint_append,
     reduce_checkpoint_comments,
     reduce_checkpoint_events,
+    render_checkpoint_archive_comments,
     sanitize_diagnostic,
     validate_session_id,
 )
@@ -450,11 +451,56 @@ class GitHubCommentCheckpointStore:
         self.session_id = session_id
 
     def load(self, *, selected_checkpoint_digest: str | None = None) -> JournalState:
+        list_recent = getattr(self.client, "list_checkpoint_comments", None)
+        comments = (
+            list_recent(self.issue_number, session_id=self.session_id)
+            if callable(list_recent)
+            else self.client.list_comments(self.issue_number)
+        )
         return reduce_checkpoint_comments(
-            self.client.list_comments(self.issue_number),
+            comments,
             session_id=self.session_id,
             selected_checkpoint_digest=selected_checkpoint_digest,
         )
+
+    def publish_archive(self, events: Sequence[PlanningCheckpoint]) -> JournalState:
+        """Persist the current complete journal as a compact issue snapshot."""
+        if not events:
+            return self.load()
+        current = self.load()
+        head = events[-1]
+        candidate = reduce_checkpoint_events(
+            tuple(events),
+            selected_checkpoint_digest=None,
+            incomplete_manifest_digests=(),
+        )
+        if (
+            candidate.status != "active"
+            or candidate.head is None
+            or candidate.head.digest != head.digest
+        ):
+            raise JournalForkError("cannot archive a conflicted checkpoint history")
+        if current.head is not None and current.head.digest == head.digest:
+            return current
+        if current.status not in {"empty", "active"}:
+            raise JournalForkError(
+                "cannot publish an archive over a conflicted planning journal"
+            )
+        archive_digests = {event.digest for event in candidate.events}
+        if current.head is not None and current.head.digest not in archive_digests:
+            raise JournalForkError(
+                "current issue checkpoint is not in the archive history"
+            )
+        for body in render_checkpoint_archive_comments(
+            events, session_id=self.session_id
+        ):
+            self.client.add_issue_comment(self.issue_number, body)
+        archived = self.load()
+        if archived.head is None or archived.head.digest != head.digest:
+            raise JournalForkError(
+                "checkpoint archive did not produce the expected journal head"
+            )
+        return archived
 
     def append(
         self,

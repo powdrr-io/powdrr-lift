@@ -6,6 +6,7 @@ import base64
 import hashlib
 import json
 import re
+import zlib
 from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -14,12 +15,15 @@ from typing import Any, Protocol
 from powdrr_service.planning.contracts import PlanningContractError, Question
 
 MAX_CHECKPOINT_COMMENT_CHARS = 48 * 1024
+MAX_CHECKPOINT_ARCHIVE_BYTES = 64 * 1024 * 1024
 _CHUNK_RAW_BYTES = 24 * 1024
 _SESSION_ID_PATTERN = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._-]{0,127}$")
 _DIGEST_PATTERN = re.compile(r"^sha256:[0-9a-f]{64}$")
 _EVENT_MARKER = "<!-- powdrr-planning-checkpoint:v1 -->"
 _CHUNK_MARKER = "<!-- powdrr-planning-checkpoint-chunk:v1 -->"
 _MANIFEST_MARKER = "<!-- powdrr-planning-checkpoint-manifest:v1 -->"
+_ARCHIVE_CHUNK_MARKER = "<!-- powdrr-planning-checkpoint-archive-chunk:v1 -->"
+_ARCHIVE_MANIFEST_MARKER = "<!-- powdrr-planning-checkpoint-archive-manifest:v1 -->"
 _SECRET_KEY_PATTERN = re.compile(
     r"(?:authorization|authentication|api[_-]?key|(?:access|refresh|auth)?[_-]?token$|"
     r"secret|password|passwd|credential|cookie|private[_-]?key)",
@@ -463,6 +467,73 @@ def render_checkpoint_comments(
     return (*chunk_comments, manifest_body)
 
 
+def render_checkpoint_archive_comments(
+    events: Sequence[PlanningCheckpoint], *, session_id: str
+) -> tuple[str, ...]:
+    """Render a lossless compressed archive that can replace an old event tail."""
+    validate_session_id(session_id)
+    ordered = tuple(events)
+    if any(event.session_id != session_id for event in ordered):
+        raise PlanningJournalError("archive contains a checkpoint from another session")
+    payload_bytes = canonical_json(
+        {
+            "schema": "planning-checkpoint-archive-v1",
+            "session_id": session_id,
+            "events": [event.to_data() for event in ordered],
+        }
+    ).encode("utf-8")
+    if len(payload_bytes) > MAX_CHECKPOINT_ARCHIVE_BYTES:
+        raise PlanningJournalError("planning checkpoint archive exceeds the size limit")
+    compressed = zlib.compress(payload_bytes, level=9)
+    archive_digest = _digest(compressed)
+    pieces = [
+        compressed[offset : offset + _CHUNK_RAW_BYTES]
+        for offset in range(0, len(compressed), _CHUNK_RAW_BYTES)
+    ]
+    chunk_comments: list[str] = []
+    chunk_records: list[dict[str, Any]] = []
+    for index, piece in enumerate(pieces, start=1):
+        chunk_digest = _digest(piece)
+        chunk_payload = {
+            "schema": "planning-checkpoint-archive-chunk-v1",
+            "session_id": session_id,
+            "archive_digest": archive_digest,
+            "chunk_index": index,
+            "chunk_count": len(pieces),
+            "chunk_digest": chunk_digest,
+            "content_base64": base64.b64encode(piece).decode("ascii"),
+        }
+        body = _render_comment(
+            _ARCHIVE_CHUNK_MARKER,
+            f"Powdrr planning checkpoint archive chunk {index}/{len(pieces)}",
+            chunk_payload,
+        )
+        if _comment_size(body) >= MAX_CHECKPOINT_COMMENT_CHARS:
+            raise AssertionError("checkpoint archive chunk exceeds the comment limit")
+        chunk_comments.append(body)
+        chunk_records.append({"index": index, "digest": chunk_digest})
+    manifest = {
+        "schema": "planning-checkpoint-archive-manifest-v1",
+        "session_id": session_id,
+        "archive_digest": archive_digest,
+        "head_digest": None if not ordered else ordered[-1].digest,
+        "event_count": len(ordered),
+        "chunk_count": len(pieces),
+        "payload_digest": _digest(payload_bytes),
+        "chunks": chunk_records,
+    }
+    manifest_body = _render_comment(
+        _ARCHIVE_MANIFEST_MARKER,
+        "Powdrr planning checkpoint archive manifest",
+        manifest,
+    )
+    if _comment_size(manifest_body) >= MAX_CHECKPOINT_COMMENT_CHARS:
+        raise PlanningJournalError(
+            "checkpoint archive manifest exceeds the comment limit"
+        )
+    return (*chunk_comments, manifest_body)
+
+
 def reduce_checkpoint_comments(
     comments: Sequence[Mapping[str, Any]],
     *,
@@ -474,6 +545,10 @@ def reduce_checkpoint_comments(
     chunks: dict[str, dict[int, tuple[Mapping[str, Any], bytes]]] = defaultdict(dict)
     manifests: list[Mapping[str, Any]] = []
     events: dict[str, PlanningCheckpoint] = {}
+    archive_chunks: dict[str, dict[int, tuple[Mapping[str, Any], bytes]]] = defaultdict(
+        dict
+    )
+    archive_manifests: list[Mapping[str, Any]] = []
     for comment in comments:
         body = comment.get("body")
         if not isinstance(body, str):
@@ -511,6 +586,31 @@ def reduce_checkpoint_comments(
             chunks[event_digest][index] = (payload, piece)
         elif marker == _MANIFEST_MARKER and payload.get("session_id") == session_id:
             manifests.append(payload)
+        elif marker == _ARCHIVE_CHUNK_MARKER:
+            if payload.get("session_id") != session_id:
+                continue
+            archive_digest = payload.get("archive_digest")
+            index = payload.get("chunk_index")
+            encoded = payload.get("content_base64")
+            if (
+                not isinstance(archive_digest, str)
+                or isinstance(index, bool)
+                or not isinstance(index, int)
+                or not isinstance(encoded, str)
+            ):
+                continue
+            try:
+                piece = base64.b64decode(encoded, validate=True)
+            except ValueError:
+                continue
+            if payload.get("chunk_digest") != _digest(piece):
+                continue
+            archive_chunks[archive_digest][index] = (payload, piece)
+        elif (
+            marker == _ARCHIVE_MANIFEST_MARKER
+            and payload.get("session_id") == session_id
+        ):
+            archive_manifests.append(payload)
 
     incomplete: set[str] = set()
     for manifest in manifests:
@@ -566,11 +666,110 @@ def reduce_checkpoint_comments(
         if checkpoint.session_id == session_id and checkpoint.digest == event_digest:
             events[checkpoint.digest] = checkpoint
 
+    for manifest in archive_manifests:
+        archive_digest = manifest.get("archive_digest")
+        count = manifest.get("chunk_count")
+        records = manifest.get("chunks")
+        if (
+            not isinstance(archive_digest, str)
+            or isinstance(count, bool)
+            or not isinstance(count, int)
+            or count < 1
+            or not isinstance(records, list)
+            or len(records) != count
+        ):
+            continue
+        chunk_set = archive_chunks.get(archive_digest, {})
+        if set(chunk_set) != set(range(1, count + 1)):
+            incomplete.add(archive_digest)
+            continue
+        expected_archive_digests: dict[int, str] = {}
+        valid_manifest = True
+        for record in records:
+            if not isinstance(record, Mapping):
+                valid_manifest = False
+                break
+            index = record.get("index")
+            digest = record.get("digest")
+            if (
+                isinstance(index, bool)
+                or not isinstance(index, int)
+                or not isinstance(digest, str)
+            ):
+                valid_manifest = False
+                break
+            expected_archive_digests[index] = digest
+        if not valid_manifest or any(
+            expected_archive_digests.get(index) != value[0].get("chunk_digest")
+            for index, value in chunk_set.items()
+        ):
+            continue
+        compressed = b"".join(chunk_set[index][1] for index in range(1, count + 1))
+        if archive_digest != _digest(compressed):
+            continue
+        try:
+            decompressor = zlib.decompressobj()
+            payload_bytes = decompressor.decompress(
+                compressed, MAX_CHECKPOINT_ARCHIVE_BYTES + 1
+            )
+            if (
+                len(payload_bytes) > MAX_CHECKPOINT_ARCHIVE_BYTES
+                or decompressor.unconsumed_tail
+                or not decompressor.eof
+            ):
+                continue
+            if manifest.get("payload_digest") != _digest(payload_bytes):
+                continue
+            archive = json.loads(payload_bytes)
+            if (
+                not isinstance(archive, Mapping)
+                or archive.get("schema") != "planning-checkpoint-archive-v1"
+                or archive.get("session_id") != session_id
+                or not isinstance(archive.get("events"), list)
+            ):
+                continue
+            archived_events = [
+                PlanningCheckpoint.from_data(value)
+                for value in archive["events"]
+                if isinstance(value, Mapping)
+            ]
+        except (
+            UnicodeDecodeError,
+            json.JSONDecodeError,
+            zlib.error,
+            PlanningJournalError,
+        ):
+            continue
+        if (
+            len(archived_events) != len(archive["events"])
+            or manifest.get("event_count") != len(archived_events)
+            or (None if not archived_events else archived_events[-1].digest)
+            != manifest.get("head_digest")
+            or any(event.session_id != session_id for event in archived_events)
+        ):
+            continue
+        for checkpoint in archived_events:
+            events[checkpoint.digest] = checkpoint
+
     return reduce_checkpoint_events(
         tuple(events.values()),
         selected_checkpoint_digest=selected_checkpoint_digest,
         incomplete_manifest_digests=tuple(sorted(incomplete)),
     )
+
+
+def has_complete_checkpoint_archive(
+    comments: Sequence[Mapping[str, Any]], *, session_id: str
+) -> bool:
+    """Return whether the supplied recent comments can restore a full archive."""
+    if not any(
+        isinstance(comment.get("body"), str)
+        and _ARCHIVE_MANIFEST_MARKER in comment["body"]
+        for comment in comments
+    ):
+        return False
+    state = reduce_checkpoint_comments(comments, session_id=session_id)
+    return state.status == "active" and state.head is not None
 
 
 def reduce_checkpoint_events(
@@ -775,7 +974,13 @@ def _comment_size(body: str) -> int:
 
 
 def _comment_payload(body: str) -> tuple[str, Mapping[str, Any]] | None:
-    for marker in (_EVENT_MARKER, _CHUNK_MARKER, _MANIFEST_MARKER):
+    for marker in (
+        _EVENT_MARKER,
+        _CHUNK_MARKER,
+        _MANIFEST_MARKER,
+        _ARCHIVE_CHUNK_MARKER,
+        _ARCHIVE_MANIFEST_MARKER,
+    ):
         if marker not in body:
             continue
         try:
@@ -839,8 +1044,10 @@ __all__ = [
     "prepare_checkpoint_append",
     "reduce_checkpoint_comments",
     "reduce_checkpoint_events",
+    "has_complete_checkpoint_archive",
     "render_checkpoint_comment",
     "render_checkpoint_comments",
+    "render_checkpoint_archive_comments",
     "sanitize_diagnostic",
     "validate_session_id",
 ]

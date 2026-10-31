@@ -1,0 +1,194 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1258
+title: Move provider configuration into service package
+intent:
+  problem: Model mappings, provider definitions, and context limits were stored in the legacy agent namespace even though they control private provider routing.
+  goal: Move provider configuration into powdrr_service and update every consumer to use the service-owned module.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 982, end_line: 982}
+  summary: Update a dependency edge to the service provider configuration.
+  rationale: Keep the ownership graph aligned with runtime imports.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 2375, end_line: 2375}
+  summary: Update a dependency edge to the service provider configuration.
+  rationale: Keep the ownership graph aligned with runtime imports.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 2488, end_line: 2488}
+  summary: Update a dependency edge to the service provider configuration.
+  rationale: Keep the ownership graph aligned with runtime imports.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 2605, end_line: 2605}
+  summary: Update a dependency edge to the service provider configuration.
+  rationale: Keep the ownership graph aligned with runtime imports.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 3123, end_line: 3123}
+  summary: Remove the legacy error-module dependency from provider configuration.
+  rationale: Make the service-owned config independent of agent code.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 3126, end_line: 3126}
+  summary: Assign provider configuration to its service package path.
+  rationale: Keep declared ownership and source location consistent.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 3135, end_line: 3135}
+  summary: Update a dependency edge to the service provider configuration.
+  rationale: Keep the ownership graph aligned with runtime imports.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 3149, end_line: 3149}
+  summary: Update a dependency edge to the service provider configuration.
+  rationale: Keep the ownership graph aligned with runtime imports.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 3295, end_line: 3295}
+  summary: Update a dependency edge to the service provider configuration.
+  rationale: Keep the ownership graph aligned with runtime imports.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 3371, end_line: 3371}
+  summary: Update a dependency edge to the service provider configuration.
+  rationale: Keep the ownership graph aligned with runtime imports.
+- path: packages/service/src/powdrr_service/providers/__init__.py
+  type: added
+  span: {start_line: 1, end_line: 1}
+  summary: Add the service providers package.
+  rationale: Group private provider configuration and clients in the service distribution.
+- path: packages/service/src/powdrr_service/providers/config.py
+  type: renamed
+  span: {start_line: 1, end_line: 253}
+  summary: Raise a service-owned configuration error for unknown providers.
+  rationale: Move model routing and provider configuration into the service package without importing agent error code.
+- path: science/classifications/compare_jev_other_classifiers.py
+  type: modified
+  span: {start_line: 26, end_line: 26}
+  summary: Load model mappings from the service package.
+  rationale: Keep classifier experiments aligned with production provider routing.
+- path: science/classifications/compare_jev_other_classifiers.py
+  type: modified
+  span: {start_line: 28, end_line: 28}
+  summary: Remove the legacy provider configuration import.
+  rationale: Use the service-owned provider registry.
+- path: science/classifications/root_disposition/build_dataset.py
+  type: modified
+  span: {start_line: 32, end_line: 32}
+  summary: Load model mappings from the service package.
+  rationale: Keep dataset generation aligned with production provider routing.
+- path: science/classifications/root_disposition/build_dataset.py
+  type: modified
+  span: {start_line: 34, end_line: 34}
+  summary: Remove the legacy provider configuration import.
+  rationale: Use the service-owned provider registry.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 52, end_line: 56}
+  summary: Import provider choices and mappings from the service package.
+  rationale: Keep CLI provider configuration on the service-owned implementation.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 278, end_line: 282}
+  summary: Remove the legacy provider configuration import.
+  rationale: Route CLI configuration through the service-owned module.
+- path: src/powdrr_lift/workrr/__init__.py
+  type: modified
+  span: {start_line: 3, end_line: 10}
+  summary: Re-export provider configuration types from the service package.
+  rationale: Ensure the combined application uses the authoritative service types.
+- path: src/powdrr_lift/workrr/__init__.py
+  type: modified
+  span: {start_line: 62, end_line: 68}
+  summary: Remove the legacy provider configuration re-export.
+  rationale: Keep the combined package pointed at the service types.
+- path: src/powdrr_lift/workrr/chat_config.py
+  type: modified
+  span: {start_line: 8, end_line: 8}
+  summary: Read the default model and mapping type from the service package.
+  rationale: Remove the legacy provider configuration dependency.
+- path: src/powdrr_lift/workrr/credential_check.py
+  type: modified
+  span: {start_line: 13, end_line: 17}
+  summary: Read provider model mappings from the service package.
+  rationale: Keep credential checks aligned with service-owned provider settings.
+- path: src/powdrr_lift/workrr/credential_check.py
+  type: modified
+  span: {start_line: 21, end_line: 24}
+  summary: Remove the legacy provider configuration import.
+  rationale: Keep credential checks on the service-owned registry.
+- path: src/powdrr_lift/workrr/provider_runtime.py
+  type: modified
+  span: {start_line: 15, end_line: 16}
+  summary: Read model context limits from the service package.
+  rationale: Use service-owned model metadata during provider setup.
+- path: src/powdrr_lift/workrr/provider_runtime.py
+  type: modified
+  span: {start_line: 17, end_line: 17}
+  summary: Remove the legacy model-limits import.
+  rationale: Use service-owned model metadata during provider setup.
+- path: src/powdrr_lift/workrr/providers.py
+  type: modified
+  span: {start_line: 35, end_line: 41}
+  summary: Read provider definitions and mappings from the service package.
+  rationale: Use the service-owned provider registry for client construction.
+- path: src/powdrr_lift/workrr/providers.py
+  type: modified
+  span: {start_line: 21, end_line: 21}
+  summary: Remove the legacy provider configuration import.
+  rationale: Use the service-owned provider registry for client construction.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 29, end_line: 34}
+  summary: Read model defaults and mappings from the service package.
+  rationale: Keep task execution aligned with service-owned model routing.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 171, end_line: 176}
+  summary: Remove the legacy provider configuration import.
+  rationale: Keep task execution aligned with service-owned model routing.
+- path: src/powdrr_lift/workrr/workflow_provider_selection.py
+  type: modified
+  span: {start_line: 9, end_line: 10}
+  summary: Resolve provider definitions from the service package.
+  rationale: Keep workflow provider selection aligned with the authoritative registry.
+- path: src/powdrr_lift/workrr/workflow_provider_selection.py
+  type: modified
+  span: {start_line: 10, end_line: 10}
+  summary: Remove the legacy provider configuration import.
+  rationale: Keep workflow provider selection aligned with the authoritative registry.
+- path: tests/test_credential_check.py
+  type: modified
+  span: {start_line: 8, end_line: 8}
+  summary: Import provider mapping test data from the service package.
+  rationale: Exercise the moved configuration directly.
+- path: tests/test_credential_check.py
+  type: modified
+  span: {start_line: 17, end_line: 17}
+  summary: Remove the legacy provider configuration import.
+  rationale: Exercise the moved configuration directly.
+- path: tests/test_module_boundaries.py
+  type: modified
+  span: {start_line: 139, end_line: 145}
+  summary: Check the service provider configuration has no legacy agent imports.
+  rationale: Enforce the package boundary after the move.
+- path: tests/test_module_boundaries.py
+  type: modified
+  span: {start_line: 125, end_line: 125}
+  summary: Remove the moved module from the legacy package boundary list.
+  rationale: Keep boundary tests aligned with current package ownership.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span: {start_line: 15, end_line: 15}
+  summary: Import the provider model constant from the service package.
+  rationale: Keep evaluator tests aligned with the moved configuration.
+- path: tests/test_provider_config.py
+  type: added
+  span: {start_line: 1, end_line: 30}
+  summary: Verify provider mapping targets and unsupported provider errors.
+  rationale: Protect provider registry integrity in its service-owned location.

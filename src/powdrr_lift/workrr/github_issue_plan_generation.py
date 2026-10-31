@@ -558,7 +558,7 @@ def _normalize_structrr_operation_identities(
 
 
 def _snapshot_fingerprint(snapshot: Mapping[str, Any]) -> str:
-    from powdrr_lift.structrr.rebase import snapshot_digest
+    from powdrr_service.structrr.snapshot import snapshot_digest
 
     return snapshot_digest(snapshot)
 

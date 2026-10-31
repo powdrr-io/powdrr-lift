@@ -4,6 +4,7 @@ import subprocess
 from pathlib import Path
 
 import yaml
+from powdrr_service.structrr.snapshot import snapshot_digest
 
 from powdrr_lift.structrr.bootstrap import (
     BOOTSTRAP_SECTION_VERSIONS,
@@ -11,7 +12,7 @@ from powdrr_lift.structrr.bootstrap import (
     validate_bootstrap_document,
     validate_bootstrap_sections,
 )
-from powdrr_lift.structrr.rebase import rebase_structrr_snapshot, snapshot_digest
+from powdrr_lift.structrr.rebase import rebase_structrr_snapshot
 
 
 def _git(repo: Path, *args: str) -> None:
@@ -634,11 +635,14 @@ def _snapshot(
 
 
 def test_snapshot_digest_ignores_semantic_collection_order() -> None:
+    import powdrr_lift.structrr.rebase as legacy_rebase
+
     first = _snapshot()
     second = _snapshot()
     second["entities"] = list(reversed(second["entities"]))
 
     assert snapshot_digest(first) == snapshot_digest(second)
+    assert not hasattr(legacy_rebase, "snapshot_digest")
 
 
 def test_rebase_ignores_unrelated_current_changes() -> None:

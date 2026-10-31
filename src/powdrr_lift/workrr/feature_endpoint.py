@@ -15,6 +15,7 @@ from typing import Any, cast
 
 import yaml
 from powdrr_service.planning.workflow_ids import slugify_workflow_id
+from powdrr_service.structrr.snapshot import snapshot_digest
 
 from powdrr_lift.change_log_parser import parse_change_log
 from powdrr_lift.core.behavior_contract import (
@@ -80,7 +81,6 @@ from powdrr_lift.structrr.proposal_review import (
     load_review_receipt,
     write_review_receipt,
 )
-from powdrr_lift.structrr.rebase import snapshot_digest
 from powdrr_lift.structrr.source_manifest import SourceManifest
 from powdrr_lift.structrr.validation import (
     DiscoveredValidationProfile,

@@ -26,6 +26,7 @@ from powdrr_service.planning.multipr_structrr import (
     structural_repair_findings,
 )
 from powdrr_service.planning.workflow_ids import slugify_workflow_id
+from powdrr_service.structrr.snapshot import snapshot_digest
 
 from powdrr_lift.basedpyright_tools import is_basedpyright_tool
 from powdrr_lift.core import resolve_repo_root
@@ -67,7 +68,6 @@ from powdrr_lift.process.tasks import (
 )
 from powdrr_lift.structrr.bootstrap import bootstrap_structrr
 from powdrr_lift.structrr.proposal import ProposalRevision
-from powdrr_lift.structrr.rebase import snapshot_digest
 from powdrr_lift.structrr.source_manifest import SourceManifest
 from powdrr_lift.workrr.action_operations import (
     _apply_file_edits,

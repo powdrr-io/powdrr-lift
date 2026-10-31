@@ -91,7 +91,6 @@ from powdrr_lift.structrr.rebase import (
     StructrrRebaseReport,
     StructrrRemapping,
     rebase_structrr_snapshot,
-    snapshot_digest,
 )
 from powdrr_lift.structrr.source_manifest import (
     SOURCE_EXTRACTOR_VERSION,
@@ -169,7 +168,6 @@ __all__ = [
     "StructrrRebaseReport",
     "StructrrRemapping",
     "rebase_structrr_snapshot",
-    "snapshot_digest",
     "PROPOSAL_REVISION_SCHEMA_VERSION",
     "ProposalOperation",
     "ProposalRevision",

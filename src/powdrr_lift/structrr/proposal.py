@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from powdrr_lift.structrr.rebase import snapshot_digest
+from powdrr_service.structrr.snapshot import snapshot_digest
 
 PROPOSAL_REVISION_SCHEMA_VERSION = "proposal-revision-v1"
 

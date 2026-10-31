@@ -7,13 +7,12 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
+from powdrr_service.structrr.snapshot import snapshot_digest
+
 from powdrr_lift.core.decision_obligation import content_fingerprint
 from powdrr_lift.structrr.actual_diff import StructrrActualDiff
 from powdrr_lift.structrr.proposal import ProposalRevision
-from powdrr_lift.structrr.rebase import (
-    rebase_structrr_snapshot,
-    snapshot_digest,
-)
+from powdrr_lift.structrr.rebase import rebase_structrr_snapshot
 
 CANDIDATE_COMPARISON_SCHEMA_VERSION = "candidate-comparison-v3"
 

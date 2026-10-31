@@ -47,11 +47,6 @@
       "rationale": "The service-owned multi-PR proposal still uses the existing Structrr rebase algorithm; relocate it with Structrr policy."
     },
     {
-      "import": "powdrr_lift.structrr.rebase.snapshot_digest",
-      "owner_pr": 4,
-      "rationale": "Planning reuses Structrr canonical snapshot digests so proposed changes retain existing digest identity; this canonicalization helper still needs relocation to service-owned Structrr code."
-    },
-    {
       "import": "powdrr_lift.structrr.source_manifest.SourceManifest",
       "owner_pr": 8,
       "rationale": "Actual Structrr diff compilation still uses the existing source-manifest type; move the type with the service-owned Structrr implementation."

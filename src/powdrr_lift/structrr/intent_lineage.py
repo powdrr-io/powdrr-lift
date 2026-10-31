@@ -7,9 +7,10 @@ from collections import Counter
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+from powdrr_service.structrr.snapshot import snapshot_digest
+
 from powdrr_lift.core.decision_obligation import content_fingerprint
 from powdrr_lift.structrr.proposal import ProposalRevision
-from powdrr_lift.structrr.rebase import snapshot_digest
 
 INTENT_LINEAGE_HISTORY_SCHEMA = "intent-lineage-history-v1"
 

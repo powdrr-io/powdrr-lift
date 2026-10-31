@@ -53,6 +53,7 @@ def test_file_lock_excludes_processes_and_releases_after_process_exit(
     assert process.exitcode is not None
     with file_lock(tmp_path / "worker.lock", blocking=False):
         pass
+    assert (tmp_path / "worker.lock").exists()
 
 
 def test_issue_worker_lock_keeps_nonblocking_busy_error(tmp_path: Path) -> None:

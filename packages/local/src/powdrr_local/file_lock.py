@@ -27,6 +27,7 @@ def file_lock(
         mode=mode,
         thread_local=False,
         fallback_to_soft=False,
+        preserve_lock_file=True,
     )
     lock.acquire(blocking=blocking, timeout=-1 if blocking else 0)
     try:

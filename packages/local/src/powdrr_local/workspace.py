@@ -36,6 +36,7 @@ from powdrr_contracts.workspace import (
     WorkspaceEvent,
     WorkspaceQuestion,
     WorkspaceRepository,
+    WorkspaceSnapshot,
     WorkspaceTurn,
 )
 
@@ -94,7 +95,8 @@ CREATE TABLE conversations (
 CREATE TABLE events (
     sequence INTEGER PRIMARY KEY AUTOINCREMENT, repository_id TEXT NOT NULL,
     entity_type TEXT NOT NULL, entity_id TEXT NOT NULL, event_type TEXT NOT NULL,
-    payload TEXT NOT NULL, created_at TEXT NOT NULL
+    payload TEXT NOT NULL, created_at TEXT NOT NULL,
+    schema_version INTEGER NOT NULL DEFAULT 2, attempt_id TEXT, revision INTEGER
 );
 CREATE TABLE messages (
     message_id TEXT PRIMARY KEY,
@@ -182,7 +184,7 @@ CREATE TABLE worker_ownership (
     FOREIGN KEY(job_id, attempt_id) REFERENCES job_operations(job_id, attempt_id)
 );
 CREATE INDEX worker_lease_expiry ON worker_ownership(lease_expires_at);
-PRAGMA user_version = 7;
+PRAGMA user_version = 8;
 """
 
 _REPOSITORY_TABLE = (
@@ -391,7 +393,7 @@ class WorkspaceStore:
                 if db.execute("PRAGMA user_version").fetchone()[0] == 3:
                     db.execute(_REPOSITORY_TABLE)
                     db.execute("PRAGMA user_version = 4")
-            elif version not in {4, 5, 6, 7}:
+            elif version not in {4, 5, 6, 7, 8}:
                 raise ValueError(f"Unsupported workspace schema version: {version}")
             current_version = db.execute("PRAGMA user_version").fetchone()[0]
             if current_version == 4:
@@ -401,7 +403,7 @@ class WorkspaceStore:
                     for statement in _TURN_TABLES:
                         db.execute(statement)
                     db.execute("PRAGMA user_version = 5")
-            elif current_version not in {5, 6, 7}:
+            elif current_version not in {5, 6, 7, 8}:
                 raise ValueError(
                     f"Unsupported workspace schema version: {current_version}"
                 )
@@ -413,7 +415,7 @@ class WorkspaceStore:
                     for statement in _JOB_OPERATION_TABLES:
                         db.execute(statement)
                     db.execute("PRAGMA user_version = 6")
-            elif current_version not in {6, 7}:
+            elif current_version not in {6, 7, 8}:
                 raise ValueError(
                     f"Unsupported workspace schema version: {current_version}"
                 )
@@ -425,7 +427,37 @@ class WorkspaceStore:
                     for statement in _SUPERVISOR_TABLES:
                         db.execute(statement)
                     db.execute("PRAGMA user_version = 7")
-            elif current_version != 7:
+            elif current_version not in {7, 8}:
+                raise ValueError(
+                    f"Unsupported workspace schema version: {current_version}"
+                )
+            current_version = db.execute("PRAGMA user_version").fetchone()[0]
+            if current_version == 7:
+                if not db.in_transaction:
+                    db.execute("BEGIN IMMEDIATE")
+                if db.execute("PRAGMA user_version").fetchone()[0] == 7:
+                    has_events = db.execute(
+                        "SELECT 1 FROM sqlite_master WHERE type='table' "
+                        "AND name='events'"
+                    ).fetchone()
+                    if has_events is None:
+                        db.execute(
+                            "CREATE TABLE events (sequence INTEGER PRIMARY KEY "
+                            "AUTOINCREMENT, repository_id TEXT NOT NULL, "
+                            "entity_type TEXT NOT NULL, entity_id TEXT NOT NULL, "
+                            "event_type TEXT NOT NULL, payload TEXT NOT NULL, "
+                            "created_at TEXT NOT NULL, schema_version INTEGER "
+                            "NOT NULL DEFAULT 2, attempt_id TEXT, revision INTEGER)"
+                        )
+                    else:
+                        db.execute(
+                            "ALTER TABLE events ADD COLUMN schema_version INTEGER "
+                            "NOT NULL DEFAULT 1"
+                        )
+                        db.execute("ALTER TABLE events ADD COLUMN attempt_id TEXT")
+                        db.execute("ALTER TABLE events ADD COLUMN revision INTEGER")
+                    db.execute("PRAGMA user_version = 8")
+            elif current_version != 8:
                 raise ValueError(
                     f"Unsupported workspace schema version: {current_version}"
                 )
@@ -1313,9 +1345,14 @@ class WorkspaceStore:
         timestamp: str,
     ) -> int:
         event_type = EventType(event_type).value
+        attempt_id = payload.get("attempt_id")
+        revision = payload.get("revision")
+        if revision is None and event_type.endswith(".created"):
+            revision = 1
         cursor = db.execute(
             "INSERT INTO events(repository_id,entity_type,entity_id,event_type,"
-            "payload,created_at) VALUES (?,?,?,?,?,?)",
+            "payload,created_at,schema_version,attempt_id,revision) "
+            "VALUES (?,?,?,?,?,?,2,?,?)",
             (
                 repository,
                 entity_type,
@@ -1323,6 +1360,8 @@ class WorkspaceStore:
                 event_type,
                 json.dumps(payload, allow_nan=False),
                 timestamp,
+                attempt_id,
+                revision,
             ),
         )
         assert cursor.lastrowid is not None
@@ -1442,15 +1481,95 @@ class WorkspaceStore:
                 ).fetchone()
             )
 
-    def list_conversations(self, repository_id: str) -> tuple[Conversation, ...]:
+    def list_conversations(
+        self,
+        repository_id: str,
+        *,
+        limit: int = 100,
+        before: tuple[str, str] | None = None,
+    ) -> tuple[Conversation, ...]:
+        if not 1 <= limit <= 1000:
+            raise ValueError("limit must be between 1 and 1000")
+        cursor_sql = ""
+        params: list[Any] = [repository_id]
+        if before is not None:
+            updated_at, conversation_id = before
+            cursor_sql = (
+                "AND (updated_at < ? OR (updated_at = ? AND conversation_id > ?)) "
+            )
+            params.extend((updated_at, updated_at, conversation_id))
+        params.append(limit)
         with self._connection() as db:
             return tuple(
                 self._conversation(row)
                 for row in db.execute(
                     "SELECT * FROM conversations WHERE repository_id=? "
-                    "ORDER BY updated_at DESC, conversation_id",
+                    + cursor_sql
+                    + "ORDER BY updated_at DESC, conversation_id LIMIT ?",
+                    params,
+                )
+            )
+
+    def read_snapshot(
+        self,
+        repository_id: str,
+        *,
+        conversation_limit: int = 100,
+        job_limit: int = 100,
+    ) -> WorkspaceSnapshot:
+        """Read a bounded repository projection and its replay cursor atomically."""
+        if not 1 <= conversation_limit <= 1000 or not 1 <= job_limit <= 1000:
+            raise ValueError("snapshot limits must be between 1 and 1000")
+        with self._connection() as db:
+            db.execute("BEGIN")
+            conversations = tuple(
+                self._conversation(row)
+                for row in db.execute(
+                    "SELECT * FROM conversations WHERE repository_id=? "
+                    "ORDER BY updated_at DESC,conversation_id LIMIT ?",
+                    (repository_id, conversation_limit),
+                )
+            )
+            jobs = tuple(
+                self._job(db, row["job_id"])
+                for row in db.execute(
+                    "SELECT job_id FROM jobs WHERE repository_id=? "
+                    "ORDER BY updated_at DESC,job_id LIMIT ?",
+                    (repository_id, job_limit),
+                )
+            )
+            active_turns = tuple(
+                self._turn(db, row["turn_id"])
+                for row in db.execute(
+                    "SELECT t.turn_id FROM turns t JOIN conversations c "
+                    "ON c.conversation_id=t.conversation_id "
+                    "WHERE c.repository_id=? AND t.state IN "
+                    "('accepted','running','waiting_for_input') "
+                    "ORDER BY t.updated_at DESC,t.turn_id LIMIT 1000",
                     (repository_id,),
                 )
+            )
+            active_questions = tuple(
+                self._question(db, row["question_id"])
+                for row in db.execute(
+                    "SELECT q.question_id FROM questions q JOIN conversations c "
+                    "ON c.conversation_id=q.conversation_id "
+                    "WHERE c.repository_id=? AND q.state IN ('open','answered') "
+                    "ORDER BY q.updated_at DESC,q.question_id LIMIT 1000",
+                    (repository_id,),
+                )
+            )
+            cursor = db.execute(
+                "SELECT COALESCE(MAX(sequence),0) FROM events WHERE repository_id=?",
+                (repository_id,),
+            ).fetchone()[0]
+            return WorkspaceSnapshot(
+                repository_id,
+                conversations,
+                jobs,
+                active_turns,
+                active_questions,
+                cursor,
             )
 
     def update_conversation(
@@ -1627,8 +1746,30 @@ class WorkspaceStore:
             )
             return result
 
-    def list_messages(self, conversation_id: str) -> tuple[Message, ...]:
+    def list_messages(
+        self,
+        conversation_id: str,
+        *,
+        limit: int = 100,
+        before_sequence: int | None = None,
+    ) -> tuple[Message, ...]:
+        if not 1 <= limit <= 1000:
+            raise ValueError("limit must be between 1 and 1000")
+        if before_sequence is not None and before_sequence < 1:
+            raise ValueError("before_sequence must be positive")
+        cursor_sql = "AND sequence < ? " if before_sequence is not None else ""
+        params: tuple[Any, ...] = (
+            (conversation_id, before_sequence, limit)
+            if before_sequence is not None
+            else (conversation_id, limit)
+        )
         with self._connection() as db:
+            rows = db.execute(
+                "SELECT * FROM messages WHERE conversation_id=? "
+                + cursor_sql
+                + "ORDER BY sequence DESC LIMIT ?",
+                params,
+            ).fetchall()
             return tuple(
                 Message(
                     row["message_id"],
@@ -1638,10 +1779,7 @@ class WorkspaceStore:
                     row["created_at"],
                     row["sequence"],
                 )
-                for row in db.execute(
-                    "SELECT * FROM messages WHERE conversation_id=? ORDER BY sequence",
-                    (conversation_id,),
-                )
+                for row in reversed(rows)
             )
 
     @staticmethod
@@ -1878,12 +2016,28 @@ class WorkspaceStore:
                 raise KeyError("Job operation does not exist")
             return self._operation(db, row["operation_id"])
 
-    def list_job_operations(self, job_id: str) -> tuple[JobOperation, ...]:
+    def list_job_operations(
+        self,
+        job_id: str,
+        *,
+        limit: int = 100,
+        after: tuple[str, str] | None = None,
+    ) -> tuple[JobOperation, ...]:
+        if not 1 <= limit <= 1000:
+            raise ValueError("limit must be between 1 and 1000")
+        cursor_sql = ""
+        params: list[Any] = [job_id]
+        if after is not None:
+            created_at, attempt_id = after
+            cursor_sql = "AND (created_at > ? OR (created_at = ? AND attempt_id > ?)) "
+            params.extend((created_at, created_at, attempt_id))
+        params.append(limit)
         with self._connection() as db:
             rows = db.execute(
                 "SELECT operation_id FROM job_operations WHERE job_id=? "
-                "ORDER BY created_at,attempt_id",
-                (job_id,),
+                + cursor_sql
+                + "ORDER BY created_at,attempt_id LIMIT ?",
+                params,
             ).fetchall()
             return tuple(self._operation(db, row["operation_id"]) for row in rows)
 
@@ -2548,18 +2702,30 @@ class WorkspaceStore:
         repository_id: str,
         *,
         states: Sequence[JobState] = (),
+        limit: int = 100,
+        before: tuple[str, str] | None = None,
     ) -> tuple[Job, ...]:
+        if not 1 <= limit <= 1000:
+            raise ValueError("limit must be between 1 and 1000")
+        state_values = tuple(JobState(state).value for state in states)
+        clauses = ["repository_id=?"]
+        params: list[Any] = [repository_id]
+        if state_values:
+            clauses.append("state IN (" + ",".join("?" for _ in state_values) + ")")
+            params.extend(state_values)
+        if before is not None:
+            updated_at, job_id = before
+            clauses.append("(updated_at < ? OR (updated_at = ? AND job_id > ?))")
+            params.extend((updated_at, updated_at, job_id))
+        params.append(limit)
         with self._connection() as db:
             rows = db.execute(
-                "SELECT job_id,state FROM jobs WHERE repository_id=? "
-                "ORDER BY updated_at DESC,job_id",
-                (repository_id,),
+                "SELECT job_id FROM jobs WHERE "
+                + " AND ".join(clauses)
+                + " ORDER BY updated_at DESC,job_id LIMIT ?",
+                params,
             ).fetchall()
-            return tuple(
-                self._job(db, row["job_id"])
-                for row in rows
-                if not states or row["state"] in states
-            )
+            return tuple(self._job(db, row["job_id"]) for row in rows)
 
     def transition_job(
         self,
@@ -2695,6 +2861,9 @@ class WorkspaceStore:
                     EventType(row["event_type"]),
                     json.loads(row["payload"]),
                     row["created_at"],
+                    row["schema_version"],
+                    row["attempt_id"],
+                    row["revision"],
                 )
                 for row in db.execute(
                     "SELECT * FROM events WHERE repository_id=? AND sequence>? "

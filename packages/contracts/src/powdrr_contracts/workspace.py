@@ -37,6 +37,14 @@ class JobAction(StrEnum):
     RESUME = "resume"
 
 
+class JobActionIntentState(StrEnum):
+    PENDING = "pending"
+    CLAIMED = "claimed"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    CANCELLED = "cancelled"
+
+
 class MessageRole(StrEnum):
     USER = "user"
     ASSISTANT = "assistant"
@@ -665,6 +673,74 @@ class JobBlocker:
             _validate_id(data["job_id"], "job_id"),
             _validate_text(data["title"], "title"),
             state,
+        )
+
+
+@dataclass(frozen=True)
+class WorkspaceJobActionIntent:
+    action_id: str
+    repository_id: str
+    job_id: str
+    action: JobAction
+    state: JobActionIntentState
+    expected_revision: int
+    request_id: str
+    created_at: str
+    updated_at: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": _SCHEMA_VERSION,
+            "action_id": self.action_id,
+            "repository_id": self.repository_id,
+            "job_id": self.job_id,
+            "action": self.action.value,
+            "state": self.state.value,
+            "expected_revision": self.expected_revision,
+            "request_id": self.request_id,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
+        }
+
+    @classmethod
+    def from_dict(cls, value: Any) -> Self:
+        data = _record(
+            value,
+            {
+                "action_id",
+                "repository_id",
+                "job_id",
+                "action",
+                "state",
+                "expected_revision",
+                "request_id",
+                "created_at",
+                "updated_at",
+            },
+            "workspace job action intent",
+        )
+        expected_revision = data["expected_revision"]
+        if (
+            not isinstance(expected_revision, int)
+            or isinstance(expected_revision, bool)
+            or expected_revision < 1
+        ):
+            raise WorkspaceContractError("expected_revision must be positive")
+        try:
+            action = JobAction(data["action"])
+            state = JobActionIntentState(data["state"])
+        except (TypeError, ValueError) as error:
+            raise WorkspaceContractError("Unsupported job action intent") from error
+        return cls(
+            _validate_id(data["action_id"], "action_id"),
+            _validate_id(data["repository_id"], "repository_id"),
+            _validate_id(data["job_id"], "job_id"),
+            action,
+            state,
+            expected_revision,
+            _validate_text(data["request_id"], "request_id"),
+            _validate_text(data["created_at"], "created_at"),
+            _validate_text(data["updated_at"], "updated_at"),
         )
 
 

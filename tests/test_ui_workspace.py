@@ -12,6 +12,7 @@ from powdrr_contracts.workspace import (
     EventType,
     Job,
     JobAction,
+    JobActionIntentState,
     JobAttemptSummary,
     JobBlocker,
     JobKind,
@@ -28,6 +29,7 @@ from powdrr_contracts.workspace import (
     WorkspaceApiErrorResponse,
     WorkspaceContractError,
     WorkspaceEvent,
+    WorkspaceJobActionIntent,
     WorkspaceJobDetail,
     WorkspaceQuestion,
     WorkspaceRepository,
@@ -377,6 +379,18 @@ def test_workspace_contracts_round_trip_and_reject_unknown_fields() -> None:
         allowed_actions=(JobAction.CANCEL,),
     )
     assert WorkspaceJobDetail.from_dict(detail.to_dict()) == detail
+    action_intent = WorkspaceJobActionIntent(
+        "action-1",
+        "repo-a",
+        "job-1",
+        JobAction.START,
+        JobActionIntentState.PENDING,
+        3,
+        "request-1",
+        "2026-01-01T00:00:00Z",
+        "2026-01-01T00:00:00Z",
+    )
+    assert WorkspaceJobActionIntent.from_dict(action_intent.to_dict()) == action_intent
     conversation = Conversation(
         "chat-1",
         "repo-a",
@@ -410,6 +424,50 @@ def test_workspace_contracts_round_trip_and_reject_unknown_fields() -> None:
     malformed = message.to_dict() | {"debug": "unexpected"}
     with pytest.raises(WorkspaceContractError, match="unexpected fields"):
         Message.from_dict(malformed)
+
+
+def test_pending_job_actions_are_bounded_and_repository_scoped(
+    tmp_path: Path,
+) -> None:
+    store = WorkspaceStore(tmp_path / "workspace.db")
+    action_ids: set[str] = set()
+    for index in range(2):
+        job = store.create_job(
+            "repo-a",
+            kind="planning",
+            title=f"Plan {index}",
+            request_id=f"create-{index}",
+        )
+        accepted = store.accept_job_action(
+            "repo-a",
+            job.job_id,
+            JobAction.START,
+            expected_revision=job.revision,
+            request_id=f"start-{index}",
+        )
+        action_ids.add(accepted["action_id"])
+    other_job = store.create_job(
+        "repo-b", kind="planning", title="Other", request_id="other-job"
+    )
+    store.accept_job_action(
+        "repo-b",
+        other_job.job_id,
+        JobAction.START,
+        expected_revision=other_job.revision,
+        request_id="other-start",
+    )
+
+    first_batch = store.list_pending_job_actions("repo-a", limit=1)
+    all_actions = store.list_pending_job_actions("repo-a")
+
+    assert len(first_batch) == 1
+    assert len(all_actions) == 2
+    assert {item.action_id for item in all_actions} == action_ids
+    assert all(item.repository_id == "repo-a" for item in all_actions)
+    assert all(item.state == JobActionIntentState.PENDING for item in all_actions)
+    assert store.list_pending_job_actions("repo-b")[0].job_id == other_job.job_id
+    with pytest.raises(ValueError, match="limit"):
+        store.list_pending_job_actions("repo-a", limit=0)
 
 
 def test_workspace_contracts_reject_unknown_versions_invalid_ids_and_nan() -> None:

@@ -32,6 +32,11 @@ from powdrr_service.planning.semantic_decision import (
     SemanticDecision,
     SemanticDecisionError,
 )
+from powdrr_service.structrr.obligation_evidence import (
+    ObligationEvidenceContract,
+    assert_obligation_evidence_complete,
+    compile_obligation_evidence_contract,
+)
 
 from powdrr_lift.core.behavior_contract import (
     BEHAVIOR_DIMENSIONS,
@@ -59,11 +64,6 @@ from powdrr_lift.core.semantic_faithfulness import (
     prepare_scenario_claim_reviews,
 )
 from powdrr_lift.errors import PowdrrExecutionError
-from powdrr_lift.structrr.obligation_evidence import (
-    ObligationEvidenceContract,
-    assert_obligation_evidence_complete,
-    compile_obligation_evidence_contract,
-)
 from powdrr_lift.workrr.external_contract_research import (
     bind_external_contract_assessments,
     bind_external_contract_claims,

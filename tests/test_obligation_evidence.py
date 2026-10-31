@@ -1,15 +1,21 @@
 from __future__ import annotations
 
-import pytest
+import importlib.util
 
-from powdrr_lift.core.implementation_packet import compile_implementation_packet
-from powdrr_lift.structrr.obligation_evidence import (
+import pytest
+from powdrr_service.structrr.obligation_evidence import (
     DiffExpectation,
     EvidenceRoute,
     ObligationEvidenceContract,
     assert_obligation_evidence_complete,
     compile_obligation_evidence_contract,
 )
+
+from powdrr_lift.core.implementation_packet import compile_implementation_packet
+
+
+def test_legacy_agent_obligation_evidence_module_is_removed() -> None:
+    assert importlib.util.find_spec("powdrr_lift.structrr.obligation_evidence") is None
 
 
 @pytest.mark.parametrize(

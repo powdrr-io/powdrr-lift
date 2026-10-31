@@ -12,6 +12,10 @@ from typing import Any
 
 import pytest
 import yaml
+from powdrr_service.structrr.obligation_evidence import (
+    NormativeStrength,
+    compile_obligation_evidence_contract,
+)
 
 from powdrr_lift.cli import main
 from powdrr_lift.core.decision_obligation import (
@@ -24,10 +28,6 @@ from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.structrr.actual_diff import StructrrActualDiff
 from powdrr_lift.structrr.bootstrap import BOOTSTRAP_SECTION_VERSIONS
 from powdrr_lift.structrr.gate_compiler import compile_proposal_worklist
-from powdrr_lift.structrr.obligation_evidence import (
-    NormativeStrength,
-    compile_obligation_evidence_contract,
-)
 from powdrr_lift.structrr.proposal import compile_proposal_revision
 from powdrr_lift.structrr.validation import DiscoveredValidationProfile
 from powdrr_lift.workrr.coding_agent import (

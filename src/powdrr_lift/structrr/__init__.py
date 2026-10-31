@@ -53,15 +53,6 @@ from powdrr_lift.structrr.invariant_review import (
     write_invariant_review_receipt,
     write_invariant_review_run,
 )
-from powdrr_lift.structrr.obligation_evidence import (
-    OBLIGATION_EVIDENCE_SCHEMA_VERSION,
-    DiffExpectation,
-    EvidenceRoute,
-    NormativeStrength,
-    ObligationEvidenceContract,
-    assert_obligation_evidence_complete,
-    compile_obligation_evidence_contract,
-)
 from powdrr_lift.structrr.proposal import (
     PROPOSAL_REVISION_SCHEMA_VERSION,
     ProposalOperation,
@@ -128,13 +119,6 @@ __all__ = [
     "review_candidate_invariants",
     "write_invariant_review_run",
     "write_invariant_review_receipt",
-    "DiffExpectation",
-    "EvidenceRoute",
-    "NormativeStrength",
-    "OBLIGATION_EVIDENCE_SCHEMA_VERSION",
-    "ObligationEvidenceContract",
-    "assert_obligation_evidence_complete",
-    "compile_obligation_evidence_contract",
     "PROPOSAL_REVISION_SCHEMA_VERSION",
     "ProposalOperation",
     "ProposalRevision",

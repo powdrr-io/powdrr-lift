@@ -46,6 +46,7 @@ from powdrr_service.planning.service import (
 )
 from powdrr_service.planning.source import segment_markdown_source
 from powdrr_service.planning.workflow_ids import slugify_workflow_id
+from powdrr_service.structrr.rebase import rebase_structrr_snapshot
 
 from powdrr_lift.agent_bootstrap import (
     BootstrapTaskConfig,
@@ -175,7 +176,6 @@ from powdrr_lift.structrr.intent import (
     make_intent_source,
 )
 from powdrr_lift.structrr.intent_lineage import audit_intent_lineage
-from powdrr_lift.structrr.rebase import rebase_structrr_snapshot
 from powdrr_lift.structrr.verification_health import (
     VerificationPolicyMode,
     audit_verification_health,

@@ -86,12 +86,6 @@ from powdrr_lift.structrr.proposal_review import (
     load_review_receipt,
     write_review_receipt,
 )
-from powdrr_lift.structrr.rebase import (
-    StructrrChange,
-    StructrrRebaseReport,
-    StructrrRemapping,
-    rebase_structrr_snapshot,
-)
 from powdrr_lift.structrr.source_manifest import (
     SOURCE_EXTRACTOR_VERSION,
     SOURCE_MANIFEST_SCHEMA_VERSION,
@@ -164,10 +158,6 @@ __all__ = [
     "ObligationEvidenceContract",
     "assert_obligation_evidence_complete",
     "compile_obligation_evidence_contract",
-    "StructrrChange",
-    "StructrrRebaseReport",
-    "StructrrRemapping",
-    "rebase_structrr_snapshot",
     "PROPOSAL_REVISION_SCHEMA_VERSION",
     "ProposalOperation",
     "ProposalRevision",

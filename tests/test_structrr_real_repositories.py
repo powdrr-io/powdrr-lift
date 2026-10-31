@@ -4,9 +4,9 @@ import subprocess
 from pathlib import Path
 
 import yaml
+from powdrr_service.structrr.rebase import rebase_structrr_snapshot
 
 from powdrr_lift.structrr.bootstrap import bootstrap_structrr
-from powdrr_lift.structrr.rebase import rebase_structrr_snapshot
 
 PROJECT_ROOT = Path(__file__).parents[1]
 

@@ -11,7 +11,7 @@ from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Literal
 
-from powdrr_service.structrr.snapshot import snapshot_digest as _snapshot_digest
+from powdrr_service.structrr.snapshot import snapshot_digest
 
 RebaseClassification = Literal[
     "clean",
@@ -161,8 +161,8 @@ def rebase_structrr_snapshot(
     amendment_items = tuple(_amendment_item(change) for change in affected)
     return StructrrRebaseReport(
         classification=classification,
-        baseline_digest=_snapshot_digest(baseline),
-        current_digest=_snapshot_digest(current),
+        baseline_digest=snapshot_digest(baseline),
+        current_digest=snapshot_digest(current),
         changes=tuple(changes),
         affected_changes=affected,
         remappings=affected_remappings,

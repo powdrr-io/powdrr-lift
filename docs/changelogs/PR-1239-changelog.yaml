@@ -9,47 +9,47 @@ structured_files: []
 files:
   - path: packages/service/src/powdrr_service/planning/checkpoints.py
     type: modified
-    span: {start_line: 445, end_line: 445}
-    summary: Render the complete checkpoint chain as digest-checked compressed comment chunks.
-    rationale: Preserve every immutable event while making the issue archive much smaller than its expanded event stream.
+    span: {start_line: 470, end_line: 536}
+    summary: Render a compressed event chain as digest-checked comment chunks.
+    rationale: Preserve immutable checkpoint history in fewer issue comments.
   - path: packages/service/src/powdrr_service/planning/checkpoints.py
     type: modified
-    span: {start_line: 577, end_line: 760}
-    summary: Restore event chains from validated archive chunks and manifests.
-    rationale: Resume from a compact archive without changing the existing checkpoint semantics.
+    span: {start_line: 548, end_line: 551}
+    summary: Track archive chunks and manifests while reducing comments.
+    rationale: Restore snapshots and subsequent event tails together.
   - path: packages/service/src/powdrr_service/planning/checkpoints.py
     type: modified
-    span: {start_line: 790, end_line: 795}
-    summary: Detect when recent issue comments contain a complete checkpoint archive.
-    rationale: Let the GitHub adapter stop pagination at the newest recoverable history boundary.
+    span: {start_line: 761, end_line: 774}
+    summary: Detect when recent comments contain a complete usable archive.
+    rationale: Let newest-first pagination stop at a recoverable history boundary.
   - path: packages/local/src/powdrr_local/planning/checkpoints.py
     type: modified
-    span: {start_line: 454, end_line: 503}
+    span: {start_line: 466, end_line: 504}
     summary: Publish a compressed archive and verify its restored head.
     rationale: Keep the full planning journal available from the issue for a fresh checkout.
   - path: src/powdrr_lift/workrr/github_issue_queue.py
     type: modified
-    span: {start_line: 370, end_line: 407}
+    span: {start_line: 378, end_line: 410}
     summary: Fetch newest issue comments page by page until an archive is complete.
     rationale: Avoid downloading and reducing all earlier checkpoint comments on every resume.
   - path: src/powdrr_lift/cli.py
     type: modified
-    span: {start_line: 30, end_line: 34}
+    span: {start_line: 30, end_line: 33}
     summary: Import the GitHub checkpoint archive adapter into the plan command.
     rationale: Allow plan resume to store a compact issue-side journal.
   - path: src/powdrr_lift/cli.py
     type: modified
-    span: {start_line: 2890, end_line: 2892}
+    span: {start_line: 2872, end_line: 2873}
     summary: Initialize the issue archive adapter alongside the local checkpoint journal.
     rationale: Keep planning issue state recoverable from GitHub.
   - path: src/powdrr_lift/cli.py
     type: modified
-    span: {start_line: 2985, end_line: 3000}
+    span: {start_line: 2990, end_line: 2997}
     summary: Import recent archived comments and publish the current journal at resume boundaries.
     rationale: Bring legacy issues forward and make the latest recovered or terminal state available in GitHub.
   - path: tests/test_planning_checkpoints.py
     type: modified
-    span: {start_line: 432, end_line: 528}
+    span: {start_line: 443, end_line: 521}
     summary: Cover archive round trips, archive publication, and the legacy event tail.
     rationale: Verify compressed history restores the same chain and accepted answers.
   - path: tests/test_github_issue_queue.py
@@ -57,6 +57,101 @@ files:
     span: {start_line: 612, end_line: 675}
     summary: Cover bounded reads with archives and complete reads for legacy journals.
     rationale: Ensure pagination stops only after the archive is actually recoverable.
+  - path: packages/local/src/powdrr_local/planning/checkpoints.py
+    type: modified
+    span: {start_line: 23, end_line: 23}
+    summary: Import compressed archive rendering for the GitHub checkpoint store.
+    rationale: Let the local adapter write lossless issue-side snapshots.
+  - path: packages/local/src/powdrr_local/planning/checkpoints.py
+    type: modified
+    span: {start_line: 454, end_line: 459}
+    summary: Load recent checkpoint comments through the bounded-read API when available.
+    rationale: Prefer compact archives while remaining compatible with basic clients.
+  - path: packages/local/src/powdrr_local/planning/checkpoints.py
+    type: modified
+    span: {start_line: 461, end_line: 461}
+    summary: Reduce selected issue comments into the checkpoint journal.
+    rationale: Reuse the existing reducer for archived and legacy comments.
+  - path: packages/service/src/powdrr_service/planning/checkpoints.py
+    type: modified
+    span: {start_line: 9, end_line: 9}
+    summary: Add zlib support for compact checkpoint serialization.
+    rationale: Reduce issue-comment storage for long histories.
+  - path: packages/service/src/powdrr_service/planning/checkpoints.py
+    type: modified
+    span: {start_line: 18, end_line: 18}
+    summary: Set a maximum uncompressed archive size.
+    rationale: Bound memory use when restoring issue comments.
+  - path: packages/service/src/powdrr_service/planning/checkpoints.py
+    type: modified
+    span: {start_line: 25, end_line: 26}
+    summary: Define markers for archive chunks and manifests.
+    rationale: Distinguish snapshots from existing checkpoint comments.
+  - path: packages/service/src/powdrr_service/planning/checkpoints.py
+    type: modified
+    span: {start_line: 589, end_line: 613}
+    summary: Parse and validate archive chunk comments.
+    rationale: Ignore malformed, unrelated, or corrupted chunks.
+  - path: packages/service/src/powdrr_service/planning/checkpoints.py
+    type: modified
+    span: {start_line: 669, end_line: 753}
+    summary: Validate manifests, decompress payloads, and restore archived events.
+    rationale: Accept only complete archives whose digests, session, and event chain agree.
+  - path: packages/service/src/powdrr_service/planning/checkpoints.py
+    type: modified
+    span: {start_line: 977, end_line: 983}
+    summary: Recognize archive chunk and manifest markers.
+    rationale: Route compact archive comments into the checkpoint reducer.
+  - path: packages/service/src/powdrr_service/planning/checkpoints.py
+    type: modified
+    span: {start_line: 1047, end_line: 1047}
+    summary: Export the complete-archive predicate.
+    rationale: Let GitHub pagination check whether older pages are needed.
+  - path: packages/service/src/powdrr_service/planning/checkpoints.py
+    type: modified
+    span: {start_line: 1050, end_line: 1050}
+    summary: Export compressed archive rendering.
+    rationale: Let the local persistence adapter publish snapshots.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 2986, end_line: 2988}
+    summary: Read resumable checkpoints from recent issue comments.
+    rationale: Recover archived or legacy state without loading older history unnecessarily.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 3019, end_line: 3021}
+    summary: Publish the current journal after a planning error boundary.
+    rationale: Preserve the latest recoverable checkpoint state on failure.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 3026, end_line: 3027}
+    summary: Publish the final journal after successful planning.
+    rationale: Keep terminal planning state durable in the issue.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 3062, end_line: 3072}
+    summary: Attempt archive publication during error and interruption cleanup.
+    rationale: Retain recoverable issue-side state when a planning session exits unexpectedly.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 25, end_line: 25}
+    summary: Import the complete-archive predicate for comment pagination.
+    rationale: Stop fetching only after a recoverable snapshot has been found.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 10, end_line: 13}
+    summary: Import archive serialization helpers into GitHub pagination tests.
+    rationale: Build full archive fixtures without mocking away validation.
+  - path: tests/test_planning_checkpoints.py
+    type: modified
+    span: {start_line: 24, end_line: 24}
+    summary: Import compressed archive rendering into checkpoint tests.
+    rationale: Exercise snapshot round trips and issue publication.
+  - path: tests/test_planning_checkpoints.py
+    type: modified
+    span: {start_line: 435, end_line: 435}
+    summary: Remove a blank line before archive regression tests.
+    rationale: Keep the checkpoint tests structurally consistent.
 entities: []
 entity_relationships: []
 invariants:

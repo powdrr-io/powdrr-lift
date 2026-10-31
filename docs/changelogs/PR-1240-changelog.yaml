@@ -1,0 +1,187 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1240
+title: Stream durable workspace events over SSE
+intent:
+  problem: Browser clients need ordered workspace updates that survive reconnects and service process changes.
+  goal: Stream bounded event-log batches with durable cursors, heartbeat comments, and an explicit snapshot resync response.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/design/browser-workspace-api.md
+  type: modified
+  span:
+    start_line: 74
+    end_line: 87
+  summary: Document SSE cursor, reconnect, and resync behavior.
+  rationale: Give browser clients the durable replay protocol and future-cursor recovery steps.
+- path: packages/contracts/src/powdrr_contracts/workspace.py
+  type: modified
+  span:
+    start_line: 667
+    end_line: 667
+  summary: Add the event cursor to structured API errors.
+  rationale: Return the snapshot cursor needed to recover from a future event cursor.
+- path: packages/contracts/src/powdrr_contracts/workspace.py
+  type: modified
+  span:
+    start_line: 673
+    end_line: 674
+  summary: Serialize the current event cursor when present.
+  rationale: Make resync metadata available in the stable error envelope.
+- path: packages/contracts/src/powdrr_contracts/workspace.py
+  type: modified
+  span:
+    start_line: 681
+    end_line: 686
+  summary: Accept the optional cursor field in API error records.
+  rationale: Preserve strict validation while extending the error contract.
+- path: packages/contracts/src/powdrr_contracts/workspace.py
+  type: modified
+  span:
+    start_line: 694
+    end_line: 698
+  summary: Validate non-negative event cursors in API errors.
+  rationale: Prevent malformed resync positions from reaching clients.
+- path: packages/contracts/src/powdrr_contracts/workspace.py
+  type: modified
+  span:
+    start_line: 703
+    end_line: 703
+  summary: Round-trip the optional event cursor.
+  rationale: Keep API error serialization symmetric.
+- path: packages/local/src/powdrr_local/web.py
+  type: modified
+  span:
+    start_line: 132
+    end_line: 137
+  summary: Include event-cursor metadata in API error responses.
+  rationale: Deliver resync information through the common exception handler.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 2952
+    end_line: 2960
+  summary: Read the newest durable event sequence for a repository.
+  rationale: Validate reconnect cursors against shared SQLite state.
+- path: packages/local/src/powdrr_local/workspace_api.py
+  type: modified
+  span:
+    start_line: 5
+    end_line: 5
+  summary: Add asynchronous polling support for event replay.
+  rationale: Keep waits non-blocking while clients listen for shared database updates.
+- path: packages/local/src/powdrr_local/workspace_api.py
+  type: modified
+  span:
+    start_line: 7
+    end_line: 10
+  summary: Import event-stream support and typed asynchronous iteration.
+  rationale: Implement bounded SSE serialization and client disconnect handling.
+- path: packages/local/src/powdrr_local/workspace_api.py
+  type: modified
+  span:
+    start_line: 14
+    end_line: 14
+  summary: Read the Last-Event-ID reconnect header.
+  rationale: Resume from the browser's last committed event sequence.
+- path: packages/local/src/powdrr_local/workspace_api.py
+  type: modified
+  span:
+    start_line: 25
+    end_line: 25
+  summary: Return a streaming HTTP response for event subscribers.
+  rationale: Deliver server-sent events without buffering the complete stream.
+- path: packages/local/src/powdrr_local/workspace_api.py
+  type: modified
+  span:
+    start_line: 82
+    end_line: 82
+  summary: Add optional event-cursor details to API exceptions.
+  rationale: Carry resync state through the common response shape.
+- path: packages/local/src/powdrr_local/workspace_api.py
+  type: modified
+  span:
+    start_line: 89
+    end_line: 89
+  summary: Retain event-cursor details on API exceptions.
+  rationale: Make the value available to response serialization.
+- path: packages/local/src/powdrr_local/workspace_api.py
+  type: modified
+  span:
+    start_line: 93
+    end_line: 98
+  summary: Serialize event-cursor metadata in API errors.
+  rationale: Use the same structured error envelope for cursor recovery.
+- path: packages/local/src/powdrr_local/workspace_api.py
+  type: modified
+  span:
+    start_line: 103
+    end_line: 108
+  summary: Define bounded event batch, polling, heartbeat, and cursor rules.
+  rationale: Bound per-request work and reject malformed reconnect cursors.
+- path: packages/local/src/powdrr_local/workspace_api.py
+  type: modified
+  span:
+    start_line: 137
+    end_line: 178
+  summary: Stream durable events in bounded batches and revalidate sessions.
+  rationale: Support multi-process replay without a process-local queue or long-held lock.
+- path: packages/local/src/powdrr_local/workspace_api.py
+  type: modified
+  span:
+    start_line: 242
+    end_line: 280
+  summary: Add the authenticated repository event stream route.
+  rationale: Resume exclusively after a cursor and require snapshot resync for future cursors.
+- path: tests/test_ui_workspace.py
+  type: modified
+  span:
+    start_line: 373
+    end_line: 377
+  summary: Verify API errors round-trip the current event cursor.
+  rationale: Protect cursor recovery metadata in the shared contract.
+- path: tests/test_workspace_api.py
+  type: modified
+  span:
+    start_line: 1
+    end_line: 2
+  summary: Import asyncio and JSON helpers for stream tests.
+  rationale: Exercise live event delivery and decode event frames.
+- path: tests/test_workspace_api.py
+  type: modified
+  span:
+    start_line: 9
+    end_line: 10
+  summary: Import the request and event-stream test adapters.
+  rationale: Test the stream iterator without buffering an infinite HTTP response.
+- path: tests/test_workspace_api.py
+  type: modified
+  span:
+    start_line: 197
+    end_line: 314
+  summary: Test event framing, second-store updates, and future-cursor resync.
+  rationale: Verify replay and recovery across independent store instances.
+entities:
+- id: workspace-event-stream-route
+  type: Route
+  action: added
+- id: workspace-event-replay
+  type: Event stream
+  action: added
+- id: workspace-event-stream-tests
+  type: Integration test
+  action: added
+invariants:
+- id: event-replay-uses-exclusive-durable-cursor
+  description: An event stream emits only events whose durable sequence is greater than the supplied cursor.
+  action: added
+- id: future-event-cursor-requires-snapshot-resync
+  description: A cursor ahead of the repository event log returns resync_required with the current event cursor.
+  action: added
+- id: event-stream-is-multiprocess-readable
+  description: A subscriber observes events committed through another store instance sharing the workspace database.
+  action: added
+- id: event-stream-does-not-buffer-subscriber-backlog
+  description: Event reads are bounded and a disconnected subscriber does not retain an unbounded in-memory queue.
+  action: added
+guidance: []

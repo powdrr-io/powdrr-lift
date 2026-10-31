@@ -9,7 +9,7 @@ import re
 import time
 from collections.abc import AsyncGenerator, Mapping
 from pathlib import Path
-from typing import Annotated, Any, Protocol
+from typing import Annotated, Any, Literal, Protocol
 from uuid import NAMESPACE_URL, uuid5
 
 from fastapi import APIRouter, Depends, FastAPI, Header, Query, Request
@@ -76,6 +76,18 @@ class MessageCreateRequest(WorkspaceApiRequest):
     request_id: str = Field(min_length=1, max_length=128)
     message_id: str = Field(min_length=1, max_length=128)
     content: str = Field(min_length=1, max_length=100_000)
+
+
+class JobCreateRequest(WorkspaceApiRequest):
+    request_id: str = Field(min_length=1, max_length=128)
+    kind: Literal["planning", "pr_execution"]
+    title: str = Field(min_length=1, max_length=512)
+    conversation_id: str | None = Field(default=None, max_length=128)
+    dependency_ids: list[str] = Field(default_factory=list, max_length=100)
+    job_inputs: dict[str, Any]
+    source_refs: list[str] = Field(min_length=1, max_length=100)
+    source_spec_revision: str | None = Field(default=None, max_length=256)
+    provider_config_refs: list[str] = Field(min_length=1, max_length=100)
 
 
 class WorkspaceApiException(Exception):
@@ -322,6 +334,42 @@ def install_workspace_routes(
                 else {"updated_at": last.updated_at, "job_id": last.job_id}
             ),
         }
+
+    @router.post("/repositories/{repository_id}/jobs", status_code=201)
+    async def create_job(
+        repository_id: str,
+        payload: JobCreateRequest,
+        _: None = Depends(require_session(mutating=True)),
+    ) -> dict[str, Any]:
+        await _get_repository(repository_registry, repository_id)
+        try:
+            job = await run_in_threadpool(
+                store.create_job,
+                repository_id,
+                kind=payload.kind,
+                title=payload.title,
+                conversation_id=payload.conversation_id,
+                dependency_ids=payload.dependency_ids,
+                job_inputs=payload.job_inputs,
+                source_refs=payload.source_refs,
+                source_spec_revision=payload.source_spec_revision,
+                provider_config_refs=payload.provider_config_refs,
+                request_id=payload.request_id,
+            )
+        except WorkspaceConflict as error:
+            raise WorkspaceApiException(
+                409, "request_conflict", "The request conflicts with saved data."
+            ) from error
+        except KeyError as error:
+            raise WorkspaceApiException(
+                422,
+                "invalid_job_reference",
+                "A conversation or dependency does not exist.",
+            ) from error
+        except ValueError as error:
+            raise WorkspaceApiException(422, "invalid_job", str(error)) from error
+        await _notify(event_source, repository_id)
+        return job.to_dict()
 
     @router.get("/repositories/{repository_id}/jobs/{job_id}")
     async def get_job(

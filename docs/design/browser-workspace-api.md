@@ -95,6 +95,26 @@ page. Fetch a job and its saved attempt identifiers from
 `GET /api/v1/repositories/{repository_id}/jobs/{job_id}`. Attempt details omit
 local worktree paths and provider configuration data.
 
+Create a planning job from an explicit pinned specification and a provider
+configuration reference:
+
+```http
+POST /api/v1/repositories/{repository_id}/jobs
+Origin: http://127.0.0.1:8765
+X-CSRF-Token: <csrf-token>
+Content-Type: application/json
+
+{"request_id":"<uuid>","kind":"planning","title":"Plan search","conversation_id":"<conversation-id>","dependency_ids":[],"job_inputs":{"pinned_spec_ref":"spec:search-v2"},"source_refs":["spec:search-v2"],"source_spec_revision":"revision-7","provider_config_refs":["provider:deepinfra-flash"]}
+```
+
+The endpoint returns HTTP 201 with the created job. For `pr_execution`,
+`job_inputs` must include an `approved_change_ref` present in `source_refs`.
+Source references, validated inputs, source revision, and provider configuration
+references are saved with the job and must match when its operation starts. Do
+not send provider credentials; the backend resolves provider references through
+its existing configuration. A request ID retry returns the original job, while
+reuse with different input returns HTTP 409.
+
 ## Event replay
 
 Open `GET /api/v1/repositories/{repository_id}/events?after={event_cursor}` to

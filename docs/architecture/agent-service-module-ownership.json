@@ -961,7 +961,6 @@
         "powdrr_lift.structrr.bootstrap",
         "powdrr_lift.structrr.intent",
         "powdrr_lift.structrr.intent_lineage",
-        "powdrr_lift.structrr.verification_health",
         "powdrr_lift.workrr.chat_config",
         "powdrr_lift.workrr.chat_tui",
         "powdrr_lift.workrr.coding_agent",
@@ -998,6 +997,7 @@
         "powdrr_service.planning.source",
         "powdrr_service.planning.workflow_ids",
         "powdrr_service.structrr.rebase",
+        "powdrr_service.structrr.verification_health",
         "procedrr",
         "procedrr.catalog"
       ],
@@ -2335,13 +2335,13 @@
       "reviewed": false
     },
     {
-      "extraction_pr": "3",
+      "extraction_pr": "1230",
       "internal_imports": [],
       "kind": "python_module",
-      "owner": "split",
-      "path": "src/powdrr_lift/structrr/verification_health.py",
-      "rationale": "service semantics; agent supplies pinned repository evidence",
-      "reviewed": false
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/structrr/verification_health.py",
+      "rationale": "Service-owned policy for auditing whether accepted intent has adequate verification coverage.",
+      "reviewed": true
     },
     {
       "extraction_pr": "3",

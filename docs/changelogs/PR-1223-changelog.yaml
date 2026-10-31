@@ -1,0 +1,178 @@
+{
+  "schema": "https://powdrr.io/schema/changelog-v2",
+  "change_id": 1223,
+  "title": "Bind durable job inputs to execution attempts",
+  "intent": {
+    "problem": "A job cannot be resumed or audited safely if its selected spec or approved change, provider configuration, checkpoint, or attempt identity can drift between acceptance and dispatch.",
+    "goal": "Atomically bind each new job attempt to immutable source references and validated inputs before the job enters the running state, without persisting provider secrets."
+  },
+  "human-decisions": [],
+  "structured_files": [],
+  "files": [
+    {
+      "path": "packages/contracts/src/powdrr_contracts/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 66,
+        "end_line": 66
+      },
+      "summary": "Define the immutable job operation binding contract.",
+      "rationale": "Represent the run attempt, checkpoint, workflow directory, pinned sources, validated inputs, and provider configuration references as a typed record."
+    },
+    {
+      "path": "packages/contracts/src/powdrr_contracts/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 559,
+        "end_line": 627
+      },
+      "summary": "Define the immutable job operation binding contract.",
+      "rationale": "Represent the run attempt, checkpoint, workflow directory, pinned sources, validated inputs, and provider configuration references as a typed record."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 26,
+        "end_line": 26
+      },
+      "summary": "Persist validated job operation bindings atomically before execution starts.",
+      "rationale": "Ensure a ready job has durable pinned inputs and an attempt identity before a supervisor dispatches work."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 151,
+        "end_line": 162
+      },
+      "summary": "Persist validated job operation bindings atomically before execution starts.",
+      "rationale": "Ensure a ready job has durable pinned inputs and an attempt identity before a supervisor dispatches work."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 194,
+        "end_line": 204
+      },
+      "summary": "Persist validated job operation bindings atomically before execution starts.",
+      "rationale": "Ensure a ready job has durable pinned inputs and an attempt identity before a supervisor dispatches work."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 230,
+        "end_line": 273
+      },
+      "summary": "Persist validated job operation bindings atomically before execution starts.",
+      "rationale": "Ensure a ready job has durable pinned inputs and an attempt identity before a supervisor dispatches work."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 323,
+        "end_line": 323
+      },
+      "summary": "Persist validated job operation bindings atomically before execution starts.",
+      "rationale": "Ensure a ready job has durable pinned inputs and an attempt identity before a supervisor dispatches work."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 333,
+        "end_line": 345
+      },
+      "summary": "Persist validated job operation bindings atomically before execution starts.",
+      "rationale": "Ensure a ready job has durable pinned inputs and an attempt identity before a supervisor dispatches work."
+    },
+    {
+      "path": "packages/local/src/powdrr_local/workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 1592,
+        "end_line": 1806
+      },
+      "summary": "Persist validated job operation bindings atomically before execution starts.",
+      "rationale": "Ensure a ready job has durable pinned inputs and an attempt identity before a supervisor dispatches work."
+    },
+    {
+      "path": "tests/test_ui_workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 12,
+        "end_line": 12
+      },
+      "summary": "Verify operation binding, pin validation, idempotency, secret rejection, and migration.",
+      "rationale": "Protect the execution boundary from unpinned inputs, reused attempts, and secret persistence."
+    },
+    {
+      "path": "tests/test_ui_workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 258,
+        "end_line": 258
+      },
+      "summary": "Verify operation binding, pin validation, idempotency, secret rejection, and migration.",
+      "rationale": "Protect the execution boundary from unpinned inputs, reused attempts, and secret persistence."
+    },
+    {
+      "path": "tests/test_ui_workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 456,
+        "end_line": 456
+      },
+      "summary": "Verify operation binding, pin validation, idempotency, secret rejection, and migration.",
+      "rationale": "Protect the execution boundary from unpinned inputs, reused attempts, and secret persistence."
+    },
+    {
+      "path": "tests/test_ui_workspace.py",
+      "type": "modified",
+      "span": {
+        "start_line": 611,
+        "end_line": 735
+      },
+      "summary": "Verify operation binding, pin validation, idempotency, secret rejection, and migration.",
+      "rationale": "Protect the execution boundary from unpinned inputs, reused attempts, and secret persistence."
+    }
+  ],
+  "entities": [
+    {
+      "id": "ui-workspace-records",
+      "type": "Module",
+      "action": "modified"
+    },
+    {
+      "id": "workspace-job-operation-contract",
+      "type": "Class",
+      "action": "added"
+    },
+    {
+      "id": "local-ui-workspace-store",
+      "type": "Class",
+      "action": "modified"
+    },
+    {
+      "id": "workspace-job-operation-table",
+      "type": "Table",
+      "action": "added"
+    },
+    {
+      "id": "workspace-schema-v6-migration",
+      "type": "Migration",
+      "action": "added"
+    },
+    {
+      "id": "workspace-event-type",
+      "type": "Enum",
+      "action": "modified"
+    }
+  ],
+  "entity_relationships": [],
+  "invariants": [],
+  "guidance": []
+}

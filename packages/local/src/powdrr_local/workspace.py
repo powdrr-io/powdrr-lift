@@ -2949,3 +2949,12 @@ class WorkspaceStore:
                     (repository_id, after, limit),
                 )
             )
+
+    def event_cursor(self, repository_id: str) -> int:
+        """Return the newest durable event sequence for one repository."""
+        with self._connection() as db:
+            row = db.execute(
+                "SELECT COALESCE(MAX(sequence),0) FROM events WHERE repository_id=?",
+                (repository_id,),
+            ).fetchone()
+            return int(row[0])

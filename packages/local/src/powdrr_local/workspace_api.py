@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+import asyncio
 import inspect
-from collections.abc import Mapping
+import json
+import re
+import time
+from collections.abc import AsyncIterator, Mapping
 from pathlib import Path
 from typing import Annotated, Any, Protocol
 
-from fastapi import APIRouter, Depends, FastAPI, Query, Request
+from fastapi import APIRouter, Depends, FastAPI, Header, Query, Request
 from powdrr_contracts.workspace import (
     Conversation,
     Job,
@@ -18,7 +22,7 @@ from powdrr_contracts.workspace import (
 )
 from pydantic import BaseModel, ConfigDict, Field
 from starlette.concurrency import run_in_threadpool
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, StreamingResponse
 
 from powdrr_local.workspace import WorkspaceConflict, WorkspaceStore
 
@@ -75,18 +79,31 @@ class WorkspaceApiException(Exception):
         message: str,
         *,
         current_revision: int | None = None,
+        current_event_cursor: int | None = None,
     ) -> None:
         super().__init__(message)
         self.status_code = status_code
         self.code = code
         self.message = message
         self.current_revision = current_revision
+        self.current_event_cursor = current_event_cursor
 
     def response(self) -> JSONResponse:
         body = WorkspaceApiErrorResponse(
-            WorkspaceApiError(self.code, self.message, self.current_revision)
+            WorkspaceApiError(
+                self.code,
+                self.message,
+                self.current_revision,
+                self.current_event_cursor,
+            )
         )
         return JSONResponse(body.to_dict(), status_code=self.status_code)
+
+
+_EVENT_BATCH_LIMIT = 100
+_EVENT_POLL_INTERVAL_SECONDS = 0.25
+_EVENT_HEARTBEAT_SECONDS = 15
+_EVENT_CURSOR_PATTERN = re.compile(r"^(0|[1-9][0-9]*)$")
 
 
 def require_session(*, mutating: bool = False):
@@ -115,6 +132,48 @@ async def _notify(
         result = await run_in_threadpool(event_source.notify, repository_id)
     if inspect.isawaitable(result):
         await result
+
+
+async def _event_stream(
+    store: WorkspaceStore,
+    repository_id: str,
+    after: int,
+    request: Request,
+) -> AsyncIterator[str]:
+    cursor = after
+    last_heartbeat = time.monotonic()
+    while not await request.is_disconnected():
+        now = time.monotonic()
+        if now - last_heartbeat >= _EVENT_HEARTBEAT_SECONDS:
+            try:
+                await request.app.state.authorize_request(request, mutating=False)
+            except WorkspaceApiException:
+                return
+            yield ": keep-alive\n\n"
+            last_heartbeat = now
+
+        events = await run_in_threadpool(
+            store.read_events,
+            repository_id,
+            after=cursor,
+            limit=_EVENT_BATCH_LIMIT,
+        )
+        if events:
+            for event in events:
+                if await request.is_disconnected():
+                    return
+                data = json.dumps(
+                    event.to_dict(), ensure_ascii=False, separators=(",", ":")
+                )
+                yield (
+                    f"id: {event.sequence}\n"
+                    f"event: {event.event_type.value}\n"
+                    f"data: {data}\n\n"
+                )
+                cursor = event.sequence
+            continue
+
+        await asyncio.sleep(_EVENT_POLL_INTERVAL_SECONDS)
 
 
 def install_workspace_routes(
@@ -179,6 +238,44 @@ def install_workspace_routes(
         await _get_repository(repository_registry, repository_id)
         snapshot = await run_in_threadpool(store.read_snapshot, repository_id)
         return snapshot.to_dict()
+
+    @router.get("/repositories/{repository_id}/events")
+    async def stream_events(
+        repository_id: str,
+        request: Request,
+        after: int = Query(default=0, ge=0),
+        last_event_id: Annotated[str | None, Header(alias="Last-Event-ID")] = None,
+        _: None = Depends(require_session()),
+    ) -> StreamingResponse:
+        await _get_repository(repository_registry, repository_id)
+        if last_event_id is not None:
+            if _EVENT_CURSOR_PATTERN.fullmatch(last_event_id) is None:
+                raise WorkspaceApiException(
+                    422,
+                    "invalid_cursor",
+                    "The event cursor must be a non-negative integer.",
+                )
+            cursor = int(last_event_id)
+        else:
+            cursor = after
+
+        current_cursor = await run_in_threadpool(store.event_cursor, repository_id)
+        if cursor > current_cursor:
+            raise WorkspaceApiException(
+                409,
+                "resync_required",
+                "The event cursor is ahead of this repository. Fetch a fresh snapshot and reconnect from its event cursor.",
+                current_event_cursor=current_cursor,
+            )
+
+        return StreamingResponse(
+            _event_stream(store, repository_id, cursor, request),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "X-Accel-Buffering": "no",
+            },
+        )
 
     @router.get("/repositories/{repository_id}/jobs")
     async def list_jobs(

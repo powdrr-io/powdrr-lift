@@ -370,7 +370,11 @@ def test_workspace_contracts_round_trip_and_reject_unknown_fields() -> None:
     )
     assert WorkspaceEvent.from_dict(event.to_dict()) == event
     api_error = WorkspaceApiErrorResponse(
-        WorkspaceApiError("stale_revision", "Conversation changed.", 4)
+        WorkspaceApiError(
+            "resync_required",
+            "Fetch a fresh snapshot.",
+            current_event_cursor=12,
+        )
     )
     assert WorkspaceApiErrorResponse.from_dict(api_error.to_dict()) == api_error
     malformed = message.to_dict() | {"debug": "unexpected"}

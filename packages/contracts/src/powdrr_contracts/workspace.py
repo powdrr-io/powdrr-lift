@@ -664,18 +664,26 @@ class WorkspaceApiError:
     code: str
     message: str
     current_revision: int | None = None
+    current_event_cursor: int | None = None
 
     def to_dict(self) -> dict[str, Any]:
         result: dict[str, Any] = {"code": self.code, "message": self.message}
         if self.current_revision is not None:
             result["current_revision"] = self.current_revision
+        if self.current_event_cursor is not None:
+            result["current_event_cursor"] = self.current_event_cursor
         return result
 
     @classmethod
     def from_dict(cls, value: Any) -> Self:
         if not isinstance(value, dict):
             raise WorkspaceContractError("API error must be an object")
-        allowed = {"code", "message", "current_revision"}
+        allowed = {
+            "code",
+            "message",
+            "current_revision",
+            "current_event_cursor",
+        }
         if set(value) - allowed or not {"code", "message"} <= set(value):
             raise WorkspaceContractError("API error has missing or unexpected fields")
         revision = value.get("current_revision")
@@ -683,10 +691,16 @@ class WorkspaceApiError:
             not isinstance(revision, int) or isinstance(revision, bool) or revision < 1
         ):
             raise WorkspaceContractError("current_revision must be positive")
+        cursor = value.get("current_event_cursor")
+        if cursor is not None and (
+            not isinstance(cursor, int) or isinstance(cursor, bool) or cursor < 0
+        ):
+            raise WorkspaceContractError("current_event_cursor must be non-negative")
         return cls(
             _validate_text(value["code"], "code"),
             _validate_text(value["message"], "message"),
             revision,
+            cursor,
         )
 
 

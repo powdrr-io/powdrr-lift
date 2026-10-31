@@ -5,6 +5,7 @@ import json
 import subprocess
 from collections.abc import Sequence
 from contextlib import redirect_stderr, redirect_stdout
+from importlib.resources import files
 from pathlib import Path
 from typing import Any
 
@@ -57,7 +58,17 @@ def test_bootstrap_uses_packaged_taxonomy_and_retains_local_worktree(
     assert result.bootstrap is not None
     assert result.bootstrap.validation.successful
     assert result.task.worktree.is_dir()
-    assert (result.task.worktree / "software_development_entity_taxonomy.md").is_file()
+    copied_taxonomy = result.task.worktree / "software_development_entity_taxonomy.md"
+    assert copied_taxonomy.is_file()
+    assert not (
+        Path(__file__).parents[1]
+        / "src/powdrr_lift/resources/software_development_entity_taxonomy.md"
+    ).exists()
+    assert copied_taxonomy.read_text(encoding="utf-8") == (
+        files("powdrr_service.resources")
+        .joinpath("software_development_entity_taxonomy.md")
+        .read_text(encoding="utf-8")
+    )
     assert result.pull_request_url is None
     assert result.report_json_path is not None and result.report_json_path.is_file()
     assert result.report_markdown_path is not None

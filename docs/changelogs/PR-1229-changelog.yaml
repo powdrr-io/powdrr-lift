@@ -1,0 +1,106 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1229
+title: Reuse incremental Structrr projections during planning
+intent:
+  problem: "Planning rebuilt the full Structrr proposal for every dependency layer and repeated the same prefix compilation while assembling the accepted proposal."
+  goal: "Project only newly completed item operations onto the current snapshot so large plans can reconstruct their question frontier without repeated full-history compilation."
+human-decisions: []
+structured_files: []
+files:
+  - path: packages/service/src/powdrr_service/planning/multipr_structrr.py
+    type: modified
+    span: {start_line: 571, end_line: 611}
+    summary: Add and export a helper that projects one batch of structural operations onto an existing snapshot.
+    rationale: Keep projection behavior consistent while applying only newly completed work.
+  - path: packages/service/src/powdrr_service/planning/multipr_structrr.py
+    type: modified
+    span: {start_line: 655, end_line: 655}
+    summary: Export the incremental structural projection helper.
+    rationale: Make incremental projection available to the planning driver.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 53, end_line: 56}
+    summary: Import the incremental projection helper.
+    rationale: Reuse the multi-PR projection logic in planning.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 77, end_line: 77}
+    summary: Import the dependency conflict validator.
+    rationale: Preserve unordered subject conflict checks during incremental planning.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 920, end_line: 920}
+    summary: Initialize the projected baseline once before traversing dependency layers.
+    rationale: Avoid recreating the baseline and full proposal for every layer.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 926, end_line: 942}
+    summary: Remove repeated compilation of all prior item records.
+    rationale: Eliminate quadratic proposal reconstruction as the frontier advances.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 1004, end_line: 1004}
+    summary: Collect operations for the current ready dependency batch.
+    rationale: Separate newly completed operations from previously projected operations.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 1032, end_line: 1032}
+    summary: Add each accepted change to the current batch.
+    rationale: Project only operations accepted in the current dependency layer.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 1035, end_line: 1038}
+    summary: Validate conflicts and incrementally advance the projected snapshot.
+    rationale: Preserve conflict validation while avoiding full-prefix recompilation.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 1099, end_line: 1100}
+    summary: Initialize one running projection for accepted proposal assembly.
+    rationale: Reuse projected item state while rebuilding the final operation list.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 1102, end_line: 1102}
+    summary: Track operations for the current item.
+    rationale: Apply each item’s operations once to the running projection.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 1117, end_line: 1134}
+    summary: Remove recompilation of every previous item prefix.
+    rationale: Avoid another quadratic pass after planning questions are accepted.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 1145, end_line: 1146}
+    summary: Advance the final accepted proposal projection one item at a time.
+    rationale: Keep accepted proposal assembly linear in the number of operations.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 442, end_line: 442}
+    summary: Call the public dependency conflict validator from canonical compilation.
+    rationale: Preserve unordered subject conflict checks while the proposal is projected incrementally.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 1293, end_line: 1293}
+    summary: Make the existing unordered subject conflict check public.
+    rationale: Apply the same dependency conflict rule before projecting each newly completed batch.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 1465, end_line: 1465}
+    summary: Export the dependency conflict validator.
+    rationale: Allow the planning driver to use canonical conflict validation.
+  - path: tests/test_multipr_structrr.py
+    type: modified
+    span: {start_line: 12, end_line: 12}
+    summary: Import the incremental projection helper in its test module.
+    rationale: Exercise equivalence between incremental and canonical projection.
+  - path: tests/test_multipr_structrr.py
+    type: modified
+    span: {start_line: 80, end_line: 106}
+    summary: Verify repeated incremental projections produce the same snapshot as multi-PR compilation.
+    rationale: Guard equivalence between the optimized projection and canonical proposal result.
+entities: []
+entity_relationships: []
+invariants:
+  - id: planning-frontier-projection-is-incremental
+    description: Each completed dependency batch is projected onto the previously projected Structrr snapshot, and the final state matches canonical multi-PR compilation.
+    action: altered
+guidance: []

@@ -92,8 +92,16 @@ List jobs with `GET /api/v1/repositories/{repository_id}/jobs`. Repeat the
 `states` query parameter to filter by one or more states, and use the returned
 `next_cursor` fields as `before_updated_at` and `before_job_id` for the next
 page. Fetch a job and its saved attempt identifiers from
-`GET /api/v1/repositories/{repository_id}/jobs/{job_id}`. Attempt details omit
-local worktree paths and provider configuration data.
+`GET /api/v1/repositories/{repository_id}/jobs/{job_id}`. Job detail includes the
+latest attempt, a bounded attempt history, dependency blockers, artifact outputs,
+and actions allowed by the current job state. Stage and question are `null` until
+the workflow adapter records structured stage or job-specific question data.
+Attempt details omit local worktree paths, checkpoint paths, and provider
+configuration data. The detail projection is read in one SQLite transaction.
+
+```json
+{"schema_version":1,"job":{"schema_version":1,"job_id":"job-1","repository_id":"repo-1","kind":"planning","title":"Implement search","state":"pending","conversation_id":null,"dependency_ids":["job-2"],"artifact_refs":[],"detail":"","revision":1,"created_at":"<timestamp>","updated_at":"<timestamp>"},"latest_attempt":null,"attempts":[],"stage":null,"blockers":[{"schema_version":1,"job_id":"job-2","title":"Plan search","state":"ready"}],"question":null,"outputs":[],"allowed_actions":["cancel"]}
+```
 
 Create a planning job from an explicit pinned specification and a provider
 configuration reference:

@@ -15,7 +15,6 @@ from uuid import NAMESPACE_URL, uuid5
 from fastapi import APIRouter, Depends, FastAPI, Header, Query, Request
 from powdrr_contracts.workspace import (
     Conversation,
-    Job,
     JobState,
     WorkspaceApiError,
     WorkspaceApiErrorResponse,
@@ -378,20 +377,15 @@ def install_workspace_routes(
         _: None = Depends(require_session()),
     ) -> dict[str, Any]:
         await _get_repository(repository_registry, repository_id)
-        job = await _get_job_in_repository(store, repository_id, job_id)
-        operations = await run_in_threadpool(store.list_job_operations, job_id)
-        return {
-            "job": job.to_dict(),
-            "attempts": [
-                {
-                    "attempt_id": item.attempt_id,
-                    "run_id": item.run_id,
-                    "source_spec_revision": item.source_spec_revision,
-                    "created_at": item.created_at,
-                }
-                for item in operations
-            ],
-        }
+        try:
+            detail = await run_in_threadpool(
+                store.read_job_detail, repository_id, job_id
+            )
+        except KeyError as error:
+            raise WorkspaceApiException(
+                404, "not_found", "Job was not found."
+            ) from error
+        return detail.to_dict()
 
     @router.get("/repositories/{repository_id}/conversations")
     async def list_conversations(
@@ -585,15 +579,3 @@ async def _get_conversation_in_repository(
             404, "not_found", "Conversation was not found."
         ) from error
     return _conversation_in_repository(conversation, repository_id)
-
-
-async def _get_job_in_repository(
-    store: WorkspaceStore, repository_id: str, job_id: str
-) -> Job:
-    try:
-        job = await run_in_threadpool(store.get_job, job_id)
-    except KeyError as error:
-        raise WorkspaceApiException(404, "not_found", "Job was not found.") from error
-    if job.repository_id != repository_id:
-        raise WorkspaceApiException(404, "not_found", "Job was not found.")
-    return job

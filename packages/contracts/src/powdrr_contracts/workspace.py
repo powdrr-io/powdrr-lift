@@ -30,6 +30,13 @@ class JobState(StrEnum):
     CANCELLED = "cancelled"
 
 
+class JobAction(StrEnum):
+    START = "start"
+    CANCEL = "cancel"
+    RETRY = "retry"
+    RESUME = "resume"
+
+
 class MessageRole(StrEnum):
     USER = "user"
     ASSISTANT = "assistant"
@@ -595,6 +602,149 @@ class WorkspaceQuestion:
             revision,
             _validate_text(data["created_at"], "created_at"),
             _validate_text(data["updated_at"], "updated_at"),
+        )
+
+
+@dataclass(frozen=True)
+class JobAttemptSummary:
+    attempt_id: str
+    run_id: str
+    source_spec_revision: str | None
+    created_at: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": _SCHEMA_VERSION,
+            "attempt_id": self.attempt_id,
+            "run_id": self.run_id,
+            "source_spec_revision": self.source_spec_revision,
+            "created_at": self.created_at,
+        }
+
+    @classmethod
+    def from_dict(cls, value: Any) -> Self:
+        data = _record(
+            value,
+            {"attempt_id", "run_id", "source_spec_revision", "created_at"},
+            "job attempt summary",
+        )
+        revision = data["source_spec_revision"]
+        return cls(
+            _validate_id(data["attempt_id"], "attempt_id"),
+            _validate_id(data["run_id"], "run_id"),
+            None
+            if revision is None
+            else _validate_text(revision, "source_spec_revision"),
+            _validate_text(data["created_at"], "created_at"),
+        )
+
+
+@dataclass(frozen=True)
+class JobBlocker:
+    job_id: str
+    title: str
+    state: JobState
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": _SCHEMA_VERSION,
+            "job_id": self.job_id,
+            "title": self.title,
+            "state": self.state.value,
+        }
+
+    @classmethod
+    def from_dict(cls, value: Any) -> Self:
+        data = _record(value, {"job_id", "title", "state"}, "job blocker")
+        try:
+            state = JobState(data["state"])
+        except (TypeError, ValueError) as error:
+            raise WorkspaceContractError("Unsupported blocker state") from error
+        return cls(
+            _validate_id(data["job_id"], "job_id"),
+            _validate_text(data["title"], "title"),
+            state,
+        )
+
+
+@dataclass(frozen=True)
+class WorkspaceJobDetail:
+    job: Job
+    attempts: tuple[JobAttemptSummary, ...]
+    stage: str | None
+    blockers: tuple[JobBlocker, ...]
+    question: WorkspaceQuestion | None
+    outputs: tuple[str, ...]
+    allowed_actions: tuple[JobAction, ...]
+
+    @property
+    def latest_attempt(self) -> JobAttemptSummary | None:
+        return self.attempts[-1] if self.attempts else None
+
+    def to_dict(self) -> dict[str, Any]:
+        latest = self.latest_attempt
+        return {
+            "schema_version": _SCHEMA_VERSION,
+            "job": self.job.to_dict(),
+            "latest_attempt": None if latest is None else latest.to_dict(),
+            "attempts": [item.to_dict() for item in self.attempts],
+            "stage": self.stage,
+            "blockers": [item.to_dict() for item in self.blockers],
+            "question": None if self.question is None else self.question.to_dict(),
+            "outputs": list(self.outputs),
+            "allowed_actions": [item.value for item in self.allowed_actions],
+        }
+
+    @classmethod
+    def from_dict(cls, value: Any) -> Self:
+        data = _record(
+            value,
+            {
+                "job",
+                "latest_attempt",
+                "attempts",
+                "stage",
+                "blockers",
+                "question",
+                "outputs",
+                "allowed_actions",
+            },
+            "workspace job detail",
+        )
+        for key in ("attempts", "blockers", "outputs", "allowed_actions"):
+            if not isinstance(data[key], list):
+                raise WorkspaceContractError(f"{key} must be a list")
+        attempts = tuple(JobAttemptSummary.from_dict(item) for item in data["attempts"])
+        latest = (
+            None
+            if data["latest_attempt"] is None
+            else JobAttemptSummary.from_dict(data["latest_attempt"])
+        )
+        if latest != (attempts[-1] if attempts else None):
+            raise WorkspaceContractError("latest_attempt must match the newest attempt")
+        stage = data["stage"]
+        if stage is not None:
+            stage = _validate_text(stage, "stage")
+        question = (
+            None
+            if data["question"] is None
+            else WorkspaceQuestion.from_dict(data["question"])
+        )
+        actions: list[JobAction] = []
+        try:
+            actions = [JobAction(item) for item in data["allowed_actions"]]
+        except (TypeError, ValueError) as error:
+            raise WorkspaceContractError("Unsupported job action") from error
+        if len(set(actions)) != len(actions):
+            raise WorkspaceContractError("allowed_actions must not contain duplicates")
+        return cls(
+            Job.from_dict(data["job"]),
+            attempts,
+            stage,
+            tuple(JobBlocker.from_dict(item) for item in data["blockers"]),
+            question,
+            _tuple_of_text(data["outputs"], "outputs"),
+            tuple(actions),
         )
 
 

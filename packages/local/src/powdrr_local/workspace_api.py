@@ -5,11 +5,13 @@ from __future__ import annotations
 import inspect
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Annotated, Any, Protocol
 
 from fastapi import APIRouter, Depends, FastAPI, Query, Request
 from powdrr_contracts.workspace import (
     Conversation,
+    Job,
+    JobState,
     WorkspaceApiError,
     WorkspaceApiErrorResponse,
     WorkspaceRepository,
@@ -178,6 +180,66 @@ def install_workspace_routes(
         snapshot = await run_in_threadpool(store.read_snapshot, repository_id)
         return snapshot.to_dict()
 
+    @router.get("/repositories/{repository_id}/jobs")
+    async def list_jobs(
+        repository_id: str,
+        states: Annotated[list[JobState] | None, Query()] = None,
+        limit: int = Query(default=100, ge=1, le=1000),
+        before_updated_at: str | None = None,
+        before_job_id: str | None = None,
+        _: None = Depends(require_session()),
+    ) -> dict[str, Any]:
+        await _get_repository(repository_registry, repository_id)
+        if (before_updated_at is None) != (before_job_id is None):
+            raise WorkspaceApiException(
+                422,
+                "invalid_cursor",
+                "Both job cursor fields must be supplied together.",
+            )
+        before = (
+            None
+            if before_updated_at is None
+            else (before_updated_at, before_job_id or "")
+        )
+        jobs = await run_in_threadpool(
+            store.list_jobs,
+            repository_id,
+            states=states or (),
+            limit=limit,
+            before=before,
+        )
+        last = jobs[-1] if len(jobs) == limit else None
+        return {
+            "jobs": [item.to_dict() for item in jobs],
+            "next_cursor": (
+                None
+                if last is None
+                else {"updated_at": last.updated_at, "job_id": last.job_id}
+            ),
+        }
+
+    @router.get("/repositories/{repository_id}/jobs/{job_id}")
+    async def get_job(
+        repository_id: str,
+        job_id: str,
+        _: None = Depends(require_session()),
+    ) -> dict[str, Any]:
+        await _get_repository(repository_registry, repository_id)
+        job = await _get_job_in_repository(store, repository_id, job_id)
+        operations = await run_in_threadpool(store.list_job_operations, job_id)
+        return {
+            "job": job.to_dict(),
+            "attempts": [
+                {
+                    "attempt_id": item.attempt_id,
+                    "run_id": item.run_id,
+                    "source_spec_revision": item.source_spec_revision,
+                    "created_at": item.created_at,
+                }
+                for item in operations
+            ],
+        }
+
     @router.get("/repositories/{repository_id}/conversations")
     async def list_conversations(
         repository_id: str,
@@ -328,3 +390,15 @@ async def _get_conversation_in_repository(
             404, "not_found", "Conversation was not found."
         ) from error
     return _conversation_in_repository(conversation, repository_id)
+
+
+async def _get_job_in_repository(
+    store: WorkspaceStore, repository_id: str, job_id: str
+) -> Job:
+    try:
+        job = await run_in_threadpool(store.get_job, job_id)
+    except KeyError as error:
+        raise WorkspaceApiException(404, "not_found", "Job was not found.") from error
+    if job.repository_id != repository_id:
+        raise WorkspaceApiException(404, "not_found", "Job was not found.")
+    return job

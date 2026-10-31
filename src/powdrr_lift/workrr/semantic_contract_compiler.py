@@ -22,6 +22,10 @@ from powdrr_service.planning.semantic_decision import (
     SemanticDecisionProvider,
     SemanticDecisionSpec,
 )
+from powdrr_service.semantic_classifier import (
+    has_explicit_prohibition_directive,
+    resolve_deterministic_source_decision,
+)
 
 from powdrr_lift.core.classifier_input import format_classifier_input
 from powdrr_lift.core.semantic_faithfulness import (
@@ -35,10 +39,6 @@ from powdrr_lift.core.semantic_faithfulness import (
 )
 from powdrr_lift.core.semantic_faithfulness import (
     prepare_field_entailment_reviews as prepare_field_reviews,
-)
-from powdrr_lift.workrr.semantic_classifier import (
-    has_explicit_prohibition_directive,
-    resolve_deterministic_source_decision,
 )
 
 SOURCE_CLASSIFIER_REVISION = (

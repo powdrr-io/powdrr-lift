@@ -1,5 +1,5 @@
 schema: https://powdrr.io/schema/changelog-v2
-change_id: 1230
+change_id: 1231
 title: Replace POSIX-only file locks with portable process locks
 intent:
   problem: Five execution and persistence modules import fcntl directly, preventing

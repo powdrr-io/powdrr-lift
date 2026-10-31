@@ -1,0 +1,44 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1247
+title: Normalize planned file subjects from descriptions
+intent:
+  problem: "Structural subject planning can describe a new planned file in prose, causing deterministic path validation to reject the answer after repeated model retries."
+  goal: "Bind an unambiguous planned write path from a new-file description and tell the planner to return the exact path."
+human-decisions: []
+structured_files: []
+files:
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 567, end_line: 569}
+    summary: Require a new file subject to copy its planned path exactly.
+    rationale: Make the expected file identity explicit in the question prompt.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 592, end_line: 594}
+    summary: Clarify the file-specific identity field semantics.
+    rationale: Distinguish exact file paths from prose descriptions of entities and relationships.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 1266, end_line: 1276}
+    summary: Extract a unique planned path mentioned in a file identity description.
+    rationale: Accept unambiguous model wording while keeping file identity bound to planned writes.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 1280, end_line: 1287}
+    summary: Match planned paths only as complete path tokens.
+    rationale: Avoid binding partial path names or ambiguous multiple file references.
+  - path: tests/test_planning_structrr.py
+    type: modified
+    span: {start_line: 777, end_line: 829}
+    summary: Cover unique and ambiguous planned paths inside file descriptions.
+    rationale: Ensure only one exact planned write path is normalized from prose.
+entities: []
+entity_relationships: []
+invariants:
+  - id: new-file-subjects-bind-only-to-planned-paths
+    description: A newly added file subject resolves to exactly one planned write path.
+    action: altered
+  - id: ambiguous-file-descriptions-are-rejected
+    description: A description mentioning multiple planned write paths is not silently assigned to either.
+    action: altered
+guidance: []

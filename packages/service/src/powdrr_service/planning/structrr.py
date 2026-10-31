@@ -564,7 +564,9 @@ def build_subject_enumeration_request(
             "Structrr. Include only changes required by this item's allocated "
             "units. Use a supplied existing subject reference, or describe one new "
             "identity. A new file subject must name one of the supplied planned "
-            "write paths. Cite the requirements, units, and source anchors that "
+            "write paths. For a new file subject, copy the exact planned write "
+            "path into new_identity_description with no added prose or prefix. "
+            "Cite the requirements, units, and source anchors that "
             "justify each subject. Omit implementation details that do not change "
             "Structrr. "
             "Use a supplied source_subjects stable_key to reference an existing "
@@ -587,7 +589,9 @@ def build_subject_enumeration_request(
             "section": "entities, entity_relationships, or files.",
             "subject_ref": "Existing subject ID/stable key, or null for a new subject.",
             "new_identity_description": (
-                "Concrete identity description, or null for an existing subject."
+                "For a new file subject, the exact planned write path with no added "
+                "prose or prefix; for a new entity or relationship, a concise "
+                "identity description; otherwise null."
             ),
             "action": (
                 "added for a new_identity_description; changed, deleted, or removed "
@@ -1259,7 +1263,26 @@ def _validate_planned_file_description(
         referenced_path = _file_reference_path(value)
         if referenced_path is not None and referenced_path in paths:
             value = referenced_path
+        else:
+            referenced_paths = [
+                path for path in paths if _contains_planned_path(value, path)
+            ]
+            if len(referenced_paths) == 1:
+                value = referenced_paths[0]
+            elif len(referenced_paths) > 1:
+                raise PlanningContractError(
+                    pointer,
+                    "new file subject description names multiple planned write paths",
+                )
     return _validate_planned_path(value, paths, pointer)
+
+
+def _contains_planned_path(description: str, path: str) -> bool:
+    pattern = re.compile(
+        rf"(?<![A-Za-z0-9_./-]){re.escape(path)}"
+        r"(?=$|[\s,;:!?\"'`()\]]|\.(?=$|[\s,;:!?\"'`()\]]))"
+    )
+    return pattern.search(description) is not None
 
 
 def _path(value: str, pointer: str) -> None:

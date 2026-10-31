@@ -1,9 +1,13 @@
+import asyncio
+import json
 import subprocess
 from pathlib import Path
 
 from fastapi.testclient import TestClient
 from powdrr_local.web import create_app
 from powdrr_local.workspace import WorkspaceStore
+from powdrr_local.workspace_api import _event_stream
+from starlette.requests import Request
 
 
 def _client(tmp_path: Path) -> tuple[TestClient, WorkspaceStore, str, str]:
@@ -190,3 +194,121 @@ def test_job_detail_hides_local_paths_and_checks_repository_association(
     )
     assert response.status_code == 404
     assert response.json()["error"]["code"] == "not_found"
+
+
+def test_event_stream_formats_durable_replay_events(tmp_path: Path) -> None:
+    client, store, repository_id, secret = _client(tmp_path)
+    _sign_in(client, secret)
+    conversation = WorkspaceStore(store.path).create_conversation(
+        repository_id, "Replay event", request_id="replay-conversation"
+    )
+    cursor = store.event_cursor(repository_id)
+
+    scope = {
+        "type": "http",
+        "asgi": {"version": "3.0", "spec_version": "2.3"},
+        "http_version": "1.1",
+        "method": "GET",
+        "scheme": "http",
+        "path": "/api/v1/events",
+        "raw_path": b"/api/v1/events",
+        "query_string": b"",
+        "headers": [],
+        "client": ("127.0.0.1", 1234),
+        "server": ("127.0.0.1", 8765),
+        "app": client.app,
+    }
+
+    async def receive() -> dict[str, object]:
+        return {"type": "http.request", "body": b"", "more_body": False}
+
+    request = Request(scope, receive)
+
+    async def first_frame() -> str:
+        stream = _event_stream(store, repository_id, cursor - 1, request)
+        try:
+            return await anext(stream)
+        finally:
+            await stream.aclose()
+
+    frame = asyncio.run(first_frame())
+    lines = frame.splitlines()
+    assert lines[0] == f"id: {cursor}"
+    assert lines[1] == "event: conversation.created"
+    assert lines[2].startswith("data: ")
+    event = json.loads(lines[2].removeprefix("data: "))
+    assert event["entity_id"] == conversation.conversation_id
+
+
+def test_event_stream_requires_snapshot_for_a_future_cursor(tmp_path: Path) -> None:
+    client, store, repository_id, secret = _client(tmp_path)
+    _sign_in(client, secret)
+    current_cursor = store.event_cursor(repository_id)
+
+    response = client.get(
+        f"/api/v1/repositories/{repository_id}/events",
+        params={"after": current_cursor + 5},
+    )
+    assert response.status_code == 409
+    assert response.json()["error"] == {
+        "code": "resync_required",
+        "message": (
+            "The event cursor is ahead of this repository. Fetch a fresh snapshot "
+            "and reconnect from its event cursor."
+        ),
+        "current_event_cursor": current_cursor,
+    }
+
+
+def test_event_stream_reads_events_written_by_another_store_instance(
+    tmp_path: Path,
+) -> None:
+    client, store, repository_id, secret = _client(tmp_path)
+    _sign_in(client, secret)
+    cursor = store.event_cursor(repository_id)
+    other_store = WorkspaceStore(store.path)
+    scope = {
+        "type": "http",
+        "asgi": {"version": "3.0", "spec_version": "2.3"},
+        "http_version": "1.1",
+        "method": "GET",
+        "scheme": "http",
+        "path": "/api/v1/events",
+        "raw_path": b"/api/v1/events",
+        "query_string": b"",
+        "headers": [],
+        "client": ("127.0.0.1", 1234),
+        "server": ("127.0.0.1", 8765),
+        "app": client.app,
+    }
+
+    async def receive() -> dict[str, object]:
+        return {"type": "http.request", "body": b"", "more_body": False}
+
+    request = Request(scope, receive)
+
+    async def receive_new_event() -> tuple[str, str]:
+        async def publish() -> str:
+            await asyncio.sleep(0.02)
+            conversation = await asyncio.to_thread(
+                other_store.create_conversation,
+                repository_id,
+                "Published by another process",
+                request_id="other-process-conversation",
+            )
+            return conversation.conversation_id
+
+        publisher = asyncio.create_task(publish())
+        stream = _event_stream(store, repository_id, cursor, request)
+        try:
+            frame = await anext(stream)
+            conversation_id = await publisher
+            return frame, conversation_id
+        finally:
+            await stream.aclose()
+
+    frame, conversation_id = asyncio.run(receive_new_event())
+    lines = frame.splitlines()
+    assert lines[1] == "event: conversation.created"
+    event = json.loads(lines[2].removeprefix("data: "))
+    assert event["entity_id"] == conversation_id

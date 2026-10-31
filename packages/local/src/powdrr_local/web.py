@@ -129,7 +129,12 @@ def create_app(
     ) -> JSONResponse:
         del request
         body = WorkspaceApiErrorResponse(
-            WorkspaceApiError(error.code, error.message, error.current_revision)
+            WorkspaceApiError(
+                error.code,
+                error.message,
+                error.current_revision,
+                error.current_event_cursor,
+            )
         )
         return JSONResponse(body.to_dict(), status_code=error.status_code)
 

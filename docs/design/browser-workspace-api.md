@@ -71,6 +71,20 @@ page. Fetch a job and its saved attempt identifiers from
 `GET /api/v1/repositories/{repository_id}/jobs/{job_id}`. Attempt details omit
 local worktree paths and provider configuration data.
 
+## Event replay
+
+Open `GET /api/v1/repositories/{repository_id}/events?after={event_cursor}` to
+receive server-sent events after the snapshot cursor. The server assigns each
+event's durable sequence as its SSE `id`. On reconnect, `Last-Event-ID` takes
+precedence over the `after` query parameter. Events are read in bounded batches
+from SQLite, so a disconnected browser does not hold workflow work or an
+unbounded event queue. Heartbeats are SSE comments and do not advance the cursor.
+
+If the supplied cursor is ahead of the repository's current event cursor, the
+server returns HTTP 409 with `code: "resync_required"` and the current cursor.
+Fetch a new repository snapshot, then reconnect from its `event_cursor`. Events
+are retained for the beta and are not silently skipped.
+
 All errors use this stable envelope:
 
 ```json

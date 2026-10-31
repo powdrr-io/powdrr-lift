@@ -116,6 +116,14 @@ CREATE TABLE dependencies (
     dependency_id TEXT NOT NULL REFERENCES jobs(job_id),
     PRIMARY KEY(job_id, dependency_id)
 );
+CREATE TABLE job_submissions (
+    job_id TEXT PRIMARY KEY REFERENCES jobs(job_id),
+    source_spec_revision TEXT,
+    source_refs TEXT NOT NULL,
+    job_inputs TEXT NOT NULL,
+    provider_config_refs TEXT NOT NULL,
+    created_at TEXT NOT NULL
+);
 CREATE INDEX conversation_repository ON conversations(repository_id, updated_at);
 CREATE INDEX message_conversation ON messages(conversation_id, sequence);
 CREATE INDEX job_repository ON jobs(repository_id, state, updated_at);
@@ -201,7 +209,7 @@ CREATE TABLE turn_dispatch_intents (
 CREATE INDEX pending_turn_dispatches ON turn_dispatch_intents(
     repository_id, state, created_at
 );
-PRAGMA user_version = 10;
+PRAGMA user_version = 11;
 """
 
 _REPOSITORY_TABLE = (
@@ -361,6 +369,45 @@ def _reject_secret_input_fields(value: Any, path: str = "job_inputs") -> None:
             _reject_secret_input_fields(child, f"{path}[{index}]")
 
 
+def _validate_pinned_job_inputs(
+    kind: JobKind,
+    job_inputs: dict[str, Any],
+    source_refs: Sequence[str],
+    source_spec_revision: str | None,
+    provider_config_refs: Sequence[str],
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    if not isinstance(job_inputs, dict):
+        raise ValueError("job_inputs must be an object")
+    _validate_json_value(job_inputs)
+    _reject_secret_input_fields(job_inputs)
+    refs = tuple(dict.fromkeys(_required(ref, "source_ref") for ref in source_refs))
+    if not refs:
+        raise ValueError("At least one immutable source reference is required")
+    provider_refs = tuple(
+        dict.fromkeys(
+            _required(ref, "provider_config_ref") for ref in provider_config_refs
+        )
+    )
+    if not provider_refs:
+        raise ValueError("At least one provider configuration reference is required")
+    if source_spec_revision is not None:
+        _required(source_spec_revision, "source_spec_revision")
+
+    if kind == JobKind.PLANNING:
+        pinned_spec_ref = job_inputs.get("pinned_spec_ref")
+        if not isinstance(pinned_spec_ref, str) or not pinned_spec_ref.strip():
+            raise ValueError("Planning inputs require pinned_spec_ref")
+        if pinned_spec_ref not in refs or source_spec_revision is None:
+            raise ValueError("Planning inputs require the pinned spec and its revision")
+    elif kind == JobKind.PR_EXECUTION:
+        approved_ref = job_inputs.get("approved_change_ref")
+        if not isinstance(approved_ref, str) or not approved_ref.strip():
+            raise ValueError("PR execution inputs require approved_change_ref")
+        if approved_ref not in refs:
+            raise ValueError("Approved change must be included in source_refs")
+    return refs, provider_refs
+
+
 class WorkspaceStore:
     """One SQLite database shared by local UI sessions and worker adapters."""
 
@@ -410,7 +457,7 @@ class WorkspaceStore:
                 if db.execute("PRAGMA user_version").fetchone()[0] == 3:
                     db.execute(_REPOSITORY_TABLE)
                     db.execute("PRAGMA user_version = 4")
-            elif version not in {4, 5, 6, 7, 8, 9, 10}:
+            elif version not in {4, 5, 6, 7, 8, 9, 10, 11}:
                 raise ValueError(f"Unsupported workspace schema version: {version}")
             current_version = db.execute("PRAGMA user_version").fetchone()[0]
             if current_version == 4:
@@ -420,7 +467,7 @@ class WorkspaceStore:
                     for statement in _TURN_TABLES:
                         db.execute(statement)
                     db.execute("PRAGMA user_version = 5")
-            elif current_version not in {5, 6, 7, 8, 9, 10}:
+            elif current_version not in {5, 6, 7, 8, 9, 10, 11}:
                 raise ValueError(
                     f"Unsupported workspace schema version: {current_version}"
                 )
@@ -432,7 +479,7 @@ class WorkspaceStore:
                     for statement in _JOB_OPERATION_TABLES:
                         db.execute(statement)
                     db.execute("PRAGMA user_version = 6")
-            elif current_version not in {6, 7, 8, 9, 10}:
+            elif current_version not in {6, 7, 8, 9, 10, 11}:
                 raise ValueError(
                     f"Unsupported workspace schema version: {current_version}"
                 )
@@ -444,7 +491,7 @@ class WorkspaceStore:
                     for statement in _SUPERVISOR_TABLES:
                         db.execute(statement)
                     db.execute("PRAGMA user_version = 7")
-            elif current_version not in {7, 8, 9, 10}:
+            elif current_version not in {7, 8, 9, 10, 11}:
                 raise ValueError(
                     f"Unsupported workspace schema version: {current_version}"
                 )
@@ -474,7 +521,7 @@ class WorkspaceStore:
                         db.execute("ALTER TABLE events ADD COLUMN attempt_id TEXT")
                         db.execute("ALTER TABLE events ADD COLUMN revision INTEGER")
                     db.execute("PRAGMA user_version = 8")
-            elif current_version not in {8, 9, 10}:
+            elif current_version not in {8, 9, 10, 11}:
                 raise ValueError(
                     f"Unsupported workspace schema version: {current_version}"
                 )
@@ -496,7 +543,7 @@ class WorkspaceStore:
                         "CREATE INDEX api_session_expiry ON api_sessions(expires_at)"
                     )
                     db.execute("PRAGMA user_version = 9")
-            elif current_version not in {9, 10}:
+            elif current_version not in {9, 10, 11}:
                 raise ValueError(
                     f"Unsupported workspace schema version: {current_version}"
                 )
@@ -518,7 +565,25 @@ class WorkspaceStore:
                         "turn_dispatch_intents(repository_id, state, created_at)"
                     )
                     db.execute("PRAGMA user_version = 10")
-            elif current_version != 10:
+            elif current_version not in {10, 11}:
+                raise ValueError(
+                    f"Unsupported workspace schema version: {current_version}"
+                )
+            current_version = db.execute("PRAGMA user_version").fetchone()[0]
+            if current_version == 10:
+                if not db.in_transaction:
+                    db.execute("BEGIN IMMEDIATE")
+                if db.execute("PRAGMA user_version").fetchone()[0] == 10:
+                    db.execute(
+                        "CREATE TABLE job_submissions ("
+                        "job_id TEXT PRIMARY KEY REFERENCES jobs(job_id), "
+                        "source_spec_revision TEXT, source_refs TEXT NOT NULL, "
+                        "job_inputs TEXT NOT NULL, "
+                        "provider_config_refs TEXT NOT NULL, "
+                        "created_at TEXT NOT NULL)"
+                    )
+                    db.execute("PRAGMA user_version = 11")
+            elif current_version != 11:
                 raise ValueError(
                     f"Unsupported workspace schema version: {current_version}"
                 )
@@ -2003,30 +2068,19 @@ class WorkspaceStore:
             (checkpoint_ref, "checkpoint_ref"),
         ):
             _required(value, name)
-        if not isinstance(job_inputs, dict):
-            raise ValueError("job_inputs must be an object")
-        _validate_json_value(job_inputs)
-        _reject_secret_input_fields(job_inputs)
-        refs = tuple(dict.fromkeys(_required(ref, "source_ref") for ref in source_refs))
-        if not refs:
-            raise ValueError("At least one immutable source reference is required")
-        provider_refs = tuple(
-            dict.fromkeys(
-                _required(ref, "provider_config_ref") for ref in provider_config_refs
-            )
+        job = self.get_job(job_id)
+        refs, provider_refs = _validate_pinned_job_inputs(
+            job.kind,
+            job_inputs,
+            source_refs,
+            source_spec_revision,
+            provider_config_refs,
         )
-        if not provider_refs:
-            raise ValueError(
-                "At least one provider configuration reference is required"
-            )
         try:
             workdir = str(Path(workflow_directory).expanduser().resolve())
         except (OSError, RuntimeError) as error:
             raise ValueError("workflow_directory cannot be resolved") from error
         _required(workdir, "workflow_directory")
-        if source_spec_revision is not None:
-            _required(source_spec_revision, "source_spec_revision")
-
         command = {
             "operation": "job.start_operation",
             "job_id": job_id,
@@ -2052,25 +2106,24 @@ class WorkspaceStore:
                 raise WorkspaceConflict("Job revision has changed")
             if job.state != JobState.READY:
                 raise WorkspaceConflict("Only a ready job can start a new operation")
+            submission = db.execute(
+                "SELECT * FROM job_submissions WHERE job_id=?", (job_id,)
+            ).fetchone()
+            if submission is not None and (
+                json.loads(submission["job_inputs"]) != job_inputs
+                or tuple(json.loads(submission["source_refs"])) != refs
+                or tuple(json.loads(submission["provider_config_refs"]))
+                != provider_refs
+                or submission["source_spec_revision"] != source_spec_revision
+            ):
+                raise ValueError(
+                    "Operation inputs differ from the saved job submission"
+                )
             if any(
                 self._job(db, dependency).state != JobState.SUCCEEDED
                 for dependency in job.dependency_ids
             ):
                 raise ValueError("Job dependencies are incomplete")
-            if job.kind == JobKind.PLANNING:
-                pinned_spec_ref = job_inputs.get("pinned_spec_ref")
-                if not isinstance(pinned_spec_ref, str) or not pinned_spec_ref.strip():
-                    raise ValueError("Planning inputs require pinned_spec_ref")
-                if pinned_spec_ref not in refs or source_spec_revision is None:
-                    raise ValueError(
-                        "Planning operations require the pinned spec and its revision"
-                    )
-            elif job.kind == JobKind.PR_EXECUTION:
-                approved_ref = job_inputs.get("approved_change_ref")
-                if not isinstance(approved_ref, str) or not approved_ref.strip():
-                    raise ValueError("PR execution inputs require approved_change_ref")
-                if approved_ref not in refs:
-                    raise ValueError("Approved change must be included in source_refs")
             if (
                 db.execute(
                     "SELECT 1 FROM job_operations WHERE job_id=? AND attempt_id=?",
@@ -2756,6 +2809,10 @@ class WorkspaceStore:
         title: str,
         conversation_id: str | None = None,
         dependency_ids: Sequence[str] = (),
+        job_inputs: dict[str, Any] | None = None,
+        source_refs: Sequence[str] = (),
+        source_spec_revision: str | None = None,
+        provider_config_refs: Sequence[str] = (),
         request_id: str | None = None,
     ) -> Job:
         _required(repository_id, "repository_id")
@@ -2764,6 +2821,18 @@ class WorkspaceStore:
             kind = JobKind(kind)
         except (TypeError, ValueError) as error:
             raise ValueError("Unsupported job kind") from error
+        submission_refs: tuple[str, ...] = ()
+        submission_provider_refs: tuple[str, ...] = ()
+        if job_inputs is not None:
+            submission_refs, submission_provider_refs = _validate_pinned_job_inputs(
+                kind,
+                job_inputs,
+                source_refs,
+                source_spec_revision,
+                provider_config_refs,
+            )
+        elif source_refs or source_spec_revision is not None or provider_config_refs:
+            raise ValueError("Job submission references require job_inputs")
         command = {
             "operation": "job.create",
             "kind": kind.value,
@@ -2771,6 +2840,15 @@ class WorkspaceStore:
             "conversation_id": conversation_id,
             "dependency_ids": list(dependency_ids),
         }
+        if job_inputs is not None:
+            command.update(
+                {
+                    "job_inputs": job_inputs,
+                    "source_refs": list(submission_refs),
+                    "source_spec_revision": source_spec_revision,
+                    "provider_config_refs": list(submission_provider_refs),
+                }
+            )
         identity, timestamp = uuid4().hex, _now()
         with self._connection() as db:
             db.execute("BEGIN IMMEDIATE")
@@ -2815,6 +2893,18 @@ class WorkspaceStore:
                 "INSERT INTO dependencies VALUES (?,?)",
                 ((identity, dependency) for dependency in dependencies),
             )
+            if job_inputs is not None:
+                db.execute(
+                    "INSERT INTO job_submissions VALUES (?,?,?,?,?,?)",
+                    (
+                        identity,
+                        source_spec_revision,
+                        json.dumps(submission_refs),
+                        json.dumps(job_inputs, sort_keys=True, allow_nan=False),
+                        json.dumps(submission_provider_refs),
+                        timestamp,
+                    ),
+                )
             self._event(
                 db,
                 repository_id,
@@ -2842,6 +2932,23 @@ class WorkspaceStore:
                 timestamp,
             )
             return result
+
+    def get_job_submission(self, job_id: str) -> dict[str, Any]:
+        """Return the immutable validated inputs captured when a job was created."""
+        with self._connection() as db:
+            row = db.execute(
+                "SELECT * FROM job_submissions WHERE job_id=?", (job_id,)
+            ).fetchone()
+            if row is None:
+                raise KeyError("Job submission does not exist")
+            return {
+                "job_id": job_id,
+                "source_spec_revision": row["source_spec_revision"],
+                "source_refs": tuple(json.loads(row["source_refs"])),
+                "job_inputs": json.loads(row["job_inputs"]),
+                "provider_config_refs": tuple(json.loads(row["provider_config_refs"])),
+                "created_at": row["created_at"],
+            }
 
     def get_job(self, job_id: str) -> Job:
         with self._connection() as db:

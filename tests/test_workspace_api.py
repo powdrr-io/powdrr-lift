@@ -38,7 +38,7 @@ def test_health_is_public_and_session_bootstrap_is_single_use(tmp_path: Path) ->
     client, store, _, secret = _client(tmp_path)
     assert client.get("/api/v1/health").json() == {
         "status": "ok",
-        "schema_version": 10,
+        "schema_version": 11,
         "scheduler": {"status": "not_configured"},
     }
 
@@ -200,6 +200,69 @@ def test_job_list_is_filtered_and_uses_bounded_cursors(tmp_path: Path) -> None:
         page["jobs"][0]["job_id"],
         second_page.json()["jobs"][0]["job_id"],
     } == {first.job_id, second.job_id}
+
+
+def test_job_creation_persists_validated_inputs_and_replays_request(
+    tmp_path: Path,
+) -> None:
+    client, store, repository_id, secret = _client(tmp_path)
+    csrf = _sign_in(client, secret)
+    headers = {
+        "Origin": "http://127.0.0.1:8765",
+        "X-CSRF-Token": csrf,
+    }
+    conversation = store.create_conversation(repository_id, "Search")
+    payload = {
+        "request_id": "create-search-plan",
+        "kind": "planning",
+        "title": "Plan search",
+        "conversation_id": conversation.conversation_id,
+        "dependency_ids": [],
+        "job_inputs": {"pinned_spec_ref": "spec:search-v2", "include_tests": True},
+        "source_refs": ["spec:search-v2"],
+        "source_spec_revision": "revision-7",
+        "provider_config_refs": ["provider:deepinfra-flash"],
+    }
+    path = f"/api/v1/repositories/{repository_id}/jobs"
+
+    created = client.post(path, headers=headers, json=payload)
+    retried = client.post(path, headers=headers, json=payload)
+
+    assert created.status_code == 201, created.text
+    assert retried.status_code == 201
+    assert retried.json() == created.json()
+    job = created.json()
+    assert job["kind"] == "planning"
+    assert job["state"] == "ready"
+    submission = store.get_job_submission(job["job_id"])
+    assert submission["job_inputs"] == payload["job_inputs"]
+    assert submission["source_refs"] == ("spec:search-v2",)
+    assert submission["source_spec_revision"] == "revision-7"
+    assert submission["provider_config_refs"] == ("provider:deepinfra-flash",)
+
+    changed_retry = client.post(
+        path,
+        headers=headers,
+        json={**payload, "job_inputs": {"pinned_spec_ref": "spec:search-v2"}},
+    )
+    assert changed_retry.status_code == 409
+    assert changed_retry.json()["error"]["code"] == "request_conflict"
+
+    invalid = client.post(
+        path,
+        headers=headers,
+        json={
+            **payload,
+            "request_id": "create-secret-plan",
+            "job_inputs": {
+                "pinned_spec_ref": "spec:search-v2",
+                "access_token": "never-persist-this",
+            },
+        },
+    )
+    assert invalid.status_code == 422
+    assert invalid.json()["error"]["code"] == "invalid_job"
+    assert len(store.list_jobs(repository_id)) == 1
 
 
 def test_job_detail_hides_local_paths_and_checks_repository_association(

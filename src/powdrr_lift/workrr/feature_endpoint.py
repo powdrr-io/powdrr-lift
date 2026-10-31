@@ -14,6 +14,10 @@ from pathlib import Path
 from typing import Any, cast
 
 import yaml
+from powdrr_service.behavior_contract import (
+    behavior_scenario_probe_findings,
+    compile_behavior_scenarios,
+)
 from powdrr_service.decision_obligation import (
     DecisionOutcome,
     DecisionResult,
@@ -39,10 +43,6 @@ from powdrr_service.structrr.obligation_evidence import ObligationEvidenceContra
 from powdrr_service.structrr.snapshot import snapshot_digest
 
 from powdrr_lift.change_log_parser import parse_change_log
-from powdrr_lift.core.behavior_contract import (
-    behavior_scenario_probe_findings,
-    compile_behavior_scenarios,
-)
 from powdrr_lift.core.contract_closure import (
     ContractClosureError,
     RepositoryEvidence,
@@ -5569,7 +5569,7 @@ def _compile_required_test_case_edits(
                 f"required test case {item['id']!r} has an invalid behavior scenario"
             )
         if isinstance(behavior_scenario, Mapping):
-            from powdrr_lift.core.behavior_contract import compile_behavior_scenarios
+            from powdrr_service.behavior_contract import compile_behavior_scenarios
 
             compile_behavior_scenarios((behavior_scenario,))
         if isinstance(expected_outcome, str) and expected_outcome.strip():
@@ -7910,7 +7910,7 @@ def _candidate_behavior_probe_findings(
         isinstance(item, Mapping) for item in scenarios
     ):
         raise PowdrrExecutionError("implementation behavior probes are malformed")
-    from powdrr_lift.core.behavior_contract import behavior_scenario_probe_findings
+    from powdrr_service.behavior_contract import behavior_scenario_probe_findings
 
     return behavior_scenario_probe_findings(scenarios)
 

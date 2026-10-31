@@ -5,7 +5,8 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
-from powdrr_lift.core.behavior_contract import BEHAVIOR_DIMENSIONS
+from powdrr_service.behavior_contract import BEHAVIOR_DIMENSIONS
+
 from powdrr_lift.workrr import jev_classifier, probe_repair
 
 

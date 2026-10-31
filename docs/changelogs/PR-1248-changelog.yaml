@@ -1,0 +1,153 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1248
+title: Move behavior-scenario contracts into service
+intent:
+  problem: The behavior-scenario schema, compiler, and validation policy lived in the legacy core package and were imported throughout agent orchestration.
+  goal: Make service the sole owner of behavior-scenario contracts and update every consumer to use the service module directly.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 1091, end_line: 1091}
+  summary: Record PR #1248 as the behavior contract extraction.
+  rationale: Link the service-owned module record to its implementation PR.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 1096, end_line: 1098}
+  summary: Assign behavior-scenario contracts to service.
+  rationale: Track the authoritative module location and its service-owned semantics.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 1288, end_line: 1288}
+  summary: Update the implementation packet dependency.
+  rationale: Reflect its direct use of the service-owned behavior contract.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 2539, end_line: 2539}
+  summary: Update the coding agent dependency.
+  rationale: Reflect its direct use of the service-owned scenario type.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 2567, end_line: 2567}
+  summary: Update the command catalog dependency.
+  rationale: Keep the ownership inventory aligned with the agent import graph.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 2746, end_line: 2746}
+  summary: Update external research scenario validation dependency.
+  rationale: Use the service-owned scenario compiler for validated projections.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 2770, end_line: 2770}
+  summary: Update feature endpoint behavior policy dependency.
+  rationale: Reflect direct use of service-owned scenario validation.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 3027, end_line: 3027}
+  summary: Update probe repair behavior validation dependency.
+  rationale: Keep probe repair on the authoritative service contract.
+- path: src/powdrr_lift/core/implementation_packet.py
+  type: modified
+  span: {start_line: 9, end_line: 9}
+  summary: Import behavior scenario packet compilation from service.
+  rationale: Keep the agent packet builder on the service-owned contract API.
+- path: src/powdrr_lift/core/implementation_packet.py
+  type: modified
+  span: {start_line: 16, end_line: 17}
+  summary: Keep service-owned obligation evidence imports together.
+  rationale: Preserve a clear import boundary after the behavior contract move.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span: {start_line: 23, end_line: 23}
+  summary: Import the behavior scenario type from service.
+  rationale: Keep the agent protocol typed against the owning package.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span: {start_line: 25, end_line: 25}
+  summary: Remove the legacy core scenario type import.
+  rationale: Eliminate the obsolete agent-side package dependency.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span: {start_line: 14, end_line: 19}
+  summary: Import behavior-scenario validation and dimensions from service.
+  rationale: Keep command execution on the canonical contract implementation.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span: {start_line: 42, end_line: 47}
+  summary: Remove the legacy core behavior contract import.
+  rationale: Eliminate the old agent-side contract dependency.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span: {start_line: 17, end_line: 20}
+  summary: Import scenario validation helpers from service.
+  rationale: Use the authoritative behavior contract in feature orchestration.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span: {start_line: 42, end_line: 45}
+  summary: Remove the former core behavior contract import.
+  rationale: Eliminate the legacy agent-side dependency.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span: {start_line: 5572, end_line: 5572}
+  summary: Validate required behavior scenarios through service.
+  rationale: Keep scenario validation under service ownership.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span: {start_line: 7913, end_line: 7913}
+  summary: Derive candidate probe findings through service.
+  rationale: Keep probe obligation logic in the owning package.
+- path: src/powdrr_lift/workrr/probe_repair.py
+  type: modified
+  span: {start_line: 10, end_line: 10}
+  summary: Import behavior scenario validation from service.
+  rationale: Keep probe repair aligned with the authoritative contract.
+- path: src/powdrr_lift/workrr/probe_repair.py
+  type: modified
+  span: {start_line: 14, end_line: 16}
+  summary: Keep service-owned decision imports in a separate import group.
+  rationale: Preserve clear module ownership in probe repair.
+- path: src/powdrr_lift/workrr/external_contract_research.py
+  type: modified
+  span: {start_line: 616, end_line: 616}
+  summary: Validate projected behavior scenarios through service.
+  rationale: Ensure externally sourced requirements use the canonical scenario compiler.
+- path: tests/test_behavior_contract.py
+  type: modified
+  span: {start_line: 3, end_line: 3}
+  summary: Add module lookup for the legacy path regression.
+  rationale: Confirm the agent-side behavior contract module was removed.
+- path: tests/test_behavior_contract.py
+  type: modified
+  span: {start_line: 7, end_line: 7}
+  summary: Import the scenario contract from service.
+  rationale: Exercise the authoritative implementation directly.
+- path: tests/test_behavior_contract.py
+  type: modified
+  span: {start_line: 14, end_line: 14}
+  summary: Separate service contract imports from agent test helpers.
+  rationale: Keep the test's package boundary explicit.
+- path: tests/test_behavior_contract.py
+  type: modified
+  span: {start_line: 25, end_line: 28}
+  summary: Assert the legacy core module path is absent.
+  rationale: Prevent reintroduction of a compatibility module.
+- path: tests/test_coding_agent.py
+  type: modified
+  span: {start_line: 10, end_line: 10}
+  summary: Import behavior dimensions from service.
+  rationale: Use the service-owned vocabulary in agent tests.
+- path: tests/test_coding_agent.py
+  type: modified
+  span: {start_line: 12, end_line: 12}
+  summary: Remove the old core behavior dimensions import.
+  rationale: Exercise the owning package directly.
+- path: tests/test_probe_repair.py
+  type: modified
+  span: {start_line: 8, end_line: 9}
+  summary: Import behavior dimensions from service.
+  rationale: Use the canonical dimensions in probe repair tests.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []

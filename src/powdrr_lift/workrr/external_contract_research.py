@@ -613,7 +613,7 @@ def finalize_external_contract_context(
                 f"external contract projection {index} does not cite its "
                 "accepted source quote"
             )
-        from powdrr_lift.core.behavior_contract import compile_behavior_scenarios
+        from powdrr_service.behavior_contract import compile_behavior_scenarios
 
         try:
             compile_behavior_scenarios([scenario_document])

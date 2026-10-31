@@ -1,8 +1,14 @@
-from powdrr_lift.structrr.verification_health import (
+import importlib.util
+
+from powdrr_service.structrr.verification_health import (
     HealthFindingKind,
     VerificationPolicyMode,
     audit_verification_health,
 )
+
+
+def test_legacy_agent_verification_health_module_is_removed() -> None:
+    assert importlib.util.find_spec("powdrr_lift.structrr.verification_health") is None
 
 
 def test_required_for_new_reports_legacy_debt_without_blocking() -> None:

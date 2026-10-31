@@ -1,0 +1,194 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1235
+title: Add secured local workspace HTTP API foundation
+intent:
+  problem: The browser workspace needs a same-origin local API for repository and design-chat data.
+  goal: Add a loopback-only FastAPI application with shared-database sessions, bounded reads, and stable API errors.
+human-decisions: []
+structured_files: []
+files:
+- path: packages/contracts/src/powdrr_contracts/workspace.py
+  type: modified
+  span:
+    start_line: 662
+    end_line: 706
+  summary: Define stable workspace API error records.
+  rationale: Share validated error envelopes between the local API and its clients.
+- path: packages/local/pyproject.toml
+  type: modified
+  span:
+    start_line: 7
+    end_line: 7
+  summary: Add FastAPI as the HTTP application framework.
+  rationale: Provide the planned local HTTP API foundation.
+- path: packages/local/pyproject.toml
+  type: modified
+  span:
+    start_line: 13
+    end_line: 13
+  summary: Add Uvicorn as the local ASGI server.
+  rationale: Support running the application factory as a local service.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 187
+    end_line: 195
+  summary: Create durable bootstrap-token and session tables.
+  rationale: Share authentication state across service processes through SQLite.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 404
+    end_line: 404
+  summary: Allow migrations to recognize schema version 9.
+  rationale: Continue upgrading existing databases through the API session schema.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 414
+    end_line: 414
+  summary: Allow migrations to recognize schema version 9.
+  rationale: Continue upgrading existing databases through the API session schema.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 426
+    end_line: 426
+  summary: Allow migrations to recognize schema version 9.
+  rationale: Continue upgrading existing databases through the API session schema.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 438
+    end_line: 438
+  summary: Allow migrations to recognize schema version 9.
+  rationale: Continue upgrading existing databases through the API session schema.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 468
+    end_line: 490
+  summary: Migrate schema version 8 to API session storage.
+  rationale: Install session tables without losing existing workspace state.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 506
+    end_line: 553
+  summary: Persist and validate API session state transactionally.
+  rationale: Make bootstrap consumption, session lookup, expiry, and revocation visible to every process.
+- path: packages/local/src/powdrr_local/web.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 237
+  summary: Build a loopback-only FastAPI app with session security and stable errors.
+  rationale: Establish the local application boundary without starting global services at import time.
+- path: packages/local/src/powdrr_local/workspace_api.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 330
+  summary: Expose health, repository, snapshot, and design-conversation routes.
+  rationale: Support authenticated bounded workspace reads and idempotent repository and conversation mutations.
+- path: docs/design/browser-workspace-api.md
+  type: added
+  span:
+    start_line: 1
+    end_line: 74
+  summary: Document session bootstrap and workspace API examples.
+  rationale: Specify the request security headers and response shapes for the browser client.
+- path: tests/test_ui_workspace.py
+  type: modified
+  span:
+    start_line: 23
+    end_line: 24
+  summary: Import the API error contract for round-trip verification.
+  rationale: Verify the structured error record remains transport-safe.
+- path: tests/test_ui_workspace.py
+  type: modified
+  span:
+    start_line: 338
+    end_line: 338
+  summary: Update migration expectations for schema version 9.
+  rationale: Verify older workspace versions migrate through the new API schema.
+- path: tests/test_ui_workspace.py
+  type: modified
+  span:
+    start_line: 372
+    end_line: 375
+  summary: Verify API error records round trip through their contract.
+  rationale: Protect the stable response envelope used by API clients.
+- path: tests/test_ui_workspace.py
+  type: modified
+  span:
+    start_line: 553
+    end_line: 553
+  summary: Verify older workspace databases upgrade to schema version 9.
+  rationale: Preserve supported migrations as API tables are introduced.
+- path: tests/test_ui_workspace.py
+  type: modified
+  span:
+    start_line: 831
+    end_line: 831
+  summary: Update migration expectations for schema version 9.
+  rationale: Keep job-operation migration coverage aligned with the new schema.
+- path: tests/test_ui_workspace.py
+  type: modified
+  span:
+    start_line: 846
+    end_line: 846
+  summary: Update migration expectations for schema version 9.
+  rationale: Keep worker-ownership migration coverage aligned with the new schema.
+- path: tests/test_ui_workspace.py
+  type: modified
+  span:
+    start_line: 851
+    end_line: 864
+  summary: Verify v8 workspace databases migrate to API session storage.
+  rationale: Protect existing workspace databases when adding session storage.
+- path: tests/test_ui_workspace.py
+  type: modified
+  span:
+    start_line: 1114
+    end_line: 1135
+  summary: Verify bootstrap-token consumption is atomic across store instances.
+  rationale: Ensure SQLite transaction semantics coordinate multiple service instances.
+- path: tests/test_workspace_api.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 105
+  summary: Exercise the HTTP API with a real client and temporary workspace database.
+  rationale: Verify bootstrap, CSRF and origin checks, and stale revision errors at the HTTP boundary.
+entities:
+- id: local-workspace-http-api
+  type: REST API
+  action: added
+- id: workspace-api-application-factory
+  type: Function
+  action: added
+- id: workspace-api-routes
+  type: Route
+  action: added
+- id: workspace-api-error-contract
+  type: Class
+  action: added
+- id: workspace-api-session-storage
+  type: Table
+  action: added
+- id: workspace-api-http-tests
+  type: Integration test
+  action: added
+entity_relationships: []
+invariants:
+- id: one-time-bootstrap-shared-across-processes
+  description: A bootstrap token can create only one session across app instances sharing the workspace database.
+  action: added
+- id: browser-mutations-require-origin-and-csrf
+  description: Mutating API requests require the configured Origin and a matching CSRF token bound to the authenticated session.
+  action: added
+- id: workspace-api-errors-are-stable
+  description: API errors use a stable envelope and do not expose Python tracebacks.
+  action: added
+guidance: []

@@ -184,7 +184,15 @@ CREATE TABLE worker_ownership (
     FOREIGN KEY(job_id, attempt_id) REFERENCES job_operations(job_id, attempt_id)
 );
 CREATE INDEX worker_lease_expiry ON worker_ownership(lease_expires_at);
-PRAGMA user_version = 8;
+CREATE TABLE api_bootstrap_uses (
+    token_digest TEXT PRIMARY KEY, consumed_at TEXT NOT NULL
+);
+CREATE TABLE api_sessions (
+    session_digest TEXT PRIMARY KEY, csrf_digest TEXT NOT NULL,
+    created_at TEXT NOT NULL, expires_at TEXT NOT NULL
+);
+CREATE INDEX api_session_expiry ON api_sessions(expires_at);
+PRAGMA user_version = 9;
 """
 
 _REPOSITORY_TABLE = (
@@ -393,7 +401,7 @@ class WorkspaceStore:
                 if db.execute("PRAGMA user_version").fetchone()[0] == 3:
                     db.execute(_REPOSITORY_TABLE)
                     db.execute("PRAGMA user_version = 4")
-            elif version not in {4, 5, 6, 7, 8}:
+            elif version not in {4, 5, 6, 7, 8, 9}:
                 raise ValueError(f"Unsupported workspace schema version: {version}")
             current_version = db.execute("PRAGMA user_version").fetchone()[0]
             if current_version == 4:
@@ -403,7 +411,7 @@ class WorkspaceStore:
                     for statement in _TURN_TABLES:
                         db.execute(statement)
                     db.execute("PRAGMA user_version = 5")
-            elif current_version not in {5, 6, 7, 8}:
+            elif current_version not in {5, 6, 7, 8, 9}:
                 raise ValueError(
                     f"Unsupported workspace schema version: {current_version}"
                 )
@@ -415,7 +423,7 @@ class WorkspaceStore:
                     for statement in _JOB_OPERATION_TABLES:
                         db.execute(statement)
                     db.execute("PRAGMA user_version = 6")
-            elif current_version not in {6, 7, 8}:
+            elif current_version not in {6, 7, 8, 9}:
                 raise ValueError(
                     f"Unsupported workspace schema version: {current_version}"
                 )
@@ -427,7 +435,7 @@ class WorkspaceStore:
                     for statement in _SUPERVISOR_TABLES:
                         db.execute(statement)
                     db.execute("PRAGMA user_version = 7")
-            elif current_version not in {7, 8}:
+            elif current_version not in {7, 8, 9}:
                 raise ValueError(
                     f"Unsupported workspace schema version: {current_version}"
                 )
@@ -457,7 +465,29 @@ class WorkspaceStore:
                         db.execute("ALTER TABLE events ADD COLUMN attempt_id TEXT")
                         db.execute("ALTER TABLE events ADD COLUMN revision INTEGER")
                     db.execute("PRAGMA user_version = 8")
-            elif current_version != 8:
+            elif current_version not in {8, 9}:
+                raise ValueError(
+                    f"Unsupported workspace schema version: {current_version}"
+                )
+            current_version = db.execute("PRAGMA user_version").fetchone()[0]
+            if current_version == 8:
+                if not db.in_transaction:
+                    db.execute("BEGIN IMMEDIATE")
+                if db.execute("PRAGMA user_version").fetchone()[0] == 8:
+                    db.execute(
+                        "CREATE TABLE api_bootstrap_uses ("
+                        "token_digest TEXT PRIMARY KEY, consumed_at TEXT NOT NULL)"
+                    )
+                    db.execute(
+                        "CREATE TABLE api_sessions ("
+                        "session_digest TEXT PRIMARY KEY, csrf_digest TEXT NOT NULL, "
+                        "created_at TEXT NOT NULL, expires_at TEXT NOT NULL)"
+                    )
+                    db.execute(
+                        "CREATE INDEX api_session_expiry ON api_sessions(expires_at)"
+                    )
+                    db.execute("PRAGMA user_version = 9")
+            elif current_version != 9:
                 raise ValueError(
                     f"Unsupported workspace schema version: {current_version}"
                 )
@@ -472,6 +502,54 @@ class WorkspaceStore:
                 yield db
         finally:
             db.close()
+
+    @property
+    def schema_version(self) -> int:
+        with self._connection() as db:
+            return int(db.execute("PRAGMA user_version").fetchone()[0])
+
+    def consume_api_bootstrap_token(
+        self,
+        token_digest: str,
+        *,
+        session_digest: str,
+        csrf_digest: str,
+        created_at: str,
+        expires_at: str,
+    ) -> bool:
+        """Atomically consume a one-time API token and persist its session."""
+        with self._connection() as db:
+            db.execute("BEGIN IMMEDIATE")
+            try:
+                db.execute(
+                    "INSERT INTO api_bootstrap_uses VALUES (?,?)",
+                    (token_digest, created_at),
+                )
+            except sqlite3.IntegrityError:
+                return False
+            db.execute("DELETE FROM api_sessions WHERE expires_at<=?", (created_at,))
+            db.execute(
+                "INSERT INTO api_sessions VALUES (?,?,?,?)",
+                (session_digest, csrf_digest, created_at, expires_at),
+            )
+            return True
+
+    def get_api_session_csrf_digest(
+        self, session_digest: str, *, now: str
+    ) -> str | None:
+        with self._connection() as db:
+            row = db.execute(
+                "SELECT csrf_digest FROM api_sessions "
+                "WHERE session_digest=? AND expires_at>?",
+                (session_digest, now),
+            ).fetchone()
+            return None if row is None else str(row["csrf_digest"])
+
+    def revoke_api_session(self, session_digest: str) -> None:
+        with self._connection() as db:
+            db.execute(
+                "DELETE FROM api_sessions WHERE session_digest=?", (session_digest,)
+            )
 
     @staticmethod
     def _canonical_git_root(path: str | Path) -> Path:

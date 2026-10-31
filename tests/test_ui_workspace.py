@@ -20,6 +20,8 @@ from powdrr_contracts.workspace import (
     TurnState,
     WorkerOwnership,
     WorkerState,
+    WorkspaceApiError,
+    WorkspaceApiErrorResponse,
     WorkspaceContractError,
     WorkspaceEvent,
     WorkspaceQuestion,
@@ -333,7 +335,7 @@ def test_version_one_database_migrates_without_changing_existing_records(
     with sqlite3.connect(path) as db:
         version = db.execute("PRAGMA user_version").fetchone()[0]
         sequence = db.execute("SELECT sequence FROM events").fetchone()[0]
-    assert version == 8
+    assert version == 9
     assert sequence == 7
     assert conversation.revision == 1
     assert conversation.specification_refs == ("docs/old.yaml",)
@@ -367,6 +369,10 @@ def test_workspace_contracts_round_trip_and_reject_unknown_fields() -> None:
         attempt_id="attempt-1",
     )
     assert WorkspaceEvent.from_dict(event.to_dict()) == event
+    api_error = WorkspaceApiErrorResponse(
+        WorkspaceApiError("stale_revision", "Conversation changed.", 4)
+    )
+    assert WorkspaceApiErrorResponse.from_dict(api_error.to_dict()) == api_error
     malformed = message.to_dict() | {"debug": "unexpected"}
     with pytest.raises(WorkspaceContractError, match="unexpected fields"):
         Message.from_dict(malformed)
@@ -544,7 +550,7 @@ def test_schema_v3_migrates_to_durable_turns(tmp_path: Path) -> None:
             row[0]
             for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")
         }
-    assert version == 8
+    assert version == 9
     assert "repositories" in tables
     assert "turns" in tables
     assert "questions" in tables
@@ -822,7 +828,7 @@ def test_schema_v5_migrates_to_job_operation_bindings(tmp_path: Path) -> None:
             row[0]
             for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")
         }
-    assert version == 8
+    assert version == 9
     assert "job_operations" in tables
 
 
@@ -837,9 +843,23 @@ def test_schema_v6_migrates_to_supervisor_and_worker_ownership(tmp_path: Path) -
             row[0]
             for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")
         }
-    assert version == 8
+    assert version == 9
     assert "supervisor_lease" in tables
     assert "worker_ownership" in tables
+
+
+def test_schema_v8_migrates_to_api_sessions(tmp_path: Path) -> None:
+    path = tmp_path / "workspace-v8.db"
+    with sqlite3.connect(path) as db:
+        db.execute("PRAGMA user_version = 8")
+    store = WorkspaceStore(path)
+    assert store.schema_version == 9
+    with sqlite3.connect(path) as db:
+        table_names = {
+            row[0]
+            for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")
+        }
+    assert {"api_bootstrap_uses", "api_sessions"} <= table_names
 
 
 def test_supervisor_lease_excludes_second_launcher_and_fences_old_generation(
@@ -1091,3 +1111,25 @@ def test_expired_worker_can_be_reclaimed_only_by_current_supervisor_generation(
             process_started_at="worker-start-a",
             now=instant + timedelta(seconds=7),
         )
+
+
+def test_api_bootstrap_token_is_single_use_across_store_instances(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "workspace.db"
+    stores = (WorkspaceStore(path), WorkspaceStore(path))
+
+    def consume(index: int) -> bool:
+        return stores[index].consume_api_bootstrap_token(
+            "token-digest",
+            session_digest=f"session-{index}",
+            csrf_digest=f"csrf-{index}",
+            created_at="2026-01-01T00:00:00+00:00",
+            expires_at="2026-01-01T08:00:00+00:00",
+        )
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        outcomes = tuple(pool.map(consume, (0, 1)))
+
+    assert sorted(outcomes) == [False, True]
+    assert stores[0].schema_version == 9

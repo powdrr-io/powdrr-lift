@@ -660,6 +660,51 @@ class WorkspaceSnapshot:
 
 
 @dataclass(frozen=True)
+class WorkspaceApiError:
+    code: str
+    message: str
+    current_revision: int | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        result: dict[str, Any] = {"code": self.code, "message": self.message}
+        if self.current_revision is not None:
+            result["current_revision"] = self.current_revision
+        return result
+
+    @classmethod
+    def from_dict(cls, value: Any) -> Self:
+        if not isinstance(value, dict):
+            raise WorkspaceContractError("API error must be an object")
+        allowed = {"code", "message", "current_revision"}
+        if set(value) - allowed or not {"code", "message"} <= set(value):
+            raise WorkspaceContractError("API error has missing or unexpected fields")
+        revision = value.get("current_revision")
+        if revision is not None and (
+            not isinstance(revision, int) or isinstance(revision, bool) or revision < 1
+        ):
+            raise WorkspaceContractError("current_revision must be positive")
+        return cls(
+            _validate_text(value["code"], "code"),
+            _validate_text(value["message"], "message"),
+            revision,
+        )
+
+
+@dataclass(frozen=True)
+class WorkspaceApiErrorResponse:
+    error: WorkspaceApiError
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"error": self.error.to_dict()}
+
+    @classmethod
+    def from_dict(cls, value: Any) -> Self:
+        if not isinstance(value, dict) or set(value) != {"error"}:
+            raise WorkspaceContractError("API error response must contain error")
+        return cls(WorkspaceApiError.from_dict(value["error"]))
+
+
+@dataclass(frozen=True)
 class JobOperation:
     operation_id: str
     job_id: str

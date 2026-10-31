@@ -6,11 +6,9 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+import powdrr_service.external_contract_research as research_module
 import pytest
-
-import powdrr_lift.workrr.external_contract_research as research_module
-from powdrr_lift.workrr.command_catalog import feature_command_catalog
-from powdrr_lift.workrr.external_contract_research import (
+from powdrr_service.external_contract_research import (
     bind_external_contract_assessments,
     bind_external_contract_claims,
     bind_external_contract_search_selections,
@@ -22,10 +20,21 @@ from powdrr_lift.workrr.external_contract_research import (
     redact_external_contract_search_event,
     search_external_contract_sources,
 )
+
+from powdrr_lift.workrr.command_catalog import feature_command_catalog
 from powdrr_lift.workrr.jev_classifier import JevSemanticClassifierClient
 from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
 from procedrr.parser import parse_and_validate
 from procedrr_evaluator import Evaluator
+
+
+def test_external_research_has_no_legacy_agent_module() -> None:
+    import importlib.util
+
+    assert (
+        importlib.util.find_spec("powdrr_lift.workrr.external_contract_research")
+        is None
+    )
 
 
 def test_external_contract_research_procedure_is_valid() -> None:

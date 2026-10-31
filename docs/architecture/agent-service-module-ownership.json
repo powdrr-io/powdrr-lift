@@ -2575,7 +2575,7 @@
         "powdrr_lift.errors",
         "powdrr_service.structrr.obligation_evidence",
         "powdrr_lift.workrr",
-        "powdrr_lift.workrr.external_contract_research",
+        "powdrr_service.external_contract_research",
         "powdrr_lift.workrr.repository_subject_binding",
         "powdrr_lift.workrr.semantic_contract_compiler",
         "powdrr_lift.workrr.uncertainty_decisions",
@@ -2744,11 +2744,11 @@
       "extraction_pr": "6",
       "internal_imports": [
         "powdrr_service.behavior_contract",
-        "powdrr_lift.workrr.http_retry"
+        "powdrr_service.http_retry"
       ],
       "kind": "python_module",
       "owner": "service",
-      "path": "src/powdrr_lift/workrr/external_contract_research.py",
+      "path": "packages/service/src/powdrr_service/external_contract_research.py",
       "rationale": "external search, source interpretation, and API credentials",
       "reviewed": false
     },
@@ -2793,7 +2793,7 @@
         "powdrr_lift.workrr.coding_agent_validation",
         "powdrr_lift.workrr.command_catalog",
         "powdrr_lift.workrr.evidence_reconciliation",
-        "powdrr_lift.workrr.external_contract_research",
+        "powdrr_service.external_contract_research",
         "powdrr_lift.workrr.git",
         "powdrr_lift.workrr.jev_classifier",
         "powdrr_lift.workrr.postrun_probes",
@@ -2876,9 +2876,9 @@
       "extraction_pr": "5/7",
       "internal_imports": [],
       "kind": "python_module",
-      "owner": "split",
-      "path": "src/powdrr_lift/workrr/http_retry.py",
-      "rationale": "separate service decisions from agent I/O and orchestration",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/http_retry.py",
+      "rationale": "bounded retry policy for service-owned HTTP calls",
       "reviewed": false
     },
     {
@@ -2897,7 +2897,7 @@
     {
       "extraction_pr": "6",
       "internal_imports": [
-        "powdrr_lift.workrr.http_retry",
+        "powdrr_service.http_retry",
         "powdrr_lift.workrr.protocol"
       ],
       "kind": "python_module",

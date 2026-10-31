@@ -324,10 +324,13 @@ class WorkspaceEvent:
     event_type: EventType
     payload: dict[str, Any]
     created_at: str
+    schema_version: int = 2
+    attempt_id: str | None = None
+    revision: int | None = None
 
     def to_dict(self) -> dict[str, Any]:
-        return {
-            "schema_version": _SCHEMA_VERSION,
+        result = {
+            "schema_version": self.schema_version,
             "sequence": self.sequence,
             "repository_id": self.repository_id,
             "entity_type": self.entity_type,
@@ -336,22 +339,34 @@ class WorkspaceEvent:
             "payload": self.payload,
             "created_at": self.created_at,
         }
+        if self.schema_version >= 2:
+            result["attempt_id"] = self.attempt_id
+            result["revision"] = self.revision
+        return result
 
     @classmethod
     def from_dict(cls, value: Any) -> Self:
-        data = _record(
-            value,
-            {
-                "sequence",
-                "repository_id",
-                "entity_type",
-                "entity_id",
-                "event_type",
-                "payload",
-                "created_at",
-            },
-            "event",
-        )
+        if not isinstance(value, dict):
+            raise WorkspaceContractError("event must be an object")
+        version = value.get("schema_version")
+        fields = {
+            "sequence",
+            "repository_id",
+            "entity_type",
+            "entity_id",
+            "event_type",
+            "payload",
+            "created_at",
+        }
+        if version == 1:
+            data = _record(value, fields, "event")
+        elif version == 2:
+            if set(value) != fields | {"schema_version", "attempt_id", "revision"}:
+                raise WorkspaceContractError("event has missing or unexpected fields")
+            _validate_json(value)
+            data = value
+        else:
+            raise WorkspaceContractError("Unsupported event schema version")
         sequence = data["sequence"]
         if not isinstance(sequence, int) or isinstance(sequence, bool) or sequence < 1:
             raise WorkspaceContractError("sequence must be a positive integer")
@@ -361,6 +376,14 @@ class WorkspaceEvent:
             raise WorkspaceContractError("Unsupported event type") from error
         if not isinstance(data["payload"], dict):
             raise WorkspaceContractError("payload must be an object")
+        attempt_id = data.get("attempt_id")
+        revision = data.get("revision")
+        if attempt_id is not None:
+            attempt_id = _validate_id(attempt_id, "attempt_id")
+        if revision is not None and (
+            not isinstance(revision, int) or isinstance(revision, bool) or revision < 1
+        ):
+            raise WorkspaceContractError("revision must be a positive integer")
         return cls(
             sequence,
             _validate_id(data["repository_id"], "repository_id"),
@@ -369,6 +392,9 @@ class WorkspaceEvent:
             event_type,
             data["payload"],
             _validate_text(data["created_at"], "created_at"),
+            version,
+            attempt_id,
+            revision,
         )
 
 
@@ -569,6 +595,67 @@ class WorkspaceQuestion:
             revision,
             _validate_text(data["created_at"], "created_at"),
             _validate_text(data["updated_at"], "updated_at"),
+        )
+
+
+@dataclass(frozen=True)
+class WorkspaceSnapshot:
+    repository_id: str
+    conversations: tuple[Conversation, ...]
+    jobs: tuple[Job, ...]
+    active_turns: tuple[WorkspaceTurn, ...]
+    active_questions: tuple[WorkspaceQuestion, ...]
+    event_cursor: int
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": _SCHEMA_VERSION,
+            "repository_id": self.repository_id,
+            "conversations": [item.to_dict() for item in self.conversations],
+            "jobs": [item.to_dict() for item in self.jobs],
+            "active_turns": [item.to_dict() for item in self.active_turns],
+            "active_questions": [item.to_dict() for item in self.active_questions],
+            "event_cursor": self.event_cursor,
+        }
+
+    @classmethod
+    def from_dict(cls, value: Any) -> Self:
+        data = _record(
+            value,
+            {
+                "repository_id",
+                "conversations",
+                "jobs",
+                "active_turns",
+                "active_questions",
+                "event_cursor",
+            },
+            "workspace snapshot",
+        )
+        for key in ("conversations", "jobs", "active_turns", "active_questions"):
+            if not isinstance(data[key], list):
+                raise WorkspaceContractError(f"{key} must be a list")
+        cursor = data["event_cursor"]
+        if not isinstance(cursor, int) or isinstance(cursor, bool) or cursor < 0:
+            raise WorkspaceContractError("event_cursor must be a non-negative integer")
+        repository_id = _validate_id(data["repository_id"], "repository_id")
+        conversations = tuple(
+            Conversation.from_dict(item) for item in data["conversations"]
+        )
+        jobs = tuple(Job.from_dict(item) for item in data["jobs"])
+        if any(item.repository_id != repository_id for item in conversations + jobs):
+            raise WorkspaceContractError(
+                "snapshot records must belong to the snapshot repository"
+            )
+        return cls(
+            repository_id,
+            conversations,
+            jobs,
+            tuple(WorkspaceTurn.from_dict(item) for item in data["active_turns"]),
+            tuple(
+                WorkspaceQuestion.from_dict(item) for item in data["active_questions"]
+            ),
+            cursor,
         )
 
 

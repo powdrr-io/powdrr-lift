@@ -24,6 +24,7 @@ from powdrr_contracts.workspace import (
     WorkspaceEvent,
     WorkspaceQuestion,
     WorkspaceRepository,
+    WorkspaceSnapshot,
     WorkspaceTurn,
 )
 from powdrr_local.workspace import WorkspaceConflict, WorkspaceStore
@@ -179,6 +180,78 @@ def test_replay_cursor_and_interrupted_job_survive_restart(tmp_path: Path) -> No
     assert resumed.state == JobState.READY
 
 
+def test_bounded_history_pages_and_snapshot_cursor_replay(tmp_path: Path) -> None:
+    store = WorkspaceStore(tmp_path / "workspace.db")
+    conversations = [
+        store.create_conversation("repo", f"Feature {index}") for index in range(3)
+    ]
+    chat = conversations[0]
+    messages = [
+        store.append_message(
+            chat.conversation_id,
+            message_id=f"message-{index}",
+            role="user",
+            content=f"Message {index}",
+        )
+        for index in range(3)
+    ]
+    jobs = [
+        store.create_job("repo", kind="planning", title=f"Plan {index}")
+        for index in range(3)
+    ]
+
+    newest_messages = store.list_messages(chat.conversation_id, limit=2)
+    assert newest_messages == tuple(messages[1:])
+    assert store.list_messages(
+        chat.conversation_id, limit=2, before_sequence=messages[1].sequence
+    ) == (messages[0],)
+    first_conversations = store.list_conversations("repo", limit=2)
+    next_conversations = store.list_conversations(
+        "repo",
+        limit=2,
+        before=(
+            first_conversations[-1].updated_at,
+            first_conversations[-1].conversation_id,
+        ),
+    )
+    assert len(first_conversations) == 2
+    assert len(next_conversations) == 1
+    first_jobs = store.list_jobs("repo", limit=2)
+    next_jobs = store.list_jobs(
+        "repo",
+        limit=2,
+        before=(first_jobs[-1].updated_at, first_jobs[-1].job_id),
+    )
+    assert len(first_jobs) == 2
+    assert len(next_jobs) == 1
+    assert {item.job_id for item in first_jobs + next_jobs} == {
+        item.job_id for item in jobs
+    }
+
+    snapshot = store.read_snapshot("repo", conversation_limit=2, job_limit=2)
+    assert len(snapshot.conversations) == 2
+    assert len(snapshot.jobs) == 2
+    assert WorkspaceSnapshot.from_dict(snapshot.to_dict()) == snapshot
+    later = store.create_conversation("repo", "Created after snapshot")
+    replay = store.read_events("repo", after=snapshot.event_cursor)
+    assert len(replay) == 1
+    assert replay[0].entity_id == later.conversation_id
+    assert replay[0].schema_version == 2
+    assert replay[0].revision == 1
+
+
+def test_history_limits_are_validated(tmp_path: Path) -> None:
+    store = WorkspaceStore(tmp_path / "workspace.db")
+    with pytest.raises(ValueError, match="limit"):
+        store.list_conversations("repo", limit=0)
+    with pytest.raises(ValueError, match="limit"):
+        store.list_messages("chat", limit=1001)
+    with pytest.raises(ValueError, match="limit"):
+        store.list_jobs("repo", limit=0)
+    with pytest.raises(ValueError, match="limit"):
+        store.list_job_operations("job", limit=1001)
+
+
 def test_invalid_links_do_not_leave_partial_jobs_or_events(tmp_path: Path) -> None:
     store = WorkspaceStore(tmp_path / "workspace.db")
     chat = store.create_conversation("other-repo", "Other feature")
@@ -260,10 +333,11 @@ def test_version_one_database_migrates_without_changing_existing_records(
     with sqlite3.connect(path) as db:
         version = db.execute("PRAGMA user_version").fetchone()[0]
         sequence = db.execute("SELECT sequence FROM events").fetchone()[0]
-    assert version == 7
+    assert version == 8
     assert sequence == 7
     assert conversation.revision == 1
     assert conversation.specification_refs == ("docs/old.yaml",)
+    assert store.read_events("repo-old")[0].schema_version == 1
 
 
 def test_workspace_contracts_round_trip_and_reject_unknown_fields() -> None:
@@ -281,6 +355,18 @@ def test_workspace_contracts_round_trip_and_reject_unknown_fields() -> None:
         2,
     )
     assert Conversation.from_dict(conversation.to_dict()) == conversation
+    event = WorkspaceEvent(
+        1,
+        "repo-a",
+        "job",
+        "job-1",
+        EventType.JOB_UPDATED,
+        {"revision": 3, "attempt_id": "attempt-1"},
+        "2026-01-01T00:00:00Z",
+        revision=3,
+        attempt_id="attempt-1",
+    )
+    assert WorkspaceEvent.from_dict(event.to_dict()) == event
     malformed = message.to_dict() | {"debug": "unexpected"}
     with pytest.raises(WorkspaceContractError, match="unexpected fields"):
         Message.from_dict(malformed)
@@ -458,7 +544,7 @@ def test_schema_v3_migrates_to_durable_turns(tmp_path: Path) -> None:
             row[0]
             for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")
         }
-    assert version == 7
+    assert version == 8
     assert "repositories" in tables
     assert "turns" in tables
     assert "questions" in tables
@@ -736,7 +822,7 @@ def test_schema_v5_migrates_to_job_operation_bindings(tmp_path: Path) -> None:
             row[0]
             for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")
         }
-    assert version == 7
+    assert version == 8
     assert "job_operations" in tables
 
 
@@ -751,7 +837,7 @@ def test_schema_v6_migrates_to_supervisor_and_worker_ownership(tmp_path: Path) -
             row[0]
             for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")
         }
-    assert version == 7
+    assert version == 8
     assert "supervisor_lease" in tables
     assert "worker_ownership" in tables
 

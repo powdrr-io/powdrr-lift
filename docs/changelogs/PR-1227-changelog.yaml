@@ -1,0 +1,346 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1227
+title: Add bounded workspace snapshots and versioned events
+intent:
+  problem: Workspace refreshes can load unbounded histories, and separate reads of
+    current state and the event cursor can leave a reconnecting UI with gaps.
+  goal: Provide bounded history pages, an atomic repository snapshot with its replay
+    cursor, and versioned event records that carry attempt and revision metadata.
+human-decisions: []
+structured_files: []
+files:
+- path: packages/contracts/src/powdrr_contracts/workspace.py
+  type: modified
+  span:
+    start_line: 327
+    end_line: 329
+  summary: Add typed snapshot and versioned event contracts.
+  rationale: Let workspace clients exchange bounded snapshots and merge events using
+    typed revision and attempt metadata.
+- path: packages/contracts/src/powdrr_contracts/workspace.py
+  type: modified
+  span:
+    start_line: 332
+    end_line: 333
+  summary: Add typed snapshot and versioned event contracts.
+  rationale: Let workspace clients exchange bounded snapshots and merge events using
+    typed revision and attempt metadata.
+- path: packages/contracts/src/powdrr_contracts/workspace.py
+  type: modified
+  span:
+    start_line: 342
+    end_line: 345
+  summary: Add typed snapshot and versioned event contracts.
+  rationale: Let workspace clients exchange bounded snapshots and merge events using
+    typed revision and attempt metadata.
+- path: packages/contracts/src/powdrr_contracts/workspace.py
+  type: modified
+  span:
+    start_line: 349
+    end_line: 369
+  summary: Add typed snapshot and versioned event contracts.
+  rationale: Let workspace clients exchange bounded snapshots and merge events using
+    typed revision and attempt metadata.
+- path: packages/contracts/src/powdrr_contracts/workspace.py
+  type: modified
+  span:
+    start_line: 379
+    end_line: 386
+  summary: Add typed snapshot and versioned event contracts.
+  rationale: Let workspace clients exchange bounded snapshots and merge events using
+    typed revision and attempt metadata.
+- path: packages/contracts/src/powdrr_contracts/workspace.py
+  type: modified
+  span:
+    start_line: 395
+    end_line: 397
+  summary: Add typed snapshot and versioned event contracts.
+  rationale: Let workspace clients exchange bounded snapshots and merge events using
+    typed revision and attempt metadata.
+- path: packages/contracts/src/powdrr_contracts/workspace.py
+  type: modified
+  span:
+    start_line: 601
+    end_line: 661
+  summary: Add typed snapshot and versioned event contracts.
+  rationale: Let workspace clients exchange bounded snapshots and merge events using
+    typed revision and attempt metadata.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 39
+    end_line: 39
+  summary: Add bounded reads, atomic snapshots, and versioned event persistence.
+  rationale: Keep UI refreshes bounded and ensure replay cursors match the repository
+    state read in one transaction.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 98
+    end_line: 99
+  summary: Add bounded reads, atomic snapshots, and versioned event persistence.
+  rationale: Keep UI refreshes bounded and ensure replay cursors match the repository
+    state read in one transaction.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 187
+    end_line: 187
+  summary: Add bounded reads, atomic snapshots, and versioned event persistence.
+  rationale: Keep UI refreshes bounded and ensure replay cursors match the repository
+    state read in one transaction.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 396
+    end_line: 396
+  summary: Add bounded reads, atomic snapshots, and versioned event persistence.
+  rationale: Keep UI refreshes bounded and ensure replay cursors match the repository
+    state read in one transaction.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 406
+    end_line: 406
+  summary: Add bounded reads, atomic snapshots, and versioned event persistence.
+  rationale: Keep UI refreshes bounded and ensure replay cursors match the repository
+    state read in one transaction.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 418
+    end_line: 418
+  summary: Add bounded reads, atomic snapshots, and versioned event persistence.
+  rationale: Keep UI refreshes bounded and ensure replay cursors match the repository
+    state read in one transaction.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 430
+    end_line: 460
+  summary: Add bounded reads, atomic snapshots, and versioned event persistence.
+  rationale: Keep UI refreshes bounded and ensure replay cursors match the repository
+    state read in one transaction.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 1348
+    end_line: 1351
+  summary: Add bounded reads, atomic snapshots, and versioned event persistence.
+  rationale: Keep UI refreshes bounded and ensure replay cursors match the repository
+    state read in one transaction.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 1354
+    end_line: 1355
+  summary: Add bounded reads, atomic snapshots, and versioned event persistence.
+  rationale: Keep UI refreshes bounded and ensure replay cursors match the repository
+    state read in one transaction.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 1363
+    end_line: 1364
+  summary: Add bounded reads, atomic snapshots, and versioned event persistence.
+  rationale: Keep UI refreshes bounded and ensure replay cursors match the repository
+    state read in one transaction.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 1484
+    end_line: 1501
+  summary: Add bounded reads, atomic snapshots, and versioned event persistence.
+  rationale: Keep UI refreshes bounded and ensure replay cursors match the repository
+    state read in one transaction.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 1507
+    end_line: 1558
+  summary: Add bounded reads, atomic snapshots, and versioned event persistence.
+  rationale: Keep UI refreshes bounded and ensure replay cursors match the repository
+    state read in one transaction.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 1562
+    end_line: 1573
+  summary: Add bounded reads, atomic snapshots, and versioned event persistence.
+  rationale: Keep UI refreshes bounded and ensure replay cursors match the repository
+    state read in one transaction.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 1749
+    end_line: 1765
+  summary: Add bounded reads, atomic snapshots, and versioned event persistence.
+  rationale: Keep UI refreshes bounded and ensure replay cursors match the repository
+    state read in one transaction.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 1767
+    end_line: 1772
+  summary: Add bounded reads, atomic snapshots, and versioned event persistence.
+  rationale: Keep UI refreshes bounded and ensure replay cursors match the repository
+    state read in one transaction.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 1782
+    end_line: 1782
+  summary: Add bounded reads, atomic snapshots, and versioned event persistence.
+  rationale: Keep UI refreshes bounded and ensure replay cursors match the repository
+    state read in one transaction.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 2019
+    end_line: 2034
+  summary: Add bounded reads, atomic snapshots, and versioned event persistence.
+  rationale: Keep UI refreshes bounded and ensure replay cursors match the repository
+    state read in one transaction.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 2038
+    end_line: 2040
+  summary: Add bounded reads, atomic snapshots, and versioned event persistence.
+  rationale: Keep UI refreshes bounded and ensure replay cursors match the repository
+    state read in one transaction.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 2705
+    end_line: 2706
+  summary: Add bounded reads, atomic snapshots, and versioned event persistence.
+  rationale: Keep UI refreshes bounded and ensure replay cursors match the repository
+    state read in one transaction.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 2708
+    end_line: 2720
+  summary: Add bounded reads, atomic snapshots, and versioned event persistence.
+  rationale: Keep UI refreshes bounded and ensure replay cursors match the repository
+    state read in one transaction.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 2723
+    end_line: 2726
+  summary: Add bounded reads, atomic snapshots, and versioned event persistence.
+  rationale: Keep UI refreshes bounded and ensure replay cursors match the repository
+    state read in one transaction.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 2728
+    end_line: 2728
+  summary: Add bounded reads, atomic snapshots, and versioned event persistence.
+  rationale: Keep UI refreshes bounded and ensure replay cursors match the repository
+    state read in one transaction.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 2864
+    end_line: 2866
+  summary: Add bounded reads, atomic snapshots, and versioned event persistence.
+  rationale: Keep UI refreshes bounded and ensure replay cursors match the repository
+    state read in one transaction.
+- path: tests/test_ui_workspace.py
+  type: modified
+  span:
+    start_line: 27
+    end_line: 27
+  summary: Verify snapshot pagination, reconnect replay, and legacy event migration.
+  rationale: Protect the bounded paging and schema compatibility guarantees added
+    by this change.
+- path: tests/test_ui_workspace.py
+  type: modified
+  span:
+    start_line: 183
+    end_line: 254
+  summary: Verify snapshot pagination, reconnect replay, and legacy event migration.
+  rationale: Protect the bounded paging and schema compatibility guarantees added
+    by this change.
+- path: tests/test_ui_workspace.py
+  type: modified
+  span:
+    start_line: 336
+    end_line: 336
+  summary: Verify snapshot pagination, reconnect replay, and legacy event migration.
+  rationale: Protect the bounded paging and schema compatibility guarantees added
+    by this change.
+- path: tests/test_ui_workspace.py
+  type: modified
+  span:
+    start_line: 340
+    end_line: 340
+  summary: Verify snapshot pagination, reconnect replay, and legacy event migration.
+  rationale: Protect the bounded paging and schema compatibility guarantees added
+    by this change.
+- path: tests/test_ui_workspace.py
+  type: modified
+  span:
+    start_line: 358
+    end_line: 369
+  summary: Verify snapshot pagination, reconnect replay, and legacy event migration.
+  rationale: Protect the bounded paging and schema compatibility guarantees added
+    by this change.
+- path: tests/test_ui_workspace.py
+  type: modified
+  span:
+    start_line: 547
+    end_line: 547
+  summary: Verify snapshot pagination, reconnect replay, and legacy event migration.
+  rationale: Protect the bounded paging and schema compatibility guarantees added
+    by this change.
+- path: tests/test_ui_workspace.py
+  type: modified
+  span:
+    start_line: 825
+    end_line: 825
+  summary: Verify snapshot pagination, reconnect replay, and legacy event migration.
+  rationale: Protect the bounded paging and schema compatibility guarantees added
+    by this change.
+- path: tests/test_ui_workspace.py
+  type: modified
+  span:
+    start_line: 840
+    end_line: 840
+  summary: Verify snapshot pagination, reconnect replay, and legacy event migration.
+  rationale: Protect the bounded paging and schema compatibility guarantees added
+    by this change.
+entities:
+- id: workspace-event-envelope
+  type: Event schema
+  action: added
+- id: workspace-snapshot-contract
+  type: Class
+  action: added
+- id: local-ui-workspace-store
+  type: Class
+  action: modified
+- id: workspace-event-schema-v8-migration
+  type: Migration
+  action: added
+- id: workspace-snapshot-pagination-tests
+  type: Unit test
+  action: added
+entity_relationships: []
+invariants:
+- id: snapshot-cursor-atomicity
+  description: Repository projection records and the high-water event cursor are read
+    from the same SQLite transaction.
+  action: added
+- id: bounded-workspace-history
+  description: Conversation, message, job, operation, and event list reads require
+    a bounded limit no greater than 1000.
+  action: added
+- id: legacy-event-readability
+  description: Events stored before schema version eight remain readable as event
+    envelope version one.
+  action: added
+guidance: []

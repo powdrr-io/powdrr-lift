@@ -7,6 +7,10 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from powdrr_service.planning.checkpoints import (
+    PlanningCheckpoint,
+    render_checkpoint_archive_comments,
+)
 
 import powdrr_lift.workrr.github_issue_queue as github_issue_queue
 from powdrr_lift.workrr.github_issue_queue import (
@@ -603,6 +607,70 @@ def test_github_issue_comment_listing_retries_transient_timeout() -> None:
     assert len(commands) == 2
     assert commands[0] == commands[1]
     assert delays == [1.0]
+
+
+def test_checkpoint_comment_listing_stops_at_a_complete_archive() -> None:
+    root = PlanningCheckpoint.create(
+        session_id="planning-session-1",
+        event_id="event-root",
+        sequence=1,
+        parent_digest=None,
+        event_type="question_started",
+        payload={"question": {"question_id": "q-1"}},
+        id_counters={},
+    )
+    archive_comments = render_checkpoint_archive_comments(
+        (root,), session_id="planning-session-1"
+    )
+    commands: list[list[str]] = []
+
+    def run(
+        arguments: list[str], **_kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
+        commands.append(arguments)
+        return subprocess.CompletedProcess(
+            arguments,
+            0,
+            json.dumps(
+                [
+                    {"id": index, "body": body}
+                    for index, body in enumerate(archive_comments, start=1)
+                ]
+            ),
+            "",
+        )
+
+    comments = GitHubIssueClient("example/project", run=run).list_checkpoint_comments(
+        42, session_id="planning-session-1"
+    )
+
+    assert len(comments) == len(archive_comments)
+    assert len(commands) == 1
+    assert "direction=desc" in commands[0][-1]
+
+
+def test_checkpoint_comment_listing_reads_legacy_pages_without_an_archive() -> None:
+    commands: list[list[str]] = []
+    pages = [
+        [{"id": index, "body": "legacy checkpoint"} for index in range(100)],
+        [{"id": 101, "body": "legacy checkpoint"}],
+    ]
+
+    def run(
+        arguments: list[str], **_kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
+        commands.append(arguments)
+        page_number = int(arguments[-1].rsplit("page=", 1)[1])
+        return subprocess.CompletedProcess(
+            arguments, 0, json.dumps(pages[page_number - 1]), ""
+        )
+
+    comments = GitHubIssueClient("example/project", run=run).list_checkpoint_comments(
+        42, session_id="planning-session-1"
+    )
+
+    assert len(comments) == 101
+    assert len(commands) == 2
 
 
 def test_github_issue_client_closes_fulfilled_issue_with_completed_reason() -> None:

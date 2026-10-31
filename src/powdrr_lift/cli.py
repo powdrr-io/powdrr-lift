@@ -27,7 +27,10 @@ from powdrr_contracts.models import (
     artifact_manifest_digest,
 )
 from powdrr_local import JsonServiceBridge, LocalPowdrrService
-from powdrr_local.planning.checkpoints import LocalCheckpointStore
+from powdrr_local.planning.checkpoints import (
+    GitHubCommentCheckpointStore,
+    LocalCheckpointStore,
+)
 from powdrr_local.planning.repair_publication import (
     RepairPublicationError,
     publish_repair_pull_request,
@@ -2866,6 +2869,8 @@ def _run_plan_session(args: argparse.Namespace, *, resume: bool = False) -> int:
     repo_root = resolve_repo_root(args.repo_root).resolve()
     github = GitHubIssueClient(args.repository) if resume else None
     session: PlanningSession | None = None
+    store: LocalCheckpointStore | None = None
+    issue_checkpoint_store: GitHubCommentCheckpointStore | None = None
     try:
         if resume:
             assert github is not None
@@ -2978,10 +2983,18 @@ def _run_plan_session(args: argparse.Namespace, *, resume: bool = False) -> int:
         )
         assert github is not None
         store = LocalCheckpointStore(repo_root, session_id=session.session_id)
+        issue_checkpoint_store = GitHubCommentCheckpointStore(
+            github, session.issue.number, session_id=session.session_id
+        )
         if resume and not store.path.exists():
-            # Read older sessions' issue-comment journal once during migration.
-            # All subsequent planning checkpoints stay in the local journal.
-            store.import_legacy_comments(github.list_comments(session.issue.number))
+            store.import_legacy_comments(
+                github.list_checkpoint_comments(
+                    session.issue.number, session_id=session.session_id
+                )
+            )
+        journal = store.load()
+        if journal.events:
+            issue_checkpoint_store.publish_archive(journal.events)
         process_directory = (
             Path(__file__).resolve().parents[2] / "docs" / "procedrr" / "processes"
         )
@@ -3003,10 +3016,15 @@ def _run_plan_session(args: argparse.Namespace, *, resume: bool = False) -> int:
             stderr=sys.stderr,
         )
         if result.terminal_status.value != "succeeded":
+            journal = store.load()
+            if journal.events:
+                issue_checkpoint_store.publish_archive(journal.events)
             raise PlanningServiceError(
                 f"Procedrr planning process ended {result.terminal_status.value}"
             )
         journal = store.load()
+        if journal.events:
+            issue_checkpoint_store.publish_archive(journal.events)
         accepted_answers = _accepted_planning_answers(journal.events)
         relative_output = output_path.relative_to(repo_root).as_posix()
         plan_slug = slugify_workflow_id(plan_id)
@@ -3041,6 +3059,17 @@ def _run_plan_session(args: argparse.Namespace, *, resume: bool = False) -> int:
                 file=sys.stderr,
             )
     except Exception as error:
+        if store is not None and issue_checkpoint_store is not None:
+            try:
+                journal = store.load()
+                if journal.events:
+                    issue_checkpoint_store.publish_archive(journal.events)
+            except Exception as archive_error:
+                print(
+                    f"Could not publish the planning checkpoint archive: "
+                    f"{archive_error}",
+                    file=sys.stderr,
+                )
         if session is not None and github is not None:
             try:
                 github.add_issue_comment(

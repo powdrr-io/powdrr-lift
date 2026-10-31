@@ -21,6 +21,7 @@ from powdrr_service.planning.checkpoints import (
     PlanningJournalError,
     StaleCheckpointParent,
     reduce_checkpoint_comments,
+    render_checkpoint_archive_comments,
     render_checkpoint_comments,
 )
 from powdrr_service.planning.contracts import PlanningContractError, Question
@@ -432,12 +433,90 @@ def test_incomplete_chunk_manifest_is_not_accepted_and_complete_set_recovers() -
     assert incomplete.status == "empty"
     assert incomplete.head is None
     assert incomplete.incomplete_manifest_digests == (large.digest,)
-
     complete = reduce_checkpoint_comments(
         [{"body": body} for body in rendered], session_id="planning-session-1"
     )
     assert complete.status == "active"
     assert complete.head == large
+
+
+def test_compressed_archive_reduces_to_original_events_and_new_tail() -> None:
+    root = _checkpoint(
+        event_id="event-root",
+        sequence=1,
+        parent=None,
+        event_type="question_started",
+        payload={"question": _question()},
+    )
+    accepted = _checkpoint(
+        event_id="event-answer",
+        sequence=2,
+        parent=root.digest,
+        event_type="answer_accepted",
+        payload={
+            "question": _question(),
+            "input_digest": "sha256:" + "a" * 64,
+            "accepted_answer": {"requirements": [{"id": "req-1"}]},
+        },
+    )
+    archive_comments = render_checkpoint_archive_comments(
+        (root, accepted), session_id="planning-session-1"
+    )
+    tail = _checkpoint(
+        event_id="event-next-question",
+        sequence=3,
+        parent=accepted.digest,
+        event_type="question_started",
+        payload={"question": _question("q-000002")},
+    )
+
+    state = reduce_checkpoint_comments(
+        [
+            *({"body": body} for body in archive_comments),
+            {"body": render_checkpoint_comments(tail)[0]},
+        ],
+        session_id="planning-session-1",
+    )
+
+    assert state.status == "active"
+    assert [event.digest for event in state.events] == [
+        root.digest,
+        accepted.digest,
+        tail.digest,
+    ]
+    assert state.accepted_answers == (accepted.payload,)
+    assert state.pending_question == _question("q-000002")
+
+
+def test_github_checkpoint_store_publishes_archive_once_and_reloads_it() -> None:
+    api = _FakeIssueComments()
+    store = GitHubCommentCheckpointStore(api, 44, session_id="planning-session-1")
+    root = _checkpoint(
+        event_id="event-root",
+        sequence=1,
+        parent=None,
+        event_type="question_started",
+        payload={"question": _question()},
+    )
+    accepted = _checkpoint(
+        event_id="event-answer",
+        sequence=2,
+        parent=root.digest,
+        event_type="answer_accepted",
+        payload={
+            "question": _question(),
+            "accepted_answer": {"requirements": []},
+        },
+    )
+
+    archived = store.publish_archive((root, accepted))
+    comment_count = len(api.comments)
+    unchanged = store.publish_archive((root, accepted))
+
+    assert archived.head == accepted
+    assert unchanged.head == accepted
+    assert len(api.comments) == comment_count
+    assert any("checkpoint-archive-manifest" in item["body"] for item in api.comments)
 
 
 def test_duplicate_comment_delivery_is_idempotent() -> None:

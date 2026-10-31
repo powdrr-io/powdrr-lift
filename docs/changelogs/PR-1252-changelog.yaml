@@ -1,0 +1,49 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1252
+title: Publish only new planning checkpoint events
+intent:
+  problem: Resuming planning republishes the entire durable checkpoint history to GitHub even when only a small local tail is missing, delaying startup and creating redundant comments.
+  goal: Append only checkpoint events newer than the issue's current head while preserving full-history reconstruction from prior and delta archives.
+human-decisions: []
+structured_files: []
+files:
+- path: packages/local/src/powdrr_local/planning/checkpoints.py
+  type: modified
+  span: {start_line: 489, end_line: 497}
+  summary: Find the issue journal head in the validated local history.
+  rationale: Identify the boundary between already durable events and the missing local tail.
+- path: packages/local/src/powdrr_local/planning/checkpoints.py
+  type: modified
+  span: {start_line: 499, end_line: 507}
+  summary: Select only events after the current GitHub checkpoint head.
+  rationale: Avoid re-uploading the entire planning journal when resuming from a local checkpoint tail.
+- path: packages/local/src/powdrr_local/planning/checkpoints.py
+  type: modified
+  span: {start_line: 509, end_line: 509}
+  summary: Render the missing checkpoint tail as an archive.
+  rationale: Append only new checkpoint events to the GitHub issue.
+- path: tests/test_planning_checkpoints.py
+  type: modified
+  span: {start_line: 23, end_line: 23}
+  summary: Import the complete-archive validator for delta tests.
+  rationale: Exercise whether a tail archive alone can safely restore a journal.
+- path: tests/test_planning_checkpoints.py
+  type: modified
+  span: {start_line: 492, end_line: 538}
+  summary: Verify delta archives require their parent archive to restore a complete journal.
+  rationale: Ensure compact delta publication does not make an incomplete journal look resumable.
+- path: tests/test_planning_checkpoints.py
+  type: modified
+  span: {start_line: 570, end_line: 611}
+  summary: Verify publishing a journal extension sends only its missing events.
+  rationale: Prevent repeated full-history uploads as planning checkpoints grow.
+entities: []
+entity_relationships: []
+invariants:
+- id: planning-checkpoint-archive-appends
+  description: Publishing a newer local checkpoint journal appends events after the issue's current head without replacing earlier durable events.
+  action: altered
+- id: delta-archive-needs-parent-history
+  description: A checkpoint delta is complete only when its parent history is also available to reconstruct the full journal.
+  action: added
+guidance: []

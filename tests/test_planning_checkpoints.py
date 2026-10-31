@@ -20,6 +20,7 @@ from powdrr_service.planning.checkpoints import (
     PlanningCheckpoint,
     PlanningJournalError,
     StaleCheckpointParent,
+    has_complete_checkpoint_archive,
     reduce_checkpoint_comments,
     render_checkpoint_archive_comments,
     render_checkpoint_comments,
@@ -488,6 +489,53 @@ def test_compressed_archive_reduces_to_original_events_and_new_tail() -> None:
     assert state.pending_question == _question("q-000002")
 
 
+def test_checkpoint_archive_delta_requires_its_parent_archive() -> None:
+    root = _checkpoint(
+        event_id="event-root",
+        sequence=1,
+        parent=None,
+        event_type="question_started",
+        payload={"question": _question()},
+    )
+    accepted = _checkpoint(
+        event_id="event-answer",
+        sequence=2,
+        parent=root.digest,
+        event_type="answer_accepted",
+        payload={"question": _question(), "accepted_answer": {"records": []}},
+    )
+    tail = _checkpoint(
+        event_id="event-next-question",
+        sequence=3,
+        parent=accepted.digest,
+        event_type="question_started",
+        payload={"question": _question("q-000002")},
+    )
+    base_archive = render_checkpoint_archive_comments(
+        (root, accepted), session_id="planning-session-1"
+    )
+    delta_archive = render_checkpoint_archive_comments(
+        (tail,), session_id="planning-session-1"
+    )
+
+    assert not has_complete_checkpoint_archive(
+        [{"body": body} for body in delta_archive],
+        session_id="planning-session-1",
+    )
+    combined = [
+        *({"body": body} for body in delta_archive),
+        *({"body": body} for body in base_archive),
+    ]
+    assert has_complete_checkpoint_archive(combined, session_id="planning-session-1")
+    state = reduce_checkpoint_comments(combined, session_id="planning-session-1")
+    assert state.status == "active"
+    assert [event.digest for event in state.events] == [
+        root.digest,
+        accepted.digest,
+        tail.digest,
+    ]
+
+
 def test_github_checkpoint_store_publishes_archive_once_and_reloads_it() -> None:
     api = _FakeIssueComments()
     store = GitHubCommentCheckpointStore(api, 44, session_id="planning-session-1")
@@ -517,6 +565,48 @@ def test_github_checkpoint_store_publishes_archive_once_and_reloads_it() -> None
     assert unchanged.head == accepted
     assert len(api.comments) == comment_count
     assert any("checkpoint-archive-manifest" in item["body"] for item in api.comments)
+
+
+def test_github_checkpoint_store_publishes_only_events_after_existing_archive() -> None:
+    api = _FakeIssueComments()
+    store = GitHubCommentCheckpointStore(api, 44, session_id="planning-session-1")
+    root = _checkpoint(
+        event_id="event-root",
+        sequence=1,
+        parent=None,
+        event_type="question_started",
+        payload={"question": _question()},
+    )
+    accepted = _checkpoint(
+        event_id="event-answer",
+        sequence=2,
+        parent=root.digest,
+        event_type="answer_accepted",
+        payload={"question": _question(), "accepted_answer": {"records": []}},
+    )
+    tail = _checkpoint(
+        event_id="event-next-question",
+        sequence=3,
+        parent=accepted.digest,
+        event_type="question_started",
+        payload={"question": _question("q-000002")},
+    )
+
+    store.publish_archive((root, accepted))
+    old_comment_count = len(api.comments)
+    tail_archive = render_checkpoint_archive_comments(
+        (tail,), session_id="planning-session-1"
+    )
+
+    updated = store.publish_archive((root, accepted, tail))
+
+    assert updated.head == tail
+    assert len(api.comments) - old_comment_count == len(tail_archive)
+    assert [event.digest for event in store.load().events] == [
+        root.digest,
+        accepted.digest,
+        tail.digest,
+    ]
 
 
 def test_duplicate_comment_delivery_is_idempotent() -> None:

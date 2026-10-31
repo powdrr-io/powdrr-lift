@@ -1,0 +1,41 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1222
+title: Normalize existing Structrr subjects marked added
+intent:
+  problem: "Structural planning stopped after the model referenced an existing projected subject but labeled its action added."
+  goal: "Resolve this contradictory action deterministically as changed and clarify the inventory prompt so existing subjects are not labeled added."
+human-decisions: []
+structured_files: []
+files:
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 240, end_line: 246}
+    summary: Normalize added actions on existing projected subjects to changed.
+    rationale: The resolved subject identity proves it already exists, so treating it as a new identity would contradict the repository evidence and unnecessarily block planning.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 557, end_line: 560}
+    summary: Specify that added applies only when no existing subject reference is supplied.
+    rationale: Make the structural inventory contract explicit for the model.
+  - path: tests/test_planning_structrr.py
+    type: modified
+    span: {start_line: 165, end_line: 165}
+    summary: Assert that the prompt distinguishes new identities from existing subjects.
+    rationale: Keep the question wording aligned with the parser behavior.
+  - path: tests/test_planning_structrr.py
+    type: modified
+    span: {start_line: 168, end_line: 168}
+    summary: Assert that the prompt explicitly forbids labeling an existing subject added.
+    rationale: Prevent regressions in the model-facing structural inventory contract.
+  - path: tests/test_planning_structrr.py
+    type: modified
+    span: {start_line: 721, end_line: 748}
+    summary: Cover normalization for existing entity and file subjects.
+    rationale: Prevent a contradictory model action from blocking structural planning again.
+entities: []
+entity_relationships: []
+invariants:
+  - id: existing-subjects-are-never-added
+    description: An existing subject reference cannot represent a new identity; an added action on a resolved existing subject is normalized to changed.
+    action: altered
+guidance: []

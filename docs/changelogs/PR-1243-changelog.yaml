@@ -1,0 +1,197 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1243
+title: Accept chat messages as durable turns
+intent:
+  problem: The browser API can read committed conversation messages but cannot submit a user message as resumable work.
+  goal: Accept chat messages through an idempotent API command and persist a supervisor-readable dispatch intent before returning HTTP 202.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/design/browser-workspace-api.md
+  type: modified
+  span:
+    start_line: 67
+    end_line: 90
+  summary: Document the message submission command, acceptance response, and retry behavior.
+  rationale: Define the browser contract for durable, asynchronous turn submission.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 195
+    end_line: 204
+  summary: Add schema version 10 with a pending turn dispatch table and index.
+  rationale: Persist work acceptance in the same database transaction as a turn.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 413
+    end_line: 413
+  summary: Accept the latest schema in the initial version dispatch.
+  rationale: Route current databases through the version 10 migration.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 423
+    end_line: 423
+  summary: Keep the schema 4 migration chain compatible with version 10.
+  rationale: Allow older database versions to continue upgrading.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 435
+    end_line: 435
+  summary: Keep the schema 5 migration chain compatible with version 10.
+  rationale: Allow older database versions to continue upgrading.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 447
+    end_line: 447
+  summary: Keep the schema 6 migration chain compatible with version 10.
+  rationale: Allow older database versions to continue upgrading.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 477
+    end_line: 477
+  summary: Keep the schema 7 migration chain compatible with version 10.
+  rationale: Allow older database versions to continue upgrading.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 499
+    end_line: 521
+  summary: Migrate existing workspace databases from version 9 to version 10.
+  rationale: Preserve existing data while adding the durable dispatch queue.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 880
+    end_line: 889
+  summary: Persist dispatch intents atomically with accepted turns.
+  rationale: Ensure accepted work survives service restarts and network disconnects.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 906
+    end_line: 920
+  summary: Provide bounded reads of pending turn dispatch intents.
+  rationale: Let a future supervisor find accepted turns after service restarts.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 1919
+    end_line: 1934
+  summary: Read the committed message referenced by a turn.
+  rationale: Return the persisted message in the asynchronous acceptance response.
+- path: packages/local/src/powdrr_local/workspace_api.py
+  type: modified
+  span:
+    start_line: 75
+    end_line: 80
+  summary: Validate the message submission request envelope.
+  rationale: Require stable request and message identifiers with bounded content.
+- path: packages/local/src/powdrr_local/workspace_api.py
+  type: modified
+  span:
+    start_line: 13
+    end_line: 13
+  summary: Import deterministic turn ID generation.
+  rationale: Recreate the same turn identifier when a client retries a request.
+- path: packages/local/src/powdrr_local/workspace_api.py
+  type: modified
+  span:
+    start_line: 474
+    end_line: 515
+  summary: Add the authenticated message submission endpoint with deterministic turn IDs.
+  rationale: Support safe command retries and return only after durable acceptance.
+- path: tests/test_ui_workspace.py
+  type: modified
+  span:
+    start_line: 338
+    end_line: 338
+  summary: Update the version 1 migration expectation to schema version 10.
+  rationale: Keep legacy migration and fresh database checks aligned with the new schema.
+- path: tests/test_ui_workspace.py
+  type: modified
+  span:
+    start_line: 557
+    end_line: 557
+  summary: Update the version 3 migration expectation to schema version 10.
+  rationale: Keep legacy migration checks aligned with the new schema.
+- path: tests/test_ui_workspace.py
+  type: modified
+  span:
+    start_line: 835
+    end_line: 835
+  summary: Update the version 5 migration expectation to schema version 10.
+  rationale: Keep legacy migration checks aligned with the new schema.
+- path: tests/test_ui_workspace.py
+  type: modified
+  span:
+    start_line: 850
+    end_line: 850
+  summary: Update the version 6 migration expectation to schema version 10.
+  rationale: Keep legacy migration checks aligned with the new schema.
+- path: tests/test_ui_workspace.py
+  type: modified
+  span:
+    start_line: 860
+    end_line: 860
+  summary: Update the version 8 migration expectation to schema version 10.
+  rationale: Keep legacy migration checks aligned with the new schema.
+- path: tests/test_ui_workspace.py
+  type: modified
+  span:
+    start_line: 1139
+    end_line: 1139
+  summary: Update the API bootstrap test expectation to schema version 10.
+  rationale: Keep API session persistence checks aligned with the new schema.
+- path: tests/test_workspace_api.py
+  type: modified
+  span:
+    start_line: 41
+    end_line: 41
+  summary: Update the health route test to report schema version 10.
+  rationale: Keep the API health contract aligned with the new schema.
+- path: tests/test_workspace_api.py
+  type: modified
+  span:
+    start_line: 100
+    end_line: 156
+  summary: Verify durable message acceptance, retries, conflicts, and pending dispatch recovery.
+  rationale: Exercise the HTTP command with the real temporary SQLite store.
+entities:
+- id: workspace-chat-message-submit
+  type: Route
+  action: added
+- id: workspace-turn-dispatch-intents
+  type: Table
+  action: added
+- id: workspace-turn-intake-migration
+  type: Migration
+  action: added
+- id: workspace-turn-submission-tests
+  type: Integration test
+  action: added
+entity_relationships:
+- id: message-submission-is-tested
+  type: verifies
+  source: workspace-turn-submission-tests
+  target: workspace-chat-message-submit
+  action: added
+  description: HTTP tests verify accepted responses, idempotent retries, conflicting payloads, and persisted pending intents.
+invariants:
+- id: turn-acceptance-and-dispatch-intent-are-atomic
+  description: A user message, accepted turn, idempotency result, and pending dispatch intent commit in one SQLite transaction.
+  action: added
+- id: message-retry-replays-original-acceptance
+  description: The same request ID and payload returns the original turn and message; reusing the request ID with a different payload conflicts.
+  action: added
+- id: one-active-turn-per-conversation
+  description: A conversation with an active turn rejects a second new turn.
+  action: added
+guidance:
+- id: supervisor-consumes-pending-turn-intents
+  description: The later supervisor integration must claim pending turn dispatch intents from shared SQLite; HTTP handlers must not run workflow code.
+  action: added

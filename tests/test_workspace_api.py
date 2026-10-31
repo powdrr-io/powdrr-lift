@@ -38,7 +38,7 @@ def test_health_is_public_and_session_bootstrap_is_single_use(tmp_path: Path) ->
     client, store, _, secret = _client(tmp_path)
     assert client.get("/api/v1/health").json() == {
         "status": "ok",
-        "schema_version": 9,
+        "schema_version": 10,
         "scheduler": {"status": "not_configured"},
     }
 
@@ -95,6 +95,63 @@ def test_conversation_mutations_require_origin_and_csrf(tmp_path: Path) -> None:
         "message": "This conversation changed in another window.",
         "current_revision": 1,
     }
+
+
+def test_message_submission_is_durable_and_idempotent(tmp_path: Path) -> None:
+    client, store, repository_id, secret = _client(tmp_path)
+    csrf = _sign_in(client, secret)
+    headers = {
+        "Origin": "http://127.0.0.1:8765",
+        "X-CSRF-Token": csrf,
+    }
+    conversation = client.post(
+        f"/api/v1/repositories/{repository_id}/conversations",
+        headers=headers,
+        json={"title": "Search", "request_id": "create-search"},
+    ).json()
+    path = (
+        f"/api/v1/repositories/{repository_id}/conversations/"
+        f"{conversation['conversation_id']}/messages"
+    )
+    payload = {
+        "request_id": "submit-search",
+        "message_id": "message-search-1",
+        "content": "Add search",
+    }
+
+    accepted = client.post(path, headers=headers, json=payload)
+    retried = client.post(path, headers=headers, json=payload)
+
+    assert accepted.status_code == retried.status_code == 202
+    result = accepted.json()
+    assert retried.json() == result
+    assert result["message"]["content"] == "Add search"
+    assert result["turn_id"]
+    assert result["state"] == "accepted"
+    assert len(store.list_messages(conversation["conversation_id"])) == 1
+    assert len(store.list_pending_turn_dispatches(repository_id)) == 1
+
+    reopened = WorkspaceStore(store.path)
+    assert len(reopened.list_pending_turn_dispatches(repository_id)) == 1
+    conflicting_retry = client.post(
+        path,
+        headers=headers,
+        json={**payload, "content": "Do something else"},
+    )
+    assert conflicting_retry.status_code == 409
+    assert conflicting_retry.json()["error"]["code"] == "request_conflict"
+
+    active_turn_conflict = client.post(
+        path,
+        headers=headers,
+        json={
+            "request_id": "submit-search-second",
+            "message_id": "message-search-2",
+            "content": "Another turn",
+        },
+    )
+    assert active_turn_conflict.status_code == 409
+    assert len(reopened.list_pending_turn_dispatches(repository_id)) == 1
 
 
 def test_mutation_with_wrong_origin_is_rejected(tmp_path: Path) -> None:

@@ -64,6 +64,30 @@ Conversation updates carry `expected_revision`; a stale update returns HTTP 409
 with an `error` object containing `code`, `message`, and the current revision.
 Conversation and message reads are bounded and support cursor pagination.
 
+Submit a user message to start one accepted turn in its conversation:
+
+```http
+POST /api/v1/repositories/{repository_id}/conversations/{conversation_id}/messages
+Origin: http://127.0.0.1:8765
+X-CSRF-Token: <csrf-token>
+Content-Type: application/json
+
+{"request_id":"<uuid>","message_id":"<uuid>","content":"Add search"}
+```
+
+The server returns HTTP 202 only after committing the user message, accepted
+turn, idempotency result, and pending dispatch intent together:
+
+```json
+{"message":{"schema_version":1,"message_id":"<uuid>","conversation_id":"<uuid>","role":"user","content":"Add search","created_at":"<timestamp>","sequence":17},"turn_id":"<uuid>","state":"accepted"}
+```
+
+Retry the identical command with the same `request_id` to receive the original
+acceptance. Reusing that ID with a different payload returns HTTP 409. Each
+conversation accepts at most one active turn. A 202 confirms durable acceptance;
+it does not mean the assistant has completed. The supervisor consumes the
+pending dispatch intent outside the HTTP request handler.
+
 List jobs with `GET /api/v1/repositories/{repository_id}/jobs`. Repeat the
 `states` query parameter to filter by one or more states, and use the returned
 `next_cursor` fields as `before_updated_at` and `before_job_id` for the next

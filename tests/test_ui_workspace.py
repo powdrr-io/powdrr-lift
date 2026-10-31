@@ -335,7 +335,7 @@ def test_version_one_database_migrates_without_changing_existing_records(
     with sqlite3.connect(path) as db:
         version = db.execute("PRAGMA user_version").fetchone()[0]
         sequence = db.execute("SELECT sequence FROM events").fetchone()[0]
-    assert version == 9
+    assert version == 10
     assert sequence == 7
     assert conversation.revision == 1
     assert conversation.specification_refs == ("docs/old.yaml",)
@@ -554,7 +554,7 @@ def test_schema_v3_migrates_to_durable_turns(tmp_path: Path) -> None:
             row[0]
             for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")
         }
-    assert version == 9
+    assert version == 10
     assert "repositories" in tables
     assert "turns" in tables
     assert "questions" in tables
@@ -832,7 +832,7 @@ def test_schema_v5_migrates_to_job_operation_bindings(tmp_path: Path) -> None:
             row[0]
             for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")
         }
-    assert version == 9
+    assert version == 10
     assert "job_operations" in tables
 
 
@@ -847,7 +847,7 @@ def test_schema_v6_migrates_to_supervisor_and_worker_ownership(tmp_path: Path) -
             row[0]
             for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")
         }
-    assert version == 9
+    assert version == 10
     assert "supervisor_lease" in tables
     assert "worker_ownership" in tables
 
@@ -857,7 +857,7 @@ def test_schema_v8_migrates_to_api_sessions(tmp_path: Path) -> None:
     with sqlite3.connect(path) as db:
         db.execute("PRAGMA user_version = 8")
     store = WorkspaceStore(path)
-    assert store.schema_version == 9
+    assert store.schema_version == 10
     with sqlite3.connect(path) as db:
         table_names = {
             row[0]
@@ -1136,4 +1136,4 @@ def test_api_bootstrap_token_is_single_use_across_store_instances(
         outcomes = tuple(pool.map(consume, (0, 1)))
 
     assert sorted(outcomes) == [False, True]
-    assert stores[0].schema_version == 9
+    assert stores[0].schema_version == 10

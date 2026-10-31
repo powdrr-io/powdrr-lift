@@ -1325,7 +1325,7 @@
       "reviewed": false
     },
     {
-      "extraction_pr": "1242",
+      "extraction_pr": "1244",
       "internal_imports": [],
       "kind": "python_module",
       "owner": "service",

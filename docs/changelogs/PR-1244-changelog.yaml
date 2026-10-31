@@ -1,5 +1,5 @@
 schema: https://powdrr.io/schema/changelog-v2
-change_id: 1242
+change_id: 1244
 title: Move intent packet policy into service
 intent:
   problem: The operation-scoped intent packet schema, stable fingerprint, and coding-context renderer still lived in the legacy agent package.

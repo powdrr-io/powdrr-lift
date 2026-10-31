@@ -10,14 +10,6 @@ New product-language APIs belong in this package; this marker is intentionally
 small until each implementation has a clean ownership boundary.
 """
 
-from powdrr_lift.structrr.active_intent import (
-    ACTIVE_INTENT_SECTION_VERSION,
-    ActiveIntentReference,
-    ActiveIntentResolutionError,
-    active_intent_section,
-    resolve_active_intent,
-    validate_active_intent_section,
-)
 from powdrr_lift.structrr.actual_diff import (
     ACTUAL_DIFF_SCHEMA_VERSION,
     StructrrActualDiff,
@@ -125,12 +117,6 @@ __all__ = [
     "CANDIDATE_COMPARISON_SCHEMA_VERSION",
     "CandidateScopeDecision",
     "compare_candidate_snapshot",
-    "ACTIVE_INTENT_SECTION_VERSION",
-    "ActiveIntentReference",
-    "ActiveIntentResolutionError",
-    "active_intent_section",
-    "resolve_active_intent",
-    "validate_active_intent_section",
     "INTENT_LINEAGE_HISTORY_SCHEMA",
     "audit_intent_lineage",
     "INVARIANT_REVIEW_PREDICATE_VERSION",

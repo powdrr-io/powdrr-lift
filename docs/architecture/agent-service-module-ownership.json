@@ -2111,7 +2111,6 @@
     {
       "extraction_pr": "3",
       "internal_imports": [
-        "powdrr_lift.structrr.active_intent",
         "powdrr_lift.structrr.actual_diff",
         "powdrr_lift.structrr.bootstrap",
         "powdrr_lift.structrr.candidate_comparison",
@@ -2131,13 +2130,13 @@
       "reviewed": false
     },
     {
-      "extraction_pr": "3",
+      "extraction_pr": "1228",
       "internal_imports": [],
       "kind": "python_module",
-      "owner": "split",
-      "path": "src/powdrr_lift/structrr/active_intent.py",
-      "rationale": "service semantics; agent supplies pinned repository evidence",
-      "reviewed": false
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/structrr/active_intent.py",
+      "rationale": "Service-owned deterministic normalization, merging, and validation of active intent clauses.",
+      "reviewed": true
     },
     {
       "extraction_pr": "3",
@@ -2160,11 +2159,11 @@
         "powdrr_lift.core.decision_obligation",
         "powdrr_lift.core.entity_taxonomy",
         "powdrr_lift.core.spec_paths",
-        "powdrr_lift.structrr.active_intent",
         "powdrr_lift.structrr.python_topology",
         "powdrr_lift.structrr.source_manifest",
         "powdrr_lift.structrr.validation",
-        "powdrr_lift.structrr.validation_models"
+        "powdrr_lift.structrr.validation_models",
+        "powdrr_service.structrr.active_intent"
       ],
       "kind": "python_module",
       "owner": "split",
@@ -2781,7 +2780,6 @@
         "powdrr_lift.core.spec_context",
         "powdrr_lift.core.verification_contract",
         "powdrr_lift.errors",
-        "powdrr_lift.structrr.active_intent",
         "powdrr_lift.structrr.actual_diff",
         "powdrr_lift.structrr.bootstrap",
         "powdrr_lift.structrr.candidate_comparison",
@@ -2811,6 +2809,7 @@
         "powdrr_lift.workrr.verification_evidence",
         "powdrr_lift.workrr.verification_provider",
         "powdrr_service.planning.workflow_ids",
+        "powdrr_service.structrr.active_intent",
         "powdrr_service.structrr.snapshot",
         "procedrr",
         "procedrr_evaluator.evaluator",

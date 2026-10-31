@@ -1,19 +1,21 @@
 from __future__ import annotations
 
-from pathlib import Path
+import importlib.util
 
 import pytest
-
-from powdrr_lift.structrr.active_intent import (
+from powdrr_service.structrr.active_intent import (
     ActiveIntentResolutionError,
     resolve_active_intent,
     validate_active_intent_section,
 )
 
 
-def test_resolver_reads_only_committed_baseline_intent(tmp_path: Path) -> None:
+def test_legacy_agent_active_intent_module_is_removed() -> None:
+    assert importlib.util.find_spec("powdrr_lift.structrr.active_intent") is None
+
+
+def test_resolver_reads_only_committed_baseline_intent() -> None:
     resolved = resolve_active_intent(
-        tmp_path,
         baseline_document={
             "invariants": [
                 {
@@ -29,9 +31,8 @@ def test_resolver_reads_only_committed_baseline_intent(tmp_path: Path) -> None:
     assert resolved[0].to_data()["statement"] == "Baseline intent."
 
 
-def test_feature_overlay_replaces_and_removes_baseline_intent(tmp_path: Path) -> None:
+def test_feature_overlay_replaces_and_removes_baseline_intent() -> None:
     resolved = resolve_active_intent(
-        tmp_path,
         baseline_document={
             "invariants": [
                 {"id": "keep", "description": "Keep this.", "source": "base"},
@@ -69,10 +70,9 @@ def test_feature_overlay_replaces_and_removes_baseline_intent(tmp_path: Path) ->
     ]
 
 
-def test_conflicting_baseline_entries_block_resolution(tmp_path: Path) -> None:
+def test_conflicting_baseline_entries_block_resolution() -> None:
     with pytest.raises(ActiveIntentResolutionError, match="same-clause"):
         resolve_active_intent(
-            tmp_path,
             baseline_document={
                 "active_intent": [
                     {

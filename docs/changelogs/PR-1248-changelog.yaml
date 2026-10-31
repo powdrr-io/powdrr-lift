@@ -1,0 +1,155 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1248
+title: Return actionable workspace job details
+intent:
+  problem: The job detail endpoint returns attempts but omits blockers, outputs, and actions available for the current state.
+  goal: Return one typed, bounded, repository-scoped job projection with attempts, blockers, outputs, and allowed actions.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/design/browser-workspace-api.md
+  type: modified
+  span:
+    start_line: 95
+    end_line: 104
+  summary: Document the complete job detail response and its unavailable stage/question fields.
+  rationale: Explain sanitized attempt data, structured workflow limits, and the detail response shape.
+- path: packages/contracts/src/powdrr_contracts/workspace.py
+  type: modified
+  span:
+    start_line: 33
+    end_line: 39
+  summary: Define the supported job actions in the contracts package.
+  rationale: Give clients a typed set of action affordances.
+- path: packages/contracts/src/powdrr_contracts/workspace.py
+  type: modified
+  span:
+    start_line: 608
+    end_line: 750
+  summary: Add typed job attempt, blocker, and detail response records.
+  rationale: Validate the full detail envelope independently of FastAPI.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 26
+    end_line: 28
+  summary: Import job detail contract records for the storage projection.
+  rationale: Construct a typed job detail response from one read transaction.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 40
+    end_line: 40
+  summary: Import the job detail response contract.
+  rationale: Return a validated contract record from workspace storage.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 93
+    end_line: 104
+  summary: Map each job state to its currently permitted action affordances.
+  rationale: Let clients render actions that match the persisted state machine.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 2973
+    end_line: 3017
+  summary: Read bounded attempts and unresolved dependency blockers in one transaction.
+  rationale: Provide a consistent repository-scoped detail projection without exposing local paths.
+- path: packages/local/src/powdrr_local/workspace_api.py
+  type: modified
+  span:
+    start_line: 18
+    end_line: 18
+  summary: Remove the no-longer-needed job model import.
+  rationale: The route now returns the typed job detail projection.
+- path: packages/local/src/powdrr_local/workspace_api.py
+  type: modified
+  span:
+    start_line: 380
+    end_line: 388
+  summary: Return full typed job detail and preserve repository-scoped 404 behavior.
+  rationale: Expose attempts, blockers, outputs, and allowed actions through the existing route.
+- path: packages/local/src/powdrr_local/workspace_api.py
+  type: modified
+  span:
+    start_line: 588
+    end_line: 599
+  summary: Remove the superseded single-job lookup helper.
+  rationale: Repository validation now occurs atomically in the detail read.
+- path: tests/test_ui_workspace.py
+  type: modified
+  span:
+    start_line: 14
+    end_line: 17
+  summary: Import job detail contract types for round-trip coverage.
+  rationale: Test typed detail and action serialization.
+- path: tests/test_ui_workspace.py
+  type: modified
+  span:
+    start_line: 31
+    end_line: 31
+  summary: Import the job detail record for contract tests.
+  rationale: Verify the new API response record round-trips.
+- path: tests/test_ui_workspace.py
+  type: modified
+  span:
+    start_line: 355
+    end_line: 379
+  summary: Verify job detail contract serialization and latest-attempt consistency.
+  rationale: Reject malformed projections before they reach API clients.
+- path: tests/test_workspace_api.py
+  type: modified
+  span:
+    start_line: 295
+    end_line: 295
+  summary: Update the job detail attempt assertion for the typed response record.
+  rationale: Preserve existing sanitized attempt fields in the expanded response.
+- path: tests/test_workspace_api.py
+  type: modified
+  span:
+    start_line: 302
+    end_line: 307
+  summary: Verify latest attempt, outputs, stage, question, blockers, and allowed actions.
+  rationale: Exercise the complete detail response for a running job.
+- path: tests/test_workspace_api.py
+  type: modified
+  span:
+    start_line: 326
+    end_line: 366
+  summary: Verify pending jobs report dependency blockers and only permitted actions.
+  rationale: Ensure the API accurately explains why a dependent job cannot start.
+entities:
+- id: workspace-job-detail-route
+  type: Route
+  action: added
+- id: workspace-job-detail-contract
+  type: Struct
+  action: added
+- id: workspace-job-action-enum
+  type: Enum
+  action: added
+- id: workspace-job-detail-tests
+  type: Integration test
+  action: added
+entity_relationships:
+- id: job-detail-is-tested
+  type: verifies
+  source: workspace-job-detail-tests
+  target: workspace-job-detail-route
+  action: added
+  description: Tests verify the sanitized detail response, blockers, actions, and repository scope.
+invariants:
+- id: job-detail-read-is-consistent-and-bounded
+  description: Job, attempts, and dependency blockers are read from one SQLite snapshot and attempt history is capped at 100 entries.
+  action: added
+- id: job-detail-does-not-expose-local-paths-or-provider-config
+  description: Attempt summaries omit workflow paths, checkpoint paths, and provider configuration references.
+  action: added
+- id: allowed-job-actions-follow-state
+  description: The detail response exposes only actions permitted by the persisted job state.
+  action: added
+guidance:
+- id: stage-and-question-require-structured-workflow-data
+  description: Keep stage and question null until the workflow adapter records structured stage and job-specific question relationships.
+  action: added

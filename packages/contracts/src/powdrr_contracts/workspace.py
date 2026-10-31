@@ -59,6 +59,10 @@ class EventType(StrEnum):
     MESSAGE_CREATED = "message.created"
     JOB_CREATED = "job.created"
     JOB_UPDATED = "job.updated"
+    TURN_CREATED = "turn.created"
+    TURN_UPDATED = "turn.updated"
+    QUESTION_CREATED = "question.created"
+    QUESTION_UPDATED = "question.updated"
 
 
 _SCHEMA_VERSION = 1
@@ -389,4 +393,165 @@ class WorkspaceRepository:
             _validate_text(data["display_name"], "display_name"),
             _validate_text(data["canonical_root"], "canonical_root"),
             _validate_text(data["created_at"], "created_at"),
+        )
+
+
+@dataclass(frozen=True)
+class WorkspaceTurn:
+    turn_id: str
+    conversation_id: str
+    user_message_id: str
+    run_id: str | None
+    attempt_id: str | None
+    state: TurnState
+    final_message_id: str | None
+    error: str | None
+    revision: int
+    created_at: str
+    updated_at: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": _SCHEMA_VERSION,
+            "turn_id": self.turn_id,
+            "conversation_id": self.conversation_id,
+            "user_message_id": self.user_message_id,
+            "run_id": self.run_id,
+            "attempt_id": self.attempt_id,
+            "state": self.state.value,
+            "final_message_id": self.final_message_id,
+            "error": self.error,
+            "revision": self.revision,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
+        }
+
+    @classmethod
+    def from_dict(cls, value: Any) -> Self:
+        data = _record(
+            value,
+            {
+                "turn_id",
+                "conversation_id",
+                "user_message_id",
+                "run_id",
+                "attempt_id",
+                "state",
+                "final_message_id",
+                "error",
+                "revision",
+                "created_at",
+                "updated_at",
+            },
+            "turn",
+        )
+        try:
+            state = TurnState(data["state"])
+        except (TypeError, ValueError) as error:
+            raise WorkspaceContractError("Unsupported turn state") from error
+        revision = data["revision"]
+        if not isinstance(revision, int) or isinstance(revision, bool) or revision < 1:
+            raise WorkspaceContractError("revision must be a positive integer")
+        run_id = data["run_id"]
+        attempt_id = data["attempt_id"]
+        if (run_id is None) != (attempt_id is None):
+            raise WorkspaceContractError("run_id and attempt_id must be set together")
+        return cls(
+            _validate_id(data["turn_id"], "turn_id"),
+            _validate_id(data["conversation_id"], "conversation_id"),
+            _validate_id(data["user_message_id"], "user_message_id"),
+            None if run_id is None else _validate_id(run_id, "run_id"),
+            None if attempt_id is None else _validate_id(attempt_id, "attempt_id"),
+            state,
+            None
+            if data["final_message_id"] is None
+            else _validate_id(data["final_message_id"], "final_message_id"),
+            None if data["error"] is None else _validate_text(data["error"], "error"),
+            revision,
+            _validate_text(data["created_at"], "created_at"),
+            _validate_text(data["updated_at"], "updated_at"),
+        )
+
+
+@dataclass(frozen=True)
+class WorkspaceQuestion:
+    question_id: str
+    conversation_id: str
+    turn_id: str
+    prompt: str
+    response_schema: dict[str, Any]
+    run_id: str
+    attempt_id: str
+    state: QuestionState
+    answer: Any | None
+    delivery_receipt_id: str | None
+    revision: int
+    created_at: str
+    updated_at: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": _SCHEMA_VERSION,
+            "question_id": self.question_id,
+            "conversation_id": self.conversation_id,
+            "turn_id": self.turn_id,
+            "prompt": self.prompt,
+            "response_schema": self.response_schema,
+            "run_id": self.run_id,
+            "attempt_id": self.attempt_id,
+            "state": self.state.value,
+            "answer": self.answer,
+            "delivery_receipt_id": self.delivery_receipt_id,
+            "revision": self.revision,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
+        }
+
+    @classmethod
+    def from_dict(cls, value: Any) -> Self:
+        data = _record(
+            value,
+            {
+                "question_id",
+                "conversation_id",
+                "turn_id",
+                "prompt",
+                "response_schema",
+                "run_id",
+                "attempt_id",
+                "state",
+                "answer",
+                "delivery_receipt_id",
+                "revision",
+                "created_at",
+                "updated_at",
+            },
+            "question",
+        )
+        try:
+            state = QuestionState(data["state"])
+        except (TypeError, ValueError) as error:
+            raise WorkspaceContractError("Unsupported question state") from error
+        revision = data["revision"]
+        if not isinstance(revision, int) or isinstance(revision, bool) or revision < 1:
+            raise WorkspaceContractError("revision must be a positive integer")
+        if not isinstance(data["response_schema"], dict):
+            raise WorkspaceContractError("response_schema must be an object")
+        _validate_json(data["answer"])
+        return cls(
+            _validate_id(data["question_id"], "question_id"),
+            _validate_id(data["conversation_id"], "conversation_id"),
+            _validate_id(data["turn_id"], "turn_id"),
+            _validate_text(data["prompt"], "prompt"),
+            data["response_schema"],
+            _validate_id(data["run_id"], "run_id"),
+            _validate_id(data["attempt_id"], "attempt_id"),
+            state,
+            data["answer"],
+            None
+            if data["delivery_receipt_id"] is None
+            else _validate_id(data["delivery_receipt_id"], "delivery_receipt_id"),
+            revision,
+            _validate_text(data["created_at"], "created_at"),
+            _validate_text(data["updated_at"], "updated_at"),
         )

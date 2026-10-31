@@ -11,6 +11,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, cast
 
+from powdrr_service.decision_obligation import content_fingerprint
 from powdrr_service.planning.feature_obligation import (
     SEMANTIC_KINDS,
     FeatureObligationError,
@@ -44,7 +45,6 @@ from powdrr_lift.core.behavior_contract import (
     compile_behavior_scenarios,
     validate_normative_assumptions,
 )
-from powdrr_lift.core.decision_obligation import content_fingerprint
 from powdrr_lift.core.repository_inventory import (
     CandidateSet,
     InventoryError,

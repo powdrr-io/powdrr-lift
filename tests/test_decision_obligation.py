@@ -1,13 +1,18 @@
 from __future__ import annotations
 
-import pytest
+import importlib.util
 
-from powdrr_lift.core.decision_obligation import (
+import pytest
+from powdrr_service.decision_obligation import (
     DecisionOutcome,
     DecisionResult,
     DecisionSpecification,
     DecisionWorklist,
 )
+
+
+def test_legacy_agent_decision_obligation_module_is_removed() -> None:
+    assert importlib.util.find_spec("powdrr_lift.core.decision_obligation") is None
 
 
 def test_worklist_order_and_fingerprint_are_deterministic() -> None:

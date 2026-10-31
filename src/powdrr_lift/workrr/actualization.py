@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from powdrr_lift.core.decision_obligation import content_fingerprint
+from powdrr_service.decision_obligation import content_fingerprint
 
 
 def reconcile_actualization(

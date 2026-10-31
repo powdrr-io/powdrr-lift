@@ -13,12 +13,12 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from powdrr_service.decision_obligation import content_fingerprint
 from powdrr_service.structrr.validation_models import (
     validate_validation_records,
 )
 
 from powdrr_lift.change_log_parser import parse_change_log
-from powdrr_lift.core.decision_obligation import content_fingerprint
 from powdrr_lift.core.entity_taxonomy import EntityTaxonomy, load_entity_taxonomy
 from powdrr_lift.core.spec_paths import is_specification_path
 from powdrr_lift.structrr.source_manifest import (

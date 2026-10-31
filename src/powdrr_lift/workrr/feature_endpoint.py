@@ -14,6 +14,13 @@ from pathlib import Path
 from typing import Any, cast
 
 import yaml
+from powdrr_service.decision_obligation import (
+    DecisionOutcome,
+    DecisionResult,
+    DecisionWorklist,
+    content_fingerprint,
+    evidence_fingerprint,
+)
 from powdrr_service.planning.workflow_ids import slugify_workflow_id
 from powdrr_service.structrr.active_intent import (
     ActiveIntentReference,
@@ -34,13 +41,6 @@ from powdrr_lift.core.contract_closure import (
     collect_python_evidence,
     compile_contract_closure,
     validate_contract_closure,
-)
-from powdrr_lift.core.decision_obligation import (
-    DecisionOutcome,
-    DecisionResult,
-    DecisionWorklist,
-    content_fingerprint,
-    evidence_fingerprint,
 )
 from powdrr_lift.core.execution_plan import ExecutionPlan, ExecutionUnit
 from powdrr_lift.core.implementation_packet import compile_implementation_packet

@@ -8,12 +8,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from powdrr_lift.core.decision_obligation import (
+from powdrr_service.decision_obligation import (
     DecisionOutcome,
     DecisionResult,
     DecisionWorklist,
     evidence_fingerprint,
 )
+
 from powdrr_lift.structrr.gate_compiler import (
     compile_proposal_worklist,
     evaluate_structural_proposal_gate,

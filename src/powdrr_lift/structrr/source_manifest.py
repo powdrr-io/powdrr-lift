@@ -8,7 +8,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
-from powdrr_lift.core.decision_obligation import content_fingerprint
+from powdrr_service.decision_obligation import content_fingerprint
+
 from powdrr_lift.core.spec_paths import is_specification_path
 
 SOURCE_MANIFEST_SCHEMA_VERSION = "structrr-source-manifest-v1"

@@ -342,7 +342,7 @@ def test_version_one_database_migrates_without_changing_existing_records(
     with sqlite3.connect(path) as db:
         version = db.execute("PRAGMA user_version").fetchone()[0]
         sequence = db.execute("SELECT sequence FROM events").fetchone()[0]
-    assert version == 12
+    assert version == 13
     assert sequence == 7
     assert conversation.revision == 1
     assert conversation.specification_refs == ("docs/old.yaml",)
@@ -642,7 +642,7 @@ def test_schema_v3_migrates_to_durable_turns(tmp_path: Path) -> None:
             row[0]
             for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")
         }
-    assert version == 12
+    assert version == 13
     assert "repositories" in tables
     assert "turns" in tables
     assert "questions" in tables
@@ -974,7 +974,7 @@ def test_schema_v5_migrates_to_job_operation_bindings(tmp_path: Path) -> None:
             row[0]
             for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")
         }
-    assert version == 12
+    assert version == 13
     assert "job_operations" in tables
 
 
@@ -989,7 +989,7 @@ def test_schema_v6_migrates_to_supervisor_and_worker_ownership(tmp_path: Path) -
             row[0]
             for row in db.execute("SELECT name FROM sqlite_master WHERE type='table'")
         }
-    assert version == 12
+    assert version == 13
     assert "supervisor_lease" in tables
     assert "worker_ownership" in tables
 
@@ -999,7 +999,7 @@ def test_schema_v8_migrates_to_api_sessions(tmp_path: Path) -> None:
     with sqlite3.connect(path) as db:
         db.execute("PRAGMA user_version = 8")
     store = WorkspaceStore(path)
-    assert store.schema_version == 12
+    assert store.schema_version == 13
     with sqlite3.connect(path) as db:
         table_names = {
             row[0]
@@ -1055,6 +1055,131 @@ def test_supervisor_lease_excludes_second_launcher_and_fences_old_generation(
             first.generation,
             now=instant + timedelta(seconds=13),
         )
+
+
+def test_job_action_claims_are_fenced_and_recover_across_supervisor_generations(
+    tmp_path: Path,
+) -> None:
+    store = WorkspaceStore(tmp_path / "workspace.db")
+    instant = datetime(2026, 10, 31, tzinfo=UTC)
+    job = store.create_job(
+        "repo", kind="planning", title="Plan", request_id="create-plan"
+    )
+    accepted = store.accept_job_action(
+        "repo",
+        job.job_id,
+        JobAction.START,
+        expected_revision=job.revision,
+        request_id="start-plan",
+    )
+    first_supervisor = store.acquire_supervisor_lease(
+        "supervisor-a",
+        process_id=100,
+        process_started_at="supervisor-a-start",
+        lease_seconds=30,
+        now=instant,
+    )
+
+    claimed = store.claim_next_job_action_intent(
+        "repo",
+        claim_id="claim-a",
+        supervisor_id=first_supervisor.supervisor_id,
+        supervisor_generation=first_supervisor.generation,
+        now=instant + timedelta(seconds=1),
+    )
+
+    assert claimed is not None
+    assert claimed.action_id == accepted["action_id"]
+    assert claimed.state == JobActionIntentState.CLAIMED
+    assert (
+        store.claim_next_job_action_intent(
+            "repo",
+            claim_id="claim-duplicate",
+            supervisor_id=first_supervisor.supervisor_id,
+            supervisor_generation=first_supervisor.generation,
+            now=instant + timedelta(seconds=2),
+        )
+        is None
+    )
+    with pytest.raises(WorkspaceConflict, match="Another supervisor"):
+        store.acquire_supervisor_lease(
+            "supervisor-b",
+            process_id=200,
+            process_started_at="supervisor-b-start",
+            now=instant + timedelta(seconds=2),
+        )
+
+    store.release_supervisor_lease(
+        first_supervisor.supervisor_id,
+        first_supervisor.generation,
+        now=instant + timedelta(seconds=3),
+    )
+    second_supervisor = store.acquire_supervisor_lease(
+        "supervisor-b",
+        process_id=200,
+        process_started_at="supervisor-b-start",
+        now=instant + timedelta(seconds=4),
+    )
+    recovered_claim = store.claim_next_job_action_intent(
+        "repo",
+        claim_id="claim-b",
+        supervisor_id=second_supervisor.supervisor_id,
+        supervisor_generation=second_supervisor.generation,
+        now=instant + timedelta(seconds=5),
+    )
+    assert recovered_claim is not None
+    assert recovered_claim.action_id == claimed.action_id
+    assert recovered_claim.state == JobActionIntentState.CLAIMED
+    with pytest.raises(WorkspaceConflict, match="stale or expired"):
+        store.finish_job_action_intent(
+            claimed.action_id,
+            claim_id="claim-a",
+            supervisor_id=first_supervisor.supervisor_id,
+            supervisor_generation=first_supervisor.generation,
+            state=JobActionIntentState.COMPLETED,
+            now=instant + timedelta(seconds=6),
+        )
+
+    completed = store.finish_job_action_intent(
+        claimed.action_id,
+        claim_id="claim-b",
+        supervisor_id=second_supervisor.supervisor_id,
+        supervisor_generation=second_supervisor.generation,
+        state=JobActionIntentState.COMPLETED,
+        now=instant + timedelta(seconds=6),
+    )
+    replayed = store.finish_job_action_intent(
+        claimed.action_id,
+        claim_id="claim-b",
+        supervisor_id=second_supervisor.supervisor_id,
+        supervisor_generation=second_supervisor.generation,
+        state=JobActionIntentState.COMPLETED,
+        now=instant + timedelta(seconds=7),
+    )
+    assert completed.state == JobActionIntentState.COMPLETED
+    assert replayed == completed
+
+
+def test_schema_v12_migrates_claim_fencing_columns(tmp_path: Path) -> None:
+    path = tmp_path / "workspace-v12.db"
+    with sqlite3.connect(path) as db:
+        db.execute(
+            "CREATE TABLE job_action_intents ("
+            "action_id TEXT PRIMARY KEY, repository_id TEXT NOT NULL, "
+            "job_id TEXT NOT NULL, action TEXT NOT NULL, state TEXT NOT NULL, "
+            "expected_revision INTEGER NOT NULL, request_id TEXT NOT NULL, "
+            "created_at TEXT NOT NULL, updated_at TEXT NOT NULL)"
+        )
+        db.execute("PRAGMA user_version = 12")
+
+    store = WorkspaceStore(path)
+
+    assert store.schema_version == 13
+    with sqlite3.connect(path) as db:
+        columns = {
+            row[1] for row in db.execute("PRAGMA table_info(job_action_intents)")
+        }
+    assert {"claimed_by", "claimed_generation"} <= columns
 
 
 def test_worker_lease_heartbeat_cancellation_and_exit_are_durable(
@@ -1278,4 +1403,4 @@ def test_api_bootstrap_token_is_single_use_across_store_instances(
         outcomes = tuple(pool.map(consume, (0, 1)))
 
     assert sorted(outcomes) == [False, True]
-    assert stores[0].schema_version == 12
+    assert stores[0].schema_version == 13

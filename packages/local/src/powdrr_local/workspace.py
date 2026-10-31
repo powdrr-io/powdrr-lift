@@ -237,6 +237,8 @@ CREATE TABLE job_action_intents (
     ),
     expected_revision INTEGER NOT NULL,
     request_id TEXT NOT NULL,
+    claimed_by TEXT,
+    claimed_generation INTEGER,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
@@ -245,7 +247,7 @@ CREATE UNIQUE INDEX one_active_job_action ON job_action_intents(job_id)
 CREATE INDEX pending_job_action_intents ON job_action_intents(
     repository_id,state,created_at
 );
-PRAGMA user_version = 12;
+PRAGMA user_version = 13;
 """
 
 _REPOSITORY_TABLE = (
@@ -493,7 +495,7 @@ class WorkspaceStore:
                 if db.execute("PRAGMA user_version").fetchone()[0] == 3:
                     db.execute(_REPOSITORY_TABLE)
                     db.execute("PRAGMA user_version = 4")
-            elif version not in {4, 5, 6, 7, 8, 9, 10, 11, 12}:
+            elif version not in {4, 5, 6, 7, 8, 9, 10, 11, 12, 13}:
                 raise ValueError(f"Unsupported workspace schema version: {version}")
             current_version = db.execute("PRAGMA user_version").fetchone()[0]
             if current_version == 4:
@@ -503,7 +505,7 @@ class WorkspaceStore:
                     for statement in _TURN_TABLES:
                         db.execute(statement)
                     db.execute("PRAGMA user_version = 5")
-            elif current_version not in {5, 6, 7, 8, 9, 10, 11, 12}:
+            elif current_version not in {5, 6, 7, 8, 9, 10, 11, 12, 13}:
                 raise ValueError(
                     f"Unsupported workspace schema version: {current_version}"
                 )
@@ -515,7 +517,7 @@ class WorkspaceStore:
                     for statement in _JOB_OPERATION_TABLES:
                         db.execute(statement)
                     db.execute("PRAGMA user_version = 6")
-            elif current_version not in {6, 7, 8, 9, 10, 11, 12}:
+            elif current_version not in {6, 7, 8, 9, 10, 11, 12, 13}:
                 raise ValueError(
                     f"Unsupported workspace schema version: {current_version}"
                 )
@@ -527,7 +529,7 @@ class WorkspaceStore:
                     for statement in _SUPERVISOR_TABLES:
                         db.execute(statement)
                     db.execute("PRAGMA user_version = 7")
-            elif current_version not in {7, 8, 9, 10, 11, 12}:
+            elif current_version not in {7, 8, 9, 10, 11, 12, 13}:
                 raise ValueError(
                     f"Unsupported workspace schema version: {current_version}"
                 )
@@ -557,7 +559,7 @@ class WorkspaceStore:
                         db.execute("ALTER TABLE events ADD COLUMN attempt_id TEXT")
                         db.execute("ALTER TABLE events ADD COLUMN revision INTEGER")
                     db.execute("PRAGMA user_version = 8")
-            elif current_version not in {8, 9, 10, 11, 12}:
+            elif current_version not in {8, 9, 10, 11, 12, 13}:
                 raise ValueError(
                     f"Unsupported workspace schema version: {current_version}"
                 )
@@ -579,7 +581,7 @@ class WorkspaceStore:
                         "CREATE INDEX api_session_expiry ON api_sessions(expires_at)"
                     )
                     db.execute("PRAGMA user_version = 9")
-            elif current_version not in {9, 10, 11, 12}:
+            elif current_version not in {9, 10, 11, 12, 13}:
                 raise ValueError(
                     f"Unsupported workspace schema version: {current_version}"
                 )
@@ -601,7 +603,7 @@ class WorkspaceStore:
                         "turn_dispatch_intents(repository_id, state, created_at)"
                     )
                     db.execute("PRAGMA user_version = 10")
-            elif current_version not in {10, 11, 12}:
+            elif current_version not in {10, 11, 12, 13}:
                 raise ValueError(
                     f"Unsupported workspace schema version: {current_version}"
                 )
@@ -646,7 +648,20 @@ class WorkspaceStore:
                     )
                     db.execute("PRAGMA user_version = 12")
             current_version = db.execute("PRAGMA user_version").fetchone()[0]
-            if current_version != 12:
+            if current_version == 12:
+                if not db.in_transaction:
+                    db.execute("BEGIN IMMEDIATE")
+                if db.execute("PRAGMA user_version").fetchone()[0] == 12:
+                    db.execute(
+                        "ALTER TABLE job_action_intents ADD COLUMN claimed_by TEXT"
+                    )
+                    db.execute(
+                        "ALTER TABLE job_action_intents "
+                        "ADD COLUMN claimed_generation INTEGER"
+                    )
+                    db.execute("PRAGMA user_version = 13")
+            current_version = db.execute("PRAGMA user_version").fetchone()[0]
+            if current_version != 13:
                 raise ValueError(
                     f"Unsupported workspace schema version: {current_version}"
                 )
@@ -3150,6 +3165,169 @@ class WorkspaceStore:
                     updated_at=row["updated_at"],
                 )
                 for row in rows
+            )
+
+    def claim_next_job_action_intent(
+        self,
+        repository_id: str,
+        *,
+        claim_id: str,
+        supervisor_id: str,
+        supervisor_generation: int,
+        now: datetime | None = None,
+    ) -> WorkspaceJobActionIntent | None:
+        """Claim one pending action under the current supervisor generation."""
+        _required(repository_id, "repository_id")
+        _required(claim_id, "claim_id")
+        _required(supervisor_id, "supervisor_id")
+        instant = _utc_datetime(now)
+        timestamp = _timestamp(instant)
+        with self._connection() as db:
+            db.execute("BEGIN IMMEDIATE")
+            lease = self._supervisor_lease(db)
+            if (
+                lease.supervisor_id != supervisor_id
+                or lease.generation != supervisor_generation
+                or _parse_timestamp(lease.lease_expires_at) <= instant
+            ):
+                raise WorkspaceConflict("Supervisor lease is stale or expired")
+            row = db.execute(
+                "SELECT * FROM job_action_intents WHERE repository_id=? AND "
+                "(state='pending' OR (state='claimed' AND "
+                "(claimed_generation IS NULL OR claimed_generation!=?))) "
+                "ORDER BY created_at,action_id LIMIT 1",
+                (repository_id, supervisor_generation),
+            ).fetchone()
+            if row is None:
+                return None
+            db.execute(
+                "UPDATE job_action_intents SET state='claimed',claimed_by=?,"
+                "claimed_generation=?,updated_at=? WHERE action_id=?",
+                (claim_id, supervisor_generation, timestamp, row["action_id"]),
+            )
+            job = self._job(db, row["job_id"])
+            self._event(
+                db,
+                repository_id,
+                "job",
+                row["job_id"],
+                EventType.JOB_ACTION_UPDATED,
+                {
+                    "action_id": row["action_id"],
+                    "action": row["action"],
+                    "state": JobActionIntentState.CLAIMED.value,
+                    "revision": job.revision,
+                },
+                timestamp,
+            )
+            claimed = db.execute(
+                "SELECT * FROM job_action_intents WHERE action_id=?",
+                (row["action_id"],),
+            ).fetchone()
+            return WorkspaceJobActionIntent(
+                action_id=claimed["action_id"],
+                repository_id=claimed["repository_id"],
+                job_id=claimed["job_id"],
+                action=JobAction(claimed["action"]),
+                state=JobActionIntentState(claimed["state"]),
+                expected_revision=claimed["expected_revision"],
+                request_id=claimed["request_id"],
+                created_at=claimed["created_at"],
+                updated_at=claimed["updated_at"],
+            )
+
+    def finish_job_action_intent(
+        self,
+        action_id: str,
+        *,
+        claim_id: str,
+        supervisor_id: str,
+        supervisor_generation: int,
+        state: JobActionIntentState,
+        now: datetime | None = None,
+    ) -> WorkspaceJobActionIntent:
+        """Complete, fail, or release a claimed intent under its lease."""
+        state = JobActionIntentState(state)
+        if state not in {
+            JobActionIntentState.COMPLETED,
+            JobActionIntentState.FAILED,
+            JobActionIntentState.PENDING,
+        }:
+            raise ValueError("A claimed action can only complete, fail, or be released")
+        _required(action_id, "action_id")
+        _required(claim_id, "claim_id")
+        instant = _utc_datetime(now)
+        timestamp = _timestamp(instant)
+        with self._connection() as db:
+            db.execute("BEGIN IMMEDIATE")
+            lease = self._supervisor_lease(db)
+            if (
+                lease.supervisor_id != supervisor_id
+                or lease.generation != supervisor_generation
+                or _parse_timestamp(lease.lease_expires_at) <= instant
+            ):
+                raise WorkspaceConflict("Supervisor lease is stale or expired")
+            row = db.execute(
+                "SELECT * FROM job_action_intents WHERE action_id=?",
+                (action_id,),
+            ).fetchone()
+            if row is None:
+                raise KeyError("Job action intent does not exist")
+            if (
+                row["state"] == state.value
+                and row["claimed_by"] == claim_id
+                and row["claimed_generation"] == supervisor_generation
+            ):
+                return WorkspaceJobActionIntent(
+                    action_id=row["action_id"],
+                    repository_id=row["repository_id"],
+                    job_id=row["job_id"],
+                    action=JobAction(row["action"]),
+                    state=JobActionIntentState(row["state"]),
+                    expected_revision=row["expected_revision"],
+                    request_id=row["request_id"],
+                    created_at=row["created_at"],
+                    updated_at=row["updated_at"],
+                )
+            if (
+                row["state"] != JobActionIntentState.CLAIMED.value
+                or row["claimed_by"] != claim_id
+                or row["claimed_generation"] != supervisor_generation
+            ):
+                raise WorkspaceConflict("Job action claim is stale or owned elsewhere")
+            db.execute(
+                "UPDATE job_action_intents SET state=?,updated_at=? WHERE action_id=?",
+                (state.value, timestamp, action_id),
+            )
+            job = self._job(db, row["job_id"])
+            self._event(
+                db,
+                row["repository_id"],
+                "job",
+                row["job_id"],
+                EventType.JOB_ACTION_UPDATED,
+                {
+                    "action_id": action_id,
+                    "action": row["action"],
+                    "state": state.value,
+                    "revision": job.revision,
+                },
+                timestamp,
+            )
+            updated = db.execute(
+                "SELECT * FROM job_action_intents WHERE action_id=?",
+                (action_id,),
+            ).fetchone()
+            return WorkspaceJobActionIntent(
+                action_id=updated["action_id"],
+                repository_id=updated["repository_id"],
+                job_id=updated["job_id"],
+                action=JobAction(updated["action"]),
+                state=JobActionIntentState(updated["state"]),
+                expected_revision=updated["expected_revision"],
+                request_id=updated["request_id"],
+                created_at=updated["created_at"],
+                updated_at=updated["updated_at"],
             )
 
     def read_job_detail(self, repository_id: str, job_id: str) -> WorkspaceJobDetail:

@@ -1,5 +1,5 @@
 schema: https://powdrr.io/schema/changelog-v2
-change_id: 1237
+change_id: 1238
 title: Expose workspace job reads through local API
 intent:
   problem: The browser workspace needs bounded job listings and safe job-attempt details.

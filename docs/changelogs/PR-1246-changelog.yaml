@@ -1,0 +1,281 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1246
+title: Create jobs with pinned workspace inputs
+intent:
+  problem: The workspace API cannot create jobs while preserving the exact specification, approved change, and provider configuration intended for execution.
+  goal: Add idempotent job creation that validates and stores immutable pinned inputs before any later start command.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/design/browser-workspace-api.md
+  type: modified
+  span:
+    start_line: 98
+    end_line: 117
+  summary: Document job creation requests, pinned inputs, and the 201 response.
+  rationale: Give browser clients the complete request contract and explain how execution inputs stay fixed.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 119
+    end_line: 126
+  summary: Add the durable job submissions table to new databases.
+  rationale: Store validated inputs and immutable references with each created job.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 212
+    end_line: 212
+  summary: Advance fresh workspace databases to schema version 11.
+  rationale: Identify the schema that includes pinned job submissions.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 372
+    end_line: 410
+  summary: Validate pinned job inputs, immutable source references, provider references, and secret fields.
+  rationale: Apply the same kind-specific rules before creating or starting a job.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 460
+    end_line: 460
+  summary: Allow databases already at schema version 11.
+  rationale: Avoid treating the newest supported version as unknown.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 470
+    end_line: 470
+  summary: Keep the schema 4 migration chain compatible with version 11.
+  rationale: Allow older database versions to continue upgrading.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 482
+    end_line: 482
+  summary: Keep the schema 5 migration chain compatible with version 11.
+  rationale: Allow older database versions to continue upgrading.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 494
+    end_line: 494
+  summary: Keep the schema 6 migration chain compatible with version 11.
+  rationale: Allow older database versions to continue upgrading.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 524
+    end_line: 524
+  summary: Keep the schema 7 migration chain compatible with version 11.
+  rationale: Allow older database versions to continue upgrading.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 546
+    end_line: 546
+  summary: Keep the schema 8 migration chain compatible with version 11.
+  rationale: Allow older database versions to continue upgrading.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 568
+    end_line: 586
+  summary: Migrate schema version 10 databases to version 11 with job submissions.
+  rationale: Add pinned input persistence without changing existing job records.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 2071
+    end_line: 2077
+  summary: Reuse pinned-input validation when binding a job operation.
+  rationale: Keep submission validation and execution-start validation consistent.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 2018
+    end_line: 2021
+  summary: Remove duplicated source-reference validation from operation start.
+  rationale: Centralize the rules in the shared pinned-input validator.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 2027
+    end_line: 2029
+  summary: Remove duplicated provider-reference validation from operation start.
+  rationale: Keep provider-reference checks consistent across create and start.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 2109
+    end_line: 2121
+  summary: Reject operation inputs that differ from the saved job submission.
+  rationale: Prevent a ready job from starting with unapproved or drifting inputs.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 2060
+    end_line: 2073
+  summary: Remove repeated planning and execution pin checks from operation start.
+  rationale: Use the shared validator for both job creation and operation binding.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 2812
+    end_line: 2815
+  summary: Accept pinned inputs and references in the job creation command.
+  rationale: Capture execution requirements at job creation time.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 2824
+    end_line: 2835
+  summary: Include canonical pinned submission data in the idempotency digest.
+  rationale: Make retries replay the original job and reject changed payloads.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 2843
+    end_line: 2851
+  summary: Validate and normalize optional job submission inputs.
+  rationale: Preserve existing storage callers while requiring complete inputs from the API.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 2896
+    end_line: 2907
+  summary: Persist validated job submission data in the job creation transaction.
+  rationale: Keep inputs durable before any later dispatch request.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 2936
+    end_line: 2952
+  summary: Add typed access to saved job submission inputs.
+  rationale: Let future supervisor actions read the exact validated request.
+- path: packages/local/src/powdrr_local/workspace_api.py
+  type: modified
+  span:
+    start_line: 12
+    end_line: 12
+  summary: Import the literal job-kind request type.
+  rationale: Validate supported JSON job kinds under strict request parsing.
+- path: packages/local/src/powdrr_local/workspace_api.py
+  type: modified
+  span:
+    start_line: 81
+    end_line: 92
+  summary: Define the strict job creation request envelope.
+  rationale: Require pinned input and provider reference fields from browser clients.
+- path: packages/local/src/powdrr_local/workspace_api.py
+  type: modified
+  span:
+    start_line: 338
+    end_line: 373
+  summary: Add authenticated, idempotent job creation with stable errors and event notification.
+  rationale: Expose job creation without running a workflow in the HTTP handler.
+- path: tests/test_ui_workspace.py
+  type: modified
+  span:
+    start_line: 338
+    end_line: 338
+  summary: Update the version 1 migration expectation to schema version 11.
+  rationale: Keep legacy database migration checks current.
+- path: tests/test_ui_workspace.py
+  type: modified
+  span:
+    start_line: 557
+    end_line: 557
+  summary: Update the version 3 migration expectation to schema version 11.
+  rationale: Keep legacy database migration checks current.
+- path: tests/test_ui_workspace.py
+  type: modified
+  span:
+    start_line: 773
+    end_line: 825
+  summary: Verify saved pinned inputs cannot drift when starting an operation.
+  rationale: Ensure stored inputs remain the source of truth through dispatch binding.
+- path: tests/test_ui_workspace.py
+  type: modified
+  span:
+    start_line: 561
+    end_line: 561
+  summary: Assert the legacy schema 3 migration creates the job submissions table.
+  rationale: Verify the complete older-schema migration path reaches version 11.
+- path: tests/test_ui_workspace.py
+  type: modified
+  span:
+    start_line: 889
+    end_line: 889
+  summary: Update the version 5 migration expectation to schema version 11.
+  rationale: Keep legacy database migration checks current.
+- path: tests/test_ui_workspace.py
+  type: modified
+  span:
+    start_line: 904
+    end_line: 904
+  summary: Update the version 6 migration expectation to schema version 11.
+  rationale: Keep legacy database migration checks current.
+- path: tests/test_ui_workspace.py
+  type: modified
+  span:
+    start_line: 914
+    end_line: 914
+  summary: Update the version 8 migration expectation to schema version 11.
+  rationale: Keep legacy database migration checks current.
+- path: tests/test_ui_workspace.py
+  type: modified
+  span:
+    start_line: 1193
+    end_line: 1193
+  summary: Update the API bootstrap migration expectation to schema version 11.
+  rationale: Keep session persistence checks current.
+- path: tests/test_workspace_api.py
+  type: modified
+  span:
+    start_line: 41
+    end_line: 41
+  summary: Update the health route schema version expectation to 11.
+  rationale: Keep the API health response aligned with the database.
+- path: tests/test_workspace_api.py
+  type: modified
+  span:
+    start_line: 205
+    end_line: 267
+  summary: Verify API job creation, idempotent replay, pinned input persistence, and secret rejection.
+  rationale: Exercise the browser command against the real temporary SQLite store.
+entities:
+- id: workspace-job-create-route
+  type: Route
+  action: added
+- id: workspace-job-submissions
+  type: Table
+  action: added
+- id: workspace-job-submission-migration
+  type: Migration
+  action: added
+- id: workspace-job-create-tests
+  type: Integration test
+  action: added
+entity_relationships:
+- id: job-create-is-tested
+  type: verifies
+  source: workspace-job-create-tests
+  target: workspace-job-create-route
+  action: added
+  description: API tests cover valid creation, idempotent retries, conflicts, saved inputs, and secret rejection.
+invariants:
+- id: job-submission-persists-before-start
+  description: Validated job inputs, source references, source revision, and provider configuration references are persisted atomically when the job is created.
+  action: added
+- id: job-operation-inputs-match-submission
+  description: Starting a job with a saved submission rejects input or reference changes.
+  action: added
+- id: job-submission-retry-is-idempotent
+  description: An identical request ID and payload replays the original job, while changed payload reuse conflicts.
+  action: added
+guidance:
+- id: job-inputs-are-references-not-credentials
+  description: Send provider configuration references only; provider credentials remain in backend configuration.
+  action: added

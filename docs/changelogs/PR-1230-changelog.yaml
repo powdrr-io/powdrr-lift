@@ -1,0 +1,70 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1230
+title: Move verification-health policy into service
+intent:
+  problem: The verification-health audit and its policy records still lived in the legacy agent package.
+  goal: Move this dependency-free policy into the service package, use it directly from the CLI, and remove the
+    old module.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 964
+    end_line: 964
+  summary: Move verification-health policy to the service ownership inventory.
+  rationale: Keep module ownership and imports aligned with the relocated audit implementation.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 1000
+    end_line: 1000
+  summary: Move verification-health policy to the service ownership inventory.
+  rationale: Keep module ownership and imports aligned with the relocated audit implementation.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2338
+    end_line: 2338
+  summary: Move verification-health policy to the service ownership inventory.
+  rationale: Keep module ownership and imports aligned with the relocated audit implementation.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2341
+    end_line: 2344
+  summary: Move verification-health policy to the service ownership inventory.
+  rationale: Keep module ownership and imports aligned with the relocated audit implementation.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 50
+    end_line: 53
+  summary: Import verification-health policy directly from the service package.
+  rationale: Keep local input/output in the CLI and verification acceptance policy in service.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 179
+    end_line: 182
+  summary: Import verification-health policy directly from the service package.
+  rationale: Keep local input/output in the CLI and verification acceptance policy in service.
+- path: tests/test_verification_health.py
+  type: modified
+  span:
+    start_line: 1
+    end_line: 3
+  summary: Import the service audit API and assert the legacy module is absent.
+  rationale: Protect policy ownership without a compatibility shim.
+- path: tests/test_verification_health.py
+  type: modified
+  span:
+    start_line: 10
+    end_line: 13
+  summary: Import the service audit API and assert the legacy module is absent.
+  rationale: Protect policy ownership without a compatibility shim.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []

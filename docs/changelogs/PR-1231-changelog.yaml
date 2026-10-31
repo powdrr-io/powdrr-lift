@@ -1,0 +1,111 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1231
+title: Move validation record models into service
+intent:
+  problem: Typed validation records and their deterministic schema checks still lived in the legacy agent package.
+  goal: Move the shared validation contract into the service package and update all consumers to import it directly.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2123
+    end_line: 2123
+  summary: Remove the legacy package export from the ownership inventory.
+  rationale: Keep the dependency inventory aligned with the deleted agent-side module exports.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2164
+    end_line: 2164
+  summary: Record the service package import for Structrr bootstrap.
+  rationale: Reflect the direct service dependency after moving the model module.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2309
+    end_line: 2309
+  summary: Record the service package import for validation discovery.
+  rationale: Reflect the direct service dependency after moving the model module.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2319
+    end_line: 2319
+  summary: Assign validation model ownership to service.
+  rationale: Keep the module ownership and extraction record accurate.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2322
+    end_line: 2325
+  summary: Replace the legacy module path with the service package path.
+  rationale: Document the implementation location and its service-owned schema policy.
+- path: docs/plans/bootstrap-validation-discovery.md
+  type: modified
+  span:
+    start_line: 97
+    end_line: 97
+  summary: Update the validation model path in the implementation plan.
+  rationale: Keep the plan aligned with the completed service extraction.
+- path: src/powdrr_lift/structrr/__init__.py
+  type: modified
+  span:
+    start_line: 89
+    end_line: 97
+  summary: Remove re-exports of validation model APIs from the agent package.
+  rationale: Avoid retaining an agent-side compatibility surface after ownership moved to service.
+- path: src/powdrr_lift/structrr/__init__.py
+  type: modified
+  span:
+    start_line: 170
+    end_line: 176
+  summary: Remove validation model symbols from the agent package export list.
+  rationale: Keep the public agent package exports consistent with module ownership.
+- path: src/powdrr_lift/structrr/bootstrap.py
+  type: modified
+  span:
+    start_line: 16
+    end_line: 18
+  summary: Import validation record checks from the service package.
+  rationale: Let the agent bootstrap use the service-owned validation contract directly.
+- path: src/powdrr_lift/structrr/bootstrap.py
+  type: modified
+  span:
+    start_line: 26
+    end_line: 28
+  summary: Remove the legacy validation model import.
+  rationale: Eliminate the obsolete dependency after moving validation models to service.
+- path: src/powdrr_lift/structrr/validation.py
+  type: modified
+  span:
+    start_line: 16
+    end_line: 16
+  summary: Use service-owned validation model types.
+  rationale: Keep validation discovery on the service package contract.
+- path: src/powdrr_lift/structrr/validation.py
+  type: modified
+  span:
+    start_line: 21
+    end_line: 22
+  summary: Maintain import ordering after the package boundary update.
+  rationale: Keep module imports formatted consistently.
+- path: tests/test_validation_models.py
+  type: modified
+  span:
+    start_line: 3
+    end_line: 5
+  summary: Import model APIs from the service package.
+  rationale: Exercise the owning package directly.
+- path: tests/test_validation_models.py
+  type: modified
+  span:
+    start_line: 15
+    end_line: 18
+  summary: Assert the former agent validation model module is absent.
+  rationale: Prevent a legacy compatibility shim from reappearing.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []

@@ -9,6 +9,7 @@ from powdrr_service.planning.multipr_structrr import (
     active_decision_drift_findings,
     compile_multi_pr_proposal,
     load_multi_pr_proposal,
+    project_structural_operations,
     rebase_final_plan_state,
     rebase_item_proposal,
     write_multi_pr_proposal,
@@ -74,6 +75,33 @@ def test_multi_pr_proposal_partitions_operations_over_projected_states() -> None
         entity["id"] == "first-module"
         for entity in proposal.item_baselines["second"]["entities"]
     )
+
+
+def test_incremental_structural_projection_matches_multi_pr_compilation() -> None:
+    proposal = _proposal()
+    operations = [
+        {
+            "operation_id": "first-add",
+            "section": "entities",
+            "subject_id": "first-module",
+            "action": "added",
+            "content": {"id": "first-module", "type": "Module"},
+        },
+        {
+            "operation_id": "second-add",
+            "section": "entities",
+            "subject_id": "second-module",
+            "action": "added",
+            "content": {"id": "second-module", "type": "Module"},
+        },
+    ]
+
+    projected = project_structural_operations(
+        proposal.baseline_snapshot, operations[:1]
+    )
+    projected = project_structural_operations(projected, operations[1:])
+
+    assert projected == proposal.expected_final_snapshot
 
 
 def test_changed_existing_file_materializes_missing_source_subject() -> None:

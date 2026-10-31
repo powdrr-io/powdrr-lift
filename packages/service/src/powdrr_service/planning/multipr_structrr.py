@@ -568,6 +568,47 @@ def _apply_sections(
     return result
 
 
+def project_structural_operations(
+    baseline_snapshot: Mapping[str, Any],
+    operations: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    """Apply one newly completed item batch to an already projected snapshot."""
+    grouped: dict[str, list[dict[str, Any]]] = {}
+    seen_operation_ids: set[str] = set()
+    for index, operation in enumerate(operations, start=1):
+        operation_id = operation.get("operation_id")
+        section = operation.get("section")
+        subject_id = operation.get("subject_id")
+        action = operation.get("action")
+        content = operation.get("content")
+        if not all(
+            isinstance(value, str) and value.strip()
+            for value in (operation_id, section, subject_id, action)
+        ):
+            raise ValueError(f"Structrr operation {index} has incomplete identity")
+        assert isinstance(operation_id, str)
+        assert isinstance(section, str)
+        assert isinstance(subject_id, str)
+        assert isinstance(action, str)
+        if operation_id in seen_operation_ids:
+            raise ValueError(f"duplicate Structrr operation id: {operation_id}")
+        seen_operation_ids.add(operation_id)
+        if section not in _STRUCTURAL_SECTIONS or action not in _ACTIONS:
+            raise ValueError(f"Structrr operation {operation_id!r} is unsupported")
+        if not isinstance(content, Mapping):
+            raise ValueError(f"Structrr operation {operation_id!r} has no content")
+        identity_key = "stable_key" if section == "files" else "id"
+        if content.get(identity_key, subject_id) != subject_id:
+            raise ValueError(
+                f"Structrr operation {operation_id!r} content identity differs "
+                "from subject_id"
+            )
+        grouped.setdefault(section, []).append(
+            {**dict(content), identity_key: subject_id, "action": action}
+        )
+    return _apply_sections(baseline_snapshot, grouped)
+
+
 def _strings(value: Any) -> tuple[str, ...]:
     if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
         return ()
@@ -611,6 +652,7 @@ __all__ = [
     "active_decision_drift_findings",
     "inherited_decision_records",
     "compile_multi_pr_proposal",
+    "project_structural_operations",
     "load_multi_pr_proposal",
     "rebase_item_proposal",
     "rebase_final_plan_state",

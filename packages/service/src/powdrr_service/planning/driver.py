@@ -50,7 +50,10 @@ from powdrr_service.planning.dependencies import (
     discover_dependency_candidates,
 )
 from powdrr_service.planning.evidence import Evidence
-from powdrr_service.planning.multipr_structrr import MultiPRStructrrProposal
+from powdrr_service.planning.multipr_structrr import (
+    MultiPRStructrrProposal,
+    project_structural_operations,
+)
 from powdrr_service.planning.plan_models import PlannedWorkItem, ReviewedExecutionPlan
 from powdrr_service.planning.questions import (
     QuestionRequest,
@@ -71,6 +74,7 @@ from powdrr_service.planning.structrr import (
     build_structural_change_request,
     build_subject_enumeration_request,
     compile_structrr_plan,
+    reject_unordered_subject_conflicts,
 )
 from powdrr_service.planning.workflow_ids import slugify_workflow_id
 from powdrr_service.structrr.snapshot import snapshot_digest
@@ -913,6 +917,7 @@ class SourceLedgerQuestionMachine:
             prerequisites[edge.after_item_id].add(edge.before_item_id)
         completed: set[str] = set()
         prior_operations: list[Mapping[str, Any]] = []
+        projected: Mapping[str, Any] = self.structrr_baseline
         while len(completed) < len(order):
             ready_item_ids = tuple(
                 item_id
@@ -923,23 +928,6 @@ class SourceLedgerQuestionMachine:
                 raise PlanningCompilationError(
                     "Structrr planning item graph has no ready item"
                 )
-            prior_records = tuple(
-                record_by_id[item_id] for item_id in order if item_id in completed
-            )
-            projected = (
-                self.structrr_baseline
-                if not prior_records
-                else compile_structrr_plan(
-                    plan_id=self.plan_id,
-                    baseline_snapshot=self.structrr_baseline,
-                    items=prior_records,
-                    item_order=tuple(
-                        item_id for item_id in order if item_id in completed
-                    ),
-                    operations=prior_operations,
-                    source_ref=self._structrr_source_ref(),
-                ).expected_final_snapshot
-            )
             subjects_by_item: dict[str, tuple[BoundStructuralSubject, ...]] = {}
             pending_enumerations: list[QuestionRequest[Any]] = []
             for item_id in ready_item_ids:
@@ -1013,6 +1001,7 @@ class SourceLedgerQuestionMachine:
                 if subject.section == "entities"
             )
             pending_changes: list[QuestionRequest[Any]] = []
+            batch_operations: list[Mapping[str, Any]] = []
             for item_id in ready_item_ids:
                 record = record_by_id[item_id]
                 units = tuple(record["units"])
@@ -1040,9 +1029,13 @@ class SourceLedgerQuestionMachine:
                     change = change_request.parse_answer(answer)
                     operation = bind_structural_operation(change)
                     if operation is not None:
-                        prior_operations.append(operation)
+                        batch_operations.append(operation)
             if pending_changes:
                 return tuple(pending_changes)
+            all_operations = (*prior_operations, *batch_operations)
+            reject_unordered_subject_conflicts(all_operations, prerequisites)
+            projected = project_structural_operations(projected, batch_operations)
+            prior_operations.extend(batch_operations)
             completed.update(ready_item_ids)
         return ()
 
@@ -1103,8 +1096,10 @@ class SourceLedgerQuestionMachine:
         assembly = self.accepted_assembly(accepted_answers, plan_id=self.plan_id)
         ledger = self.accepted_ledger(accepted_answers)
         requirement_by_id = {item.id: item for item in ledger.requirements}
-        for item_index, record in enumerate(item_records):
+        projected: Mapping[str, Any] = self.structrr_baseline
+        for record in item_records:
             item_id = str(record["id"])
+            item_operations: list[Mapping[str, Any]] = []
             units = tuple(record["units"])
             source_refs = tuple(
                 dict.fromkeys(
@@ -1114,24 +1109,6 @@ class SourceLedgerQuestionMachine:
                     for ref in requirement_by_id[requirement_id].source_refs
                 )
             )
-            previous_records = item_records[:item_index]
-            if previous_records:
-                previous_ids = {str(item["id"]) for item in previous_records}
-                prior_order = [
-                    candidate
-                    for candidate in assembly.dependency_graph.item_order
-                    if candidate in previous_ids
-                ]
-                projected = compile_structrr_plan(
-                    plan_id=self.plan_id,
-                    baseline_snapshot=self.structrr_baseline,
-                    items=previous_records,
-                    item_order=prior_order,
-                    operations=operations,
-                    source_ref=self._structrr_source_ref(),
-                ).expected_final_snapshot
-            else:
-                projected = self.structrr_baseline
             subjects = self._accepted_structural_subjects(
                 item_id,
                 units,
@@ -1165,6 +1142,8 @@ class SourceLedgerQuestionMachine:
                 operation = bind_structural_operation(change)
                 if operation is not None:
                     operations.append(operation)
+                    item_operations.append(operation)
+            projected = project_structural_operations(projected, item_operations)
         return compile_structrr_plan(
             plan_id=self.plan_id,
             baseline_snapshot=self.structrr_baseline,

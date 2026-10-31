@@ -162,9 +162,10 @@ def test_structural_questions_send_only_relevant_baseline_subjects(
         source_refs=(source_ref,),
         projected_baseline=baseline,
     )
-    assert "new_identity_description is non-null, action must be added" in (
+    assert "Use action added only when subject_ref is null" in (
         enumeration.exact_question
     )
+    assert "never mark an existing subject as added" in enumeration.exact_question
     enumeration_messages = build_question_messages(enumeration)
     enumeration_input = enumeration_messages[1]["content"]
     without_projected_file = build_subject_enumeration_request(
@@ -715,6 +716,34 @@ def test_existing_projected_file_path_is_a_valid_structural_subject() -> None:
 
     assert page.records[0].subject_id == f"path::{path}"
     assert page.records[0].planned_path == path
+
+
+@pytest.mark.parametrize(
+    ("section", "subject_ref", "baseline"),
+    [
+        ("entities", "entity-01", {"entities": [{"id": "entity-01"}]}),
+        (
+            "files",
+            "path::src/existing.py",
+            {"files": [{"path": "src/existing.py"}], "source_subjects": []},
+        ),
+    ],
+)
+def test_existing_subject_marked_added_is_normalized_to_changed(
+    section: str, subject_ref: str, baseline: dict[str, Any]
+) -> None:
+    candidate = _record(subject_ref)
+    candidate["section"] = section
+    candidate["action"] = "added"
+
+    page = _parse_page(
+        _candidate_page([candidate], has_more=False, next_anchor=None),
+        baseline=baseline,
+    )
+
+    assert page.records[0].subject_id == subject_ref
+    assert page.records[0].action == "changed"
+    assert page.records[0].is_new is False
 
 
 @pytest.mark.parametrize("reference_prefix", ["path::", "file:"])

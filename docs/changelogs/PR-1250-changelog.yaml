@@ -1,0 +1,224 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1250
+title: Accept durable workspace job actions
+intent:
+  problem: The browser workspace can show job actions but has no safe API for accepting them across service processes.
+  goal: Add a revision-checked, idempotent job action endpoint backed by a transactional SQLite outbox.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/design/browser-workspace-api.md
+  type: modified
+  span:
+    start_line: 102
+    end_line: 119
+  summary: Document the job action request, 202 response, and supervisor boundary.
+  rationale: Clarify that accepted actions are durable intents and do not execute in the HTTP handler.
+- path: packages/contracts/src/powdrr_contracts/workspace.py
+  type: modified
+  span:
+    start_line: 74
+    end_line: 74
+  summary: Add an event type for accepted job actions.
+  rationale: Let event subscribers observe durable job action acceptance.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 228
+    end_line: 246
+  summary: Add the durable action outbox, active-action uniqueness rule, and schema version 12.
+  rationale: Persist action requests safely across processes and service restarts.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 494
+    end_line: 494
+  summary: Allow schema version 12 through the initial migration guard.
+  rationale: Preserve support for existing databases already at the newest schema.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 504
+    end_line: 504
+  summary: Allow schema version 12 through the schema 4 migration guard.
+  rationale: Preserve support for existing databases already at the newest schema.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 516
+    end_line: 516
+  summary: Allow schema version 12 through the schema 5 migration guard.
+  rationale: Preserve support for existing databases already at the newest schema.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 528
+    end_line: 528
+  summary: Allow schema version 12 through the schema 6 migration guard.
+  rationale: Preserve support for existing databases already at the newest schema.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 558
+    end_line: 558
+  summary: Allow schema version 12 through the schema 7 migration guard.
+  rationale: Preserve support for existing databases already at the newest schema.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 580
+    end_line: 580
+  summary: Allow schema version 12 through the schema 8 migration guard.
+  rationale: Preserve support for existing databases already at the newest schema.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 602
+    end_line: 602
+  summary: Allow schema version 12 through the schema 9 migration guard.
+  rationale: Preserve support for existing databases already at the newest schema.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 620
+    end_line: 647
+  summary: Migrate schema version 11 databases to include the job action outbox.
+  rationale: Preserve existing workspace data while enabling durable action acceptance.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 3018
+    end_line: 3124
+  summary: Accept actions transactionally with revision checks, request replay, and job events.
+  rationale: Commit the action intent and idempotency result without running workflow code.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 3160
+    end_line: 3175
+  summary: Hide actions already represented by a pending or claimed intent.
+  rationale: Keep job detail action affordances aligned with accepted work.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 3183
+    end_line: 3183
+  summary: Return the filtered action affordances in job detail.
+  rationale: Ensure the response reflects the pending action state.
+- path: packages/local/src/powdrr_local/workspace_api.py
+  type: modified
+  span:
+    start_line: 18
+    end_line: 18
+  summary: Import the shared job action type for request handling.
+  rationale: Keep API action validation aligned with the workspace contract.
+- path: packages/local/src/powdrr_local/workspace_api.py
+  type: modified
+  span:
+    start_line: 93
+    end_line: 98
+  summary: Define a strict job action request envelope.
+  rationale: Validate request IDs, revisions, and supported actions.
+- path: packages/local/src/powdrr_local/workspace_api.py
+  type: modified
+  span:
+    start_line: 397
+    end_line: 436
+  summary: Add an authenticated job action endpoint with stable conflicts and event notification.
+  rationale: Expose durable action acceptance while keeping execution in the supervisor.
+- path: tests/test_workspace_api.py
+  type: modified
+  span:
+    start_line: 41
+    end_line: 41
+  summary: Expect schema version 12 in the workspace health response test.
+  rationale: Keep health contract assertions aligned with the current database schema.
+- path: tests/test_workspace_api.py
+  type: modified
+  span:
+    start_line: 367
+    end_line: 476
+  summary: Cover idempotent acceptance, durable persistence, stale revisions, and duplicate or unavailable actions.
+  rationale: Verify API behavior and ensure the endpoint does not report uncommitted work.
+- path: tests/test_ui_workspace.py
+  type: modified
+  span:
+    start_line: 343
+    end_line: 343
+  summary: Expect schema version 12 when upgrading a version 1 database.
+  rationale: Verify the migration preserves records and reaches the latest schema.
+- path: tests/test_ui_workspace.py
+  type: modified
+  span:
+    start_line: 587
+    end_line: 587
+  summary: Expect schema version 12 when upgrading a version 3 database.
+  rationale: Verify legacy turn migrations include the action outbox.
+- path: tests/test_ui_workspace.py
+  type: modified
+  span:
+    start_line: 919
+    end_line: 919
+  summary: Expect schema version 12 when upgrading a version 5 database.
+  rationale: Verify legacy operation migrations include the action outbox.
+- path: tests/test_ui_workspace.py
+  type: modified
+  span:
+    start_line: 934
+    end_line: 934
+  summary: Expect schema version 12 when upgrading a version 6 database.
+  rationale: Verify legacy worker migrations include the action outbox.
+- path: tests/test_ui_workspace.py
+  type: modified
+  span:
+    start_line: 944
+    end_line: 944
+  summary: Expect schema version 12 when upgrading a version 8 database.
+  rationale: Verify API session migrations include the action outbox.
+- path: tests/test_ui_workspace.py
+  type: modified
+  span:
+    start_line: 1223
+    end_line: 1223
+  summary: Expect schema version 12 across stores sharing the same database.
+  rationale: Verify multi-process store initialization sees the latest schema.
+entities:
+- id: workspace-job-action-route
+  type: Route
+  action: added
+- id: workspace-job-action-outbox
+  type: Table
+  action: added
+- id: workspace-job-action-event
+  type: Event schema
+  action: added
+- id: workspace-job-action-api-tests
+  type: Integration test
+  action: added
+entity_relationships:
+- id: action-route-persists-outbox-intent
+  type: writes to
+  source: workspace-job-action-route
+  target: workspace-job-action-outbox
+  action: added
+  description: The route commits an action intent with the request replay result in one SQLite transaction.
+- id: action-api-tests-verify-route
+  type: verifies
+  source: workspace-job-action-api-tests
+  target: workspace-job-action-route
+  action: added
+  description: Tests verify idempotency, revision conflicts, persistence, and action availability.
+invariants:
+- id: job-action-acceptance-is-atomic-and-idempotent
+  description: The action intent, job event, job revision update, and request replay result commit together.
+  action: added
+- id: at-most-one-active-job-action
+  description: A job has at most one pending or claimed action intent; a pending non-cancel action can be superseded by cancellation.
+  action: added
+- id: http-job-action-does-not-run-workflow
+  description: The API records accepted intent only; a supervisor applies it outside the request handler.
+  action: added
+guidance:
+- id: preserve-job-action-supervisor-boundary
+  description: Keep workflow startup, retry recovery, and worker cancellation in the supervisor when implementing outbox consumption.
+  action: added

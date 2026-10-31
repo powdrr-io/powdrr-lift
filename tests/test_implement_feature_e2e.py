@@ -13,9 +13,9 @@ from typing import Any
 
 import pytest
 import yaml
+from powdrr_service.decision_obligation import evidence_fingerprint
 from powdrr_service.planning.semantic_decision import SEMANTIC_DIMENSION_DECISION_KINDS
 
-from powdrr_lift.core.decision_obligation import evidence_fingerprint
 from powdrr_lift.workrr.coding_agent import MiniSWEAgentProvider
 from powdrr_lift.workrr.feature_endpoint import (
     FeatureEndpointConfig,

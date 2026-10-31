@@ -6,10 +6,10 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
+from powdrr_service.decision_obligation import content_fingerprint
 from powdrr_service.structrr.rebase import rebase_structrr_snapshot
 from powdrr_service.structrr.snapshot import snapshot_digest
 
-from powdrr_lift.core.decision_obligation import content_fingerprint
 from powdrr_lift.structrr.source_manifest import (
     SourceManifest,
     compare_source_manifests,

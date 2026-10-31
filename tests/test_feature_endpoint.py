@@ -12,17 +12,17 @@ from typing import Any
 
 import pytest
 import yaml
+from powdrr_service.decision_obligation import (
+    DecisionOutcome,
+    DecisionResult,
+    evidence_fingerprint,
+)
 from powdrr_service.structrr.obligation_evidence import (
     NormativeStrength,
     compile_obligation_evidence_contract,
 )
 
 from powdrr_lift.cli import main
-from powdrr_lift.core.decision_obligation import (
-    DecisionOutcome,
-    DecisionResult,
-    evidence_fingerprint,
-)
 from powdrr_lift.core.execution_plan import ExecutionUnit
 from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.structrr.actual_diff import StructrrActualDiff

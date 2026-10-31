@@ -9,9 +9,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
-from powdrr_service.structrr.obligation_evidence import NormativeStrength
-
-from powdrr_lift.core.decision_obligation import (
+from powdrr_service.decision_obligation import (
     DecisionOutcome,
     DecisionResult,
     DecisionSpecification,
@@ -19,6 +17,8 @@ from powdrr_lift.core.decision_obligation import (
     content_fingerprint,
     evidence_fingerprint,
 )
+from powdrr_service.structrr.obligation_evidence import NormativeStrength
+
 from powdrr_lift.structrr.actual_diff import StructrrActualDiff
 from powdrr_lift.structrr.candidate_comparison import (
     CANDIDATE_COMPARISON_SCHEMA_VERSION,

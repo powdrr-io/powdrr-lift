@@ -1183,13 +1183,13 @@
       "reviewed": false
     },
     {
-      "extraction_pr": "3/8",
+      "extraction_pr": "1236",
       "internal_imports": [],
       "kind": "python_module",
-      "owner": "split",
-      "path": "src/powdrr_lift/core/decision_obligation.py",
-      "rationale": "classify each symbol as service policy or public exchanged data",
-      "reviewed": false
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/decision_obligation.py",
+      "rationale": "Service-owned decision specification, result, worklist, and evidence fingerprint contracts.",
+      "reviewed": true
     },
     {
       "extraction_pr": "3/8",
@@ -2139,7 +2139,7 @@
     {
       "extraction_pr": "3",
       "internal_imports": [
-        "powdrr_lift.core.decision_obligation",
+        "powdrr_service.decision_obligation",
         "powdrr_lift.structrr.source_manifest",
         "powdrr_service.structrr.rebase",
         "powdrr_service.structrr.snapshot"
@@ -2154,7 +2154,7 @@
       "extraction_pr": "3",
       "internal_imports": [
         "powdrr_lift.change_log_parser",
-        "powdrr_lift.core.decision_obligation",
+        "powdrr_service.decision_obligation",
         "powdrr_lift.core.entity_taxonomy",
         "powdrr_lift.core.spec_paths",
         "powdrr_lift.structrr.python_topology",
@@ -2172,7 +2172,7 @@
     {
       "extraction_pr": "3",
       "internal_imports": [
-        "powdrr_lift.core.decision_obligation",
+        "powdrr_service.decision_obligation",
         "powdrr_lift.structrr.actual_diff",
         "powdrr_lift.structrr.proposal",
         "powdrr_service.structrr.rebase",
@@ -2187,7 +2187,7 @@
     {
       "extraction_pr": "3",
       "internal_imports": [
-        "powdrr_lift.core.decision_obligation",
+        "powdrr_service.decision_obligation",
         "powdrr_lift.structrr.proposal",
         "powdrr_lift.structrr.verification_obligations"
       ],
@@ -2211,7 +2211,7 @@
     {
       "extraction_pr": "3",
       "internal_imports": [
-        "powdrr_lift.core.decision_obligation",
+        "powdrr_service.decision_obligation",
         "powdrr_lift.structrr.proposal",
         "powdrr_service.structrr.snapshot"
       ],
@@ -2224,7 +2224,7 @@
     {
       "extraction_pr": "3",
       "internal_imports": [
-        "powdrr_lift.core.decision_obligation",
+        "powdrr_service.decision_obligation",
         "powdrr_lift.structrr.actual_diff",
         "powdrr_lift.structrr.candidate_comparison",
         "powdrr_service.structrr.obligation_evidence",
@@ -2259,7 +2259,7 @@
     {
       "extraction_pr": "3",
       "internal_imports": [
-        "powdrr_lift.core.decision_obligation",
+        "powdrr_service.decision_obligation",
         "powdrr_lift.structrr.gate_compiler",
         "powdrr_lift.structrr.proposal"
       ],
@@ -2292,7 +2292,7 @@
     {
       "extraction_pr": "3",
       "internal_imports": [
-        "powdrr_lift.core.decision_obligation",
+        "powdrr_service.decision_obligation",
         "powdrr_lift.core.spec_paths"
       ],
       "kind": "python_module",
@@ -2414,7 +2414,7 @@
     {
       "extraction_pr": "5/7",
       "internal_imports": [
-        "powdrr_lift.core.decision_obligation"
+        "powdrr_service.decision_obligation"
       ],
       "kind": "python_module",
       "owner": "split",
@@ -2567,7 +2567,7 @@
       "extraction_pr": "3",
       "internal_imports": [
         "powdrr_lift.core.behavior_contract",
-        "powdrr_lift.core.decision_obligation",
+        "powdrr_service.decision_obligation",
         "powdrr_service.planning.feature_obligation",
         "powdrr_service.planning.instruction_ledger",
         "powdrr_lift.core.repository_inventory",
@@ -2771,7 +2771,7 @@
         "powdrr_lift.change_log_parser",
         "powdrr_lift.core.behavior_contract",
         "powdrr_lift.core.contract_closure",
-        "powdrr_lift.core.decision_obligation",
+        "powdrr_service.decision_obligation",
         "powdrr_lift.core.execution_plan",
         "powdrr_lift.core.implementation_packet",
         "powdrr_lift.core.obligation_review",
@@ -3027,7 +3027,7 @@
       "extraction_pr": "7",
       "internal_imports": [
         "powdrr_lift.core.behavior_contract",
-        "powdrr_lift.core.decision_obligation",
+        "powdrr_service.decision_obligation",
         "powdrr_service.planning.semantic_contract",
         "powdrr_lift.core.semantic_faithfulness",
         "powdrr_lift.workrr.llm",

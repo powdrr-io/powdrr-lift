@@ -7,9 +7,9 @@ from pathlib import Path
 from typing import Any, TypedDict
 
 import pytest
+from powdrr_service.decision_obligation import DecisionOutcome, DecisionResult
 from powdrr_service.structrr.obligation_evidence import NormativeStrength
 
-from powdrr_lift.core.decision_obligation import DecisionOutcome, DecisionResult
 from powdrr_lift.structrr.actual_diff import (
     StructrrActualDiff,
     compile_actual_structrr_diff,

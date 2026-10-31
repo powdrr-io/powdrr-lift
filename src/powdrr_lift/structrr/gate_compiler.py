@@ -7,10 +7,11 @@ import json
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from powdrr_lift.core.decision_obligation import (
+from powdrr_service.decision_obligation import (
     DecisionSpecification,
     DecisionWorklist,
 )
+
 from powdrr_lift.structrr.proposal import ProposalRevision
 from powdrr_lift.structrr.verification_obligations import (
     VerificationObligationCompilation,

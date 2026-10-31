@@ -25,6 +25,9 @@ from powdrr_service.decision_obligation import (
     content_fingerprint,
     evidence_fingerprint,
 )
+from powdrr_service.external_contract_research import (
+    redact_external_contract_search_event,
+)
 from powdrr_service.obligation_review import (
     ObligationEvidencePacket,
     ObligationReviewError,
@@ -124,9 +127,6 @@ from powdrr_lift.workrr.command_catalog import (
     feature_command_catalog,
 )
 from powdrr_lift.workrr.evidence_reconciliation import reconcile_verification_evidence
-from powdrr_lift.workrr.external_contract_research import (
-    redact_external_contract_search_event,
-)
 from powdrr_lift.workrr.git import integration_branch_name
 from powdrr_lift.workrr.jev_classifier import (
     preferred_semantic_classifier_client,

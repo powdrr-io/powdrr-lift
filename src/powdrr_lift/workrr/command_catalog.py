@@ -18,6 +18,17 @@ from powdrr_service.behavior_contract import (
     validate_normative_assumptions,
 )
 from powdrr_service.decision_obligation import content_fingerprint
+from powdrr_service.external_contract_research import (
+    bind_external_contract_assessments,
+    bind_external_contract_claims,
+    bind_external_contract_search_selections,
+    capture_external_sources,
+    extract_external_contract_evidence,
+    finalize_external_contract_context,
+    prepare_external_contract_projection_requests,
+    project_external_contract_requirements,
+    search_external_contract_sources,
+)
 from powdrr_service.planning.feature_obligation import (
     SEMANTIC_KINDS,
     FeatureObligationError,
@@ -64,17 +75,6 @@ from powdrr_lift.core.semantic_faithfulness import (
     prepare_scenario_claim_reviews,
 )
 from powdrr_lift.errors import PowdrrExecutionError
-from powdrr_lift.workrr.external_contract_research import (
-    bind_external_contract_assessments,
-    bind_external_contract_claims,
-    bind_external_contract_search_selections,
-    capture_external_sources,
-    extract_external_contract_evidence,
-    finalize_external_contract_context,
-    prepare_external_contract_projection_requests,
-    project_external_contract_requirements,
-    search_external_contract_sources,
-)
 from powdrr_lift.workrr.repository_subject_binding import (
     add_candidate_source_excerpts,
     bind_candidate_relation_decisions,

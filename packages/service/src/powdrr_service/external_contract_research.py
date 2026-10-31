@@ -23,7 +23,7 @@ from html.parser import HTMLParser
 from pathlib import Path
 from typing import Any
 
-from powdrr_lift.workrr.http_retry import retry_transient_http
+from powdrr_service.http_retry import retry_transient_http
 
 MAX_SOURCES = 8
 MAX_RESPONSE_BYTES = 1_000_000

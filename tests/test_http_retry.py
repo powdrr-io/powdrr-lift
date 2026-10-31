@@ -4,8 +4,13 @@ from email.message import Message
 from urllib.error import HTTPError
 
 import pytest
+from powdrr_service import http_retry
 
-from powdrr_lift.workrr import http_retry
+
+def test_http_retry_has_no_legacy_agent_module() -> None:
+    import importlib.util
+
+    assert importlib.util.find_spec("powdrr_lift.workrr.http_retry") is None
 
 
 @pytest.mark.parametrize("status_code", [429, 503])

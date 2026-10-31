@@ -14,7 +14,8 @@ from typing import Any
 from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
 
-from powdrr_lift.workrr.http_retry import retry_transient_http
+from powdrr_service.http_retry import retry_transient_http
+
 from powdrr_lift.workrr.protocol import WorkflowLLMClient
 
 LOGGER = logging.getLogger(__name__)

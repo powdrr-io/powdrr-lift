@@ -1,16 +1,17 @@
 from __future__ import annotations
 
+import importlib.util
 from typing import Any
 
 import pytest
-
-from powdrr_lift.core.behavior_contract import (
+from powdrr_service.behavior_contract import (
     BEHAVIOR_DIMENSIONS,
     BehaviorContractError,
     behavior_scenario_probe_findings,
     compile_behavior_scenarios,
     validate_capability_matrix,
 )
+
 from powdrr_lift.core.implementation_packet import compile_implementation_packet
 from powdrr_lift.workrr.coding_agent_validation import (
     ValidationReport,
@@ -19,6 +20,10 @@ from powdrr_lift.workrr.coding_agent_validation import (
     ValidationResultStatus,
     normalize_failure,
 )
+
+
+def test_behavior_contract_has_no_legacy_core_module() -> None:
+    assert importlib.util.find_spec("powdrr_lift.core.behavior_contract") is None
 
 
 def _scenario() -> dict[str, Any]:

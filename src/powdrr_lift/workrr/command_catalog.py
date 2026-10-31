@@ -11,6 +11,12 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, cast
 
+from powdrr_service.behavior_contract import (
+    BEHAVIOR_DIMENSIONS,
+    SUPPORTED_ASSUMPTION_DIMENSIONS,
+    compile_behavior_scenarios,
+    validate_normative_assumptions,
+)
 from powdrr_service.decision_obligation import content_fingerprint
 from powdrr_service.planning.feature_obligation import (
     SEMANTIC_KINDS,
@@ -39,12 +45,6 @@ from powdrr_service.structrr.obligation_evidence import (
     compile_obligation_evidence_contract,
 )
 
-from powdrr_lift.core.behavior_contract import (
-    BEHAVIOR_DIMENSIONS,
-    SUPPORTED_ASSUMPTION_DIMENSIONS,
-    compile_behavior_scenarios,
-    validate_normative_assumptions,
-)
 from powdrr_lift.core.repository_inventory import (
     CandidateSet,
     InventoryError,

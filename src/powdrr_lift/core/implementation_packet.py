@@ -6,15 +6,15 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from powdrr_service.structrr.obligation_evidence import ObligationEvidenceContract
-
-from powdrr_lift.core.behavior_contract import (
+from powdrr_service.behavior_contract import (
     BehaviorScenario,
     _worker_text,
     behavior_scenario_probe_findings,
     compile_behavior_scenarios,
     render_behavior_matrix,
 )
+from powdrr_service.structrr.obligation_evidence import ObligationEvidenceContract
+
 from powdrr_lift.core.contract_closure import render_contract_closure
 
 

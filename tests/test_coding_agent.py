@@ -7,9 +7,9 @@ from dataclasses import replace
 from pathlib import Path
 
 import pytest
+from powdrr_service.behavior_contract import BEHAVIOR_DIMENSIONS
 
 from powdrr_lift.cli import main
-from powdrr_lift.core.behavior_contract import BEHAVIOR_DIMENSIONS
 from powdrr_lift.core.execution_plan import ExecutionPlan, ExecutionUnit
 from powdrr_lift.core.implementation_packet import compile_implementation_packet
 from powdrr_lift.minisweagent_monitor import MiniSWEAgentSnapshot

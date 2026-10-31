@@ -7,13 +7,13 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
-from powdrr_service.decision_obligation import content_fingerprint
-from powdrr_service.planning.semantic_contract import PartialSemanticContract
-
-from powdrr_lift.core.behavior_contract import (
+from powdrr_service.behavior_contract import (
     behavior_scenario_probe_findings,
     compile_behavior_scenarios,
 )
+from powdrr_service.decision_obligation import content_fingerprint
+from powdrr_service.planning.semantic_contract import PartialSemanticContract
+
 from powdrr_lift.core.semantic_faithfulness import (
     finalize_scenario_claim_reviews,
     prepare_scenario_claim_reviews,

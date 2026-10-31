@@ -1093,9 +1093,9 @@
         "powdrr_service.planning.semantic_decision"
       ],
       "kind": "python_module",
-      "owner": "split",
-      "path": "src/powdrr_lift/core/behavior_contract.py",
-      "rationale": "classify each symbol as service policy or public exchanged data",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/behavior_contract.py",
+      "rationale": "validated behavior-scenario schema, compilation, and probe obligations",
       "reviewed": false
     },
     {
@@ -1285,7 +1285,7 @@
     {
       "extraction_pr": "3/8",
       "internal_imports": [
-        "powdrr_lift.core.behavior_contract",
+        "powdrr_service.behavior_contract",
         "powdrr_lift.core.contract_closure",
         "powdrr_service.structrr.obligation_evidence"
       ],
@@ -2536,7 +2536,7 @@
     {
       "extraction_pr": "6",
       "internal_imports": [
-        "powdrr_lift.core.behavior_contract",
+        "powdrr_service.behavior_contract",
         "powdrr_lift.core.execution_plan",
         "powdrr_lift.core.implementation_packet",
         "powdrr_service.intent_packet",
@@ -2564,7 +2564,7 @@
     {
       "extraction_pr": "3",
       "internal_imports": [
-        "powdrr_lift.core.behavior_contract",
+        "powdrr_service.behavior_contract",
         "powdrr_service.decision_obligation",
         "powdrr_service.planning.feature_obligation",
         "powdrr_service.planning.instruction_ledger",
@@ -2743,7 +2743,7 @@
     {
       "extraction_pr": "6",
       "internal_imports": [
-        "powdrr_lift.core.behavior_contract",
+        "powdrr_service.behavior_contract",
         "powdrr_lift.workrr.http_retry"
       ],
       "kind": "python_module",
@@ -2767,7 +2767,7 @@
       "extraction_pr": "5/7",
       "internal_imports": [
         "powdrr_lift.change_log_parser",
-        "powdrr_lift.core.behavior_contract",
+        "powdrr_service.behavior_contract",
         "powdrr_lift.core.contract_closure",
         "powdrr_service.decision_obligation",
         "powdrr_lift.core.execution_plan",
@@ -3024,7 +3024,7 @@
     {
       "extraction_pr": "7",
       "internal_imports": [
-        "powdrr_lift.core.behavior_contract",
+        "powdrr_service.behavior_contract",
         "powdrr_service.decision_obligation",
         "powdrr_service.planning.semantic_contract",
         "powdrr_lift.core.semantic_faithfulness",

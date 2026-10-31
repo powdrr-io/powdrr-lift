@@ -6,7 +6,6 @@ and contain only stable pointers back to the reviewed plan revision.
 
 from __future__ import annotations
 
-import fcntl
 import hashlib
 import json
 import os
@@ -22,6 +21,7 @@ from time import sleep, time
 from typing import Any
 from urllib.parse import quote
 
+from powdrr_local.file_lock import Timeout, file_lock
 from powdrr_service.planning.plan_document import (
     MANUAL_PREREQUISITE_TRIGGER,  # noqa: F401 - legacy public re-export
     QUEUE_SCHEMA,  # noqa: F401 - legacy public re-export
@@ -2462,17 +2462,13 @@ def _worker_lock(repo_root: Path) -> Iterator[None]:
     else:
         lock_path = repo_root / ".powdrr" / "github-issue-worker.lock"
     lock_path.parent.mkdir(parents=True, exist_ok=True)
-    with lock_path.open("a", encoding="utf-8") as lock_file:
-        try:
-            fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError as error:
-            raise GitHubIssueQueueError(
-                "another issue worker is already running"
-            ) from error
-        try:
+    try:
+        with file_lock(lock_path, blocking=False):
             yield
-        finally:
-            fcntl.flock(lock_file.fileno(), fcntl.LOCK_UN)
+    except Timeout as error:
+        raise GitHubIssueQueueError(
+            "another issue worker is already running"
+        ) from error
 
 
 def _issue_from_api(text: str) -> QueueIssue:

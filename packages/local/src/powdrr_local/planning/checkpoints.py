@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import fcntl
 import json
 import os
 import subprocess
@@ -24,6 +23,8 @@ from powdrr_service.planning.checkpoints import (
     sanitize_diagnostic,
     validate_session_id,
 )
+
+from powdrr_local.file_lock import file_lock
 
 
 def _compact_json(value: Mapping[str, Any]) -> str:
@@ -226,10 +227,7 @@ class LocalCheckpointStore:
             raise PlanningJournalError("checkpoint belongs to another planning session")
         self.directory.mkdir(parents=True, exist_ok=True, mode=0o700)
         os.chmod(self.directory, 0o700)
-        lock_descriptor = os.open(self.lock_path, os.O_CREAT | os.O_RDWR, 0o600)
-        try:
-            os.fchmod(lock_descriptor, 0o600)
-            fcntl.flock(lock_descriptor, fcntl.LOCK_EX)
+        with file_lock(self.lock_path):
             current = self.load(selected_checkpoint_digest=selected_checkpoint_digest)
             if (
                 current.status == "conflicted"
@@ -278,9 +276,6 @@ class LocalCheckpointStore:
             )
             self._remember(updated)
             return updated
-        finally:
-            fcntl.flock(lock_descriptor, fcntl.LOCK_UN)
-            os.close(lock_descriptor)
 
     def _write(self, events: Sequence[PlanningCheckpoint]) -> None:
         self.directory.mkdir(parents=True, exist_ok=True, mode=0o700)

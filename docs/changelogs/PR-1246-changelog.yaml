@@ -29,7 +29,7 @@ files:
     rationale: Avoid binding partial path names or ambiguous multiple file references.
   - path: tests/test_planning_structrr.py
     type: modified
-    span: {start_line: 777, end_line: 827}
+    span: {start_line: 777, end_line: 829}
     summary: Cover unique and ambiguous planned paths inside file descriptions.
     rationale: Ensure only one exact planned write path is normalized from prose.
 entities: []

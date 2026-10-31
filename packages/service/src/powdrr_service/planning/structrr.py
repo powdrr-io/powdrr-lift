@@ -157,6 +157,7 @@ def parse_structural_subject_page(
                 pointer,
                 "exactly one of subject_ref and new_identity_description is required",
             )
+        recovered_planned_file = False
         if section == "entities" and subject_ref is not None:
             try:
                 _existing_subject_id("entities", subject_ref, projected_baseline)
@@ -173,6 +174,14 @@ def parse_structural_subject_page(
                         not in str(file_error)
                     ):
                         raise
+                    referenced_path = _file_reference_path(subject_ref)
+                    if referenced_path in planned_paths:
+                        # When a planned, baseline-absent file is mislabeled as
+                        # an entity, resolve it as a new file subject directly.
+                        section = "files"
+                        new_description = referenced_path
+                        subject_ref = None
+                        recovered_planned_file = True
                 else:
                     # Models sometimes place a known file or source-symbol
                     # reference in the entities section. Resolve its section
@@ -184,6 +193,8 @@ def parse_structural_subject_page(
             raise PlanningContractError(
                 f"{pointer}/action", "unsupported Structrr action"
             )
+        if recovered_planned_file:
+            action = "added"
         # The model sometimes labels a planned, baseline-absent file as an
         # existing subject. Resolve that ambiguity deterministically from the
         # plan's write set and projected baseline instead of asking the model

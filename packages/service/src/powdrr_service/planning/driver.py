@@ -135,6 +135,8 @@ class SourceLedgerQuestionMachine:
         self._oversized_work_unit_groups: set[tuple[str, ...]] = set()
         self._single_proposal_requirements: set[str] = set()
         self._supplemental_work_unit_requirements: set[str] = set()
+        self._accepted_assembly_cache_key: tuple[Any, ...] | None = None
+        self._accepted_assembly_cache_value: PlanningAssembly | None = None
 
     @property
     def invalid_accepted_question_ids(self) -> frozenset[str]:
@@ -780,6 +782,59 @@ class SourceLedgerQuestionMachine:
         workflow_directory: str | Path = "docs/workflows",
     ) -> PlanningAssembly:
         """Freeze CP-SAT groups and project confirmed unit edges into plan items."""
+        assembly_answers = tuple(
+            sorted(
+                (question_id, answer)
+                for question_id, answer in accepted_answers.items()
+                if not question_id.startswith(
+                    ("structural-subjects-", "describe-structural-change-")
+                )
+            )
+        )
+        assembly_question_ids = {question_id for question_id, _ in assembly_answers}
+        accepted_digests = (
+            ()
+            if self._accepted_question_input_digests is None
+            else tuple(
+                sorted(
+                    (question_id, digest)
+                    for question_id, digest in (
+                        self._accepted_question_input_digests.items()
+                    )
+                    if question_id in assembly_question_ids
+                )
+            )
+        )
+        cache_key = (
+            plan_id,
+            str(workflow_directory),
+            assembly_answers,
+            accepted_digests,
+            tuple(sorted(self._oversized_work_unit_groups)),
+            tuple(sorted(self._single_proposal_requirements)),
+            tuple(sorted(self._supplemental_work_unit_requirements)),
+        )
+        if (
+            cache_key == self._accepted_assembly_cache_key
+            and self._accepted_assembly_cache_value is not None
+        ):
+            return self._accepted_assembly_cache_value
+        assembly = self._compile_accepted_assembly(
+            accepted_answers,
+            plan_id=plan_id,
+            workflow_directory=workflow_directory,
+        )
+        self._accepted_assembly_cache_key = cache_key
+        self._accepted_assembly_cache_value = assembly
+        return assembly
+
+    def _compile_accepted_assembly(
+        self,
+        accepted_answers: Mapping[str, Mapping[str, Any]],
+        *,
+        plan_id: str,
+        workflow_directory: str | Path,
+    ) -> PlanningAssembly:
         proposals_context, proposals = self._accepted_work_unit_proposals(
             accepted_answers
         )

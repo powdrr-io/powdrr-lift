@@ -42,11 +42,6 @@
       "rationale": "The service-owned multi-PR proposal still uses the established Structrr compiler; relocate it with Structrr policy."
     },
     {
-      "import": "powdrr_lift.structrr.rebase.rebase_structrr_snapshot",
-      "owner_pr": 8,
-      "rationale": "The service-owned multi-PR proposal still uses the existing Structrr rebase algorithm; relocate it with Structrr policy."
-    },
-    {
       "import": "powdrr_lift.structrr.source_manifest.SourceManifest",
       "owner_pr": 8,
       "rationale": "Actual Structrr diff compilation still uses the existing source-manifest type; move the type with the service-owned Structrr implementation."

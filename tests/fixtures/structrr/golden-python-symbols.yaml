@@ -20,17 +20,17 @@ symbols:
     span:
       start_line: 1495
       end_line: 1563
-  - path: src/powdrr_lift/structrr/rebase.py
+  - path: packages/service/src/powdrr_service/structrr/rebase.py
     kind: function
-    qualified_name: src.powdrr_lift.structrr.rebase.rebase_structrr_snapshot
-    stable_key: python::src.powdrr_lift.structrr.rebase.rebase_structrr_snapshot
+    qualified_name: packages.service.src.powdrr_service.structrr.rebase.rebase_structrr_snapshot
+    stable_key: python::packages.service.src.powdrr_service.structrr.rebase.rebase_structrr_snapshot
     span:
       start_line: 119
       end_line: 171
-  - path: src/powdrr_lift/structrr/rebase.py
+  - path: packages/service/src/powdrr_service/structrr/rebase.py
     kind: method
-    qualified_name: src.powdrr_lift.structrr.rebase.StructrrRebaseReport.to_data
-    stable_key: python::src.powdrr_lift.structrr.rebase.StructrrRebaseReport.to_data
+    qualified_name: packages.service.src.powdrr_service.structrr.rebase.StructrrRebaseReport.to_data
+    stable_key: python::packages.service.src.powdrr_service.structrr.rebase.StructrrRebaseReport.to_data
     span:
       start_line: 105
       end_line: 116

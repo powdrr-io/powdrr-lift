@@ -525,7 +525,6 @@
     {
       "extraction_pr": "4",
       "internal_imports": [
-        "powdrr_lift.structrr.rebase",
         "powdrr_service.planning.assembly",
         "powdrr_service.planning.compiler",
         "powdrr_service.planning.contracts",
@@ -592,8 +591,8 @@
         "powdrr_lift.structrr.actual_diff",
         "powdrr_lift.structrr.candidate_comparison",
         "powdrr_lift.structrr.proposal",
-        "powdrr_lift.structrr.rebase",
         "powdrr_lift.structrr.source_manifest",
+        "powdrr_service.structrr.rebase",
         "powdrr_service.structrr.snapshot"
       ],
       "kind": "python_module",
@@ -668,7 +667,6 @@
     {
       "extraction_pr": "4",
       "internal_imports": [
-        "powdrr_lift.structrr.rebase",
         "powdrr_service.planning.assembly",
         "powdrr_service.planning.contracts",
         "powdrr_service.planning.multipr_structrr",
@@ -963,7 +961,6 @@
         "powdrr_lift.structrr.bootstrap",
         "powdrr_lift.structrr.intent",
         "powdrr_lift.structrr.intent_lineage",
-        "powdrr_lift.structrr.rebase",
         "powdrr_lift.structrr.verification_health",
         "powdrr_lift.workrr.chat_config",
         "powdrr_lift.workrr.chat_tui",
@@ -980,15 +977,7 @@
         "powdrr_lift.workrr.github_issue_queue",
         "powdrr_lift.workrr.human_task",
         "powdrr_lift.workrr.local_model",
-        "powdrr_service.planning.plan_sizing",
-        "powdrr_service.planning.assembly",
-        "powdrr_local.planning.checkpoints",
-        "powdrr_service.planning.compiler",
         "powdrr_lift.workrr.planning.evidence",
-        "powdrr_service.planning.driver",
-        "powdrr_service.planning.repair_service",
-        "powdrr_service.planning.service",
-        "powdrr_service.planning.source",
         "powdrr_lift.workrr.procedrr_chat",
         "powdrr_lift.workrr.prompt_benchmark_comparison",
         "powdrr_lift.workrr.provider_config",
@@ -999,9 +988,18 @@
         "powdrr_lift.workrr.scenario",
         "powdrr_lift.workrr.task_agent",
         "powdrr_lift.workrr.workflow_provider_selection",
+        "powdrr_local.planning.checkpoints",
+        "powdrr_service.planning.assembly",
+        "powdrr_service.planning.compiler",
+        "powdrr_service.planning.driver",
+        "powdrr_service.planning.plan_sizing",
+        "powdrr_service.planning.repair_service",
+        "powdrr_service.planning.service",
+        "powdrr_service.planning.source",
+        "powdrr_service.planning.workflow_ids",
+        "powdrr_service.structrr.rebase",
         "procedrr",
-        "procedrr.catalog",
-        "powdrr_service.planning.workflow_ids"
+        "procedrr.catalog"
       ],
       "kind": "python_module",
       "owner": "split",
@@ -2122,7 +2120,6 @@
         "powdrr_lift.structrr.obligation_evidence",
         "powdrr_lift.structrr.proposal",
         "powdrr_lift.structrr.proposal_review",
-        "powdrr_lift.structrr.rebase",
         "powdrr_lift.structrr.source_manifest",
         "powdrr_lift.structrr.validation_models",
         "powdrr_lift.structrr.verification_obligations"
@@ -2146,8 +2143,8 @@
       "extraction_pr": "3",
       "internal_imports": [
         "powdrr_lift.core.decision_obligation",
-        "powdrr_lift.structrr.rebase",
         "powdrr_lift.structrr.source_manifest",
+        "powdrr_service.structrr.rebase",
         "powdrr_service.structrr.snapshot"
       ],
       "kind": "python_module",
@@ -2181,7 +2178,7 @@
         "powdrr_lift.core.decision_obligation",
         "powdrr_lift.structrr.actual_diff",
         "powdrr_lift.structrr.proposal",
-        "powdrr_lift.structrr.rebase",
+        "powdrr_service.structrr.rebase",
         "powdrr_service.structrr.snapshot"
       ],
       "kind": "python_module",
@@ -2219,7 +2216,6 @@
       "internal_imports": [
         "powdrr_lift.core.decision_obligation",
         "powdrr_lift.structrr.proposal",
-        "powdrr_lift.structrr.rebase",
         "powdrr_service.structrr.snapshot"
       ],
       "kind": "python_module",
@@ -2255,7 +2251,6 @@
     {
       "extraction_pr": "3",
       "internal_imports": [
-        "powdrr_lift.structrr.rebase",
         "powdrr_service.structrr.snapshot"
       ],
       "kind": "python_module",
@@ -2287,15 +2282,15 @@
       "reviewed": false
     },
     {
-      "extraction_pr": "3",
+      "extraction_pr": "1224",
       "internal_imports": [
         "powdrr_service.structrr.snapshot"
       ],
       "kind": "python_module",
-      "owner": "split",
-      "path": "src/powdrr_lift/structrr/rebase.py",
-      "rationale": "service semantics; agent supplies pinned repository evidence",
-      "reviewed": false
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/structrr/rebase.py",
+      "rationale": "Service-owned deterministic comparison and impact classification for Structrr snapshot changes.",
+      "reviewed": true
     },
     {
       "extraction_pr": "3",
@@ -2794,7 +2789,6 @@
         "powdrr_lift.structrr.obligation_evidence",
         "powdrr_lift.structrr.proposal",
         "powdrr_lift.structrr.proposal_review",
-        "powdrr_lift.structrr.rebase",
         "powdrr_lift.structrr.source_manifest",
         "powdrr_lift.structrr.validation",
         "powdrr_lift.structrr.verification_obligations",
@@ -2854,7 +2848,6 @@
       "internal_imports": [
         "powdrr_lift.basedpyright_tools",
         "powdrr_lift.errors",
-        "powdrr_lift.structrr.rebase",
         "powdrr_lift.workrr.github_issue_queue",
         "powdrr_lift.workrr.llm",
         "powdrr_service.planning.multipr_structrr",
@@ -3286,7 +3279,6 @@
         "powdrr_lift.process.tasks",
         "powdrr_lift.structrr.bootstrap",
         "powdrr_lift.structrr.proposal",
-        "powdrr_lift.structrr.rebase",
         "powdrr_lift.structrr.source_manifest",
         "powdrr_lift.workrr.action_operations",
         "powdrr_lift.workrr.coding_agent",

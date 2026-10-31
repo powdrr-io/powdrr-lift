@@ -15,8 +15,8 @@ from powdrr_lift.structrr.actual_diff import (
 )
 from powdrr_lift.structrr.candidate_comparison import compare_candidate_snapshot
 from powdrr_lift.structrr.proposal import ProposalRevision, compile_proposal_revision
-from powdrr_lift.structrr.rebase import rebase_structrr_snapshot
 from powdrr_lift.structrr.source_manifest import SourceManifest
+from powdrr_service.structrr.rebase import rebase_structrr_snapshot
 from powdrr_service.structrr.snapshot import snapshot_digest
 
 MULTIPR_STRUCTRR_SCHEMA = "multipr-structrr-proposal-v1"

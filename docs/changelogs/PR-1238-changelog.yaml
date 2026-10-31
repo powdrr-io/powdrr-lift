@@ -1,0 +1,66 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1238
+title: Expose workspace job reads through local API
+intent:
+  problem: The browser workspace needs bounded job listings and safe job-attempt details.
+  goal: Add authenticated repository-scoped job read routes without exposing local execution paths.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/design/browser-workspace-api.md
+  type: modified
+  span:
+    start_line: 67
+    end_line: 73
+  summary: Document job-list pagination and attempt detail reads.
+  rationale: Give browser clients the query and cursor fields for the job routes.
+- path: packages/local/src/powdrr_local/workspace_api.py
+  type: modified
+  span:
+    start_line: 8
+    end_line: 8
+  summary: Add the annotated query type for job-state filters.
+  rationale: Parse repeated state filters in the job-list route.
+- path: packages/local/src/powdrr_local/workspace_api.py
+  type: modified
+  span:
+    start_line: 13
+    end_line: 14
+  summary: Import job contracts for route responses and filtering.
+  rationale: Keep HTTP job data aligned with persisted workspace records.
+- path: packages/local/src/powdrr_local/workspace_api.py
+  type: modified
+  span:
+    start_line: 183
+    end_line: 242
+  summary: Add paged job listing and saved-attempt detail routes.
+  rationale: Let the browser inspect repository job state without accessing local execution paths.
+- path: packages/local/src/powdrr_local/workspace_api.py
+  type: modified
+  span:
+    start_line: 393
+    end_line: 404
+  summary: Enforce job-to-repository association for job details.
+  rationale: Prevent cross-repository records from being read by guessing an ID.
+- path: tests/test_workspace_api.py
+  type: modified
+  span:
+    start_line: 106
+    end_line: 192
+  summary: Test filtered pagination, safe attempt details, and repository isolation.
+  rationale: Verify job reads at the HTTP boundary with real temporary storage.
+entities:
+- id: workspace-job-read-routes
+  type: Route
+  action: added
+- id: workspace-job-read-tests
+  type: Integration test
+  action: added
+invariants:
+- id: job-detail-is-repository-scoped
+  description: Job detail routes return 404 when the job belongs to a different repository.
+  action: added
+- id: browser-job-details-hide-local-paths
+  description: Job attempt responses do not expose workflow directory paths or provider configuration data.
+  action: added
+guidance: []

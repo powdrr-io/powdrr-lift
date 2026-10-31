@@ -64,6 +64,13 @@ Conversation updates carry `expected_revision`; a stale update returns HTTP 409
 with an `error` object containing `code`, `message`, and the current revision.
 Conversation and message reads are bounded and support cursor pagination.
 
+List jobs with `GET /api/v1/repositories/{repository_id}/jobs`. Repeat the
+`states` query parameter to filter by one or more states, and use the returned
+`next_cursor` fields as `before_updated_at` and `before_job_id` for the next
+page. Fetch a job and its saved attempt identifiers from
+`GET /api/v1/repositories/{repository_id}/jobs/{job_id}`. Attempt details omit
+local worktree paths and provider configuration data.
+
 All errors use this stable envelope:
 
 ```json

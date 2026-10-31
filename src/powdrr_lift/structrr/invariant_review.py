@@ -9,6 +9,8 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
+from powdrr_service.structrr.obligation_evidence import NormativeStrength
+
 from powdrr_lift.core.decision_obligation import (
     DecisionOutcome,
     DecisionResult,
@@ -21,7 +23,6 @@ from powdrr_lift.structrr.actual_diff import StructrrActualDiff
 from powdrr_lift.structrr.candidate_comparison import (
     CANDIDATE_COMPARISON_SCHEMA_VERSION,
 )
-from powdrr_lift.structrr.obligation_evidence import NormativeStrength
 from powdrr_lift.structrr.proposal import ProposalRevision
 
 INVARIANT_REVIEW_RECEIPT_SCHEMA_VERSION = "invariant-review-receipt-v2"

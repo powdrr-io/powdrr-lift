@@ -1,0 +1,133 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1234
+title: Move obligation evidence contracts into service
+intent:
+  problem: Obligation evidence contracts and their deterministic compiler still lived in the legacy agent package.
+  goal: Put the evidence schema, compilation policy, and completeness checks in service and update all consumers to import them directly.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 1292, end_line: 1292}
+  summary: Record service ownership for implementation packet contract imports.
+  rationale: Keep the dependency inventory aligned with the service-owned contract.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 2119, end_line: 2119}
+  summary: Remove the deleted module from legacy Structrr package dependencies.
+  rationale: Keep the inventory accurate after removing the agent-side re-export.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 2230, end_line: 2230}
+  summary: Record the service dependency for invariant review.
+  rationale: Reflect the direct import of the service-owned normative-strength type.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 2240, end_line: 2240}
+  summary: Record the extraction PR for obligation evidence contracts.
+  rationale: Link the ownership record to the extraction that established it.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 2243, end_line: 2246}
+  summary: Assign obligation evidence contracts to the service package.
+  rationale: Document their service-owned schema, compiler, and completeness policy.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 2578, end_line: 2578}
+  summary: Record the service dependency for the feature endpoint.
+  rationale: Reflect the endpoint's direct use of the service-owned contract type.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 2785, end_line: 2785}
+  summary: Record the service dependency for the command catalog.
+  rationale: Reflect direct calls to the service contract compiler and checker.
+- path: src/powdrr_lift/core/implementation_packet.py
+  type: modified
+  span: {start_line: 9, end_line: 10}
+  summary: Import obligation evidence contracts from service.
+  rationale: Keep implementation packets on the owning package's contract type.
+- path: src/powdrr_lift/core/implementation_packet.py
+  type: modified
+  span: {start_line: 17, end_line: 17}
+  summary: Remove the legacy obligation evidence import.
+  rationale: Eliminate the obsolete agent package dependency.
+- path: src/powdrr_lift/structrr/__init__.py
+  type: modified
+  span: {start_line: 56, end_line: 64}
+  summary: Remove obligation evidence re-exports from the agent Structrr package.
+  rationale: Avoid keeping an agent-side compatibility surface after extraction.
+- path: src/powdrr_lift/structrr/__init__.py
+  type: modified
+  span: {start_line: 131, end_line: 137}
+  summary: Remove the moved symbols from the legacy export list.
+  rationale: Keep public exports consistent with package ownership.
+- path: src/powdrr_lift/structrr/invariant_review.py
+  type: modified
+  span: {start_line: 12, end_line: 13}
+  summary: Import normative strength from service.
+  rationale: Use the service-owned obligation classification type.
+- path: src/powdrr_lift/structrr/invariant_review.py
+  type: modified
+  span: {start_line: 24, end_line: 24}
+  summary: Remove the legacy normative-strength import.
+  rationale: Eliminate the obsolete agent package dependency.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span: {start_line: 35, end_line: 39}
+  summary: Import obligation evidence APIs from service.
+  rationale: Keep contract compilation and coverage checks within service ownership.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span: {start_line: 62, end_line: 66}
+  summary: Remove the legacy obligation evidence import.
+  rationale: Eliminate the obsolete agent package dependency.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span: {start_line: 23, end_line: 23}
+  summary: Import the obligation evidence contract type from service.
+  rationale: Keep workflow composition on the owning package's contract type.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span: {start_line: 72, end_line: 72}
+  summary: Remove the legacy obligation evidence import.
+  rationale: Eliminate the obsolete agent package dependency.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span: {start_line: 15, end_line: 18}
+  summary: Import obligation evidence helpers from service.
+  rationale: Exercise the owning package directly in workflow tests.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span: {start_line: 27, end_line: 30}
+  summary: Remove the legacy test import.
+  rationale: Keep tests aligned with the production package boundary.
+- path: tests/test_invariant_review.py
+  type: modified
+  span: {start_line: 10, end_line: 10}
+  summary: Import normative strength from service.
+  rationale: Exercise the owning package directly in invariant review tests.
+- path: tests/test_invariant_review.py
+  type: modified
+  span: {start_line: 32, end_line: 32}
+  summary: Remove the legacy test import.
+  rationale: Keep tests aligned with the production package boundary.
+- path: tests/test_obligation_evidence.py
+  type: modified
+  span: {start_line: 3, end_line: 3}
+  summary: Import the module lookup helper for the legacy-path regression assertion.
+  rationale: Verify the deleted agent module does not return as a compatibility shim.
+- path: tests/test_obligation_evidence.py
+  type: modified
+  span: {start_line: 5, end_line: 6}
+  summary: Import obligation evidence APIs from service.
+  rationale: Exercise the owning package directly.
+- path: tests/test_obligation_evidence.py
+  type: modified
+  span: {start_line: 14, end_line: 19}
+  summary: Assert that the legacy agent module is absent.
+  rationale: Protect the clean service ownership boundary.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []

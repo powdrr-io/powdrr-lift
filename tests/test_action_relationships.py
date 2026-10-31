@@ -1,9 +1,12 @@
-from powdrr_lift.core.action_relationship import (
+import importlib.util
+
+from powdrr_service.action_relationship import (
     ActionFact,
     ActionRelationship,
     expand_action_relationships,
     validate_relationship_graph,
 )
+
 from powdrr_lift.core.execution_state import initial_execution_state
 from powdrr_lift.execution.relationships import (
     action_can_complete,
@@ -13,6 +16,10 @@ from powdrr_lift.execution.relationships import (
     satisfy_execution_obligation,
     satisfy_obligation,
 )
+
+
+def test_legacy_agent_action_relationship_module_is_removed() -> None:
+    assert importlib.util.find_spec("powdrr_lift.core.action_relationship") is None
 
 
 def test_review_edit_expands_validation_then_thread_resolution() -> None:

@@ -1,0 +1,73 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1240
+title: Move action relationship policy into service
+intent:
+  problem: Declarative action relationship rules, obligation expansion, and cycle checks still lived in the legacy agent package.
+  goal: Move deterministic relationship policy into service and keep execution adapters on direct service imports.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 1033, end_line: 1033}
+  summary: Remove the legacy package dependency on action relationship policy.
+  rationale: Keep the agent core export inventory aligned with the deleted re-export.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 1067, end_line: 1067}
+  summary: Record the extraction PR for action relationships.
+  rationale: Link the ownership record to the service extraction.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 1070, end_line: 1073}
+  summary: Assign action relationship policy to service.
+  rationale: Document service ownership of semantic matching, obligation expansion, and cycle validation.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 1749, end_line: 1749}
+  summary: Record the service dependency for the execution kernel.
+  rationale: Reflect its direct use of builtin relationship policy.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 1788, end_line: 1788}
+  summary: Record the service dependency for execution relationship adapters.
+  rationale: Reflect their direct use of the service policy types.
+- path: src/powdrr_lift/core/__init__.py
+  type: modified
+  span: {start_line: 63, end_line: 70}
+  summary: Remove action relationship re-exports from the agent core package.
+  rationale: Avoid preserving an agent compatibility surface after extraction.
+- path: src/powdrr_lift/execution/kernel.py
+  type: modified
+  span: {start_line: 10, end_line: 11}
+  summary: Import builtin action relationships from service.
+  rationale: Keep execution orchestration on service-owned semantic policy.
+- path: src/powdrr_lift/execution/relationships.py
+  type: modified
+  span: {start_line: 8, end_line: 8}
+  summary: Import relationship models and functions from service.
+  rationale: Keep local execution adapters on the owning package's API.
+- path: src/powdrr_lift/execution/relationships.py
+  type: modified
+  span: {start_line: 16, end_line: 16}
+  summary: Separate imports after changing the package boundary.
+  rationale: Preserve the formatted import block.
+- path: tests/test_action_relationships.py
+  type: modified
+  span: {start_line: 1, end_line: 3}
+  summary: Import action relationship APIs from service.
+  rationale: Exercise the owning package directly.
+- path: tests/test_action_relationships.py
+  type: modified
+  span: {start_line: 9, end_line: 9}
+  summary: Add spacing for the service import group.
+  rationale: Keep the test imports formatted consistently.
+- path: tests/test_action_relationships.py
+  type: modified
+  span: {start_line: 21, end_line: 24}
+  summary: Assert the former agent module path is absent.
+  rationale: Protect the clean package boundary without a compatibility shim.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []

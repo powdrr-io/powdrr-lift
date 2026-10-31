@@ -60,14 +60,6 @@ from powdrr_lift.core.effective_contract import (
     EffectiveContract,
     resolve_effective_contract,
 )
-from powdrr_lift.core.action_relationship import (
-    BUILTIN_ACTION_RELATIONSHIPS,
-    ActionFact,
-    ActionRelationship,
-    RelationshipObligation,
-    expand_action_relationships,
-    validate_relationship_graph,
-)
 from powdrr_lift.core.tool_manifest import (
     TOOL_MANIFEST_SCHEMA_VERSION,
     IdempotencyKind,

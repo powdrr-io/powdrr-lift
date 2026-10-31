@@ -1,5 +1,5 @@
 schema: https://powdrr.io/schema/changelog-v2
-change_id: 1231
+change_id: 1233
 title: Move validation record models into service
 intent:
   problem: Typed validation records and their deterministic schema checks still lived in the legacy agent package.

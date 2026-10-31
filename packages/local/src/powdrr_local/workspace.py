@@ -192,7 +192,16 @@ CREATE TABLE api_sessions (
     created_at TEXT NOT NULL, expires_at TEXT NOT NULL
 );
 CREATE INDEX api_session_expiry ON api_sessions(expires_at);
-PRAGMA user_version = 9;
+CREATE TABLE turn_dispatch_intents (
+    turn_id TEXT PRIMARY KEY REFERENCES turns(turn_id),
+    repository_id TEXT NOT NULL,
+    state TEXT NOT NULL DEFAULT 'pending' CHECK (state IN ('pending','claimed')),
+    created_at TEXT NOT NULL
+);
+CREATE INDEX pending_turn_dispatches ON turn_dispatch_intents(
+    repository_id, state, created_at
+);
+PRAGMA user_version = 10;
 """
 
 _REPOSITORY_TABLE = (
@@ -401,7 +410,7 @@ class WorkspaceStore:
                 if db.execute("PRAGMA user_version").fetchone()[0] == 3:
                     db.execute(_REPOSITORY_TABLE)
                     db.execute("PRAGMA user_version = 4")
-            elif version not in {4, 5, 6, 7, 8, 9}:
+            elif version not in {4, 5, 6, 7, 8, 9, 10}:
                 raise ValueError(f"Unsupported workspace schema version: {version}")
             current_version = db.execute("PRAGMA user_version").fetchone()[0]
             if current_version == 4:
@@ -411,7 +420,7 @@ class WorkspaceStore:
                     for statement in _TURN_TABLES:
                         db.execute(statement)
                     db.execute("PRAGMA user_version = 5")
-            elif current_version not in {5, 6, 7, 8, 9}:
+            elif current_version not in {5, 6, 7, 8, 9, 10}:
                 raise ValueError(
                     f"Unsupported workspace schema version: {current_version}"
                 )
@@ -423,7 +432,7 @@ class WorkspaceStore:
                     for statement in _JOB_OPERATION_TABLES:
                         db.execute(statement)
                     db.execute("PRAGMA user_version = 6")
-            elif current_version not in {6, 7, 8, 9}:
+            elif current_version not in {6, 7, 8, 9, 10}:
                 raise ValueError(
                     f"Unsupported workspace schema version: {current_version}"
                 )
@@ -435,7 +444,7 @@ class WorkspaceStore:
                     for statement in _SUPERVISOR_TABLES:
                         db.execute(statement)
                     db.execute("PRAGMA user_version = 7")
-            elif current_version not in {7, 8, 9}:
+            elif current_version not in {7, 8, 9, 10}:
                 raise ValueError(
                     f"Unsupported workspace schema version: {current_version}"
                 )
@@ -465,7 +474,7 @@ class WorkspaceStore:
                         db.execute("ALTER TABLE events ADD COLUMN attempt_id TEXT")
                         db.execute("ALTER TABLE events ADD COLUMN revision INTEGER")
                     db.execute("PRAGMA user_version = 8")
-            elif current_version not in {8, 9}:
+            elif current_version not in {8, 9, 10}:
                 raise ValueError(
                     f"Unsupported workspace schema version: {current_version}"
                 )
@@ -487,7 +496,29 @@ class WorkspaceStore:
                         "CREATE INDEX api_session_expiry ON api_sessions(expires_at)"
                     )
                     db.execute("PRAGMA user_version = 9")
-            elif current_version != 9:
+            elif current_version not in {9, 10}:
+                raise ValueError(
+                    f"Unsupported workspace schema version: {current_version}"
+                )
+            current_version = db.execute("PRAGMA user_version").fetchone()[0]
+            if current_version == 9:
+                if not db.in_transaction:
+                    db.execute("BEGIN IMMEDIATE")
+                if db.execute("PRAGMA user_version").fetchone()[0] == 9:
+                    db.execute(
+                        "CREATE TABLE turn_dispatch_intents ("
+                        "turn_id TEXT PRIMARY KEY REFERENCES turns(turn_id), "
+                        "repository_id TEXT NOT NULL, "
+                        "state TEXT NOT NULL DEFAULT 'pending' "
+                        "CHECK (state IN ('pending','claimed')), "
+                        "created_at TEXT NOT NULL)"
+                    )
+                    db.execute(
+                        "CREATE INDEX pending_turn_dispatches ON "
+                        "turn_dispatch_intents(repository_id, state, created_at)"
+                    )
+                    db.execute("PRAGMA user_version = 10")
+            elif current_version != 10:
                 raise ValueError(
                     f"Unsupported workspace schema version: {current_version}"
                 )
@@ -846,6 +877,16 @@ class WorkspaceStore:
                 },
                 timestamp,
             )
+            db.execute(
+                "INSERT INTO turn_dispatch_intents "
+                "(turn_id, repository_id, state, created_at) VALUES (?,?,?,?)",
+                (
+                    turn_id,
+                    conversation.repository_id,
+                    "pending",
+                    timestamp,
+                ),
+            )
             result = self._turn(db, turn_id)
             self._record_request(
                 db,
@@ -861,6 +902,21 @@ class WorkspaceStore:
     def get_turn(self, turn_id: str) -> WorkspaceTurn:
         with self._connection() as db:
             return self._turn(db, turn_id)
+
+    def list_pending_turn_dispatches(
+        self, repository_id: str, *, limit: int = 100
+    ) -> tuple[WorkspaceTurn, ...]:
+        """Return durable accepted turns awaiting supervisor dispatch."""
+        if not 1 <= limit <= 1000:
+            raise ValueError("limit must be between 1 and 1000")
+        with self._connection() as db:
+            rows = db.execute(
+                "SELECT turn_id FROM turn_dispatch_intents "
+                "WHERE repository_id=? AND state='pending' "
+                "ORDER BY created_at, turn_id LIMIT ?",
+                (repository_id, limit),
+            ).fetchall()
+            return tuple(self._turn(db, row["turn_id"]) for row in rows)
 
     def list_turns(
         self, conversation_id: str, *, limit: int = 50
@@ -1858,6 +1914,22 @@ class WorkspaceStore:
                     row["sequence"],
                 )
                 for row in reversed(rows)
+            )
+
+    def get_message(self, message_id: str) -> Message:
+        with self._connection() as db:
+            row = db.execute(
+                "SELECT * FROM messages WHERE message_id=?", (message_id,)
+            ).fetchone()
+            if row is None:
+                raise KeyError("Message does not exist")
+            return Message(
+                row["message_id"],
+                row["conversation_id"],
+                MessageRole(row["role"]),
+                row["content"],
+                row["created_at"],
+                row["sequence"],
             )
 
     @staticmethod

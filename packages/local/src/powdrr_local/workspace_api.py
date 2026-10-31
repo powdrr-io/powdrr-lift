@@ -10,6 +10,7 @@ import time
 from collections.abc import AsyncGenerator, Mapping
 from pathlib import Path
 from typing import Annotated, Any, Protocol
+from uuid import NAMESPACE_URL, uuid5
 
 from fastapi import APIRouter, Depends, FastAPI, Header, Query, Request
 from powdrr_contracts.workspace import (
@@ -69,6 +70,12 @@ class ConversationUpdateRequest(WorkspaceApiRequest):
     expected_revision: int = Field(ge=1)
     specification_refs: list[str] | None = None
     request_id: str = Field(min_length=1, max_length=128)
+
+
+class MessageCreateRequest(WorkspaceApiRequest):
+    request_id: str = Field(min_length=1, max_length=128)
+    message_id: str = Field(min_length=1, max_length=128)
+    content: str = Field(min_length=1, max_length=100_000)
 
 
 class WorkspaceApiException(Exception):
@@ -462,6 +469,48 @@ def install_workspace_routes(
             "next_before_sequence": (
                 messages[0].sequence if len(messages) == limit else None
             ),
+        }
+
+    @router.post(
+        "/repositories/{repository_id}/conversations/{conversation_id}/messages",
+        status_code=202,
+    )
+    async def submit_message(
+        repository_id: str,
+        conversation_id: str,
+        payload: MessageCreateRequest,
+        _: None = Depends(require_session(mutating=True)),
+    ) -> dict[str, Any]:
+        await _get_repository(repository_registry, repository_id)
+        await _get_conversation_in_repository(store, repository_id, conversation_id)
+        # The command envelope intentionally omits turn_id. Derive it from stable
+        # request scope so a network retry hashes to the original command result.
+        turn_id = uuid5(
+            NAMESPACE_URL,
+            f"powdrr-workspace-turn:{repository_id}:{conversation_id}:"
+            f"{payload.request_id}",
+        ).hex
+        try:
+            turn = await run_in_threadpool(
+                store.create_turn,
+                conversation_id,
+                turn_id=turn_id,
+                message_id=payload.message_id,
+                content=payload.content,
+                request_id=payload.request_id,
+            )
+            message = await run_in_threadpool(store.get_message, turn.user_message_id)
+        except WorkspaceConflict as error:
+            raise WorkspaceApiException(
+                409,
+                "request_conflict",
+                "The request conflicts with an active turn or saved data.",
+            ) from error
+        await _notify(event_source, repository_id)
+        return {
+            "message": message.to_dict(),
+            "turn_id": turn.turn_id,
+            "state": turn.state.value,
         }
 
     app.include_router(router)

@@ -157,6 +157,7 @@ def parse_structural_subject_page(
                 pointer,
                 "exactly one of subject_ref and new_identity_description is required",
             )
+        recovered_planned_file = False
         if section == "entities" and subject_ref is not None:
             try:
                 _existing_subject_id("entities", subject_ref, projected_baseline)
@@ -173,6 +174,14 @@ def parse_structural_subject_page(
                         not in str(file_error)
                     ):
                         raise
+                    referenced_path = _file_reference_path(subject_ref)
+                    if referenced_path in planned_paths:
+                        # When a planned, baseline-absent file is mislabeled as
+                        # an entity, resolve it as a new file subject directly.
+                        section = "files"
+                        new_description = referenced_path
+                        subject_ref = None
+                        recovered_planned_file = True
                 else:
                     # Models sometimes place a known file or source-symbol
                     # reference in the entities section. Resolve its section
@@ -184,6 +193,8 @@ def parse_structural_subject_page(
             raise PlanningContractError(
                 f"{pointer}/action", "unsupported Structrr action"
             )
+        if recovered_planned_file:
+            action = "added"
         # The model sometimes labels a planned, baseline-absent file as an
         # existing subject. Resolve that ambiguity deterministically from the
         # plan's write set and projected baseline instead of asking the model
@@ -462,14 +473,22 @@ def build_subject_enumeration_request(
 ) -> QuestionRequest[StructuralSubjectPage]:
     unit_ids = {unit.id for unit in units}
     requirement_ids = {req for unit in units for req in unit.requirement_ids}
-    path_refs = tuple(
-        ContextRecord(
-            f"planned-write:{unit.id}:{write.path}",
-            {"unit_id": unit.id, **write.to_data()},
-        )
-        for unit in units
-        for write in unit.planned_writes
-    )
+    path_refs_list: list[ContextRecord] = []
+    path_ref_counts: dict[str, int] = {}
+    for unit in units:
+        for write in unit.planned_writes:
+            base_ref_id = f"planned-write:{unit.id}:{write.path}"
+            occurrence = path_ref_counts.get(base_ref_id, 0) + 1
+            path_ref_counts[base_ref_id] = occurrence
+            ref_id = (
+                base_ref_id
+                if occurrence == 1
+                else f"{base_ref_id}:duplicate-{occurrence}"
+            )
+            path_refs_list.append(
+                ContextRecord(ref_id, {"unit_id": unit.id, **write.to_data()})
+            )
+    path_refs = tuple(path_refs_list)
     excerpt_map = _source_excerpts(source, source_refs)
     unit_facts = tuple(
         ContextRecord(f"unit:{unit.id}", unit.to_data()) for unit in units

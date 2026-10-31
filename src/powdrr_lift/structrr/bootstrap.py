@@ -546,7 +546,7 @@ def validate_bootstrap_document(
         issues, document.get("invariants"), "invariant", root_path
     )
     _validate_lifecycle_section(issues, document.get("guidance"), "guidance", root_path)
-    from powdrr_lift.structrr.active_intent import validate_active_intent_section
+    from powdrr_service.structrr.active_intent import validate_active_intent_section
 
     for diagnostic in validate_active_intent_section(document.get("active_intent")):
         issues.append(
@@ -1215,7 +1215,8 @@ def _build_document(
     repository_name: str | None = None,
     validation_files: Sequence[str] = (),
 ) -> dict[str, Any]:
-    from powdrr_lift.structrr.active_intent import active_intent_section
+    from powdrr_service.structrr.active_intent import active_intent_section
+
     from powdrr_lift.structrr.python_topology import discover_python_topology
     from powdrr_lift.structrr.validation import (
         assign_python_topology,
@@ -1322,9 +1323,7 @@ def _build_document(
     for item in (*invariants.values(), *guidance.values()):
         statements.setdefault(item["id"], item)
 
-    active_intent = active_intent_section(
-        (*invariants.values(), *guidance.values()), root
-    )
+    active_intent = active_intent_section((*invariants.values(), *guidance.values()))
 
     for tool_id in tools:
         entities.setdefault(

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any
 
 ACTIVE_INTENT_SECTION_VERSION = 1
@@ -41,7 +40,6 @@ class ActiveIntentResolutionError(ValueError):
 
 
 def resolve_active_intent(
-    worktree: str | Path,
     *,
     baseline_document: Mapping[str, Any] | None = None,
     feature_document: Mapping[str, Any] | None = None,
@@ -54,7 +52,6 @@ def resolve_active_intent(
     or runtime intent store participates in resolution.
     """
     baseline = _document_entries(baseline_document)
-    del worktree
     accepted = _merge_accepted(baseline)
     if feature_document is not None:
         accepted = _apply_feature_overlay(
@@ -65,10 +62,8 @@ def resolve_active_intent(
 
 def active_intent_section(
     baseline_entries: Sequence[Mapping[str, Any]],
-    worktree: str | Path,
 ) -> list[dict[str, Any]]:
     """Build the generated bootstrap section from Structrr specification data."""
-    del worktree
     entries = _merge_accepted(
         tuple(_entry_from_mapping(item) for item in baseline_entries)
     )

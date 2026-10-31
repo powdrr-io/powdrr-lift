@@ -15,6 +15,11 @@ from typing import Any, cast
 
 import yaml
 from powdrr_service.planning.workflow_ids import slugify_workflow_id
+from powdrr_service.structrr.active_intent import (
+    ActiveIntentReference,
+    ActiveIntentResolutionError,
+    resolve_active_intent,
+)
 from powdrr_service.structrr.snapshot import snapshot_digest
 
 from powdrr_lift.change_log_parser import parse_change_log
@@ -51,11 +56,6 @@ from powdrr_lift.core.spec_context import (
     render_gather_context_report,
 )
 from powdrr_lift.errors import PowdrrExecutionError
-from powdrr_lift.structrr.active_intent import (
-    ActiveIntentReference,
-    ActiveIntentResolutionError,
-    resolve_active_intent,
-)
 from powdrr_lift.structrr.actual_diff import (
     StructrrActualDiff,
     compile_actual_structrr_diff,
@@ -869,7 +869,6 @@ def _prepare_proposal_review(
         if not config.agent_managed_git:
             _commit(runner, worktree, "Record proposal revision")
     active_intent_clauses = _resolve_feature_intent(
-        worktree,
         baseline_document=baseline_document,
         feature_document=plan_document,
     )
@@ -1119,7 +1118,6 @@ def _validate_review_evidence_sources(
     active_intent_refs = {
         f"intent:{clause.clause_id}"
         for clause in _resolve_feature_intent(
-            worktree,
             baseline_document=baseline_document,
             feature_document=feature_document,
         )
@@ -1585,9 +1583,7 @@ def _compile_verification_obligations(
         )
     baseline = _load_yaml_mapping(baseline_path)
     plan = _load_yaml_mapping(plan_path)
-    active = _resolve_feature_intent(
-        worktree, baseline_document=baseline, feature_document=plan
-    )
+    active = _resolve_feature_intent(baseline_document=baseline, feature_document=plan)
     candidate_mappings = _merge_contract_mappings(
         _mapping_values(baseline.get("required_test_cases")),
         _mapping_values(plan.get("required_test_cases")),
@@ -2494,7 +2490,6 @@ def _run_code_agent_phase(
     try:
         review_receipt = load_review_receipt(Path(review_path_value))
         active_intent_clauses = _resolve_feature_intent(
-            worktree,
             baseline_document=baseline_document,
             feature_document=plan_document,
         )
@@ -3908,14 +3903,12 @@ def _evidence_source_ref(prefix: str, path: Path, worktree: Path) -> str:
 
 
 def _resolve_feature_intent(
-    worktree: Path,
     *,
     baseline_document: Mapping[str, Any] | None = None,
     feature_document: Mapping[str, Any] | None = None,
 ) -> tuple[ActiveIntentReference, ...]:
     try:
         return resolve_active_intent(
-            worktree,
             baseline_document=baseline_document,
             feature_document=feature_document,
         )
@@ -3956,9 +3949,7 @@ def _prepare_implementation_review(
         runner, worktree, ["git", "diff", "--name-only", request.base_commit, "--"]
     ).splitlines()
     baseline_document = _load_yaml_mapping(Path(state["baseline_path"]))
-    active_intent_clauses = _resolve_feature_intent(
-        worktree, baseline_document=baseline_document
-    )
+    active_intent_clauses = _resolve_feature_intent(baseline_document=baseline_document)
     evidence_refs = (
         "git-diff@"
         + content_fingerprint(
@@ -7654,7 +7645,6 @@ def _prepare_final_implementation_review(
     )[0]
     plan_document = _load_yaml_mapping(Path(state["plan_path"]))
     active_clauses = _resolve_feature_intent(
-        worktree,
         baseline_document=baseline_document,
         feature_document=plan_document,
     )

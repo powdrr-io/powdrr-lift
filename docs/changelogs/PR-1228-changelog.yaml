@@ -1,0 +1,246 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1228
+title: Move active-intent resolution into service
+intent:
+  problem: Active-intent clause normalization and overlay resolution remained in the legacy agent package and accepted
+    an unused local worktree path.
+  goal: Move active-intent semantics into the service package, pass only documents across the boundary, and remove
+    legacy exports and the old module.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2114
+    end_line: 2114
+  summary: Move active-intent resolution to the service ownership inventory.
+  rationale: Keep the package ownership record aligned with the new service module and callers.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2133
+    end_line: 2133
+  summary: Move active-intent resolution to the service ownership inventory.
+  rationale: Keep the package ownership record aligned with the new service module and callers.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2136
+    end_line: 2139
+  summary: Move active-intent resolution to the service ownership inventory.
+  rationale: Keep the package ownership record aligned with the new service module and callers.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2163
+    end_line: 2163
+  summary: Move active-intent resolution to the service ownership inventory.
+  rationale: Keep the package ownership record aligned with the new service module and callers.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2165
+    end_line: 2166
+  summary: Move active-intent resolution to the service ownership inventory.
+  rationale: Keep the package ownership record aligned with the new service module and callers.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2784
+    end_line: 2784
+  summary: Move active-intent resolution to the service ownership inventory.
+  rationale: Keep the package ownership record aligned with the new service module and callers.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2812
+    end_line: 2812
+  summary: Move active-intent resolution to the service ownership inventory.
+  rationale: Keep the package ownership record aligned with the new service module and callers.
+- path: src/powdrr_lift/structrr/__init__.py
+  type: modified
+  span:
+    start_line: 13
+    end_line: 20
+  summary: Remove legacy package exports for active-intent service policy.
+  rationale: Require imports from the module that owns the policy without a compatibility shim.
+- path: src/powdrr_lift/structrr/__init__.py
+  type: modified
+  span:
+    start_line: 128
+    end_line: 133
+  summary: Remove legacy package exports for active-intent service policy.
+  rationale: Require imports from the module that owns the policy without a compatibility shim.
+- path: src/powdrr_lift/structrr/bootstrap.py
+  type: modified
+  span:
+    start_line: 549
+    end_line: 549
+  summary: Use service-owned active-intent generation and validation during bootstrap.
+  rationale: Keep bootstrap behavior while routing clause semantics to the service package.
+- path: src/powdrr_lift/structrr/bootstrap.py
+  type: modified
+  span:
+    start_line: 1218
+    end_line: 1219
+  summary: Use service-owned active-intent generation and validation during bootstrap.
+  rationale: Keep bootstrap behavior while routing clause semantics to the service package.
+- path: src/powdrr_lift/structrr/bootstrap.py
+  type: modified
+  span:
+    start_line: 1326
+    end_line: 1326
+  summary: Use service-owned active-intent generation and validation during bootstrap.
+  rationale: Keep bootstrap behavior while routing clause semantics to the service package.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 18
+    end_line: 22
+  summary: Resolve active intent through the service API without passing an unused worktree path.
+  rationale: Keep repository paths local and pass only snapshot documents to service policy.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 54
+    end_line: 58
+  summary: Resolve active intent through the service API without passing an unused worktree path.
+  rationale: Keep repository paths local and pass only snapshot documents to service policy.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 872
+    end_line: 872
+  summary: Resolve active intent through the service API without passing an unused worktree path.
+  rationale: Keep repository paths local and pass only snapshot documents to service policy.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 1122
+    end_line: 1122
+  summary: Resolve active intent through the service API without passing an unused worktree path.
+  rationale: Keep repository paths local and pass only snapshot documents to service policy.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 1586
+    end_line: 1586
+  summary: Resolve active intent through the service API without passing an unused worktree path.
+  rationale: Keep repository paths local and pass only snapshot documents to service policy.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 2497
+    end_line: 2497
+  summary: Resolve active intent through the service API without passing an unused worktree path.
+  rationale: Keep repository paths local and pass only snapshot documents to service policy.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 3911
+    end_line: 3911
+  summary: Resolve active intent through the service API without passing an unused worktree path.
+  rationale: Keep repository paths local and pass only snapshot documents to service policy.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 3918
+    end_line: 3918
+  summary: Resolve active intent through the service API without passing an unused worktree path.
+  rationale: Keep repository paths local and pass only snapshot documents to service policy.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 3952
+    end_line: 3952
+  summary: Resolve active intent through the service API without passing an unused worktree path.
+  rationale: Keep repository paths local and pass only snapshot documents to service policy.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 7657
+    end_line: 7657
+  summary: Resolve active intent through the service API without passing an unused worktree path.
+  rationale: Keep repository paths local and pass only snapshot documents to service policy.
+- path: tests/fixtures/structrr/golden-python-symbols.yaml
+  type: modified
+  span:
+    start_line: 8
+    end_line: 8
+  summary: Refresh source-symbol spans after moving active-intent policy.
+  rationale: Keep the golden bootstrap fixture aligned with source locations.
+- path: tests/fixtures/structrr/golden-python-symbols.yaml
+  type: modified
+  span:
+    start_line: 21
+    end_line: 22
+  summary: Refresh source-symbol spans after moving active-intent policy.
+  rationale: Keep the golden bootstrap fixture aligned with source locations.
+- path: tests/test_active_intent.py
+  type: modified
+  span:
+    start_line: 3
+    end_line: 3
+  summary: Exercise the service active-intent API and assert the legacy module is absent.
+  rationale: Protect overlay behavior and prevent a compatibility import from returning.
+- path: tests/test_active_intent.py
+  type: modified
+  span:
+    start_line: 6
+    end_line: 6
+  summary: Exercise the service active-intent API and assert the legacy module is absent.
+  rationale: Protect overlay behavior and prevent a compatibility import from returning.
+- path: tests/test_active_intent.py
+  type: modified
+  span:
+    start_line: 13
+    end_line: 17
+  summary: Exercise the service active-intent API and assert the legacy module is absent.
+  rationale: Protect overlay behavior and prevent a compatibility import from returning.
+- path: tests/test_active_intent.py
+  type: modified
+  span:
+    start_line: 16
+    end_line: 16
+  summary: Exercise the service active-intent API and assert the legacy module is absent.
+  rationale: Protect overlay behavior and prevent a compatibility import from returning.
+- path: tests/test_active_intent.py
+  type: modified
+  span:
+    start_line: 34
+    end_line: 34
+  summary: Exercise the service active-intent API and assert the legacy module is absent.
+  rationale: Protect overlay behavior and prevent a compatibility import from returning.
+- path: tests/test_active_intent.py
+  type: modified
+  span:
+    start_line: 34
+    end_line: 34
+  summary: Exercise the service active-intent API and assert the legacy module is absent.
+  rationale: Protect overlay behavior and prevent a compatibility import from returning.
+- path: tests/test_active_intent.py
+  type: modified
+  span:
+    start_line: 73
+    end_line: 73
+  summary: Exercise the service active-intent API and assert the legacy module is absent.
+  rationale: Protect overlay behavior and prevent a compatibility import from returning.
+- path: tests/test_active_intent.py
+  type: modified
+  span:
+    start_line: 75
+    end_line: 75
+  summary: Exercise the service active-intent API and assert the legacy module is absent.
+  rationale: Protect overlay behavior and prevent a compatibility import from returning.
+- path: packages/service/src/powdrr_service/structrr/active_intent.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 235
+  summary: Move pure active-intent normalization, overlay merging, and validation into the service package.
+  rationale: Keep active-intent semantics service-owned and independent of local worktree paths.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []

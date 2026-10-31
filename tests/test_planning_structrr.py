@@ -810,7 +810,9 @@ def test_new_file_subject_rejects_multiple_planned_paths_in_description() -> Non
     candidate = {
         "section": "files",
         "subject_ref": None,
-        "new_identity_description": "Documentation files at docs/setup.md and docs/privacy.md",
+        "new_identity_description": (
+            "Documentation files at docs/setup.md and docs/privacy.md"
+        ),
         "action": "added",
         "requirement_ids": ["req-01"],
         "unit_ids": [unit.id],

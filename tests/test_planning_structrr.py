@@ -956,6 +956,34 @@ def test_absent_planned_file_reference_is_bound_as_a_new_subject(
     assert subject.planned_path == path
 
 
+def test_duplicated_planned_file_reference_is_bound_as_a_new_subject() -> None:
+    path = "attestation/src/cli/mod.rs"
+    unit = _unit(
+        writes=(PlannedWrite(path, "implementation", "rust", ("anchor-01",), ()),)
+    )
+    candidate = {
+        "section": "files",
+        "subject_ref": f"{path}::{path}",
+        "new_identity_description": None,
+        "action": "changed",
+        "requirement_ids": ["req-01"],
+        "unit_ids": [unit.id],
+        "source_refs": ["anchor-01"],
+    }
+
+    page = _parse_page(
+        _candidate_page([candidate], has_more=False, next_anchor=None),
+        units=(unit,),
+        baseline={"files": [], "source_subjects": []},
+    )
+
+    subject = page.records[0]
+    assert subject.subject_id == f"path::{path}"
+    assert subject.action == "added"
+    assert subject.is_new is True
+    assert subject.planned_path == path
+
+
 def test_absent_unplanned_file_reference_is_still_rejected() -> None:
     path = "src/unplanned.py"
     candidate = {

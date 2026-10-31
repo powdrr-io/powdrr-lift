@@ -174,7 +174,9 @@ def parse_structural_subject_page(
                         not in str(file_error)
                     ):
                         raise
-                    referenced_path = _file_reference_path(subject_ref)
+                    referenced_path = _planned_file_reference_path(
+                        subject_ref, planned_paths
+                    )
                     if referenced_path in planned_paths:
                         # When a planned, baseline-absent file is mislabeled as
                         # an entity, resolve it as a new file subject directly.
@@ -198,12 +200,11 @@ def parse_structural_subject_page(
         # The model sometimes labels a planned, baseline-absent file as an
         # existing subject. Resolve that ambiguity deterministically from the
         # plan's write set and projected baseline instead of asking the model
-        # to assign new-identity syntax correctly. Only the two known file
-        # reference forms are eligible, and the path must be an allocated
-        # planned write that is genuinely absent from the baseline.
+        # to assign new-identity syntax correctly. Recognized file references
+        # must resolve to an allocated planned write absent from the baseline.
         if section == "files" and subject_ref is not None:
-            referenced_path = _file_reference_path(subject_ref)
-            if referenced_path is not None and referenced_path in planned_paths:
+            referenced_path = _planned_file_reference_path(subject_ref, planned_paths)
+            if referenced_path is not None:
                 try:
                     _existing_subject_id(section, subject_ref, projected_baseline)
                 except PlanningContractError as error:
@@ -1213,6 +1214,22 @@ def _file_reference_path(subject_ref: str) -> str | None:
         return subject_ref.removeprefix("path::")
     if subject_ref.startswith("file:"):
         return subject_ref.removeprefix("file:")
+    return None
+
+
+def _planned_file_reference_path(
+    subject_ref: str, planned_paths: set[str]
+) -> str | None:
+    referenced_path = _file_reference_path(subject_ref)
+    if referenced_path in planned_paths:
+        return referenced_path
+    repeated_parts = subject_ref.split("::")
+    if (
+        len(repeated_parts) == 2
+        and repeated_parts[0] == repeated_parts[1]
+        and repeated_parts[0] in planned_paths
+    ):
+        return repeated_parts[0]
     return None
 
 

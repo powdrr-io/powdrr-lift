@@ -237,9 +237,13 @@ def parse_structural_subject_page(
         if subject_ref is not None:
             subject_id = _existing_subject_id(section, subject_ref, projected_baseline)
             if action == "added":
-                raise PlanningContractError(
-                    f"{pointer}/action", "an existing subject cannot be added"
-                )
+                # The model can identify the right existing subject but still
+                # call its change "added". Once the reference resolves against
+                # the projected baseline, the identity already exists; the
+                # only non-destructive action that matches that evidence is
+                # changed. Keep identity resolution deterministic and avoid
+                # retrying a large inventory answer for this action mismatch.
+                action = "changed"
             planned_path = (
                 subject_id.removeprefix("path::")
                 if section == "files" and subject_id.startswith("path::")
@@ -550,8 +554,10 @@ def build_subject_enumeration_request(
             "subject as new. "
             "For an existing subject, copy exactly one supplied subject_ref "
             "from accepted facts; never combine or construct identifiers. "
-            "Whenever new_identity_description is non-null, action must be added. "
-            "Use changed, deleted, or removed only with a supplied subject_ref. "
+            "Use action added only when subject_ref is null and "
+            "new_identity_description is non-null. An existing subject_ref must "
+            "use changed, deleted, or removed; never mark an existing subject "
+            "as added. "
             "Return at most eight subjects. An empty final page means no "
             "structural change is needed for this item."
             " If another page is needed, set has_more true and copy the exact "

@@ -1,0 +1,96 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1226
+title: Append planning checkpoints without rewriting history
+intent:
+  problem: "The local planning journal rewrote, reread, and revalidated its entire growing history for every checkpoint, making long sessions increasingly expensive to continue."
+  goal: "Keep the hash-linked history durable while storing compact append-only events and reusing the validated state within a process."
+human-decisions: []
+structured_files: []
+files:
+  - path: packages/local/src/powdrr_local/planning/checkpoints.py
+    type: modified
+    span: {start_line: 29, end_line: 38}
+    summary: Serialize journal records as compact JSON lines.
+    rationale: Reduce the stored size of long checkpoint histories.
+  - path: packages/local/src/powdrr_local/planning/checkpoints.py
+    type: modified
+    span: {start_line: 70, end_line: 71}
+    summary: Cache the validated journal state and its file signature.
+    rationale: Avoid reloading unchanged history during repeated planner transitions.
+  - path: packages/local/src/powdrr_local/planning/checkpoints.py
+    type: modified
+    span: {start_line: 75, end_line: 75}
+    summary: Cache the empty journal state.
+    rationale: Reuse one validated view for the lifetime of the store.
+  - path: packages/local/src/powdrr_local/planning/checkpoints.py
+    type: modified
+    span: {start_line: 80, end_line: 81}
+    summary: Reuse cached state when the journal file has not changed.
+    rationale: Eliminate redundant reads within one planning process.
+  - path: packages/local/src/powdrr_local/planning/checkpoints.py
+    type: modified
+    span: {start_line: 83, end_line: 108}
+    summary: Read compact v2 journal records while retaining the v1 reader.
+    rationale: Preserve existing worktree journals and support safe migration.
+  - path: packages/local/src/powdrr_local/planning/checkpoints.py
+    type: modified
+    span: {start_line: 127, end_line: 127}
+    summary: Parse legacy comment data for existing v1 journals.
+    rationale: Preserve one-time migration from issue comment checkpoints.
+  - path: packages/local/src/powdrr_local/planning/checkpoints.py
+    type: modified
+    span: {start_line: 132, end_line: 133}
+    summary: Cache the reduced legacy journal state.
+    rationale: Avoid repeatedly reducing migrated history.
+  - path: packages/local/src/powdrr_local/planning/checkpoints.py
+    type: modified
+    span: {start_line: 142, end_line: 179}
+    summary: Parse and validate compact hash-linked events, ignoring only an incomplete final record.
+    rationale: Recover safely from process termination during an unacknowledged append.
+  - path: packages/local/src/powdrr_local/planning/checkpoints.py
+    type: modified
+    span: {start_line: 186, end_line: 200}
+    summary: Track the journal file signature for cache invalidation.
+    rationale: Reload when another process changes the journal.
+  - path: packages/local/src/powdrr_local/planning/checkpoints.py
+    type: modified
+    span: {start_line: 258, end_line: 277}
+    summary: Append one event to v2 journals and construct the updated state directly.
+    rationale: Avoid rewriting and revalidating the accumulated history for each checkpoint.
+  - path: packages/local/src/powdrr_local/planning/checkpoints.py
+    type: modified
+    span: {start_line: 279, end_line: 279}
+    summary: Cache the appended journal state.
+    rationale: Make the next planning transition reuse the validated state.
+  - path: packages/local/src/powdrr_local/planning/checkpoints.py
+    type: modified
+    span: {start_line: 286, end_line: 341}
+    summary: Write compact v2 histories atomically and append individual events with fsync.
+    rationale: Keep writes durable while changing append cost from rewriting the full journal to writing the new checkpoint.
+  - path: packages/local/src/powdrr_local/planning/checkpoints.py
+    type: modified
+    span: {start_line: 365, end_line: 366}
+    summary: Invalidate cached state after replacing the journal.
+    rationale: Ensure later loads validate the new file contents.
+  - path: tests/test_planning_checkpoints.py
+    type: modified
+    span: {start_line: 3, end_line: 3}
+    summary: Import JSON parsing for format assertions.
+    rationale: Verify the persisted append-only journal format.
+  - path: tests/test_planning_checkpoints.py
+    type: modified
+    span: {start_line: 130, end_line: 212}
+    summary: Verify compact append behavior and recovery from an incomplete trailing event.
+    rationale: Ensure appends preserve history without rewriting and that interrupted writes resume safely.
+  - path: tests/test_planning_checkpoints.py
+    type: modified
+    span: {start_line: 249, end_line: 267}
+    summary: Verify legacy issue-comment journals migrate to v2 on append.
+    rationale: Preserve resumability for existing planning sessions.
+entities: []
+entity_relationships: []
+invariants:
+  - id: planning-checkpoints-append-without-rewriting-history
+    description: A valid checkpoint extends the current hash-linked journal by appending one compact record, while legacy journals migrate atomically on first append.
+    action: altered
+guidance: []

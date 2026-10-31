@@ -1,0 +1,26 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1232
+title: Keep planned-write context references unique
+intent:
+  problem: "Planning can emit multiple writes to the same path in one work unit, which produced duplicate context reference IDs and stopped issue-session resume."
+  goal: "Assign every planned-write context record a deterministic unique reference so structural questions validate and planning can continue."
+human-decisions: []
+structured_files: []
+files:
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 465, end_line: 480}
+    summary: Add an occurrence suffix to repeated planned-write references within one unit.
+    rationale: Keep every planned-write context record addressable while satisfying question reference uniqueness.
+  - path: tests/test_planning_structrr.py
+    type: modified
+    span: {start_line: 278, end_line: 316}
+    summary: Cover enumeration requests with repeated planned-write paths.
+    rationale: Ensure duplicate write paths no longer prevent a planning question from validating.
+entities: []
+entity_relationships: []
+invariants:
+  - id: planning-context-reference-ids-are-unique
+    description: Context references for repeated planned writes use stable, unique IDs within each question.
+    action: altered
+guidance: []

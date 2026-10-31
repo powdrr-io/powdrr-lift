@@ -1336,13 +1336,13 @@
       "reviewed": false
     },
     {
-      "extraction_pr": "3/8",
+      "extraction_pr": "1237",
       "internal_imports": [],
       "kind": "python_module",
-      "owner": "split",
-      "path": "src/powdrr_lift/core/obligation_review.py",
-      "rationale": "classify each symbol as service policy or public exchanged data",
-      "reviewed": false
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/obligation_review.py",
+      "rationale": "Service-owned bounded obligation review packets, result binding, and targeted repair policy.",
+      "reviewed": true
     },
     {
       "extraction_pr": "3/8",
@@ -2774,7 +2774,7 @@
         "powdrr_service.decision_obligation",
         "powdrr_lift.core.execution_plan",
         "powdrr_lift.core.implementation_packet",
-        "powdrr_lift.core.obligation_review",
+        "powdrr_service.obligation_review",
         "powdrr_lift.core.spec_context",
         "powdrr_lift.core.verification_contract",
         "powdrr_lift.errors",

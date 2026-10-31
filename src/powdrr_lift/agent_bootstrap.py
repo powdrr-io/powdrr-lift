@@ -145,7 +145,7 @@ def run_bootstrap_task(
                     f"Requested taxonomy file does not exist: {selected_taxonomy}"
                 )
             packaged_taxonomy = (
-                files("powdrr_lift.resources")
+                files("powdrr_service.resources")
                 .joinpath("software_development_entity_taxonomy.md")
                 .read_text(encoding="utf-8")
             )

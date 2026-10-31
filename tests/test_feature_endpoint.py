@@ -3864,6 +3864,7 @@ def test_feature_taxonomy_falls_back_to_packaged_resource_for_external_target(
     assert taxonomy.is_file()
     assert "## " in taxonomy.read_text(encoding="utf-8")
     assert "resources" in taxonomy.parts
+    assert "powdrr_service" in taxonomy.parts
 
 
 def test_required_test_obligation_compiles_against_discovered_inventory() -> None:

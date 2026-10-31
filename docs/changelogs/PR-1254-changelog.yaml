@@ -1,0 +1,44 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1254
+title: Move packaged taxonomy resource into service
+intent:
+  problem: The software development entity taxonomy is service-owned policy but is packaged under the legacy powdrr_lift namespace.
+  goal: Move the packaged taxonomy into powdrr_service and update all runtime consumers to load the service-owned resource.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 2096, end_line: 2096}
+  summary: Update the resources package ownership path.
+  rationale: Keep the ownership inventory aligned with the resource's new location.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 2105, end_line: 2105}
+  summary: Update taxonomy resource ownership paths to the service package.
+  rationale: Keep the ownership inventory aligned with the resource's new location.
+- path: src/powdrr_lift/agent_bootstrap.py
+  type: modified
+  span: {start_line: 148, end_line: 148}
+  summary: Load the packaged bootstrap taxonomy from powdrr_service.resources.
+  rationale: Ensure bootstrap uses the service-owned packaged taxonomy.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span: {start_line: 5835, end_line: 5835}
+  summary: Load the packaged feature taxonomy fallback from powdrr_service.resources.
+  rationale: Ensure feature planning resolves the relocated packaged resource.
+- path: tests/test_agent_bootstrap.py
+  type: modified
+  span: {start_line: 8, end_line: 8}
+  summary: Import package resource access for the bootstrap regression.
+  rationale: Read the relocated packaged taxonomy in the test.
+- path: tests/test_agent_bootstrap.py
+  type: modified
+  span: {start_line: 61, end_line: 71}
+  summary: Verify bootstrap copies the contents of the service-packaged taxonomy.
+  rationale: Cover resource packaging and bootstrap behavior after the move.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span: {start_line: 3867, end_line: 3867}
+  summary: Assert feature taxonomy fallback resolves inside powdrr_service.
+  rationale: Prevent regression to the legacy packaged resource path.

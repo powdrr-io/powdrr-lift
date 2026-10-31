@@ -5832,7 +5832,7 @@ def _structrr_taxonomy_path(worktree: Path) -> Path:
     repository_path = worktree / "software_development_entity_taxonomy.md"
     if repository_path.is_file():
         return repository_path
-    packaged_resource = files("powdrr_lift.resources").joinpath(
+    packaged_resource = files("powdrr_service.resources").joinpath(
         "software_development_entity_taxonomy.md"
     )
     packaged_path = Path(str(packaged_resource))

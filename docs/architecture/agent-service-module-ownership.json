@@ -2093,7 +2093,7 @@
       "internal_imports": [],
       "kind": "python_module",
       "owner": "service",
-      "path": "src/powdrr_lift/resources/__init__.py",
+      "path": "packages/service/src/powdrr_service/resources/__init__.py",
       "rationale": "Powdrr-owned taxonomy and semantic policy resource",
       "reviewed": false
     },
@@ -2102,7 +2102,7 @@
       "internal_imports": [],
       "kind": "resource",
       "owner": "service",
-      "path": "src/powdrr_lift/resources/software_development_entity_taxonomy.md",
+      "path": "packages/service/src/powdrr_service/resources/software_development_entity_taxonomy.md",
       "rationale": "Powdrr-owned taxonomy and semantic policy resource",
       "reviewed": false
     },

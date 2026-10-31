@@ -4,11 +4,13 @@ version = "0.1.0"
 description = "Local composition and JSON bridge for Powdrr agent and service."
 requires-python = ">=3.12"
 dependencies = [
+    "fastapi>=0.160,<1",
     "filelock>=3.32.2",
     "jsonschema>=4.25.1",
     "powdrr-agent",
     "powdrr-contracts",
     "powdrr-service",
+    "uvicorn>=0.38,<1",
 ]
 
 [build-system]

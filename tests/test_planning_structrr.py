@@ -644,6 +644,89 @@ def test_structural_page_example_does_not_repeat_prior_subjects() -> None:
     request.parse_answer(request.valid_example)
 
 
+def test_structural_page_correction_fits_with_many_prior_subjects() -> None:
+    text = (
+        "# Plan\n\n## First area\n"
+        + ("a" * 5_000)
+        + "\n\n## Second area\n"
+        + ("b" * 5_000)
+        + "\n"
+    )
+    source = segment_markdown_source(
+        PinnedSourceDocument(
+            repository="owner/repo",
+            commit_sha="a" * 40,
+            path="docs/plan.md",
+            blob_sha="b" * 40,
+            content_sha256=hashlib.sha256(text.encode()).hexdigest(),
+            text=text,
+        )
+    )
+    source_refs = tuple(anchor.id for anchor in source.anchors[-2:])
+    unit = _unit(
+        unit_id="unit-0527",
+        writes=(
+            PlannedWrite("src/new.py", "implementation", "python", source_refs, ()),
+        ),
+    )
+    prior_subjects = tuple(
+        BoundStructuralSubject(
+            f"python::symbol-{index:03d}",
+            "files",
+            "item-0282",
+            "changed",
+            ("req-01", "req-02", "req-03", "req-04"),
+            (unit.id,),
+            source_refs,
+            False,
+            None,
+        )
+        for index in range(24)
+    )
+    request = build_subject_enumeration_request(
+        plan_id="plan-01",
+        item_id="item-0282",
+        units=(unit,),
+        source=source,
+        source_refs=source_refs,
+        projected_baseline={"entities": [], "files": [], "source_subjects": []},
+        prior_subjects=prior_subjects,
+        page_ordinal=4,
+    )
+    prior_facts = [
+        record.value
+        for record in request.accepted_facts
+        if record.ref_id.startswith("prior-subject:")
+    ]
+    assert len(prior_facts) == 24
+    assert {"section": "files", "subject_id": "python::symbol-000"} in prior_facts
+    previous_answer = {
+        "records": [
+            {
+                "section": "files",
+                "subject_ref": f"python::symbol-{index:03d}",
+                "new_identity_description": None,
+                "action": "changed",
+                "requirement_ids": ["req-01", "req-02", "req-03", "req-04"],
+                "unit_ids": [unit.id],
+                "source_refs": list(source_refs),
+            }
+            for index in range(8)
+        ],
+        "has_more": True,
+        "next_anchor": "structural-page-0005",
+    }
+
+    messages = build_question_messages(
+        request,
+        attempt=2,
+        correction=PlanningContractError("/records/0", "invalid planned subject"),
+        previous_answer=previous_answer,
+    )
+
+    assert len(messages[1]["content"]) < 24_000
+
+
 def test_file_subject_can_reference_projected_file_entity_id() -> None:
     baseline = {
         "entities": [],

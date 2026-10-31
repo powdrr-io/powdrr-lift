@@ -501,7 +501,8 @@ def build_subject_enumeration_request(
     )
     prior_facts = tuple(
         ContextRecord(
-            f"prior-subject:{subject.section}:{subject.subject_id}", subject.to_data()
+            f"prior-subject:{subject.section}:{subject.subject_id}",
+            {"section": subject.section, "subject_id": subject.subject_id},
         )
         for subject in prior_subjects
     )

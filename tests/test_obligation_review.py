@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-import pytest
+import importlib.util
 
-from powdrr_lift.core.obligation_review import (
+import pytest
+from powdrr_service.obligation_review import (
     ObligationEvidencePacket,
     ObligationReviewError,
     aggregate_obligation_reviews,
@@ -10,6 +11,10 @@ from powdrr_lift.core.obligation_review import (
     compile_obligation_evidence_packets,
     compile_targeted_repair_packets,
 )
+
+
+def test_legacy_agent_obligation_review_module_is_removed() -> None:
+    assert importlib.util.find_spec("powdrr_lift.core.obligation_review") is None
 
 
 def _packets() -> tuple[ObligationEvidencePacket, ...]:

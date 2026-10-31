@@ -1088,7 +1088,7 @@
       "reviewed": false
     },
     {
-      "extraction_pr": "3/8",
+      "extraction_pr": "1248",
       "internal_imports": [
         "powdrr_service.planning.semantic_decision"
       ],

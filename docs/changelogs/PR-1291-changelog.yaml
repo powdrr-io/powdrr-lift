@@ -1,5 +1,5 @@
 schema: https://powdrr.io/schema/changelog-v2
-change_id: 1290
+change_id: 1291
 title: Record compact planning cost telemetry
 intent:
   problem: Large planning runs expose too little structured timing and provider usage data to identify their slow phases and costly questions.

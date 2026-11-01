@@ -1,0 +1,452 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1264
+title: Move concrete provider clients into service package
+intent:
+  problem: Concrete model-provider request handling still lives in the agent package,
+    coupling provider transport to workflow execution.
+  goal: Make provider clients service-owned and keep only workflow error adaptation
+    and local model setup in the agent.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 984
+    end_line: 984
+  summary: Reassign concrete provider clients and their error types to the service
+    package.
+  rationale: Keep the ownership inventory aligned with the provider transport boundary.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2605
+    end_line: 2605
+  summary: Reassign concrete provider clients and their error types to the service
+    package.
+  rationale: Keep the ownership inventory aligned with the provider transport boundary.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2930
+    end_line: 2930
+  summary: Reassign concrete provider clients and their error types to the service
+    package.
+  rationale: Keep the ownership inventory aligned with the provider transport boundary.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3068
+    end_line: 3068
+  summary: Reassign concrete provider clients and their error types to the service
+    package.
+  rationale: Keep the ownership inventory aligned with the provider transport boundary.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3156
+    end_line: 3156
+  summary: Reassign concrete provider clients and their error types to the service
+    package.
+  rationale: Keep the ownership inventory aligned with the provider transport boundary.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3159
+    end_line: 3160
+  summary: Reassign concrete provider clients and their error types to the service
+    package.
+  rationale: Keep the ownership inventory aligned with the provider transport boundary.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3162
+    end_line: 3163
+  summary: Reassign concrete provider clients and their error types to the service
+    package.
+  rationale: Keep the ownership inventory aligned with the provider transport boundary.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3166
+    end_line: 3166
+  summary: Reassign concrete provider clients and their error types to the service
+    package.
+  rationale: Keep the ownership inventory aligned with the provider transport boundary.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3168
+    end_line: 3168
+  summary: Reassign concrete provider clients and their error types to the service
+    package.
+  rationale: Keep the ownership inventory aligned with the provider transport boundary.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3172
+    end_line: 3173
+  summary: Reassign concrete provider clients and their error types to the service
+    package.
+  rationale: Keep the ownership inventory aligned with the provider transport boundary.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3175
+    end_line: 3175
+  summary: Reassign concrete provider clients and their error types to the service
+    package.
+  rationale: Keep the ownership inventory aligned with the provider transport boundary.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3180
+    end_line: 3190
+  summary: Reassign concrete provider clients and their error types to the service
+    package.
+  rationale: Keep the ownership inventory aligned with the provider transport boundary.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3333
+    end_line: 3333
+  summary: Reassign concrete provider clients and their error types to the service
+    package.
+  rationale: Keep the ownership inventory aligned with the provider transport boundary.
+- path: packages/service/pyproject.toml
+  type: modified
+  span:
+    start_line: 6
+    end_line: 6
+  summary: Declare the provider library dependency for the service package.
+  rationale: The service now constructs and runs concrete provider clients.
+- path: packages/service/src/powdrr_service/providers/clients.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 889
+  summary: Own concrete OpenAI, Anthropic, and local provider clients and response
+    handling.
+  rationale: Move outbound model requests and provider response parsing out of the
+    agent package.
+- path: packages/service/src/powdrr_service/providers/errors.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 24
+  summary: Define service-owned provider transport, HTTP, and response errors.
+  rationale: Let the service report provider failures without depending on agent error
+    classes.
+- path: science/classifications/compare_jev_other_classifiers.py
+  type: modified
+  span:
+    start_line: 30
+    end_line: 30
+  summary: Import provider construction through the agent runtime adapter.
+  rationale: Keep science tooling on the new provider ownership boundary.
+- path: science/classifications/root_disposition/build_dataset.py
+  type: modified
+  span:
+    start_line: 36
+    end_line: 36
+  summary: Import provider construction through the agent runtime adapter.
+  rationale: Keep science tooling on the new provider ownership boundary.
+- path: science/deepswe/acceptance_templates/cli.py
+  type: modified
+  span:
+    start_line: 15
+    end_line: 15
+  summary: Import provider construction through the agent runtime adapter.
+  rationale: Keep the acceptance-template CLI compatible with the new module boundary.
+- path: science/deepswe/test_case_prediction/predictor.py
+  type: modified
+  span:
+    start_line: 17
+    end_line: 17
+  summary: Import provider construction through the agent runtime adapter.
+  rationale: Keep the predictor compatible with the new module boundary.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 285
+    end_line: 285
+  summary: Route CLI provider construction through the agent runtime adapter.
+  rationale: Preserve workflow-facing CLI behavior after extracting concrete clients.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 287
+    end_line: 287
+  summary: Route CLI provider construction through the agent runtime adapter.
+  rationale: Preserve workflow-facing CLI behavior after extracting concrete clients.
+- path: src/powdrr_lift/workrr/credential_check.py
+  type: modified
+  span:
+    start_line: 31
+    end_line: 31
+  summary: Use service-owned provider configuration and selection from the runtime
+    adapter.
+  rationale: Remove imports from the deleted agent provider module.
+- path: src/powdrr_lift/workrr/local_model.py
+  type: modified
+  span:
+    start_line: 5
+    end_line: 5
+  summary: Keep local model cache and context configuration with agent runtime setup.
+  rationale: Resolve machine-local model paths before constructing a service provider
+    client.
+- path: src/powdrr_lift/workrr/local_model.py
+  type: modified
+  span:
+    start_line: 11
+    end_line: 14
+  summary: Keep local model cache and context configuration with agent runtime setup.
+  rationale: Resolve machine-local model paths before constructing a service provider
+    client.
+- path: src/powdrr_lift/workrr/local_model.py
+  type: modified
+  span:
+    start_line: 53
+    end_line: 82
+  summary: Keep local model cache and context configuration with agent runtime setup.
+  rationale: Resolve machine-local model paths before constructing a service provider
+    client.
+- path: src/powdrr_lift/workrr/provider_runtime.py
+  type: modified
+  span:
+    start_line: 11
+    end_line: 11
+  summary: Adapt service provider clients and errors to the workflow runtime contract.
+  rationale: Keep workflow-specific error semantics in the agent while delegating
+    transport to the service.
+- path: src/powdrr_lift/workrr/provider_runtime.py
+  type: modified
+  span:
+    start_line: 14
+    end_line: 14
+  summary: Adapt service provider clients and errors to the workflow runtime contract.
+  rationale: Keep workflow-specific error semantics in the agent while delegating
+    transport to the service.
+- path: src/powdrr_lift/workrr/provider_runtime.py
+  type: modified
+  span:
+    start_line: 16
+    end_line: 22
+  summary: Adapt service provider clients and errors to the workflow runtime contract.
+  rationale: Keep workflow-specific error semantics in the agent while delegating
+    transport to the service.
+- path: src/powdrr_lift/workrr/provider_runtime.py
+  type: modified
+  span:
+    start_line: 27
+    end_line: 31
+  summary: Adapt service provider clients and errors to the workflow runtime contract.
+  rationale: Keep workflow-specific error semantics in the agent while delegating
+    transport to the service.
+- path: src/powdrr_lift/workrr/provider_runtime.py
+  type: modified
+  span:
+    start_line: 37
+    end_line: 37
+  summary: Adapt service provider clients and errors to the workflow runtime contract.
+  rationale: Keep workflow-specific error semantics in the agent while delegating
+    transport to the service.
+- path: src/powdrr_lift/workrr/provider_runtime.py
+  type: modified
+  span:
+    start_line: 39
+    end_line: 44
+  summary: Adapt service provider clients and errors to the workflow runtime contract.
+  rationale: Keep workflow-specific error semantics in the agent while delegating
+    transport to the service.
+- path: src/powdrr_lift/workrr/provider_runtime.py
+  type: modified
+  span:
+    start_line: 46
+    end_line: 46
+  summary: Adapt service provider clients and errors to the workflow runtime contract.
+  rationale: Keep workflow-specific error semantics in the agent while delegating
+    transport to the service.
+- path: src/powdrr_lift/workrr/provider_runtime.py
+  type: modified
+  span:
+    start_line: 50
+    end_line: 135
+  summary: Adapt service provider clients and errors to the workflow runtime contract.
+  rationale: Keep workflow-specific error semantics in the agent while delegating
+    transport to the service.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 170
+    end_line: 170
+  summary: Construct workflow clients through the runtime adapter.
+  rationale: Ensure task execution uses service-owned provider transports.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 184
+    end_line: 184
+  summary: Construct workflow clients through the runtime adapter.
+  rationale: Ensure task execution uses service-owned provider transports.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 186
+    end_line: 189
+  summary: Construct workflow clients through the runtime adapter.
+  rationale: Ensure task execution uses service-owned provider transports.
+- path: tests/test_live_deepinfra_provider.py
+  type: modified
+  span:
+    start_line: 11
+    end_line: 11
+  summary: Import provider runtime interfaces from their new owner.
+  rationale: Keep provider integration coverage aligned with the module split.
+- path: tests/test_module_boundaries.py
+  type: modified
+  span:
+    start_line: 125
+    end_line: 125
+  summary: Assert provider service modules do not import agent modules.
+  rationale: Prevent the service boundary from regressing.
+- path: tests/test_module_boundaries.py
+  type: modified
+  span:
+    start_line: 138
+    end_line: 138
+  summary: Assert provider service modules do not import agent modules.
+  rationale: Prevent the service boundary from regressing.
+- path: tests/test_module_boundaries.py
+  type: modified
+  span:
+    start_line: 143
+    end_line: 143
+  summary: Assert provider service modules do not import agent modules.
+  rationale: Prevent the service boundary from regressing.
+- path: tests/test_module_boundaries.py
+  type: modified
+  span:
+    start_line: 145
+    end_line: 145
+  summary: Assert provider service modules do not import agent modules.
+  rationale: Prevent the service boundary from regressing.
+- path: tests/test_provider_client_boundary.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 62
+  summary: Verify the agent adapter preserves provider error classifications.
+  rationale: Protect workflow handling of HTTP, transport, and repairable response
+    failures.
+- path: tests/test_provider_schema_compatibility.py
+  type: modified
+  span:
+    start_line: 8
+    end_line: 8
+  summary: Exercise concrete provider response parsing through service-owned clients.
+  rationale: Preserve response schema behavior after moving provider implementations.
+- path: tests/test_provider_schema_compatibility.py
+  type: modified
+  span:
+    start_line: 14
+    end_line: 14
+  summary: Exercise concrete provider response parsing through service-owned clients.
+  rationale: Preserve response schema behavior after moving provider implementations.
+- path: tests/test_provider_schema_compatibility.py
+  type: modified
+  span:
+    start_line: 57
+    end_line: 61
+  summary: Exercise concrete provider response parsing through service-owned clients.
+  rationale: Preserve response schema behavior after moving provider implementations.
+- path: tests/test_provider_schema_compatibility.py
+  type: modified
+  span:
+    start_line: 83
+    end_line: 83
+  summary: Exercise concrete provider response parsing through service-owned clients.
+  rationale: Preserve response schema behavior after moving provider implementations.
+- path: tests/test_provider_schema_compatibility.py
+  type: modified
+  span:
+    start_line: 125
+    end_line: 125
+  summary: Exercise concrete provider response parsing through service-owned clients.
+  rationale: Preserve response schema behavior after moving provider implementations.
+- path: tests/test_provider_schema_compatibility.py
+  type: modified
+  span:
+    start_line: 134
+    end_line: 134
+  summary: Exercise concrete provider response parsing through service-owned clients.
+  rationale: Preserve response schema behavior after moving provider implementations.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 3924
+    end_line: 3924
+  summary: Patch the service-owned concrete provider in task-agent tests.
+  rationale: Keep workflow test doubles attached to the extracted implementation.
+- path: tests/test_workrr_procedrr.py
+  type: modified
+  span:
+    start_line: 6
+    end_line: 7
+  summary: Update provider imports in Procedrr workflow coverage.
+  rationale: Keep workflow coverage using the agent runtime adapter.
+- path: tests/test_workrr_procedrr.py
+  type: modified
+  span:
+    start_line: 14
+    end_line: 14
+  summary: Update provider imports in Procedrr workflow coverage.
+  rationale: Keep workflow coverage using the agent runtime adapter.
+- path: tests/test_workrr_procedrr.py
+  type: modified
+  span:
+    start_line: 295
+    end_line: 295
+  summary: Update provider imports in Procedrr workflow coverage.
+  rationale: Keep workflow coverage using the agent runtime adapter.
+entities:
+- id: service-provider-clients
+  type: Module
+  action: added
+- id: service-provider-errors
+  type: Module
+  action: added
+- id: workflow-provider-runtime-adapter
+  type: Module
+  action: added
+- id: provider-client-boundary-tests
+  type: Test suite
+  action: added
+entity_relationships:
+- id: workflow-provider-adapter-wraps-service-client
+  type: calls
+  source: workflow-provider-runtime-adapter
+  target: service-provider-clients
+  action: added
+  description: The agent adapter constructs service clients and translates service
+    errors into workflow errors.
+- id: provider-boundary-tests-cover-adapter
+  type: verifies
+  source: provider-client-boundary-tests
+  target: workflow-provider-runtime-adapter
+  action: added
+  description: Tests verify the adapter preserves HTTP, transport, and response error
+    behavior.
+invariants:
+- id: service-provider-client-is-agent-independent
+  description: Concrete provider clients and provider errors do not import agent modules.
+  action: added
+- id: workflow-error-contract-remains-agent-owned
+  description: Workflow-facing provider failures retain their established agent error
+    categories.
+  action: altered
+guidance:
+- id: provider-runtime-construction
+  description: Construct concrete provider clients through the service client factory
+    and translate workflow-specific errors in the agent adapter.
+  action: added

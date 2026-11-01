@@ -4,11 +4,13 @@ import subprocess
 import sys
 import traceback
 from collections.abc import Callable
+from dataclasses import replace
 from math import ceil
 from pathlib import Path
 from queue import Queue
 from threading import Event, Thread
 from typing import Any, TextIO, cast
+from uuid import uuid4
 
 from rich.text import Text
 from textual import on
@@ -19,7 +21,10 @@ from textual.widgets import Label, ListItem, ListView, TextArea
 
 from powdrr_lift.workrr.chat_config import WorkflowChatConfig
 from powdrr_lift.workrr.execution_state import ProcessExecutionReference
-from powdrr_lift.workrr.procedrr_chat import run_procedrr_workflow_chat
+from powdrr_lift.workrr.procedrr_chat import (
+    WORKFLOW_CHAT_WAITING_FOR_INPUT,
+    run_procedrr_workflow_chat,
+)
 
 run_workflow_chat = run_procedrr_workflow_chat
 
@@ -474,12 +479,33 @@ class WorkflowChatApp(App[None]):
 
     def _run_workflow(self) -> None:
         first_workflow = True
+        awaiting_durable_answer = False
+        run_config = replace(
+            self._config,
+            execution_id=self._config.execution_id or f"chat-{uuid4().hex}",
+            defer_user_input=True,
+            resume_value=None,
+        )
         while not self._stop_requested.is_set():
             if not first_workflow:
                 self._request_submitted.wait()
                 self._request_submitted.clear()
                 if self._stop_requested.is_set():
                     return
+                if awaiting_durable_answer:
+                    answer = self._answers.get()
+                    awaiting_durable_answer = False
+                    run_config = replace(run_config, resume_value=answer)
+                else:
+                    # A completed process starts a fresh execution for the next
+                    # chat message, while a suspended process keeps its ID.
+                    run_config = replace(
+                        self._config,
+                        initial_message=None,
+                        execution_id=f"chat-{uuid4().hex}",
+                        defer_user_input=True,
+                        resume_value=None,
+                    )
             stdout = _TextualStdoutOutput(self)
             stderr = _TextualOutput(self, channel="stderr")
             self._failure_message = None
@@ -489,7 +515,7 @@ class WorkflowChatApp(App[None]):
             self._workflow_active = True
             try:
                 self._exit_code = run_workflow_chat(
-                    self._config,
+                    run_config,
                     input_func=self._next_answer,
                     stdout=cast(TextIO, stdout),
                     stderr=cast(TextIO, stderr),
@@ -509,6 +535,10 @@ class WorkflowChatApp(App[None]):
             if self._stop_requested.is_set():
                 return
             self.call_from_thread(self._finish)
+            if self._exit_code == WORKFLOW_CHAT_WAITING_FOR_INPUT:
+                awaiting_durable_answer = True
+                first_workflow = False
+                continue
             if self._exit_code != 0:
                 return
             first_workflow = False
@@ -768,10 +798,13 @@ class WorkflowChatApp(App[None]):
         self._set_status(f"failed — {message}")
 
     def _finish(self) -> None:
-        if self._exit_code == 0:
+        if self._exit_code in {0, WORKFLOW_CHAT_WAITING_FOR_INPUT}:
             # The agent emits the process-specific completion status through the
             # progress callback; preserve that wording in the final UI state.
-            self._set_status(self._current_status)
+            if self._exit_code == WORKFLOW_CHAT_WAITING_FOR_INPUT:
+                self._set_status("waiting for your response")
+            else:
+                self._set_status(self._current_status)
             if self._response is not None:
                 self._response.disabled = False
                 self._response.focus()

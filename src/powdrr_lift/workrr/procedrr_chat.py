@@ -28,22 +28,30 @@ from powdrr_lift.workrr.chat_config import WorkflowChatConfig
 from powdrr_lift.workrr.chat_context import (
     _load_workflow_context,
     _persist_workflow_context,
+    _resolve_worktree_context,
     _resolve_worktree_for_request,
+    _workflow_context_pr_is_closed,
+    _worktree_reuse_decision,
 )
 from powdrr_lift.workrr.chat_io import _prompt_user
 from powdrr_lift.workrr.execution_state import (
     ProcessExecutionReference,
     _WorkflowExecutionState,
 )
+from powdrr_lift.workrr.paths import is_dedicated_worktree
 from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
 from powdrr_lift.workrr.procedrr_operations import WorkrrOperationExecutor
 from powdrr_lift.workrr.provider_runtime import WorkflowClientRegistry
 from procedrr import ProcessCatalog, ProcessDefinition
+from procedrr_evaluator.evaluator import SuspendEvaluation
 from procedrr_evaluator.runtime import (
     ProcedrrExecutionService,
+    ProcessExecutionCheckpoint,
     ProcessExecutionEvent,
     ProcessTerminalStatus,
 )
+
+WORKFLOW_CHAT_WAITING_FOR_INPUT = 3
 
 
 def run_procedrr_workflow_chat(
@@ -67,22 +75,82 @@ def run_procedrr_workflow_chat(
         print(f"Could not load Procedrr processes: {error}", file=stderr)
         return 1
 
-    workflow_context = _load_workflow_context(
-        configured_repo_root, conversation_id=config.conversation_id
-    )
-    context_data = workflow_context.to_data() if workflow_context is not None else {}
-    if config.initial_message is None:
-        user_request = _prompt_user(
-            "What do you want to do? ",
-            input_func=input_func,
-            stdout=stdout,
-            status_stream=stderr,
+    execution_id = config.execution_id or f"procedrr-chat-{uuid4().hex}"
+    if not all(character.isalnum() or character in "._-" for character in execution_id):
+        print(
+            "The configured execution id contains unsupported characters.", file=stderr
+        )
+        return 1
+    run_directory = configured_repo_root / ".powdrr" / "procedrr-runs"
+    events_path = run_directory / f"{execution_id}.events.jsonl"
+    manifest_path = run_directory / f"{execution_id}.json"
+    resuming = config.resume_value is not None
+    resume_kind: str | None = None
+    resume_worktree_choice: bool | None = None
+    process_input_transcript: list[dict[str, str]] = []
+    resume_manifest: dict[str, Any] | None = None
+    resume_checkpoint: ProcessExecutionCheckpoint | None = None
+    if resuming:
+        if config.execution_id is None:
+            print("Resuming a chat requires its execution id.", file=stderr)
+            return 1
+        try:
+            loaded = json.loads(manifest_path.read_text(encoding="utf-8"))
+            if not isinstance(loaded, dict) or loaded.get("status") != "suspended":
+                raise ValueError("execution is not waiting for user input")
+            if loaded.get("conversation_id") != config.conversation_id:
+                raise ValueError("execution belongs to a different conversation")
+            resume_kind = loaded.get("suspension_kind")
+            if resume_kind == "interpreter":
+                checkpoint_data = loaded.get("checkpoint")
+                if not isinstance(checkpoint_data, Mapping):
+                    raise ValueError("execution manifest has no checkpoint")
+                resume_checkpoint = ProcessExecutionCheckpoint.from_data(
+                    checkpoint_data
+                )
+            elif resume_kind not in {"process_input", "worktree_choice"}:
+                raise ValueError("execution has an unsupported suspension type")
+            resume_manifest = loaded
+        except (OSError, json.JSONDecodeError, ValueError) as error:
+            print(f"Could not resume Procedrr chat: {error}", file=stderr)
+            return 1
+        request = resume_manifest.get("user_request")
+        if not isinstance(request, str) or not request:
+            print("Execution manifest has no original chat request.", file=stderr)
+            return 1
+        if config.initial_message is not None and config.initial_message != request:
+            print("Resume message differs from the original chat request.", file=stderr)
+            return 1
+        user_request = request
+        workflow_context = _load_workflow_context(
+            configured_repo_root, conversation_id=config.conversation_id
+        )
+        saved_bindings = resume_manifest.get("bindings")
+        context_data = (
+            dict(saved_bindings.get("workflow_context", {}))
+            if isinstance(saved_bindings, Mapping)
+            and isinstance(saved_bindings.get("workflow_context", {}), Mapping)
+            else {}
         )
     else:
-        user_request = config.initial_message
-        if not user_request.strip():
-            print("The initial chat message must not be empty.", file=stderr)
-            return 1
+        workflow_context = _load_workflow_context(
+            configured_repo_root, conversation_id=config.conversation_id
+        )
+        context_data = (
+            workflow_context.to_data() if workflow_context is not None else {}
+        )
+        if config.initial_message is None:
+            user_request = _prompt_user(
+                "What do you want to do? ",
+                input_func=input_func,
+                stdout=stdout,
+                status_stream=stderr,
+            )
+        else:
+            user_request = config.initial_message
+            if not user_request.strip():
+                print("The initial chat message must not be empty.", file=stderr)
+                return 1
 
     provider_roles = resolve_provider_roles(
         config.provider,
@@ -124,28 +192,184 @@ def run_procedrr_workflow_chat(
             )
         return process_clients[cache_key]
 
-    selection = _select_process(
-        catalog,
-        procedrr_client("normal"),
-        user_request,
-        context_data,
-    )
-    if selection is None:
-        print("Could not select a Procedrr process.", file=stderr)
-        return 1
-    process = catalog.get(selection)
-    print(f"Matched process: {selection}", file=stdout)
+    resuming_interpreter = resuming and resume_kind == "interpreter"
+    resuming_process_input = resuming and resume_kind in {
+        "process_input",
+        "worktree_choice",
+    }
+    if resuming_interpreter:
+        assert resume_manifest is not None and resume_checkpoint is not None
+        process_id = resume_manifest.get("process_id")
+        if not isinstance(process_id, str):
+            print("Execution manifest has no process id.", file=stderr)
+            return 1
+        try:
+            process = catalog.get(process_id)
+        except KeyError:
+            print(
+                f"The suspended process {process_id!r} is no longer available.",
+                file=stderr,
+            )
+            return 1
+        if process.identity != resume_checkpoint.identity:
+            print("The suspended process definition has changed.", file=stderr)
+            return 1
+        raw_bindings = resume_manifest.get("bindings")
+        if not isinstance(raw_bindings, Mapping):
+            print("Execution manifest has no initial process bindings.", file=stderr)
+            return 1
+        bindings = dict(raw_bindings)
+    elif resuming_process_input:
+        assert resume_manifest is not None
+        process_id = resume_manifest.get("process_id")
+        if not isinstance(process_id, str):
+            print("Execution manifest has no process id.", file=stderr)
+            return 1
+        try:
+            process = catalog.get(process_id)
+        except KeyError:
+            print(
+                f"The suspended process {process_id!r} is no longer available.",
+                file=stderr,
+            )
+            return 1
+        fingerprint = resume_manifest.get("process_fingerprint")
+        if fingerprint != process.identity.fingerprint:
+            print("The suspended process definition has changed.", file=stderr)
+            return 1
+        raw_bindings = resume_manifest.get("bindings")
+        pending_name = resume_manifest.get("pending_input_name")
+        if not isinstance(raw_bindings, Mapping) or not isinstance(pending_name, str):
+            print("Execution manifest has incomplete process input state.", file=stderr)
+            return 1
+        bindings = dict(raw_bindings)
+        saved_transcript = resume_manifest.get("process_input_transcript")
+        if isinstance(saved_transcript, list):
+            process_input_transcript = [
+                dict(entry)
+                for entry in saved_transcript
+                if isinstance(entry, Mapping)
+                and isinstance(entry.get("role"), str)
+                and isinstance(entry.get("content"), str)
+            ]
+        process_input_transcript.extend(
+            [
+                {
+                    "role": "assistant",
+                    "content": str(resume_manifest.get("pending_question", "")),
+                },
+                {"role": "user", "content": config.resume_value or ""},
+            ]
+        )
+        if resume_kind == "worktree_choice":
+            answer = (config.resume_value or "").casefold()
+            if answer not in {
+                "y",
+                "yes",
+                "reuse",
+                "same",
+                "continue",
+                "n",
+                "no",
+                "new",
+            }:
+                print("Please answer yes or no.", file=stderr)
+                print(
+                    str(resume_manifest.get("pending_question", "")),
+                    file=stdout,
+                    flush=True,
+                )
+                return WORKFLOW_CHAT_WAITING_FOR_INPUT
+            resume_worktree_choice = answer in {"y", "yes", "reuse", "same", "continue"}
+            try:
+                bindings = process.validate_inputs(bindings)
+            except ValueError as error:
+                print(f"Invalid process inputs: {error}", file=stderr)
+                return 1
+        else:
+            declaration = _process_input_declaration(process, pending_name)
+            if declaration is None:
+                print("The pending process input is no longer declared.", file=stderr)
+                return 1
+            try:
+                bindings[pending_name] = _parse_process_input(
+                    config.resume_value or "", declaration
+                )
+            except ValueError as error:
+                print(str(error), file=stderr)
+                question = str(resume_manifest.get("pending_question", ""))
+                print(question, file=stdout, flush=True)
+                return WORKFLOW_CHAT_WAITING_FOR_INPUT
+            collected_bindings, pending_input = _collect_process_inputs(
+                process,
+                user_request=user_request,
+                workflow_context=context_data,
+                input_func=input_func,
+                stdout=stdout,
+                stderr=stderr,
+                initial_bindings=bindings,
+                defer_user_input=config.defer_user_input,
+            )
+            if pending_input is not None:
+                _write_preexecution_suspension(
+                    manifest_path,
+                    resume_manifest,
+                    process,
+                    collected_bindings,
+                    pending_input,
+                    suspension_kind="process_input",
+                    process_input_transcript=process_input_transcript,
+                )
+                print(pending_input[1], file=stdout, flush=True)
+                return WORKFLOW_CHAT_WAITING_FOR_INPUT
+            if collected_bindings is None:
+                return 1
+            bindings = collected_bindings
+    else:
+        selection = _select_process(
+            catalog,
+            procedrr_client("normal"),
+            user_request,
+            context_data,
+        )
+        if selection is None:
+            print("Could not select a Procedrr process.", file=stderr)
+            return 1
+        process = catalog.get(selection)
+        print(f"Matched process: {selection}", file=stdout)
 
-    bindings = _collect_process_inputs(
-        process,
-        user_request=user_request,
-        workflow_context=context_data,
-        input_func=input_func,
-        stdout=stdout,
-        stderr=stderr,
-    )
-    if bindings is None:
-        return 1
+        collected_bindings, pending_input = _collect_process_inputs(
+            process,
+            user_request=user_request,
+            workflow_context=context_data,
+            input_func=input_func,
+            stdout=stdout,
+            stderr=stderr,
+            defer_user_input=config.defer_user_input,
+        )
+        if pending_input is not None:
+            _write_preexecution_suspension(
+                manifest_path,
+                {
+                    "schema_version": 1,
+                    "execution_id": execution_id,
+                    "user_request": user_request,
+                    "conversation_id": config.conversation_id,
+                    "workflow_context": context_data,
+                    "process_input_transcript": process_input_transcript,
+                    "started_at": datetime.now(UTC).isoformat(),
+                },
+                process,
+                collected_bindings,
+                pending_input,
+                suspension_kind="process_input",
+                process_input_transcript=process_input_transcript,
+            )
+            print(pending_input[1], file=stdout, flush=True)
+            return WORKFLOW_CHAT_WAITING_FOR_INPUT
+        if collected_bindings is None:
+            return 1
+        bindings = collected_bindings
 
     process_steps = process.document.get("steps", [])
     step_list = process_steps if isinstance(process_steps, list) else []
@@ -154,22 +378,70 @@ def run_procedrr_workflow_chat(
         path=process.path,
         steps=tuple(dict(step) for step in step_list if isinstance(step, Mapping)),
     )
-    worktree_root = _resolve_worktree_for_request(
-        configured_repo_root,
-        request=user_request,
-        selected_process=selected_process,
-        context=workflow_context,
-        input_func=input_func,
-        stdout=stdout,
-        stderr=stderr,
-        verbose=config.verbose,
-    )
-    execution_id = config.execution_id or f"procedrr-chat-{uuid4().hex}"
-    if not all(character.isalnum() or character in "._-" for character in execution_id):
-        print(
-            "The configured execution id contains unsupported characters.", file=stderr
-        )
-        return 1
+    if resuming_interpreter:
+        assert resume_manifest is not None
+        worktree_value = resume_manifest.get("worktree_root")
+        if not isinstance(worktree_value, str):
+            print("Execution manifest has no worktree root.", file=stderr)
+            return 1
+        worktree_root = Path(worktree_value).expanduser().resolve()
+        if not worktree_root.is_dir():
+            print("The suspended chat worktree is no longer available.", file=stderr)
+            return 1
+    else:
+        if resume_worktree_choice is not None and workflow_context is not None:
+            worktree_root = (
+                workflow_context.worktree_root
+                if resume_worktree_choice
+                else _resolve_worktree_context(
+                    configured_repo_root,
+                    stderr=stderr,
+                    verbose=config.verbose,
+                )
+            )
+        else:
+            reuse_decision = _worktree_reuse_decision(
+                user_request, selected_process, workflow_context
+            )
+            if (
+                config.defer_user_input
+                and not is_dedicated_worktree(configured_repo_root)
+                and workflow_context is not None
+                and reuse_decision is None
+                and not _workflow_context_pr_is_closed(workflow_context)
+            ):
+                question = (
+                    "A previous workflow worktree is available. "
+                    "Do you want to reuse it? "
+                )
+                _write_preexecution_suspension(
+                    manifest_path,
+                    {
+                        "schema_version": 1,
+                        "execution_id": execution_id,
+                        "user_request": user_request,
+                        "conversation_id": config.conversation_id,
+                        "workflow_context": context_data,
+                        "process_input_transcript": process_input_transcript,
+                    },
+                    process,
+                    bindings,
+                    ("__worktree_reuse__", question),
+                    suspension_kind="worktree_choice",
+                    process_input_transcript=process_input_transcript,
+                )
+                print(question, file=stdout, flush=True)
+                return WORKFLOW_CHAT_WAITING_FOR_INPUT
+            worktree_root = _resolve_worktree_for_request(
+                configured_repo_root,
+                request=user_request,
+                selected_process=selected_process,
+                context=workflow_context,
+                input_func=input_func,
+                stdout=stdout,
+                stderr=stderr,
+                verbose=config.verbose,
+            )
     runtime = ExecutionRuntime(
         execution_id,
         profile_id=process.name,
@@ -183,7 +455,10 @@ def run_procedrr_workflow_chat(
     state = _WorkflowExecutionState(
         selected_process=selected_process,
         root_process=selected_process,
-        transcript=[{"role": "user", "content": user_request}],
+        transcript=[
+            {"role": "user", "content": user_request},
+            *process_input_transcript,
+        ],
         execution_events=[],
         audit_events=[],
         execution_context=[],
@@ -194,6 +469,10 @@ def run_procedrr_workflow_chat(
         file_added_callback=file_added_callback,
         runtime=runtime,
     )
+    if resuming_interpreter and resume_manifest is not None:
+        saved_state = resume_manifest.get("workflow_state")
+        if isinstance(saved_state, Mapping):
+            _restore_chat_state(state, saved_state)
     operation_adapter = _ChatProcedrrOperations(
         state,
         config,
@@ -240,20 +519,27 @@ def run_procedrr_workflow_chat(
         "jev": jev_client,
     }
 
-    run_directory = configured_repo_root / ".powdrr" / "procedrr-runs"
-    events_path = run_directory / f"{execution_id}.events.jsonl"
-    manifest_path = run_directory / f"{execution_id}.json"
     run_directory.mkdir(parents=True, exist_ok=True)
-    manifest: dict[str, Any] = {
-        "schema_version": 1,
-        "execution_id": execution_id,
-        "process_id": process.identity.process_id,
-        "process_fingerprint": process.identity.fingerprint,
-        "bindings": bindings,
-        "status": "running",
-        "event_cursor": 0,
-        "started_at": datetime.now(UTC).isoformat(),
-    }
+    if resuming_interpreter and resume_manifest is not None:
+        manifest = resume_manifest
+        manifest["status"] = "running"
+        manifest["resumed_at"] = datetime.now(UTC).isoformat()
+        manifest.pop("suspension_kind", None)
+    else:
+        manifest = {
+            "schema_version": 1,
+            "execution_id": execution_id,
+            "process_id": process.identity.process_id,
+            "process_fingerprint": process.identity.fingerprint,
+            "bindings": bindings,
+            "user_request": user_request,
+            "conversation_id": config.conversation_id,
+            "worktree_root": str(worktree_root),
+            "workflow_state": _chat_state_to_data(state),
+            "status": "running",
+            "event_cursor": 0,
+            "started_at": datetime.now(UTC).isoformat(),
+        }
     _write_manifest(manifest_path, manifest)
 
     def persist_event(event: ProcessExecutionEvent) -> None:
@@ -278,7 +564,12 @@ def run_procedrr_workflow_chat(
         event_sink=persist_event,
     )
     try:
-        result = service.execute(process.name, bindings)
+        result = service.execute(
+            process.name,
+            bindings,
+            checkpoint=resume_checkpoint if resuming_interpreter else None,
+            resume_value=config.resume_value if resuming_interpreter else None,
+        )
     except Exception as error:  # noqa: BLE001 - user-facing workflow boundary
         manifest["status"] = "failed"
         manifest["failure"] = f"{type(error).__name__}: {error}"
@@ -293,6 +584,30 @@ def run_procedrr_workflow_chat(
         )
         print(f"Procedrr process failed: {error}", file=stderr)
         return 1
+    if result.terminal_status is ProcessTerminalStatus.SUSPENDED:
+        if result.checkpoint is None or operation_adapter.pending_question is None:
+            manifest["status"] = "failed"
+            manifest["failure"] = (
+                "execution suspended without a durable question checkpoint"
+            )
+            manifest["finished_at"] = datetime.now(UTC).isoformat()
+            _write_manifest(manifest_path, manifest)
+            print(manifest["failure"], file=stderr)
+            return 1
+        manifest["status"] = "suspended"
+        manifest["suspension_kind"] = "interpreter"
+        manifest["checkpoint"] = result.checkpoint.to_data()
+        manifest["pending_question"] = operation_adapter.pending_question
+        manifest["workflow_state"] = _chat_state_to_data(state)
+        manifest["event_cursor"] = result.event_cursor
+        manifest["suspended_at"] = datetime.now(UTC).isoformat()
+        _write_manifest(manifest_path, manifest)
+        print(operation_adapter.pending_question, file=stdout, flush=True)
+        return WORKFLOW_CHAT_WAITING_FOR_INPUT
+    manifest.pop("checkpoint", None)
+    manifest.pop("pending_question", None)
+    manifest.pop("suspension_kind", None)
+    manifest["workflow_state"] = _chat_state_to_data(state)
     manifest["status"] = result.terminal_status.value
     manifest["result_bindings"] = dict(result.bindings)
     manifest["finished_at"] = datetime.now(UTC).isoformat()
@@ -323,6 +638,58 @@ def _write_manifest(path: Path, manifest: Mapping[str, Any]) -> None:
         encoding="utf-8",
     )
     temporary.replace(path)
+
+
+def _chat_state_to_data(state: _WorkflowExecutionState) -> dict[str, Any]:
+    """Serialize the workflow state needed to continue a suspended chat."""
+    return {
+        "transcript": state.transcript,
+        "execution_events": state.execution_events,
+        "audit_events": state.audit_events,
+        "execution_context": state.execution_context,
+        "step_index": state.step_index,
+        "worktree_root": str(state.worktree_root),
+        "error_log_root": str(state.error_log_root),
+        "handoff_records": state.handoff_records,
+        "durable_facts": state.durable_facts,
+        "current_file_path": (
+            str(state.current_file_path)
+            if state.current_file_path is not None
+            else None
+        ),
+        "stalled_step_context": state.stalled_step_context,
+    }
+
+
+def _restore_chat_state(
+    state: _WorkflowExecutionState, data: Mapping[str, Any]
+) -> None:
+    """Restore persisted workflow facts while discarding process-local caches."""
+    for key in ("transcript", "execution_events", "audit_events", "execution_context"):
+        value = data.get(key)
+        if isinstance(value, list):
+            setattr(state, key, value)
+    step_index = data.get("step_index")
+    if isinstance(step_index, int) and not isinstance(step_index, bool):
+        state.step_index = step_index
+    for key in ("worktree_root", "error_log_root"):
+        value = data.get(key)
+        if isinstance(value, str):
+            setattr(state, key, Path(value).expanduser().resolve())
+    for key in ("handoff_records", "durable_facts"):
+        value = data.get(key)
+        if isinstance(value, dict):
+            setattr(state, key, value)
+    current_file_path = data.get("current_file_path")
+    if isinstance(current_file_path, str):
+        state.current_file_path = Path(current_file_path).expanduser().resolve()
+    elif current_file_path is None:
+        state.current_file_path = None
+    stalled_context = data.get("stalled_step_context")
+    if isinstance(stalled_context, list):
+        state.stalled_step_context = stalled_context
+    state.current_file_context_cache.clear()
+    state.fuzzy_match_cache.clear()
 
 
 def _select_process(
@@ -376,15 +743,19 @@ def _collect_process_inputs(
     input_func: Callable[[], str],
     stdout: TextIO,
     stderr: TextIO,
-) -> dict[str, Any] | None:
+    initial_bindings: Mapping[str, Any] | None = None,
+    defer_user_input: bool = False,
+) -> tuple[dict[str, Any] | None, tuple[str, str] | None]:
     declarations = process.document.get("inputs", [])
     if not isinstance(declarations, list):
-        return None
+        return None, None
     bindings: dict[str, Any] = {
         "user_request": user_request,
         "workflow_context": dict(workflow_context),
         "language_labels": [],
     }
+    if initial_bindings is not None:
+        bindings.update(initial_bindings)
     for declaration in declarations:
         if not isinstance(declaration, Mapping):
             continue
@@ -394,37 +765,89 @@ def _collect_process_inputs(
         if declaration.get("required") is not True:
             continue
         prompt = declaration.get("question") or f"Provide {name.replace('_', ' ')}: "
+        if defer_user_input:
+            return bindings, (name, str(prompt))
         answer = _prompt_user(
             str(prompt),
             input_func=input_func,
             stdout=stdout,
             status_stream=stderr,
         )
-        schema = declaration.get("schema")
-        expected_type = (
-            schema.get("type")
-            if isinstance(schema, Mapping)
-            else declaration.get("type")
-        )
-        if expected_type in {"object", "array"}:
-            try:
-                bindings[name] = json.loads(answer)
-            except json.JSONDecodeError:
-                print(f"Expected JSON for {name}.", file=stderr)
-                return None
-        elif expected_type == "integer":
-            try:
-                bindings[name] = int(answer)
-            except ValueError:
-                print(f"Expected an integer for {name}.", file=stderr)
-                return None
-        else:
-            bindings[name] = answer
+        try:
+            bindings[name] = _parse_process_input(answer, declaration)
+        except ValueError as error:
+            print(str(error), file=stderr)
+            return None, None
     try:
-        return process.validate_inputs(bindings)
+        return process.validate_inputs(bindings), None
     except ValueError as error:
         print(f"Invalid process inputs: {error}", file=stderr)
+        return None, None
+
+
+def _process_input_declaration(
+    process: ProcessDefinition, name: str
+) -> Mapping[str, Any] | None:
+    declarations = process.document.get("inputs", [])
+    if not isinstance(declarations, list):
         return None
+    return next(
+        (
+            declaration
+            for declaration in declarations
+            if isinstance(declaration, Mapping) and declaration.get("name") == name
+        ),
+        None,
+    )
+
+
+def _parse_process_input(answer: str, declaration: Mapping[str, Any]) -> Any:
+    name = declaration.get("name")
+    label = name if isinstance(name, str) else "process input"
+    schema = declaration.get("schema")
+    expected_type = (
+        schema.get("type") if isinstance(schema, Mapping) else declaration.get("type")
+    )
+    if expected_type in {"object", "array"}:
+        try:
+            return json.loads(answer)
+        except json.JSONDecodeError as error:
+            raise ValueError(f"Expected JSON for {label}.") from error
+    if expected_type == "integer":
+        try:
+            return int(answer)
+        except ValueError as error:
+            raise ValueError(f"Expected an integer for {label}.") from error
+    return answer
+
+
+def _write_preexecution_suspension(
+    manifest_path: Path,
+    manifest: Mapping[str, Any],
+    process: ProcessDefinition,
+    bindings: Mapping[str, Any] | None,
+    pending_input: tuple[str, str],
+    *,
+    suspension_kind: str,
+    process_input_transcript: list[dict[str, str]],
+) -> None:
+    input_name, question = pending_input
+    manifest_path.parent.mkdir(parents=True, exist_ok=True)
+    suspended = dict(manifest)
+    suspended.update(
+        {
+            "process_id": process.identity.process_id,
+            "process_fingerprint": process.identity.fingerprint,
+            "bindings": dict(bindings or {}),
+            "pending_input_name": input_name,
+            "pending_question": question,
+            "process_input_transcript": process_input_transcript,
+            "suspension_kind": suspension_kind,
+            "status": "suspended",
+            "suspended_at": datetime.now(UTC).isoformat(),
+        }
+    )
+    _write_manifest(manifest_path, suspended)
 
 
 class _ChatProcedrrOperations:
@@ -447,8 +870,48 @@ class _ChatProcedrrOperations:
         self.stdout = stdout
         self.stderr = stderr
         self.handlers = _workflow_action_handlers()
+        self.pending_question: str | None = None
 
     def execute(self, operation: str, parameters: Mapping[str, Any]) -> Any:
+        if operation == "prompt_user":
+            resume = parameters.get("__procedrr_resume__")
+            if isinstance(resume, Mapping):
+                resume_data = resume.get("data")
+                saved_state = (
+                    resume_data.get("workflow_state")
+                    if isinstance(resume_data, Mapping)
+                    else None
+                )
+                if isinstance(saved_state, Mapping):
+                    _restore_chat_state(self.state, saved_state)
+                answer = resume.get("value")
+                if not isinstance(answer, str):
+                    raise ValueError("resumed prompt_user requires a string answer")
+                prompt = _string(parameters.get("text"), "text")
+                self.state.transcript.extend(
+                    [
+                        {"role": "assistant", "content": prompt},
+                        {"role": "user", "content": answer},
+                    ]
+                )
+                self.state.execution_events.append(
+                    {
+                        "kind": "prompt_user",
+                        "text": prompt,
+                        "answer": answer,
+                        "step_index": self.state.step_index,
+                    }
+                )
+                return {"answer": answer}
+            if self.config.defer_user_input:
+                prompt = _string(parameters.get("text"), "text")
+                self.pending_question = prompt
+                raise SuspendEvaluation(
+                    {"answer": ""},
+                    "waiting for a user response",
+                    resume_data={"workflow_state": _chat_state_to_data(self.state)},
+                    resume_with_executor=True,
+                )
         if operation == "respond":
             text = parameters.get("text")
             if not isinstance(text, str):

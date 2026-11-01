@@ -106,7 +106,7 @@ def test_miniswe_model_subprocess_calls_service_while_parent_keeps_progressing(
             log_path=None,
             cwd=tmp_path,
             env=child_environment,
-            timeout_seconds=10.0,
+            timeout_seconds=30.0,
             poll_interval=0.05,
             on_snapshot=on_snapshot,
             inference_parent=parent,

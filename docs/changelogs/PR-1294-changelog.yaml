@@ -1,0 +1,336 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1294
+title: Add workspace job navigation and status view
+intent:
+  problem: The workspace stores autonomous jobs and exposes detailed status, but the browser UI only shows a placeholder for jobs.
+  goal: Let developers browse active and ready jobs in the sidebar and inspect a selected job's current status in the main workspace.
+human-decisions: []
+structured_files: []
+files:
+- path: ui/src/App.css
+  type: modified
+  span:
+    start_line: 31
+    end_line: 31
+  summary: Add the jobs section to the shared sidebar heading layout.
+  rationale: Align the jobs section with existing workspace navigation typography.
+- path: ui/src/App.css
+  type: modified
+  span:
+    start_line: 84
+    end_line: 84
+  summary: Apply the shared sidebar heading text style to the jobs section.
+  rationale: Keep chat and job navigation visually consistent.
+- path: ui/src/App.css
+  type: modified
+  span:
+    start_line: 166
+    end_line: 172
+  summary: Replace the static jobs placeholder with a scrollable job section layout.
+  rationale: Reserve sidebar space for active and ready job lists.
+- path: ui/src/App.css
+  type: modified
+  span:
+    start_line: 170
+    end_line: 170
+  summary: Remove styles that only applied to the placeholder jobs content.
+  rationale: Remove styling no longer used by the live job navigation.
+- path: ui/src/App.css
+  type: modified
+  span:
+    start_line: 175
+    end_line: 194
+  summary: Style job tabs, job rows, status markers, and empty lists.
+  rationale: Make job state and selection clear in the sidebar.
+- path: ui/src/App.css
+  type: modified
+  span:
+    start_line: 222
+    end_line: 255
+  summary: Style job status, progress, blockers, attempts, and output details.
+  rationale: Give job details a clear visual hierarchy in the main workspace.
+- path: ui/src/App.css
+  type: modified
+  span:
+    start_line: 409
+    end_line: 413
+  summary: Adapt the job status view for narrow screens.
+  rationale: Keep status details readable on mobile-sized windows.
+- path: ui/src/App.test.tsx
+  type: modified
+  span:
+    start_line: 5
+    end_line: 5
+  summary: Import the job records used to exercise workspace navigation.
+  rationale: Keep the browser test fixtures aligned with the job API types.
+- path: ui/src/App.test.tsx
+  type: modified
+  span:
+    start_line: 18
+    end_line: 18
+  summary: Add a job detail request mock to the UI test harness.
+  rationale: Test selected-job status without a live API.
+- path: ui/src/App.test.tsx
+  type: modified
+  span:
+    start_line: 79
+    end_line: 79
+  summary: Reset job detail request behavior between UI tests.
+  rationale: Keep navigation tests independent.
+- path: ui/src/App.test.tsx
+  type: modified
+  span:
+    start_line: 195
+    end_line: 267
+  summary: Verify running and ready job tabs, status details, and URL selection.
+  rationale: Cover the main user path from job discovery to status inspection.
+- path: ui/src/App.tsx
+  type: modified
+  span:
+    start_line: 6
+    end_line: 6
+  summary: Import the detailed job status type.
+  rationale: Keep selected-job view data typed.
+- path: ui/src/App.tsx
+  type: modified
+  span:
+    start_line: 8
+    end_line: 8
+  summary: Import the job status view component.
+  rationale: Render details for a selected autonomous job.
+- path: ui/src/App.tsx
+  type: modified
+  span:
+    start_line: 15
+    end_line: 15
+  summary: Read the selected job identifier from the workspace URL.
+  rationale: Restore job selection on page reload.
+- path: ui/src/App.tsx
+  type: modified
+  span:
+    start_line: 20
+    end_line: 20
+  summary: Add job ID to the URL selection model.
+  rationale: Keep the selected workspace item explicit in browser navigation.
+- path: ui/src/App.tsx
+  type: modified
+  span:
+    start_line: 24
+    end_line: 24
+  summary: Allow URL updates to include the selected job.
+  rationale: Support direct links to job status.
+- path: ui/src/App.tsx
+  type: modified
+  span:
+    start_line: 30
+    end_line: 31
+  summary: Set or clear the job query parameter when navigation changes.
+  rationale: Keep chat and job URL selections mutually exclusive.
+- path: ui/src/App.tsx
+  type: modified
+  span:
+    start_line: 84
+    end_line: 120
+  summary: Add accessible sidebar rows with job type and state labels.
+  rationale: Let developers distinguish planning and PR execution work at a glance.
+- path: ui/src/App.tsx
+  type: modified
+  span:
+    start_line: 127
+    end_line: 130
+  summary: Track selected job and its detail in application state.
+  rationale: Maintain navigation and status state for autonomous work.
+- path: ui/src/App.tsx
+  type: modified
+  span:
+    start_line: 148
+    end_line: 148
+  summary: Track job selection across workspace refreshes.
+  rationale: Keep the selected job stable while snapshots update.
+- path: ui/src/App.tsx
+  type: modified
+  span:
+    start_line: 154
+    end_line: 154
+  summary: Resolve the selected job from the latest repository snapshot.
+  rationale: Connect the URL job ID to its persisted summary.
+- path: ui/src/App.tsx
+  type: modified
+  span:
+    start_line: 172
+    end_line: 174
+  summary: Preserve the selected job when refresh chooses a fallback conversation.
+  rationale: Avoid changing the selected workspace view during background refresh.
+- path: ui/src/App.tsx
+  type: modified
+  span:
+    start_line: 180
+    end_line: 180
+  summary: Preserve job selection in the workspace URL after refresh.
+  rationale: Keep the URL aligned with the selected item.
+- path: ui/src/App.tsx
+  type: modified
+  span:
+    start_line: 200
+    end_line: 200
+  summary: Retain restored job selection during initial workspace loading.
+  rationale: Keep direct job links selected after data loads.
+- path: ui/src/App.tsx
+  type: modified
+  span:
+    start_line: 241
+    end_line: 266
+  summary: Load selected job detail and refresh it when its snapshot revision changes.
+  rationale: Keep the status panel synchronized with background job updates.
+- path: ui/src/App.tsx
+  type: modified
+  span:
+    start_line: 323
+    end_line: 324
+  summary: Restore job selection when navigating browser history.
+  rationale: Make back and forward navigation restore the selected job.
+- path: ui/src/App.tsx
+  type: modified
+  span:
+    start_line: 380
+    end_line: 380
+  summary: Clear the selected job after registering a repository.
+  rationale: Avoid carrying job state across repositories.
+- path: ui/src/App.tsx
+  type: modified
+  span:
+    start_line: 382
+    end_line: 382
+  summary: Reset the selected job reference after repository registration.
+  rationale: Prevent refresh logic from retaining an unrelated job.
+- path: ui/src/App.tsx
+  type: modified
+  span:
+    start_line: 400
+    end_line: 401
+  summary: Clear job selection when creating a design conversation.
+  rationale: Show the newly created conversation in the main pane.
+- path: ui/src/App.tsx
+  type: modified
+  span:
+    start_line: 417
+    end_line: 418
+  summary: Clear job selection when choosing a design chat.
+  rationale: Keep one workspace item selected at a time.
+- path: ui/src/App.tsx
+  type: modified
+  span:
+    start_line: 425
+    end_line: 434
+  summary: Select a job independently from conversations and store its URL state.
+  rationale: Open autonomous work in the main status pane.
+- path: ui/src/App.tsx
+  type: modified
+  span:
+    start_line: 482
+    end_line: 483
+  summary: Clear job selection when switching repositories.
+  rationale: Avoid carrying a job from one repository into another.
+- path: ui/src/App.tsx
+  type: modified
+  span:
+    start_line: 521
+    end_line: 525
+  summary: Group active and ready or pending jobs from the workspace snapshot.
+  rationale: Populate the two sidebar tabs from persisted job states.
+- path: ui/src/App.tsx
+  type: modified
+  span:
+    start_line: 565
+    end_line: 569
+  summary: Render the jobs section and tabs in the sidebar.
+  rationale: Replace the placeholder with navigable status groups.
+- path: ui/src/App.tsx
+  type: modified
+  span:
+    start_line: 571
+    end_line: 579
+  summary: List jobs for the selected tab and show its empty state.
+  rationale: Make running and ready work quickly browsable.
+- path: ui/src/App.tsx
+  type: modified
+  span:
+    start_line: 596
+    end_line: 596
+  summary: Show the selected job title in the workspace breadcrumb.
+  rationale: Keep job context visible above its status view.
+- path: ui/src/App.tsx
+  type: modified
+  span:
+    start_line: 621
+    end_line: 628
+  summary: Show selected job details with loading and error feedback in the main pane.
+  rationale: Make the right side of the workspace reflect the selected autonomous job.
+- path: ui/src/api/client.ts
+  type: modified
+  span:
+    start_line: 7
+    end_line: 7
+  summary: Import the job detail response type.
+  rationale: Keep job requests typed at the API client boundary.
+- path: ui/src/api/client.ts
+  type: modified
+  span:
+    start_line: 89
+    end_line: 95
+  summary: Add a client method for loading a repository-scoped job detail record.
+  rationale: Read the existing detailed status projection for selected jobs.
+- path: ui/src/api/types.ts
+  type: modified
+  span:
+    start_line: 61
+    end_line: 103
+  summary: Define typed job, attempt, blocker, and detail records and type snapshot jobs.
+  rationale: Match the existing versioned workspace job API contract.
+- path: ui/src/api/types.ts
+  type: modified
+  span:
+    start_line: 108
+    end_line: 108
+  summary: Replace untyped snapshot jobs with workspace job records.
+  rationale: Let the sidebar group jobs by supported state values.
+- path: ui/src/components/JobStatus.tsx
+  type: added
+  span:
+    start_line: 1
+    end_line: 107
+  summary: Render job state, stage, question, blockers, latest attempt, and outputs.
+  rationale: Provide a focused status view for the autonomous job selected in the sidebar.
+entities:
+- id: workspace-browser-ui
+  type: Module
+  action: modified
+- id: workspace-job-navigation
+  type: Frontend component
+  action: added
+- id: workspace-job-status-view
+  type: Frontend component
+  action: added
+entity_relationships:
+- id: job-navigation-part-of-browser-ui
+  type: part_of
+  source: workspace-job-navigation
+  target: workspace-browser-ui
+  action: added
+  description: The sidebar job navigation is part of the workspace browser UI.
+- id: job-status-part-of-browser-ui
+  type: part_of
+  source: workspace-job-status-view
+  target: workspace-browser-ui
+  action: added
+  description: The selected job status view is part of the workspace browser UI.
+invariants:
+- id: job-status-is-repository-scoped
+  description: A selected job detail is loaded using both its repository ID and job ID, and it is refreshed when the corresponding snapshot revision changes.
+  action: added
+- id: job-navigation-preserves-selection
+  description: Selecting a job stores its ID in the URL and clears the conversation selection so the main pane shows one selected workspace item at a time.
+  action: added
+guidance: []
+features: []
+proposed_prs: []

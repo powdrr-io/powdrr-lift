@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
-import type { Conversation, Message, WorkspaceQuestion, WorkspaceRepository, WorkspaceSnapshot, WorkspaceTurn } from './api/types'
+import type { Conversation, Message, WorkspaceJob, WorkspaceJobDetail, WorkspaceQuestion, WorkspaceRepository, WorkspaceSnapshot, WorkspaceTurn } from './api/types'
 
 const mocks = vi.hoisted(() => ({
   resumeSession: vi.fn(),
@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   messages: vi.fn(),
   sendMessage: vi.fn(),
   answerQuestion: vi.fn(),
+  jobDetail: vi.fn(),
   events: vi.fn(),
 }))
 
@@ -75,6 +76,7 @@ describe('workspace shell', () => {
     mocks.messages.mockResolvedValue([])
     mocks.sendMessage.mockResolvedValue(undefined)
     mocks.answerQuestion.mockResolvedValue(undefined)
+    mocks.jobDetail.mockResolvedValue(undefined)
     mocks.events.mockImplementation((_repositoryId: string, _after: number, signal: AbortSignal) =>
       (async function* () {
         await new Promise<void>((resolve) => {
@@ -189,5 +191,78 @@ describe('workspace shell', () => {
     const questionCard = within(await screen.findByRole('region', { name: 'Interview question' }))
     expect(questionCard.getByText('Answer received')).toBeTruthy()
     expect(questionCard.getByText('Product names')).toBeTruthy()
+  })
+
+  it('lists running and ready jobs and opens the selected job status', async () => {
+    const user = userEvent.setup()
+    const runningJob: WorkspaceJob = {
+      schema_version: 1,
+      job_id: 'job-running',
+      repository_id: 'repo-1',
+      kind: 'planning',
+      title: 'Plan search',
+      state: 'running',
+      conversation_id: null,
+      dependency_ids: [],
+      artifact_refs: [],
+      detail: 'Reviewing related modules.',
+      revision: 2,
+      created_at: '2026-11-01T00:00:00Z',
+      updated_at: '2026-11-01T00:01:00Z',
+    }
+    const readyJob: WorkspaceJob = {
+      ...runningJob,
+      job_id: 'job-ready',
+      kind: 'pr_execution',
+      title: 'Create search PR',
+      state: 'ready',
+      detail: '',
+    }
+    const detail: WorkspaceJobDetail = {
+      schema_version: 1,
+      job: runningJob,
+      latest_attempt: {
+        schema_version: 1,
+        attempt_id: 'attempt-1',
+        run_id: 'run-1',
+        source_spec_revision: 'spec-r3',
+        created_at: '2026-11-01T00:00:00Z',
+      },
+      attempts: [{
+        schema_version: 1,
+        attempt_id: 'attempt-1',
+        run_id: 'run-1',
+        source_spec_revision: 'spec-r3',
+        created_at: '2026-11-01T00:00:00Z',
+      }],
+      stage: 'Gathering repository context',
+      blockers: [],
+      question: null,
+      outputs: ['artifacts/search-plan.md'],
+      allowed_actions: ['cancel'],
+    }
+    mocks.resumeSession.mockResolvedValue(undefined)
+    mocks.listRepositories.mockResolvedValue([repository])
+    mocks.listConversations.mockResolvedValue([conversation])
+    mocks.snapshot.mockResolvedValue({ ...emptySnapshot(), jobs: [runningJob, readyJob] })
+    mocks.messages.mockResolvedValue([userMessage])
+    mocks.jobDetail.mockResolvedValue(detail)
+
+    const { container } = render(<App />)
+
+    const app = within(container)
+    expect(await app.findByRole('button', { name: /Plan search/ })).toBeTruthy()
+    await user.click(app.getByRole('tab', { name: /Ready \/ pending/ }))
+    const readyButton = await app.findByRole('button', { name: /Create search PR/ })
+    expect(readyButton).toBeTruthy()
+    await user.click(app.getByRole('tab', { name: /Running/ }))
+    await user.click(app.getByRole('button', { name: /Plan search/ }))
+
+    expect(await app.findByRole('heading', { name: 'Plan search' })).toBeTruthy()
+    expect(app.getByText('Gathering repository context')).toBeTruthy()
+    expect(app.getByText('run-1')).toBeTruthy()
+    expect(new URL(window.location.href).searchParams.get('job')).toBe('job-running')
+    expect(new URL(window.location.href).searchParams.has('conversation')).toBe(false)
+    expect(mocks.jobDetail).toHaveBeenCalledWith('repo-1', 'job-running')
   })
 })

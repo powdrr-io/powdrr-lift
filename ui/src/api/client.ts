@@ -4,6 +4,7 @@ import type {
   ConversationMessages,
   Message,
   WorkspaceEvent,
+  WorkspaceJobDetail,
   WorkspaceQuestion,
   WorkspaceRepository,
   WorkspaceSnapshot,
@@ -83,6 +84,13 @@ export class WorkspaceClient {
       `${apiRoot}/repositories/${encodeURIComponent(repositoryId)}/snapshot`,
     )
     return (await response.json()) as WorkspaceSnapshot
+  }
+
+  async jobDetail(repositoryId: string, jobId: string): Promise<WorkspaceJobDetail> {
+    const response = await this.read(
+      `${apiRoot}/repositories/${encodeURIComponent(repositoryId)}/jobs/${encodeURIComponent(jobId)}`,
+    )
+    return (await response.json()) as WorkspaceJobDetail
   }
 
   async listConversations(repositoryId: string): Promise<Conversation[]> {

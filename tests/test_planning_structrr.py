@@ -12,6 +12,7 @@ from powdrr_service.planning.dependencies import Validation
 from powdrr_service.planning.driver import (
     SourceLedger,
     SourceLedgerQuestionMachine,
+    _planned_existing_structural_subjects,
     _planned_file_subjects,
 )
 from powdrr_service.planning.questions import build_question_messages
@@ -203,6 +204,8 @@ def test_structural_questions_send_only_relevant_baseline_subjects(
         planned_paths={"src/relevant.py"},
         known_entity_ids={f"file:src/unrelated-{index}.py" for index in range(80)},
         valid_example={"result": "unchanged", "reason": "Already satisfied."},
+        source=source,
+        units=(unit,),
     )
     change_input = build_question_messages(change)[1]["content"]
 
@@ -224,6 +227,11 @@ def test_structural_questions_send_only_relevant_baseline_subjects(
     assert "python::unrelated_0" not in enumeration_input
     assert unrelated_payload not in enumeration_input
     assert "python::relevant" in change_input
+    assert "Implement the deliverable." in change_input
+    assert source_ref in change.question.context_ref_ids
+    assert change.source_excerpts == structrr_module._source_excerpts(
+        source, (source_ref,)
+    )
     assert "python::unrelated_0" not in change_input
     assert unrelated_payload not in change_input
 
@@ -876,6 +884,59 @@ def test_planned_file_subjects_are_bound_deterministically_and_coalesced() -> No
     assert subjects[0].requirement_ids == ("req-01", "req-02")
     assert subjects[0].unit_ids == ("unit-01", "unit-02")
     assert subjects[0].source_refs == ("anchor-01", "anchor-02")
+
+
+def test_existing_structural_candidates_are_bound_from_planned_paths() -> None:
+    unit = _unit(
+        writes=(PlannedWrite("src/changed.py", "implementation", "python", (), ()),)
+    )
+    requirements = {
+        "req-01": Requirement(
+            "req-01", "Update the changed module", "feature", ("anchor-01",), (), ()
+        )
+    }
+    baseline = {
+        "entities": [
+            {"id": "module:changed", "type": "Module"},
+            {"id": "module:other", "type": "Module", "path": "src/other.py"},
+        ],
+        "source_subjects": [
+            {
+                "path": "src/changed.py",
+                "file_entity_id": "module:changed",
+            }
+        ],
+        "entity_relationships": [
+            {
+                "id": "relationship:imports",
+                "source": "module:changed",
+                "relationship": "imports",
+                "target": "module:other",
+            },
+            {
+                "id": "relationship:unrelated",
+                "source": "module:other",
+                "relationship": "imports",
+                "target": "module:elsewhere",
+            },
+        ],
+    }
+
+    subjects = _planned_existing_structural_subjects(
+        "item-01",
+        (unit,),
+        requirement_by_id=requirements,
+        projected_baseline=baseline,
+        fallback_source_refs=("anchor-fallback",),
+    )
+
+    assert [(subject.section, subject.subject_id) for subject in subjects] == [
+        ("entities", "module:changed"),
+        ("entity_relationships", "relationship:imports"),
+    ]
+    assert all(subject.requirement_ids == ("req-01",) for subject in subjects)
+    assert all(subject.unit_ids == (unit.id,) for subject in subjects)
+    assert all(subject.source_refs == ("anchor-01",) for subject in subjects)
 
 
 def test_planned_file_subject_cannot_be_repeated_on_a_later_page() -> None:

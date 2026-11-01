@@ -12,6 +12,7 @@ from powdrr_service.planning.dependencies import Validation
 from powdrr_service.planning.driver import (
     SourceLedger,
     SourceLedgerQuestionMachine,
+    _planned_file_subjects,
 )
 from powdrr_service.planning.questions import build_question_messages
 from powdrr_service.planning.source import (
@@ -211,9 +212,10 @@ def test_structural_questions_send_only_relevant_baseline_subjects(
         enumeration.question.input_digest
         != without_projected_file.question.input_digest
     )
-    assert "Never describe an existing file subject as new" in (
-        enumeration.exact_question
-    )
+    assert "do not return file subjects" in (enumeration.exact_question)
+    assert enumeration.answer_schema["properties"]["records"]["items"]["properties"][
+        "section"
+    ]["enum"] == ["entities", "entity_relationships"]
     subject_ref_schema = enumeration.answer_schema["properties"]["records"]["items"][
         "properties"
     ]["subject_ref"]
@@ -245,12 +247,15 @@ def test_structural_subject_answer_is_reasked_when_projected_context_changes() -
         structrr_baseline={"entities": [], "entity_relationships": [], "files": []},
     )
     unit = _unit(
-        writes=(PlannedWrite("src/new.py", "implementation", "python", (), ()),)
+        writes=(
+            PlannedWrite("src/new.py", "implementation", "python", (), ()),
+            PlannedWrite("src/existing.py", "test", "python", (), ()),
+        )
     )
     item_record = {
         "id": "item-0001",
         "dependencies": [],
-        "allowed_paths": ["src/new.py"],
+        "allowed_paths": ["src/existing.py", "src/new.py"],
         "acceptance_criteria": [],
         "unit_ids": [unit.id],
         "units": [unit],
@@ -273,6 +278,63 @@ def test_structural_subject_answer_is_reasked_when_projected_context_changes() -
     assert [request.question.question_id for request in requests] == [question_id]
     assert machine.invalid_accepted_question_ids == frozenset({question_id})
     assert machine._request_is_pending(requests[0], {question_id: stale_answer})
+
+
+def test_planned_file_subjects_do_not_need_structural_llm_calls() -> None:
+    text = "# Plan\n\nImplement the requested behavior.\n"
+    source = segment_markdown_source(
+        PinnedSourceDocument(
+            repository="owner/repo",
+            commit_sha="a" * 40,
+            path="docs/plan.md",
+            blob_sha="b" * 40,
+            content_sha256=hashlib.sha256(text.encode()).hexdigest(),
+            text=text,
+        )
+    )
+    source_ref = source.anchors[0].id
+    requirement = Requirement(
+        "req-01", "Implement the requested behavior.", "feature", (source_ref,), (), ()
+    )
+    unit = _unit(
+        writes=(PlannedWrite("src/new.py", "implementation", "python", (), ()),)
+    )
+    machine: Any = SourceLedgerQuestionMachine(
+        source,
+        plan_id="plan-01",
+        structrr_baseline={
+            "entities": [],
+            "entity_relationships": [],
+            "files": [{"path": "src/existing.py"}],
+            "source_subjects": [],
+        },
+    )
+    item_record = {
+        "id": "item-0001",
+        "dependencies": [],
+        "allowed_paths": ["src/new.py"],
+        "acceptance_criteria": [],
+        "unit_ids": [unit.id],
+        "units": [unit],
+    }
+    machine._structrr_item_records = lambda _answers: (item_record,)
+    machine.accepted_assembly = lambda _answers, *, plan_id: SimpleNamespace(
+        dependency_graph=SimpleNamespace(item_order=("item-0001",), item_edges=())
+    )
+    machine.accepted_ledger = lambda _answers: SimpleNamespace(
+        requirements=(requirement,)
+    )
+
+    first_request = machine._structrr_requests({})[0]
+    question_id = first_request.question.question_id
+    answer = {"records": [], "has_more": False, "next_anchor": None}
+    machine.set_accepted_question_input_digests(
+        {question_id: first_request.question.input_digest}
+    )
+
+    requests = machine._structrr_requests({question_id: answer})
+
+    assert requests == ()
 
 
 def test_subject_enumeration_uses_unique_refs_for_repeated_planned_write_paths() -> (
@@ -640,7 +702,7 @@ def test_structural_page_example_does_not_repeat_prior_subjects() -> None:
         page_ordinal=2,
     )
 
-    assert request.valid_example["records"][0]["section"] == "files"
+    assert request.valid_example["records"] == []
     request.parse_answer(request.valid_example)
 
 
@@ -672,7 +734,7 @@ def test_structural_page_correction_fits_with_many_prior_subjects() -> None:
     prior_subjects = tuple(
         BoundStructuralSubject(
             f"python::symbol-{index:03d}",
-            "files",
+            "entities",
             "item-0282",
             "changed",
             ("req-01", "req-02", "req-03", "req-04"),
@@ -699,11 +761,11 @@ def test_structural_page_correction_fits_with_many_prior_subjects() -> None:
         if record.ref_id.startswith("prior-subject:")
     ]
     assert len(prior_facts) == 24
-    assert {"section": "files", "subject_id": "python::symbol-000"} in prior_facts
+    assert {"section": "entities", "subject_id": "python::symbol-000"} in prior_facts
     previous_answer = {
         "records": [
             {
-                "section": "files",
+                "section": "entities",
                 "subject_ref": f"python::symbol-{index:03d}",
                 "new_identity_description": None,
                 "action": "changed",
@@ -765,6 +827,86 @@ def test_file_reference_in_entity_section_is_resolved_as_file(
 
     assert page.records[0].section == "files"
     assert page.records[0].subject_id == f"path::{path}"
+
+
+def test_planned_file_subjects_are_bound_deterministically_and_coalesced() -> None:
+    shared_path = "src/shared.py"
+    units = (
+        _unit(
+            "unit-01",
+            ("req-01",),
+            writes=(PlannedWrite(shared_path, "implementation", "python", (), ()),),
+        ),
+        _unit(
+            "unit-02",
+            ("req-02",),
+            writes=(PlannedWrite(shared_path, "test", "python", (), ()),),
+        ),
+    )
+    requirements = {
+        "req-01": Requirement(
+            "req-01", "First change", "feature", ("anchor-01",), (), ()
+        ),
+        "req-02": Requirement(
+            "req-02", "Second change", "feature", ("anchor-02",), (), ()
+        ),
+    }
+
+    subjects = _planned_file_subjects(
+        "item-01",
+        units,
+        requirement_by_id=requirements,
+        projected_baseline={"entities": [], "entity_relationships": [], "files": []},
+        fallback_source_refs=("anchor-fallback",),
+    )
+
+    assert len(subjects) == 1
+    assert subjects[0].subject_id == f"path::{shared_path}"
+    assert subjects[0].action == "added"
+    assert subjects[0].is_new
+    assert subjects[0].requirement_ids == ("req-01", "req-02")
+    assert subjects[0].unit_ids == ("unit-01", "unit-02")
+    assert subjects[0].source_refs == ("anchor-01", "anchor-02")
+
+
+def test_planned_file_subject_cannot_be_repeated_on_a_later_page() -> None:
+    path = "src/new.py"
+    unit = _unit(writes=(PlannedWrite(path, "implementation", "python", (), ()),))
+    record: dict[str, Any] = {
+        "section": "files",
+        "subject_ref": None,
+        "new_identity_description": path,
+        "action": "added",
+        "requirement_ids": ["req-01"],
+        "unit_ids": [unit.id],
+        "source_refs": ["anchor-01"],
+    }
+    page_one = {
+        "records": [record],
+        "has_more": True,
+        "next_anchor": "structural-page-0002",
+    }
+
+    first = _parse_page(page_one, units=(unit,))
+    assert first.records[0].subject_id == f"path::{path}"
+    with pytest.raises(PlanningContractError, match="already enumerated"):
+        _parse_page(
+            {
+                **page_one,
+                "records": [
+                    {
+                        **record,
+                        "subject_ref": f"path::{path}",
+                        "new_identity_description": None,
+                    }
+                ],
+                "has_more": False,
+                "next_anchor": None,
+            },
+            page_ordinal=2,
+            units=(unit,),
+            prior={("files", f"path::{path}")},
+        )
 
 
 def test_subject_page_accepts_all_known_source_references() -> None:
@@ -844,7 +986,7 @@ def test_subject_page_coalesces_shared_planned_file_across_units() -> None:
     assert subject.source_refs == ("anchor-01", "anchor-02")
 
 
-def test_subject_pages_coalesce_shared_planned_file_across_pages() -> None:
+def test_subject_pages_reject_shared_planned_file_repeated_across_pages() -> None:
     path = "attestation/scripts/verify-all.sh"
     units = (
         _unit(
@@ -881,26 +1023,21 @@ def test_subject_pages_coalesce_shared_planned_file_across_pages() -> None:
         source_ids={"anchor-01", "anchor-02"},
         baseline={"entities": [], "files": []},
     )
-    second = _parse_page(
-        _candidate_page(
-            [record("req-02", "unit-02", "anchor-02")],
-            has_more=False,
-            next_anchor=None,
-        ),
-        page_ordinal=2,
-        units=units,
-        requirements={"req-01", "req-02"},
-        source_ids={"anchor-01", "anchor-02"},
-        baseline={"entities": [], "files": []},
-        prior={("files", f"path::{path}")},
-    )
-
-    subjects = complete_subject_enumeration((first, second))
-
-    assert len(subjects) == 1
-    assert subjects[0].requirement_ids == ("req-01", "req-02")
-    assert subjects[0].unit_ids == ("unit-01", "unit-02")
-    assert subjects[0].source_refs == ("anchor-01", "anchor-02")
+    assert first.records[0].subject_id == f"path::{path}"
+    with pytest.raises(PlanningContractError, match="already enumerated"):
+        _parse_page(
+            _candidate_page(
+                [record("req-02", "unit-02", "anchor-02")],
+                has_more=False,
+                next_anchor=None,
+            ),
+            page_ordinal=2,
+            units=units,
+            requirements={"req-01", "req-02"},
+            source_ids={"anchor-01", "anchor-02"},
+            baseline={"entities": [], "files": []},
+            prior={("files", f"path::{path}")},
+        )
 
 
 def test_subject_page_parser_rejects_unknown_existing_reference() -> None:

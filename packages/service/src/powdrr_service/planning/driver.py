@@ -70,6 +70,7 @@ from powdrr_service.planning.source import (
 )
 from powdrr_service.planning.structrr import (
     BoundStructuralSubject,
+    StructuralChange,
     StructuralSubjectPage,
     bind_structural_operation,
     build_structural_change_request,
@@ -81,6 +82,100 @@ from powdrr_service.planning.structrr import (
 )
 from powdrr_service.planning.workflow_ids import slugify_workflow_id
 from powdrr_service.structrr.snapshot import snapshot_digest
+
+
+def _planned_file_subjects(
+    item_id: str,
+    units: Sequence[WorkUnit],
+    *,
+    requirement_by_id: Mapping[str, Requirement],
+    projected_baseline: Mapping[str, Any],
+    fallback_source_refs: Sequence[str],
+) -> tuple[BoundStructuralSubject, ...]:
+    """Bind planned file paths deterministically instead of asking an LLM."""
+    owners_by_path: dict[str, dict[str, set[str]]] = {}
+    for unit in units:
+        for write in unit.planned_writes:
+            if not write.path:
+                continue
+            owner = owners_by_path.setdefault(
+                write.path, {"requirements": set(), "units": set(), "sources": set()}
+            )
+            owner["units"].add(unit.id)
+            owner["requirements"].update(unit.requirement_ids)
+            for requirement_id in unit.requirement_ids:
+                requirement = requirement_by_id.get(requirement_id)
+                if requirement is not None:
+                    owner["sources"].update(requirement.source_refs)
+
+    source_subjects = projected_baseline.get("source_subjects", [])
+    entities = projected_baseline.get("entities", [])
+    files = projected_baseline.get("files", [])
+    subjects: list[BoundStructuralSubject] = []
+    for path, owner in sorted(owners_by_path.items()):
+        existing_record = (
+            next(
+                (
+                    record
+                    for record in source_subjects
+                    if isinstance(record, Mapping)
+                    and (
+                        record.get("path") == path
+                        or record.get("id") in {path, f"file:{path}", f"path::{path}"}
+                    )
+                ),
+                None,
+            )
+            if isinstance(source_subjects, list)
+            else None
+        )
+        if existing_record is None and isinstance(entities, list):
+            existing_record = next(
+                (
+                    record
+                    for record in entities
+                    if isinstance(record, Mapping)
+                    and (
+                        record.get("path") == path
+                        or record.get("id") in {path, f"file:{path}", f"path::{path}"}
+                    )
+                ),
+                None,
+            )
+        if existing_record is None and isinstance(files, list):
+            existing_record = next(
+                (
+                    record
+                    for record in files
+                    if isinstance(record, Mapping) and record.get("path") == path
+                ),
+                None,
+            )
+        stable_key = (
+            existing_record.get("stable_key")
+            if isinstance(existing_record, Mapping)
+            else None
+        )
+        subject_id = (
+            stable_key
+            if isinstance(stable_key, str) and stable_key
+            else f"path::{path}"
+        )
+        source_refs = tuple(sorted(owner["sources"])) or tuple(fallback_source_refs)
+        subjects.append(
+            BoundStructuralSubject(
+                subject_id,
+                "files",
+                item_id,
+                "changed" if existing_record is not None else "added",
+                tuple(sorted(owner["requirements"])),
+                tuple(sorted(owner["units"])),
+                source_refs,
+                existing_record is None,
+                path,
+            )
+        )
+    return tuple(subjects)
 
 
 @dataclass(frozen=True, slots=True)
@@ -1005,8 +1100,15 @@ class SourceLedgerQuestionMachine:
                         for source_ref in requirement_by_id[requirement_id].source_refs
                     )
                 )
+                planned_file_subjects = _planned_file_subjects(
+                    item_id,
+                    units,
+                    requirement_by_id=requirement_by_id,
+                    projected_baseline=projected,
+                    fallback_source_refs=source_refs,
+                )
+                item_subjects = list(planned_file_subjects)
                 page_ordinal = 1
-                item_subjects: list[BoundStructuralSubject] = []
                 item_pages: list[StructuralSubjectPage] = []
                 while True:
                     enumeration_request = build_subject_enumeration_request(
@@ -1045,8 +1147,11 @@ class SourceLedgerQuestionMachine:
                         coalesce_structural_subjects((*item_subjects, *page.records))
                     )
                     if not page.has_more:
-                        subjects_by_item[item_id] = complete_subject_enumeration(
-                            item_pages
+                        subjects_by_item[item_id] = coalesce_structural_subjects(
+                            (
+                                *planned_file_subjects,
+                                *complete_subject_enumeration(item_pages),
+                            )
                         )
                         break
                     page_ordinal += 1
@@ -1073,6 +1178,29 @@ class SourceLedgerQuestionMachine:
                     write.path for unit in units for write in unit.planned_writes
                 }
                 for subject in subjects_by_item[item_id]:
+                    if subject.section == "files":
+                        change = StructuralChange(
+                            subject.subject_id,
+                            subject.section,
+                            subject.item_id,
+                            subject.action,
+                            "change" if subject.is_new else "unchanged",
+                            {"path": subject.planned_path}
+                            if subject.is_new and subject.planned_path is not None
+                            else None,
+                            (
+                                "Planned file path is absent from projected baseline."
+                                if subject.is_new
+                                else "File path already exists in projected baseline."
+                            ),
+                            subject.requirement_ids,
+                            subject.unit_ids,
+                            subject.source_refs,
+                        )
+                        operation = bind_structural_operation(change)
+                        if operation is not None:
+                            batch_operations.append(operation)
+                        continue
                     change_request = build_structural_change_request(
                         subject,
                         projected_baseline=projected,

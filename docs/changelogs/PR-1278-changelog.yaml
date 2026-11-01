@@ -44,17 +44,22 @@ files:
     rationale: A repeated planned file cannot keep pagination alive without adding a subject.
   - path: packages/service/src/powdrr_service/planning/structrr.py
     type: modified
-    span: {start_line: 602, end_line: 602}
+    span: {start_line: 381, end_line: 384}
+    summary: Reject an empty page that claims another structural page remains.
+    rationale: Pagination must make progress before requesting another model response.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 606, end_line: 606}
     summary: Reject model-generated file subjects after structural page parsing.
     rationale: Planned file subjects are now created deterministically by the planner.
   - path: packages/service/src/powdrr_service/planning/structrr.py
     type: modified
-    span: {start_line: 615, end_line: 619}
+    span: {start_line: 619, end_line: 623}
     summary: Return the parsed entity and relationship page after file-subject validation.
     rationale: Keep model output limited to structural identities requiring semantic analysis.
   - path: packages/service/src/powdrr_service/planning/structrr.py
     type: modified
-    span: {start_line: 641, end_line: 646}
+    span: {start_line: 645, end_line: 650}
     summary: Ask the model to enumerate entities and relationships and exclude planned file paths.
     rationale: File paths and ownership are already known from the work-unit write sets.
   - path: packages/service/src/powdrr_service/planning/structrr.py
@@ -64,17 +69,17 @@ files:
     rationale: The model no longer needs to invent or resolve file subject identifiers.
   - path: packages/service/src/powdrr_service/planning/structrr.py
     type: modified
-    span: {start_line: 663, end_line: 663}
+    span: {start_line: 667, end_line: 667}
     summary: Narrow the subject section description to entities and relationships.
     rationale: Match the model's supported enumeration scope.
   - path: packages/service/src/powdrr_service/planning/structrr.py
     type: modified
-    span: {start_line: 666, end_line: 667}
+    span: {start_line: 670, end_line: 671}
     summary: Describe new identity text only for entity and relationship subjects.
     rationale: Planned file paths do not need model-authored identities.
   - path: packages/service/src/powdrr_service/planning/structrr.py
     type: modified
-    span: {start_line: 689, end_line: 691}
+    span: {start_line: 693, end_line: 695}
     summary: Restrict the provider response schema to entities and relationships.
     rationale: Make the deterministic file-subject boundary enforceable by schema validation.
   - path: packages/service/src/powdrr_service/planning/structrr.py
@@ -89,12 +94,12 @@ files:
     rationale: Keep examples consistent with the entity and relationship schema.
   - path: packages/service/src/powdrr_service/planning/structrr.py
     type: modified
-    span: {start_line: 952, end_line: 954}
+    span: {start_line: 956, end_line: 958}
     summary: Parameterize structural page schemas by allowed section names.
     rationale: The enumeration request can enforce its narrower model output contract.
   - path: packages/service/src/powdrr_service/planning/structrr.py
     type: modified
-    span: {start_line: 959, end_line: 959}
+    span: {start_line: 963, end_line: 963}
     summary: Set the section enum from the request's allowed sections.
     rationale: Prevent file subjects from passing schema validation in model pages.
   - path: tests/test_planning_structrr.py
@@ -124,37 +129,42 @@ files:
     rationale: Confirm both new and existing file paths are handled deterministically.
   - path: tests/test_planning_structrr.py
     type: modified
-    span: {start_line: 705, end_line: 705}
+    span: {start_line: 660, end_line: 668}
+    summary: Reject an empty non-final structural page.
+    rationale: Prevent the planner from retrying a pagination cursor that produced no new subjects.
+  - path: tests/test_planning_structrr.py
+    type: modified
+    span: {start_line: 714, end_line: 714}
     summary: Use an entity subject in the pagination correction fixture.
     rationale: Keep model pagination fixtures within the narrowed enumeration scope.
   - path: tests/test_planning_structrr.py
     type: modified
-    span: {start_line: 737, end_line: 737}
+    span: {start_line: 746, end_line: 746}
     summary: Expect entity identity in the prior-subject context fixture.
     rationale: Ensure page context demonstrates only model-enumerated subjects.
   - path: tests/test_planning_structrr.py
     type: modified
-    span: {start_line: 764, end_line: 764}
+    span: {start_line: 773, end_line: 773}
     summary: Use an entity in the previous-page correction response.
     rationale: Align retry examples with the entity and relationship response schema.
   - path: tests/test_planning_structrr.py
     type: modified
-    span: {start_line: 768, end_line: 768}
+    span: {start_line: 777, end_line: 777}
     summary: Preserve the pagination correction context test with the updated subject type.
     rationale: Continue checking the bounded response context after the contract change.
   - path: tests/test_planning_structrr.py
     type: modified
-    span: {start_line: 832, end_line: 911}
+    span: {start_line: 841, end_line: 920}
     summary: Test deterministic coalescing of shared file paths and rejection of repeated page entries.
     rationale: Guard against the no-progress pagination loop found in the durable planning journal.
   - path: tests/test_planning_structrr.py
     type: modified
-    span: {start_line: 989, end_line: 989}
+    span: {start_line: 998, end_line: 998}
     summary: Rename the repeated-file pagination test to reflect rejection.
     rationale: Document the new cross-page invariant in the test name.
   - path: tests/test_planning_structrr.py
     type: modified
-    span: {start_line: 1026, end_line: 1040}
+    span: {start_line: 1035, end_line: 1049}
     summary: Replace cross-page file merging with an explicit repeated-subject rejection assertion.
     rationale: Ensure duplicate file subjects cannot extend enumeration indefinitely.
 entities: []

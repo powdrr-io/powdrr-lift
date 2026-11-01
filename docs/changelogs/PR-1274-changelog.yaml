@@ -1,0 +1,373 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1274
+title: Add structured Procedrr chat workflow events
+intent:
+  problem: Procedrr chat exposes terminal-oriented progress and file callbacks but
+    no shared typed event stream for workspace adapters to persist assistant messages,
+    questions, stages, artifacts, retries, and outcomes.
+  goal: Emit ordered structured chat events through a typed callback and local replay
+    log while preserving existing terminal presentation and resume behavior.
+human-decisions: []
+structured_files: []
+files:
+- path: src/powdrr_lift/workrr/chat_events.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 109
+  summary: Define ordered structured chat event types and emitter.
+  rationale: Provide a transport-independent callback and replay contract.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 36
+    end_line: 41
+  summary: Accept the typed event callback and initialize replay state for each chat
+    execution.
+  rationale: Give workspace adapters structured state without parsing terminal output.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 72
+    end_line: 72
+  summary: Accept the typed event callback and initialize replay state for each chat
+    execution.
+  rationale: Give workspace adapters structured state without parsing terminal output.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 93
+    end_line: 93
+  summary: Accept the typed event callback and initialize replay state for each chat
+    execution.
+  rationale: Give workspace adapters structured state without parsing terminal output.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 143
+    end_line: 143
+  summary: Persist ordered workflow events and report provider retry attempts through
+    the callback.
+  rationale: Give workspace adapters structured state without parsing terminal output.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 164
+    end_line: 200
+  summary: Persist ordered workflow events and report provider retry attempts through
+    the callback.
+  rationale: Give workspace adapters structured state without parsing terminal output.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 218
+    end_line: 234
+  summary: Persist ordered workflow events and report provider retry attempts through
+    the callback.
+  rationale: Give workspace adapters structured state without parsing terminal output.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 255
+    end_line: 255
+  summary: Persist ordered workflow events and report provider retry attempts through
+    the callback.
+  rationale: Give workspace adapters structured state without parsing terminal output.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 341
+    end_line: 346
+  summary: Emit process selection and resumable question events at interview suspension
+    points.
+  rationale: Give workspace adapters structured state without parsing terminal output.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 371
+    end_line: 376
+  summary: Emit process selection and resumable question events at interview suspension
+    points.
+  rationale: Give workspace adapters structured state without parsing terminal output.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 399
+    end_line: 404
+  summary: Emit process selection and resumable question events at interview suspension
+    points.
+  rationale: Give workspace adapters structured state without parsing terminal output.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 419
+    end_line: 422
+  summary: Emit process selection and resumable question events at interview suspension
+    points.
+  rationale: Give workspace adapters structured state without parsing terminal output.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 426
+    end_line: 430
+  summary: Emit process selection and resumable question events at interview suspension
+    points.
+  rationale: Give workspace adapters structured state without parsing terminal output.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 459
+    end_line: 464
+  summary: Emit process selection and resumable question events at interview suspension
+    points.
+  rationale: Give workspace adapters structured state without parsing terminal output.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 530
+    end_line: 535
+  summary: Emit process selection and resumable question events at interview suspension
+    points.
+  rationale: Give workspace adapters structured state without parsing terminal output.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 558
+    end_line: 567
+  summary: Publish artifact and stage events while preserving the existing terminal
+    callbacks.
+  rationale: Give workspace adapters structured state without parsing terminal output.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 582
+    end_line: 582
+  summary: Publish artifact and stage events while preserving the existing terminal
+    callbacks.
+  rationale: Give workspace adapters structured state without parsing terminal output.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 595
+    end_line: 595
+  summary: Publish artifact and stage events while preserving the existing terminal
+    callbacks.
+  rationale: Give workspace adapters structured state without parsing terminal output.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 629
+    end_line: 629
+  summary: Publish artifact and stage events while preserving the existing terminal
+    callbacks.
+  rationale: Give workspace adapters structured state without parsing terminal output.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 656
+    end_line: 656
+  summary: Publish artifact and stage events while preserving the existing terminal
+    callbacks.
+  rationale: Give workspace adapters structured state without parsing terminal output.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 659
+    end_line: 659
+  summary: Publish artifact and stage events while preserving the existing terminal
+    callbacks.
+  rationale: Give workspace adapters structured state without parsing terminal output.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 666
+    end_line: 666
+  summary: Publish artifact and stage events while preserving the existing terminal
+    callbacks.
+  rationale: Give workspace adapters structured state without parsing terminal output.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 668
+    end_line: 678
+  summary: Publish artifact and stage events while preserving the existing terminal
+    callbacks.
+  rationale: Give workspace adapters structured state without parsing terminal output.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 715
+    end_line: 719
+  summary: Report failure, waiting, success, and terminal workflow outcomes.
+  rationale: Give workspace adapters structured state without parsing terminal output.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 730
+    end_line: 734
+  summary: Report failure, waiting, success, and terminal workflow outcomes.
+  rationale: Give workspace adapters structured state without parsing terminal output.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 744
+    end_line: 748
+  summary: Report failure, waiting, success, and terminal workflow outcomes.
+  rationale: Give workspace adapters structured state without parsing terminal output.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 767
+    end_line: 778
+  summary: Report failure, waiting, success, and terminal workflow outcomes.
+  rationale: Give workspace adapters structured state without parsing terminal output.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 780
+    end_line: 781
+  summary: Report failure, waiting, success, and terminal workflow outcomes.
+  rationale: Give workspace adapters structured state without parsing terminal output.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 783
+    end_line: 787
+  summary: Report failure, waiting, success, and terminal workflow outcomes.
+  rationale: Give workspace adapters structured state without parsing terminal output.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 1025
+    end_line: 1025
+  summary: Emit typed assistant message and question events from Procedrr operations.
+  rationale: Give workspace adapters structured state without parsing terminal output.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 1034
+    end_line: 1034
+  summary: Emit typed assistant message and question events from Procedrr operations.
+  rationale: Give workspace adapters structured state without parsing terminal output.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 1037
+    end_line: 1037
+  summary: Emit typed assistant message and question events from Procedrr operations.
+  rationale: Give workspace adapters structured state without parsing terminal output.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 1073
+    end_line: 1079
+  summary: Emit typed assistant message and question events from Procedrr operations.
+  rationale: Give workspace adapters structured state without parsing terminal output.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 1090
+    end_line: 1096
+  summary: Emit typed assistant message and question events from Procedrr operations.
+  rationale: Give workspace adapters structured state without parsing terminal output.
+- path: tests/test_procedrr_chat.py
+  type: modified
+  span:
+    start_line: 18
+    end_line: 21
+  summary: Accept the typed event callback and initialize replay state for each chat
+    execution.
+  rationale: Give workspace adapters structured state without parsing terminal output.
+- path: tests/test_procedrr_chat.py
+  type: modified
+  span:
+    start_line: 345
+    end_line: 345
+  summary: Emit process selection and resumable question events at interview suspension
+    points.
+  rationale: Give workspace adapters structured state without parsing terminal output.
+- path: tests/test_procedrr_chat.py
+  type: modified
+  span:
+    start_line: 352
+    end_line: 352
+  summary: Emit process selection and resumable question events at interview suspension
+    points.
+  rationale: Give workspace adapters structured state without parsing terminal output.
+- path: tests/test_procedrr_chat.py
+  type: modified
+  span:
+    start_line: 363
+    end_line: 386
+  summary: Emit process selection and resumable question events at interview suspension
+    points.
+  rationale: Give workspace adapters structured state without parsing terminal output.
+- path: tests/test_procedrr_chat.py
+  type: modified
+  span:
+    start_line: 390
+    end_line: 390
+  summary: Emit process selection and resumable question events at interview suspension
+    points.
+  rationale: Give workspace adapters structured state without parsing terminal output.
+- path: tests/test_procedrr_chat.py
+  type: modified
+  span:
+    start_line: 405
+    end_line: 405
+  summary: Emit process selection and resumable question events at interview suspension
+    points.
+  rationale: Give workspace adapters structured state without parsing terminal output.
+- path: tests/test_procedrr_chat.py
+  type: modified
+  span:
+    start_line: 413
+    end_line: 418
+  summary: Emit process selection and resumable question events at interview suspension
+    points.
+  rationale: Give workspace adapters structured state without parsing terminal output.
+entities:
+- id: workflow-chat-event
+  type: Struct
+  action: added
+- id: workflow-chat-event-kind
+  type: Enum
+  action: added
+- id: workflow-chat-event-emitter
+  type: Class
+  action: added
+- id: workflow-chat-event-resume-test
+  type: Integration test
+  action: added
+entity_relationships:
+- id: event-emitter-publishes-typed-events
+  type: produces
+  source: workflow-chat-event-emitter
+  target: workflow-chat-event
+  action: added
+  description: The emitter assigns sequence numbers and sends structured events to
+    an optional callback.
+- id: chat-runner-emits-workflow-events
+  type: uses
+  source: workflow-chat-event
+  target: workflow-chat-event-kind
+  action: added
+  description: The chat runner uses typed categories for questions, assistant messages,
+    stages, artifacts, retries, and outcomes.
+- id: event-resume-test-verifies-chat-runner
+  type: verifies
+  source: workflow-chat-event-resume-test
+  target: workflow-chat-event-emitter
+  action: added
+  description: The integration test verifies persisted event order and cursor continuation
+    across interview suspension and resume.
+invariants:
+- id: chat-event-order-survives-resume
+  description: Structured event sequence numbers continue from the local event log
+    when a suspended Procedrr execution resumes.
+  action: added
+- id: chat-event-stream-excludes-raw-provider-failure-text
+  description: Provider retry events include bounded retry metadata and omit raw provider
+    error messages.
+  action: added
+guidance: []

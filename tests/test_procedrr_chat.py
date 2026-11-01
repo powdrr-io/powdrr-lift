@@ -15,6 +15,10 @@ from powdrr_service.decision_classifier import JevSemanticClassifierClient
 
 from powdrr_lift.workrr import chat_context, procedrr_chat
 from powdrr_lift.workrr.chat_config import WorkflowChatConfig
+from powdrr_lift.workrr.chat_events import (
+    WorkflowChatEvent,
+    WorkflowChatEventKind,
+)
 from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
 from powdrr_lift.workrr.procedrr_chat import (
     WORKFLOW_CHAT_WAITING_FOR_INPUT,
@@ -338,12 +342,14 @@ steps:
 
     first_stdout = StringIO()
     first_stderr = StringIO()
+    first_events: list[WorkflowChatEvent] = []
     first_code = run_procedrr_workflow_chat(
         initial,
         procedrr_client_factory=lambda _role: client,
         input_func=lambda: pytest.fail("all process inputs are prebound"),
         stdout=first_stdout,
         stderr=first_stderr,
+        event_callback=first_events.append,
     )
 
     manifest_path = repo_root / ".powdrr" / "procedrr-runs" / f"{execution_id}.json"
@@ -354,9 +360,34 @@ steps:
     assert manifest["checkpoint"]
     assert "Started: Configure the deployment." in first_stdout.getvalue()
     assert "Which region should I use?" in first_stdout.getvalue()
+    assert [
+        event.kind
+        for event in first_events
+        if event.kind
+        in {
+            WorkflowChatEventKind.ASSISTANT_MESSAGE,
+            WorkflowChatEventKind.QUESTION,
+            WorkflowChatEventKind.OUTCOME,
+        }
+    ] == [
+        WorkflowChatEventKind.ASSISTANT_MESSAGE,
+        WorkflowChatEventKind.QUESTION,
+        WorkflowChatEventKind.OUTCOME,
+    ]
+    assert first_events[-1].data["status"] == "waiting_for_input"
+    chat_event_path = (
+        repo_root / ".powdrr" / "procedrr-runs" / f"{execution_id}.chat-events.jsonl"
+    )
+    persisted_events = [
+        json.loads(line) for line in chat_event_path.read_text().splitlines()
+    ]
+    assert [event["sequence"] for event in persisted_events] == list(
+        range(len(first_events))
+    )
 
     resumed_stdout = StringIO()
     resumed_stderr = StringIO()
+    resumed_events: list[WorkflowChatEvent] = []
     resumed_code = run_procedrr_workflow_chat(
         WorkflowChatConfig(
             processes_dir=process_dir,
@@ -371,6 +402,7 @@ steps:
         input_func=lambda: pytest.fail("resuming must not collect new inputs"),
         stdout=resumed_stdout,
         stderr=resumed_stderr,
+        event_callback=resumed_events.append,
     )
 
     assert resumed_code == 0, resumed_stderr.getvalue()
@@ -378,6 +410,12 @@ steps:
     final_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     assert final_manifest["status"] == "succeeded"
     assert "checkpoint" not in final_manifest
+    assert resumed_events[0].sequence == len(first_events)
+    assert resumed_events[-1].kind is WorkflowChatEventKind.OUTCOME
+    assert resumed_events[-1].data["status"] == "succeeded"
+    assert final_manifest["chat_event_cursor"] == len(first_events) + len(
+        resumed_events
+    )
 
 
 def test_chat_suspends_and_resumes_required_process_inputs(

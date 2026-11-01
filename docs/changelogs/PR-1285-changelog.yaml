@@ -1,0 +1,117 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1285
+title: Move reviewed plan defect decisions into service
+intent:
+  problem: The local task agent interprets reviewed implementation steps and decides
+    whether they conflict with files already present in the base commit.
+  goal: Move plan-defect interpretation to service policy while keeping Git reads
+    on the agent and passing their hashes as evidence.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 523
+    end_line: 531
+  summary: Register the service plan-defect policy and its local evidence-collection
+    caller.
+  rationale: Keep source ownership accurate for architecture checks.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3444
+    end_line: 3445
+  summary: Register the service plan-defect policy and its local evidence-collection
+    caller.
+  rationale: Keep source ownership accurate for architecture checks.
+- path: packages/service/src/powdrr_service/planning/reviewed_plan.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 65
+  summary: Interpret implementation steps against base-tree hashes and report reviewed
+    create-existing-file conflicts.
+  rationale: Move proprietary plan-defect decisions to the service while accepting
+    repository evidence as input.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 29
+    end_line: 29
+  summary: Collect base-commit file hashes and delegate reviewed-plan conflict decisions
+    to the service.
+  rationale: Keep Git access local and route interpretation through service policy.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 1017
+    end_line: 1017
+  summary: Collect base-commit file hashes and delegate reviewed-plan conflict decisions
+    to the service.
+  rationale: Keep Git access local and route interpretation through service policy.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 1022
+    end_line: 1022
+  summary: Collect base-commit file hashes and delegate reviewed-plan conflict decisions
+    to the service.
+  rationale: Keep Git access local and route interpretation through service policy.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 1026
+    end_line: 1032
+  summary: Collect base-commit file hashes and delegate reviewed-plan conflict decisions
+    to the service.
+  rationale: Keep Git access local and route interpretation through service policy.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 1035
+    end_line: 1043
+  summary: Collect base-commit file hashes and delegate reviewed-plan conflict decisions
+    to the service.
+  rationale: Keep Git access local and route interpretation through service policy.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 1088
+    end_line: 1107
+  summary: Collect base-commit file hashes and delegate reviewed-plan conflict decisions
+    to the service.
+  rationale: Keep Git access local and route interpretation through service policy.
+- path: tests/test_reviewed_plan_service.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 54
+  summary: Cover actual create-existing conflicts, path mentions, absent files, and
+    unsafe paths.
+  rationale: Verify the service decision directly, alongside existing real-Git adapter
+    tests.
+entities:
+- id: reviewed-plan-defect-policy
+  type: Module
+  action: added
+- id: reviewed-file-creation-conflict-check
+  type: Function
+  action: added
+entity_relationships:
+- id: plan-defect-check-belongs-to-service
+  type: part_of
+  source: reviewed-file-creation-conflict-check
+  target: reviewed-plan-defect-policy
+  action: added
+  description: The service interprets implementation steps and base-file evidence
+    to identify reviewed-plan defects.
+invariants:
+- id: reviewed-plan-conflict-uses-base-file-evidence
+  description: Plan-defect policy receives repository-relative allowed paths, reviewed
+    implementation steps, base commit identity, and hashes gathered locally by the
+    agent. The policy does not perform repository I/O.
+  action: added
+guidance: []
+features: []
+proposed_prs: []

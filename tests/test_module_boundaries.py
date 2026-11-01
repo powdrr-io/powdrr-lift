@@ -141,6 +141,7 @@ def test_service_provider_configuration_does_not_import_legacy_agent_modules() -
     paths = (
         repository / "packages/service/src/powdrr_service/providers/config.py",
         repository / "packages/service/src/powdrr_service/providers/credentials.py",
+        repository / "packages/service/src/powdrr_service/providers/selection.py",
     )
     for path in paths:
         imports = _imported_modules(path)

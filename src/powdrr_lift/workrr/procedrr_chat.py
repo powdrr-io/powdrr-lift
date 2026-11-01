@@ -11,6 +11,11 @@ from pathlib import Path
 from typing import Any, TextIO
 from uuid import uuid4
 
+from powdrr_service.providers.selection import (
+    initial_model_for_provider,
+    resolve_provider_roles,
+)
+
 from powdrr_lift.core import resolve_repo_root
 from powdrr_lift.execution.runtime import ExecutionRuntime
 from powdrr_lift.workrr.actions import (
@@ -33,10 +38,6 @@ from powdrr_lift.workrr.jev_classifier import JevSemanticClassifierClient
 from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
 from powdrr_lift.workrr.procedrr_operations import WorkrrOperationExecutor
 from powdrr_lift.workrr.provider_runtime import WorkflowClientRegistry
-from powdrr_lift.workrr.providers import (
-    initial_model_for_provider,
-    resolve_provider_roles,
-)
 from procedrr import ProcessCatalog, ProcessDefinition
 from procedrr_evaluator.runtime import (
     ProcedrrExecutionService,

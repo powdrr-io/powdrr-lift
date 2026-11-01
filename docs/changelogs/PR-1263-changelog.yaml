@@ -1,0 +1,109 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1263
+title: Move provider selection policy into service package
+intent:
+  problem: Provider choice, model mapping, fallback selection, and context-limit policy remained in the legacy agent provider module.
+  goal: Move provider selection decisions into powdrr_service and update consumers to use that service-owned policy.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 3069, end_line: 3069}
+  summary: Record the service selection dependency for interactive workflow chat.
+  rationale: Keep the ownership inventory aligned with imports.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 3142, end_line: 3153}
+  summary: Update provider runtime ownership dependencies.
+  rationale: Record the provider policy module moved in this change.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 3160, end_line: 3160}
+  summary: Record service provider selection as a provider client dependency.
+  rationale: Keep the architecture inventory aligned with source imports.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 3175, end_line: 3176}
+  summary: Add the provider selection module to the service ownership inventory.
+  rationale: Make provider policy ownership explicit.
+- path: packages/service/src/powdrr_service/providers/selection.py
+  type: added
+  span: {start_line: 1, end_line: 159}
+  summary: Add service-owned provider role, model mapping, fallback, and context-limit selection.
+  rationale: Keep proprietary provider policy within the service package.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span: {start_line: 14, end_line: 18}
+  summary: Import provider and initial model selection from service.
+  rationale: Keep interactive chat consumers on service-owned selection policy.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span: {start_line: 36, end_line: 39}
+  summary: Remove provider selection imports from the legacy provider module.
+  rationale: Avoid retaining a second provider policy location.
+- path: src/powdrr_lift/workrr/provider_runtime.py
+  type: modified
+  span: {start_line: 20, end_line: 23}
+  summary: Import provider roles and context-limit policy from service.
+  rationale: Keep runtime provider configuration on the service implementation.
+- path: src/powdrr_lift/workrr/provider_runtime.py
+  type: modified
+  span: {start_line: 25, end_line: 25}
+  summary: Remove the legacy provider model-limit import.
+  rationale: Use service-owned model context policy.
+- path: src/powdrr_lift/workrr/provider_runtime.py
+  type: modified
+  span: {start_line: 27, end_line: 27}
+  summary: Remove the legacy provider role resolver import.
+  rationale: Use service-owned provider selection.
+- path: src/powdrr_lift/workrr/providers.py
+  type: modified
+  span: {start_line: 20, end_line: 21}
+  summary: Remove model-selection imports from the legacy provider client module.
+  rationale: Keep provider selection policy in the service package.
+- path: src/powdrr_lift/workrr/providers.py
+  type: modified
+  span: {start_line: 25, end_line: 27}
+  summary: Retain only provider configuration types needed by client construction.
+  rationale: Separate provider clients from selection policy.
+- path: src/powdrr_lift/workrr/providers.py
+  type: modified
+  span: {start_line: 28, end_line: 28}
+  summary: Import service provider model limits for client construction.
+  rationale: Keep model limits service-owned.
+- path: src/powdrr_lift/workrr/providers.py
+  type: modified
+  span: {start_line: 29, end_line: 29}
+  summary: Remove the legacy credential discovery import.
+  rationale: Use service-owned credentials and provider discovery.
+- path: src/powdrr_lift/workrr/providers.py
+  type: modified
+  span: {start_line: 59, end_line: 182}
+  summary: Remove provider roles, provider mapping, and model fallback implementations.
+  rationale: Make the service package the sole owner of provider selection policy.
+- path: src/powdrr_lift/workrr/providers.py
+  type: modified
+  span: {start_line: 936, end_line: 950}
+  summary: Remove provider model context-limit policy from the client module.
+  rationale: Use service-owned model limits.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 36, end_line: 39}
+  summary: Import model backup and mapping resolution from the service package.
+  rationale: Keep workflow task model policy service-owned.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 184, end_line: 185}
+  summary: Remove model policy imports from the legacy provider module.
+  rationale: Avoid a legacy provider selection implementation.
+- path: tests/test_module_boundaries.py
+  type: modified
+  span: {start_line: 144, end_line: 144}
+  summary: Check that provider selection remains independent of legacy agent modules.
+  rationale: Enforce the service package boundary.
+- path: tests/test_provider_selection.py
+  type: added
+  span: {start_line: 1, end_line: 66}
+  summary: Test provider priority, explicit mapping, forced models, configuration errors, and context limits.
+  rationale: Protect service-owned provider selection behavior.

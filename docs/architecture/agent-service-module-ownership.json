@@ -3066,6 +3066,7 @@
         "powdrr_lift.workrr.procedrr_operations",
         "powdrr_lift.workrr.provider_runtime",
         "powdrr_lift.workrr.providers",
+        "powdrr_service.providers.selection",
         "procedrr",
         "procedrr_evaluator.runtime"
       ],
@@ -3141,9 +3142,22 @@
     {
       "extraction_pr": "6",
       "internal_imports": [
+        "powdrr_service.providers.config",
+        "powdrr_service.providers.credentials"
+      ],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/providers/selection.py",
+      "rationale": "provider selection, model mapping, fallback, and context-limit policy",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "6",
+      "internal_imports": [
         "powdrr_lift.workrr.exchanges",
         "powdrr_lift.workrr.llm",
         "powdrr_service.providers.config",
+        "powdrr_service.providers.selection",
         "powdrr_lift.workrr.providers"
       ],
       "kind": "python_module",
@@ -3158,7 +3172,8 @@
         "powdrr_lift.errors",
         "powdrr_lift.workrr.llm",
         "powdrr_service.providers.config",
-        "powdrr_service.providers.credentials"
+        "powdrr_service.providers.credentials",
+        "powdrr_service.providers.selection"
       ],
       "kind": "python_module",
       "owner": "service",

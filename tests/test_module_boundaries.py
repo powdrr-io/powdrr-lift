@@ -143,6 +143,7 @@ def test_service_provider_modules_do_not_import_legacy_agent_modules() -> None:
         repository / "packages/service/src/powdrr_service/providers/errors.py",
         repository / "packages/service/src/powdrr_service/providers/selection.py",
         repository / "packages/service/src/powdrr_service/providers/clients.py",
+        repository / "packages/service/src/powdrr_service/decision_classifier.py",
     )
     for path in paths:
         imports = _imported_modules(path)

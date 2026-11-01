@@ -14,14 +14,14 @@ from typing import Any
 
 import yaml
 from jsonschema import validate
-
-from powdrr_lift.workrr import WorkflowLLMClient
-from powdrr_lift.workrr.jev_classifier import (
+from powdrr_service.decision_classifier import (
     JEV_DEFAULT_BASE_URL,
     _call_jev,
     _classifier_request,
     _format_classifier_result,
 )
+
+from powdrr_lift.workrr import WorkflowLLMClient
 from procedrr import parse_and_validate
 from procedrr_evaluator import Evaluator
 from science.deepswe.acceptance_templates.cli import DEFAULT_MODEL, _client

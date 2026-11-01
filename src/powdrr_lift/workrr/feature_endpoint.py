@@ -18,6 +18,9 @@ from powdrr_service.behavior_contract import (
     behavior_scenario_probe_findings,
     compile_behavior_scenarios,
 )
+from powdrr_service.decision_classifier import (
+    preferred_semantic_classifier_client,
+)
 from powdrr_service.decision_obligation import (
     DecisionOutcome,
     DecisionResult,
@@ -128,9 +131,6 @@ from powdrr_lift.workrr.command_catalog import (
 )
 from powdrr_lift.workrr.evidence_reconciliation import reconcile_verification_evidence
 from powdrr_lift.workrr.git import integration_branch_name
-from powdrr_lift.workrr.jev_classifier import (
-    preferred_semantic_classifier_client,
-)
 from powdrr_lift.workrr.postrun_probes import (
     POSTRUN_PROBE_SCHEMA_VERSION,
     PostRunProbe,

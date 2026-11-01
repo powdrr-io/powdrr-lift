@@ -7,16 +7,14 @@ import logging
 import os
 import time
 import uuid
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from concurrent.futures import Future
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Protocol, cast
 from urllib.parse import urlsplit
 from urllib.request import Request, urlopen
 
 from powdrr_service.http_retry import retry_transient_http
-
-from powdrr_lift.workrr.protocol import WorkflowLLMClient
 
 LOGGER = logging.getLogger(__name__)
 JEV_ENDPOINT = "https://api.typesafe.ai/v1/systemone"
@@ -37,6 +35,10 @@ class _PendingDecision:
     future: Future[dict[str, Any]]
 
 
+class _DecisionFallback(Protocol):
+    def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]: ...
+
+
 class _DecisionApiSemanticClassifierClient:
     """Common typed-decision API adapter with optional planning fallback."""
 
@@ -47,7 +49,7 @@ class _DecisionApiSemanticClassifierClient:
 
     def __init__(
         self,
-        fallback: WorkflowLLMClient,
+        fallback: _DecisionFallback,
         *,
         api_key: str | None = None,
         endpoint: str | None = None,
@@ -361,7 +363,7 @@ class JevSemanticClassifierClient(_DecisionApiSemanticClassifierClient):
 
     def __init__(
         self,
-        fallback: WorkflowLLMClient,
+        fallback: _DecisionFallback,
         *,
         api_key: str | None = None,
         endpoint: str | None = None,
@@ -442,7 +444,7 @@ class SubQSemanticClassifierClient(_DecisionApiSemanticClassifierClient):
 
     def __init__(
         self,
-        fallback: WorkflowLLMClient,
+        fallback: _DecisionFallback,
         *,
         api_key: str | None = None,
         endpoint: str | None = None,
@@ -467,7 +469,7 @@ class SubQSemanticClassifierClient(_DecisionApiSemanticClassifierClient):
 
 
 def preferred_semantic_classifier_client(
-    fallback: WorkflowLLMClient, *, fail_closed: bool = False
+    fallback: _DecisionFallback, *, fail_closed: bool = False
 ) -> _DecisionApiSemanticClassifierClient | None:
     """Prefer SubQ, then Jev, and let the caller use its LLM if neither is set."""
     if os.environ.get("SUBQ_API_KEY"):
@@ -482,14 +484,15 @@ def preferred_semantic_classifier_client(
 
 
 def _fallback(
-    client: WorkflowLLMClient,
+    client: _DecisionFallback,
     messages: list[dict[str, str]],
     response_schema: Mapping[str, Any] | None,
 ) -> dict[str, Any]:
     if response_schema is None:
         return client.complete_json(messages)
+    complete_json = cast(Callable[..., dict[str, Any]], client.complete_json)
     try:
-        return client.complete_json(messages, response_schema=response_schema)  # type: ignore[call-arg]
+        return complete_json(messages, response_schema=response_schema)
     except TypeError:
         return client.complete_json(messages)
 

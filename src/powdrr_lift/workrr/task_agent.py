@@ -16,6 +16,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any, TextIO
 
 import yaml
+from powdrr_service.decision_classifier import JevSemanticClassifierClient
 from powdrr_service.planning.multipr_structrr import (
     active_decision_drift_findings,
     inherited_decision_records,
@@ -144,7 +145,6 @@ from powdrr_lift.workrr.git import (
     workflow_id_from_task_id,
 )
 from powdrr_lift.workrr.github_issue_queue import MANUAL_PREREQUISITE_TRIGGER
-from powdrr_lift.workrr.jev_classifier import JevSemanticClassifierClient
 from powdrr_lift.workrr.llm import (
     DEFAULT_MAX_ROUNDTRIPS,
     PowdrrExecutionError,

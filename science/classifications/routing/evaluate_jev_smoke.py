@@ -16,9 +16,9 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "src"))
 
+from powdrr_service import decision_classifier as jev_classifier  # noqa: E402
 from powdrr_service.planning.semantic_decision import SemanticDecisionSpec  # noqa: E402
 
-from powdrr_lift.workrr import jev_classifier  # noqa: E402
 from powdrr_lift.workrr.semantic_contract_compiler import (  # noqa: E402
     CLASSIFIER_DEFINITIONS,
     SOURCE_CLASSIFIER_REVISION,
@@ -229,7 +229,9 @@ def main() -> int:
         "documents_sha256": hashlib.sha256(args.documents.read_bytes()).hexdigest(),
         "implementation_sha256": hashlib.sha256(
             Path(__file__).read_bytes()
-            + (ROOT / "src/powdrr_lift/workrr/jev_classifier.py").read_bytes()
+            + (
+                ROOT / "packages/service/src/powdrr_service/decision_classifier.py"
+            ).read_bytes()
             + (
                 ROOT / "src/powdrr_lift/workrr/semantic_contract_compiler.py"
             ).read_bytes()

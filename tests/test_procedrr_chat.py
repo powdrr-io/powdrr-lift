@@ -11,10 +11,10 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from powdrr_service.decision_classifier import JevSemanticClassifierClient
 
 from powdrr_lift.workrr import chat_context, procedrr_chat
 from powdrr_lift.workrr.chat_config import WorkflowChatConfig
-from powdrr_lift.workrr.jev_classifier import JevSemanticClassifierClient
 from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
 from powdrr_lift.workrr.procedrr_chat import (
     WORKFLOW_CHAT_WAITING_FOR_INPUT,

@@ -1,0 +1,321 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1272
+title: Route MiniSWE model inference through service IPC
+intent:
+  problem: MiniSWE runs as a child process and currently calls LLM providers directly,
+    which exposes provider credentials in the agent process and bypasses the service
+    inference boundary.
+  goal: Keep MiniSWE's agent loop in its worker while sending model requests to the
+    parent service process over a bounded local IPC protocol, with provider credentials
+    held only by the parent.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 1971
+    end_line: 1990
+  summary: Register the local inference IPC transport and MiniSWE model adapter as
+    agent-owned modules.
+  rationale: Keep the worker transport and model integration in the open-source agent
+    boundary.
+- path: src/powdrr_lift/inference_ipc.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 46
+  summary: Add bounded, length-prefixed JSON framing for local inference requests
+    and responses.
+  rationale: Exchange typed service-contract payloads safely across the MiniSWE child-process
+    boundary.
+- path: src/powdrr_lift/minisweagent_inference.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 81
+  summary: Implement a MiniSWE LiteLLM-compatible model that sends requests over IPC
+    and reconstructs provider responses.
+  rationale: Preserve MiniSWE's normal action parsing and cost accounting while moving
+    network inference out of its worker.
+- path: src/powdrr_lift/minisweagent_monitor.py
+  type: modified
+  span:
+    start_line: 9
+    end_line: 9
+  summary: Import socket support for the local worker-service channel.
+  rationale: The process monitor owns the child socket lifecycle.
+- path: src/powdrr_lift/minisweagent_monitor.py
+  type: modified
+  span:
+    start_line: 11
+    end_line: 11
+  summary: Import threading for independent service request dispatch.
+  rationale: Keep model inference from blocking subprocess monitoring and timeout
+    enforcement.
+- path: src/powdrr_lift/minisweagent_monitor.py
+  type: modified
+  span:
+    start_line: 18
+    end_line: 20
+  summary: Use the shared chat request and response contracts with the IPC framing
+    helpers.
+  rationale: Ensure the subprocess boundary uses the same typed payloads as service
+    inference.
+- path: src/powdrr_lift/minisweagent_monitor.py
+  type: modified
+  span:
+    start_line: 156
+    end_line: 159
+  summary: Accept the two IPC sockets and the parent-side inference handler.
+  rationale: Allow MiniSWE process execution to provide inference without exposing
+    a provider client to the worker.
+- path: src/powdrr_lift/minisweagent_monitor.py
+  type: modified
+  span:
+    start_line: 171
+    end_line: 175
+  summary: Validate that IPC sockets and handler are provided together.
+  rationale: Fail early on incomplete inference channel configuration.
+- path: src/powdrr_lift/minisweagent_monitor.py
+  type: modified
+  span:
+    start_line: 183
+    end_line: 183
+  summary: Pass the child socket descriptor through subprocess creation.
+  rationale: Give the worker only its local IPC capability.
+- path: src/powdrr_lift/minisweagent_monitor.py
+  type: modified
+  span:
+    start_line: 185
+    end_line: 195
+  summary: Close the parent's child-descriptor copy and start a daemon request-dispatch
+    thread.
+  rationale: Serve inference requests while the existing process monitor tracks output
+    and timeouts.
+- path: src/powdrr_lift/minisweagent_monitor.py
+  type: modified
+  span:
+    start_line: 311
+    end_line: 314
+  summary: Close the parent IPC socket and briefly join the dispatcher during cleanup.
+  rationale: Release IPC resources after worker completion or timeout.
+- path: src/powdrr_lift/minisweagent_monitor.py
+  type: modified
+  span:
+    start_line: 323
+    end_line: 365
+  summary: Dispatch framed requests to the service handler and return correlated success
+    or error envelopes.
+  rationale: Keep provider inference in the parent and report service errors to the
+    waiting MiniSWE model.
+- path: src/powdrr_lift/minisweagent_session.py
+  type: modified
+  span:
+    start_line: 7
+    end_line: 7
+  summary: Read environment configuration for the worker inference descriptor.
+  rationale: Use the passed local channel when launched by the Powdrr provider.
+- path: src/powdrr_lift/minisweagent_session.py
+  type: modified
+  span:
+    start_line: 47
+    end_line: 55
+  summary: Configure the MiniSWE model class to use the IPC adapter when a descriptor
+    is present.
+  rationale: Keep standalone session behavior available while Powdrr runs use parent-served
+    inference.
+- path: src/powdrr_lift/minisweagent_session.py
+  type: modified
+  span:
+    start_line: 66
+    end_line: 66
+  summary: Apply the assembled model settings to MiniSWE configuration.
+  rationale: Route all Powdrr-launched model queries through the IPC adapter.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 14
+    end_line: 14
+  summary: Import socket support for creating the worker private IPC channel.
+  rationale: Connect each MiniSWE run to the parent service handler.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 24
+    end_line: 24
+  summary: Import the shared inference request and response types.
+  rationale: Keep the injected handler aligned with the service contract.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 728
+    end_line: 730
+  summary: Allow the provider to receive a parent-side inference handler.
+  rationale: Make inference composition injectable for applications and tests.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 752
+    end_line: 754
+  summary: Strip provider credentials from the MiniSWE worker environment.
+  rationale: Prevent the open-source agent subprocess from making direct provider
+    calls.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 756
+    end_line: 756
+  summary: Set MiniSWE silent startup mode.
+  rationale: Keep the child process headless.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 758
+    end_line: 764
+  summary: Create an isolated MiniSWE config directory and a socketpair for inference.
+  rationale: Avoid loading user provider settings into the worker and bind its model
+    to the parent channel.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 758
+    end_line: 773
+  summary: Build the session-module command for fresh, resumed, and large-prompt runs.
+  rationale: Ensure every MiniSWE invocation applies the IPC model configuration.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 775
+    end_line: 795
+  summary: Pass task, resume trajectory, workspace, model, and output settings to
+    the MiniSWE session module.
+  rationale: Preserve task execution behavior while consistently using the IPC-capable
+    entry point.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 882
+    end_line: 884
+  summary: Pass the IPC sockets and parent inference handler to the process monitor.
+  rationale: Serve worker model requests through the injected parent-side service
+    handler.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 894
+    end_line: 896
+  summary: Close sockets and remove temporary MiniSWE configuration after each run.
+  rationale: Avoid leaking process channels or temporary settings across tasks.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 929
+    end_line: 976
+  summary: Remove provider environment variables and compose the default local service
+    inference handler.
+  rationale: Keep provider credentials in the parent and use the existing service
+    bridge and DeepInfra client.
+- path: tests/test_coding_agent.py
+  type: modified
+  span:
+    start_line: 331
+    end_line: 331
+  summary: Set a provider token in the parent test environment.
+  rationale: Verify it is stripped before the MiniSWE subprocess starts.
+- path: tests/test_coding_agent.py
+  type: modified
+  span:
+    start_line: 369
+    end_line: 369
+  summary: Expect the session module command for every MiniSWE run.
+  rationale: Validate use of the IPC-capable entry point.
+- path: tests/test_coding_agent.py
+  type: modified
+  span:
+    start_line: 378
+    end_line: 380
+  summary: Assert provider CLI flags are not used by the session module.
+  rationale: Ensure provider behavior is supplied through the IPC configuration.
+- path: tests/test_coding_agent.py
+  type: modified
+  span:
+    start_line: 388
+    end_line: 391
+  summary: Verify provider secrets are absent from worker env and the IPC handler
+    is configured.
+  rationale: Protect the parent-service credential boundary.
+- path: tests/test_coding_agent.py
+  type: modified
+  span:
+    start_line: 427
+    end_line: 427
+  summary: Update sandbox invocation assertions for the session module command.
+  rationale: Preserve protected-path behavior with the IPC runner.
+- path: tests/test_coding_agent.py
+  type: modified
+  span:
+    start_line: 550
+    end_line: 552
+  summary: Verify both initial and resumed attempts use the session module.
+  rationale: Keep continuation runs on the same inference path.
+- path: tests/test_minisweagent_inference.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 206
+  summary: Exercise the MiniSWE session subprocess through IPC, run a returned bash
+    tool call, submit the task, validate frame exchange, and enforce timeout during
+    outstanding inference.
+  rationale: Prove the worker-service model boundary and cancellation behavior without
+    a live provider.
+entities:
+- id: miniswe-ipc-model-adapter
+  type: Class
+  action: added
+- id: inference-ipc-transport
+  type: Module
+  action: added
+- id: miniswe-parent-inference-dispatch
+  type: Function
+  action: added
+- id: miniswe-agent-provider
+  type: Class
+  action: added
+- id: miniswe-inference-ipc-tests
+  type: Test suite
+  action: added
+entity_relationships:
+- id: miniswe-adapter-uses-ipc-transport
+  type: uses
+  source: miniswe-ipc-model-adapter
+  target: inference-ipc-transport
+  action: added
+  description: The MiniSWE model adapter sends typed chat requests and receives responses
+    using the framed IPC transport.
+- id: parent-dispatch-calls-inference-handler
+  type: calls
+  source: miniswe-parent-inference-dispatch
+  target: miniswe-agent-provider
+  action: added
+  description: The parent process routes worker requests to the configured service
+    inference handler.
+- id: ipc-tests-verify-miniswe-inference-flow
+  type: verifies
+  source: miniswe-inference-ipc-tests
+  target: miniswe-ipc-model-adapter
+  action: added
+  description: Tests run a MiniSWE session subprocess through the service IPC path,
+    execute a returned tool call, submit, and enforce timeout during outstanding inference.
+invariants:
+- id: provider-credentials-stay-out-of-miniswe-worker
+  description: MiniSWE worker processes do not receive provider API keys or base URLs;
+    model requests are served by the parent process.
+  action: added
+- id: miniswe-worker-timeout-remains-enforced-during-inference
+  description: The parent continues monitoring and can terminate the MiniSWE worker
+    when its timeout expires during a pending service inference request.
+  action: added
+guidance: []
+features: []
+proposed_prs: []

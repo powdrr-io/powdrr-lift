@@ -11,6 +11,7 @@ import hashlib
 import json
 import os
 import shutil
+import socket
 import subprocess
 import sys
 import tempfile
@@ -20,6 +21,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any, Protocol, cast
 
+from powdrr_contracts.models import ChatCompletionRequest, ChatCompletionResponse
 from powdrr_service.behavior_contract import BehaviorScenario
 from powdrr_service.intent_packet import IntentPacket
 
@@ -723,6 +725,9 @@ class MiniSWEAgentProvider:
     prompt_suffix: str = ""
     progress_callback: Callable[[str], None] | None = None
     write_denied_paths: tuple[Path, ...] = ()
+    inference_handler: (
+        Callable[[ChatCompletionRequest], ChatCompletionResponse] | None
+    ) = None
     session_trajectory: Path | None = field(default=None, init=False)
 
     def prepare_request(self, request: ImplementationRequest) -> ImplementationRequest:
@@ -744,33 +749,20 @@ class MiniSWEAgentProvider:
         )
         environment = os.environ.copy()
         environment.pop("VIRTUAL_ENV", None)
-        # mini-swe-agent v2 otherwise launches its first-run interactive setup
-        # when the container has no user config. Coding-agent runs are always
-        # headless, so mark setup complete and rely on the explicit model and
-        # provider credentials supplied by Powdrr.
+        _remove_provider_credentials(environment)
+        # Avoid loading per-user MiniSWE .env files in the worker. Provider
+        # credentials remain available only to the parent service process.
         environment["MSWEA_CONFIGURED"] = "true"
-        if environment.get("DEEPINFRA_API_KEY") is None:
-            token = environment.get("DEEPINFRA_API_TOKEN")
-            if token:
-                environment["DEEPINFRA_API_KEY"] = token
+        environment["MSWEA_SILENT_STARTUP"] = "true"
         environment["PWD"] = str(workspace_root)
+        inference_config_root = Path(tempfile.mkdtemp(prefix="powdrr-miniswe-config-"))
+        environment["MSWEA_GLOBAL_CONFIG_DIR"] = str(inference_config_root)
+        inference_parent, inference_child = socket.socketpair()
+        environment["POWDRR_MINISWE_INFERENCE_FD"] = str(inference_child.fileno())
+        inference_handler = self.inference_handler or _local_service_inference_handler(
+            self.timeout_seconds
+        )
         mini_config = _miniswe_builtin_config(self.executable)
-        command = [
-            self.executable,
-        ]
-        if mini_config is not None:
-            # mini's LocalEnvironment gives its configured cwd precedence over
-            # the subprocess cwd. Preserve the built-in defaults, then bind
-            # that setting to the task worktree so a global config cannot make
-            # the worker inspect a sibling checkout.
-            command.extend(
-                (
-                    "--config",
-                    str(mini_config),
-                    "--config",
-                    f"environment.cwd={workspace_root}",
-                )
-            )
         output_path = (
             self.diagnostics_root / f"{attempt_id}.traj.json"
             if self.diagnostics_root is not None
@@ -780,53 +772,27 @@ class MiniSWEAgentProvider:
         use_task_file = len(task_prompt.encode("utf-8")) > (
             MINISWEAGENT_MAX_TASK_ARGUMENT_BYTES
         )
-        if self.session_trajectory is None:
-            if not use_task_file:
-                command.extend(
-                    [
-                        "--task",
-                        task_prompt,
-                        "--yolo",
-                        "--exit-immediately",
-                        # Powdrr owns the wall-clock budget and can continue a partial
-                        # attempt locally. mini's default dollar limit otherwise exits
-                        # cleanly in the middle of an implementation.
-                        "--cost-limit",
-                        "0",
-                    ]
-                )
-                if self.model is not None:
-                    command.extend(("--model", self.model))
-        if self.session_trajectory is not None or use_task_file:
-            # mini has no CLI resume flag. Restore its saved conversation and
-            # append this request as another user message in the same session.
-            # For large prompts, use the Python entry point and read task text
-            # from a file to stay below the operating system's per-argument limit.
-            command = [
-                sys.executable,
-                "-m",
-                "powdrr_lift.minisweagent_session",
-            ]
-            if self.session_trajectory is not None:
-                command.extend(("--previous", str(self.session_trajectory)))
-            if use_task_file:
-                with tempfile.NamedTemporaryFile(
-                    mode="w",
-                    encoding="utf-8",
-                    prefix="powdrr-miniswe-task-",
-                    suffix=".txt",
-                    delete=False,
-                ) as task_stream:
-                    task_stream.write(task_prompt)
-                    task_file = Path(task_stream.name)
-                command.extend(("--task-file", str(task_file)))
-            else:
-                command.extend(("--task", task_prompt))
-            if mini_config is not None:
-                command.extend(("--config", str(mini_config)))
-            command.extend(("--config", f"environment.cwd={workspace_root}"))
-            if self.model is not None:
-                command.extend(("--model", self.model))
+        command = [sys.executable, "-m", "powdrr_lift.minisweagent_session"]
+        if self.session_trajectory is not None:
+            command.extend(("--previous", str(self.session_trajectory)))
+        if use_task_file:
+            with tempfile.NamedTemporaryFile(
+                mode="w",
+                encoding="utf-8",
+                prefix="powdrr-miniswe-task-",
+                suffix=".txt",
+                delete=False,
+            ) as task_stream:
+                task_stream.write(task_prompt)
+                task_file = Path(task_stream.name)
+            command.extend(("--task-file", str(task_file)))
+        else:
+            command.extend(("--task", task_prompt))
+        if mini_config is not None:
+            command.extend(("--config", str(mini_config)))
+        command.extend(("--config", f"environment.cwd={workspace_root}"))
+        if self.model is not None:
+            command.extend(("--model", self.model))
         if output_path is not None:
             assert self.diagnostics_root is not None
             self.diagnostics_root.mkdir(parents=True, exist_ok=True)
@@ -913,6 +879,9 @@ class MiniSWEAgentProvider:
                 cwd=worktree_root,
                 env=environment,
                 timeout_seconds=self.timeout_seconds,
+                inference_parent=inference_parent,
+                inference_child=inference_child,
+                inference_handler=inference_handler,
                 on_snapshot=(
                     report_progress if self.progress_callback is not None else None
                 ),
@@ -922,6 +891,9 @@ class MiniSWEAgentProvider:
                 task_file.unlink(missing_ok=True)
             if sandbox_profile is not None:
                 sandbox_profile.unlink(missing_ok=True)
+            inference_parent.close()
+            inference_child.close()
+            shutil.rmtree(inference_config_root, ignore_errors=True)
         if output_path is not None and output_path.exists():
             self.session_trajectory = output_path
         if completed.returncode == 0 and self.diagnostics_root is not None:
@@ -952,6 +924,54 @@ def _seatbelt_write_deny_profile(paths: Sequence[Path]) -> str:
         f"(deny file-write* (subpath {json.dumps(path)}))" for path in denied_paths
     )
     return "\n".join(rules) + "\n"
+
+
+_PROVIDER_ENVIRONMENT_NAMES = frozenset(
+    {
+        "OPENAI_API_KEY",
+        "OPENAI_BASE_URL",
+        "CODEX_API_KEY",
+        "CODEX_BASE_URL",
+        "ANTHROPIC_API_KEY",
+        "ANTHROPIC_AUTH_TOKEN",
+        "ANTHROPIC_BASE_URL",
+        "CLAUDE_API_KEY",
+        "DEEPINFRA_API_KEY",
+        "DEEPINFRA_API_TOKEN",
+        "DEEPINFRA_BASE_URL",
+        "DEEPINFRA_CHAT_COMPLETIONS_URL",
+        "OPENROUTER_API_KEY",
+        "OPENROUTER_BASE_URL",
+        "ZAI_API_KEY",
+        "ZAI_BASE_URL",
+        "GLM_API_KEY",
+        "SUBQ_API_KEY",
+        "SUBQ_BASE_URL",
+        "TYPESAFEAI_API_KEY",
+        "TYPESAFE_API_KEY",
+        "SYSTEM_ONE_API_KEY",
+        "SYSTEM_ONE_BASE_URL",
+    }
+)
+
+
+def _remove_provider_credentials(environment: dict[str, str]) -> None:
+    for name in _PROVIDER_ENVIRONMENT_NAMES:
+        environment.pop(name, None)
+
+
+def _local_service_inference_handler(
+    worker_timeout_seconds: float,
+) -> Callable[[ChatCompletionRequest], ChatCompletionResponse]:
+    """Build the local service bridge used by the MiniSWE parent process."""
+    from powdrr_local import JsonServiceBridge, LocalPowdrrService
+    from powdrr_service.providers.inference import DeepInfraInferenceClient
+
+    request_timeout = max(0.1, min(120.0, worker_timeout_seconds * 0.8))
+    service = LocalPowdrrService(
+        inference_client=DeepInfraInferenceClient(timeout=request_timeout)
+    )
+    return JsonServiceBridge(service).infer
 
 
 def _miniswe_builtin_config(executable: str) -> Path | None:

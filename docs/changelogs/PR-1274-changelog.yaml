@@ -1,5 +1,5 @@
 schema: https://powdrr.io/schema/changelog-v2
-change_id: 1273
+change_id: 1274
 title: Add structured Procedrr chat workflow events
 intent:
   problem: Procedrr chat exposes terminal-oriented progress and file callbacks but

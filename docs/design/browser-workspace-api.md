@@ -28,7 +28,10 @@ token for browser memory:
 The bootstrap token is consumed atomically in SQLite, so separate service
 processes cannot exchange it more than once. Mutating requests must include the
 exact configured `Origin` and the returned `X-CSRF-Token`. The cookie is not
-readable by browser JavaScript.
+readable by browser JavaScript. After a browser reload, call
+`POST /api/v1/session/refresh` with the configured `Origin`; the live session
+cookie authorizes an atomic CSRF-token rotation. Keep the returned token in
+browser memory. Requests from another origin cannot refresh a token.
 
 ## Repository and conversation requests
 

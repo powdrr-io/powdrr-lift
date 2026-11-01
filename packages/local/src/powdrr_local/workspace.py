@@ -732,6 +732,18 @@ class WorkspaceStore:
             ).fetchone()
             return None if row is None else str(row["csrf_digest"])
 
+    def rotate_api_session_csrf_digest(
+        self, session_digest: str, *, csrf_digest: str, now: str
+    ) -> bool:
+        """Rotate a live session's CSRF token after checking its cookie identity."""
+        with self._connection() as db:
+            cursor = db.execute(
+                "UPDATE api_sessions SET csrf_digest=? "
+                "WHERE session_digest=? AND expires_at>?",
+                (csrf_digest, session_digest, now),
+            )
+            return cursor.rowcount == 1
+
     def revoke_api_session(self, session_digest: str) -> None:
         with self._connection() as db:
             db.execute(

@@ -1,0 +1,96 @@
+/** Browser-facing records from the versioned powdrr_contracts workspace API. */
+export type WorkspaceRepository = {
+  schema_version: 1
+  repository_id: string
+  display_name: string
+}
+
+export type Conversation = {
+  schema_version: 1
+  conversation_id: string
+  repository_id: string
+  title: string
+  specification_refs: string[]
+  created_at: string
+  updated_at: string
+  revision: number
+}
+
+export type Message = {
+  schema_version: 1
+  message_id: string
+  conversation_id: string
+  role: 'user' | 'assistant' | 'system'
+  content: string
+  created_at: string
+  sequence: number
+}
+
+export type WorkspaceTurn = {
+  schema_version: 1
+  turn_id: string
+  conversation_id: string
+  user_message_id: string
+  run_id: string | null
+  attempt_id: string | null
+  state: 'accepted' | 'running' | 'waiting_for_input' | 'succeeded' | 'failed' | 'cancelled'
+  final_message_id: string | null
+  error: string | null
+  revision: number
+  created_at: string
+  updated_at: string
+}
+
+export type WorkspaceSnapshot = {
+  schema_version: 1
+  repository_id: string
+  conversations: Conversation[]
+  jobs: unknown[]
+  active_turns: WorkspaceTurn[]
+  active_questions: unknown[]
+  event_cursor: number
+}
+
+export type WorkspaceEvent = {
+  schema_version: number
+  sequence: number
+  repository_id: string
+  entity_type: string
+  entity_id: string
+  event_type: string
+  payload: Record<string, unknown>
+  created_at: string
+  attempt_id?: string | null
+  revision?: number | null
+}
+
+export type ConversationMessages = {
+  messages: Message[]
+  next_before_sequence: number | null
+}
+
+export type ApiError = {
+  code: string
+  message: string
+  current_revision?: number
+  current_event_cursor?: number
+}
+
+export class WorkspaceApiError extends Error {
+  readonly status: number
+  readonly code?: string
+  readonly currentEventCursor?: number
+
+  constructor(
+    message: string,
+    status: number,
+    code?: string,
+    currentEventCursor?: number,
+  ) {
+    super(message)
+    this.name = 'WorkspaceApiError'
+    this.status = status
+    this.code = code
+    this.currentEventCursor = currentEventCursor
+  }
+}

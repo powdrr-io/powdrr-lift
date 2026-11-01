@@ -40,6 +40,8 @@ class LocalPowdrrService:
         self._inference_client = inference_client or DeepInfraInferenceClient()
 
     def start(self, request: OperationRequest) -> OperationUpdate:
+        if request.operation_kind == "review_feedback":
+            return self._review_feedback(request)
         if request.operation_kind == "plan":
             return self._planning_session(request)
         if request.operation_kind == "replan":
@@ -81,6 +83,40 @@ class LocalPowdrrService:
                 Artifact(
                     artifact_id="artifact-state/workflows.json",
                     media_type="application/vnd.powdrr.artifact-state+json",
+                    data=payload,
+                ),
+            ),
+        )
+
+    def _review_feedback(self, request: OperationRequest) -> OperationUpdate:
+        try:
+            from powdrr_service.review_feedback import (
+                ReviewFeedbackError,
+                build_review_feedback_ledger,
+            )
+
+            evidence = request.inputs.get("review_evidence")
+            if not isinstance(evidence, dict):
+                raise ReviewFeedbackError("review_evidence must be an object")
+            ledger = build_review_feedback_ledger(evidence)
+        except ReviewFeedbackError as exc:
+            return _failed(request.request_id, "invalid_review_evidence", str(exc))
+
+        payload = json.dumps(ledger, sort_keys=True, separators=(",", ":")).encode()
+        phase = (
+            "review_threads_prepared"
+            if ledger["status"] == "ready"
+            else "review_threads_empty"
+        )
+        return OperationUpdate(
+            operation_id=request.request_id,
+            revision=1,
+            status="succeeded",
+            progress=({"phase": phase},),
+            output_artifacts=(
+                Artifact(
+                    artifact_id="review/review-feedback-ledger.json",
+                    media_type="application/vnd.powdrr.review-feedback+json",
                     data=payload,
                 ),
             ),

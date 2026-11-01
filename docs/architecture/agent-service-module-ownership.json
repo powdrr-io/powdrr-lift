@@ -530,6 +530,15 @@
       "reviewed": false
     },
     {
+      "extraction_pr": "7",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/review_feedback.py",
+      "rationale": "prepare a deterministic review-thread ledger from locally captured GitHub evidence",
+      "reviewed": false
+    },
+    {
       "extraction_pr": "4",
       "internal_imports": [
         "powdrr_lift.workrr.procedrr",

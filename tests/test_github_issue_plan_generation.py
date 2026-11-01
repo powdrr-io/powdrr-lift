@@ -12,7 +12,7 @@ from powdrr_service.planning.multipr_structrr import compile_multi_pr_proposal
 from powdrr_service.planning.plan_sizing import PlanSizingError, size_plan_items
 
 from powdrr_lift import cli
-from powdrr_lift.workrr import jev_classifier
+from powdrr_lift.workrr import jev_classifier, planned_workflow_task
 from powdrr_lift.workrr.github_issue_plan_generation import (
     PLAN_COVERAGE_AUDIT_RESPONSE_SCHEMA,
     PLAN_ITEMS_RESPONSE_SCHEMA,
@@ -1377,7 +1377,7 @@ def test_generated_plan_resolves_procedrr_process_workflow(tmp_path: Path) -> No
 
     workflow_dir, tasks = instantiate_procedrr_process_workflow(
         process_id=instance.process_id,
-        process_directory=cli._bundled_procedrr_process_directory(),
+        process_directory=planned_workflow_task._bundled_procedrr_process_directory(),
         input_state=instance.inputs,
         work_item_name=instance.workflow_id,
         workflow_instance_name=instance.workflow_id,
@@ -1443,7 +1443,7 @@ def test_issue_worker_runs_plan_task_from_durable_runtime_directory(
 
     monkeypatch.setattr(cli, "resolve_repo_root", lambda _path: tmp_path)
     monkeypatch.setattr(
-        cli,
+        planned_workflow_task,
         "create_workflow_worktree",
         lambda *_args, **kwargs: (
             integration_worktree,
@@ -1472,7 +1472,7 @@ def test_issue_worker_runs_plan_task_from_durable_runtime_directory(
             detail=None,
         )
 
-    monkeypatch.setattr(cli, "run_workflow_task", run_workflow_task)
+    monkeypatch.setattr(planned_workflow_task, "run_workflow_task", run_workflow_task)
     monkeypatch.setattr(cli, "run_worker_once", run_worker_once)
 
     status = cli._run_github_issue_worker(
@@ -1493,11 +1493,11 @@ def test_issue_worker_runs_plan_task_from_durable_runtime_directory(
     assert status == 0
     assert runtime_directory.is_relative_to(integration_worktree)
     assert runtime_directory != workflow_file.parent
-    workflow_instance = cli.load_plan_workflow_instance(workflow_file)
+    workflow_instance = load_plan_workflow_instance(workflow_file)
     state = load_workflow_git_state(runtime_directory, plan.items[0].workflow_id)
     assert state is not None
     attempt_id = state.integration_branch.rsplit("-attempt-", maxsplit=1)[1]
-    instance_id = cli._plan_workflow_instance_id(
+    instance_id = planned_workflow_task._plan_workflow_instance_id(
         plan.items[0].workflow_id,
         workflow_instance.inputs,
         "worker",
@@ -1521,22 +1521,26 @@ def test_issue_worker_runs_plan_task_from_durable_runtime_directory(
 def test_plan_workflow_instance_id_tracks_input_changes() -> None:
     workflow_id = "proposal-v1-foundation"
 
-    original = cli._plan_workflow_instance_id(
+    original = planned_workflow_task._plan_workflow_instance_id(
         workflow_id, {"objective": "first"}, "worker-a"
     )
 
     assert (
-        cli._plan_workflow_instance_id(workflow_id, {"objective": "first"}, "worker-a")
+        planned_workflow_task._plan_workflow_instance_id(
+            workflow_id, {"objective": "first"}, "worker-a"
+        )
         == original
     )
     assert (
-        cli._plan_workflow_instance_id(
+        planned_workflow_task._plan_workflow_instance_id(
             workflow_id, {"objective": "revised"}, "worker-a"
         )
         != original
     )
     assert (
-        cli._plan_workflow_instance_id(workflow_id, {"objective": "first"}, "worker-b")
+        planned_workflow_task._plan_workflow_instance_id(
+            workflow_id, {"objective": "first"}, "worker-b"
+        )
         != original
     )
 
@@ -1546,7 +1550,7 @@ def test_plan_worker_process_catalog_does_not_depend_on_target_repo(
 ) -> None:
     from procedrr import ProcessCatalog
 
-    process_directory = cli._bundled_procedrr_process_directory()
+    process_directory = planned_workflow_task._bundled_procedrr_process_directory()
     target_process_directory = tmp_path / "docs" / "procedrr" / "processes"
 
     assert not target_process_directory.exists()

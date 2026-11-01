@@ -3,7 +3,6 @@ from __future__ import annotations
 import argparse
 import contextlib
 import difflib
-import hashlib
 import io
 import json
 import math
@@ -244,7 +243,6 @@ from powdrr_lift.workrr.git import (
     commit_and_push_workflow_initialization,
     create_workflow_worktree,
     inspect_workflow_run,
-    integration_branch_name,
     load_workflow_git_state,
     new_publication_id,
     resolve_git_repository_root,
@@ -253,7 +251,6 @@ from powdrr_lift.workrr.git import (
 )
 from powdrr_lift.workrr.github_issue_plan_generation import (
     PlanGenerationError,
-    load_plan_workflow_instance,
     publish_execution_plan_pull_request,
 )
 from powdrr_lift.workrr.github_issue_queue import (
@@ -273,6 +270,10 @@ from powdrr_lift.workrr.human_task import (
     run_human_task,
 )
 from powdrr_lift.workrr.local_model import download_local_qwen_model
+from powdrr_lift.workrr.planned_workflow_task import (
+    PlannedWorkflowTaskOptions,
+    run_planned_workflow_task,
+)
 from powdrr_lift.workrr.planning.evidence import (
     read_evidence_excerpt,
     search_requirements_evidence,
@@ -3387,6 +3388,30 @@ def _run_fulfill_plan_issue_without_pr(args: argparse.Namespace) -> int:
 
 def _run_github_issue_worker(args: argparse.Namespace) -> int:
     repo_root = resolve_repo_root(args.repo_root)
+    options = PlannedWorkflowTaskOptions(
+        provider=args.provider,
+        repository=args.repository,
+        api_key=args.api_key,
+        base_url=args.base_url,
+        max_roundtrips=args.max_roundtrips,
+        context_compaction_threshold=args.context_compaction_threshold,
+        verbose=args.verbose,
+        code_agent=getattr(args, "code_agent", "minisweagent"),
+        opencode_executable=getattr(args, "opencode_executable", "opencode"),
+        opencode_model=getattr(args, "opencode_model", None),
+        minisweagent_executable=getattr(args, "minisweagent_executable", "mini"),
+        minisweagent_model=getattr(
+            args,
+            "minisweagent_model",
+            "deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731",
+        ),
+        coding_agent_timeout_seconds=getattr(
+            args, "coding_agent_timeout_seconds", 1800.0
+        ),
+        coding_agent_validation_timeout_seconds=getattr(
+            args, "coding_agent_validation_timeout_seconds", 1800.0
+        ),
+    )
 
     def run_task(
         workflow_path: Path,
@@ -3397,154 +3422,16 @@ def _run_github_issue_worker(args: argparse.Namespace) -> int:
         fulfilled_without_pr_dependencies: tuple[str, ...],
         checkpoint_callback: TaskCheckpointCallback,
     ) -> int:
-        if workflow_path.is_dir():
-            workflow_dir = workflow_path
-        else:
-            instance = load_plan_workflow_instance(workflow_path)
-            if instance.workflow_id != workflow_id:
-                raise PlanGenerationError(
-                    "workflow definition ID does not match its plan item"
-                )
-            workflow_inputs = dict(instance.inputs)
-            workflow_context = dict(workflow_inputs["proposed_pr_context"])
-            workflow_context.update(
-                {
-                    "title": item.title,
-                    "objective": item.objective,
-                    "scope": list(item.scope),
-                    "acceptance_criteria": list(item.acceptance_criteria),
-                    "allowed_paths": list(item.allowed_paths),
-                }
-            )
-            workflow_inputs["feature_description"] = item.objective
-            if item.implementation_steps:
-                workflow_context["implementation_steps"] = list(
-                    item.implementation_steps
-                )
-            if item.inline_adjustments:
-                workflow_context["inline_plan_adjustments"] = [
-                    dict(adjustment) for adjustment in item.inline_adjustments
-                ]
-            workflow_inputs["proposed_pr_context"] = workflow_context
-            execution_id = uuid.uuid4().hex[:12]
-            workflow_instance_id = _plan_workflow_instance_id(
-                workflow_id, workflow_inputs, worker_id, attempt_id=execution_id
-            )
-            integration_branch = integration_branch_name(
-                f"{workflow_id}-attempt-{execution_id}"
-            )
-            integration_worktree, integration_branch = create_workflow_worktree(
-                repo_root,
-                workflow_id,
-                base_branch="main",
-                branch_name=integration_branch,
-                worktree_name=integration_branch,
-            )
-            runtime_relative_directory = (
-                Path("docs")
-                / "workflows"
-                / slugify_workflow_id(plan.plan_id)
-                / "runtime"
-                / slugify_workflow_id(workflow_instance_id)
-            )
-            workflow_dir, _tasks = instantiate_procedrr_process_workflow(
-                process_id=instance.process_id,
-                process_directory=_bundled_procedrr_process_directory(),
-                input_state=workflow_inputs,
-                work_item_name=workflow_instance_id,
-                workflow_instance_name=workflow_instance_id,
-                output_root=(integration_worktree / runtime_relative_directory.parent),
-            )
-            save_workflow_git_state(
-                workflow_dir,
-                WorkflowGitState(
-                    proposed_pr_id=workflow_id,
-                    base_branch="main",
-                    integration_branch=integration_branch,
-                    workflow_relative_directory=(
-                        workflow_dir.relative_to(integration_worktree).as_posix()
-                    ),
-                    publication_id=execution_id,
-                    depends_on_workflows=tuple(
-                        planned.workflow_id
-                        for dependency in item.dependencies
-                        for planned in plan.items
-                        if planned.item_id == dependency
-                    ),
-                    fulfilled_without_pr_dependencies=(
-                        fulfilled_without_pr_dependencies
-                    ),
-                ),
-            )
-            return run_workflow_task(
-                WorkflowTaskAgentConfig(
-                    workflow_dir=workflow_dir,
-                    repo_root=repo_root,
-                    provider=args.provider,
-                    workflow_id=workflow_id,
-                    api_key=args.api_key,
-                    base_url=args.base_url,
-                    max_roundtrips=args.max_roundtrips,
-                    context_compaction_threshold=args.context_compaction_threshold,
-                    verbose=args.verbose,
-                    code_agent=getattr(args, "code_agent", "minisweagent"),
-                    opencode_executable=getattr(
-                        args, "opencode_executable", "opencode"
-                    ),
-                    opencode_model=getattr(args, "opencode_model", None),
-                    minisweagent_executable=getattr(
-                        args, "minisweagent_executable", "mini"
-                    ),
-                    minisweagent_model=getattr(
-                        args,
-                        "minisweagent_model",
-                        "deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731",
-                    ),
-                    coding_agent_timeout_seconds=getattr(
-                        args, "coding_agent_timeout_seconds", 1800.0
-                    ),
-                    coding_agent_validation_timeout_seconds=getattr(
-                        args, "coding_agent_validation_timeout_seconds", 1800.0
-                    ),
-                    task_checkpoint_callback=checkpoint_callback,
-                    github_issue_number=item.github_issue_number,
-                    github_repository=args.repository,
-                ),
-                stdout=sys.stdout,
-                stderr=sys.stderr,
-            )
-        return run_workflow_task(
-            WorkflowTaskAgentConfig(
-                workflow_dir=workflow_dir,
-                repo_root=repo_root,
-                provider=args.provider,
-                workflow_id=workflow_id,
-                api_key=args.api_key,
-                base_url=args.base_url,
-                max_roundtrips=args.max_roundtrips,
-                context_compaction_threshold=args.context_compaction_threshold,
-                verbose=args.verbose,
-                code_agent=getattr(args, "code_agent", "minisweagent"),
-                opencode_executable=getattr(args, "opencode_executable", "opencode"),
-                opencode_model=getattr(args, "opencode_model", None),
-                minisweagent_executable=getattr(
-                    args, "minisweagent_executable", "mini"
-                ),
-                minisweagent_model=getattr(
-                    args,
-                    "minisweagent_model",
-                    "deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731",
-                ),
-                coding_agent_timeout_seconds=getattr(
-                    args, "coding_agent_timeout_seconds", 1800.0
-                ),
-                coding_agent_validation_timeout_seconds=getattr(
-                    args, "coding_agent_validation_timeout_seconds", 1800.0
-                ),
-                task_checkpoint_callback=checkpoint_callback,
-                github_issue_number=item.github_issue_number,
-                github_repository=args.repository,
-            ),
+        return run_planned_workflow_task(
+            workflow_path=workflow_path,
+            workflow_id=workflow_id,
+            worker_id=worker_id,
+            item=item,
+            plan=plan,
+            fulfilled_without_pr_dependencies=fulfilled_without_pr_dependencies,
+            checkpoint_callback=checkpoint_callback,
+            repo_root=repo_root,
+            options=options,
             stdout=sys.stdout,
             stderr=sys.stderr,
         )
@@ -3665,32 +3552,6 @@ def _run_github_issue_worker_continue(args: argparse.Namespace) -> int:
         )
     )
     return 0 if report.outcome in {"awaiting_review", "awaiting_human"} else 1
-
-
-def _plan_workflow_instance_id(
-    workflow_id: str,
-    input_state: Mapping[str, Any],
-    worker_id: str,
-    *,
-    attempt_id: str | None = None,
-) -> str:
-    """Give every issue-worker attempt its own durable Procedrr run directory."""
-    serialized = json.dumps(
-        input_state,
-        ensure_ascii=False,
-        separators=(",", ":"),
-        sort_keys=True,
-    )
-    fingerprint = hashlib.sha256(serialized.encode("utf-8")).hexdigest()[:12]
-    suffix = f"-{slugify_workflow_id(worker_id)}"
-    if attempt_id:
-        suffix += f"-attempt-{slugify_workflow_id(attempt_id)}"
-    return f"{workflow_id}-task-{fingerprint}{suffix}"
-
-
-def _bundled_procedrr_process_directory() -> Path:
-    """Locate Powdrr-Lift's process catalog, independent of target repository."""
-    return Path(__file__).resolve().parents[2] / "docs" / "procedrr" / "processes"
 
 
 def _run_pull_request_description(args: argparse.Namespace) -> int:

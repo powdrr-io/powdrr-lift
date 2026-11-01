@@ -5,7 +5,12 @@ import time
 from pathlib import Path
 
 from fastapi.testclient import TestClient
-from powdrr_contracts.workspace import MessageRole, TurnState, WorkspaceTurn
+from powdrr_contracts.workspace import (
+    MessageRole,
+    QuestionState,
+    TurnState,
+    WorkspaceTurn,
+)
 from powdrr_local.web import create_app
 from powdrr_local.workspace import WorkspaceStore
 from powdrr_local.workspace_api import _event_stream
@@ -103,6 +108,73 @@ def test_session_refresh_rotates_csrf_for_the_existing_browser_cookie(
         json={"title": "Fresh token", "request_id": "fresh-token"},
     )
     assert current_request.status_code == 201
+
+
+def test_question_answer_api_validates_replays_and_fences_stale_answers(
+    tmp_path: Path,
+) -> None:
+    client, store, repository_id, secret = _client(tmp_path)
+    csrf = _sign_in(client, secret)
+    conversation = store.create_conversation(repository_id, "Design")
+    turn = store.create_turn(
+        conversation.conversation_id,
+        turn_id="question-turn",
+        message_id="question-user-message",
+        content="Design a search feature.",
+    )
+    running = store.transition_turn(
+        turn.turn_id,
+        expected_revision=turn.revision,
+        state=TurnState.RUNNING,
+        run_id="question-run",
+        attempt_id="question-attempt",
+    )
+    question = store.create_question(
+        turn.turn_id,
+        question_id="question-api",
+        prompt="What should search include?",
+        response_schema={"type": "string", "minLength": 3},
+        run_id="question-run",
+        attempt_id="question-attempt",
+        expected_turn_revision=running.revision,
+    )
+    headers = {
+        "Origin": "http://127.0.0.1:8765",
+        "X-CSRF-Token": csrf,
+    }
+    endpoint = (
+        f"/api/v1/repositories/{repository_id}/questions/{question.question_id}/answer"
+    )
+    payload = {
+        "request_id": "answer-question-request",
+        "expected_revision": question.revision,
+        "answer": "Product names",
+    }
+
+    invalid = client.post(endpoint, headers=headers, json={**payload, "answer": "x"})
+    assert invalid.status_code == 422
+    assert invalid.json()["error"]["code"] == "invalid_answer"
+
+    answered = client.post(endpoint, headers=headers, json=payload)
+    assert answered.status_code == 202
+    assert answered.json()["state"] == QuestionState.ANSWERED.value
+    assert answered.json()["answer"] == "Product names"
+    replayed = client.post(endpoint, headers=headers, json=payload)
+    assert replayed.status_code == 202
+    assert replayed.json() == answered.json()
+
+    stale = client.post(
+        endpoint,
+        headers=headers,
+        json={
+            **payload,
+            "request_id": "answer-question-stale",
+            "answer": "Other",
+            "expected_revision": 1,
+        },
+    )
+    assert stale.status_code == 409
+    assert stale.json()["error"]["code"] == "stale_revision"
 
 
 def test_app_lifespan_dispatches_workspace_turns_under_supervisor_lease(

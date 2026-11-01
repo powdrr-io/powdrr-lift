@@ -1,0 +1,187 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1292
+title: Answer design interview questions in workspace chat
+intent:
+  problem: The workspace persists design interview questions, but the browser client cannot show them or submit answers.
+  goal: Let users answer schema-defined interview questions in chat and resume the design interview with durable, idempotent answers.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/design/browser-workspace-api.md
+  type: modified
+  span:
+    start_line: 94
+    end_line: 113
+  summary: Document the persisted question answer endpoint, schema validation, idempotency, and conflict responses.
+  rationale: Keep the browser API contract clear for clients that answer interview questions.
+- path: packages/local/src/powdrr_local/workspace_api.py
+  type: modified
+  span:
+    start_line: 81
+    end_line: 86
+  summary: Define the strict answer request envelope with revision and idempotency fields.
+  rationale: Require each answer to target the question version the user reviewed.
+- path: packages/local/src/powdrr_local/workspace_api.py
+  type: modified
+  span:
+    start_line: 617
+    end_line: 678
+  summary: Add a repository-scoped question answer route with schema validation and conflict reporting.
+  rationale: Persist answers through the workspace store and wake the interview continuation.
+- path: tests/test_workspace_api.py
+  type: modified
+  span:
+    start_line: 8
+    end_line: 13
+  summary: Import the question state used by answer route assertions.
+  rationale: Assert the persisted question lifecycle after an accepted answer.
+- path: tests/test_workspace_api.py
+  type: modified
+  span:
+    start_line: 113
+    end_line: 179
+  summary: Verify schema rejection, accepted answer replay, and stale revision fencing.
+  rationale: Cover the durable API behavior clients rely on when answering a question.
+- path: ui/src/App.css
+  type: modified
+  span:
+    start_line: 250
+    end_line: 270
+  summary: Style open and answered interview question cards and their form controls.
+  rationale: Make question prompts and structured answers readable within the chat transcript.
+- path: ui/src/App.css
+  type: modified
+  span:
+    start_line: 370
+    end_line: 370
+  summary: Adjust question card spacing for narrow screens.
+  rationale: Keep interview questions usable in the responsive workspace layout.
+- path: ui/src/App.test.tsx
+  type: modified
+  span:
+    start_line: 5
+    end_line: 5
+  summary: Import question and turn contract types for the interview flow test.
+  rationale: Build typed fixtures that match persisted workspace snapshots.
+- path: ui/src/App.test.tsx
+  type: modified
+  span:
+    start_line: 17
+    end_line: 17
+  summary: Add an answer API mock to the workspace test harness.
+  rationale: Exercise question submission without network access.
+- path: ui/src/App.test.tsx
+  type: modified
+  span:
+    start_line: 77
+    end_line: 77
+  summary: Reset answer API behavior between frontend tests.
+  rationale: Keep the question flow test isolated from other workspace scenarios.
+- path: ui/src/App.test.tsx
+  type: modified
+  span:
+    start_line: 129
+    end_line: 192
+  summary: Verify persisted questions render, accept a valid answer, and display the saved response.
+  rationale: Cover the main user path through the chat interview card.
+- path: ui/src/App.tsx
+  type: modified
+  span:
+    start_line: 8
+    end_line: 8
+  summary: Import the interview question card component.
+  rationale: Render persisted questions within the selected conversation.
+- path: ui/src/App.tsx
+  type: modified
+  span:
+    start_line: 109
+    end_line: 109
+  summary: Select the active question for the current conversation.
+  rationale: Keep question state aligned with the selected chat.
+- path: ui/src/App.tsx
+  type: modified
+  span:
+    start_line: 359
+    end_line: 378
+  summary: Submit answers with the saved question revision and refresh after stale conflicts.
+  rationale: Preserve concurrency safety while allowing the interview to continue.
+- path: ui/src/App.tsx
+  type: modified
+  span:
+    start_line: 517
+    end_line: 517
+  summary: Reflect whether the interview needs input or has accepted an answer.
+  rationale: Make the design chat status match its persisted question state.
+- path: ui/src/App.tsx
+  type: modified
+  span:
+    start_line: 544
+    end_line: 545
+  summary: Render the question card and show when the interview is continuing after an answer.
+  rationale: Keep the response and continuation state visible in the transcript.
+- path: ui/src/api/client.ts
+  type: modified
+  span:
+    start_line: 7
+    end_line: 7
+  summary: Import the workspace question response type.
+  rationale: Keep question mutations typed at the API client boundary.
+- path: ui/src/api/client.ts
+  type: modified
+  span:
+    start_line: 37
+    end_line: 37
+  summary: Track stable request IDs for retried question answers.
+  rationale: Preserve server idempotency when a client retries an answer request.
+- path: ui/src/api/client.ts
+  type: modified
+  span:
+    start_line: 141
+    end_line: 165
+  summary: Add a typed client method for submitting question answers.
+  rationale: Centralize the authenticated, idempotent answer request.
+- path: ui/src/api/types.ts
+  type: modified
+  span:
+    start_line: 44
+    end_line: 60
+  summary: Define the browser question record, including response schema and lifecycle state.
+  rationale: Match the persisted question projection exposed by the workspace API.
+- path: ui/src/api/types.ts
+  type: modified
+  span:
+    start_line: 67
+    end_line: 67
+  summary: Type active snapshot questions as workspace question records.
+  rationale: Let the chat UI consume questions without untyped payloads.
+- path: ui/src/components/QuestionCard.tsx
+  type: added
+  span:
+    start_line: 1
+    end_line: 213
+  summary: Add schema-driven question inputs, local answer checks, and accepted-answer display.
+  rationale: Let users respond to supported string, enum, boolean, numeric, and structured interview questions.
+entities:
+- id: workspace-chat-shell
+  type: Function
+  action: modified
+- id: workspace-interview-question-card
+  type: Function
+  action: added
+- id: workspace-question-answer-endpoint
+  type: Function
+  action: added
+entity_relationships:
+- id: workspace-chat-renders-active-question
+  type: uses
+  source: workspace-chat-shell
+  target: workspace-interview-question-card
+  action: added
+  description: The selected conversation renders its persisted interview question using the question card.
+invariants:
+- id: workspace-question-answer-uses-current-revision
+  description: An answer is accepted only for the question revision presented to the browser, and repeated requests use a stable request identifier.
+  action: added
+guidance: []
+features: []
+proposed_prs: []

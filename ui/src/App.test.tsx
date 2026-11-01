@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
-import type { Conversation, Message, WorkspaceRepository, WorkspaceSnapshot } from './api/types'
+import type { Conversation, Message, WorkspaceQuestion, WorkspaceRepository, WorkspaceSnapshot, WorkspaceTurn } from './api/types'
 
 const mocks = vi.hoisted(() => ({
   resumeSession: vi.fn(),
@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   createConversation: vi.fn(),
   messages: vi.fn(),
   sendMessage: vi.fn(),
+  answerQuestion: vi.fn(),
   events: vi.fn(),
 }))
 
@@ -73,6 +74,7 @@ describe('workspace shell', () => {
     mocks.createConversation.mockResolvedValue(conversation)
     mocks.messages.mockResolvedValue([])
     mocks.sendMessage.mockResolvedValue(undefined)
+    mocks.answerQuestion.mockResolvedValue(undefined)
     mocks.events.mockImplementation((_repositoryId: string, _after: number, signal: AbortSignal) =>
       (async function* () {
         await new Promise<void>((resolve) => {
@@ -123,5 +125,69 @@ describe('workspace shell', () => {
     expect(await screen.findByText('Design a deployment dashboard.')).toBeTruthy()
     const transcript = screen.getByLabelText('Design conversation')
     expect(within(transcript).getByText('You')).toBeTruthy()
+  })
+
+  it('renders a persisted interview question and submits its schema-valid answer', async () => {
+    const user = userEvent.setup()
+    const question: WorkspaceQuestion = {
+      schema_version: 1,
+      question_id: 'question-1',
+      conversation_id: 'conversation-1',
+      turn_id: 'turn-1',
+      prompt: 'What should search include?',
+      response_schema: { type: 'string', minLength: 3 },
+      run_id: 'run-1',
+      attempt_id: 'attempt-1',
+      state: 'open',
+      answer: null,
+      delivery_receipt_id: null,
+      revision: 1,
+      created_at: '2026-11-01T00:00:00Z',
+      updated_at: '2026-11-01T00:00:00Z',
+    }
+    const turn: WorkspaceTurn = {
+      schema_version: 1,
+      turn_id: 'turn-1',
+      conversation_id: 'conversation-1',
+      user_message_id: 'message-1',
+      run_id: 'run-1',
+      attempt_id: 'attempt-1',
+      state: 'waiting_for_input',
+      final_message_id: null,
+      error: null,
+      revision: 3,
+      created_at: '2026-11-01T00:00:00Z',
+      updated_at: '2026-11-01T00:00:00Z',
+    }
+    let currentQuestion = question
+    mocks.resumeSession.mockResolvedValue(undefined)
+    mocks.listRepositories.mockResolvedValue([repository])
+    mocks.listConversations.mockResolvedValue([conversation])
+    mocks.snapshot.mockImplementation(async () => ({
+      ...emptySnapshot(),
+      active_turns: [turn],
+      active_questions: [currentQuestion],
+    }))
+    mocks.messages.mockResolvedValue([userMessage])
+    mocks.answerQuestion.mockImplementation(async (_repoId: string, _questionId: string, _revision: number, answer: unknown) => {
+      currentQuestion = { ...question, state: 'answered', answer, revision: 2 }
+      return currentQuestion
+    })
+
+    render(<App />)
+
+    expect(await screen.findByText('What should search include?')).toBeTruthy()
+    await user.type(screen.getByLabelText('Your answer'), 'Product names')
+    await user.click(screen.getByRole('button', { name: /Send answer/ }))
+
+    await waitFor(() => expect(mocks.answerQuestion).toHaveBeenCalledWith(
+      'repo-1',
+      'question-1',
+      1,
+      'Product names',
+    ))
+    const questionCard = within(await screen.findByRole('region', { name: 'Interview question' }))
+    expect(questionCard.getByText('Answer received')).toBeTruthy()
+    expect(questionCard.getByText('Product names')).toBeTruthy()
   })
 })

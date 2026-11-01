@@ -336,6 +336,8 @@ class DependencyCandidateDiscovery:
 def discover_dependency_candidates(
     units: Sequence[WorkUnit],
     pending_outputs: Sequence[PendingUnitOutput],
+    *,
+    related_requirement_ids: Mapping[str, Sequence[str]] | None = None,
 ) -> DependencyCandidateDiscovery:
     """Avoid all-pairs dependency questions by pruning to concrete evidence."""
     by_id = {unit.id: unit for unit in units}
@@ -377,6 +379,7 @@ def discover_dependency_candidates(
         if producer is None:
             continue
         producer_text = f"{_dependency_unit_text(producer)} {pending.description}"
+        output_phrase = _dependency_token_sequence(pending.description)
         candidate_tokens = {
             token
             for token in _dependency_tokens(producer_text)
@@ -388,14 +391,33 @@ def discover_dependency_candidates(
             if paths_by_unit[producer.id] & paths_by_unit[consumer.id]:
                 # Same-file work is ordered deterministically above.
                 continue
-            consumer_title = consumer.deliverable.casefold()
+            consumer_text = unit_text[consumer.id].casefold()
             explicit_path_reference = any(
-                path.casefold() in consumer_title
+                path.casefold() in consumer_text
                 for path in paths_by_unit[producer.id]
                 if path
             )
+            explicit_output_reference = len(
+                output_phrase
+            ) >= 2 and _contains_token_sequence(
+                _dependency_token_sequence(consumer_text), output_phrase
+            )
+            related_requirements = related_requirement_ids or {}
+            shared_requirement_relation = any(
+                consumer_requirement
+                in related_requirements.get(producer_requirement, ())
+                or producer_requirement
+                in related_requirements.get(consumer_requirement, ())
+                for producer_requirement in pending.requirement_ids
+                for consumer_requirement in consumer.requirement_ids
+            )
             shared_rare_tokens = candidate_tokens & unit_tokens[consumer.id]
-            if explicit_path_reference or len(shared_rare_tokens) >= 3:
+            if (
+                explicit_path_reference
+                or explicit_output_reference
+                or shared_requirement_relation
+                or len(shared_rare_tokens) >= 3
+            ):
                 pairs.append((pending, consumer))
     return DependencyCandidateDiscovery(write_order_edges, tuple(pairs))
 
@@ -411,11 +433,22 @@ def _dependency_unit_text(unit: WorkUnit) -> str:
 
 
 def _dependency_tokens(text: str) -> set[str]:
-    return {
+    return set(_dependency_token_sequence(text))
+
+
+def _dependency_token_sequence(text: str) -> tuple[str, ...]:
+    return tuple(
         token.casefold()
         for token in re.findall(r"[A-Za-z0-9]+", text)
         if len(token) >= 5
-    }
+    )
+
+
+def _contains_token_sequence(candidate: Sequence[str], required: Sequence[str]) -> bool:
+    return any(
+        tuple(candidate[offset : offset + len(required)]) == tuple(required)
+        for offset in range(len(candidate) - len(required) + 1)
+    )
 
 
 @dataclass(frozen=True, slots=True)

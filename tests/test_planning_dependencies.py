@@ -298,6 +298,44 @@ def test_dependency_discovery_keeps_named_output_path_in_deliverable() -> None:
     assert discovery.confirmation_pairs == ((output, consumer),)
 
 
+def test_dependency_discovery_finds_explicit_short_output_reference() -> None:
+    producer = replace(
+        _unit("unit-0001"),
+        deliverable="Prepare artifacts.",
+        implementation_step="Generate the required data.",
+    )
+    consumer = replace(
+        _unit("unit-0002", "req-0002"),
+        deliverable="Update the downstream check.",
+        implementation_step="Consume the signed manifest before verification.",
+    )
+    output = PendingUnitOutput(producer.id, "Signed manifest", producer.requirement_ids)
+
+    discovery = discover_dependency_candidates([producer, consumer], [output])
+
+    assert discovery.confirmation_pairs == ((output, consumer),)
+
+
+def test_dependency_discovery_uses_explicit_related_requirement_edges() -> None:
+    producer = replace(_unit("unit-0001"), deliverable="Prepare the setup.")
+    consumer = replace(
+        _unit("unit-0002", "req-0002"),
+        deliverable="Run the integration check.",
+        implementation_step="Read the configured endpoint.",
+    )
+    output = PendingUnitOutput(
+        producer.id, "Operator-installed endpoint", producer.requirement_ids
+    )
+
+    discovery = discover_dependency_candidates(
+        [producer, consumer],
+        [output],
+        related_requirement_ids={"req-0001": ("req-0002",)},
+    )
+
+    assert discovery.confirmation_pairs == ((output, consumer),)
+
+
 def test_dependency_confirmation_has_exact_required_and_independent_variants() -> None:
     required = parse_dependency_confirmation(
         {

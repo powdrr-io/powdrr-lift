@@ -3,10 +3,24 @@ change_id: 1293
 title: Reduce planning calls with deterministic filtering
 intent:
   problem: Large plan generation spends excessive time asking repeated or derivable questions and its operational cost is difficult to inspect.
-  goal: Batch independent planning questions, derive safe answers from pinned facts, reduce work-unit response size, and record privacy-conscious cost summaries.
+  goal: Batch independent planning questions, derive safe answers and candidate sets from pinned facts, reduce model response size, preserve title quality, and record privacy-conscious cost summaries.
 human-decisions: []
 structured_files: []
 files:
+- path: docs/changelogs/PR-1292-changelog.yaml
+  type: modified
+  span:
+    start_line: 1
+    end_line: 187
+  summary: Update planning behavior and its regression coverage.
+  rationale: Keep the planning contract deterministic, bounded, and replayable.
+- path: docs/design/browser-workspace-api.md
+  type: modified
+  span:
+    start_line: 94
+    end_line: 113
+  summary: Update planning behavior and its regression coverage.
+  rationale: Keep the planning contract deterministic, bounded, and replayable.
 - path: packages/local/src/powdrr_local/planning/checkpoints.py
   type: modified
   span:
@@ -70,454 +84,734 @@ files:
     end_line: 759
   summary: Aggregate bounded planning-call, deterministic-decision, pagination, and repository-search telemetry.
   rationale: Keep compact cost and search summaries local without exposing journal answer content.
+- path: packages/local/src/powdrr_local/workspace_api.py
+  type: modified
+  span:
+    start_line: 81
+    end_line: 86
+  summary: Update planning behavior and its regression coverage.
+  rationale: Keep the planning contract deterministic, bounded, and replayable.
+- path: packages/local/src/powdrr_local/workspace_api.py
+  type: modified
+  span:
+    start_line: 617
+    end_line: 678
+  summary: Update planning behavior and its regression coverage.
+  rationale: Keep the planning contract deterministic, bounded, and replayable.
 - path: packages/service/src/powdrr_service/planning/assembly.py
   type: modified
   span:
     start_line: 42
     end_line: 42
-  summary: Derive catalog and runtime fields and version the compact work-unit proposal contract.
-  rationale: Remove model-authored fields that are already determined by pinned paths and singleton catalogs.
+  summary: Derive complete item scopes and validate specific, distinct titles from frozen work-unit facts.
+  rationale: Keep model responses focused on the PR outcome while code preserves scope membership and catches generic or duplicate titles.
 - path: packages/service/src/powdrr_service/planning/assembly.py
   type: modified
   span:
     start_line: 87
     end_line: 88
-  summary: Derive catalog and runtime fields and version the compact work-unit proposal contract.
-  rationale: Remove model-authored fields that are already determined by pinned paths and singleton catalogs.
+  summary: Derive complete item scopes and validate specific, distinct titles from frozen work-unit facts.
+  rationale: Keep model responses focused on the PR outcome while code preserves scope membership and catches generic or duplicate titles.
 - path: packages/service/src/powdrr_service/planning/assembly.py
   type: modified
   span:
     start_line: 92
     end_line: 92
-  summary: Derive catalog and runtime fields and version the compact work-unit proposal contract.
-  rationale: Remove model-authored fields that are already determined by pinned paths and singleton catalogs.
+  summary: Derive complete item scopes and validate specific, distinct titles from frozen work-unit facts.
+  rationale: Keep model responses focused on the PR outcome while code preserves scope membership and catches generic or duplicate titles.
 - path: packages/service/src/powdrr_service/planning/assembly.py
   type: modified
   span:
     start_line: 106
     end_line: 110
-  summary: Derive catalog and runtime fields and version the compact work-unit proposal contract.
-  rationale: Remove model-authored fields that are already determined by pinned paths and singleton catalogs.
+  summary: Derive complete item scopes and validate specific, distinct titles from frozen work-unit facts.
+  rationale: Keep model responses focused on the PR outcome while code preserves scope membership and catches generic or duplicate titles.
 - path: packages/service/src/powdrr_service/planning/assembly.py
   type: modified
   span:
     start_line: 109
     end_line: 109
-  summary: Derive catalog and runtime fields and version the compact work-unit proposal contract.
-  rationale: Remove model-authored fields that are already determined by pinned paths and singleton catalogs.
+  summary: Derive complete item scopes and validate specific, distinct titles from frozen work-unit facts.
+  rationale: Keep model responses focused on the PR outcome while code preserves scope membership and catches generic or duplicate titles.
 - path: packages/service/src/powdrr_service/planning/assembly.py
   type: modified
   span:
     start_line: 132
     end_line: 135
-  summary: Derive catalog and runtime fields and version the compact work-unit proposal contract.
-  rationale: Remove model-authored fields that are already determined by pinned paths and singleton catalogs.
+  summary: Derive complete item scopes and validate specific, distinct titles from frozen work-unit facts.
+  rationale: Keep model responses focused on the PR outcome while code preserves scope membership and catches generic or duplicate titles.
 - path: packages/service/src/powdrr_service/planning/assembly.py
   type: modified
   span:
     start_line: 159
     end_line: 163
-  summary: Derive catalog and runtime fields and version the compact work-unit proposal contract.
-  rationale: Remove model-authored fields that are already determined by pinned paths and singleton catalogs.
+  summary: Derive complete item scopes and validate specific, distinct titles from frozen work-unit facts.
+  rationale: Keep model responses focused on the PR outcome while code preserves scope membership and catches generic or duplicate titles.
 - path: packages/service/src/powdrr_service/planning/assembly.py
   type: modified
   span:
     start_line: 380
     end_line: 381
-  summary: Derive catalog and runtime fields and version the compact work-unit proposal contract.
-  rationale: Remove model-authored fields that are already determined by pinned paths and singleton catalogs.
+  summary: Derive complete item scopes and validate specific, distinct titles from frozen work-unit facts.
+  rationale: Keep model responses focused on the PR outcome while code preserves scope membership and catches generic or duplicate titles.
 - path: packages/service/src/powdrr_service/planning/assembly.py
   type: modified
   span:
     start_line: 385
     end_line: 385
-  summary: Derive catalog and runtime fields and version the compact work-unit proposal contract.
-  rationale: Remove model-authored fields that are already determined by pinned paths and singleton catalogs.
+  summary: Derive complete item scopes and validate specific, distinct titles from frozen work-unit facts.
+  rationale: Keep model responses focused on the PR outcome while code preserves scope membership and catches generic or duplicate titles.
 - path: packages/service/src/powdrr_service/planning/assembly.py
   type: modified
   span:
     start_line: 368
     end_line: 368
-  summary: Derive catalog and runtime fields and version the compact work-unit proposal contract.
-  rationale: Remove model-authored fields that are already determined by pinned paths and singleton catalogs.
+  summary: Derive complete item scopes and validate specific, distinct titles from frozen work-unit facts.
+  rationale: Keep model responses focused on the PR outcome while code preserves scope membership and catches generic or duplicate titles.
 - path: packages/service/src/powdrr_service/planning/assembly.py
   type: modified
   span:
     start_line: 370
     end_line: 370
-  summary: Derive catalog and runtime fields and version the compact work-unit proposal contract.
-  rationale: Remove model-authored fields that are already determined by pinned paths and singleton catalogs.
+  summary: Derive complete item scopes and validate specific, distinct titles from frozen work-unit facts.
+  rationale: Keep model responses focused on the PR outcome while code preserves scope membership and catches generic or duplicate titles.
 - path: packages/service/src/powdrr_service/planning/assembly.py
   type: modified
   span:
     start_line: 372
     end_line: 372
-  summary: Derive catalog and runtime fields and version the compact work-unit proposal contract.
-  rationale: Remove model-authored fields that are already determined by pinned paths and singleton catalogs.
+  summary: Derive complete item scopes and validate specific, distinct titles from frozen work-unit facts.
+  rationale: Keep model responses focused on the PR outcome while code preserves scope membership and catches generic or duplicate titles.
 - path: packages/service/src/powdrr_service/planning/assembly.py
   type: modified
   span:
     start_line: 427
     end_line: 431
-  summary: Derive catalog and runtime fields and version the compact work-unit proposal contract.
-  rationale: Remove model-authored fields that are already determined by pinned paths and singleton catalogs.
+  summary: Derive complete item scopes and validate specific, distinct titles from frozen work-unit facts.
+  rationale: Keep model responses focused on the PR outcome while code preserves scope membership and catches generic or duplicate titles.
 - path: packages/service/src/powdrr_service/planning/assembly.py
   type: modified
   span:
     start_line: 400
     end_line: 405
-  summary: Derive catalog and runtime fields and version the compact work-unit proposal contract.
-  rationale: Remove model-authored fields that are already determined by pinned paths and singleton catalogs.
+  summary: Derive complete item scopes and validate specific, distinct titles from frozen work-unit facts.
+  rationale: Keep model responses focused on the PR outcome while code preserves scope membership and catches generic or duplicate titles.
 - path: packages/service/src/powdrr_service/planning/assembly.py
   type: modified
   span:
     start_line: 427
     end_line: 427
-  summary: Derive catalog and runtime fields and version the compact work-unit proposal contract.
-  rationale: Remove model-authored fields that are already determined by pinned paths and singleton catalogs.
+  summary: Derive complete item scopes and validate specific, distinct titles from frozen work-unit facts.
+  rationale: Keep model responses focused on the PR outcome while code preserves scope membership and catches generic or duplicate titles.
 - path: packages/service/src/powdrr_service/planning/assembly.py
   type: modified
   span:
     start_line: 443
     end_line: 443
-  summary: Derive catalog and runtime fields and version the compact work-unit proposal contract.
-  rationale: Remove model-authored fields that are already determined by pinned paths and singleton catalogs.
+  summary: Derive complete item scopes and validate specific, distinct titles from frozen work-unit facts.
+  rationale: Keep model responses focused on the PR outcome while code preserves scope membership and catches generic or duplicate titles.
 - path: packages/service/src/powdrr_service/planning/assembly.py
   type: modified
   span:
     start_line: 490
     end_line: 497
-  summary: Derive catalog and runtime fields and version the compact work-unit proposal contract.
-  rationale: Remove model-authored fields that are already determined by pinned paths and singleton catalogs.
+  summary: Derive complete item scopes and validate specific, distinct titles from frozen work-unit facts.
+  rationale: Keep model responses focused on the PR outcome while code preserves scope membership and catches generic or duplicate titles.
 - path: packages/service/src/powdrr_service/planning/assembly.py
   type: modified
   span:
     start_line: 463
     end_line: 466
-  summary: Derive catalog and runtime fields and version the compact work-unit proposal contract.
-  rationale: Remove model-authored fields that are already determined by pinned paths and singleton catalogs.
+  summary: Derive complete item scopes and validate specific, distinct titles from frozen work-unit facts.
+  rationale: Keep model responses focused on the PR outcome while code preserves scope membership and catches generic or duplicate titles.
 - path: packages/service/src/powdrr_service/planning/assembly.py
   type: modified
   span:
     start_line: 469
     end_line: 469
-  summary: Derive catalog and runtime fields and version the compact work-unit proposal contract.
-  rationale: Remove model-authored fields that are already determined by pinned paths and singleton catalogs.
+  summary: Derive complete item scopes and validate specific, distinct titles from frozen work-unit facts.
+  rationale: Keep model responses focused on the PR outcome while code preserves scope membership and catches generic or duplicate titles.
 - path: packages/service/src/powdrr_service/planning/assembly.py
   type: modified
   span:
     start_line: 590
     end_line: 605
-  summary: Derive catalog and runtime fields and version the compact work-unit proposal contract.
-  rationale: Remove model-authored fields that are already determined by pinned paths and singleton catalogs.
+  summary: Derive complete item scopes and validate specific, distinct titles from frozen work-unit facts.
+  rationale: Keep model responses focused on the PR outcome while code preserves scope membership and catches generic or duplicate titles.
 - path: packages/service/src/powdrr_service/planning/assembly.py
   type: modified
   span:
     start_line: 608
     end_line: 608
-  summary: Derive catalog and runtime fields and version the compact work-unit proposal contract.
-  rationale: Remove model-authored fields that are already determined by pinned paths and singleton catalogs.
+  summary: Derive complete item scopes and validate specific, distinct titles from frozen work-unit facts.
+  rationale: Keep model responses focused on the PR outcome while code preserves scope membership and catches generic or duplicate titles.
 - path: packages/service/src/powdrr_service/planning/assembly.py
   type: modified
   span:
     start_line: 615
     end_line: 615
-  summary: Derive catalog and runtime fields and version the compact work-unit proposal contract.
-  rationale: Remove model-authored fields that are already determined by pinned paths and singleton catalogs.
+  summary: Derive complete item scopes and validate specific, distinct titles from frozen work-unit facts.
+  rationale: Keep model responses focused on the PR outcome while code preserves scope membership and catches generic or duplicate titles.
 - path: packages/service/src/powdrr_service/planning/assembly.py
   type: modified
   span:
     start_line: 626
     end_line: 631
-  summary: Derive catalog and runtime fields and version the compact work-unit proposal contract.
-  rationale: Remove model-authored fields that are already determined by pinned paths and singleton catalogs.
+  summary: Derive complete item scopes and validate specific, distinct titles from frozen work-unit facts.
+  rationale: Keep model responses focused on the PR outcome while code preserves scope membership and catches generic or duplicate titles.
 - path: packages/service/src/powdrr_service/planning/assembly.py
   type: modified
   span:
     start_line: 636
     end_line: 636
-  summary: Derive catalog and runtime fields and version the compact work-unit proposal contract.
-  rationale: Remove model-authored fields that are already determined by pinned paths and singleton catalogs.
+  summary: Derive complete item scopes and validate specific, distinct titles from frozen work-unit facts.
+  rationale: Keep model responses focused on the PR outcome while code preserves scope membership and catches generic or duplicate titles.
 - path: packages/service/src/powdrr_service/planning/assembly.py
   type: modified
   span:
     start_line: 639
     end_line: 639
-  summary: Derive catalog and runtime fields and version the compact work-unit proposal contract.
-  rationale: Remove model-authored fields that are already determined by pinned paths and singleton catalogs.
+  summary: Derive complete item scopes and validate specific, distinct titles from frozen work-unit facts.
+  rationale: Keep model responses focused on the PR outcome while code preserves scope membership and catches generic or duplicate titles.
 - path: packages/service/src/powdrr_service/planning/assembly.py
   type: modified
   span:
     start_line: 671
     end_line: 676
-  summary: Derive catalog and runtime fields and version the compact work-unit proposal contract.
-  rationale: Remove model-authored fields that are already determined by pinned paths and singleton catalogs.
+  summary: Derive complete item scopes and validate specific, distinct titles from frozen work-unit facts.
+  rationale: Keep model responses focused on the PR outcome while code preserves scope membership and catches generic or duplicate titles.
 - path: packages/service/src/powdrr_service/planning/assembly.py
   type: modified
   span:
     start_line: 787
     end_line: 787
-  summary: Derive catalog and runtime fields and version the compact work-unit proposal contract.
-  rationale: Remove model-authored fields that are already determined by pinned paths and singleton catalogs.
+  summary: Derive complete item scopes and validate specific, distinct titles from frozen work-unit facts.
+  rationale: Keep model responses focused on the PR outcome while code preserves scope membership and catches generic or duplicate titles.
 - path: packages/service/src/powdrr_service/planning/assembly.py
   type: modified
   span:
     start_line: 789
     end_line: 789
-  summary: Derive catalog and runtime fields and version the compact work-unit proposal contract.
-  rationale: Remove model-authored fields that are already determined by pinned paths and singleton catalogs.
+  summary: Derive complete item scopes and validate specific, distinct titles from frozen work-unit facts.
+  rationale: Keep model responses focused on the PR outcome while code preserves scope membership and catches generic or duplicate titles.
 - path: packages/service/src/powdrr_service/planning/assembly.py
   type: modified
   span:
     start_line: 791
     end_line: 791
-  summary: Derive catalog and runtime fields and version the compact work-unit proposal contract.
-  rationale: Remove model-authored fields that are already determined by pinned paths and singleton catalogs.
+  summary: Derive complete item scopes and validate specific, distinct titles from frozen work-unit facts.
+  rationale: Keep model responses focused on the PR outcome while code preserves scope membership and catches generic or duplicate titles.
 - path: packages/service/src/powdrr_service/planning/assembly.py
   type: modified
   span:
     start_line: 793
     end_line: 793
-  summary: Derive catalog and runtime fields and version the compact work-unit proposal contract.
-  rationale: Remove model-authored fields that are already determined by pinned paths and singleton catalogs.
+  summary: Derive complete item scopes and validate specific, distinct titles from frozen work-unit facts.
+  rationale: Keep model responses focused on the PR outcome while code preserves scope membership and catches generic or duplicate titles.
 - path: packages/service/src/powdrr_service/planning/assembly.py
   type: modified
   span:
     start_line: 842
     end_line: 845
-  summary: Derive catalog and runtime fields and version the compact work-unit proposal contract.
-  rationale: Remove model-authored fields that are already determined by pinned paths and singleton catalogs.
+  summary: Derive complete item scopes and validate specific, distinct titles from frozen work-unit facts.
+  rationale: Keep model responses focused on the PR outcome while code preserves scope membership and catches generic or duplicate titles.
 - path: packages/service/src/powdrr_service/planning/assembly.py
   type: modified
   span:
     start_line: 831
     end_line: 832
-  summary: Derive catalog and runtime fields and version the compact work-unit proposal contract.
-  rationale: Remove model-authored fields that are already determined by pinned paths and singleton catalogs.
+  summary: Derive complete item scopes and validate specific, distinct titles from frozen work-unit facts.
+  rationale: Keep model responses focused on the PR outcome while code preserves scope membership and catches generic or duplicate titles.
 - path: packages/service/src/powdrr_service/planning/assembly.py
   type: modified
   span:
     start_line: 837
     end_line: 838
-  summary: Derive catalog and runtime fields and version the compact work-unit proposal contract.
-  rationale: Remove model-authored fields that are already determined by pinned paths and singleton catalogs.
+  summary: Derive complete item scopes and validate specific, distinct titles from frozen work-unit facts.
+  rationale: Keep model responses focused on the PR outcome while code preserves scope membership and catches generic or duplicate titles.
 - path: packages/service/src/powdrr_service/planning/assembly.py
   type: modified
   span:
     start_line: 889
     end_line: 896
-  summary: Derive catalog and runtime fields and version the compact work-unit proposal contract.
-  rationale: Remove model-authored fields that are already determined by pinned paths and singleton catalogs.
+  summary: Derive complete item scopes and validate specific, distinct titles from frozen work-unit facts.
+  rationale: Keep model responses focused on the PR outcome while code preserves scope membership and catches generic or duplicate titles.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 1115
+    end_line: 1118
+  summary: Derive complete item scopes and validate specific, distinct titles from frozen work-unit facts.
+  rationale: Keep model responses focused on the PR outcome while code preserves scope membership and catches generic or duplicate titles.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 1120
+    end_line: 1120
+  summary: Derive complete item scopes and validate specific, distinct titles from frozen work-unit facts.
+  rationale: Keep model responses focused on the PR outcome while code preserves scope membership and catches generic or duplicate titles.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 1123
+    end_line: 1137
+  summary: Derive complete item scopes and validate specific, distinct titles from frozen work-unit facts.
+  rationale: Keep model responses focused on the PR outcome while code preserves scope membership and catches generic or duplicate titles.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 1139
+    end_line: 1139
+  summary: Derive complete item scopes and validate specific, distinct titles from frozen work-unit facts.
+  rationale: Keep model responses focused on the PR outcome while code preserves scope membership and catches generic or duplicate titles.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 1141
+    end_line: 1144
+  summary: Derive complete item scopes and validate specific, distinct titles from frozen work-unit facts.
+  rationale: Keep model responses focused on the PR outcome while code preserves scope membership and catches generic or duplicate titles.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 1148
+    end_line: 1152
+  summary: Derive complete item scopes and validate specific, distinct titles from frozen work-unit facts.
+  rationale: Keep model responses focused on the PR outcome while code preserves scope membership and catches generic or duplicate titles.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 1158
+    end_line: 1168
+  summary: Derive complete item scopes and validate specific, distinct titles from frozen work-unit facts.
+  rationale: Keep model responses focused on the PR outcome while code preserves scope membership and catches generic or duplicate titles.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 1170
+    end_line: 1170
+  summary: Derive complete item scopes and validate specific, distinct titles from frozen work-unit facts.
+  rationale: Keep model responses focused on the PR outcome while code preserves scope membership and catches generic or duplicate titles.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 1172
+    end_line: 1172
+  summary: Derive complete item scopes and validate specific, distinct titles from frozen work-unit facts.
+  rationale: Keep model responses focused on the PR outcome while code preserves scope membership and catches generic or duplicate titles.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 1178
+    end_line: 1187
+  summary: Derive complete item scopes and validate specific, distinct titles from frozen work-unit facts.
+  rationale: Keep model responses focused on the PR outcome while code preserves scope membership and catches generic or duplicate titles.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 1190
+    end_line: 1191
+  summary: Derive complete item scopes and validate specific, distinct titles from frozen work-unit facts.
+  rationale: Keep model responses focused on the PR outcome while code preserves scope membership and catches generic or duplicate titles.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 1194
+    end_line: 1238
+  summary: Derive complete item scopes and validate specific, distinct titles from frozen work-unit facts.
+  rationale: Keep model responses focused on the PR outcome while code preserves scope membership and catches generic or duplicate titles.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 1240
+    end_line: 1240
+  summary: Derive complete item scopes and validate specific, distinct titles from frozen work-unit facts.
+  rationale: Keep model responses focused on the PR outcome while code preserves scope membership and catches generic or duplicate titles.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 1268
+    end_line: 1273
+  summary: Derive complete item scopes and validate specific, distinct titles from frozen work-unit facts.
+  rationale: Keep model responses focused on the PR outcome while code preserves scope membership and catches generic or duplicate titles.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 1243
+    end_line: 1255
+  summary: Derive complete item scopes and validate specific, distinct titles from frozen work-unit facts.
+  rationale: Keep model responses focused on the PR outcome while code preserves scope membership and catches generic or duplicate titles.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 1260
+    end_line: 1264
+  summary: Derive complete item scopes and validate specific, distinct titles from frozen work-unit facts.
+  rationale: Keep model responses focused on the PR outcome while code preserves scope membership and catches generic or duplicate titles.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 1287
+    end_line: 1290
+  summary: Derive complete item scopes and validate specific, distinct titles from frozen work-unit facts.
+  rationale: Keep model responses focused on the PR outcome while code preserves scope membership and catches generic or duplicate titles.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 1272
+    end_line: 1272
+  summary: Derive complete item scopes and validate specific, distinct titles from frozen work-unit facts.
+  rationale: Keep model responses focused on the PR outcome while code preserves scope membership and catches generic or duplicate titles.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 1278
+    end_line: 1278
+  summary: Derive complete item scopes and validate specific, distinct titles from frozen work-unit facts.
+  rationale: Keep model responses focused on the PR outcome while code preserves scope membership and catches generic or duplicate titles.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 1304
+    end_line: 1325
+  summary: Derive complete item scopes and validate specific, distinct titles from frozen work-unit facts.
+  rationale: Keep model responses focused on the PR outcome while code preserves scope membership and catches generic or duplicate titles.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 1284
+    end_line: 1284
+  summary: Derive complete item scopes and validate specific, distinct titles from frozen work-unit facts.
+  rationale: Keep model responses focused on the PR outcome while code preserves scope membership and catches generic or duplicate titles.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 1288
+    end_line: 1346
+  summary: Derive complete item scopes and validate specific, distinct titles from frozen work-unit facts.
+  rationale: Keep model responses focused on the PR outcome while code preserves scope membership and catches generic or duplicate titles.
+- path: packages/service/src/powdrr_service/planning/dependencies.py
+  type: modified
+  span:
+    start_line: 339
+    end_line: 340
+  summary: Discover dependency candidates from explicit output references and related requirement links.
+  rationale: Surface likely producer-consumer edges without constructing or asking the model to discover an all-pairs dependency graph.
+- path: packages/service/src/powdrr_service/planning/dependencies.py
+  type: modified
+  span:
+    start_line: 382
+    end_line: 382
+  summary: Discover dependency candidates from explicit output references and related requirement links.
+  rationale: Surface likely producer-consumer edges without constructing or asking the model to discover an all-pairs dependency graph.
+- path: packages/service/src/powdrr_service/planning/dependencies.py
+  type: modified
+  span:
+    start_line: 394
+    end_line: 394
+  summary: Discover dependency candidates from explicit output references and related requirement links.
+  rationale: Surface likely producer-consumer edges without constructing or asking the model to discover an all-pairs dependency graph.
+- path: packages/service/src/powdrr_service/planning/dependencies.py
+  type: modified
+  span:
+    start_line: 396
+    end_line: 396
+  summary: Discover dependency candidates from explicit output references and related requirement links.
+  rationale: Surface likely producer-consumer edges without constructing or asking the model to discover an all-pairs dependency graph.
+- path: packages/service/src/powdrr_service/planning/dependencies.py
+  type: modified
+  span:
+    start_line: 400
+    end_line: 413
+  summary: Discover dependency candidates from explicit output references and related requirement links.
+  rationale: Surface likely producer-consumer edges without constructing or asking the model to discover an all-pairs dependency graph.
+- path: packages/service/src/powdrr_service/planning/dependencies.py
+  type: modified
+  span:
+    start_line: 415
+    end_line: 420
+  summary: Discover dependency candidates from explicit output references and related requirement links.
+  rationale: Surface likely producer-consumer edges without constructing or asking the model to discover an all-pairs dependency graph.
+- path: packages/service/src/powdrr_service/planning/dependencies.py
+  type: modified
+  span:
+    start_line: 436
+    end_line: 440
+  summary: Discover dependency candidates from explicit output references and related requirement links.
+  rationale: Surface likely producer-consumer edges without constructing or asking the model to discover an all-pairs dependency graph.
+- path: packages/service/src/powdrr_service/planning/dependencies.py
+  type: modified
+  span:
+    start_line: 444
+    end_line: 451
+  summary: Discover dependency candidates from explicit output references and related requirement links.
+  rationale: Surface likely producer-consumer edges without constructing or asking the model to discover an all-pairs dependency graph.
 - path: packages/service/src/powdrr_service/planning/driver.py
   type: modified
   span:
     start_line: 5
     end_line: 5
-  summary: Batch planning frontiers and derive safe source and zero-hit coverage answers.
-  rationale: Reduce provider round trips while preserving ambiguous cases for targeted review and durable answer replay.
+  summary: Bind existing Structrr entities and relationships to planned paths and pass source relations into dependency discovery.
+  rationale: Reduce structural discovery and dependency confirmation to bounded candidates associated with the affected work.
 - path: packages/service/src/powdrr_service/planning/driver.py
   type: modified
   span:
-    start_line: 346
-    end_line: 346
-  summary: Batch planning frontiers and derive safe source and zero-hit coverage answers.
-  rationale: Reduce provider round trips while preserving ambiguous cases for targeted review and durable answer replay.
+    start_line: 214
+    end_line: 214
+  summary: Bind existing Structrr entities and relationships to planned paths and pass source relations into dependency discovery.
+  rationale: Reduce structural discovery and dependency confirmation to bounded candidates associated with the affected work.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 226
+    end_line: 239
+  summary: Bind existing Structrr entities and relationships to planned paths and pass source relations into dependency discovery.
+  rationale: Reduce structural discovery and dependency confirmation to bounded candidates associated with the affected work.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 246
+    end_line: 258
+  summary: Bind existing Structrr entities and relationships to planned paths and pass source relations into dependency discovery.
+  rationale: Reduce structural discovery and dependency confirmation to bounded candidates associated with the affected work.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 260
+    end_line: 263
+  summary: Bind existing Structrr entities and relationships to planned paths and pass source relations into dependency discovery.
+  rationale: Reduce structural discovery and dependency confirmation to bounded candidates associated with the affected work.
 - path: packages/service/src/powdrr_service/planning/driver.py
   type: modified
   span:
     start_line: 370
-    end_line: 431
-  summary: Batch planning frontiers and derive safe source and zero-hit coverage answers.
-  rationale: Reduce provider round trips while preserving ambiguous cases for targeted review and durable answer replay.
+    end_line: 370
+  summary: Bind existing Structrr entities and relationships to planned paths and pass source relations into dependency discovery.
+  rationale: Reduce structural discovery and dependency confirmation to bounded candidates associated with the affected work.
 - path: packages/service/src/powdrr_service/planning/driver.py
   type: modified
   span:
-    start_line: 441
-    end_line: 441
-  summary: Batch planning frontiers and derive safe source and zero-hit coverage answers.
-  rationale: Reduce provider round trips while preserving ambiguous cases for targeted review and durable answer replay.
+    start_line: 394
+    end_line: 455
+  summary: Bind existing Structrr entities and relationships to planned paths and pass source relations into dependency discovery.
+  rationale: Reduce structural discovery and dependency confirmation to bounded candidates associated with the affected work.
 - path: packages/service/src/powdrr_service/planning/driver.py
   type: modified
   span:
-    start_line: 472
-    end_line: 472
-  summary: Batch planning frontiers and derive safe source and zero-hit coverage answers.
-  rationale: Reduce provider round trips while preserving ambiguous cases for targeted review and durable answer replay.
+    start_line: 465
+    end_line: 465
+  summary: Bind existing Structrr entities and relationships to planned paths and pass source relations into dependency discovery.
+  rationale: Reduce structural discovery and dependency confirmation to bounded candidates associated with the affected work.
 - path: packages/service/src/powdrr_service/planning/driver.py
   type: modified
   span:
-    start_line: 502
-    end_line: 502
-  summary: Batch planning frontiers and derive safe source and zero-hit coverage answers.
-  rationale: Reduce provider round trips while preserving ambiguous cases for targeted review and durable answer replay.
+    start_line: 496
+    end_line: 496
+  summary: Bind existing Structrr entities and relationships to planned paths and pass source relations into dependency discovery.
+  rationale: Reduce structural discovery and dependency confirmation to bounded candidates associated with the affected work.
 - path: packages/service/src/powdrr_service/planning/driver.py
   type: modified
   span:
-    start_line: 522
-    end_line: 522
-  summary: Batch planning frontiers and derive safe source and zero-hit coverage answers.
-  rationale: Reduce provider round trips while preserving ambiguous cases for targeted review and durable answer replay.
+    start_line: 526
+    end_line: 526
+  summary: Bind existing Structrr entities and relationships to planned paths and pass source relations into dependency discovery.
+  rationale: Reduce structural discovery and dependency confirmation to bounded candidates associated with the affected work.
 - path: packages/service/src/powdrr_service/planning/driver.py
   type: modified
   span:
-    start_line: 524
-    end_line: 543
-  summary: Batch planning frontiers and derive safe source and zero-hit coverage answers.
-  rationale: Reduce provider round trips while preserving ambiguous cases for targeted review and durable answer replay.
+    start_line: 546
+    end_line: 546
+  summary: Bind existing Structrr entities and relationships to planned paths and pass source relations into dependency discovery.
+  rationale: Reduce structural discovery and dependency confirmation to bounded candidates associated with the affected work.
 - path: packages/service/src/powdrr_service/planning/driver.py
   type: modified
   span:
     start_line: 548
-    end_line: 548
-  summary: Batch planning frontiers and derive safe source and zero-hit coverage answers.
-  rationale: Reduce provider round trips while preserving ambiguous cases for targeted review and durable answer replay.
+    end_line: 567
+  summary: Bind existing Structrr entities and relationships to planned paths and pass source relations into dependency discovery.
+  rationale: Reduce structural discovery and dependency confirmation to bounded candidates associated with the affected work.
 - path: packages/service/src/powdrr_service/planning/driver.py
   type: modified
   span:
-    start_line: 570
-    end_line: 573
-  summary: Batch planning frontiers and derive safe source and zero-hit coverage answers.
-  rationale: Reduce provider round trips while preserving ambiguous cases for targeted review and durable answer replay.
+    start_line: 572
+    end_line: 572
+  summary: Bind existing Structrr entities and relationships to planned paths and pass source relations into dependency discovery.
+  rationale: Reduce structural discovery and dependency confirmation to bounded candidates associated with the affected work.
 - path: packages/service/src/powdrr_service/planning/driver.py
   type: modified
   span:
-    start_line: 595
-    end_line: 595
-  summary: Batch planning frontiers and derive safe source and zero-hit coverage answers.
-  rationale: Reduce provider round trips while preserving ambiguous cases for targeted review and durable answer replay.
+    start_line: 594
+    end_line: 597
+  summary: Bind existing Structrr entities and relationships to planned paths and pass source relations into dependency discovery.
+  rationale: Reduce structural discovery and dependency confirmation to bounded candidates associated with the affected work.
 - path: packages/service/src/powdrr_service/planning/driver.py
   type: modified
   span:
-    start_line: 617
-    end_line: 617
-  summary: Batch planning frontiers and derive safe source and zero-hit coverage answers.
-  rationale: Reduce provider round trips while preserving ambiguous cases for targeted review and durable answer replay.
+    start_line: 619
+    end_line: 619
+  summary: Bind existing Structrr entities and relationships to planned paths and pass source relations into dependency discovery.
+  rationale: Reduce structural discovery and dependency confirmation to bounded candidates associated with the affected work.
 - path: packages/service/src/powdrr_service/planning/driver.py
   type: modified
   span:
-    start_line: 628
-    end_line: 628
-  summary: Batch planning frontiers and derive safe source and zero-hit coverage answers.
-  rationale: Reduce provider round trips while preserving ambiguous cases for targeted review and durable answer replay.
+    start_line: 641
+    end_line: 641
+  summary: Bind existing Structrr entities and relationships to planned paths and pass source relations into dependency discovery.
+  rationale: Reduce structural discovery and dependency confirmation to bounded candidates associated with the affected work.
 - path: packages/service/src/powdrr_service/planning/driver.py
   type: modified
   span:
-    start_line: 630
-    end_line: 635
-  summary: Batch planning frontiers and derive safe source and zero-hit coverage answers.
-  rationale: Reduce provider round trips while preserving ambiguous cases for targeted review and durable answer replay.
+    start_line: 652
+    end_line: 652
+  summary: Bind existing Structrr entities and relationships to planned paths and pass source relations into dependency discovery.
+  rationale: Reduce structural discovery and dependency confirmation to bounded candidates associated with the affected work.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 654
+    end_line: 659
+  summary: Bind existing Structrr entities and relationships to planned paths and pass source relations into dependency discovery.
+  rationale: Reduce structural discovery and dependency confirmation to bounded candidates associated with the affected work.
 - path: packages/service/src/powdrr_service/planning/driver.py
   type: modified
   span:
     start_line: 792
     end_line: 793
-  summary: Batch planning frontiers and derive safe source and zero-hit coverage answers.
-  rationale: Reduce provider round trips while preserving ambiguous cases for targeted review and durable answer replay.
+  summary: Bind existing Structrr entities and relationships to planned paths and pass source relations into dependency discovery.
+  rationale: Reduce structural discovery and dependency confirmation to bounded candidates associated with the affected work.
 - path: packages/service/src/powdrr_service/planning/driver.py
   type: modified
   span:
     start_line: 799
     end_line: 800
-  summary: Batch planning frontiers and derive safe source and zero-hit coverage answers.
-  rationale: Reduce provider round trips while preserving ambiguous cases for targeted review and durable answer replay.
+  summary: Bind existing Structrr entities and relationships to planned paths and pass source relations into dependency discovery.
+  rationale: Reduce structural discovery and dependency confirmation to bounded candidates associated with the affected work.
 - path: packages/service/src/powdrr_service/planning/driver.py
   type: modified
   span:
     start_line: 805
     end_line: 805
-  summary: Batch planning frontiers and derive safe source and zero-hit coverage answers.
-  rationale: Reduce provider round trips while preserving ambiguous cases for targeted review and durable answer replay.
+  summary: Bind existing Structrr entities and relationships to planned paths and pass source relations into dependency discovery.
+  rationale: Reduce structural discovery and dependency confirmation to bounded candidates associated with the affected work.
 - path: packages/service/src/powdrr_service/planning/driver.py
   type: modified
   span:
     start_line: 812
     end_line: 812
-  summary: Batch planning frontiers and derive safe source and zero-hit coverage answers.
-  rationale: Reduce provider round trips while preserving ambiguous cases for targeted review and durable answer replay.
+  summary: Bind existing Structrr entities and relationships to planned paths and pass source relations into dependency discovery.
+  rationale: Reduce structural discovery and dependency confirmation to bounded candidates associated with the affected work.
 - path: packages/service/src/powdrr_service/planning/driver.py
   type: modified
   span:
-    start_line: 1998
-    end_line: 2063
-  summary: Batch planning frontiers and derive safe source and zero-hit coverage answers.
-  rationale: Reduce provider round trips while preserving ambiguous cases for targeted review and durable answer replay.
+    start_line: 1014
+    end_line: 1057
+  summary: Bind existing Structrr entities and relationships to planned paths and pass source relations into dependency discovery.
+  rationale: Reduce structural discovery and dependency confirmation to bounded candidates associated with the affected work.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 1129
+    end_line: 1132
+  summary: Bind existing Structrr entities and relationships to planned paths and pass source relations into dependency discovery.
+  rationale: Reduce structural discovery and dependency confirmation to bounded candidates associated with the affected work.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 1134
+    end_line: 1136
+  summary: Bind existing Structrr entities and relationships to planned paths and pass source relations into dependency discovery.
+  rationale: Reduce structural discovery and dependency confirmation to bounded candidates associated with the affected work.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 2068
+    end_line: 2133
+  summary: Bind existing Structrr entities and relationships to planned paths and pass source relations into dependency discovery.
+  rationale: Reduce structural discovery and dependency confirmation to bounded candidates associated with the affected work.
 - path: packages/service/src/powdrr_service/planning/service.py
   type: modified
   span:
     start_line: 11
     end_line: 11
-  summary: Journal deterministic answers and measure phase, pagination, and model-call costs.
-  rationale: Make automatic decisions replayable and expose planning execution cost by phase.
+  summary: Preserve telemetry for accepted and bounded-retry answers, including terminal needs-answer outcomes.
+  rationale: Ensure invalid model answers remain diagnosable and checkpointed instead of crashing telemetry collection.
 - path: packages/service/src/powdrr_service/planning/service.py
   type: modified
   span:
     start_line: 274
     end_line: 274
-  summary: Journal deterministic answers and measure phase, pagination, and model-call costs.
-  rationale: Make automatic decisions replayable and expose planning execution cost by phase.
+  summary: Preserve telemetry for accepted and bounded-retry answers, including terminal needs-answer outcomes.
+  rationale: Ensure invalid model answers remain diagnosable and checkpointed instead of crashing telemetry collection.
 - path: packages/service/src/powdrr_service/planning/service.py
   type: modified
   span:
     start_line: 477
     end_line: 535
-  summary: Journal deterministic answers and measure phase, pagination, and model-call costs.
-  rationale: Make automatic decisions replayable and expose planning execution cost by phase.
+  summary: Preserve telemetry for accepted and bounded-retry answers, including terminal needs-answer outcomes.
+  rationale: Ensure invalid model answers remain diagnosable and checkpointed instead of crashing telemetry collection.
 - path: packages/service/src/powdrr_service/planning/service.py
   type: modified
   span:
     start_line: 588
     end_line: 588
-  summary: Journal deterministic answers and measure phase, pagination, and model-call costs.
-  rationale: Make automatic decisions replayable and expose planning execution cost by phase.
+  summary: Preserve telemetry for accepted and bounded-retry answers, including terminal needs-answer outcomes.
+  rationale: Ensure invalid model answers remain diagnosable and checkpointed instead of crashing telemetry collection.
 - path: packages/service/src/powdrr_service/planning/service.py
   type: modified
   span:
     start_line: 528
     end_line: 529
-  summary: Journal deterministic answers and measure phase, pagination, and model-call costs.
-  rationale: Make automatic decisions replayable and expose planning execution cost by phase.
+  summary: Preserve telemetry for accepted and bounded-retry answers, including terminal needs-answer outcomes.
+  rationale: Ensure invalid model answers remain diagnosable and checkpointed instead of crashing telemetry collection.
 - path: packages/service/src/powdrr_service/planning/service.py
   type: modified
   span:
     start_line: 580
     end_line: 585
-  summary: Journal deterministic answers and measure phase, pagination, and model-call costs.
-  rationale: Make automatic decisions replayable and expose planning execution cost by phase.
+  summary: Preserve telemetry for accepted and bounded-retry answers, including terminal needs-answer outcomes.
+  rationale: Ensure invalid model answers remain diagnosable and checkpointed instead of crashing telemetry collection.
 - path: packages/service/src/powdrr_service/planning/service.py
   type: modified
   span:
     start_line: 697
     end_line: 697
-  summary: Journal deterministic answers and measure phase, pagination, and model-call costs.
-  rationale: Make automatic decisions replayable and expose planning execution cost by phase.
+  summary: Preserve telemetry for accepted and bounded-retry answers, including terminal needs-answer outcomes.
+  rationale: Ensure invalid model answers remain diagnosable and checkpointed instead of crashing telemetry collection.
 - path: packages/service/src/powdrr_service/planning/service.py
   type: modified
   span:
-    start_line: 741
-    end_line: 756
-  summary: Journal deterministic answers and measure phase, pagination, and model-call costs.
-  rationale: Make automatic decisions replayable and expose planning execution cost by phase.
+    start_line: 736
+    end_line: 738
+  summary: Preserve telemetry for accepted and bounded-retry answers, including terminal needs-answer outcomes.
+  rationale: Ensure invalid model answers remain diagnosable and checkpointed instead of crashing telemetry collection.
 - path: packages/service/src/powdrr_service/planning/service.py
   type: modified
   span:
-    start_line: 760
-    end_line: 760
-  summary: Journal deterministic answers and measure phase, pagination, and model-call costs.
-  rationale: Make automatic decisions replayable and expose planning execution cost by phase.
+    start_line: 743
+    end_line: 758
+  summary: Preserve telemetry for accepted and bounded-retry answers, including terminal needs-answer outcomes.
+  rationale: Ensure invalid model answers remain diagnosable and checkpointed instead of crashing telemetry collection.
 - path: packages/service/src/powdrr_service/planning/service.py
   type: modified
   span:
-    start_line: 799
-    end_line: 799
-  summary: Journal deterministic answers and measure phase, pagination, and model-call costs.
-  rationale: Make automatic decisions replayable and expose planning execution cost by phase.
+    start_line: 762
+    end_line: 762
+  summary: Preserve telemetry for accepted and bounded-retry answers, including terminal needs-answer outcomes.
+  rationale: Ensure invalid model answers remain diagnosable and checkpointed instead of crashing telemetry collection.
 - path: packages/service/src/powdrr_service/planning/service.py
   type: modified
   span:
-    start_line: 829
-    end_line: 927
-  summary: Journal deterministic answers and measure phase, pagination, and model-call costs.
-  rationale: Make automatic decisions replayable and expose planning execution cost by phase.
+    start_line: 801
+    end_line: 801
+  summary: Preserve telemetry for accepted and bounded-retry answers, including terminal needs-answer outcomes.
+  rationale: Ensure invalid model answers remain diagnosable and checkpointed instead of crashing telemetry collection.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 831
+    end_line: 929
+  summary: Preserve telemetry for accepted and bounded-retry answers, including terminal needs-answer outcomes.
+  rationale: Ensure invalid model answers remain diagnosable and checkpointed instead of crashing telemetry collection.
 - path: src/powdrr_lift/workrr/planning_session.py
   type: modified
   span:
@@ -579,99 +873,162 @@ files:
   span:
     start_line: 84
     end_line: 85
-  summary: Exercise the compact work-unit schema and deterministic runtime derivation.
-  rationale: Protect semantic proposal fields and retain parser enforcement for mixed or ambiguous runtimes.
+  summary: Cover derived work-unit scopes, compact schemas, and specific distinct item titles.
+  rationale: Verify the smaller model contract retains complete scope and rejects generic or duplicate PR titles.
 - path: tests/test_planning_assembly.py
   type: modified
   span:
     start_line: 90
     end_line: 90
-  summary: Exercise the compact work-unit schema and deterministic runtime derivation.
-  rationale: Protect semantic proposal fields and retain parser enforcement for mixed or ambiguous runtimes.
+  summary: Cover derived work-unit scopes, compact schemas, and specific distinct item titles.
+  rationale: Verify the smaller model contract retains complete scope and rejects generic or duplicate PR titles.
 - path: tests/test_planning_assembly.py
   type: modified
   span:
     start_line: 97
     end_line: 97
-  summary: Exercise the compact work-unit schema and deterministic runtime derivation.
-  rationale: Protect semantic proposal fields and retain parser enforcement for mixed or ambiguous runtimes.
+  summary: Cover derived work-unit scopes, compact schemas, and specific distinct item titles.
+  rationale: Verify the smaller model contract retains complete scope and rejects generic or duplicate PR titles.
 - path: tests/test_planning_assembly.py
   type: modified
   span:
     start_line: 156
     end_line: 156
-  summary: Exercise the compact work-unit schema and deterministic runtime derivation.
-  rationale: Protect semantic proposal fields and retain parser enforcement for mixed or ambiguous runtimes.
+  summary: Cover derived work-unit scopes, compact schemas, and specific distinct item titles.
+  rationale: Verify the smaller model contract retains complete scope and rejects generic or duplicate PR titles.
 - path: tests/test_planning_assembly.py
   type: modified
   span:
     start_line: 195
     end_line: 195
-  summary: Exercise the compact work-unit schema and deterministic runtime derivation.
-  rationale: Protect semantic proposal fields and retain parser enforcement for mixed or ambiguous runtimes.
+  summary: Cover derived work-unit scopes, compact schemas, and specific distinct item titles.
+  rationale: Verify the smaller model contract retains complete scope and rejects generic or duplicate PR titles.
 - path: tests/test_planning_assembly.py
   type: modified
   span:
     start_line: 219
     end_line: 219
-  summary: Exercise the compact work-unit schema and deterministic runtime derivation.
-  rationale: Protect semantic proposal fields and retain parser enforcement for mixed or ambiguous runtimes.
+  summary: Cover derived work-unit scopes, compact schemas, and specific distinct item titles.
+  rationale: Verify the smaller model contract retains complete scope and rejects generic or duplicate PR titles.
 - path: tests/test_planning_assembly.py
   type: modified
   span:
     start_line: 242
     end_line: 242
-  summary: Exercise the compact work-unit schema and deterministic runtime derivation.
-  rationale: Protect semantic proposal fields and retain parser enforcement for mixed or ambiguous runtimes.
+  summary: Cover derived work-unit scopes, compact schemas, and specific distinct item titles.
+  rationale: Verify the smaller model contract retains complete scope and rejects generic or duplicate PR titles.
 - path: tests/test_planning_assembly.py
   type: modified
   span:
-    start_line: 406
-    end_line: 408
-  summary: Exercise the compact work-unit schema and deterministic runtime derivation.
-  rationale: Protect semantic proposal fields and retain parser enforcement for mixed or ambiguous runtimes.
+    start_line: 331
+    end_line: 331
+  summary: Cover derived work-unit scopes, compact schemas, and specific distinct item titles.
+  rationale: Verify the smaller model contract retains complete scope and rejects generic or duplicate PR titles.
 - path: tests/test_planning_assembly.py
   type: modified
   span:
-    start_line: 410
-    end_line: 410
-  summary: Exercise the compact work-unit schema and deterministic runtime derivation.
-  rationale: Protect semantic proposal fields and retain parser enforcement for mixed or ambiguous runtimes.
+    start_line: 342
+    end_line: 344
+  summary: Cover derived work-unit scopes, compact schemas, and specific distinct item titles.
+  rationale: Verify the smaller model contract retains complete scope and rejects generic or duplicate PR titles.
 - path: tests/test_planning_assembly.py
   type: modified
   span:
-    start_line: 420
-    end_line: 422
-  summary: Exercise the compact work-unit schema and deterministic runtime derivation.
-  rationale: Protect semantic proposal fields and retain parser enforcement for mixed or ambiguous runtimes.
+    start_line: 340
+    end_line: 346
+  summary: Cover derived work-unit scopes, compact schemas, and specific distinct item titles.
+  rationale: Verify the smaller model contract retains complete scope and rejects generic or duplicate PR titles.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 349
+    end_line: 349
+  summary: Cover derived work-unit scopes, compact schemas, and specific distinct item titles.
+  rationale: Verify the smaller model contract retains complete scope and rejects generic or duplicate PR titles.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 361
+    end_line: 367
+  summary: Cover derived work-unit scopes, compact schemas, and specific distinct item titles.
+  rationale: Verify the smaller model contract retains complete scope and rejects generic or duplicate PR titles.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 370
+    end_line: 370
+  summary: Cover derived work-unit scopes, compact schemas, and specific distinct item titles.
+  rationale: Verify the smaller model contract retains complete scope and rejects generic or duplicate PR titles.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 372
+    end_line: 372
+  summary: Cover derived work-unit scopes, compact schemas, and specific distinct item titles.
+  rationale: Verify the smaller model contract retains complete scope and rejects generic or duplicate PR titles.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 377
+    end_line: 378
+  summary: Cover derived work-unit scopes, compact schemas, and specific distinct item titles.
+  rationale: Verify the smaller model contract retains complete scope and rejects generic or duplicate PR titles.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 388
+    end_line: 428
+  summary: Cover derived work-unit scopes, compact schemas, and specific distinct item titles.
+  rationale: Verify the smaller model contract retains complete scope and rejects generic or duplicate PR titles.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 446
+    end_line: 448
+  summary: Cover derived work-unit scopes, compact schemas, and specific distinct item titles.
+  rationale: Verify the smaller model contract retains complete scope and rejects generic or duplicate PR titles.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 450
+    end_line: 450
+  summary: Cover derived work-unit scopes, compact schemas, and specific distinct item titles.
+  rationale: Verify the smaller model contract retains complete scope and rejects generic or duplicate PR titles.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 460
+    end_line: 462
+  summary: Cover derived work-unit scopes, compact schemas, and specific distinct item titles.
+  rationale: Verify the smaller model contract retains complete scope and rejects generic or duplicate PR titles.
 - path: tests/test_planning_assembly.py
   type: modified
   span:
     start_line: 441
     end_line: 447
-  summary: Exercise the compact work-unit schema and deterministic runtime derivation.
-  rationale: Protect semantic proposal fields and retain parser enforcement for mixed or ambiguous runtimes.
+  summary: Cover derived work-unit scopes, compact schemas, and specific distinct item titles.
+  rationale: Verify the smaller model contract retains complete scope and rejects generic or duplicate PR titles.
 - path: tests/test_planning_assembly.py
   type: modified
   span:
     start_line: 601
     end_line: 602
-  summary: Exercise the compact work-unit schema and deterministic runtime derivation.
-  rationale: Protect semantic proposal fields and retain parser enforcement for mixed or ambiguous runtimes.
+  summary: Cover derived work-unit scopes, compact schemas, and specific distinct item titles.
+  rationale: Verify the smaller model contract retains complete scope and rejects generic or duplicate PR titles.
 - path: tests/test_planning_assembly.py
   type: modified
   span:
     start_line: 606
     end_line: 606
-  summary: Exercise the compact work-unit schema and deterministic runtime derivation.
-  rationale: Protect semantic proposal fields and retain parser enforcement for mixed or ambiguous runtimes.
+  summary: Cover derived work-unit scopes, compact schemas, and specific distinct item titles.
+  rationale: Verify the smaller model contract retains complete scope and rejects generic or duplicate PR titles.
 - path: tests/test_planning_assembly.py
   type: modified
   span:
-    start_line: 733
-    end_line: 733
-  summary: Exercise the compact work-unit schema and deterministic runtime derivation.
-  rationale: Protect semantic proposal fields and retain parser enforcement for mixed or ambiguous runtimes.
+    start_line: 773
+    end_line: 773
+  summary: Cover derived work-unit scopes, compact schemas, and specific distinct item titles.
+  rationale: Verify the smaller model contract retains complete scope and rejects generic or duplicate PR titles.
 - path: tests/test_planning_checkpoints.py
   type: modified
   span:
@@ -700,146 +1057,335 @@ files:
     end_line: 881
   summary: Verify large-journal telemetry summaries include search and deterministic outcomes.
   rationale: Ensure operational summaries aggregate bounded records without loading the checkpoint history.
+- path: tests/test_planning_dependencies.py
+  type: modified
+  span:
+    start_line: 301
+    end_line: 338
+  summary: Cover explicit producer-output references and requirement-related dependency candidates.
+  rationale: Prove dependency discovery catches concrete non-lexical edges while retaining a bounded candidate set.
 - path: tests/test_planning_service.py
   type: modified
   span:
-    start_line: 19
-    end_line: 23
-  summary: Cover batched frontiers, deterministic source classification, zero-hit coverage, and durable provenance.
-  rationale: Prove automated answers preserve existing plan behavior and uncertain decisions still reach the model.
+    start_line: 10
+    end_line: 10
+  summary: Cover batching, deterministic dispositions, Structrr path bindings, and retry telemetry.
+  rationale: Exercise nontrivial planning responses and ensure candidate ownership and terminal answer state survive the service path.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 20
+    end_line: 25
+  summary: Cover batching, deterministic dispositions, Structrr path bindings, and retry telemetry.
+  rationale: Exercise nontrivial planning responses and ensure candidate ownership and terminal answer state survive the service path.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 41
+    end_line: 41
+  summary: Cover batching, deterministic dispositions, Structrr path bindings, and retry telemetry.
+  rationale: Exercise nontrivial planning responses and ensure candidate ownership and terminal answer state survive the service path.
 - path: tests/test_planning_service.py
   type: modified
   span:
     start_line: 135
     end_line: 136
-  summary: Cover batched frontiers, deterministic source classification, zero-hit coverage, and durable provenance.
-  rationale: Prove automated answers preserve existing plan behavior and uncertain decisions still reach the model.
+  summary: Cover batching, deterministic dispositions, Structrr path bindings, and retry telemetry.
+  rationale: Exercise nontrivial planning responses and ensure candidate ownership and terminal answer state survive the service path.
 - path: tests/test_planning_service.py
   type: modified
   span:
     start_line: 141
     end_line: 141
-  summary: Cover batched frontiers, deterministic source classification, zero-hit coverage, and durable provenance.
-  rationale: Prove automated answers preserve existing plan behavior and uncertain decisions still reach the model.
+  summary: Cover batching, deterministic dispositions, Structrr path bindings, and retry telemetry.
+  rationale: Exercise nontrivial planning responses and ensure candidate ownership and terminal answer state survive the service path.
 - path: tests/test_planning_service.py
   type: modified
   span:
     start_line: 148
     end_line: 148
-  summary: Cover batched frontiers, deterministic source classification, zero-hit coverage, and durable provenance.
-  rationale: Prove automated answers preserve existing plan behavior and uncertain decisions still reach the model.
+  summary: Cover batching, deterministic dispositions, Structrr path bindings, and retry telemetry.
+  rationale: Exercise nontrivial planning responses and ensure candidate ownership and terminal answer state survive the service path.
 - path: tests/test_planning_service.py
   type: modified
   span:
-    start_line: 582
-    end_line: 582
-  summary: Cover batched frontiers, deterministic source classification, zero-hit coverage, and durable provenance.
-  rationale: Prove automated answers preserve existing plan behavior and uncertain decisions still reach the model.
+    start_line: 160
+    end_line: 160
+  summary: Cover batching, deterministic dispositions, Structrr path bindings, and retry telemetry.
+  rationale: Exercise nontrivial planning responses and ensure candidate ownership and terminal answer state survive the service path.
 - path: tests/test_planning_service.py
   type: modified
   span:
-    start_line: 605
-    end_line: 605
-  summary: Cover batched frontiers, deterministic source classification, zero-hit coverage, and durable provenance.
-  rationale: Prove automated answers preserve existing plan behavior and uncertain decisions still reach the model.
+    start_line: 159
+    end_line: 164
+  summary: Cover batching, deterministic dispositions, Structrr path bindings, and retry telemetry.
+  rationale: Exercise nontrivial planning responses and ensure candidate ownership and terminal answer state survive the service path.
 - path: tests/test_planning_service.py
   type: modified
   span:
-    start_line: 909
-    end_line: 916
-  summary: Cover batched frontiers, deterministic source classification, zero-hit coverage, and durable provenance.
-  rationale: Prove automated answers preserve existing plan behavior and uncertain decisions still reach the model.
+    start_line: 292
+    end_line: 346
+  summary: Cover batching, deterministic dispositions, Structrr path bindings, and retry telemetry.
+  rationale: Exercise nontrivial planning responses and ensure candidate ownership and terminal answer state survive the service path.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 348
+    end_line: 348
+  summary: Cover batching, deterministic dispositions, Structrr path bindings, and retry telemetry.
+  rationale: Exercise nontrivial planning responses and ensure candidate ownership and terminal answer state survive the service path.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 634
+    end_line: 634
+  summary: Cover batching, deterministic dispositions, Structrr path bindings, and retry telemetry.
+  rationale: Exercise nontrivial planning responses and ensure candidate ownership and terminal answer state survive the service path.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 657
+    end_line: 657
+  summary: Cover batching, deterministic dispositions, Structrr path bindings, and retry telemetry.
+  rationale: Exercise nontrivial planning responses and ensure candidate ownership and terminal answer state survive the service path.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 961
+    end_line: 968
+  summary: Cover batching, deterministic dispositions, Structrr path bindings, and retry telemetry.
+  rationale: Exercise nontrivial planning responses and ensure candidate ownership and terminal answer state survive the service path.
 - path: tests/test_planning_service.py
   type: modified
   span:
     start_line: 926
     end_line: 940
-  summary: Cover batched frontiers, deterministic source classification, zero-hit coverage, and durable provenance.
-  rationale: Prove automated answers preserve existing plan behavior and uncertain decisions still reach the model.
+  summary: Cover batching, deterministic dispositions, Structrr path bindings, and retry telemetry.
+  rationale: Exercise nontrivial planning responses and ensure candidate ownership and terminal answer state survive the service path.
 - path: tests/test_planning_service.py
   type: modified
   span:
     start_line: 947
     end_line: 948
-  summary: Cover batched frontiers, deterministic source classification, zero-hit coverage, and durable provenance.
-  rationale: Prove automated answers preserve existing plan behavior and uncertain decisions still reach the model.
+  summary: Cover batching, deterministic dispositions, Structrr path bindings, and retry telemetry.
+  rationale: Exercise nontrivial planning responses and ensure candidate ownership and terminal answer state survive the service path.
 - path: tests/test_planning_service.py
   type: modified
   span:
     start_line: 953
     end_line: 953
-  summary: Cover batched frontiers, deterministic source classification, zero-hit coverage, and durable provenance.
-  rationale: Prove automated answers preserve existing plan behavior and uncertain decisions still reach the model.
+  summary: Cover batching, deterministic dispositions, Structrr path bindings, and retry telemetry.
+  rationale: Exercise nontrivial planning responses and ensure candidate ownership and terminal answer state survive the service path.
 - path: tests/test_planning_service.py
   type: modified
   span:
     start_line: 960
     end_line: 960
-  summary: Cover batched frontiers, deterministic source classification, zero-hit coverage, and durable provenance.
-  rationale: Prove automated answers preserve existing plan behavior and uncertain decisions still reach the model.
+  summary: Cover batching, deterministic dispositions, Structrr path bindings, and retry telemetry.
+  rationale: Exercise nontrivial planning responses and ensure candidate ownership and terminal answer state survive the service path.
 - path: tests/test_planning_service.py
   type: modified
   span:
     start_line: 973
     end_line: 974
-  summary: Cover batched frontiers, deterministic source classification, zero-hit coverage, and durable provenance.
-  rationale: Prove automated answers preserve existing plan behavior and uncertain decisions still reach the model.
+  summary: Cover batching, deterministic dispositions, Structrr path bindings, and retry telemetry.
+  rationale: Exercise nontrivial planning responses and ensure candidate ownership and terminal answer state survive the service path.
 - path: tests/test_planning_service.py
   type: modified
   span:
     start_line: 979
     end_line: 979
-  summary: Cover batched frontiers, deterministic source classification, zero-hit coverage, and durable provenance.
-  rationale: Prove automated answers preserve existing plan behavior and uncertain decisions still reach the model.
+  summary: Cover batching, deterministic dispositions, Structrr path bindings, and retry telemetry.
+  rationale: Exercise nontrivial planning responses and ensure candidate ownership and terminal answer state survive the service path.
 - path: tests/test_planning_service.py
   type: modified
   span:
     start_line: 986
     end_line: 986
-  summary: Cover batched frontiers, deterministic source classification, zero-hit coverage, and durable provenance.
-  rationale: Prove automated answers preserve existing plan behavior and uncertain decisions still reach the model.
+  summary: Cover batching, deterministic dispositions, Structrr path bindings, and retry telemetry.
+  rationale: Exercise nontrivial planning responses and ensure candidate ownership and terminal answer state survive the service path.
 - path: tests/test_planning_service.py
   type: modified
   span:
-    start_line: 1035
-    end_line: 1096
-  summary: Cover batched frontiers, deterministic source classification, zero-hit coverage, and durable provenance.
-  rationale: Prove automated answers preserve existing plan behavior and uncertain decisions still reach the model.
+    start_line: 1031
+    end_line: 1031
+  summary: Cover batching, deterministic dispositions, Structrr path bindings, and retry telemetry.
+  rationale: Exercise nontrivial planning responses and ensure candidate ownership and terminal answer state survive the service path.
 - path: tests/test_planning_service.py
   type: modified
   span:
-    start_line: 1113
-    end_line: 1118
-  summary: Cover batched frontiers, deterministic source classification, zero-hit coverage, and durable provenance.
-  rationale: Prove automated answers preserve existing plan behavior and uncertain decisions still reach the model.
+    start_line: 1088
+    end_line: 1223
+  summary: Cover batching, deterministic dispositions, Structrr path bindings, and retry telemetry.
+  rationale: Exercise nontrivial planning responses and ensure candidate ownership and terminal answer state survive the service path.
 - path: tests/test_planning_service.py
   type: modified
   span:
-    start_line: 1163
-    end_line: 1163
-  summary: Cover batched frontiers, deterministic source classification, zero-hit coverage, and durable provenance.
-  rationale: Prove automated answers preserve existing plan behavior and uncertain decisions still reach the model.
+    start_line: 1240
+    end_line: 1245
+  summary: Cover batching, deterministic dispositions, Structrr path bindings, and retry telemetry.
+  rationale: Exercise nontrivial planning responses and ensure candidate ownership and terminal answer state survive the service path.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1290
+    end_line: 1290
+  summary: Cover batching, deterministic dispositions, Structrr path bindings, and retry telemetry.
+  rationale: Exercise nontrivial planning responses and ensure candidate ownership and terminal answer state survive the service path.
 - path: tests/test_planning_service.py
   type: modified
   span:
     start_line: 1118
     end_line: 1118
-  summary: Cover batched frontiers, deterministic source classification, zero-hit coverage, and durable provenance.
-  rationale: Prove automated answers preserve existing plan behavior and uncertain decisions still reach the model.
+  summary: Cover batching, deterministic dispositions, Structrr path bindings, and retry telemetry.
+  rationale: Exercise nontrivial planning responses and ensure candidate ownership and terminal answer state survive the service path.
 - path: tests/test_planning_service.py
   type: modified
   span:
-    start_line: 1170
-    end_line: 1183
-  summary: Cover batched frontiers, deterministic source classification, zero-hit coverage, and durable provenance.
-  rationale: Prove automated answers preserve existing plan behavior and uncertain decisions still reach the model.
+    start_line: 1297
+    end_line: 1310
+  summary: Cover batching, deterministic dispositions, Structrr path bindings, and retry telemetry.
+  rationale: Exercise nontrivial planning responses and ensure candidate ownership and terminal answer state survive the service path.
 - path: tests/test_planning_service.py
   type: modified
   span:
-    start_line: 1201
-    end_line: 1219
-  summary: Cover batched frontiers, deterministic source classification, zero-hit coverage, and durable provenance.
-  rationale: Prove automated answers preserve existing plan behavior and uncertain decisions still reach the model.
+    start_line: 1328
+    end_line: 1346
+  summary: Cover batching, deterministic dispositions, Structrr path bindings, and retry telemetry.
+  rationale: Exercise nontrivial planning responses and ensure candidate ownership and terminal answer state survive the service path.
+- path: tests/test_workspace_api.py
+  type: modified
+  span:
+    start_line: 8
+    end_line: 8
+  summary: Update planning behavior and its regression coverage.
+  rationale: Keep the planning contract deterministic, bounded, and replayable.
+- path: tests/test_workspace_api.py
+  type: modified
+  span:
+    start_line: 113
+    end_line: 179
+  summary: Update planning behavior and its regression coverage.
+  rationale: Keep the planning contract deterministic, bounded, and replayable.
+- path: ui/src/App.css
+  type: modified
+  span:
+    start_line: 250
+    end_line: 270
+  summary: Update planning behavior and its regression coverage.
+  rationale: Keep the planning contract deterministic, bounded, and replayable.
+- path: ui/src/App.css
+  type: modified
+  span:
+    start_line: 370
+    end_line: 370
+  summary: Update planning behavior and its regression coverage.
+  rationale: Keep the planning contract deterministic, bounded, and replayable.
+- path: ui/src/App.test.tsx
+  type: modified
+  span:
+    start_line: 5
+    end_line: 5
+  summary: Update planning behavior and its regression coverage.
+  rationale: Keep the planning contract deterministic, bounded, and replayable.
+- path: ui/src/App.test.tsx
+  type: modified
+  span:
+    start_line: 17
+    end_line: 17
+  summary: Update planning behavior and its regression coverage.
+  rationale: Keep the planning contract deterministic, bounded, and replayable.
+- path: ui/src/App.test.tsx
+  type: modified
+  span:
+    start_line: 77
+    end_line: 77
+  summary: Update planning behavior and its regression coverage.
+  rationale: Keep the planning contract deterministic, bounded, and replayable.
+- path: ui/src/App.test.tsx
+  type: modified
+  span:
+    start_line: 129
+    end_line: 192
+  summary: Update planning behavior and its regression coverage.
+  rationale: Keep the planning contract deterministic, bounded, and replayable.
+- path: ui/src/App.tsx
+  type: modified
+  span:
+    start_line: 8
+    end_line: 8
+  summary: Update planning behavior and its regression coverage.
+  rationale: Keep the planning contract deterministic, bounded, and replayable.
+- path: ui/src/App.tsx
+  type: modified
+  span:
+    start_line: 109
+    end_line: 109
+  summary: Update planning behavior and its regression coverage.
+  rationale: Keep the planning contract deterministic, bounded, and replayable.
+- path: ui/src/App.tsx
+  type: modified
+  span:
+    start_line: 359
+    end_line: 378
+  summary: Update planning behavior and its regression coverage.
+  rationale: Keep the planning contract deterministic, bounded, and replayable.
+- path: ui/src/App.tsx
+  type: modified
+  span:
+    start_line: 495
+    end_line: 495
+  summary: Update planning behavior and its regression coverage.
+  rationale: Keep the planning contract deterministic, bounded, and replayable.
+- path: ui/src/App.tsx
+  type: modified
+  span:
+    start_line: 522
+    end_line: 522
+  summary: Update planning behavior and its regression coverage.
+  rationale: Keep the planning contract deterministic, bounded, and replayable.
+- path: ui/src/api/client.ts
+  type: modified
+  span:
+    start_line: 7
+    end_line: 7
+  summary: Update planning behavior and its regression coverage.
+  rationale: Keep the planning contract deterministic, bounded, and replayable.
+- path: ui/src/api/client.ts
+  type: modified
+  span:
+    start_line: 37
+    end_line: 37
+  summary: Update planning behavior and its regression coverage.
+  rationale: Keep the planning contract deterministic, bounded, and replayable.
+- path: ui/src/api/client.ts
+  type: modified
+  span:
+    start_line: 141
+    end_line: 165
+  summary: Update planning behavior and its regression coverage.
+  rationale: Keep the planning contract deterministic, bounded, and replayable.
+- path: ui/src/api/types.ts
+  type: modified
+  span:
+    start_line: 44
+    end_line: 60
+  summary: Update planning behavior and its regression coverage.
+  rationale: Keep the planning contract deterministic, bounded, and replayable.
+- path: ui/src/api/types.ts
+  type: modified
+  span:
+    start_line: 50
+    end_line: 50
+  summary: Update planning behavior and its regression coverage.
+  rationale: Keep the planning contract deterministic, bounded, and replayable.
+- path: ui/src/components/QuestionCard.tsx
+  type: modified
+  span:
+    start_line: 1
+    end_line: 213
+  summary: Update planning behavior and its regression coverage.
+  rationale: Keep the planning contract deterministic, bounded, and replayable.
 entities:
 - id: planning-question-frontier
   type: Workflow
@@ -852,6 +1398,14 @@ entities:
   action: added
 - id: planning-efficiency-test-suite
   type: Test suite
+- id: planning-structrr-candidate-binding
+  type: Module
+  action: modified
+- id: planning-dependency-candidate-discovery
+  type: Module
+  action: modified
+- id: planning-item-description-contract
+  type: Technical specification
   action: added
 entity_relationships: []
 invariants:
@@ -863,6 +1417,15 @@ invariants:
   action: added
 - id: work-unit-derived-fields-are-validated
   description: Runtime, component, and validation values are derived from pinned paths and supplied catalogs while mixed runtimes and ambiguous paths remain rejected.
+  action: added
+- id: planning-structrr-candidates-follow-pinned-paths
+  description: Existing structural entities and relationships are proposed only when baseline path bindings connect them to planned writes, and they retain their owning units and requirements.
+  action: added
+- id: dependency-candidates-have-concrete-signals
+  description: Dependency discovery uses deterministic write ordering, explicit output and path references, related requirement links, and supplemental lexical signals before targeted confirmation.
+  action: added
+- id: item-scope-is-derived-and-titles-are-validated
+  description: Compiled item scope comes from frozen allocation membership, and item titles must be distinct, specific, and grounded in concrete deliverables.
   action: added
 guidance:
 - id: keep-planning-telemetry-content-free

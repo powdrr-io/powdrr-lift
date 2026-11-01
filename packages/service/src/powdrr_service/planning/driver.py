@@ -211,7 +211,7 @@ def _planned_existing_structural_subjects(
         else []
     )
     source_subjects = projected_baseline.get("source_subjects", [])
-    entity_path_by_id: dict[str, str] = {}
+    entity_paths_by_id: dict[str, set[str]] = {}
     if isinstance(source_subjects, list):
         for source_subject in source_subjects:
             if not isinstance(source_subject, Mapping):
@@ -223,20 +223,44 @@ def _planned_existing_structural_subjects(
                 and path in owners_by_path
                 and isinstance(entity_id, str)
             ):
-                entity_path_by_id[entity_id] = path
+                entity_paths_by_id.setdefault(entity_id, set()).add(path)
+    source_bindings = projected_baseline.get("source_bindings", [])
+    if isinstance(source_bindings, list):
+        for binding in source_bindings:
+            if not isinstance(binding, Mapping):
+                continue
+            path = binding.get("path")
+            entity_id = binding.get("entity_id")
+            if (
+                isinstance(path, str)
+                and path in owners_by_path
+                and isinstance(entity_id, str)
+            ):
+                entity_paths_by_id.setdefault(entity_id, set()).add(path)
     candidates: dict[str, dict[str, set[str]]] = {}
     for entity in entities:
         entity_id = entity.get("id")
         if not isinstance(entity_id, str):
             continue
         path = entity.get("path")
-        if not isinstance(path, str):
-            path = entity_path_by_id.get(entity_id)
-        if not isinstance(path, str) and entity_id.startswith("file:"):
-            path = entity_id.removeprefix("file:")
-        if path not in path_owner:
+        entity_paths = (
+            {path}
+            if isinstance(path, str)
+            else set(entity_paths_by_id.get(entity_id, ()))
+        )
+        if not entity_paths and entity_id.startswith("file:"):
+            entity_paths.add(entity_id.removeprefix("file:"))
+        related_owners = [
+            path_owner[candidate_path]
+            for candidate_path in sorted(entity_paths)
+            if candidate_path in path_owner
+        ]
+        if not related_owners:
             continue
-        owner = path_owner[path]
+        owner = {
+            key: set().union(*(candidate[key] for candidate in related_owners))
+            for key in ("requirements", "units", "sources")
+        }
         candidates[entity_id] = owner
 
     result: list[BoundStructuralSubject] = []
@@ -987,10 +1011,50 @@ class SourceLedgerQuestionMachine:
         if not units:
             return ()
         by_id = {unit.id: unit for unit in units}
-        return tuple(
-            build_item_description_request(group, by_id)
-            for group in allocate_work_unit_groups(units).groups
-        )
+        requests: list[QuestionRequest[Any]] = []
+        accepted_titles: list[tuple[str, str]] = []
+        for group in allocate_work_unit_groups(units).groups:
+            request = build_item_description_request(
+                group, by_id, already_used_titles=accepted_titles
+            )
+            answer = accepted_answers.get(request.question.question_id)
+            if answer is None:
+                requests.append(request)
+                continue
+            if (
+                self._accepted_question_input_digests is not None
+                and self._accepted_question_input_digests.get(
+                    request.question.question_id
+                )
+                != request.question.input_digest
+            ):
+                issue = "the work-unit details or prior item titles changed"
+                self._invalid_accepted_question_ids.add(request.question.question_id)
+                requests.append(
+                    build_item_description_request(
+                        group,
+                        by_id,
+                        already_used_titles=accepted_titles,
+                        title_issue=issue,
+                    )
+                )
+                continue
+            try:
+                description = request.parse_answer(answer)
+            except PlanningContractError as error:
+                self._invalid_accepted_question_ids.add(request.question.question_id)
+                requests.append(
+                    build_item_description_request(
+                        group,
+                        by_id,
+                        already_used_titles=accepted_titles,
+                        title_issue=str(error),
+                    )
+                )
+                continue
+            accepted_titles.append((group.id, description.title))
+            requests.append(request)
+        return tuple(requests)
 
     def accepted_item_descriptions(
         self, accepted_answers: Mapping[str, Mapping[str, Any]]
@@ -1062,8 +1126,14 @@ class SourceLedgerQuestionMachine:
     ) -> tuple[AllocatedWorkUnits, DependencyCandidateDiscovery]:
         context, proposals = self._accepted_work_unit_proposals(accepted_answers)
         allocation = allocate_work_units(proposals, context=context)
+        related_requirement_ids = {
+            requirement_id: requirement.related_requirement_ids
+            for requirement_id, requirement in context.requirements.items()
+        }
         discovery = discover_dependency_candidates(
-            allocation.units, allocation.pending_outputs
+            allocation.units,
+            allocation.pending_outputs,
+            related_requirement_ids=related_requirement_ids,
         )
         return allocation, discovery
 

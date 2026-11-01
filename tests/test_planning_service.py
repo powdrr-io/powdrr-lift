@@ -7,6 +7,7 @@ from pathlib import Path
 from threading import Barrier, Lock
 from typing import Any
 
+from powdrr_service.planning.assembly import PlannedWrite, WorkUnit
 from powdrr_service.planning.checkpoints import (
     InMemoryCheckpointStore,
     PlanningCheckpoint,
@@ -20,6 +21,7 @@ from powdrr_service.planning.driver import (
     SourceLedgerQuestionMachine,
     _deterministic_block_disposition,
     _is_completed_zero_hit_search,
+    _planned_existing_structural_subjects,
 )
 from powdrr_service.planning.questions import (
     QuestionRequest,
@@ -36,6 +38,7 @@ from powdrr_service.planning.service import (
 )
 from powdrr_service.planning.source import (
     PinnedSourceDocument,
+    Requirement,
     segment_markdown_source,
 )
 
@@ -154,14 +157,8 @@ class _PlanningScriptClient:
             }
         if kind == "describe_item":
             return {
-                "title": "Implement the behavior",
+                "title": f"Implement behavior in {question['subject_ids'][0]}",
                 "objective": "Implement the behavior described by the plan.",
-                "scope": [
-                    {
-                        "description": "Implement and validate the behavior.",
-                        "unit_ids": ["unit-0001"],
-                    }
-                ],
             }
         if kind == "enumerate_structural_subjects":
             return {"records": [], "has_more": False, "next_anchor": None}
@@ -292,8 +289,63 @@ def test_accepted_question_is_durable_and_not_called_again() -> None:
     assert machine.accepted_input_digests == {
         machine.request.question.question_id: machine.request.question.input_digest
     }
+
+
+def test_invalid_answer_is_checkpointed_with_telemetry_after_bounded_corrections() -> (
+    None
+):
+    session_id = "session-invalid-answer"
+    store = InMemoryCheckpointStore(session_id=session_id)
+    session = PlanningSession(
+        session_id=session_id,
+        plan_id="bounded-plan",
+        repository="powdrr-io/example",
+        base_commit="a" * 40,
+        source_path="docs/plan.md",
+        source_blob_sha="b" * 40,
+        verification_command="make test",
+        issue=QueueIssue(
+            43, "Planning: bounded-plan", "", "open", ("powdrr:planning",), ""
+        ),
+    )
+
+    class InvalidClient:
+        calls = 0
+
+        def complete_json(
+            self,
+            messages: list[dict[str, str]],
+            *,
+            response_schema: dict[str, Any] | None = None,
+        ) -> dict[str, Any]:
+            del messages, response_schema
+            self.calls += 1
+            return {
+                "records": [],
+                "has_more": True,
+                "next_anchor": None,
+            }
+
+    metrics: list[Mapping[str, Any]] = []
+    client = InvalidClient()
+    transition = advance_planning_session(
+        session=session,
+        state_machine=_Machine(),
+        checkpoint_store=store,
+        client=client,
+        options=PlanningOptions(
+            model="test-model", telemetry_sink=lambda metric: metrics.append(metric)
+        ),
+        stderr=None,
+    )
+
+    assert transition.status == "needs_answer"
+    assert client.calls == 3
+    assert metrics[0]["outcome"] == "needs_answer"
+    assert metrics[0]["validation_failures"] == 2
+    assert store.load().events[-1].event_type == "needs_answer"
     assert [event.event_type for event in store.load().events] == [
-        "answer_accepted",
+        "needs_answer",
     ]
 
 
@@ -976,6 +1028,7 @@ def test_source_question_machine_accounts_for_normative_and_context_blocks() -> 
             }
         elif question.kind == "describe_item":
             answer = dict(request.valid_example)
+            answer["title"] = f"Implement behavior in {question.subject_ids[0]}"
         elif question.kind == "confirm_dependency":
             answer = {
                 "result": "required",
@@ -1092,6 +1145,80 @@ def test_zero_hit_coverage_requires_complete_pinned_search_metadata() -> None:
     assert not _is_completed_zero_hit_search(incomplete, pinned_commit="a" * 40)
     assert not _is_completed_zero_hit_search(positive_count, pinned_commit="a" * 40)
     assert not _is_completed_zero_hit_search(complete, pinned_commit="b" * 40)
+
+
+def test_structural_candidates_follow_baseline_symbol_bindings_on_planned_paths() -> (
+    None
+):
+    text = "# Plan\n\nChange the parser in src/parser.py.\n"
+    document = PinnedSourceDocument(
+        repository="owner/repo",
+        commit_sha="a" * 40,
+        path="docs/plan.md",
+        blob_sha="b" * 40,
+        content_sha256=hashlib.sha256(text.encode()).hexdigest(),
+        text=text,
+    )
+    source = segment_markdown_source(document)
+    anchor = source.anchors[-1].id
+    requirement = Requirement(
+        "req-0001", "Change the parser.", "behavior", (anchor,), ("group-1",), ()
+    )
+    unit = WorkUnit(
+        "unit-0001",
+        (requirement.id,),
+        "Update the parser",
+        "repository",
+        "python",
+        (PlannedWrite("src/parser.py", "implementation", "python", (), ()),),
+        "Change parser behavior.",
+        ("The parser handles the requested case.",),
+        ("validation-0001",),
+    )
+    baseline = {
+        "entities": [
+            {"id": "entity:parse", "type": "Function", "name": "parse"},
+            {"id": "entity:unrelated", "type": "Function", "name": "unrelated"},
+        ],
+        "source_subjects": [
+            {
+                "id": "python:src/parser.py::src.parser.parse",
+                "stable_key": "python::src.parser.parse",
+                "path": "src/parser.py",
+                "file_entity_id": "file:src/parser.py",
+            }
+        ],
+        "source_bindings": [
+            {"entity_id": "entity:parse", "path": "src/parser.py"},
+            {"entity_id": "entity:unrelated", "path": "src/other.py"},
+        ],
+        "entity_relationships": [
+            {
+                "id": "relationship:parse-calls-tokenize",
+                "source": "entity:parse",
+                "target": "entity:tokenize",
+            },
+            {
+                "id": "relationship:unrelated",
+                "source": "entity:unrelated",
+                "target": "entity:other",
+            },
+        ],
+    }
+
+    candidates = _planned_existing_structural_subjects(
+        "item-0001",
+        (unit,),
+        requirement_by_id={requirement.id: requirement},
+        projected_baseline=baseline,
+        fallback_source_refs=(anchor,),
+    )
+
+    assert {item.subject_id for item in candidates} == {
+        "entity:parse",
+        "relationship:parse-calls-tokenize",
+    }
+    assert all(item.unit_ids == (unit.id,) for item in candidates)
 
 
 def test_procedrr_runs_real_planning_machine_through_compiled_artifacts() -> None:

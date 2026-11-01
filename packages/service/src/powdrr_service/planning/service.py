@@ -733,7 +733,9 @@ def _run_question_batch(
             result = None
         raw_answer = (
             result.raw_answer
-            if isinstance(result, (AcceptedQuestionAnswer, NeedsQuestionAnswer))
+            if isinstance(result, AcceptedQuestionAnswer)
+            else result.previous_answer
+            if isinstance(result, NeedsQuestionAnswer)
             else None
         )
         question = request.question

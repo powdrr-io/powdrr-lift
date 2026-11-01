@@ -328,30 +328,25 @@ def test_standalone_units_are_not_grouped_with_product_work() -> None:
     ).unit_ids == ("unit-0002",)
 
 
-def test_scope_description_must_assign_each_unit_once() -> None:
+def test_item_scope_membership_is_derived_from_allocated_units() -> None:
     group = AllocationGroup(
         "allocation-0001", ("unit-0001", "unit-0002"), (), (), "neutral", 2
     )
     valid = {
         "title": "Add the parser behavior",
         "objective": "Implement and validate the parser behavior.",
-        "scope": [
-            {"description": "Build both units.", "unit_ids": ["unit-0001", "unit-0002"]}
-        ],
     }
 
-    assert parse_item_description(valid, group=group).title == "Add the parser behavior"
-    invalid = {
-        **valid,
-        "scope": [{"description": "Only one.", "unit_ids": ["unit-0001"]}],
-    }
-    with pytest.raises(
-        PlanningContractError, match="cover each allocated unit exactly once"
-    ):
-        parse_item_description(invalid, group=group)
+    parsed = parse_item_description(valid, group=group)
+
+    assert parsed.title == "Add the parser behavior"
+    assert tuple(unit for scope in parsed.scope for unit in scope.unit_ids) == (
+        "unit-0001",
+        "unit-0002",
+    )
 
 
-def test_item_description_combines_excess_scope_entries_without_losing_units() -> None:
+def test_item_description_groups_deterministic_scopes_by_component() -> None:
     group = AllocationGroup(
         "allocation-0001",
         ("unit-0001", "unit-0002", "unit-0003", "unit-0004"),
@@ -363,20 +358,24 @@ def test_item_description_combines_excess_scope_entries_without_losing_units() -
     answer = {
         "title": "Implement the verification script",
         "objective": "Validate all configured attestation steps.",
-        "scope": [
-            {"description": f"Implement part {index}.", "unit_ids": [unit_id]}
-            for index, unit_id in enumerate(group.unit_ids, start=1)
-        ],
+    }
+    units = {
+        unit_id: _unit(
+            index,
+            component="tests" if index > 2 else "implementation",
+        )
+        for index, unit_id in enumerate(group.unit_ids, start=1)
     }
 
-    parsed = parse_item_description(answer, group=group)
+    parsed = parse_item_description(answer, group=group, units=units)
 
-    assert len(parsed.scope) == 3
+    assert len(parsed.scope) == 2
     assert (
         tuple(unit_id for scope in parsed.scope for unit_id in scope.unit_ids)
         == group.unit_ids
     )
-    assert "Implement part 1.; Implement part 2." == parsed.scope[0].description
+    assert parsed.scope[0].unit_ids == ("unit-0001", "unit-0002")
+    assert parsed.scope[1].unit_ids == ("unit-0003", "unit-0004")
 
 
 def test_item_description_question_example_passes_its_parser() -> None:
@@ -386,6 +385,47 @@ def test_item_description_question_example_passes_its_parser() -> None:
     request = build_item_description_request(group, {"unit-0001": _unit(1)})
 
     request.validate()
+    assert request.question.contract_version == 2
+    assert request.question.expected_answer_schema == "describe-item-v2"
+    assert "scope" not in request.answer_schema["properties"]
+
+
+def test_item_description_title_quality_is_specific_and_distinct() -> None:
+    group = AllocationGroup(
+        "allocation-0001", ("unit-0001",), ("req-0001",), ("core",), "neutral", 1
+    )
+    unit = replace(
+        _unit(1),
+        deliverable="A signed manifest verification script",
+        implementation_step="Verify signed manifest contents before publishing.",
+    )
+    request = build_item_description_request(group, {unit.id: unit})
+
+    request.parse_answer(
+        {
+            "title": "Verify signed manifest contents",
+            "objective": "Reject unsigned or malformed manifests before publishing.",
+        }
+    )
+    with pytest.raises(PlanningContractError, match="concrete outcome"):
+        request.parse_answer(
+            {"title": "Implement code", "objective": "Implement the allocated work."}
+        )
+
+    next_group = replace(group, id="allocation-0002", unit_ids=("unit-0002",))
+    next_unit = replace(unit, id="unit-0002", requirement_ids=("req-0002",))
+    duplicate_request = build_item_description_request(
+        next_group,
+        {next_unit.id: next_unit},
+        already_used_titles=((group.id, "Verify signed manifest contents"),),
+    )
+    with pytest.raises(PlanningContractError, match="distinct"):
+        duplicate_request.parse_answer(
+            {
+                "title": "Verify signed manifest contents",
+                "objective": "Verify the next allocated unit.",
+            }
+        )
 
 
 def test_work_unit_question_has_a_parser_valid_example_and_exact_context() -> None:

@@ -14,7 +14,10 @@ from powdrr_local.workspace import WorkspaceStore
 from powdrr_lift.workrr import procedrr_chat
 from powdrr_lift.workrr.chat_config import WorkflowChatConfig
 from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
-from powdrr_lift.workrr.workspace_chat_turn import WorkspaceChatTurnRunner
+from powdrr_lift.workrr.workspace_chat_turn import (
+    WorkspaceChatTurnDispatcher,
+    WorkspaceChatTurnRunner,
+)
 
 
 class SelectingProvider:
@@ -142,3 +145,46 @@ def test_workspace_turn_runs_and_resumes_procedrr_chat(
     manifest_path = repo_root / ".powdrr" / "procedrr-runs" / f"{succeeded.run_id}.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     assert manifest["status"] == "succeeded"
+
+
+def test_chat_dispatcher_uses_the_turns_registered_repository(
+    tmp_path: Path,
+) -> None:
+    repo_root = tmp_path / ".worktrees" / "registered-repository"
+    repo_root.mkdir(parents=True)
+    subprocess.run(["git", "init", "-q"], cwd=repo_root, check=True)
+    store = WorkspaceStore(tmp_path / "workspace.sqlite3")
+    repository = store.register_repository(repo_root, request_id="register-repo")
+    conversation = store.create_conversation(repository.repository_id, "Interview")
+    turn = store.create_turn(
+        conversation.conversation_id,
+        turn_id="registered-turn",
+        message_id="registered-user-message",
+        content="Design a deployment flow.",
+    )
+    observed: dict[str, Any] = {}
+
+    def fake_chat(config: WorkflowChatConfig, **_kwargs: Any) -> int:
+        observed["repo_root"] = config.repo_root
+        observed["initial_message"] = config.initial_message
+        observed["defer_user_input"] = config.defer_user_input
+        return 0
+
+    dispatcher = WorkspaceChatTurnDispatcher(
+        store,
+        store,
+        WorkflowChatConfig(
+            processes_dir=tmp_path / "processes",
+            repo_root=tmp_path / "wrong-repository",
+        ),
+        chat_runner=fake_chat,
+    )
+
+    completed = dispatcher.dispatch_turn(turn)
+
+    assert completed.state is TurnState.SUCCEEDED
+    assert observed == {
+        "repo_root": repo_root.resolve(),
+        "initial_message": "Design a deployment flow.",
+        "defer_user_input": True,
+    }

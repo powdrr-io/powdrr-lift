@@ -6,7 +6,8 @@ import inspect
 import json
 from collections.abc import Callable, Mapping
 from dataclasses import replace
-from typing import Any
+from pathlib import Path
+from typing import Any, Protocol
 from uuid import uuid4
 
 from powdrr_contracts.workspace import (
@@ -14,6 +15,7 @@ from powdrr_contracts.workspace import (
     QuestionState,
     TurnState,
     WorkspaceQuestion,
+    WorkspaceRepository,
     WorkspaceTurn,
 )
 from powdrr_local.workspace import WorkspaceConflict, WorkspaceStore
@@ -257,12 +259,42 @@ class WorkspaceChatTurnRunner:
             raise TypeError("Workspace chat event notifier must be synchronous")
 
 
-class WorkspaceChatTurnDispatcher:
-    """Adapt the workflow runner to the local workspace supervisor protocol."""
+class WorkspaceChatRepositoryRegistry(Protocol):
+    def get_repository(self, repository_id: str) -> WorkspaceRepository: ...
 
-    def __init__(self, runner: WorkspaceChatTurnRunner) -> None:
-        self._runner = runner
+
+class WorkspaceChatTurnDispatcher:
+    """Build a conversation-scoped chat runner for each registered repository."""
+
+    def __init__(
+        self,
+        store: WorkspaceStore,
+        repository_registry: WorkspaceChatRepositoryRegistry,
+        workflow_config: WorkflowChatConfig,
+        *,
+        chat_runner: Callable[..., int] = run_procedrr_workflow_chat,
+        event_notifier: Callable[[str], Any] | None = None,
+    ) -> None:
+        self._store = store
+        self._repository_registry = repository_registry
+        self._workflow_config = workflow_config
+        self._chat_runner = chat_runner
+        self._event_notifier = event_notifier
 
     def dispatch_turn(self, turn: WorkspaceTurn) -> WorkspaceTurn:
-        """Execute the claimed turn through its persisted workspace ID."""
-        return self._runner.run_turn(turn.turn_id)
+        """Dispatch a turn with its registered repository as the workflow root."""
+        conversation = self._store.get_conversation(turn.conversation_id)
+        repository = self._repository_registry.get_repository(
+            conversation.repository_id
+        )
+        config = replace(
+            self._workflow_config,
+            repo_root=Path(repository.canonical_root),
+        )
+        runner = WorkspaceChatTurnRunner(
+            self._store,
+            config,
+            chat_runner=self._chat_runner,
+            event_notifier=self._event_notifier,
+        )
+        return runner.run_turn(turn.turn_id)

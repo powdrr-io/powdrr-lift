@@ -1,0 +1,112 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1286
+title: Compose workspace app with Procedrr chat
+intent:
+  problem: The workspace API has lifecycle-managed chat dispatch, but no application
+    composition that connects it to the real Procedrr workflow and registered repositories.
+  goal: Provide a workspace app factory that persists workspace state and dispatches
+    each design chat with its registered repository context.
+human-decisions: []
+structured_files: []
+files:
+- path: src/powdrr_lift/workrr/workspace_app.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 59
+  summary: Compose the workspace API, persistent store, and Procedrr chat dispatcher.
+  rationale: Provide the application-level integration point for the local workspace service.
+- path: src/powdrr_lift/workrr/workspace_chat_turn.py
+  type: modified
+  span:
+    start_line: 9
+    end_line: 10
+  summary: Import repository paths and typing support for repository-aware dispatch.
+  rationale: Configure each chat turn from its registered repository.
+- path: src/powdrr_lift/workrr/workspace_chat_turn.py
+  type: modified
+  span:
+    start_line: 18
+    end_line: 18
+  summary: Import the registered repository model used by the dispatcher.
+  rationale: Resolve persisted repository metadata for each chat turn.
+- path: src/powdrr_lift/workrr/workspace_chat_turn.py
+  type: modified
+  span:
+    start_line: 262
+    end_line: 265
+  summary: Define the repository registry contract for chat dispatch.
+  rationale: Keep repository lookup explicit at the workspace boundary.
+- path: src/powdrr_lift/workrr/workspace_chat_turn.py
+  type: modified
+  span:
+    start_line: 267
+    end_line: 267
+  summary: Describe the dispatcher as constructing a repository-specific runner.
+  rationale: Document the dispatcher's per-conversation behavior.
+- path: src/powdrr_lift/workrr/workspace_chat_turn.py
+  type: modified
+  span:
+    start_line: 269
+    end_line: 282
+  summary: Accept the workspace store, repository registry, and base workflow configuration.
+  rationale: Supply the data needed to prepare repository-aware chat turns.
+- path: src/powdrr_lift/workrr/workspace_chat_turn.py
+  type: modified
+  span:
+    start_line: 285
+    end_line: 300
+  summary: Look up the conversation repository and dispatch with its canonical root.
+  rationale: Ensure each design conversation runs in its registered repository.
+- path: tests/test_workspace_api.py
+  type: modified
+  span:
+    start_line: 14
+    end_line: 15
+  summary: Import the workspace app factory for composition coverage.
+  rationale: Exercise the production application construction path.
+- path: tests/test_workspace_api.py
+  type: modified
+  span:
+    start_line: 130
+    end_line: 150
+  summary: Verify workspace app composition and lifecycle-managed dispatch startup and shutdown.
+  rationale: Cover persistent store setup and app lifespan wiring.
+- path: tests/test_workspace_chat_turn.py
+  type: modified
+  span:
+    start_line: 17
+    end_line: 20
+  summary: Import the repository-aware chat dispatcher.
+  rationale: Cover dispatch using the workspace repository registry.
+- path: tests/test_workspace_chat_turn.py
+  type: modified
+  span:
+    start_line: 148
+    end_line: 190
+  summary: Verify a chat turn uses its registered repository root and preserves its initial message.
+  rationale: Prevent dispatch from using a stale or unrelated repository configuration.
+entities:
+- id: workspace-application-composition
+  type: Module
+  action: added
+- id: workspace-application-factory
+  type: Function
+  action: added
+- id: workspace-chat-turn-dispatcher
+  type: Class
+  action: added
+entity_relationships:
+- id: workspace-app-composes-chat-dispatch
+  type: uses
+  source: workspace-application-factory
+  target: workspace-chat-turn-dispatcher
+  action: added
+  description: The workspace application factory wires the Procedrr dispatcher into the local API lifecycle.
+invariants:
+- id: workspace-chat-uses-registered-repository
+  description: Each dispatched chat turn resolves the repository registered to its conversation and uses its canonical root for the Procedrr workflow.
+  action: added
+guidance: []
+features: []
+proposed_prs: []

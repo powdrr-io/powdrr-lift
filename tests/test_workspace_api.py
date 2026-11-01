@@ -11,6 +11,8 @@ from powdrr_local.workspace import WorkspaceStore
 from powdrr_local.workspace_api import _event_stream
 from starlette.requests import Request
 
+from powdrr_lift.workrr.workspace_app import build_workspace_app
+
 
 def _client(tmp_path: Path) -> tuple[TestClient, WorkspaceStore, str, str]:
     store = WorkspaceStore(tmp_path / "workspace.db")
@@ -123,6 +125,27 @@ def test_app_lifespan_dispatches_workspace_turns_under_supervisor_lease(
         assert health["scheduler"]["turn_dispatch"]["supervisor_generation"] == 1
 
     assert store.list_pending_turn_dispatches(repository.repository_id) == ()
+
+
+def test_workspace_app_factory_composes_procedrr_turn_dispatch(tmp_path: Path) -> None:
+    app = build_workspace_app(
+        data_dir=tmp_path / "workspace-data",
+        bootstrap_secret="bootstrap-secret-value-that-is-at-least-32-characters",
+        expected_origin="http://127.0.0.1:8765",
+    )
+
+    with TestClient(app, base_url="http://127.0.0.1:8765") as client:
+        deadline = time.monotonic() + 5
+        while True:
+            health = client.get("/api/v1/health").json()
+            dispatch_status = health["scheduler"]["turn_dispatch"]["status"]
+            if dispatch_status == "running":
+                break
+            assert time.monotonic() < deadline
+            time.sleep(0.01)
+
+    assert app.state.store.path == tmp_path / "workspace-data" / "workspace.sqlite3"
+    assert app.state.turn_dispatch_runtime.health()["status"] == "stopped"
 
 
 def test_conversation_mutations_require_origin_and_csrf(tmp_path: Path) -> None:

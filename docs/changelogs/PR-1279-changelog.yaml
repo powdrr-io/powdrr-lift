@@ -1,0 +1,197 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1279
+title: Add durable workspace chat turn dispatch
+intent:
+  problem: Accepted workspace turns and answered interview questions have durable dispatch rows but lack supervisor-generation claims for safe multi-process delivery.
+  goal: Claim eligible turns under the current supervisor lease, requeue answered questions, and fence running turns from automatic duplicate dispatch after supervisor replacement.
+human-decisions: []
+structured_files: []
+files:
+- path: packages/local/src/powdrr_local/turn_dispatch_supervisor.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 115
+  summary: Add the async supervisor adapter for claiming and dispatching chat turns.
+  rationale: Reuse the durable supervisor lease and dispatch one eligible turn through an injected workflow adapter.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 498
+    end_line: 498
+  summary: Allow the new workspace schema version during database initialization.
+  rationale: Keep older-schema upgrades compatible with the added dispatch claim migration.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 508
+    end_line: 508
+  summary: Allow the new workspace schema version after turn migration.
+  rationale: Preserve sequential database migration support.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 520
+    end_line: 520
+  summary: Allow the new workspace schema version after job operation migration.
+  rationale: Preserve sequential database migration support.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 532
+    end_line: 532
+  summary: Allow the new workspace schema version after worker table migration.
+  rationale: Preserve sequential database migration support.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 562
+    end_line: 562
+  summary: Allow the new workspace schema version after event migration.
+  rationale: Preserve sequential database migration support.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 584
+    end_line: 584
+  summary: Allow the new workspace schema version after API session migration.
+  rationale: Preserve sequential database migration support.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 606
+    end_line: 606
+  summary: Allow the new workspace schema version after turn dispatch table creation.
+  rationale: Preserve sequential database migration support.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 664
+    end_line: 677
+  summary: Add supervisor claim identity and generation to turn dispatch intents.
+  rationale: Fence claims across service process and supervisor restarts.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 1077
+    end_line: 1178
+  summary: Claim eligible turns and finish their durable dispatch intents.
+  rationale: Keep unanswered turns parked, requeue answered continuations, and prevent a running turn from being blindly reclaimed.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 1656
+    end_line: 1660
+  summary: Requeue the turn dispatch intent when a question is answered.
+  rationale: Wake the supervisor to resume the saved workflow continuation.
+- path: src/powdrr_lift/workrr/workspace_chat_turn.py
+  type: modified
+  span:
+    start_line: 258
+    end_line: 268
+  summary: Adapt the Procedrr turn runner to the workspace dispatcher protocol.
+  rationale: Let the local supervisor invoke the previously added turn runner by durable turn ID.
+- path: tests/test_ui_workspace.py
+  type: modified
+  span:
+    start_line: 345
+    end_line: 345
+  summary: Update the legacy database migration version expectation.
+  rationale: Verify older database migrations reach the current schema.
+- path: tests/test_ui_workspace.py
+  type: modified
+  span:
+    start_line: 645
+    end_line: 645
+  summary: Update the durable turn migration version expectation.
+  rationale: Verify older database migrations reach the current schema.
+- path: tests/test_ui_workspace.py
+  type: modified
+  span:
+    start_line: 1015
+    end_line: 1015
+  summary: Update the job operation migration version expectation.
+  rationale: Verify older database migrations reach the current schema.
+- path: tests/test_ui_workspace.py
+  type: modified
+  span:
+    start_line: 1030
+    end_line: 1030
+  summary: Update the worker ownership migration version expectation.
+  rationale: Verify older database migrations reach the current schema.
+- path: tests/test_ui_workspace.py
+  type: modified
+  span:
+    start_line: 1040
+    end_line: 1040
+  summary: Update the API session migration version expectation.
+  rationale: Verify older database migrations reach the current schema.
+- path: tests/test_ui_workspace.py
+  type: modified
+  span:
+    start_line: 1211
+    end_line: 1215
+  summary: Include the turn dispatch table in the schema version 12 migration fixture.
+  rationale: Model the complete version 12 schema before testing sequential upgrades.
+- path: tests/test_ui_workspace.py
+  type: modified
+  span:
+    start_line: 1220
+    end_line: 1220
+  summary: Update the claim fencing migration version expectation.
+  rationale: Verify version 12 upgrades through the new migration.
+- path: tests/test_ui_workspace.py
+  type: modified
+  span:
+    start_line: 1228
+    end_line: 1247
+  summary: Verify version 13 databases gain turn dispatch claim columns.
+  rationale: Protect existing workspace data while adding supervisor fencing.
+- path: tests/test_ui_workspace.py
+  type: modified
+  span:
+    start_line: 1469
+    end_line: 1469
+  summary: Update the API token migration version expectation.
+  rationale: Verify the workspace opens at the current schema version.
+- path: tests/test_workspace_api.py
+  type: modified
+  span:
+    start_line: 41
+    end_line: 41
+  summary: Expect the updated schema version from the health route.
+  rationale: Keep the API contract test aligned with database migration version 14.
+- path: tests/test_workspace_turn_dispatch_supervisor.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 197
+  summary: Test question parking, answer requeue, and supervisor generation fencing.
+  rationale: Verify multi-process dispatch claims cannot duplicate a running turn.
+entities:
+- id: workspace-turn-dispatch-supervisor
+  type: Class
+  action: added
+- id: turn-dispatch-claim-migration
+  type: Migration
+  action: added
+- id: claim-next-turn-dispatch
+  type: Method
+  action: added
+entity_relationships:
+- id: supervisor-claims-workspace-turns
+  type: uses
+  source: workspace-turn-dispatch-supervisor
+  target: claim-next-turn-dispatch
+  action: added
+  description: The supervisor claims turn dispatches using the durable database lease and generation.
+invariants:
+- id: running-turn-is-not-automatically-reclaimed
+  description: A turn left running after a supervisor failure remains fenced; recovery must establish worker ownership and confirm the previous attempt stopped before starting another attempt.
+  action: added
+- id: answered-question-requeues-turn
+  description: Answering a persisted question clears its old dispatch claim and makes the continuation eligible for dispatch.
+  action: added
+guidance: []
+features: []
+proposed_prs: []

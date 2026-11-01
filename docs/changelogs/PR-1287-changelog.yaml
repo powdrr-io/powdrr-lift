@@ -1,0 +1,67 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1287
+title: Add service review feedback ledger operation
+intent:
+  problem: Review feedback thread selection and ledger preparation are embedded in
+    workflow instructions instead of being a deterministic service operation.
+  goal: Build a validated ledger from agent-captured GitHub review-thread evidence,
+    preserving current conversations and distinguishing empty from invalid evidence.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span:
+      start_line: 532
+      end_line: 540
+    summary: Register deterministic review feedback preparation as service-owned.
+    rationale: Keep the ownership inventory aligned with the service extraction.
+  - path: packages/service/src/powdrr_service/local_service.py
+    type: modified
+    span:
+      start_line: 43
+      end_line: 44
+    summary: Route the review_feedback operation through service ledger preparation.
+    rationale: Expose review-thread normalization through the existing operation boundary.
+  - path: packages/service/src/powdrr_service/local_service.py
+    type: modified
+    span:
+      start_line: 91
+      end_line: 124
+    summary: Route the review_feedback operation through service ledger preparation.
+    rationale: Expose review-thread normalization through the existing operation boundary.
+  - path: packages/service/src/powdrr_service/review_feedback.py
+    type: added
+    span:
+      start_line: 1
+      end_line: 104
+    summary: Filter closed or outdated threads and preserve current review conversations.
+    rationale: Make review-thread selection deterministic and validate required evidence.
+  - path: tests/test_review_feedback_service.py
+    type: added
+    span:
+      start_line: 1
+      end_line: 177
+    summary: Cover ledger contents, empty results, invalid evidence, and operation responses.
+    rationale: Verify the service API and keep empty and failure outcomes distinct.
+entities:
+  - id: review-feedback-ledger
+    type: Module
+    action: added
+  - id: build-review-feedback-ledger
+    type: Function
+    action: added
+entity_relationships:
+  - id: review-thread-evidence-projected-into-ledger
+    type: part_of
+    source: build-review-feedback-ledger
+    target: review-feedback-ledger
+    action: added
+    description: Service policy filters thread state and retains the full current conversation.
+invariants:
+  - id: review-feedback-empty-is-not-invalid
+    description: A valid response with no current unresolved threads succeeds with status empty; malformed evidence fails.
+    action: added
+guidance: []
+features: []
+proposed_prs: []

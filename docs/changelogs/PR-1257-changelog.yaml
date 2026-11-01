@@ -1,0 +1,26 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1257
+title: Compact prior subjects in planning context
+intent:
+  problem: Structural subject page corrections can exceed the bounded prompt size because every previously accepted subject is repeated with full metadata.
+  goal: Keep the prior identity context needed to avoid duplicate subjects while making correction prompts fit the input bound.
+human-decisions: []
+structured_files: []
+files:
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span: {start_line: 504, end_line: 505}
+  summary: Include only each prior subject's section and stable identity in accepted facts.
+  rationale: Preserve duplicate detection context without repeating requirements and source metadata.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span: {start_line: 647, end_line: 729}
+  summary: Verify a bounded correction fits with many prior subjects and retains their identities.
+  rationale: Reproduce the oversized correction context from Gaterr planning issue #98.
+entities: []
+entity_relationships: []
+invariants:
+- id: prior-subject-context-is-identity-only
+  description: Structural subject enumeration receives prior subject section and identity, sufficient for duplicate suppression, without repeating full metadata.
+  action: altered
+guidance: []

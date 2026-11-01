@@ -1391,6 +1391,84 @@ class WorkspaceStore:
             )
             return result
 
+    def append_turn_activity(
+        self,
+        turn_id: str,
+        *,
+        run_id: str,
+        attempt_id: str,
+        activity_id: str,
+        kind: str,
+        data: dict[str, Any],
+        request_id: str | None = None,
+    ) -> int:
+        """Append one attempt-fenced workflow event to the durable event stream."""
+        for value, name in (
+            (run_id, "run_id"),
+            (attempt_id, "attempt_id"),
+            (activity_id, "activity_id"),
+            (kind, "kind"),
+        ):
+            _required(value, name)
+        if not isinstance(data, dict):
+            raise ValueError("data must be an object")
+        _validate_json_value(data)
+        command = {
+            "operation": "turn.activity",
+            "turn_id": turn_id,
+            "run_id": run_id,
+            "attempt_id": attempt_id,
+            "activity_id": activity_id,
+            "kind": kind,
+            "data": data,
+        }
+        with self._connection() as db:
+            db.execute("BEGIN IMMEDIATE")
+            turn = self._turn(db, turn_id)
+            conversation = self._conversation(
+                db.execute(
+                    "SELECT * FROM conversations WHERE conversation_id=?",
+                    (turn.conversation_id,),
+                ).fetchone()
+            )
+            replay = self._replay_request(
+                db, conversation.repository_id, request_id, command, "event"
+            )
+            if replay is not None:
+                return int(replay["sequence"])
+            if (turn.run_id, turn.attempt_id) != (run_id, attempt_id):
+                raise WorkspaceConflict(
+                    "Activity belongs to a different run or attempt"
+                )
+            if turn.state not in {TurnState.RUNNING, TurnState.WAITING_FOR_INPUT}:
+                raise WorkspaceConflict("Turn is not active")
+            timestamp = _now()
+            sequence = self._event(
+                db,
+                conversation.repository_id,
+                "turn",
+                turn_id,
+                EventType.TURN_ACTIVITY,
+                {
+                    "activity_id": activity_id,
+                    "kind": kind,
+                    "data": data,
+                    "run_id": run_id,
+                    "attempt_id": attempt_id,
+                },
+                timestamp,
+            )
+            self._record_request(
+                db,
+                conversation.repository_id,
+                request_id,
+                command,
+                "event",
+                {"sequence": sequence},
+                timestamp,
+            )
+            return sequence
+
     def get_question(self, question_id: str) -> WorkspaceQuestion:
         with self._connection() as db:
             return self._question(db, question_id)
@@ -1932,6 +2010,9 @@ class WorkspaceStore:
         message_id: str,
         role: str,
         content: str,
+        turn_id: str | None = None,
+        run_id: str | None = None,
+        attempt_id: str | None = None,
         request_id: str | None = None,
     ) -> Message:
         """A retried submission with the same ID creates one message and event."""
@@ -1943,6 +2024,12 @@ class WorkspaceStore:
             raise ValueError("Unsupported message role") from error
         if role not in MessageRole:
             raise ValueError("Unsupported message role")
+        if (run_id is None) != (attempt_id is None):
+            raise ValueError("run_id and attempt_id must be provided together")
+        if (turn_id is None) != (run_id is None):
+            raise ValueError(
+                "turn_id, run_id, and attempt_id must be provided together"
+            )
         command = {
             "operation": "message.append",
             "conversation_id": conversation_id,
@@ -1950,6 +2037,10 @@ class WorkspaceStore:
             "role": role.value,
             "content": content,
         }
+        if turn_id is not None:
+            command.update(
+                {"turn_id": turn_id, "run_id": run_id, "attempt_id": attempt_id}
+            )
         with self._connection() as db:
             db.execute("BEGIN IMMEDIATE")
             conversation = self._conversation(
@@ -1958,11 +2049,24 @@ class WorkspaceStore:
                     (conversation_id,),
                 ).fetchone()
             )
+            if turn_id is not None:
+                turn = self._turn(db, turn_id)
+                if turn.conversation_id != conversation_id:
+                    raise WorkspaceConflict("Turn belongs to a different conversation")
+                if (turn.run_id, turn.attempt_id) != (run_id, attempt_id):
+                    raise WorkspaceConflict(
+                        "Message belongs to a different run or attempt"
+                    )
             replay = self._replay_request(
                 db, conversation.repository_id, request_id, command, "message"
             )
             if replay is not None:
                 return Message.from_dict(replay)
+            if turn_id is not None and turn.state not in {
+                TurnState.RUNNING,
+                TurnState.WAITING_FOR_INPUT,
+            }:
+                raise WorkspaceConflict("Turn is not active")
             row = db.execute(
                 "SELECT * FROM messages WHERE message_id=?", (message_id,)
             ).fetchone()
@@ -1998,7 +2102,13 @@ class WorkspaceStore:
                 "conversation",
                 conversation_id,
                 "message.created",
-                {"message_id": message_id, "role": role, "content": content},
+                {
+                    "message_id": message_id,
+                    "role": role,
+                    "content": content,
+                    "turn_id": turn_id,
+                    "attempt_id": attempt_id,
+                },
                 timestamp,
             )
             db.execute(

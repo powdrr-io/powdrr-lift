@@ -1,0 +1,169 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1277
+title: Connect durable workspace turns to Procedrr chat
+intent:
+  problem: Workspace conversations can persist turns and questions, but accepted turns do not yet run through the Procedrr chat workflow or persist its messages and progress.
+  goal: Run accepted workspace turns through Procedrr, persist assistant messages and typed questions, resume saved executions from answers, and record attempt-fenced workflow activity.
+human-decisions: []
+structured_files: []
+files:
+- path: packages/contracts/src/powdrr_contracts/workspace.py
+  type: modified
+  span:
+    start_line: 79
+    end_line: 79
+  summary: Add the turn activity event type.
+  rationale: Give durable workspace events a distinct type for Procedrr stages, retries, artifacts, and outcomes.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 1394
+    end_line: 1471
+  summary: Persist active-turn activity with run and attempt fencing.
+  rationale: Keep workflow progress in the local event stream and reject writes from stale executions.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 2013
+    end_line: 2015
+  summary: Accept optional turn, run, and attempt bindings for messages.
+  rationale: Allow workflow assistant messages to be tied to their durable turn.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 2027
+    end_line: 2032
+  summary: Include turn bindings in message idempotency commands.
+  rationale: Ensure a replay cannot substitute a different execution attempt.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 2040
+    end_line: 2043
+  summary: Bind message request digests to their turn execution.
+  rationale: Keep retries unique to the same turn, run, and attempt.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 2052
+    end_line: 2059
+  summary: Validate message turn ownership and execution identity.
+  rationale: Reject writes from unrelated or stale workflow executions.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 2065
+    end_line: 2069
+  summary: Require bound messages to target an active turn.
+  rationale: Prevent a completed turn from receiving new assistant content.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 2105
+    end_line: 2111
+  summary: Bind assistant messages to their active turn and permit idempotent retries.
+  rationale: Prevent late executions from attaching messages to another turn while preserving request replay.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 345
+    end_line: 349
+  summary: Attach a response schema to saved worktree questions.
+  rationale: Let workspace clients validate answers against the input required to resume Procedrr.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 379
+    end_line: 385
+  summary: Attach a response schema to resumed process-input questions.
+  rationale: Let workspace clients validate answers against the input required to resume Procedrr.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 413
+    end_line: 419
+  summary: Attach a response schema to newly suspended process inputs.
+  rationale: Let workspace clients validate answers against the input required to resume Procedrr.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 479
+    end_line: 485
+  summary: Attach a response schema to process-input questions on resume.
+  rationale: Let workspace clients validate answers against the input required to resume Procedrr.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 556
+    end_line: 560
+  summary: Attach a response schema to deferred worktree questions.
+  rationale: Let workspace clients validate answers against the input required to resume Procedrr.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 991
+    end_line: 1005
+  summary: Derive question response schemas from process input declarations.
+  rationale: Preserve declared scalar and schema-based input types in durable questions.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 1119
+    end_line: 1119
+  summary: Mark prompt-user questions as string responses.
+  rationale: Make the durable answer contract explicit for chat continuation.
+- path: src/powdrr_lift/workrr/workspace_chat_turn.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 257
+  summary: Run accepted turns and resume answered questions through Procedrr chat.
+  rationale: Bridge durable workspace state to the existing workflow chat runner and persist messages, questions, and activity with attempt fencing.
+- path: tests/test_ui_workspace.py
+  type: modified
+  span:
+    start_line: 792
+    end_line: 804
+  summary: Bind a persisted assistant response and activity to the active turn.
+  rationale: Protect against stale execution writes in the workspace store.
+- path: tests/test_ui_workspace.py
+  type: modified
+  span:
+    start_line: 814
+    end_line: 838
+  summary: Verify bound messages and activity replay after turn completion.
+  rationale: Protect idempotent recovery without allowing stale writes to bypass turn fencing.
+- path: tests/test_workspace_chat_turn.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 144
+  summary: Exercise an end-to-end Procedrr workspace turn with a durable question and resume.
+  rationale: Verify the adapter persists structured events, question schemas, the answer, and the final assistant message.
+entities:
+- id: workspace-chat-turn-runner
+  type: Class
+  action: added
+- id: turn-activity-event-type
+  type: Enum
+  action: added
+- id: append-turn-activity
+  type: Method
+  action: added
+entity_relationships:
+- id: chat-runner-persists-workspace-turns
+  type: uses
+  source: workspace-chat-turn-runner
+  target: append-turn-activity
+  action: added
+  description: The adapter persists Procedrr progress through attempt-fenced workspace activity events.
+invariants:
+- id: workspace-chat-events-match-current-turn-attempt
+  description: Assistant messages and activity events are accepted only when their turn, run, and attempt match the active workspace turn; request retries replay the original result.
+  action: added
+- id: workspace-question-preserves-response-schema
+  description: A persisted question carries the response schema needed to validate and resume its Procedrr input.
+  action: added
+guidance: []
+features: []
+proposed_prs: []

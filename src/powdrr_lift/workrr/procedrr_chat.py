@@ -342,7 +342,11 @@ def run_procedrr_workflow_chat(
                     WorkflowChatEventKind.QUESTION,
                     process_id=process.name,
                     text=str(resume_manifest.get("pending_question", "")),
-                    data={"input_name": "__worktree_reuse__", "resumable": True},
+                    data={
+                        "input_name": "__worktree_reuse__",
+                        "resumable": True,
+                        "response_schema": {"type": "string"},
+                    },
                 )
                 print(
                     str(resume_manifest.get("pending_question", "")),
@@ -372,7 +376,13 @@ def run_procedrr_workflow_chat(
                     WorkflowChatEventKind.QUESTION,
                     process_id=process.name,
                     text=question,
-                    data={"input_name": pending_name, "resumable": True},
+                    data={
+                        "input_name": pending_name,
+                        "resumable": True,
+                        "response_schema": _process_input_response_schema(
+                            process, pending_name
+                        ),
+                    },
                 )
                 print(question, file=stdout, flush=True)
                 return WORKFLOW_CHAT_WAITING_FOR_INPUT
@@ -400,7 +410,13 @@ def run_procedrr_workflow_chat(
                     WorkflowChatEventKind.QUESTION,
                     process_id=process.name,
                     text=pending_input[1],
-                    data={"input_name": pending_input[0], "resumable": True},
+                    data={
+                        "input_name": pending_input[0],
+                        "resumable": True,
+                        "response_schema": _process_input_response_schema(
+                            process, pending_input[0]
+                        ),
+                    },
                 )
                 print(pending_input[1], file=stdout, flush=True)
                 return WORKFLOW_CHAT_WAITING_FOR_INPUT
@@ -460,7 +476,13 @@ def run_procedrr_workflow_chat(
                 WorkflowChatEventKind.QUESTION,
                 process_id=process.name,
                 text=pending_input[1],
-                data={"input_name": pending_input[0], "resumable": True},
+                data={
+                    "input_name": pending_input[0],
+                    "resumable": True,
+                    "response_schema": _process_input_response_schema(
+                        process, pending_input[0]
+                    ),
+                },
             )
             print(pending_input[1], file=stdout, flush=True)
             return WORKFLOW_CHAT_WAITING_FOR_INPUT
@@ -531,7 +553,11 @@ def run_procedrr_workflow_chat(
                     WorkflowChatEventKind.QUESTION,
                     process_id=process.name,
                     text=question,
-                    data={"input_name": "__worktree_reuse__", "resumable": True},
+                    data={
+                        "input_name": "__worktree_reuse__",
+                        "resumable": True,
+                        "response_schema": {"type": "string"},
+                    },
                 )
                 print(question, file=stdout, flush=True)
                 return WORKFLOW_CHAT_WAITING_FOR_INPUT
@@ -962,6 +988,21 @@ def _process_input_declaration(
     )
 
 
+def _process_input_response_schema(
+    process: ProcessDefinition, name: str
+) -> dict[str, Any]:
+    declaration = _process_input_declaration(process, name)
+    if declaration is None:
+        return {"type": "string"}
+    schema = declaration.get("schema")
+    if isinstance(schema, Mapping):
+        return dict(schema)
+    input_type = declaration.get("type")
+    if input_type in {"string", "integer", "number", "boolean", "object", "array"}:
+        return {"type": input_type}
+    return {"type": "string"}
+
+
 def _parse_process_input(answer: str, declaration: Mapping[str, Any]) -> Any:
     name = declaration.get("name")
     label = name if isinstance(name, str) else "process input"
@@ -1075,7 +1116,7 @@ class _ChatProcedrrOperations:
                         WorkflowChatEventKind.QUESTION,
                         process_id=self.state.selected_process.name,
                         text=prompt,
-                        data={"resumable": True},
+                        data={"resumable": True, "response_schema": {"type": "string"}},
                     )
                 raise SuspendEvaluation(
                     {"answer": ""},

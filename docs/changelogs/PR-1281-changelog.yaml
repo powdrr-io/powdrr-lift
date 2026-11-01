@@ -112,6 +112,13 @@ files:
     end_line: 127
   summary: Verify app startup dispatches a queued turn under a supervisor lease.
   rationale: Cover FastAPI lifespan integration, turn completion, and scheduler health reporting.
+- path: tests/test_minisweagent_inference.py
+  type: modified
+  span:
+    start_line: 109
+    end_line: 109
+  summary: Allow slower hosted runners more time to start the MiniSWE subprocess.
+  rationale: Avoid reporting slow interpreter or model startup as an IPC failure while preserving the test's complete inference and tool-call assertions.
 entities:
 - id: workspace-turn-dispatch-runtime
   type: Class

@@ -3109,10 +3109,12 @@
         "powdrr_lift.workrr.chat_config",
         "powdrr_lift.workrr.chat_context",
         "powdrr_lift.workrr.chat_io",
+        "powdrr_lift.errors",
         "powdrr_lift.workrr.execution_state",
         "powdrr_service.decision_classifier",
         "powdrr_lift.workrr.procedrr",
         "powdrr_lift.workrr.procedrr_operations",
+        "powdrr_lift.workrr.review_feedback",
         "powdrr_lift.workrr.provider_runtime",
         "powdrr_service.providers.selection",
         "procedrr",
@@ -3122,6 +3124,22 @@
       "owner": "split",
       "path": "src/powdrr_lift/workrr/procedrr_chat.py",
       "rationale": "agent user interaction; service interview policy",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "7",
+      "internal_imports": [
+        "powdrr_contracts.models",
+        "powdrr_lift.errors",
+        "powdrr_lift.execution.builtin_tools",
+        "powdrr_lift.execution.runtime",
+        "powdrr_lift.intrinsic_git_gh",
+        "powdrr_local"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "src/powdrr_lift/workrr/review_feedback.py",
+      "rationale": "capture review-thread evidence locally and call the service operation through the serialized boundary",
       "reviewed": false
     },
     {

@@ -188,14 +188,16 @@ def test_feature_planning_retrieves_module_scoped_decisions() -> None:
     assert "related_modules" in fill["details"]
 
 
-def test_address_review_comments_flow_uses_structrr_and_thread_aware_gh_tools() -> None:
+def test_address_review_comments_flow_uses_service_prepared_thread_ledger() -> None:
     process = ProcessCatalog.load(Path("docs/procedrr/processes")).get(
         "address-review-comments"
     )
     specialize = process.document["steps"][0]["specialize"]
     question = " ".join(specialize["question"].split())
 
-    assert "pr_review_threads" in question
+    assert "service-prepared workflow_context.review_feedback_ledger" in question
+    assert "captured_head_sha" in question
+    assert "Do not re-filter the service ledger" in question
     assert "gather_context" in question
     assert "proposed-PR" in question
     assert "pr_review_reply" in question
@@ -206,6 +208,79 @@ def test_address_review_comments_flow_uses_structrr_and_thread_aware_gh_tools() 
     )
     assert "Do not use the clean-branch PR publisher" in question
     assert "gather_context" in specialize["allowed_tools"]
+
+
+def test_chat_prepares_review_ledger_before_running_review_process(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    process_dir = tmp_path / "processes"
+    process_dir.mkdir()
+    shutil.copy(Path("docs/procedrr/processes/select-process.yaml"), process_dir)
+    (process_dir / "address-review-comments.yaml").write_text(
+        """\
+version: 1
+name: address-review-comments
+description: Exercise review feedback binding.
+inputs:
+  - {name: user_request, type: string, required: true}
+  - {name: workflow_context, type: object, required: true}
+  - {name: language_labels, type: array, required: true}
+steps:
+  - operation:
+      tool: respond
+      parameters:
+        text: "Prepared ${workflow_context.review_feedback_ledger.status}"
+      bind: response
+  - terminal: succeeded
+""",
+        encoding="utf-8",
+    )
+    repo_root = tmp_path / ".worktrees" / "repo"
+    repo_root.mkdir(parents=True)
+    subprocess.run(["git", "init", "-q"], cwd=repo_root, check=True)
+    ledger_calls: list[dict[str, Any]] = []
+
+    def prepare_ledger(**kwargs: Any) -> dict[str, Any]:
+        ledger_calls.append(kwargs)
+        return {"status": "ready", "threads": [{"thread_id": "thread-1"}]}
+
+    monkeypatch.setattr(
+        procedrr_chat, "_select_process", lambda *_args: "address-review-comments"
+    )
+    monkeypatch.setattr(
+        procedrr_chat,
+        "prepare_review_feedback_ledger",
+        prepare_ledger,
+    )
+    monkeypatch.setattr(
+        procedrr_chat, "_persist_workflow_context", lambda *_args, **_kwargs: None
+    )
+    client = WorkrrProcedrrClient(
+        _SelectingProvider(),  # type: ignore[arg-type]
+        process_directory=process_dir,
+        provider_retry_attempts=0,
+    )
+    stdout = StringIO()
+    stderr = StringIO()
+
+    exit_code = run_procedrr_workflow_chat(
+        WorkflowChatConfig(
+            processes_dir=process_dir,
+            repo_root=repo_root,
+            provider="local",
+            execution_id="review-ledger-chat",
+            conversation_id="review-ledger-chat",
+            initial_message="Address review comments on this PR.",
+        ),
+        procedrr_client_factory=lambda _role: client,
+        stdout=stdout,
+        stderr=stderr,
+    )
+
+    assert exit_code == 0, stderr.getvalue()
+    assert "Prepared ready" in stdout.getvalue()
+    assert len(ledger_calls) == 1
+    assert ledger_calls[0]["worktree_root"] == str(repo_root.resolve())
 
 
 def test_chat_operation_adapter_converts_line_edits() -> None:

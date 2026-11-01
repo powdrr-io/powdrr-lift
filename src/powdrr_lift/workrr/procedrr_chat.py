@@ -18,6 +18,7 @@ from powdrr_service.providers.selection import (
 )
 
 from powdrr_lift.core import resolve_repo_root
+from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.execution.runtime import ExecutionRuntime
 from powdrr_lift.workrr.actions import (
     WorkflowAction,
@@ -48,6 +49,7 @@ from powdrr_lift.workrr.paths import is_dedicated_worktree
 from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
 from powdrr_lift.workrr.procedrr_operations import WorkrrOperationExecutor
 from powdrr_lift.workrr.provider_runtime import WorkflowClientRegistry
+from powdrr_lift.workrr.review_feedback import prepare_review_feedback_ledger
 from procedrr import ProcessCatalog, ProcessDefinition
 from procedrr_evaluator.evaluator import SuspendEvaluation
 from procedrr_evaluator.runtime import (
@@ -581,6 +583,38 @@ def run_procedrr_workflow_chat(
         user_request,
         source_ref=f"{execution_id}:user-request",
     )
+    if process.name == "address-review-comments":
+        existing_context = bindings.get("workflow_context")
+        review_context = (
+            dict(existing_context)
+            if isinstance(existing_context, Mapping)
+            else dict(context_data)
+        )
+        has_resumed_ledger = resuming_interpreter and isinstance(
+            review_context.get("review_feedback_ledger"), Mapping
+        )
+        if not has_resumed_ledger:
+            try:
+                review_context["review_feedback_ledger"] = (
+                    prepare_review_feedback_ledger(
+                        worktree_root=str(worktree_root),
+                        runtime=runtime,
+                        workflow_context=review_context,
+                    )
+                )
+            except PowdrrExecutionError as error:
+                print(
+                    f"Could not prepare review feedback: {error}",
+                    file=stderr,
+                )
+                chat_events.emit(
+                    WorkflowChatEventKind.OUTCOME,
+                    process_id=process.name,
+                    data={"status": "failed", "reason": "review_feedback_failed"},
+                )
+                return 1
+        context_data = review_context
+        bindings["workflow_context"] = review_context
 
     def report_added_files(paths: tuple[str, ...]) -> None:
         chat_events.emit(

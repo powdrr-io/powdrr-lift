@@ -85,6 +85,9 @@ def test_intrinsics_require_structured_operations() -> None:
 
 def test_gh_intrinsic_operations_have_expected_commands() -> None:
     assert intrinsic_command(
+        {"operation": "pr_view", "json_fields": ["number", "url"]}, tool="gh"
+    ) == ["pr", "view", "--json", "number,url"]
+    assert intrinsic_command(
         {"operation": "pr_view", "pr_reference": "394"}, tool="gh"
     ) == ["pr", "view", "394"]
     assert intrinsic_command(

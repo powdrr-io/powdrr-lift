@@ -611,8 +611,12 @@ def _gh_command(parameters: Mapping[str, Any]) -> list[str]:
     operation = parameters.get("operation")
     reference = parameters.get("pr_reference", parameters.get("number"))
     if operation in {"pr_view", "pr_diff", "pr_checks"}:
-        reference = _required_text(reference, "pr_reference")
-        command = ["pr", operation.removeprefix("pr_").replace("_", "-"), reference]
+        subcommand = operation.removeprefix("pr_").replace("_", "-")
+        if operation == "pr_view" and reference is None:
+            command = ["pr", "view"]
+        else:
+            reference = _required_text(reference, "pr_reference")
+            command = ["pr", subcommand, reference]
         if operation == "pr_view" and parameters.get("json_fields") is not None:
             fields = parameters.get("json_fields")
             if (

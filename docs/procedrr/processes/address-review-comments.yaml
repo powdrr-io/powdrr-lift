@@ -8,7 +8,7 @@ limits:
   llm_activations: 260
   tool_calls: 260
   context_chars: 60000
-  context_value_chars: 16000
+  context_value_chars: 60000
 steps:
   - specialize:
       process: generate-fragment
@@ -33,18 +33,22 @@ steps:
             step_type: governed
             llm_type: long_context
             details: >-
-              Resolve the target from workflow_context.pr_url or pr_number, otherwise
-              from the current worktree branch. Use gh pr_view to capture number, URL,
-              title, body, state, base/head branch, head SHA, labels, files, commits,
-              and reviews; use gh pr_diff for the complete current diff; and use
-              gh pr_review_threads with the owner/name repository and numeric PR
-              number. That operation returns all paginated review threads, their
-              resolved/outdated state, anchors, root comments, replies, and current
-              PR head identity. Build one ledger entry per unresolved, current thread
-              with thread ID, root comment ID, author, path/line, full conversation,
-              requested outcome, and evidence references. Ignore resolved or outdated
-              threads and informational comments. Do not post replies or change code
-              until the complete PR metadata, diff, and thread list are captured.
+              Use the service-prepared workflow_context.review_feedback_ledger as
+              the complete review-thread snapshot. Its status must be ready or empty;
+              a missing or invalid ledger means evidence preparation failed and no
+              review work may proceed. Use gh pr_view to capture number, URL, title,
+              body, state, base/head branch, current head SHA, labels, files, commits,
+              and reviews; use gh pr_diff for the complete current diff. Require the PR
+              number and head SHA to match the ledger's pull_request.number and
+              captured_head_sha. If the identity differs, stop before edits or public
+              replies and ask for a fresh review-feedback run. Build one reasoning
+              entry per ledger.threads item, preserving its thread ID, root comment
+              ID, author, path/line anchor, and complete conversation. An empty
+              ledger means there are no current unresolved threads to address; report
+              that result and finish without recovering scope or attempting changes.
+              Do not re-filter the service ledger or infer that evidence is empty when
+              preparation failed. Do not post replies or change code until the PR
+              metadata, diff, and service ledger agree on the same PR head.
             tool_invocation_packages: [gh_readonly]
           - id: recover-original-intent
             description: Recover the feature and proposed-PR contract from Structrr.
@@ -72,8 +76,9 @@ steps:
             llm_type: high_reasoning
             details: >-
               For every ledger entry, compare the request with the PR diff and the
-              feature/proposed-PR contract. Classify it as: current-scope code or
-              test correction; current-scope documentation correction; question
+              feature/proposed-PR contract. Classify it as: informational feedback
+              requiring no action; current-scope code or test correction; current-scope
+              documentation correction; question
               answerable from the implementation or specifications; work explicitly
               assigned to another proposed PR; new work that belongs in a separate
               PR; or conflict/ambiguity requiring the user. Collapse comments with

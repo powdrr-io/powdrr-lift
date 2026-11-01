@@ -1,0 +1,163 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1275
+title: Move execute-PR test authoring prompt policy into service
+intent:
+  problem: The execute-PR integration-test authoring prompt contains proprietary quality
+    and authoring policy in the mixed task agent module.
+  goal: Make service code own the authoring prompt while the local agent inserts its
+    workspace path only at worker launch time.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3238
+    end_line: 3246
+  summary: Register the new service prompt-policy module and its legacy caller.
+  rationale: Keep ownership and imports visible during staged extraction.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3389
+    end_line: 3389
+  summary: Register the new service prompt-policy module and its legacy caller.
+  rationale: Keep ownership and imports visible during staged extraction.
+- path: packages/service/src/powdrr_service/verification/__init__.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 1
+  summary: Create the service-owned verification package.
+  rationale: Group private test-authoring prompt policy under service verification.
+- path: packages/service/src/powdrr_service/verification/execute_pr_test_authoring.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 72
+  summary: Build the execute-PR test-authoring prompt from the reviewed plan and obligations
+    without accepting a local repository path.
+  rationale: Move proprietary authoring instructions to the service and leave workspace
+    substitution to the local agent.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 740
+    end_line: 742
+  summary: Resolve the service prompt workspace placeholder immediately before starting
+    MiniSWE.
+  rationale: Supply local execution context without sending absolute repository paths
+    into the service prompt builder.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 751
+    end_line: 751
+  summary: Resolve the service prompt workspace placeholder immediately before starting
+    MiniSWE.
+  rationale: Supply local execution context without sending absolute repository paths
+    into the service prompt builder.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 43
+    end_line: 45
+  summary: Call the service prompt builder from execute-PR test-authoring orchestration.
+  rationale: Keep local worktree setup and execution in the agent while moving prompt
+    policy to service.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 1220
+    end_line: 1280
+  summary: Call the service prompt builder from execute-PR test-authoring orchestration.
+  rationale: Keep local worktree setup and execution in the agent while moving prompt
+    policy to service.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 1933
+    end_line: 1933
+  summary: Call the service prompt builder from execute-PR test-authoring orchestration.
+  rationale: Keep local worktree setup and execution in the agent while moving prompt
+    policy to service.
+- path: tests/test_coding_agent.py
+  type: modified
+  span:
+    start_line: 372
+    end_line: 377
+  summary: Verify MiniSWE resolves the workspace placeholder using its actual worktree.
+  rationale: Prove service-generated prompt context becomes accurate local worker
+    instructions.
+- path: tests/test_coding_agent.py
+  type: modified
+  span:
+    start_line: 387
+    end_line: 388
+  summary: Verify MiniSWE resolves the workspace placeholder using its actual worktree.
+  rationale: Prove service-generated prompt context becomes accurate local worker
+    instructions.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 19
+    end_line: 22
+  summary: Verify the service prompt retains authoring requirements and contains no
+    local repository path.
+  rationale: Protect the service/agent data boundary and preserve prompt behavior.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 58
+    end_line: 58
+  summary: Verify the service prompt retains authoring requirements and contains no
+    local repository path.
+  rationale: Protect the service/agent data boundary and preserve prompt behavior.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 301
+    end_line: 301
+  summary: Verify the service prompt retains authoring requirements and contains no
+    local repository path.
+  rationale: Protect the service/agent data boundary and preserve prompt behavior.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 305
+    end_line: 305
+  summary: Verify the service prompt retains authoring requirements and contains no
+    local repository path.
+  rationale: Protect the service/agent data boundary and preserve prompt behavior.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 313
+    end_line: 317
+  summary: Verify the service prompt retains authoring requirements and contains no
+    local repository path.
+  rationale: Protect the service/agent data boundary and preserve prompt behavior.
+entities:
+- id: execute-pr-test-authoring-prompt-builder
+  type: Function
+  action: added
+- id: execute-pr-test-authoring-policy
+  type: Module
+  action: added
+entity_relationships:
+- id: prompt-builder-belongs-to-service-policy
+  type: part_of
+  source: execute-pr-test-authoring-prompt-builder
+  target: execute-pr-test-authoring-policy
+  action: added
+  description: The service-owned verification module builds the private execute-PR
+    test-authoring prompt.
+invariants:
+- id: test-authoring-prompt-does-not-receive-local-repository-path
+  description: The service prompt builder receives repository-relative test paths
+    and plan evidence, while the local workspace root is represented by a placeholder
+    and inserted only by the agent at MiniSWE launch.
+  action: added
+guidance: []
+features: []
+proposed_prs: []

@@ -1,0 +1,101 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 0
+title: Coalesce planned file subjects across pages
+intent:
+  problem: A planned file referenced on multiple structural-subject pages is rejected as already enumerated, even when separate work units legitimately share that file.
+  goal: Look up subjects by section and stable ID, merging compatible planned-file references across pages while retaining all requirement and evidence links.
+human-decisions: []
+structured_files: []
+files:
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span: {start_line: 8, end_line: 8}
+  summary: Import iterable support for the shared subject coalescer.
+  rationale: Accept subject records from both pages and complete page sequences.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span: {start_line: 105, end_line: 151}
+  summary: Merge compatible planned-file subjects by section and stable subject ID.
+  rationale: Preserve all units, requirements, and source references when a file recurs on another page.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span: {start_line: 337, end_line: 339}
+  summary: Permit an already enumerated ID only for planned file paths that can be coalesced.
+  rationale: Keep duplicate rejection for entities and other non-file subjects.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span: {start_line: 344, end_line: 358}
+  summary: Coalesce duplicate planned-file records within an enumeration page.
+  rationale: Use the same merge rules for duplicates within one page and across pages.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span: {start_line: 361, end_line: 363}
+  summary: Record each subject's index for deterministic within-page merging.
+  rationale: Replace a repeated planned file with its unioned representation.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span: {start_line: 412, end_line: 414}
+  summary: Coalesce compatible duplicate files when completing paginated enumeration.
+  rationale: Return one structural subject per stable identity across the full page sequence.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span: {start_line: 1594, end_line: 1594}
+  summary: Export the shared subject coalescer for the planning driver.
+  rationale: Keep incremental page context and completed results consistent.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span: {start_line: 73, end_line: 73}
+  summary: Import the structural page type for typed pagination state.
+  rationale: Retain complete page sequences for validation and coalescing.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span: {start_line: 77, end_line: 77}
+  summary: Import structural subject coalescing.
+  rationale: Combine repeated planned files in execution order.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span: {start_line: 79, end_line: 79}
+  summary: Import structural page completion validation.
+  rationale: Preserve page-cursor validation after coalescing.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span: {start_line: 1010, end_line: 1010}
+  summary: Keep accepted pages for each work item.
+  rationale: Validate cursors and coalesce subjects at completion.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span: {start_line: 1043, end_line: 1046}
+  summary: Coalesce accepted page records before using them as prior context.
+  rationale: Avoid repeating a stable file identity in subsequent requests.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span: {start_line: 1048, end_line: 1050}
+  summary: Complete the structural subject sequence through the shared validator.
+  rationale: Preserve cursor validation while merging cross-page file references.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span: {start_line: 1117, end_line: 1117}
+  summary: Retain pages when rebuilding accepted structural subjects.
+  rationale: Apply identical page completion semantics during plan compilation.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span: {start_line: 1136, end_line: 1138}
+  summary: Coalesce prior subjects as each page is replayed.
+  rationale: Maintain unique compact context while preserving cross-page references.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span: {start_line: 1140, end_line: 1140}
+  summary: Return validated, coalesced subjects after the final page.
+  rationale: Keep replayed results consistent with live planning.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span: {start_line: 847, end_line: 905}
+  summary: Test a shared planned file repeated across two pages.
+  rationale: Ensure both units' requirements and source references survive pagination.
+entities: []
+entity_relationships: []
+invariants:
+- id: planned-file-subjects-coalesce-across-pages
+  description: Compatible planned-file subjects with the same stable ID merge across pages and retain the union of requirements, units, and source references.
+  action: altered
+guidance: []

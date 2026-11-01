@@ -705,7 +705,10 @@ def build_structural_change_request(
     planned_paths: set[str],
     known_entity_ids: set[str],
     valid_example: Mapping[str, Any],
+    source: SegmentedSource | None = None,
+    units: Sequence[WorkUnit] = (),
 ) -> QuestionRequest[StructuralChange]:
+    excerpts = _source_excerpts(source, subject.source_refs) if source else ()
     facts = [
         ContextRecord(
             f"subject:{subject.section}:{subject.subject_id}", subject.to_data()
@@ -713,6 +716,11 @@ def build_structural_change_request(
         ContextRecord(
             f"projected-baseline:{subject.item_id}:{snapshot_digest(projected_baseline)[:20]}",
             _structural_change_baseline_context(projected_baseline, subject),
+        ),
+        *(
+            ContextRecord(f"unit:{unit.id}", unit.to_data())
+            for unit in units
+            if unit.id in subject.unit_ids
         ),
     ]
     if subject.section == "entities":
@@ -728,7 +736,10 @@ def build_structural_change_request(
             ContextRecord("entity-identities", {"ids": sorted(known_entity_ids)})
         )
     accepted_facts = tuple(facts)
-    context_ids = tuple(item.ref_id for item in accepted_facts)
+    context_ids = (
+        *(excerpt.ref_id for excerpt in excerpts),
+        *(item.ref_id for item in accepted_facts),
+    )
     desired_schema = _desired_content_schema(subject)
     question_example = valid_example
     if (
@@ -751,6 +762,10 @@ def build_structural_change_request(
                 {
                     "subject": subject.to_data(),
                     "baseline": snapshot_digest(projected_baseline),
+                    "source": [(item.ref_id, item.text) for item in excerpts],
+                    "units": [
+                        unit.to_data() for unit in units if unit.id in subject.unit_ids
+                    ],
                     "taxonomy": (
                         list(taxonomy_entity_types)
                         if subject.section == "entities"
@@ -771,12 +786,13 @@ def build_structural_change_request(
             1,
         ),
         exact_question=(
-            "For this one bound Structrr subject, determine whether the projected "
-            "baseline already has the desired state. If the baseline lacks the "
-            "desired state, return change with only the desired section-specific "
-            "fields; an added subject needs change unless the baseline already "
-            "contains that desired subject. Return unchanged only when the baseline "
-            "already satisfies it. Give one concise reason of at most 200 characters; "
+            "Review this one deterministic Structrr candidate against the supplied "
+            "plan unit, source excerpt, and projected baseline. Return unchanged "
+            "when the candidate is not affected by this item or the baseline already "
+            "has the required state. Otherwise return change with only the desired "
+            "section-specific fields; an added subject needs change unless the "
+            "baseline already contains it. Give one concise reason of at most 200 "
+            "characters; "
             "do not include deliberation. Do not return IDs, action, item assignment, "
             "operation ID, or another subject."
         ),
@@ -793,7 +809,7 @@ def build_structural_change_request(
             ),
             "reason": "Why this subject should remain unchanged or receive the change.",
         },
-        source_excerpts=(),
+        source_excerpts=excerpts,
         repository_evidence=(),
         accepted_facts=accepted_facts,
         valid_example=question_example,

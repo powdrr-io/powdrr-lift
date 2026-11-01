@@ -178,6 +178,115 @@ def _planned_file_subjects(
     return tuple(subjects)
 
 
+def _planned_existing_structural_subjects(
+    item_id: str,
+    units: Sequence[WorkUnit],
+    *,
+    requirement_by_id: Mapping[str, Requirement],
+    projected_baseline: Mapping[str, Any],
+    fallback_source_refs: Sequence[str],
+) -> tuple[BoundStructuralSubject, ...]:
+    """Bind path-related baseline entities and relationships as candidates."""
+    owners_by_path: dict[str, dict[str, set[str]]] = {}
+    for unit in units:
+        for write in unit.planned_writes:
+            if not write.path:
+                continue
+            owner = owners_by_path.setdefault(
+                write.path, {"requirements": set(), "units": set(), "sources": set()}
+            )
+            owner["units"].add(unit.id)
+            owner["requirements"].update(unit.requirement_ids)
+            for requirement_id in unit.requirement_ids:
+                requirement = requirement_by_id.get(requirement_id)
+                if requirement is not None:
+                    owner["sources"].update(requirement.source_refs)
+
+    path_owner = {path: owner for path, owner in owners_by_path.items()}
+    entity_records = projected_baseline.get("entities", [])
+    entities = (
+        [record for record in entity_records if isinstance(record, Mapping)]
+        if isinstance(entity_records, list)
+        else []
+    )
+    source_subjects = projected_baseline.get("source_subjects", [])
+    entity_path_by_id: dict[str, str] = {}
+    if isinstance(source_subjects, list):
+        for source_subject in source_subjects:
+            if not isinstance(source_subject, Mapping):
+                continue
+            path = source_subject.get("path")
+            entity_id = source_subject.get("file_entity_id")
+            if (
+                isinstance(path, str)
+                and path in owners_by_path
+                and isinstance(entity_id, str)
+            ):
+                entity_path_by_id[entity_id] = path
+    candidates: dict[str, dict[str, set[str]]] = {}
+    for entity in entities:
+        entity_id = entity.get("id")
+        if not isinstance(entity_id, str):
+            continue
+        path = entity.get("path")
+        if not isinstance(path, str):
+            path = entity_path_by_id.get(entity_id)
+        if not isinstance(path, str) and entity_id.startswith("file:"):
+            path = entity_id.removeprefix("file:")
+        if path not in path_owner:
+            continue
+        owner = path_owner[path]
+        candidates[entity_id] = owner
+
+    result: list[BoundStructuralSubject] = []
+    for entity_id, owner in sorted(candidates.items()):
+        result.append(
+            BoundStructuralSubject(
+                entity_id,
+                "entities",
+                item_id,
+                "changed",
+                tuple(sorted(owner["requirements"])),
+                tuple(sorted(owner["units"])),
+                tuple(sorted(owner["sources"])) or tuple(fallback_source_refs),
+                False,
+            )
+        )
+
+    relationships = projected_baseline.get("entity_relationships", [])
+    if isinstance(relationships, list):
+        for relationship in relationships:
+            if not isinstance(relationship, Mapping):
+                continue
+            relationship_id = relationship.get("id")
+            if not isinstance(relationship_id, str):
+                continue
+            related_owners = [
+                candidates[endpoint]
+                for endpoint in (relationship.get("source"), relationship.get("target"))
+                if isinstance(endpoint, str) and endpoint in candidates
+            ]
+            if not related_owners:
+                continue
+            owner = {
+                key: set().union(*(candidate[key] for candidate in related_owners))
+                for key in ("requirements", "units", "sources")
+            }
+            result.append(
+                BoundStructuralSubject(
+                    relationship_id,
+                    "entity_relationships",
+                    item_id,
+                    "changed",
+                    tuple(sorted(owner["requirements"])),
+                    tuple(sorted(owner["units"])),
+                    tuple(sorted(owner["sources"])) or tuple(fallback_source_refs),
+                    False,
+                )
+            )
+    return tuple(result)
+
+
 @dataclass(frozen=True, slots=True)
 class SourceLedger:
     """Accepted source obligations and one disposition for every source block."""
@@ -1107,7 +1216,14 @@ class SourceLedgerQuestionMachine:
                     projected_baseline=projected,
                     fallback_source_refs=source_refs,
                 )
-                item_subjects = list(planned_file_subjects)
+                deterministic_subjects = _planned_existing_structural_subjects(
+                    item_id,
+                    units,
+                    requirement_by_id=requirement_by_id,
+                    projected_baseline=projected,
+                    fallback_source_refs=source_refs,
+                )
+                item_subjects = [*planned_file_subjects, *deterministic_subjects]
                 page_ordinal = 1
                 item_pages: list[StructuralSubjectPage] = []
                 while True:
@@ -1150,13 +1266,14 @@ class SourceLedgerQuestionMachine:
                         subjects_by_item[item_id] = coalesce_structural_subjects(
                             (
                                 *planned_file_subjects,
+                                *deterministic_subjects,
                                 *complete_subject_enumeration(item_pages),
                             )
                         )
                         break
                     page_ordinal += 1
             if pending_enumerations:
-                return tuple(pending_enumerations)
+                return batch_question_requests(pending_enumerations)
 
             known_entity_ids = {
                 str(entity.get("id"))
@@ -1207,6 +1324,8 @@ class SourceLedgerQuestionMachine:
                         taxonomy_entity_types=self.taxonomy_entity_types,
                         planned_paths=planned_paths,
                         known_entity_ids=known_entity_ids,
+                        source=self.source,
+                        units=units,
                         valid_example={
                             "result": "unchanged",
                             "reason": (
@@ -1223,7 +1342,7 @@ class SourceLedgerQuestionMachine:
                     if operation is not None:
                         batch_operations.append(operation)
             if pending_changes:
-                return tuple(pending_changes)
+                return batch_question_requests(pending_changes)
             all_operations = (*prior_operations, *batch_operations)
             reject_unordered_subject_conflicts(all_operations, prerequisites)
             projected = project_structural_operations(projected, batch_operations)

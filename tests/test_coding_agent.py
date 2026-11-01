@@ -369,7 +369,12 @@ def test_minisweagent_provider_uses_targeted_prompt_and_diagnostics(
         return subprocess.CompletedProcess(command, 0, "done\n", "")
 
     monkeypatch.setattr("powdrr_lift.workrr.coding_agent.run_minisweagent", fake_run)
-    request = provider.prepare_request(_request(_head(worktree)))
+    request = provider.prepare_request(
+        replace(
+            _request(_head(worktree)),
+            prompt="Inspect {{powdrr_workspace_root}} before starting.",
+        )
+    )
     provider.run(request, worktree_root=worktree, attempt_id="attempt-1")
 
     command = captured["command"]
@@ -379,6 +384,8 @@ def test_minisweagent_provider_uses_targeted_prompt_and_diagnostics(
     task = command[command.index("--task") + 1]
     assert "Use the repository's local conventions." in task
     assert "Stop after implementing the requested change." in task
+    assert f"Inspect {worktree.resolve()} before starting." in task
+    assert "{{powdrr_workspace_root}}" not in task
     assert f"only repository workspace is `{worktree.resolve()}`" in task
     assert "Before inspecting or editing anything, run `pwd`" in task
     assert "Do not `cd` to, read from, or write to any other checkout" in task

@@ -3236,6 +3236,15 @@
       "reviewed": false
     },
     {
+      "extraction_pr": "7",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/verification/execute_pr_test_authoring.py",
+      "rationale": "proprietary execute-PR integration test authoring prompt and policy",
+      "reviewed": false
+    },
+    {
       "extraction_pr": "5/7",
       "internal_imports": [],
       "kind": "python_module",
@@ -3377,6 +3386,7 @@
         "powdrr_lift.workrr.provider_runtime",
         "powdrr_lift.workrr.local_model",
         "powdrr_lift.workrr.test_obligations",
+        "powdrr_service.verification.execute_pr_test_authoring",
         "powdrr_service.planning.multipr_structrr",
         "powdrr_service.planning.repair_service",
         "powdrr_service.planning.workflow_ids",

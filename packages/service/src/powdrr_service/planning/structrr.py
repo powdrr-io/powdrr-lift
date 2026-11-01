@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import PurePosixPath
 from typing import Any, Literal
@@ -100,6 +100,53 @@ class StructrrPlanningError(ValueError):
 
 class UnorderedStructrrConflict(StructrrPlanningError):
     """Unordered plan items claim changes to the same structural subject."""
+
+
+def _merge_duplicate_planned_file_subject(
+    existing: BoundStructuralSubject,
+    duplicate: BoundStructuralSubject,
+) -> BoundStructuralSubject | None:
+    if (
+        existing.section != "files"
+        or duplicate.section != "files"
+        or existing.subject_id != duplicate.subject_id
+        or existing.item_id != duplicate.item_id
+        or existing.action != duplicate.action
+        or existing.is_new != duplicate.is_new
+        or existing.planned_path is None
+        or existing.planned_path != duplicate.planned_path
+    ):
+        return None
+    return BoundStructuralSubject(
+        existing.subject_id,
+        "files",
+        existing.item_id,
+        existing.action,
+        tuple(sorted(set(existing.requirement_ids) | set(duplicate.requirement_ids))),
+        tuple(sorted(set(existing.unit_ids) | set(duplicate.unit_ids))),
+        tuple(sorted(set(existing.source_refs) | set(duplicate.source_refs))),
+        existing.is_new,
+        existing.planned_path,
+    )
+
+
+def coalesce_structural_subjects(
+    subjects: Iterable[BoundStructuralSubject],
+) -> tuple[BoundStructuralSubject, ...]:
+    records: list[BoundStructuralSubject] = []
+    indexes: dict[tuple[str, str], int] = {}
+    for subject in subjects:
+        key = (subject.section, subject.subject_id)
+        existing_index = indexes.get(key)
+        if existing_index is None:
+            indexes[key] = len(records)
+            records.append(subject)
+            continue
+        merged = _merge_duplicate_planned_file_subject(records[existing_index], subject)
+        if merged is None:
+            raise StructrrPlanningError("subject enumeration contains duplicates")
+        records[existing_index] = merged
+    return tuple(records)
 
 
 def parse_structural_subject_page(
@@ -287,33 +334,33 @@ def parse_structural_subject_page(
                     "projected baseline",
                 )
         key = (section, subject_id)
-        if key in prior_subject_ids:
+        if key in prior_subject_ids and not (
+            section == "files" and planned_path in planned_paths
+        ):
             raise PlanningContractError(pointer, "subject was already enumerated")
         if key in page_keys:
             existing_index = page_record_indexes[key]
             existing = records[existing_index]
-            if (
-                section != "files"
-                or planned_path not in planned_paths
-                or existing.action != action
-                or existing.is_new != is_new
-            ):
+            merged = _merge_duplicate_planned_file_subject(
+                existing,
+                BoundStructuralSubject(
+                    subject_id,
+                    section,  # type: ignore[arg-type]
+                    item_id,
+                    action,  # type: ignore[arg-type]
+                    requirements,
+                    unit_refs,
+                    refs,
+                    is_new,
+                    planned_path,
+                ),
+            )
+            if merged is None or planned_path not in planned_paths:
                 raise PlanningContractError(pointer, "subject was already enumerated")
             # Multiple work units can legitimately plan changes to one shared
-            # file. Keep one structural subject and combine its supporting
-            # units, requirements, and evidence rather than making the model
-            # retry an answer that cannot represent the shared path twice.
-            records[existing_index] = BoundStructuralSubject(
-                subject_id,
-                section,  # type: ignore[arg-type]
-                item_id,
-                action,  # type: ignore[arg-type]
-                tuple(sorted(set(existing.requirement_ids) | set(requirements))),
-                tuple(sorted(set(existing.unit_ids) | set(unit_refs))),
-                tuple(sorted(set(existing.source_refs) | set(refs))),
-                is_new,
-                planned_path,
-            )
+            # file. Keep one structural subject and combine all supporting
+            # units, requirements, and evidence.
+            records[existing_index] = merged
             continue
         page_keys.add(key)
         page_record_indexes[key] = len(records)
@@ -362,11 +409,9 @@ def complete_subject_enumeration(
             raise StructrrPlanningError("subject enumeration has a broken page cursor")
     if pages[-1].has_more or pages[-1].next_anchor is not None:
         raise StructrrPlanningError("subject enumeration is incomplete")
-    result = tuple(record for page in pages for record in page.records)
-    keys = [(item.section, item.subject_id) for item in result]
-    if len(set(keys)) != len(keys):
-        raise StructrrPlanningError("subject enumeration contains duplicates")
-    return result
+    return coalesce_structural_subjects(
+        record for page in pages for record in page.records
+    )
 
 
 def parse_structural_change(
@@ -1546,6 +1591,7 @@ __all__ = [
     "bind_structural_operation",
     "build_structural_change_request",
     "build_subject_enumeration_request",
+    "coalesce_structural_subjects",
     "complete_subject_enumeration",
     "compile_structrr_plan",
     "parse_structural_change",

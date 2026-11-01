@@ -7,9 +7,8 @@ from typing import Any
 from urllib.error import HTTPError
 
 import pytest
-
-from powdrr_lift.workrr import jev_classifier
-from powdrr_lift.workrr.jev_classifier import (
+from powdrr_service import decision_classifier as jev_classifier
+from powdrr_service.decision_classifier import (
     JevSemanticClassifierClient,
     SubQSemanticClassifierClient,
     preferred_semantic_classifier_client,
@@ -293,7 +292,7 @@ def test_jev_logs_correlated_successful_call(
 ) -> None:
     fallback = _Fallback()
     monkeypatch.setattr(jev_classifier, "_call_jev", lambda *_: {"choice": "present"})
-    caplog.set_level("WARNING", logger="powdrr_lift.workrr.jev_classifier")
+    caplog.set_level("WARNING", logger="powdrr_service.decision_classifier")
 
     JevSemanticClassifierClient(fallback, api_key="key").complete_json(
         _messages("has_exception"), response_schema=_decision_schema()
@@ -302,7 +301,7 @@ def test_jev_logs_correlated_successful_call(
     events = [
         record.getMessage()
         for record in caplog.records
-        if record.name == "powdrr_lift.workrr.jev_classifier"
+        if record.name == "powdrr_service.decision_classifier"
     ]
     assert [event.split()[0] for event in events] == [
         "JEV_REQUEST_STARTED",

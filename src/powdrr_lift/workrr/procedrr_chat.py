@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, TextIO
 from uuid import uuid4
 
+from powdrr_service.decision_classifier import JevSemanticClassifierClient
 from powdrr_service.providers.selection import (
     initial_model_for_provider,
     resolve_provider_roles,
@@ -34,7 +35,6 @@ from powdrr_lift.workrr.execution_state import (
     ProcessExecutionReference,
     _WorkflowExecutionState,
 )
-from powdrr_lift.workrr.jev_classifier import JevSemanticClassifierClient
 from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
 from powdrr_lift.workrr.procedrr_operations import WorkrrOperationExecutor
 from powdrr_lift.workrr.provider_runtime import WorkflowClientRegistry

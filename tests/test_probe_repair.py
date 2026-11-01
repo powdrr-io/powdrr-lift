@@ -5,9 +5,10 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+from powdrr_service import decision_classifier as jev_classifier
 from powdrr_service.behavior_contract import BEHAVIOR_DIMENSIONS
 
-from powdrr_lift.workrr import jev_classifier, probe_repair
+from powdrr_lift.workrr import probe_repair
 
 
 class RepairClient:

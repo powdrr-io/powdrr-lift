@@ -2599,7 +2599,7 @@
       "extraction_pr": "5/7",
       "internal_imports": [
         "powdrr_lift.errors",
-        "powdrr_lift.workrr.jev_classifier",
+        "powdrr_service.decision_classifier",
         "powdrr_lift.workrr.llm",
         "powdrr_service.providers.config",
         "powdrr_lift.workrr.provider_runtime"
@@ -2794,7 +2794,7 @@
         "powdrr_lift.workrr.evidence_reconciliation",
         "powdrr_service.external_contract_research",
         "powdrr_lift.workrr.git",
-        "powdrr_lift.workrr.jev_classifier",
+        "powdrr_service.decision_classifier",
         "powdrr_lift.workrr.postrun_probes",
         "powdrr_lift.workrr.probe_repair",
         "powdrr_lift.workrr.procedrr",
@@ -2897,12 +2897,12 @@
       "extraction_pr": "6",
       "internal_imports": [
         "powdrr_service.http_retry",
-        "powdrr_lift.workrr.protocol"
+        "powdrr_service.providers.clients"
       ],
       "kind": "python_module",
       "owner": "service",
-      "path": "src/powdrr_lift/workrr/jev_classifier.py",
-      "rationale": "provider access, model routing, and inference policy",
+      "path": "packages/service/src/powdrr_service/decision_classifier.py",
+      "rationale": "Decision API clients, response mapping, batching, and fallback policy",
       "reviewed": false
     },
     {
@@ -3060,7 +3060,7 @@
         "powdrr_lift.workrr.chat_context",
         "powdrr_lift.workrr.chat_io",
         "powdrr_lift.workrr.execution_state",
-        "powdrr_lift.workrr.jev_classifier",
+        "powdrr_service.decision_classifier",
         "powdrr_lift.workrr.procedrr",
         "powdrr_lift.workrr.procedrr_operations",
         "powdrr_lift.workrr.provider_runtime",
@@ -3320,7 +3320,7 @@
         "powdrr_lift.workrr.git",
         "powdrr_lift.workrr.github_issue_plan_generation",
         "powdrr_lift.workrr.github_issue_queue",
-        "powdrr_lift.workrr.jev_classifier",
+        "powdrr_service.decision_classifier",
         "powdrr_lift.workrr.llm",
         "powdrr_lift.workrr.observer",
         "powdrr_lift.workrr.operation_validation",

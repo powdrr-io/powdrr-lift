@@ -8,6 +8,7 @@ from typing import Any
 
 import powdrr_service.external_contract_research as research_module
 import pytest
+from powdrr_service.decision_classifier import JevSemanticClassifierClient
 from powdrr_service.external_contract_research import (
     bind_external_contract_assessments,
     bind_external_contract_claims,
@@ -22,7 +23,6 @@ from powdrr_service.external_contract_research import (
 )
 
 from powdrr_lift.workrr.command_catalog import feature_command_catalog
-from powdrr_lift.workrr.jev_classifier import JevSemanticClassifierClient
 from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
 from procedrr.parser import parse_and_validate
 from procedrr_evaluator import Evaluator
@@ -684,7 +684,7 @@ def test_external_research_gate_and_evidence_control_model_calls(
     decision: str,
     source_available: bool,
 ) -> None:
-    from powdrr_lift.workrr import jev_classifier
+    from powdrr_service import decision_classifier as jev_classifier
 
     process_directory = Path("docs/procedrr/processes")
     document = parse_and_validate(

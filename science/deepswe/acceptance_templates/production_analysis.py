@@ -13,13 +13,13 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from powdrr_service.decision_classifier import JevSemanticClassifierClient
 from powdrr_service.planning.instruction_ledger import (
     InstructionLedger,
     apply_atomicity_decisions,
     compile_instruction_ledger,
 )
 
-from powdrr_lift.workrr.jev_classifier import JevSemanticClassifierClient
 from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
 from powdrr_lift.workrr.semantic_contract_compiler import (
     bind_source_semantic_decisions,
@@ -42,7 +42,7 @@ class JevPromptAdapter:
         self.client = client
         self._local = threading.local()
         self._handler = _JevEventHandler(self._local)
-        self._logger = logging.getLogger("powdrr_lift.workrr.jev_classifier")
+        self._logger = logging.getLogger("powdrr_service.decision_classifier")
         self._logger.addHandler(self._handler)
 
     def complete_json(

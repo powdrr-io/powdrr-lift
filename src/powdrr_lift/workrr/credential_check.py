@@ -10,6 +10,12 @@ from pathlib import Path
 from typing import Any
 from urllib.error import HTTPError, URLError
 
+from powdrr_service.decision_classifier import (
+    JEV_DEFAULT_BASE_URL,
+    JEV_MODEL,
+    _call_jev,
+    _call_subq,
+)
 from powdrr_service.providers.config import (
     LLMModelMapping,
     ProviderConfigurationError,
@@ -21,12 +27,6 @@ from powdrr_service.providers.credentials import (
 )
 
 from powdrr_lift.errors import PowdrrExecutionError
-from powdrr_lift.workrr.jev_classifier import (
-    JEV_DEFAULT_BASE_URL,
-    JEV_MODEL,
-    _call_jev,
-    _call_subq,
-)
 from powdrr_lift.workrr.llm import WorkflowLLMHTTPError
 from powdrr_lift.workrr.provider_runtime import build_workflow_client
 

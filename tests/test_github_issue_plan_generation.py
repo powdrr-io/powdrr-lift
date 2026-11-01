@@ -8,11 +8,12 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from powdrr_service import decision_classifier as jev_classifier
 from powdrr_service.planning.multipr_structrr import compile_multi_pr_proposal
 from powdrr_service.planning.plan_sizing import PlanSizingError, size_plan_items
 
 from powdrr_lift import cli
-from powdrr_lift.workrr import jev_classifier, planned_workflow_task
+from powdrr_lift.workrr import planned_workflow_task
 from powdrr_lift.workrr.github_issue_plan_generation import (
     PLAN_COVERAGE_AUDIT_RESPONSE_SCHEMA,
     PLAN_ITEMS_RESPONSE_SCHEMA,

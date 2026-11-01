@@ -5,6 +5,10 @@ import sys
 from pathlib import Path
 
 import pytest
+from powdrr_service.verification.execute_pr_test_corrections import (
+    ExecutePrTestVerificationError,
+    require_behavioral_red_result,
+)
 
 from powdrr_lift.workrr.coding_agent_validation import ValidationProfile
 from powdrr_lift.workrr.execute_pr_tests import (
@@ -17,7 +21,6 @@ from powdrr_lift.workrr.execute_pr_tests import (
     install_frozen_test_files,
     pytest_command_for_files,
     pytest_execution_evidence,
-    require_behavioral_red_result,
     run_generated_pytest,
     validate_coverage_references,
     validate_generated_test_files,
@@ -213,7 +216,7 @@ def test_generated_tests_must_fail_baseline_through_assertions() -> None:
             "stderr": "AssertionError: expected behavior is missing",
         },
     ):
-        with pytest.raises(ExecutePrTestError):
+        with pytest.raises(ExecutePrTestVerificationError):
             require_behavioral_red_result(result)
 
 

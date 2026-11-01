@@ -7,6 +7,9 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from powdrr_service.verification.execute_pr_test_corrections import (
+    ExecutePrTestVerificationError,
+)
 
 from powdrr_lift.workrr import task_agent
 from powdrr_lift.workrr.coding_agent import ImplementationRequest
@@ -118,7 +121,7 @@ def test_test_correction_must_remain_red_on_a_fresh_baseline(
     assert baseline["passed"] is False
     assert "1 failed" in baseline["stdout"]
 
-    with pytest.raises(ExecutePrTestError, match="did not fail"):
+    with pytest.raises(ExecutePrTestVerificationError, match="did not fail"):
         task_agent._validate_execute_pr_test_correction(
             repository,
             baseline_commit=base_commit,

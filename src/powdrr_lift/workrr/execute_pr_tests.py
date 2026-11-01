@@ -385,44 +385,6 @@ def run_generated_pytest(
     }
 
 
-def require_behavioral_red_result(result: Mapping[str, Any]) -> None:
-    """Reject baseline failures caused by test setup, imports, or collection."""
-    output = "\n".join(
-        str(result.get(key, "")) for key in ("stdout", "stderr", "error")
-    )
-    if result.get("returncode") in (None, 0):
-        raise ExecutePrTestError(
-            "generated integration tests did not fail against the untouched baseline"
-        )
-    if "AssertionError" not in output and "DID NOT RAISE" not in output:
-        raise ExecutePrTestError(
-            "generated integration tests failed on baseline for a non-assertion "
-            "reason; they must execute behavior and fail their expected assertion"
-        )
-    invalid_markers = (
-        "ERROR collecting",
-        "ImportError",
-        "ModuleNotFoundError",
-        "SyntaxError",
-        "collected 0 items",
-    )
-    if any(marker in output for marker in invalid_markers):
-        raise ExecutePrTestError(
-            "generated integration tests have a collection, import, or syntax "
-            "failure instead of a behavioral assertion failure"
-        )
-    if not re.search(r"(?m)^FAILED\s+\S+::test_\S+", output):
-        raise ExecutePrTestError(
-            "generated integration tests did not report a failing test assertion"
-        )
-    if re.search(r"(?m)^ERROR(?:S)?\b", output) or re.search(
-        r"\b\d+\s+errors?\b", output
-    ):
-        raise ExecutePrTestError(
-            "generated integration tests also have collection or setup errors"
-        )
-
-
 def fingerprint_test_files(files: Mapping[str, str]) -> dict[str, str]:
     """Fingerprint frozen generated tests before coding starts."""
     return {
@@ -501,7 +463,6 @@ __all__ = [
     "ExecutePrTestError",
     "candidate_test_changes",
     "pytest_command_for_files",
-    "require_behavioral_red_result",
     "run_generated_pytest",
     "fingerprint_test_files",
     "generated_test_source_paths",

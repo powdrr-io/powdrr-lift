@@ -1,0 +1,117 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1283
+title: Filter structural planning through deterministic candidates
+intent:
+  problem: Structural planning asks the model to enumerate existing Structrr subjects
+    that can already be located from the planned file paths and baseline.
+  goal: Build path-related candidates deterministically, then ask focused questions
+    with the plan unit and source evidence to confirm which candidates need changes.
+human-decisions: []
+structured_files: []
+files:
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 181, end_line: 289}
+    summary: Derive baseline entities and attached relationships from planned paths and bind them to owning requirements, units, and source anchors.
+    rationale: Remove deterministic candidate discovery from model enumeration and preserve traceable ownership for review.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 1219, end_line: 1226}
+    summary: Seed structural enumeration with deterministic candidates.
+    rationale: Avoid rediscovering existing subjects already bound to planned paths.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 1269, end_line: 1269}
+    summary: Preserve deterministic candidates in the complete subject set.
+    rationale: Ensure candidates proceed to per-subject confirmation after enumeration.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 1276, end_line: 1276}
+    summary: Batch independent subject enumeration questions.
+    rationale: Reduce model calls while keeping item questions independent.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 1327, end_line: 1328}
+    summary: Supply the plan source and allocated units to each subject review.
+    rationale: Give the targeted model decision the evidence needed to filter candidates.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 1345, end_line: 1345}
+    summary: Batch independent per-subject review questions.
+    rationale: Reduce model calls without combining the subject decisions.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 708, end_line: 709}
+    summary: Accept source and unit evidence in structural change requests.
+    rationale: Make candidate review inputs carry their relevant plan context.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 711, end_line: 711}
+    summary: Resolve source excerpts for the candidate's source anchors.
+    rationale: Attach source evidence to the review question.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 720, end_line: 724}
+    summary: Add only the allocated units that own the candidate.
+    rationale: Keep review context focused on this candidate's work.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 739, end_line: 742}
+    summary: Include source excerpt references in the accepted question context.
+    rationale: Keep question context validation aligned with the evidence supplied.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 765, end_line: 768}
+    summary: Include source excerpts and owning units in the input digest.
+    rationale: Invalidate prior answers when candidate evidence changes.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 789, end_line: 795}
+    summary: Ask whether this one candidate is affected or already satisfied.
+    rationale: Turn deterministic selection into a narrow, evidence-based confirmation.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 812, end_line: 812}
+    summary: Attach the resolved source excerpts to the question request.
+    rationale: Provide the evidence named by the confirmation prompt.
+  - path: tests/test_planning_structrr.py
+    type: modified
+    span: {start_line: 15, end_line: 15}
+    summary: Import deterministic candidate selection for unit coverage.
+    rationale: Test the new candidate-binding behavior directly.
+  - path: tests/test_planning_structrr.py
+    type: modified
+    span: {start_line: 207, end_line: 208}
+    summary: Build candidate review requests with source and unit context.
+    rationale: Verify callers can supply the evidence needed for focused review.
+  - path: tests/test_planning_structrr.py
+    type: modified
+    span: {start_line: 230, end_line: 234}
+    summary: Assert review requests include source evidence and owning unit context.
+    rationale: Protect the evidence-backed candidate filtering contract.
+  - path: tests/test_planning_structrr.py
+    type: modified
+    span: {start_line: 889, end_line: 941}
+    summary: Cover path-based entity and relationship candidate binding.
+    rationale: Verify deterministic selection excludes unrelated relationships and keeps requirement ownership.
+entities:
+  - id: planned-existing-structural-subject-selection
+    type: Function
+    action: added
+  - id: structural-candidate-review-context
+    type: Function
+    action: added
+entity_relationships:
+  - id: structural-candidates-confirmed-with-plan-evidence
+    type: part_of
+    source: structural-candidate-review-context
+    target: planned-existing-structural-subject-selection
+    action: added
+    description: Candidate review uses the deterministic subject binding together with the owning plan unit and source excerpts.
+invariants:
+  - id: existing-path-bound-subjects-are-candidates-before-enumeration
+    description: Existing baseline entities associated with planned write paths and relationships touching those entities are bound deterministically, then individually reviewed with source and unit context.
+    action: added
+guidance: []
+features: []
+proposed_prs: []

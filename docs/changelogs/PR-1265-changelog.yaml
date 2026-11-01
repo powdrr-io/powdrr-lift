@@ -1,0 +1,138 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1265
+title: Scope workflow chat context by conversation
+intent:
+  problem: Workflow chat stores previous worktree and pull request context in one repository-wide file and always prompts for the first user request.
+  goal: Let callers provide an initial message and keep workflow context in a validated conversation-specific file.
+human-decisions: []
+structured_files: []
+files:
+- path: src/powdrr_lift/workrr/chat_config.py
+  type: modified
+  span:
+    start_line: 29
+    end_line: 30
+  summary: Add optional conversation ID and explicit initial message settings.
+  rationale: Give non-interactive adapters the inputs needed to start and isolate one chat.
+- path: src/powdrr_lift/workrr/chat_context.py
+  type: modified
+  span:
+    start_line: 24
+    end_line: 44
+  summary: Validate conversation IDs and derive per-conversation context paths.
+  rationale: Prevent chats in one repository from overwriting one another's worktree context.
+- path: src/powdrr_lift/workrr/chat_context.py
+  type: modified
+  span:
+    start_line: 60
+    end_line: 63
+  summary: Load workflow context from the selected conversation path.
+  rationale: Reuse only the selected chat's saved worktree and pull request context.
+- path: src/powdrr_lift/workrr/chat_context.py
+  type: modified
+  span:
+    start_line: 100
+    end_line: 100
+  summary: Accept an optional conversation ID when persisting context.
+  rationale: Keep persistence aligned with conversation-scoped reads.
+- path: src/powdrr_lift/workrr/chat_context.py
+  type: modified
+  span:
+    start_line: 140
+    end_line: 140
+  summary: Write context to the selected conversation-specific file.
+  rationale: Avoid sharing mutable worktree context between concurrent chats.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 70
+    end_line: 71
+  summary: Load workflow context for the active conversation.
+  rationale: Prevent context reads from crossing chat boundaries.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 73
+    end_line: 85
+  summary: Use the supplied initial message or retain the interactive prompt when absent.
+  rationale: Allow a workspace adapter to start with its accepted message while preserving CLI behavior.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 292
+    end_line: 292
+  summary: Persist failure context using the current conversation ID.
+  rationale: Keep failure recovery information isolated to the originating chat.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 305
+    end_line: 305
+  summary: Persist successful context using the current conversation ID.
+  rationale: Keep later continuation scoped to the originating chat.
+- path: tests/test_procedrr_chat.py
+  type: modified
+  span:
+    start_line: 6
+    end_line: 6
+  summary: Import the context manager used by the persistence test.
+  rationale: Stub external runtime side effects while exercising context-file behavior.
+- path: tests/test_procedrr_chat.py
+  type: modified
+  span:
+    start_line: 12
+    end_line: 14
+  summary: Import pytest and the extracted chat context module.
+  rationale: Exercise conversation-aware persistence and explicit-message behavior.
+- path: tests/test_procedrr_chat.py
+  type: modified
+  span:
+    start_line: 267
+    end_line: 268
+  summary: Configure an explicit initial message and conversation ID in the chat integration test.
+  rationale: Verify the library entry point receives workspace-owned chat identity and input.
+- path: tests/test_procedrr_chat.py
+  type: modified
+  span:
+    start_line: 271
+    end_line: 271
+  summary: Fail the test if explicit startup requests input from stdin.
+  rationale: Confirm the initial user message is consumed directly.
+- path: tests/test_procedrr_chat.py
+  type: modified
+  span:
+    start_line: 279
+    end_line: 329
+  summary: Verify conversation contexts persist independently and unsafe IDs are rejected.
+  rationale: Protect per-chat context isolation and path boundaries.
+entities:
+- id: workflow-chat-conversation-id-setting
+  type: Variable
+  action: added
+- id: workflow-chat-initial-message-setting
+  type: Variable
+  action: added
+- id: conversation-context-isolation-tests
+  type: Unit test
+  action: added
+entity_relationships:
+- id: workflow-chat-context-isolated-by-conversation
+  type: uses
+  source: workflow-chat-conversation-id-setting
+  target: conversation-context-isolation-tests
+  action: added
+  description: Conversation IDs select independent workflow context files, which the tests verify.
+invariants:
+- id: context-path-is-conversation-scoped
+  description: When a conversation ID is supplied, reads and writes use .powdrr/conversations/<conversation_id>/workflow-context.json.
+  action: added
+- id: invalid-conversation-id-does-not-select-a-path
+  description: Conversation IDs are restricted to safe single-component ASCII identifiers.
+  action: added
+- id: explicit-initial-message-skips-first-input-prompt
+  description: A non-empty configured initial message is used directly; absent configuration preserves the interactive CLI prompt.
+  action: added
+guidance:
+- id: configure-workspace-chat-start
+  description: Workspace adapters can set conversation_id and initial_message when invoking run_procedrr_workflow_chat; later durable Procedrr suspension still requires saved interpreter state.
+  action: added

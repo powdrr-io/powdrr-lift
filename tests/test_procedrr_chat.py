@@ -3,14 +3,16 @@ from __future__ import annotations
 import shutil
 import subprocess
 from collections.abc import Mapping
+from contextlib import nullcontext
 from io import StringIO
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
+import pytest
 from powdrr_service.decision_classifier import JevSemanticClassifierClient
 
-from powdrr_lift.workrr import procedrr_chat
+from powdrr_lift.workrr import chat_context, procedrr_chat
 from powdrr_lift.workrr.chat_config import WorkflowChatConfig
 from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
 from powdrr_lift.workrr.procedrr_chat import (
@@ -262,9 +264,11 @@ steps:
             repo_root=repo_root,
             provider="local",
             execution_id="chat-integration",
+            conversation_id="chat-integration",
+            initial_message="Inspect this fixture.",
         ),
         procedrr_client_factory=lambda _role: client,
-        input_func=lambda: "Inspect this fixture.",
+        input_func=lambda: pytest.fail("explicit initial message must skip input"),
         stdout=stdout,
         stderr=stderr,
     )
@@ -272,6 +276,57 @@ steps:
     assert exit_code == 0, stderr.getvalue()
     assert "Matched process: echo-process" in stdout.getvalue()
     assert "Done: Inspect this fixture." in stdout.getvalue()
+    assert "What do you want to do?" not in stdout.getvalue()
+
+
+def test_workflow_context_persists_separately_per_conversation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    worktree = tmp_path / "worktree"
+    (worktree / ".git").mkdir(parents=True)
+    monkeypatch.setattr(
+        chat_context,
+        "_workflow_context_runtime",
+        lambda *_args: SimpleNamespace(without_action_contract=nullcontext),
+    )
+
+    def invoke(
+        _tool: str, parameters: Mapping[str, Any], **_kwargs: Any
+    ) -> dict[str, Any]:
+        if parameters["operation"] == "branch_current":
+            return {"stdout": "feature/chat-context"}
+        return {"returncode": 1, "stdout": ""}
+
+    monkeypatch.setattr(chat_context, "invoke_intrinsic_capability", invoke)
+
+    chat_context._persist_workflow_context(
+        tmp_path,
+        worktree,
+        process_id="design-interview",
+        request="First request",
+        conversation_id="chat-one",
+    )
+    chat_context._persist_workflow_context(
+        tmp_path,
+        worktree,
+        process_id="design-interview",
+        request="Second request",
+        conversation_id="chat-two",
+    )
+
+    first = chat_context._load_workflow_context(tmp_path, conversation_id="chat-one")
+    second = chat_context._load_workflow_context(tmp_path, conversation_id="chat-two")
+    assert first is not None and first.request == "First request"
+    assert second is not None and second.request == "Second request"
+    assert chat_context._workflow_context_path(
+        tmp_path, conversation_id="chat-one"
+    ) != chat_context._workflow_context_path(tmp_path, conversation_id="chat-two")
+    assert not (tmp_path / ".powdrr" / "workflow-context.json").exists()
+
+
+def test_workflow_context_rejects_unsafe_conversation_id(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="safe path component"):
+        chat_context._workflow_context_path(tmp_path, conversation_id="../shared")
 
 
 def test_chat_jev_provider_uses_the_decision_classifier(

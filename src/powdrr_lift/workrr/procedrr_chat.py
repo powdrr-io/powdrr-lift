@@ -67,14 +67,22 @@ def run_procedrr_workflow_chat(
         print(f"Could not load Procedrr processes: {error}", file=stderr)
         return 1
 
-    workflow_context = _load_workflow_context(configured_repo_root)
-    context_data = workflow_context.to_data() if workflow_context is not None else {}
-    user_request = _prompt_user(
-        "What do you want to do? ",
-        input_func=input_func,
-        stdout=stdout,
-        status_stream=stderr,
+    workflow_context = _load_workflow_context(
+        configured_repo_root, conversation_id=config.conversation_id
     )
+    context_data = workflow_context.to_data() if workflow_context is not None else {}
+    if config.initial_message is None:
+        user_request = _prompt_user(
+            "What do you want to do? ",
+            input_func=input_func,
+            stdout=stdout,
+            status_stream=stderr,
+        )
+    else:
+        user_request = config.initial_message
+        if not user_request.strip():
+            print("The initial chat message must not be empty.", file=stderr)
+            return 1
 
     provider_roles = resolve_provider_roles(
         config.provider,
@@ -281,6 +289,7 @@ def run_procedrr_workflow_chat(
             worktree_root,
             process_id=process.name,
             request=user_request,
+            conversation_id=config.conversation_id,
         )
         print(f"Procedrr process failed: {error}", file=stderr)
         return 1
@@ -293,6 +302,7 @@ def run_procedrr_workflow_chat(
         worktree_root,
         process_id=process.name,
         request=user_request,
+        conversation_id=config.conversation_id,
     )
     if result.terminal_status is ProcessTerminalStatus.SUCCEEDED:
         print(f"Process completed: {process.name}", file=stdout)

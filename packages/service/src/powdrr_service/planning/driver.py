@@ -70,10 +70,13 @@ from powdrr_service.planning.source import (
 )
 from powdrr_service.planning.structrr import (
     BoundStructuralSubject,
+    StructuralSubjectPage,
     bind_structural_operation,
     build_structural_change_request,
     build_subject_enumeration_request,
+    coalesce_structural_subjects,
     compile_structrr_plan,
+    complete_subject_enumeration,
     reject_unordered_subject_conflicts,
 )
 from powdrr_service.planning.workflow_ids import slugify_workflow_id
@@ -1004,6 +1007,7 @@ class SourceLedgerQuestionMachine:
                 )
                 page_ordinal = 1
                 item_subjects: list[BoundStructuralSubject] = []
+                item_pages: list[StructuralSubjectPage] = []
                 while True:
                     enumeration_request = build_subject_enumeration_request(
                         plan_id=self.plan_id,
@@ -1036,9 +1040,14 @@ class SourceLedgerQuestionMachine:
                         self._invalid_accepted_question_ids.add(question_id)
                         pending_enumerations.append(enumeration_request)
                         break
-                    item_subjects.extend(page.records)
+                    item_pages.append(page)
+                    item_subjects = list(
+                        coalesce_structural_subjects((*item_subjects, *page.records))
+                    )
                     if not page.has_more:
-                        subjects_by_item[item_id] = tuple(item_subjects)
+                        subjects_by_item[item_id] = complete_subject_enumeration(
+                            item_pages
+                        )
                         break
                     page_ordinal += 1
             if pending_enumerations:
@@ -1105,6 +1114,7 @@ class SourceLedgerQuestionMachine:
         subjects: list[BoundStructuralSubject] = []
         page_ordinal = 1
         prior_subjects: list[BoundStructuralSubject] = []
+        pages: list[StructuralSubjectPage] = []
         while True:
             request = build_subject_enumeration_request(
                 plan_id=self.plan_id,
@@ -1123,10 +1133,11 @@ class SourceLedgerQuestionMachine:
                     f"{request.question.question_id}"
                 )
             page = request.parse_answer(answer)
-            subjects.extend(page.records)
-            prior_subjects.extend(page.records)
+            pages.append(page)
+            subjects = list(coalesce_structural_subjects((*subjects, *page.records)))
+            prior_subjects = subjects
             if not page.has_more:
-                return tuple(subjects)
+                return complete_subject_enumeration(pages)
             page_ordinal += 1
 
     def _structrr_source_ref(self) -> str:

@@ -1,5 +1,5 @@
 schema: https://powdrr.io/schema/changelog-v2
-change_id: 0
+change_id: 1261
 title: Coalesce shared planned file subjects
 intent:
   problem: Structural subject enumeration rejects a valid answer when separate work units plan changes to the same file.

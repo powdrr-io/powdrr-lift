@@ -1,0 +1,200 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1289
+title: Build the first workspace chat UI
+intent:
+  problem: Developers need a graphical workspace for feature design, but the local API has no browser client and cannot restore its CSRF token after a reload.
+  goal: Provide a responsive React chat shell backed by the local workspace API and safely refresh the session token from its HttpOnly cookie.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/design/browser-workspace-api.md
+  type: modified
+  span:
+    start_line: 31
+    end_line: 34
+  summary: Document same-origin CSRF refresh after browser reload.
+  rationale: Keep the browser session flow aligned with the implemented API.
+- path: packages/local/src/powdrr_local/web.py
+  type: modified
+  span:
+    start_line: 249
+    end_line: 268
+  summary: Add an origin-checked endpoint that rotates the CSRF token for a live session cookie.
+  rationale: Let a reloaded browser recover an in-memory CSRF token without persisting it in browser storage.
+- path: packages/local/src/powdrr_local/workspace.py
+  type: modified
+  span:
+    start_line: 735
+    end_line: 746
+  summary: Atomically rotate a CSRF digest only for a non-expired session.
+  rationale: Keep session refresh safe across service processes using the shared SQLite store.
+- path: tests/test_workspace_api.py
+  type: modified
+  span:
+    start_line: 67
+    end_line: 107
+  summary: Verify origin enforcement, token rotation, rejection of the stale token, and acceptance of the replacement.
+  rationale: Cover session restoration and ensure the previous CSRF token stops authorizing mutations.
+- path: ui/.gitignore
+  type: added
+  span:
+    start_line: 1
+    end_line: 24
+  summary: Ignore frontend build output, dependencies, and local editor files.
+  rationale: Keep generated frontend artifacts out of source control.
+- path: ui/.oxlintrc.json
+  type: added
+  span:
+    start_line: 1
+    end_line: 8
+  summary: Configure the frontend lint rules.
+  rationale: Provide a consistent lint baseline for the TypeScript client.
+- path: ui/README.md
+  type: added
+  span:
+    start_line: 1
+    end_line: 34
+  summary: Document local frontend development and its required checks.
+  rationale: Make the Vite client straightforward to run against the local API.
+- path: ui/index.html
+  type: added
+  span:
+    start_line: 1
+    end_line: 15
+  summary: Define the browser entry document and Powdrr Workspace page metadata.
+  rationale: Give the local client its app identity and responsive viewport.
+- path: ui/package-lock.json
+  type: added
+  span:
+    start_line: 1
+    end_line: 4203
+  summary: Lock the React, Vite, TypeScript, markdown, lint, and test dependencies.
+  rationale: Make frontend dependency installation reproducible.
+- path: ui/package.json
+  type: added
+  span:
+    start_line: 1
+    end_line: 33
+  summary: Add the React and TypeScript frontend scripts and dependencies.
+  rationale: Establish typecheck, lint, test, development, and production build commands.
+- path: ui/public/powdrr-mark.svg
+  type: added
+  span:
+    start_line: 1
+    end_line: 10
+  summary: Add a compact Powdrr browser icon.
+  rationale: Identify the workspace tab in the browser.
+- path: ui/src/App.css
+  type: added
+  span:
+    start_line: 1
+    end_line: 362
+  summary: Style the responsive chat shell, sidebar, transcript, composer, setup, and authentication views.
+  rationale: Deliver the initial familiar LLM chat layout across desktop and narrow screens.
+- path: ui/src/App.test.tsx
+  type: added
+  span:
+    start_line: 1
+    end_line: 127
+  summary: Cover browser bootstrap, repository onboarding, chat creation, first-message submission, and URL selection.
+  rationale: Verify the first user-facing workspace flows with deterministic API responses.
+- path: ui/src/App.tsx
+  type: added
+  span:
+    start_line: 1
+    end_line: 555
+  summary: Implement repository setup, chat navigation, selection, transcript rendering, theme controls, and message composition.
+  rationale: Turn the local workspace API into an interactive feature-design chat.
+- path: ui/src/api/client.ts
+  type: added
+  span:
+    start_line: 1
+    end_line: 205
+  summary: Add typed session, repository, snapshot, conversation, message, and SSE requests.
+  rationale: Keep network access and idempotent message retries behind one client boundary.
+- path: ui/src/api/types.ts
+  type: added
+  span:
+    start_line: 1
+    end_line: 96
+  summary: Define TypeScript records matching the versioned workspace contract responses used by the chat shell.
+  rationale: Keep UI state aligned with the local API payloads.
+- path: ui/src/index.css
+  type: added
+  span:
+    start_line: 1
+    end_line: 96
+  summary: Define shared color themes, typography, and base layout rules.
+  rationale: Keep the shell consistent in light, dark, and system themes.
+- path: ui/src/main.tsx
+  type: added
+  span:
+    start_line: 1
+    end_line: 10
+  summary: Mount the React workspace shell.
+  rationale: Provide the Vite application entry point.
+- path: ui/tsconfig.app.json
+  type: added
+  span:
+    start_line: 1
+    end_line: 26
+  summary: Configure strict TypeScript checking for browser code.
+  rationale: Catch mismatches in UI components and API usage before build.
+- path: ui/tsconfig.json
+  type: added
+  span:
+    start_line: 1
+    end_line: 7
+  summary: Compose the frontend TypeScript project references.
+  rationale: Keep application and build configuration checks separate.
+- path: ui/tsconfig.node.json
+  type: added
+  span:
+    start_line: 1
+    end_line: 23
+  summary: Configure TypeScript checking for Vite and Vitest configuration.
+  rationale: Typecheck the development and test setup.
+- path: ui/vite.config.ts
+  type: added
+  span:
+    start_line: 1
+    end_line: 21
+  summary: Configure React and the same-origin development proxy to the local API.
+  rationale: Preserve the API's loopback Origin checks during frontend development.
+- path: ui/vitest.config.ts
+  type: added
+  span:
+    start_line: 1
+    end_line: 10
+  summary: Configure component tests in a DOM environment.
+  rationale: Exercise frontend interactions with realistic rendered elements.
+entities:
+- id: workspace-browser-ui
+  type: Module
+  action: added
+- id: workspace-chat-shell
+  type: Function
+  action: added
+- id: refresh-workspace-session-csrf
+  type: Function
+  action: added
+- id: rotate-workspace-session-csrf-digest
+  type: Method
+  action: added
+entity_relationships:
+- id: chat-shell-belongs-to-browser-ui
+  type: part_of
+  source: workspace-chat-shell
+  target: workspace-browser-ui
+  action: added
+  description: The chat shell renders and coordinates the workspace browser experience.
+invariants:
+- id: session-refresh-requires-live-cookie-and-configured-origin
+  description: CSRF refresh requires the configured Origin and a live HttpOnly session cookie, rotates the stored digest, and returns the replacement token only in the response body.
+  action: added
+- id: browser-keeps-csrf-token-in-memory
+  description: The browser client keeps the CSRF token in memory and does not place credentials or prompt text in URLs.
+  action: added
+guidance: []
+features: []
+proposed_prs: []

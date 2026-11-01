@@ -1,5 +1,5 @@
 schema: https://powdrr.io/schema/changelog-v2
-change_id: 0
+change_id: 1266
 title: Coalesce planned file subjects across pages
 intent:
   problem: A planned file referenced on multiple structural-subject pages is rejected as already enumerated, even when separate work units legitimately share that file.

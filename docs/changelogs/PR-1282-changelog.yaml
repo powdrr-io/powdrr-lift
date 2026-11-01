@@ -1,0 +1,300 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1282
+title: Move execute-PR test validation policy into service
+intent:
+  problem: The local execute-PR module owns deterministic generated-test path, source,
+    coverage, correction, and execution-evidence acceptance rules.
+  goal: Move test-authoring validation policy into the service while retaining subprocess
+    and filesystem operations in the agent.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2718
+    end_line: 2718
+  summary: Update the ownership inventory to mark generated-test verification policy
+    as service-owned and local process helpers as agent-owned.
+  rationale: Keep the staged agent/service boundary accurate for architecture checks.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2723
+    end_line: 2723
+  summary: Update the ownership inventory to mark generated-test verification policy
+    as service-owned and local process helpers as agent-owned.
+  rationale: Keep the staged agent/service boundary accurate for architecture checks.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3264
+    end_line: 3272
+  summary: Update the ownership inventory to mark generated-test verification policy
+    as service-owned and local process helpers as agent-owned.
+  rationale: Keep the staged agent/service boundary accurate for architecture checks.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3424
+    end_line: 3425
+  summary: Update the ownership inventory to mark generated-test verification policy
+    as service-owned and local process helpers as agent-owned.
+  rationale: Keep the staged agent/service boundary accurate for architecture checks.
+- path: packages/service/src/powdrr_service/verification/execute_pr_test_validation.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 328
+  summary: Implement deterministic test-root, changed-path, source, coverage-link,
+    correction, and pytest-evidence validation.
+  rationale: Centralize proprietary acceptance rules in the service without importing
+    local execution code.
+- path: src/powdrr_lift/workrr/execute_pr_tests.py
+  type: modified
+  span:
+    start_line: 1
+    end_line: 1
+  summary: Remove generated-test validation policy now owned by the service; retain
+    local pytest, filesystem, and Git helpers.
+  rationale: Keep the agent module responsible for execution mechanics only.
+- path: src/powdrr_lift/workrr/execute_pr_tests.py
+  type: modified
+  span:
+    start_line: 5
+    end_line: 5
+  summary: Remove generated-test validation policy now owned by the service; retain
+    local pytest, filesystem, and Git helpers.
+  rationale: Keep the agent module responsible for execution mechanics only.
+- path: src/powdrr_lift/workrr/execute_pr_tests.py
+  type: modified
+  span:
+    start_line: 8
+    end_line: 8
+  summary: Remove generated-test validation policy now owned by the service; retain
+    local pytest, filesystem, and Git helpers.
+  rationale: Keep the agent module responsible for execution mechanics only.
+- path: src/powdrr_lift/workrr/execute_pr_tests.py
+  type: modified
+  span:
+    start_line: 16
+    end_line: 16
+  summary: Remove generated-test validation policy now owned by the service; retain
+    local pytest, filesystem, and Git helpers.
+  rationale: Keep the agent module responsible for execution mechanics only.
+- path: src/powdrr_lift/workrr/execute_pr_tests.py
+  type: modified
+  span:
+    start_line: 23
+    end_line: 308
+  summary: Remove generated-test validation policy now owned by the service; retain
+    local pytest, filesystem, and Git helpers.
+  rationale: Keep the agent module responsible for execution mechanics only.
+- path: src/powdrr_lift/workrr/execute_pr_tests.py
+  type: modified
+  span:
+    start_line: 444
+    end_line: 461
+  summary: Remove generated-test validation policy now owned by the service; retain
+    local pytest, filesystem, and Git helpers.
+  rationale: Keep the agent module responsible for execution mechanics only.
+- path: src/powdrr_lift/workrr/execute_pr_tests.py
+  type: modified
+  span:
+    start_line: 468
+    end_line: 468
+  summary: Remove generated-test validation policy now owned by the service; retain
+    local pytest, filesystem, and Git helpers.
+  rationale: Keep the agent module responsible for execution mechanics only.
+- path: src/powdrr_lift/workrr/execute_pr_tests.py
+  type: modified
+  span:
+    start_line: 470
+    end_line: 471
+  summary: Remove generated-test validation policy now owned by the service; retain
+    local pytest, filesystem, and Git helpers.
+  rationale: Keep the agent module responsible for execution mechanics only.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 65
+    end_line: 73
+  summary: Use service validation functions when authoring, correcting, and recording
+    execute-PR integration tests.
+  rationale: Route generated-test acceptance through the service boundary.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 139
+    end_line: 139
+  summary: Use service validation functions when authoring, correcting, and recording
+    execute-PR integration tests.
+  rationale: Route generated-test acceptance through the service boundary.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 141
+    end_line: 141
+  summary: Use service validation functions when authoring, correcting, and recording
+    execute-PR integration tests.
+  rationale: Route generated-test acceptance through the service boundary.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 143
+    end_line: 143
+  summary: Use service validation functions when authoring, correcting, and recording
+    execute-PR integration tests.
+  rationale: Route generated-test acceptance through the service boundary.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 145
+    end_line: 147
+  summary: Use service validation functions when authoring, correcting, and recording
+    execute-PR integration tests.
+  rationale: Route generated-test acceptance through the service boundary.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 1756
+    end_line: 1756
+  summary: Use service validation functions when authoring, correcting, and recording
+    execute-PR integration tests.
+  rationale: Route generated-test acceptance through the service boundary.
+- path: tests/test_execute_pr_test_authoring.py
+  type: modified
+  span:
+    start_line: 13
+    end_line: 16
+  summary: Exercise correction validation through the service API.
+  rationale: Keep coverage for bounded correction paths and acceptance-criterion links.
+- path: tests/test_execute_pr_test_authoring.py
+  type: modified
+  span:
+    start_line: 17
+    end_line: 20
+  summary: Exercise correction validation through the service API.
+  rationale: Keep coverage for bounded correction paths and acceptance-criterion links.
+- path: tests/test_execute_pr_test_authoring.py
+  type: modified
+  span:
+    start_line: 62
+    end_line: 64
+  summary: Exercise correction validation through the service API.
+  rationale: Keep coverage for bounded correction paths and acceptance-criterion links.
+- path: tests/test_execute_pr_test_authoring.py
+  type: modified
+  span:
+    start_line: 70
+    end_line: 72
+  summary: Exercise correction validation through the service API.
+  rationale: Keep coverage for bounded correction paths and acceptance-criterion links.
+- path: tests/test_execute_pr_tests.py
+  type: modified
+  span:
+    start_line: 12
+    end_line: 20
+  summary: Run existing generated-test policy tests directly against the service implementation.
+  rationale: Verify the moved contract rather than a local duplicate.
+- path: tests/test_execute_pr_tests.py
+  type: modified
+  span:
+    start_line: 17
+    end_line: 17
+  summary: Run existing generated-test policy tests directly against the service implementation.
+  rationale: Verify the moved contract rather than a local duplicate.
+- path: tests/test_execute_pr_tests.py
+  type: modified
+  span:
+    start_line: 19
+    end_line: 20
+  summary: Run existing generated-test policy tests directly against the service implementation.
+  rationale: Verify the moved contract rather than a local duplicate.
+- path: tests/test_execute_pr_tests.py
+  type: modified
+  span:
+    start_line: 23
+    end_line: 23
+  summary: Run existing generated-test policy tests directly against the service implementation.
+  rationale: Verify the moved contract rather than a local duplicate.
+- path: tests/test_execute_pr_tests.py
+  type: modified
+  span:
+    start_line: 25
+    end_line: 26
+  summary: Run existing generated-test policy tests directly against the service implementation.
+  rationale: Verify the moved contract rather than a local duplicate.
+- path: tests/test_execute_pr_tests.py
+  type: modified
+  span:
+    start_line: 60
+    end_line: 62
+  summary: Run existing generated-test policy tests directly against the service implementation.
+  rationale: Verify the moved contract rather than a local duplicate.
+- path: tests/test_execute_pr_tests.py
+  type: modified
+  span:
+    start_line: 78
+    end_line: 80
+  summary: Run existing generated-test policy tests directly against the service implementation.
+  rationale: Verify the moved contract rather than a local duplicate.
+- path: tests/test_execute_pr_tests.py
+  type: modified
+  span:
+    start_line: 135
+    end_line: 137
+  summary: Run existing generated-test policy tests directly against the service implementation.
+  rationale: Verify the moved contract rather than a local duplicate.
+- path: tests/test_execute_pr_tests.py
+  type: modified
+  span:
+    start_line: 145
+    end_line: 147
+  summary: Run existing generated-test policy tests directly against the service implementation.
+  rationale: Verify the moved contract rather than a local duplicate.
+- path: tests/test_execute_pr_tests.py
+  type: modified
+  span:
+    start_line: 155
+    end_line: 155
+  summary: Run existing generated-test policy tests directly against the service implementation.
+  rationale: Verify the moved contract rather than a local duplicate.
+- path: tests/test_execute_pr_tests.py
+  type: modified
+  span:
+    start_line: 174
+    end_line: 176
+  summary: Run existing generated-test policy tests directly against the service implementation.
+  rationale: Verify the moved contract rather than a local duplicate.
+- path: tests/test_execute_pr_tests.py
+  type: modified
+  span:
+    start_line: 207
+    end_line: 207
+  summary: Run existing generated-test policy tests directly against the service implementation.
+  rationale: Verify the moved contract rather than a local duplicate.
+entities:
+- id: execute-pr-test-validation-policy
+  type: Module
+  action: added
+- id: execute-pr-test-suite-validation
+  type: Function
+  action: added
+entity_relationships:
+- id: test-validation-policy-in-service
+  type: part_of
+  source: execute-pr-test-suite-validation
+  target: execute-pr-test-validation-policy
+  action: added
+  description: The service verification module owns deterministic generated-test validation
+    and evidence parsing.
+invariants:
+- id: generated-test-policy-runs-in-service
+  description: The service defines generated-test path, source, obligation-coverage,
+    correction, and pytest-evidence acceptance rules; the local agent executes commands
+    and performs filesystem and Git operations.
+  action: added
+guidance: []
+features: []
+proposed_prs: []

@@ -7,20 +7,6 @@ intent:
 human-decisions: []
 structured_files: []
 files:
-- path: docs/changelogs/PR-1292-changelog.yaml
-  type: modified
-  span:
-    start_line: 1
-    end_line: 187
-  summary: Update planning behavior and its regression coverage.
-  rationale: Keep the planning contract deterministic, bounded, and replayable.
-- path: docs/design/browser-workspace-api.md
-  type: modified
-  span:
-    start_line: 94
-    end_line: 113
-  summary: Update planning behavior and its regression coverage.
-  rationale: Keep the planning contract deterministic, bounded, and replayable.
 - path: packages/local/src/powdrr_local/planning/checkpoints.py
   type: modified
   span:
@@ -84,20 +70,6 @@ files:
     end_line: 759
   summary: Aggregate bounded planning-call, deterministic-decision, pagination, and repository-search telemetry.
   rationale: Keep compact cost and search summaries local without exposing journal answer content.
-- path: packages/local/src/powdrr_local/workspace_api.py
-  type: modified
-  span:
-    start_line: 81
-    end_line: 86
-  summary: Update planning behavior and its regression coverage.
-  rationale: Keep the planning contract deterministic, bounded, and replayable.
-- path: packages/local/src/powdrr_local/workspace_api.py
-  type: modified
-  span:
-    start_line: 617
-    end_line: 678
-  summary: Update planning behavior and its regression coverage.
-  rationale: Keep the planning contract deterministic, bounded, and replayable.
 - path: packages/service/src/powdrr_service/planning/assembly.py
   type: modified
   span:
@@ -1062,8 +1034,8 @@ files:
   span:
     start_line: 301
     end_line: 338
-  summary: Cover explicit producer-output references and requirement-related dependency candidates.
-  rationale: Prove dependency discovery catches concrete non-lexical edges while retaining a bounded candidate set.
+  summary: Cover explicit producer-output references, related requirements, and transitive dependency chains.
+  rationale: Prove discovery finds known multi-step edges with concrete evidence while excluding unrelated pairs.
 - path: tests/test_planning_service.py
   type: modified
   span:
@@ -1253,139 +1225,6 @@ files:
     end_line: 1346
   summary: Cover batching, deterministic dispositions, Structrr path bindings, and retry telemetry.
   rationale: Exercise nontrivial planning responses and ensure candidate ownership and terminal answer state survive the service path.
-- path: tests/test_workspace_api.py
-  type: modified
-  span:
-    start_line: 8
-    end_line: 8
-  summary: Update planning behavior and its regression coverage.
-  rationale: Keep the planning contract deterministic, bounded, and replayable.
-- path: tests/test_workspace_api.py
-  type: modified
-  span:
-    start_line: 113
-    end_line: 179
-  summary: Update planning behavior and its regression coverage.
-  rationale: Keep the planning contract deterministic, bounded, and replayable.
-- path: ui/src/App.css
-  type: modified
-  span:
-    start_line: 250
-    end_line: 270
-  summary: Update planning behavior and its regression coverage.
-  rationale: Keep the planning contract deterministic, bounded, and replayable.
-- path: ui/src/App.css
-  type: modified
-  span:
-    start_line: 370
-    end_line: 370
-  summary: Update planning behavior and its regression coverage.
-  rationale: Keep the planning contract deterministic, bounded, and replayable.
-- path: ui/src/App.test.tsx
-  type: modified
-  span:
-    start_line: 5
-    end_line: 5
-  summary: Update planning behavior and its regression coverage.
-  rationale: Keep the planning contract deterministic, bounded, and replayable.
-- path: ui/src/App.test.tsx
-  type: modified
-  span:
-    start_line: 17
-    end_line: 17
-  summary: Update planning behavior and its regression coverage.
-  rationale: Keep the planning contract deterministic, bounded, and replayable.
-- path: ui/src/App.test.tsx
-  type: modified
-  span:
-    start_line: 77
-    end_line: 77
-  summary: Update planning behavior and its regression coverage.
-  rationale: Keep the planning contract deterministic, bounded, and replayable.
-- path: ui/src/App.test.tsx
-  type: modified
-  span:
-    start_line: 129
-    end_line: 192
-  summary: Update planning behavior and its regression coverage.
-  rationale: Keep the planning contract deterministic, bounded, and replayable.
-- path: ui/src/App.tsx
-  type: modified
-  span:
-    start_line: 8
-    end_line: 8
-  summary: Update planning behavior and its regression coverage.
-  rationale: Keep the planning contract deterministic, bounded, and replayable.
-- path: ui/src/App.tsx
-  type: modified
-  span:
-    start_line: 109
-    end_line: 109
-  summary: Update planning behavior and its regression coverage.
-  rationale: Keep the planning contract deterministic, bounded, and replayable.
-- path: ui/src/App.tsx
-  type: modified
-  span:
-    start_line: 359
-    end_line: 378
-  summary: Update planning behavior and its regression coverage.
-  rationale: Keep the planning contract deterministic, bounded, and replayable.
-- path: ui/src/App.tsx
-  type: modified
-  span:
-    start_line: 495
-    end_line: 495
-  summary: Update planning behavior and its regression coverage.
-  rationale: Keep the planning contract deterministic, bounded, and replayable.
-- path: ui/src/App.tsx
-  type: modified
-  span:
-    start_line: 522
-    end_line: 522
-  summary: Update planning behavior and its regression coverage.
-  rationale: Keep the planning contract deterministic, bounded, and replayable.
-- path: ui/src/api/client.ts
-  type: modified
-  span:
-    start_line: 7
-    end_line: 7
-  summary: Update planning behavior and its regression coverage.
-  rationale: Keep the planning contract deterministic, bounded, and replayable.
-- path: ui/src/api/client.ts
-  type: modified
-  span:
-    start_line: 37
-    end_line: 37
-  summary: Update planning behavior and its regression coverage.
-  rationale: Keep the planning contract deterministic, bounded, and replayable.
-- path: ui/src/api/client.ts
-  type: modified
-  span:
-    start_line: 141
-    end_line: 165
-  summary: Update planning behavior and its regression coverage.
-  rationale: Keep the planning contract deterministic, bounded, and replayable.
-- path: ui/src/api/types.ts
-  type: modified
-  span:
-    start_line: 44
-    end_line: 60
-  summary: Update planning behavior and its regression coverage.
-  rationale: Keep the planning contract deterministic, bounded, and replayable.
-- path: ui/src/api/types.ts
-  type: modified
-  span:
-    start_line: 50
-    end_line: 50
-  summary: Update planning behavior and its regression coverage.
-  rationale: Keep the planning contract deterministic, bounded, and replayable.
-- path: ui/src/components/QuestionCard.tsx
-  type: modified
-  span:
-    start_line: 1
-    end_line: 213
-  summary: Update planning behavior and its regression coverage.
-  rationale: Keep the planning contract deterministic, bounded, and replayable.
 entities:
 - id: planning-question-frontier
   type: Workflow
@@ -1398,12 +1237,13 @@ entities:
   action: added
 - id: planning-efficiency-test-suite
   type: Test suite
+  action: added
 - id: planning-structrr-candidate-binding
   type: Module
-  action: modified
+  action: added
 - id: planning-dependency-candidate-discovery
   type: Module
-  action: modified
+  action: added
 - id: planning-item-description-contract
   type: Technical specification
   action: added

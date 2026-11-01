@@ -283,9 +283,9 @@ from powdrr_lift.workrr.prompt_benchmark_comparison import (
     PromptBenchmarkComparisonError,
     compare_prompt_benchmark,
 )
-from powdrr_lift.workrr.provider_runtime import resolve_workflow_provider
-from powdrr_lift.workrr.providers import (
+from powdrr_lift.workrr.provider_runtime import (
     build_workflow_client,
+    resolve_workflow_provider,
 )
 from powdrr_lift.workrr.repository_subject_binding import (
     replay_subject_binding_events,

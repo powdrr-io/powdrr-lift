@@ -28,9 +28,7 @@ from powdrr_lift.workrr.jev_classifier import (
     _call_subq,
 )
 from powdrr_lift.workrr.llm import WorkflowLLMHTTPError
-from powdrr_lift.workrr.providers import (
-    build_workflow_client,
-)
+from powdrr_lift.workrr.provider_runtime import build_workflow_client
 
 CredentialResolver = Callable[..., ProviderCredentials]
 ClientBuilder = Callable[..., Any]

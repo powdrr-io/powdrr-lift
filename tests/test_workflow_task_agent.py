@@ -3921,7 +3921,7 @@ def test_workflow_task_client_defaults_to_deepinfra_cheap_model(
             )
 
     monkeypatch.setattr(
-        "powdrr_lift.workrr.providers.OpenAIChatClient",
+        "powdrr_service.providers.clients.OpenAIChatClient",
         _FakeOpenAIClient,
     )
     monkeypatch.setattr(

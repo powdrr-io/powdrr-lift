@@ -5,15 +5,13 @@ from typing import Any, cast
 from urllib.request import Request
 
 import pytest
-
-from powdrr_lift.errors import PowdrrExecutionError
-from powdrr_lift.workrr.protocol import SchemaAwareWorkflowLLMClient
-from powdrr_lift.workrr.providers import (
+from powdrr_service.providers.clients import (
     OpenAIChatClient,
     _read_openai_response,
     _remove_schema_keywords,
     build_provider_client,
 )
+from powdrr_service.providers.errors import ProviderResponseError
 
 
 def test_deepinfra_client_declares_unsupported_schema_keywords() -> None:
@@ -56,14 +54,11 @@ def test_remove_schema_keywords_recursively_copies_schema() -> None:
 def test_deepinfra_request_omits_unique_items_keyword(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    client = cast(
-        SchemaAwareWorkflowLLMClient,
-        build_provider_client(
-            provider="deepinfra-cheap",
-            model="deepseek-ai/DeepSeek-V4-Flash-0731",
-            api_key="test-token",
-            base_url="https://api.deepinfra.com/v1/openai",
-        ),
+    client = build_provider_client(
+        provider="deepinfra-cheap",
+        model="deepseek-ai/DeepSeek-V4-Flash-0731",
+        api_key="test-token",
+        base_url="https://api.deepinfra.com/v1/openai",
     )
     schema: dict[str, Any] = {
         "type": "object",
@@ -85,7 +80,7 @@ def test_deepinfra_request_omits_unique_items_keyword(
         captured.update(json.loads(request.data.decode("utf-8")))
         raise RuntimeError("stop after capturing request")
 
-    monkeypatch.setattr("powdrr_lift.workrr.providers.urlopen", capture_request)
+    monkeypatch.setattr("powdrr_service.providers.clients.urlopen", capture_request)
     with pytest.raises(RuntimeError, match="stop after capturing request"):
         client.complete_json(
             [{"role": "user", "content": "return evidence ids"}],
@@ -127,7 +122,7 @@ def test_empty_provider_response_reports_finish_reason(
             ).encode()
 
     monkeypatch.setattr(
-        "powdrr_lift.workrr.providers.urlopen",
+        "powdrr_service.providers.clients.urlopen",
         lambda *_args, **_kwargs: _Response(),
     )
     client = OpenAIChatClient(
@@ -136,7 +131,7 @@ def test_empty_provider_response_reports_finish_reason(
         base_url="https://api.deepinfra.com/v1/openai",
     )
 
-    with pytest.raises(PowdrrExecutionError, match="finish_reason='length'"):
+    with pytest.raises(ProviderResponseError, match="finish_reason='length'"):
         client.complete_json([{"role": "user", "content": "return json"}])
 
 

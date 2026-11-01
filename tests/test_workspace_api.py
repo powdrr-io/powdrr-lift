@@ -1,9 +1,11 @@
 import asyncio
 import json
 import subprocess
+import time
 from pathlib import Path
 
 from fastapi.testclient import TestClient
+from powdrr_contracts.workspace import MessageRole, TurnState, WorkspaceTurn
 from powdrr_local.web import create_app
 from powdrr_local.workspace import WorkspaceStore
 from powdrr_local.workspace_api import _event_stream
@@ -58,6 +60,69 @@ def test_health_is_public_and_session_bootstrap_is_single_use(tmp_path: Path) ->
     )
     assert response.status_code == 401
     assert response.json()["error"]["code"] == "bootstrap_used"
+
+
+def test_app_lifespan_dispatches_workspace_turns_under_supervisor_lease(
+    tmp_path: Path,
+) -> None:
+    store = WorkspaceStore(tmp_path / "workspace.db")
+    repository_path = tmp_path / "repository"
+    repository_path.mkdir()
+    subprocess.run(
+        ["git", "init", str(repository_path)], check=True, capture_output=True
+    )
+    repository = store.register_repository(repository_path, request_id="register")
+    conversation = store.create_conversation(
+        repository.repository_id, "Design interview"
+    )
+    turn = store.create_turn(
+        conversation.conversation_id,
+        turn_id="turn-lifespan",
+        message_id="message-lifespan",
+        content="Configure the deployment.",
+    )
+
+    class CompletingDispatcher:
+        def dispatch_turn(self, accepted: WorkspaceTurn) -> WorkspaceTurn:
+            running = store.transition_turn(
+                accepted.turn_id,
+                expected_revision=accepted.revision,
+                state=TurnState.RUNNING,
+                run_id="run-lifespan",
+                attempt_id="attempt-lifespan",
+            )
+            message = store.append_message(
+                conversation.conversation_id,
+                message_id="assistant-lifespan",
+                role=MessageRole.ASSISTANT.value,
+                content="The design interview is ready to continue.",
+                turn_id=accepted.turn_id,
+                run_id="run-lifespan",
+                attempt_id="attempt-lifespan",
+            )
+            return store.transition_turn(
+                accepted.turn_id,
+                expected_revision=running.revision,
+                state=TurnState.SUCCEEDED,
+                final_message_id=message.message_id,
+            )
+
+    app = create_app(
+        store=store,
+        bootstrap_secret="bootstrap-secret-value-that-is-at-least-32-characters",
+        expected_origin="http://127.0.0.1:8765",
+        turn_dispatcher=CompletingDispatcher(),
+    )
+    with TestClient(app, base_url="http://127.0.0.1:8765") as client:
+        deadline = time.monotonic() + 5
+        while store.get_turn(turn.turn_id).state is not TurnState.SUCCEEDED:
+            assert time.monotonic() < deadline
+            time.sleep(0.01)
+        health = client.get("/api/v1/health").json()
+        assert health["scheduler"]["turn_dispatch"]["status"] == "running"
+        assert health["scheduler"]["turn_dispatch"]["supervisor_generation"] == 1
+
+    assert store.list_pending_turn_dispatches(repository.repository_id) == ()
 
 
 def test_conversation_mutations_require_origin_and_csrf(tmp_path: Path) -> None:

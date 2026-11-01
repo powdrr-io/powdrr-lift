@@ -1,0 +1,145 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1281
+title: Run workspace chat dispatch from service lifespan
+intent:
+  problem: The durable turn supervisor has no API service lifecycle integration, so accepted chats remain queued unless an external caller dispatches them.
+  goal: Start an optional turn dispatch runtime with the local FastAPI app, use the database supervisor lease across service processes, and expose its status through health.
+human-decisions: []
+structured_files: []
+files:
+- path: packages/local/src/powdrr_local/turn_dispatch_runtime.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 228
+  summary: Run the turn supervisor while the API process is alive and renew its database lease.
+  rationale: Dispatch eligible accepted turns across repositories without filesystem locks and keep an expired or lost lease from starting a second local dispatch.
+- path: packages/local/src/powdrr_local/web.py
+  type: modified
+  span:
+    start_line: 9
+    end_line: 10
+  summary: Import async lifespan support for the FastAPI application.
+  rationale: Manage the optional dispatcher runtime with app startup and shutdown.
+- path: packages/local/src/powdrr_local/web.py
+  type: modified
+  span:
+    start_line: 26
+    end_line: 29
+  summary: Import the dispatch runtime and adapter protocol.
+  rationale: Keep workflow execution injected across the local package boundary.
+- path: packages/local/src/powdrr_local/web.py
+  type: modified
+  span:
+    start_line: 65
+    end_line: 65
+  summary: Accept an optional turn dispatcher in the app factory.
+  rationale: Allow configured service builds to connect durable turn claims to a workflow adapter.
+- path: packages/local/src/powdrr_local/web.py
+  type: modified
+  span:
+    start_line: 94
+    end_line: 115
+  summary: Construct and manage the turn dispatch runtime in the app lifespan.
+  rationale: Start lease-based dispatch on service startup and release ownership when a dispatch safely stops.
+- path: packages/local/src/powdrr_local/web.py
+  type: modified
+  span:
+    start_line: 121
+    end_line: 121
+  summary: Attach the lifespan manager to FastAPI.
+  rationale: Make dispatch lifecycle follow the web service lifecycle.
+- path: packages/local/src/powdrr_local/web.py
+  type: modified
+  span:
+    start_line: 128
+    end_line: 128
+  summary: Expose the dispatch runtime through application state.
+  rationale: Make runtime status available to the health route.
+- path: packages/local/src/powdrr_local/web.py
+  type: modified
+  span:
+    start_line: 263
+    end_line: 263
+  summary: Reuse the selected repository registry for dispatch startup.
+  rationale: Keep repository registration and dispatch discovery on the same registry instance.
+- path: packages/local/src/powdrr_local/workspace_api.py
+  type: modified
+  span:
+    start_line: 10
+    end_line: 10
+  summary: Import the callable type used by the session dependency factory.
+  rationale: Keep the workspace API dependency fully typed.
+- path: packages/local/src/powdrr_local/workspace_api.py
+  type: modified
+  span:
+    start_line: 134
+    end_line: 134
+  summary: Annotate the session dependency factory return type.
+  rationale: Preserve type checking for the API dependency boundary.
+- path: packages/local/src/powdrr_local/workspace_api.py
+  type: modified
+  span:
+    start_line: 215
+    end_line: 215
+  summary: Pass the request context into the health route.
+  rationale: Read the optional runtime status attached to the app.
+- path: packages/local/src/powdrr_local/workspace_api.py
+  type: modified
+  span:
+    start_line: 222
+    end_line: 227
+  summary: Include turn dispatch status in the health response.
+  rationale: Let clients distinguish a configured active or standby supervisor from an unconfigured service.
+- path: tests/test_workspace_api.py
+  type: modified
+  span:
+    start_line: 4
+    end_line: 4
+  summary: Import monotonic timing for the lifespan integration test.
+  rationale: Bound the wait for asynchronous dispatch completion.
+- path: tests/test_workspace_api.py
+  type: modified
+  span:
+    start_line: 8
+    end_line: 8
+  summary: Import workspace turn types for the deterministic adapter.
+  rationale: Model the service-injected dispatcher protocol in the integration test.
+- path: tests/test_workspace_api.py
+  type: modified
+  span:
+    start_line: 65
+    end_line: 127
+  summary: Verify app startup dispatches a queued turn under a supervisor lease.
+  rationale: Cover FastAPI lifespan integration, turn completion, and scheduler health reporting.
+- path: tests/test_minisweagent_inference.py
+  type: modified
+  span:
+    start_line: 109
+    end_line: 109
+  summary: Allow slower hosted runners more time to start the MiniSWE subprocess.
+  rationale: Avoid reporting slow interpreter or model startup as an IPC failure while preserving the test's complete inference and tool-call assertions.
+entities:
+- id: workspace-turn-dispatch-runtime
+  type: Class
+  action: added
+- id: workspace-turn-service-lifespan
+  type: Function
+  action: added
+entity_relationships:
+- id: app-lifespan-runs-turn-runtime
+  type: uses
+  source: workspace-turn-service-lifespan
+  target: workspace-turn-dispatch-runtime
+  action: added
+  description: FastAPI startup and shutdown manage the optional lease-based dispatch runtime.
+invariants:
+- id: one-active-workspace-dispatch-supervisor
+  description: Only the process holding the current database supervisor lease dispatches turns; the lease is renewed while an adapter call is in progress.
+  action: added
+- id: running-turns-require-recovery-before-restart
+  description: The service runtime dispatches accepted turns and answered questions only; running turns are left for the worker ownership recovery path.
+  action: added
+guidance: []
+features: []
+proposed_prs: []

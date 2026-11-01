@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import ast
 import hashlib
 import json
 import os
@@ -42,6 +41,12 @@ from powdrr_service.providers.selection import (
 from powdrr_service.structrr.snapshot import snapshot_digest
 from powdrr_service.verification.execute_pr_test_authoring import (
     build_execute_pr_test_author_prompt,
+)
+from powdrr_service.verification.execute_pr_test_corrections import (
+    ExecutePrTestVerificationError,
+    changed_execute_pr_test_cases,
+    require_behavioral_red_result,
+    require_execute_pr_test_correction_baseline,
 )
 from powdrr_service.verification.execute_pr_test_quality import (
     DECISION_SCHEMA,
@@ -136,7 +141,6 @@ from powdrr_lift.workrr.execute_pr_tests import (
     generated_test_source_paths_under_root,
     install_frozen_test_files,
     pytest_execution_evidence,
-    require_behavioral_red_result,
     run_generated_pytest,
     validate_coverage_references,
     validate_generated_test_files,
@@ -1344,36 +1348,7 @@ def _validate_execute_pr_test_correction(
         test_root=test_root,
     )
 
-    def test_case_fingerprints(files: Mapping[str, str]) -> dict[str, str]:
-        cases: dict[str, str] = {}
-        for path, source in files.items():
-            tree = ast.parse(source)
-            for node in tree.body:
-                if isinstance(
-                    node, (ast.FunctionDef, ast.AsyncFunctionDef)
-                ) and node.name.startswith("test_"):
-                    cases[f"{path}::{node.name}"] = ast.dump(
-                        node, include_attributes=False
-                    )
-        return cases
-
-    original_cases = test_case_fingerprints(original_sources)
-    corrected_cases = test_case_fingerprints(validated)
-    removed_cases = set(original_cases) - set(corrected_cases)
-    if removed_cases:
-        raise ExecutePrTestError(
-            "test correction may not remove generated test cases: "
-            f"{sorted(removed_cases)}"
-        )
-    corrected_test_ids = {
-        test_id
-        for test_id, fingerprint in corrected_cases.items()
-        if original_cases.get(test_id) != fingerprint
-    }
-    if not corrected_test_ids:
-        raise ExecutePrTestError(
-            "test correction must change or add at least one behavior test case"
-        )
+    corrected_test_ids = changed_execute_pr_test_cases(original_sources, validated)
     shutil.rmtree(baseline_worktree, ignore_errors=True)
     try:
         _clone_execute_pr_test_worktree(
@@ -1386,17 +1361,9 @@ def _validate_execute_pr_test_correction(
             paths=tuple(validated),
             timeout_seconds=timeout_seconds,
         )
-        require_behavioral_red_result(baseline_result)
-        output = "\n".join(
-            str(baseline_result.get(key, "")) for key in ("stdout", "stderr")
+        require_execute_pr_test_correction_baseline(
+            baseline_result, corrected_test_ids=corrected_test_ids
         )
-        failed_cases = set(re.findall(r"(?m)^FAILED\s+(\S+::test_\S+)", output))
-        if not corrected_test_ids.issubset(failed_cases):
-            raise ExecutePrTestError(
-                "each corrected test must still fail through its behavior assertion "
-                "on the untouched baseline; "
-                f"missing failures={sorted(corrected_test_ids - failed_cases)}"
-            )
         return validated, coverage, baseline_result
     finally:
         shutil.rmtree(baseline_worktree, ignore_errors=True)
@@ -1779,7 +1746,11 @@ def _author_execute_pr_tests(
                     continue
                 validation_error = None
                 break
-            except (OSError, ExecutePrTestError) as error:
+            except (
+                OSError,
+                ExecutePrTestError,
+                ExecutePrTestVerificationError,
+            ) as error:
                 validation_error = str(error)
         if validation_error is not None or baseline_report is None:
             if quality_repair_fallback is None:

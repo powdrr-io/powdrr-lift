@@ -1,0 +1,322 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1267
+title: Move decision API classifier into service package
+intent:
+  problem: JEV and SubQ network requests, retries, response mapping, and fallback
+    behavior remain in the legacy agent module.
+  goal: Place decision API classifier transports and policy in the service package
+    while keeping workflow callers and behavior intact.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2602
+    end_line: 2602
+  summary: Assign decision API classifier ownership to the service module.
+  rationale: Keep the ownership inventory consistent with the moved implementation.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2797
+    end_line: 2797
+  summary: Assign decision API classifier ownership to the service module.
+  rationale: Keep the ownership inventory consistent with the moved implementation.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2900
+    end_line: 2900
+  summary: Assign decision API classifier ownership to the service module.
+  rationale: Keep the ownership inventory consistent with the moved implementation.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2904
+    end_line: 2905
+  summary: Assign decision API classifier ownership to the service module.
+  rationale: Keep the ownership inventory consistent with the moved implementation.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3063
+    end_line: 3063
+  summary: Assign decision API classifier ownership to the service module.
+  rationale: Keep the ownership inventory consistent with the moved implementation.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3323
+    end_line: 3323
+  summary: Assign decision API classifier ownership to the service module.
+  rationale: Keep the ownership inventory consistent with the moved implementation.
+- path: packages/service/src/powdrr_service/decision_classifier.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 826
+  summary: Implement JEV and SubQ request, batch, retry, response mapping, and fallback
+    behavior.
+  rationale: Keep decision API access and its policy in the private service package
+    without importing agent code.
+- path: science/classifications/routing/evaluate_jev_smoke.py
+  type: modified
+  span:
+    start_line: 19
+    end_line: 19
+  summary: Load classifier implementation from its service-owned path in the smoke
+    evaluator.
+  rationale: Keep the development smoke tool tracking the implementation it exercises.
+- path: science/classifications/routing/evaluate_jev_smoke.py
+  type: modified
+  span:
+    start_line: 21
+    end_line: 21
+  summary: Load classifier implementation from its service-owned path in the smoke
+    evaluator.
+  rationale: Keep the development smoke tool tracking the implementation it exercises.
+- path: science/classifications/routing/evaluate_jev_smoke.py
+  type: modified
+  span:
+    start_line: 232
+    end_line: 234
+  summary: Load classifier implementation from its service-owned path in the smoke
+    evaluator.
+  rationale: Keep the development smoke tool tracking the implementation it exercises.
+- path: science/deepswe/acceptance_templates/production_analysis.py
+  type: modified
+  span:
+    start_line: 16
+    end_line: 16
+  summary: Import the service-owned JEV client for production analysis.
+  rationale: Use the extracted classifier without changing science analysis behavior.
+- path: science/deepswe/acceptance_templates/production_analysis.py
+  type: modified
+  span:
+    start_line: 22
+    end_line: 22
+  summary: Import the service-owned JEV client for production analysis.
+  rationale: Use the extracted classifier without changing science analysis behavior.
+- path: science/deepswe/acceptance_templates/production_analysis.py
+  type: modified
+  span:
+    start_line: 45
+    end_line: 45
+  summary: Import the service-owned JEV client for production analysis.
+  rationale: Use the extracted classifier without changing science analysis behavior.
+- path: science/deepswe/acceptance_templates/repository_planning/run.py
+  type: modified
+  span:
+    start_line: 17
+    end_line: 17
+  summary: Import decision API request helpers from the service module.
+  rationale: Keep repository planning experiments on the same classifier implementation.
+- path: science/deepswe/acceptance_templates/repository_planning/run.py
+  type: modified
+  span:
+    start_line: 23
+    end_line: 24
+  summary: Import decision API request helpers from the service module.
+  rationale: Keep repository planning experiments on the same classifier implementation.
+- path: science/deepswe/acceptance_templates/retrieval_experiment.py
+  type: modified
+  span:
+    start_line: 14
+    end_line: 14
+  summary: Use the service-owned JEV client in retrieval experiments.
+  rationale: Keep evaluation tooling aligned with the runtime classifier.
+- path: science/deepswe/acceptance_templates/retrieval_experiment.py
+  type: modified
+  span:
+    start_line: 16
+    end_line: 17
+  summary: Use the service-owned JEV client in retrieval experiments.
+  rationale: Keep evaluation tooling aligned with the runtime classifier.
+- path: src/powdrr_lift/workrr/credential_check.py
+  type: modified
+  span:
+    start_line: 13
+    end_line: 18
+  summary: Import classifier endpoint constants and checks from service.
+  rationale: Keep preflight credential checks attached to the extracted transport.
+- path: src/powdrr_lift/workrr/credential_check.py
+  type: modified
+  span:
+    start_line: 24
+    end_line: 29
+  summary: Import classifier endpoint constants and checks from service.
+  rationale: Keep preflight credential checks attached to the extracted transport.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 21
+    end_line: 23
+  summary: Resolve the preferred classifier through the service module.
+  rationale: Preserve feature workflow selection with the extracted client.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 131
+    end_line: 133
+  summary: Resolve the preferred classifier through the service module.
+  rationale: Preserve feature workflow selection with the extracted client.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 14
+    end_line: 14
+  summary: Construct the JEV classifier from its service-owned module.
+  rationale: Keep workflow chat behavior while moving classifier ownership.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 37
+    end_line: 37
+  summary: Construct the JEV classifier from its service-owned module.
+  rationale: Keep workflow chat behavior while moving classifier ownership.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 19
+    end_line: 19
+  summary: Import the JEV classifier from service for task orchestration.
+  rationale: Keep task-agent classification using the extracted client.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 147
+    end_line: 147
+  summary: Import the JEV classifier from service for task orchestration.
+  rationale: Keep task-agent classification using the extracted client.
+- path: tests/test_external_contract_research.py
+  type: modified
+  span:
+    start_line: 11
+    end_line: 11
+  summary: Import the service-owned classifier in external contract research tests.
+  rationale: Keep tests exercising the moved classifier implementation.
+- path: tests/test_external_contract_research.py
+  type: modified
+  span:
+    start_line: 25
+    end_line: 25
+  summary: Import the service-owned classifier in external contract research tests.
+  rationale: Keep tests exercising the moved classifier implementation.
+- path: tests/test_external_contract_research.py
+  type: modified
+  span:
+    start_line: 687
+    end_line: 687
+  summary: Import the service-owned classifier in external contract research tests.
+  rationale: Keep tests exercising the moved classifier implementation.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 11
+    end_line: 11
+  summary: Patch the service-owned classifier in plan generation tests.
+  rationale: Keep integration assertions attached to the actual classifier module.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 16
+    end_line: 16
+  summary: Patch the service-owned classifier in plan generation tests.
+  rationale: Keep integration assertions attached to the actual classifier module.
+- path: tests/test_jev_classifier.py
+  type: modified
+  span:
+    start_line: 10
+    end_line: 11
+  summary: Exercise JEV and SubQ behavior from the service classifier module.
+  rationale: Preserve fallback, batching, retries, response validation, and error
+    coverage after relocation.
+- path: tests/test_jev_classifier.py
+  type: modified
+  span:
+    start_line: 295
+    end_line: 295
+  summary: Exercise JEV and SubQ behavior from the service classifier module.
+  rationale: Preserve fallback, batching, retries, response validation, and error
+    coverage after relocation.
+- path: tests/test_jev_classifier.py
+  type: modified
+  span:
+    start_line: 304
+    end_line: 304
+  summary: Exercise JEV and SubQ behavior from the service classifier module.
+  rationale: Preserve fallback, batching, retries, response validation, and error
+    coverage after relocation.
+- path: tests/test_module_boundaries.py
+  type: modified
+  span:
+    start_line: 146
+    end_line: 146
+  summary: Include the service classifier in forbidden-agent-import checks.
+  rationale: Prevent the moved private classifier from regaining agent dependencies.
+- path: tests/test_probe_repair.py
+  type: modified
+  span:
+    start_line: 8
+    end_line: 8
+  summary: Patch the service classifier module in probe repair tests.
+  rationale: Keep repair tests using the extracted decision API client.
+- path: tests/test_probe_repair.py
+  type: modified
+  span:
+    start_line: 11
+    end_line: 11
+  summary: Patch the service classifier module in probe repair tests.
+  rationale: Keep repair tests using the extracted decision API client.
+- path: tests/test_procedrr_chat.py
+  type: modified
+  span:
+    start_line: 11
+    end_line: 12
+  summary: Import the extracted JEV client in workflow chat tests.
+  rationale: Verify service classifier integration with chat orchestration.
+- path: tests/test_procedrr_chat.py
+  type: modified
+  span:
+    start_line: 13
+    end_line: 13
+  summary: Import the extracted JEV client in workflow chat tests.
+  rationale: Verify service classifier integration with chat orchestration.
+entities:
+- id: service-decision-api-classifier
+  type: Module
+  action: added
+- id: jev-subq-classifier-clients
+  type: Class
+  action: added
+- id: decision-api-classifier-tests
+  type: Test suite
+  action: added
+entity_relationships:
+- id: classifier-clients-use-service-provider-fallback
+  type: calls
+  source: jev-subq-classifier-clients
+  target: service-decision-api-classifier
+  action: added
+  description: JEV and SubQ clients share service-owned request, response, batching,
+    and fallback behavior.
+- id: classifier-tests-cover-service-implementation
+  type: verifies
+  source: decision-api-classifier-tests
+  target: service-decision-api-classifier
+  action: modified
+  description: Tests cover classifier behavior at its new service-owned import path.
+invariants:
+- id: decision-api-module-has-no-agent-imports
+  description: The service decision classifier depends on service provider interfaces
+    and does not import agent modules.
+  action: added
+- id: classifier-fallback-semantics-preserved
+  description: Existing JEV and SubQ failure and fallback semantics remain unchanged
+    after relocation.
+  action: altered
+guidance:
+- id: use-service-decision-classifier
+  description: Workflow code should use the service-owned decision classifier implementation.
+  action: added

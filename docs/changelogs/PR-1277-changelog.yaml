@@ -1,5 +1,5 @@
 schema: https://powdrr.io/schema/changelog-v2
-change_id: 1276
+change_id: 1277
 title: Connect durable workspace turns to Procedrr chat
 intent:
   problem: Workspace conversations can persist turns and questions, but accepted turns do not yet run through the Procedrr chat workflow or persist its messages and progress.

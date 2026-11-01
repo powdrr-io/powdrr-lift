@@ -21,12 +21,23 @@ from powdrr_contracts.models import (
     artifact_manifest_digest,
 )
 
+from powdrr_service.providers.inference import (
+    DeepInfraInferenceClient,
+    InferenceClient,
+)
+
 
 class LocalPowdrrService:
     """Reconstruct public artifact state from data supplied by the agent."""
 
-    def __init__(self, *, planning_issue_store: Any | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        planning_issue_store: Any | None = None,
+        inference_client: InferenceClient | None = None,
+    ) -> None:
         self._planning_issue_store = planning_issue_store
+        self._inference_client = inference_client or DeepInfraInferenceClient()
 
     def start(self, request: OperationRequest) -> OperationUpdate:
         if request.operation_kind == "plan":
@@ -429,7 +440,7 @@ class LocalPowdrrService:
         )
 
     def infer(self, request: ChatCompletionRequest) -> ChatCompletionResponse:
-        raise NotImplementedError("provider inference moves in PR 6")
+        return self._inference_client.complete(request)
 
 
 def _git(root: Path, *args: str) -> str:

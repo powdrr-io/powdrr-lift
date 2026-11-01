@@ -3183,6 +3183,18 @@
     },
     {
       "extraction_pr": "6",
+      "internal_imports": [
+        "powdrr_contracts.models",
+        "powdrr_service.providers.errors"
+      ],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/providers/inference.py",
+      "rationale": "OpenAI-compatible MiniSWE inference forwarding through service-held DeepInfra credentials",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "6",
       "internal_imports": [],
       "kind": "python_module",
       "owner": "service",

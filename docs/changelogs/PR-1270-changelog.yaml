@@ -1,0 +1,118 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1270
+title: Implement service-side chat inference forwarding
+intent:
+  problem: The public service inference method is unimplemented, so callers cannot
+    route MiniSWE-compatible chat requests through service-owned provider credentials.
+  goal: Implement bounded OpenAI-compatible chat-completion forwarding through DeepInfra
+    and return validated assistant, tool-call, usage, and provider response data.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3183
+    end_line: 3194
+  summary: Register the service inference provider module in the ownership inventory.
+  rationale: Track ownership and forbidden dependencies for the new service inference
+    implementation.
+- path: packages/service/src/powdrr_service/local_service.py
+  type: modified
+  span:
+    start_line: 24
+    end_line: 28
+  summary: Delegate the public infer operation to an injectable service inference
+    client.
+  rationale: Implement the previously unhandled inference operation without exposing
+    provider credentials to callers.
+- path: packages/service/src/powdrr_service/local_service.py
+  type: modified
+  span:
+    start_line: 33
+    end_line: 38
+  summary: Delegate the public infer operation to an injectable service inference
+    client.
+  rationale: Implement the previously unhandled inference operation without exposing
+    provider credentials to callers.
+- path: packages/service/src/powdrr_service/local_service.py
+  type: modified
+  span:
+    start_line: 40
+    end_line: 40
+  summary: Delegate the public infer operation to an injectable service inference
+    client.
+  rationale: Implement the previously unhandled inference operation without exposing
+    provider credentials to callers.
+- path: packages/service/src/powdrr_service/local_service.py
+  type: modified
+  span:
+    start_line: 443
+    end_line: 443
+  summary: Delegate the public infer operation to an injectable service inference
+    client.
+  rationale: Implement the previously unhandled inference operation without exposing
+    provider credentials to callers.
+- path: packages/service/src/powdrr_service/providers/inference.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 155
+  summary: Forward chat requests to DeepInfra and validate the returned completion.
+  rationale: Keep provider credentials and HTTP transport inside the service while
+    preserving tool calls, usage, and response metadata.
+- path: tests/test_module_boundaries.py
+  type: modified
+  span:
+    start_line: 146
+    end_line: 146
+  summary: Enforce the service-only dependency boundary for inference forwarding.
+  rationale: Prevent provider inference from importing agent modules.
+- path: tests/test_service_inference.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 156
+  summary: Verify request forwarding, response preservation, credential ownership,
+    and malformed/error cases.
+  rationale: Prove the service inference operation and JSON bridge behavior with deterministic
+    provider responses.
+entities:
+- id: deepinfra-chat-inference-client
+  type: Class
+  action: added
+- id: local-service-infer-method
+  type: Method
+  action: added
+- id: service-inference-tests
+  type: Test suite
+  action: added
+entity_relationships:
+- id: local-service-delegates-to-inference-client
+  type: calls
+  source: local-service-infer-method
+  target: deepinfra-chat-inference-client
+  action: added
+  description: The local service forwards validated chat requests through the injected
+    provider client.
+- id: service-inference-tests-verify-forwarding
+  type: verifies
+  source: service-inference-tests
+  target: deepinfra-chat-inference-client
+  action: added
+  description: Deterministic tests cover service-key use, request fields, response
+    data, transport errors, and malformed provider responses.
+invariants:
+- id: inference-secret-stays-service-side
+  description: Provider credentials are read and used by the service inference client
+    and are not included in the public response.
+  action: added
+- id: model-response-preserves-tool-execution-data
+  description: Chat inference responses preserve assistant content, tool calls, finish
+    reason, usage, and provider response metadata.
+  action: added
+guidance:
+- id: invoke-inference-through-service-contract
+  description: Use PowdrrService.infer with the transport-independent chat request
+    contract for model inference.
+  action: added

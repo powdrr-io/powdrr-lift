@@ -789,6 +789,19 @@ def test_question_answers_validate_and_recover_until_delivered(
         message_id="assistant-message-1",
         role="assistant",
         content="I will search product names.",
+        turn_id=turn.turn_id,
+        run_id="run-1",
+        attempt_id="attempt-1",
+        request_id="assistant-response",
+    )
+    activity_sequence = reopened.append_turn_activity(
+        turn.turn_id,
+        run_id="run-1",
+        attempt_id="attempt-1",
+        activity_id="activity-1",
+        kind="stage",
+        data={"stage": "responded"},
+        request_id="stage-response",
     )
     finished = reopened.transition_turn(
         turn.turn_id,
@@ -798,6 +811,31 @@ def test_question_answers_validate_and_recover_until_delivered(
     )
     assert finished.state == TurnState.SUCCEEDED
     assert finished.final_message_id == assistant_message.message_id
+    assert (
+        reopened.append_message(
+            chat.conversation_id,
+            message_id="assistant-message-1",
+            role="assistant",
+            content="I will search product names.",
+            turn_id=turn.turn_id,
+            run_id="run-1",
+            attempt_id="attempt-1",
+            request_id="assistant-response",
+        )
+        == assistant_message
+    )
+    assert (
+        reopened.append_turn_activity(
+            turn.turn_id,
+            run_id="run-1",
+            attempt_id="attempt-1",
+            activity_id="activity-1",
+            kind="stage",
+            data={"stage": "responded"},
+            request_id="stage-response",
+        )
+        == activity_sequence
+    )
 
 
 def test_start_job_operation_persists_inputs_before_marking_job_running(

@@ -76,6 +76,7 @@ class EventType(StrEnum):
     JOB_UPDATED = "job.updated"
     TURN_CREATED = "turn.created"
     TURN_UPDATED = "turn.updated"
+    TURN_ACTIVITY = "turn.activity"
     QUESTION_CREATED = "question.created"
     QUESTION_UPDATED = "question.updated"
     JOB_OPERATION_BOUND = "job.operation_bound"

@@ -125,6 +125,7 @@ def parse_structural_subject_page(
     planned_paths = {write.path for unit in units for write in unit.planned_writes}
     records: list[BoundStructuralSubject] = []
     page_keys: set[tuple[str, str]] = set()
+    page_record_indexes: dict[tuple[str, str], int] = {}
     for index, raw in enumerate(raw_records):
         pointer = f"/records/{index}"
         if not isinstance(raw, Mapping):
@@ -286,9 +287,36 @@ def parse_structural_subject_page(
                     "projected baseline",
                 )
         key = (section, subject_id)
-        if key in page_keys or key in prior_subject_ids:
+        if key in prior_subject_ids:
             raise PlanningContractError(pointer, "subject was already enumerated")
+        if key in page_keys:
+            existing_index = page_record_indexes[key]
+            existing = records[existing_index]
+            if (
+                section != "files"
+                or planned_path not in planned_paths
+                or existing.action != action
+                or existing.is_new != is_new
+            ):
+                raise PlanningContractError(pointer, "subject was already enumerated")
+            # Multiple work units can legitimately plan changes to one shared
+            # file. Keep one structural subject and combine its supporting
+            # units, requirements, and evidence rather than making the model
+            # retry an answer that cannot represent the shared path twice.
+            records[existing_index] = BoundStructuralSubject(
+                subject_id,
+                section,  # type: ignore[arg-type]
+                item_id,
+                action,  # type: ignore[arg-type]
+                tuple(sorted(set(existing.requirement_ids) | set(requirements))),
+                tuple(sorted(set(existing.unit_ids) | set(unit_refs))),
+                tuple(sorted(set(existing.source_refs) | set(refs))),
+                is_new,
+                planned_path,
+            )
+            continue
         page_keys.add(key)
+        page_record_indexes[key] = len(records)
         records.append(
             BoundStructuralSubject(
                 subject_id,

@@ -797,6 +797,53 @@ def test_subject_page_rejects_wrong_cursor_and_duplicate_subject() -> None:
         )
 
 
+def test_subject_page_coalesces_shared_planned_file_across_units() -> None:
+    path = "attestation/scripts/verify-all.sh"
+    units = (
+        _unit(
+            "unit-01",
+            ("req-01",),
+            writes=(PlannedWrite(path, "implementation", "neutral", (), ()),),
+        ),
+        _unit(
+            "unit-02",
+            ("req-02",),
+            writes=(PlannedWrite(path, "implementation", "neutral", (), ()),),
+        ),
+    )
+    records = [
+        {
+            "section": "files",
+            "subject_ref": f"path::{path}",
+            "new_identity_description": None,
+            "action": "added",
+            "requirement_ids": [requirement_id],
+            "unit_ids": [unit_id],
+            "source_refs": [source_ref],
+        }
+        for requirement_id, unit_id, source_ref in (
+            ("req-01", "unit-01", "anchor-01"),
+            ("req-02", "unit-02", "anchor-02"),
+        )
+    ]
+
+    page = _parse_page(
+        _candidate_page(records, has_more=False, next_anchor=None),
+        units=units,
+        requirements={"req-01", "req-02"},
+        source_ids={"anchor-01", "anchor-02"},
+        baseline={"entities": [], "files": []},
+    )
+
+    assert len(page.records) == 1
+    subject = page.records[0]
+    assert subject.subject_id == f"path::{path}"
+    assert subject.action == "added"
+    assert subject.requirement_ids == ("req-01", "req-02")
+    assert subject.unit_ids == ("unit-01", "unit-02")
+    assert subject.source_refs == ("anchor-01", "anchor-02")
+
+
 def test_subject_page_parser_rejects_unknown_existing_reference() -> None:
     with pytest.raises(
         PlanningContractError, match="absent from the projected baseline"

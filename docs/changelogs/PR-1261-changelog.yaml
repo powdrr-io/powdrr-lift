@@ -1,0 +1,41 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1261
+title: Coalesce shared planned file subjects
+intent:
+  problem: Structural subject enumeration rejects a valid answer when separate work units plan changes to the same file.
+  goal: Represent the shared file once while preserving every affected requirement, work unit, and source reference.
+human-decisions: []
+structured_files: []
+files:
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span: {start_line: 128, end_line: 128}
+  summary: Track the record index for each subject on the current page.
+  rationale: Update the original subject deterministically when another work unit references the same planned file.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span: {start_line: 290, end_line: 290}
+  summary: Continue rejecting duplicate subjects already accepted on an earlier page.
+  rationale: Restrict coalescing to duplicate references present together in the same page.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span: {start_line: 292, end_line: 317}
+  summary: Coalesce compatible duplicate planned file subjects within one enumerated page.
+  rationale: Allow multiple work units to support one shared file while preserving requirements and evidence.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span: {start_line: 319, end_line: 319}
+  summary: Save the first record index for a subject in the page.
+  rationale: Keep the shared file's single structural record available for deterministic merging.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span: {start_line: 800, end_line: 846}
+  summary: Cover shared planned files across units and ensure all references are retained.
+  rationale: Reproduce the duplicate file subject that blocked Gaterr plan issue 98.
+entities: []
+entity_relationships: []
+invariants:
+- id: shared-planned-file-subject-coalescing
+  description: Compatible duplicate planned-file subjects in one page become one record containing the union of requirements, units, and source references.
+  action: altered
+guidance: []

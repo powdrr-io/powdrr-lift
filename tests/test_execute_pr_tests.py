@@ -9,21 +9,24 @@ from powdrr_service.verification.execute_pr_test_corrections import (
     ExecutePrTestVerificationError,
     require_behavioral_red_result,
 )
+from powdrr_service.verification.execute_pr_test_validation import (
+    ExecutePrTestAuthoringValidationError,
+    discover_python_test_root,
+    generated_test_source_paths,
+    generated_test_source_paths_under_root,
+    pytest_execution_evidence,
+    validate_coverage_references,
+    validate_generated_test_files,
+)
 
 from powdrr_lift.workrr.coding_agent_validation import ValidationProfile
 from powdrr_lift.workrr.execute_pr_tests import (
     ExecutePrTestError,
     candidate_test_changes,
-    discover_python_test_root,
     fingerprint_test_files,
-    generated_test_source_paths,
-    generated_test_source_paths_under_root,
     install_frozen_test_files,
     pytest_command_for_files,
-    pytest_execution_evidence,
     run_generated_pytest,
-    validate_coverage_references,
-    validate_generated_test_files,
 )
 from powdrr_lift.workrr.test_obligations import (
     ObligationError,
@@ -54,7 +57,9 @@ def test_generated_test_paths_ignore_staged_python_cache_files() -> None:
         )
     ) == ("tests/test_ci_workflow.py",)
 
-    with pytest.raises(ExecutePrTestError, match="no Python test source"):
+    with pytest.raises(
+        ExecutePrTestAuthoringValidationError, match="no Python test source"
+    ):
         generated_test_source_paths(
             ("tests/__pycache__/test_ci_workflow.cpython-312.pyc",)
         )
@@ -70,7 +75,9 @@ def test_generated_test_paths_allow_the_discovered_nested_test_root() -> None:
         test_root="attestation/tests",
     ) == ("attestation/tests/test_ci_workflow.py",)
 
-    with pytest.raises(ExecutePrTestError, match="outside attestation/tests"):
+    with pytest.raises(
+        ExecutePrTestAuthoringValidationError, match="outside attestation/tests"
+    ):
         generated_test_source_paths_under_root(
             (
                 "attestation/tests/test_ci_workflow.py",
@@ -125,7 +132,9 @@ def test_acceptance_criteria_get_deterministic_ids_and_require_test_links() -> N
         "AC-01": ["test_precedence"],
         "AC-02": ["test_rejects_invalid_syntax"],
     }
-    with pytest.raises(ExecutePrTestError, match="every acceptance criterion"):
+    with pytest.raises(
+        ExecutePrTestAuthoringValidationError, match="every acceptance criterion"
+    ):
         validate_coverage_references(
             {
                 "tests/test_parser.py": "# Covers: AC-01 test_precedence\n"
@@ -133,7 +142,9 @@ def test_acceptance_criteria_get_deterministic_ids_and_require_test_links() -> N
             },
             obligations,
         )
-    with pytest.raises(ExecutePrTestError, match="unknown obligation"):
+    with pytest.raises(
+        ExecutePrTestAuthoringValidationError, match="unknown obligation"
+    ):
         validate_coverage_references(
             {
                 "tests/test_parser.py": "# Covers: AC-03 test_precedence\n"
@@ -141,7 +152,7 @@ def test_acceptance_criteria_get_deterministic_ids_and_require_test_links() -> N
             },
             obligations,
         )
-    with pytest.raises(ExecutePrTestError, match="unlinked"):
+    with pytest.raises(ExecutePrTestAuthoringValidationError, match="unlinked"):
         validate_coverage_references(
             {
                 "tests/test_parser.py": "# Covers: AC-01 test_precedence\n"
@@ -160,7 +171,9 @@ def test_pytest_execution_evidence_reports_counts() -> None:
         "counts": {"passed": 14, "skipped": 2},
         "executed": 14,
     }
-    with pytest.raises(ExecutePrTestError, match="no terminal summary"):
+    with pytest.raises(
+        ExecutePrTestAuthoringValidationError, match="no terminal summary"
+    ):
         pytest_execution_evidence({"stdout": "", "stderr": ""})
 
 
@@ -191,7 +204,7 @@ def test_pytest_execution_evidence_reports_counts() -> None:
 def test_generated_test_validation_rejects_non_behavioral_tests(
     path: str, source: str
 ) -> None:
-    with pytest.raises(ExecutePrTestError):
+    with pytest.raises(ExecutePrTestAuthoringValidationError):
         validate_generated_test_files({path: source})
 
 

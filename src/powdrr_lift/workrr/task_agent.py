@@ -62,6 +62,15 @@ from powdrr_service.verification.execute_pr_test_quality import (
     execute_pr_test_review_targets,
     render_execute_pr_test_quality_pr_notes,
 )
+from powdrr_service.verification.execute_pr_test_validation import (
+    ExecutePrTestAuthoringValidationError,
+    discover_python_test_root,
+    generated_test_source_paths_under_root,
+    pytest_execution_evidence,
+    validate_coverage_references,
+    validate_generated_test_files,
+    validate_test_correction,
+)
 
 from powdrr_lift.basedpyright_tools import is_basedpyright_tool
 from powdrr_lift.core import resolve_repo_root
@@ -136,15 +145,9 @@ from powdrr_lift.workrr.error_logging import record_workflow_llm_error
 from powdrr_lift.workrr.execute_pr_tests import (
     ExecutePrTestError,
     candidate_test_changes,
-    discover_python_test_root,
     fingerprint_test_files,
-    generated_test_source_paths_under_root,
     install_frozen_test_files,
-    pytest_execution_evidence,
     run_generated_pytest,
-    validate_coverage_references,
-    validate_generated_test_files,
-    validate_test_correction,
 )
 from powdrr_lift.workrr.execution_loop import (
     _execute_shell_tool,
@@ -1750,6 +1753,7 @@ def _author_execute_pr_tests(
                 OSError,
                 ExecutePrTestError,
                 ExecutePrTestVerificationError,
+                ExecutePrTestAuthoringValidationError,
             ) as error:
                 validation_error = str(error)
         if validation_error is not None or baseline_report is None:

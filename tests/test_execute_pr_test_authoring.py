@@ -10,14 +10,14 @@ import pytest
 from powdrr_service.verification.execute_pr_test_corrections import (
     ExecutePrTestVerificationError,
 )
+from powdrr_service.verification.execute_pr_test_validation import (
+    ExecutePrTestAuthoringValidationError,
+    validate_test_correction,
+)
 
 from powdrr_lift.workrr import task_agent
 from powdrr_lift.workrr.coding_agent import ImplementationRequest
 from powdrr_lift.workrr.coding_agent_validation import ValidationProfile
-from powdrr_lift.workrr.execute_pr_tests import (
-    ExecutePrTestError,
-    validate_test_correction,
-)
 
 
 def _git(root: Path, *args: str) -> str:
@@ -59,13 +59,17 @@ def test_test_correction_preserves_generated_paths_and_acceptance_coverage() -> 
 
 
 def test_test_correction_rejects_added_paths_or_lost_criteria() -> None:
-    with pytest.raises(ExecutePrTestError, match="originally generated"):
+    with pytest.raises(
+        ExecutePrTestAuthoringValidationError, match="originally generated"
+    ):
         validate_test_correction(
             {"tests/test_extra.py": "def test_extra():\n    assert True\n"},
             expected_paths=("tests/test_generated.py",),
             obligations=[{"obligation_id": "AC-01"}],
         )
-    with pytest.raises(ExecutePrTestError, match=r"missing=\['AC-01'\]"):
+    with pytest.raises(
+        ExecutePrTestAuthoringValidationError, match=r"missing=\['AC-01'\]"
+    ):
         validate_test_correction(
             {"tests/test_generated.py": "def test_generated():\n    assert True\n"},
             expected_paths=("tests/test_generated.py",),

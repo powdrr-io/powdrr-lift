@@ -81,20 +81,16 @@ def _proposal(
     return {
         "requirement_ids": ["req-0001"],
         "deliverable": "A focused acceptance test.",
-        "component": "tests",
-        "implementation_runtime": runtime,
         "planned_writes": [
             {
                 "path": path,
                 "role": "test",
-                "runtime": runtime,
                 "source_refs": [anchor],
                 "evidence_ids": [],
             }
         ],
         "implementation_step": "Add the acceptance test for the behavior.",
         "acceptance_criteria": ["The test covers the required behavior."],
-        "validation_ids": ["validation-0001"],
         "required_outputs": [],
     }
 
@@ -157,7 +153,7 @@ def test_actual_python_and_swift_writes_cannot_share_a_unit() -> None:
     context, anchor = _context()
     answer = _proposal(context, anchor)
     python_write = dict(answer["planned_writes"][0])  # type: ignore[index]
-    python_write.update(path="tests/test_helper.py", runtime="python")
+    python_write.update(path="tests/test_helper.py")
     context = replace(
         context,
         repository_paths={
@@ -196,7 +192,7 @@ def test_new_extensionless_data_file_can_be_explicitly_runtime_neutral() -> None
     )
     planned_writes = answer["planned_writes"]
     assert isinstance(planned_writes, list)
-    planned_writes[0]["runtime"] = None
+    planned_writes[0]["role"] = "configuration"
 
     proposal = parse_work_unit_proposal(answer, context=context)
 
@@ -220,7 +216,7 @@ def test_platform_data_file_extensions_are_runtime_neutral(path: str) -> None:
     answer = _proposal(context, anchor, path=path, runtime="neutral")
     planned_writes = answer["planned_writes"]
     assert isinstance(planned_writes, list)
-    planned_writes[0]["runtime"] = None
+    planned_writes[0]["role"] = "configuration"
 
     proposal = parse_work_unit_proposal(answer, context=context)
 
@@ -243,7 +239,7 @@ def test_gitkeep_is_neutral_inside_a_source_named_directory() -> None:
     context = replace(context, requirements={requirement.id: requirement})
     answer = _proposal(context, anchor, path=path, runtime="neutral")
     answer["planned_writes"][0]["source_refs"] = [path_anchor]  # type: ignore[index]
-    answer["planned_writes"][0]["runtime"] = None  # type: ignore[index]
+    answer["planned_writes"][0]["role"] = "configuration"  # type: ignore[index]
 
     proposal = parse_work_unit_proposal(answer, context=context)
 
@@ -407,8 +403,11 @@ def test_work_unit_question_has_a_parser_valid_example_and_exact_context() -> No
 
     request.validate()
     assert request.question.kind == "propose_work_units"
+    assert request.question.contract_version == 2
+    assert request.question.expected_answer_schema == "work-unit-proposals-v2"
+    assert request.question.question_id.startswith("propose-units-v2-")
     assert "requirement's own source_refs" in request.exact_question
-    assert "runtime to null for non-executable artifacts" in request.exact_question
+    assert "runtime are derived" in request.exact_question
     assert "If every supplied requirement is covered" in request.exact_question
     assert (
         "requirements remain uncovered" in request.answer_field_definitions["has_more"]
@@ -418,9 +417,9 @@ def test_work_unit_question_has_a_parser_valid_example_and_exact_context() -> No
         == MAX_WORK_UNIT_PROPOSALS_PER_PAGE
     )
     record_schema = request.answer_schema["properties"]["records"]["items"]
-    assert record_schema["properties"]["validation_ids"]["items"]["enum"] == [
-        "validation-0001"
-    ]
+    assert "component" not in record_schema["properties"]
+    assert "implementation_runtime" not in record_schema["properties"]
+    assert "validation_ids" not in record_schema["properties"]
     assert MAX_WORK_UNIT_REQUIREMENTS_PER_QUESTION == 4
     with pytest.raises(PlanningContractError, match="must contain"):
         request.parse_answer(
@@ -436,13 +435,6 @@ def test_work_unit_question_has_a_parser_valid_example_and_exact_context() -> No
             context,
             ["req-0001"] * 5,
             valid_example=example,
-        )
-
-    prefixed_validation = dict(example_proposal)
-    prefixed_validation["validation_ids"] = ["validation:validation-0001"]
-    with pytest.raises(PlanningContractError, match="unknown references"):
-        request.parse_answer(
-            {"records": [prefixed_validation], "has_more": False, "next_anchor": None}
         )
 
     second_requirement = replace(context.requirements["req-0001"], id="req-0002")
@@ -598,12 +590,9 @@ def test_work_unit_continuation_only_includes_uncovered_requirements(
     assert set(example_records[0]) == {
         "requirement_ids",
         "deliverable",
-        "component",
-        "implementation_runtime",
         "planned_writes",
         "implementation_step",
         "acceptance_criteria",
-        "validation_ids",
         "required_outputs",
     }
     proposals = []
@@ -741,7 +730,7 @@ def test_cohesion_split_can_allocate_one_requirement_to_multiple_units() -> None
     split = {
         "decision": "split",
         "reason": "Implementation and focused acceptance test are separate steps.",
-        "replacements": [proposal.to_data(), proposal.to_data()],
+        "replacements": [_proposal(context, anchor), _proposal(context, anchor)],
     }
 
     from powdrr_service.planning.assembly import parse_cohesion_decision

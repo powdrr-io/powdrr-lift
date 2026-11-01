@@ -16,7 +16,11 @@ from powdrr_service.planning.contracts import (
     PlanningContractError,
     Question,
 )
-from powdrr_service.planning.driver import SourceLedgerQuestionMachine
+from powdrr_service.planning.driver import (
+    SourceLedgerQuestionMachine,
+    _deterministic_block_disposition,
+    _is_completed_zero_hit_search,
+)
 from powdrr_service.planning.questions import (
     QuestionRequest,
     SourceExcerpt,
@@ -132,20 +136,16 @@ class _PlanningScriptClient:
                     {
                         "requirement_ids": ["req-0001"],
                         "deliverable": "Implement the requested behavior.",
-                        "component": "repository",
-                        "implementation_runtime": "neutral",
                         "planned_writes": [
                             {
                                 "path": "src/behavior.txt",
                                 "role": "implementation",
-                                "runtime": None,
                                 "source_refs": [anchor_ref],
                                 "evidence_ids": [],
                             }
                         ],
                         "implementation_step": "Implement and verify the behavior.",
                         "acceptance_criteria": ["The behavior is implemented."],
-                        "validation_ids": ["validation-0001"],
                         "required_outputs": [],
                     }
                 ],
@@ -579,7 +579,7 @@ def test_oversized_work_unit_answer_replays_as_a_smaller_question_group() -> Non
         subject_ids=("req-0057", "req-0058", "req-0059", "req-0060"),
         input_digest="sha256:" + "0" * 64,
         context_ref_ids=(),
-        expected_answer_schema="work-unit-proposals-v1",
+        expected_answer_schema="work-unit-proposals-v2",
         attempt=1,
     )
     event = PlanningCheckpoint.needs_answer(
@@ -602,7 +602,7 @@ def test_oversized_work_unit_answer_replays_as_a_smaller_question_group() -> Non
         subject_ids=("req-0058",),
         input_digest="sha256:" + "1" * 64,
         context_ref_ids=(),
-        expected_answer_schema="work-unit-proposals-v1",
+        expected_answer_schema="work-unit-proposals-v2",
         attempt=1,
     )
     single_event = PlanningCheckpoint.needs_answer(
@@ -906,7 +906,14 @@ def test_source_question_machine_accounts_for_normative_and_context_blocks() -> 
         block.anchor_ids[0] for block in source.blocks if "Implement" in block.text
     )
 
-    while (request := machine.next_question(answers)) is not None:
+    while True:
+        for deterministic in machine.deterministic_answers(answers):
+            answers[deterministic["question"].question_id] = dict(
+                deterministic["answer"]
+            )
+        request = machine.next_question(answers)
+        if request is None:
+            break
         question = request.question
         if question.kind == "extract_requirements":
             block = block_by_id[question.subject_ids[0]]
@@ -923,41 +930,22 @@ def test_source_question_machine_accounts_for_normative_and_context_blocks() -> 
                 else []
             )
             answer = {"records": records, "has_more": False, "next_anchor": None}
-        elif question.kind == "classify_source_block":
-            block = block_by_id[question.subject_ids[0]]
-            if "Implement" in block.text:
-                answer = {"disposition": "normative", "requirement_ids": ["req-0001"]}
-            else:
-                answer = {"disposition": "context", "reason": "Background information."}
-        elif question.kind == "assess_requirement_coverage":
-            request.validate()
-            assert request.repository_evidence[-1].ref_id == "repository-search"
-            assert request.repository_evidence[-1].value["terms"] == ["behavior"]
-            answer = {
-                "status": "missing",
-                "evidence_ids": [],
-                "reason": "No supplied repository evidence implements it.",
-            }
         elif question.kind == "propose_work_units":
             answer = {
                 "records": [
                     {
                         "requirement_ids": ["req-0001"],
                         "deliverable": "Implement the requested behavior.",
-                        "component": "repository",
-                        "implementation_runtime": "neutral",
                         "planned_writes": [
                             {
                                 "path": "src/behavior.txt",
                                 "role": "implementation",
-                                "runtime": None,
                                 "source_refs": [requirement_anchor],
                                 "evidence_ids": [],
                             }
                         ],
                         "implementation_step": "Implement and verify the behavior.",
                         "acceptance_criteria": ["The behavior is implemented."],
-                        "validation_ids": ["validation-0001"],
                         "required_outputs": [
                             {
                                 "description": "The behavior contract.",
@@ -970,20 +958,16 @@ def test_source_question_machine_accounts_for_normative_and_context_blocks() -> 
                         "deliverable": (
                             "Test the requested behavior in src/behavior.txt."
                         ),
-                        "component": "repository",
-                        "implementation_runtime": "neutral",
                         "planned_writes": [
                             {
                                 "path": "src/test.txt",
                                 "role": "test",
-                                "runtime": None,
                                 "source_refs": [requirement_anchor],
                                 "evidence_ids": [],
                             }
                         ],
                         "implementation_step": "Add a focused behavior test.",
                         "acceptance_criteria": ["The behavior is tested."],
-                        "validation_ids": ["validation-0001"],
                         "required_outputs": [],
                     },
                 ],
@@ -1048,6 +1032,68 @@ def test_source_question_machine_accounts_for_normative_and_context_blocks() -> 
     assert searched_requirements == ["req-0001"]
 
 
+def test_source_dispositions_are_derived_only_for_unambiguous_cases() -> None:
+    normative = _deterministic_block_disposition(
+        block_id="block-1",
+        direct_ids=("req-0001", "req-0002"),
+        related_ids=(),
+        prior_direct_ids=(),
+        has_exact_duplicate=False,
+    )
+    assert normative is not None
+    assert normative[0]["disposition"] == "normative"
+    assert normative[0]["requirement_ids"] == ["req-0001", "req-0002"]
+
+    context = _deterministic_block_disposition(
+        block_id="block-2",
+        direct_ids=(),
+        related_ids=(),
+        prior_direct_ids=(),
+        has_exact_duplicate=False,
+    )
+    assert context is not None and context[0]["disposition"] == "context"
+
+    duplicate = _deterministic_block_disposition(
+        block_id="block-3",
+        direct_ids=(),
+        related_ids=(),
+        prior_direct_ids=(("req-0001",),),
+        has_exact_duplicate=True,
+    )
+    assert duplicate is not None and duplicate[0]["disposition"] == "duplicate"
+
+    related_only = _deterministic_block_disposition(
+        block_id="block-4",
+        direct_ids=(),
+        related_ids=("req-0001",),
+        prior_direct_ids=(),
+        has_exact_duplicate=False,
+    )
+    ambiguous_duplicate = _deterministic_block_disposition(
+        block_id="block-5",
+        direct_ids=(),
+        related_ids=(),
+        prior_direct_ids=(("req-0001",), ("req-0002",)),
+        has_exact_duplicate=True,
+    )
+    assert related_only is None
+    assert ambiguous_duplicate is None
+
+
+def test_zero_hit_coverage_requires_complete_pinned_search_metadata() -> None:
+    complete = RequirementEvidenceSearch((), (), 0, 0, "a" * 40)
+    incomplete = RequirementEvidenceSearch(
+        (), (), 0, 0, "a" * 40, basedpyright_available=False
+    )
+    positive_count = RequirementEvidenceSearch(
+        (), (), 1, 0, "a" * 40, basedpyright_available=True
+    )
+    assert _is_completed_zero_hit_search(complete, pinned_commit="a" * 40)
+    assert not _is_completed_zero_hit_search(incomplete, pinned_commit="a" * 40)
+    assert not _is_completed_zero_hit_search(positive_count, pinned_commit="a" * 40)
+    assert not _is_completed_zero_hit_search(complete, pinned_commit="b" * 40)
+
+
 def test_procedrr_runs_real_planning_machine_through_compiled_artifacts() -> None:
     text = (
         "# Plan\n\nImplement the requested behavior in src/behavior.txt.\n\n"
@@ -1064,6 +1110,12 @@ def test_procedrr_runs_real_planning_machine_through_compiled_artifacts() -> Non
     source = segment_markdown_source(source_document)
     machine = SourceLedgerQuestionMachine(
         source,
+        evidence_search=lambda requirements: {
+            requirement.id: RequirementEvidenceSearch(
+                (), (), 0, 0, source_document.commit_sha
+            )
+            for requirement in requirements
+        },
         verification_command="make test",
         plan_id="bounded-plan",
         structrr_baseline={
@@ -1108,19 +1160,27 @@ def test_procedrr_runs_real_planning_machine_through_compiled_artifacts() -> Non
         store.load().events[-1].payload.get("validation_result")
     )
     assert provider.calls == [
-        "extract_requirements",
-        "extract_requirements",
-        "extract_requirements",
-        "classify_source_block",
-        "classify_source_block",
-        "classify_source_block",
+        "planning_question_batch",
         "check_requirement_fidelity",
-        "assess_requirement_coverage",
         "propose_work_units",
         "describe_item",
         "enumerate_structural_subjects",
     ]
     journal = store.load()
+    deterministic_events = [
+        event
+        for event in journal.events
+        if event.event_type == "answer_accepted"
+        and event.payload.get("validation_result", {}).get("origin") == "deterministic"
+    ]
+    assert {event.payload["question"]["kind"] for event in deterministic_events} == {
+        "classify_source_block",
+        "assess_requirement_coverage",
+    }
+    assert any(
+        event.payload["validation_result"]["rule_id"] == "completed-zero-hit-search-v1"
+        for event in deterministic_events
+    )
     accepted = {
         str(event.payload["question"]["question_id"]): dict(
             event.payload["accepted_answer"]
@@ -1138,3 +1198,22 @@ def test_procedrr_runs_real_planning_machine_through_compiled_artifacts() -> Non
     )
     assert compiled.ready_item_ids == ("item-0001",)
     assert len(compiled.files) == 3
+    accepted_questions = [
+        event.payload["question"]
+        for event in journal.events
+        if event.event_type == "answer_accepted"
+    ]
+    assert (
+        sum(
+            question["kind"] == "extract_requirements"
+            for question in accepted_questions
+        )
+        == 3
+    )
+    assert (
+        sum(
+            question["kind"] == "classify_source_block"
+            for question in accepted_questions
+        )
+        == 3
+    )

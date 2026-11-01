@@ -39,7 +39,6 @@ MAX_WORK_UNIT_PROPOSALS_PER_PAGE = 3
 MAX_ITEM_CRITERIA = 5
 MAX_ITEM_SCOPE_ENTRIES = 3
 _ROLES = frozenset({"implementation", "test", "configuration", "documentation"})
-_RUNTIME_VALUES = frozenset({*CANONICAL_RUNTIMES, "neutral"})
 _NEUTRAL_SUFFIXES = frozenset(
     {
         ".cfg",
@@ -84,12 +83,9 @@ WORK_UNIT_PROPOSAL_PAGE_JSON_SCHEMA: dict[str, Any] = {
                 "required": [
                     "requirement_ids",
                     "deliverable",
-                    "component",
-                    "implementation_runtime",
                     "planned_writes",
                     "implementation_step",
                     "acceptance_criteria",
-                    "validation_ids",
                     "required_outputs",
                 ],
                 "properties": {
@@ -103,11 +99,6 @@ WORK_UNIT_PROPOSAL_PAGE_JSON_SCHEMA: dict[str, Any] = {
                         "minLength": 1,
                         "maxLength": 1_000,
                     },
-                    "component": {"type": "string", "minLength": 1, "maxLength": 120},
-                    "implementation_runtime": {
-                        "type": "string",
-                        "enum": sorted(_RUNTIME_VALUES),
-                    },
                     "planned_writes": {
                         "type": "array",
                         "minItems": 1,
@@ -115,13 +106,7 @@ WORK_UNIT_PROPOSAL_PAGE_JSON_SCHEMA: dict[str, Any] = {
                         "items": {
                             "type": "object",
                             "additionalProperties": False,
-                            "required": [
-                                "path",
-                                "role",
-                                "runtime",
-                                "source_refs",
-                                "evidence_ids",
-                            ],
+                            "required": ["path", "role", "source_refs", "evidence_ids"],
                             "properties": {
                                 "path": {
                                     "type": "string",
@@ -129,10 +114,6 @@ WORK_UNIT_PROPOSAL_PAGE_JSON_SCHEMA: dict[str, Any] = {
                                     "maxLength": 500,
                                 },
                                 "role": {"type": "string", "enum": sorted(_ROLES)},
-                                "runtime": {
-                                    "type": ["string", "null"],
-                                    "enum": [*sorted(CANONICAL_RUNTIMES), None],
-                                },
                                 "source_refs": {
                                     "type": "array",
                                     "minItems": 1,
@@ -155,11 +136,6 @@ WORK_UNIT_PROPOSAL_PAGE_JSON_SCHEMA: dict[str, Any] = {
                         "minItems": 1,
                         "maxItems": MAX_WORK_UNIT_CRITERIA,
                         "items": {"type": "string", "minLength": 1},
-                    },
-                    "validation_ids": {
-                        "type": "array",
-                        "minItems": 1,
-                        "items": {"type": "string"},
                     },
                     "required_outputs": {
                         "type": "array",
@@ -377,12 +353,9 @@ def parse_work_unit_proposal(
     expected = {
         "requirement_ids",
         "deliverable",
-        "component",
-        "implementation_runtime",
         "planned_writes",
         "implementation_step",
         "acceptance_criteria",
-        "validation_ids",
         "required_outputs",
     }
     _exact_fields(value, expected, "/")
@@ -392,18 +365,11 @@ def parse_work_unit_proposal(
         known=set(context.unresolved_requirement_ids),
         minimum=1,
     )
-    component = _text(value["component"], "/component", max_length=120)
-    if component not in context.component_ids:
+    if len(context.component_ids) != 1:
         raise PlanningContractError(
-            "/component", "component is not in the supplied catalog"
+            "/component", "component cannot be derived from the supplied catalog"
         )
-    declared_runtime = _text(
-        value["implementation_runtime"], "/implementation_runtime", max_length=40
-    )
-    if declared_runtime not in _RUNTIME_VALUES:
-        raise PlanningContractError(
-            "/implementation_runtime", "runtime is not in the canonical registry"
-        )
+    component = next(iter(context.component_ids))
     raw_writes = _array(value["planned_writes"], "/planned_writes", maximum=20)
     if not raw_writes:
         raise PlanningContractError(
@@ -424,11 +390,6 @@ def parse_work_unit_proposal(
             "one work unit cannot mix implementation runtimes; split the work",
         )
     derived_runtime = next(iter(non_neutral_runtimes), "neutral")
-    if declared_runtime != derived_runtime:
-        raise PlanningContractError(
-            "/implementation_runtime",
-            f"runtime must be derived from planned writes ({derived_runtime})",
-        )
     step = _text(value["implementation_step"], "/implementation_step")
     criteria = _text_list(
         value["acceptance_criteria"],
@@ -436,12 +397,12 @@ def parse_work_unit_proposal(
         minimum=1,
         maximum=MAX_WORK_UNIT_CRITERIA,
     )
-    validation_ids = _reference_list(
-        value["validation_ids"],
-        "/validation_ids",
-        known=set(context.validation_catalog),
-        minimum=1,
-    )
+    if len(context.validation_catalog) != 1:
+        raise PlanningContractError(
+            "/validation_ids",
+            "validation cannot be derived from the supplied catalog",
+        )
+    validation_ids = (next(iter(context.validation_catalog)),)
     raw_outputs = _array(value["required_outputs"], "/required_outputs", maximum=8)
     outputs = tuple(
         _parse_required_output(
@@ -463,7 +424,7 @@ def parse_work_unit_proposal(
         requirement_ids,
         _text(value["deliverable"], "/deliverable", max_length=1_000),
         component,
-        declared_runtime,
+        derived_runtime,
         writes,
         step,
         criteria,
@@ -479,7 +440,7 @@ def _parse_planned_write(
         raise PlanningContractError(pointer, "must be an object")
     _exact_fields(
         value,
-        {"path", "role", "runtime", "source_refs", "evidence_ids"},
+        {"path", "role", "source_refs", "evidence_ids"},
         pointer,
     )
     path = _text(value["path"], f"{pointer}/path", max_length=500)
@@ -487,14 +448,6 @@ def _parse_planned_write(
     role = _text(value["role"], f"{pointer}/role", max_length=40)
     if role not in _ROLES:
         raise PlanningContractError(f"{pointer}/role", "unknown planned-write role")
-    runtime_raw = value["runtime"]
-    runtime = (
-        None
-        if runtime_raw is None
-        else _text(runtime_raw, f"{pointer}/runtime", max_length=40)
-    )
-    if runtime is not None and runtime not in CANONICAL_RUNTIMES:
-        raise PlanningContractError(f"{pointer}/runtime", "runtime is not canonical")
     source_refs = _reference_list(
         value["source_refs"],
         f"{pointer}/source_refs",
@@ -507,9 +460,13 @@ def _parse_planned_write(
         known=set(context.evidence),
         minimum=0,
     )
+    role_value = cast(
+        Literal["implementation", "test", "configuration", "documentation"], role
+    )
+    runtime = _derive_planned_write_runtime(path, role_value, context)
     write = PlannedWrite(
         path,
-        cast(Literal["implementation", "test", "configuration", "documentation"], role),
+        role_value,
         runtime,
         source_refs,
         evidence_ids,
@@ -630,17 +587,32 @@ def parse_work_unit_proposal_page(
 
 def _write_runtime(write: PlannedWrite, context: WorkUnitContext) -> str | None:
     """Derive a write's runtime from its path and pinned repository facts."""
-    fact = context.repository_paths.get(write.path)
+    derived = _derive_planned_write_runtime(write.path, write.role, context)
+    if write.runtime != derived:
+        raise PlanningContractError(
+            "/planned_writes/runtime",
+            f"runtime for {write.path} must be {derived!r} based on the path "
+            "and repository facts",
+        )
+    return derived
+
+
+def _derive_planned_write_runtime(
+    path: str,
+    role: Literal["implementation", "test", "configuration", "documentation"],
+    context: WorkUnitContext,
+) -> str | None:
+    fact = context.repository_paths.get(path)
     if fact is not None and fact.is_symlink:
         raise PlanningContractError("/planned_writes/path", "write path is a symlink")
-    suffix = PurePosixPath(write.path).suffix.lower()
+    suffix = PurePosixPath(path).suffix.lower()
     derived = None if suffix == ".h" else PATH_RUNTIME_SUFFIXES.get(suffix)
     if derived is None and suffix in _NEUTRAL_SUFFIXES:
         derived = None
     elif (
         derived is None
         and not suffix
-        and PurePosixPath(write.path).name
+        and PurePosixPath(path).name
         in {
             "Makefile",
             "Dockerfile",
@@ -651,29 +623,25 @@ def _write_runtime(write: PlannedWrite, context: WorkUnitContext) -> str | None:
         }
     ):
         derived = None
-    elif derived is None and fact is None and not suffix and write.runtime is None:
-        # New extensionless files explicitly marked without a runtime are data
-        # artifacts. Source files should use a recognized extension or cite a
-        # repository fact that identifies their runtime.
+    elif (
+        derived is None
+        and fact is None
+        and not suffix
+        and role in {"configuration", "documentation"}
+    ):
         derived = None
     elif derived is None:
         derived = (
             fact.runtime if fact is not None else None
-        ) or context.ambiguous_runtime_resolutions.get(write.path)
+        ) or context.ambiguous_runtime_resolutions.get(path)
         if derived is None:
             raise RuntimeClassificationRequired(
-                f"runtime for planned path {write.path!r} needs repository evidence"
+                f"runtime for planned path {path!r} needs repository evidence"
             )
         if derived not in CANONICAL_RUNTIMES:
             raise PlanningContractError(
                 "/planned_writes/path", "repository runtime is not canonical"
             )
-    if write.runtime != derived:
-        raise PlanningContractError(
-            "/planned_writes/runtime",
-            f"runtime for {write.path} must be {derived!r} based on the path "
-            "and repository facts",
-        )
     return derived
 
 
@@ -816,13 +784,13 @@ def build_work_unit_proposal_request(
         question_identity["maximum_proposals"] = maximum_proposals
     question_key = _digest(question_identity)[-12:]
     question = Question(
-        question_id=f"propose-units-{requirement_ids[0]}-{question_key}",
+        question_id=f"propose-units-v2-{requirement_ids[0]}-{question_key}",
         kind="propose_work_units",
-        contract_version=1,
+        contract_version=2,
         subject_ids=tuple(requirement_ids),
-        input_digest=_digest(input_facts),
+        input_digest=_digest({"schema_version": 2, **input_facts}),
         context_ref_ids=all_refs,
-        expected_answer_schema="work-unit-proposals-v1",
+        expected_answer_schema="work-unit-proposals-v2",
         attempt=1,
     )
 
@@ -839,10 +807,6 @@ def build_work_unit_proposal_request(
     answer_schema["properties"]["records"]["maxItems"] = maximum_proposals
     record_properties = answer_schema["properties"]["records"]["items"]["properties"]
     record_properties["requirement_ids"]["items"]["enum"] = list(requirement_ids)
-    record_properties["component"]["enum"] = sorted(context.component_ids)
-    record_properties["validation_ids"]["items"]["enum"] = sorted(
-        context.validation_catalog
-    )
     write_properties = record_properties["planned_writes"]["items"]["properties"]
     write_properties["source_refs"]["items"]["enum"] = list(source_refs)
     write_properties["evidence_ids"]["items"]["enum"] = sorted(context.evidence)
@@ -864,16 +828,14 @@ def build_work_unit_proposal_request(
             "unresolved requirements. Each unit must describe one implementation "
             "step, at most two acceptance criteria, actual planned file writes, "
             "and required outputs that later work may consume. Do not invent "
-            "requirement, component, validation, evidence, or source IDs. Split "
+            "requirement, evidence, or source IDs. Component, validation, and "
+            "runtime are derived from supplied catalogs and planned paths. Split "
             "different implementation runtimes into separate units. "
             "For each requirement ID in a unit, at least one planned write must "
             "cite one of that requirement's own source_refs from its requirement "
             "fact; do not cite only a neighboring requirement's anchors. "
-            "Set a planned write's runtime to null for non-executable artifacts "
-            "such as documentation, configuration, logs, and fixtures; use a "
-            "language runtime only for executable or source files. "
-            "IDs must exactly match catalog ID values: put `validation-0001` in "
-            "validation_ids, not the context reference `validation:validation-0001`. "
+            "Use pinned repository facts for paths whose runtime cannot be "
+            "derived from their extension. Do not mix implementation runtimes. "
             "Use the valid example for field shape only; do not copy its "
             "placeholder path or example wording. "
             f"Keep descriptions concise. Return at most {maximum_proposals} records "
@@ -886,14 +848,6 @@ def build_work_unit_proposal_request(
         ),
         answer_field_definitions={
             "records": "WorkUnitProposal records with the exact fields in the schema.",
-            "implementation_runtime": (
-                "Canonical runtime derived from the actual planned writes, or "
-                "neutral when all writes are non-executable."
-            ),
-            "validation_ids": (
-                "Exact bare IDs from the supplied validation catalog, such as "
-                "validation-0001; do not add the context prefix `validation:`."
-            ),
             "required_outputs": (
                 "Concrete outputs needed by later work, with references only to "
                 "requirements this unit addresses."

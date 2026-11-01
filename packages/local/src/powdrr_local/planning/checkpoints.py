@@ -436,6 +436,7 @@ class LocalPlanningTelemetryStore:
         {
             "question_ids",
             "question_kinds",
+            "phase",
             "input_digests",
             "batch_member_count",
             "request_chars",
@@ -453,6 +454,7 @@ class LocalPlanningTelemetryStore:
             "input_digest",
             "prompt_tokens",
             "completion_tokens",
+            "pagination",
         }
     )
 
@@ -499,6 +501,55 @@ class LocalPlanningTelemetryStore:
             "run_id": run_id,
             **metric,
         }
+        self._append(record)
+
+    def record_repository_search(
+        self, run_id: str, requirement_id: str, search: Mapping[str, Any]
+    ) -> None:
+        if not run_id or any(char not in "0123456789abcdef" for char in run_id):
+            raise PlanningJournalError("telemetry run ID is malformed")
+        allowed = {
+            "matching_line_count",
+            "matching_path_count",
+            "evidence_count",
+            "basedpyright_query_count",
+            "basedpyright_match_count",
+            "rg_match_count",
+            "basedpyright_available",
+            "base_commit",
+        }
+        if set(search) != allowed:
+            raise PlanningJournalError("repository search telemetry is malformed")
+        self._append(
+            {
+                "schema": "planning-search-telemetry-v1",
+                "session_id": self.session_id,
+                "run_id": run_id,
+                "requirement_id": requirement_id,
+                **search,
+            }
+        )
+
+    def record_deterministic_answer(
+        self, run_id: str, metric: Mapping[str, Any]
+    ) -> None:
+        if not run_id or any(char not in "0123456789abcdef" for char in run_id):
+            raise PlanningJournalError("telemetry run ID is malformed")
+        allowed = {"question_id", "question_kind", "phase", "input_digest", "rule_id"}
+        if set(metric) != allowed or any(
+            not isinstance(metric.get(field), str) for field in allowed
+        ):
+            raise PlanningJournalError("deterministic telemetry is malformed")
+        self._append(
+            {
+                "schema": "planning-deterministic-telemetry-v1",
+                "session_id": self.session_id,
+                "run_id": run_id,
+                **metric,
+            }
+        )
+
+    def _append(self, record: Mapping[str, Any]) -> None:
         serialized = _compact_json(record) + "\n"
         with file_lock(self.lock_path):
             file_descriptor = os.open(
@@ -527,6 +578,20 @@ class LocalPlanningTelemetryStore:
             }
         )
         top: list[dict[str, Any]] = []
+        by_phase_and_kind: dict[str, dict[str, dict[str, Any]]] = defaultdict(dict)
+        pages: list[dict[str, Any]] = []
+        search_summary = {
+            "requirements": 0,
+            "matching_lines": 0,
+            "matching_paths": 0,
+            "evidence_records": 0,
+            "basedpyright_queries": 0,
+            "basedpyright_matches": 0,
+            "rg_matches": 0,
+            "basedpyright_unavailable": 0,
+        }
+        deterministic_count = 0
+        deterministic_by_rule: dict[str, int] = defaultdict(int)
         runs: dict[str, dict[str, Any]] = defaultdict(
             lambda: {"questions": 0, "batches": 0, "api_calls": 0, "elapsed_ms": 0.0}
         )
@@ -541,9 +606,38 @@ class LocalPlanningTelemetryStore:
                     record = json.loads(line)
                     if (
                         not isinstance(record, Mapping)
-                        or record.get("schema") != "planning-call-telemetry-v1"
                         or record.get("session_id") != self.session_id
                     ):
+                        raise PlanningJournalError("planning telemetry is malformed")
+                    if record.get("schema") == "planning-search-telemetry-v1":
+                        search_summary["requirements"] += 1
+                        for field, target in (
+                            ("matching_line_count", "matching_lines"),
+                            ("matching_path_count", "matching_paths"),
+                            ("evidence_count", "evidence_records"),
+                            ("basedpyright_query_count", "basedpyright_queries"),
+                            ("basedpyright_match_count", "basedpyright_matches"),
+                            ("rg_match_count", "rg_matches"),
+                        ):
+                            value = record.get(field)
+                            if not isinstance(value, int) or value < 0:
+                                raise PlanningJournalError(
+                                    "repository search telemetry is malformed"
+                                )
+                            search_summary[target] += value
+                        if record.get("basedpyright_available") is False:
+                            search_summary["basedpyright_unavailable"] += 1
+                        continue
+                    if record.get("schema") == "planning-deterministic-telemetry-v1":
+                        rule_id = record.get("rule_id")
+                        if not isinstance(rule_id, str):
+                            raise PlanningJournalError(
+                                "deterministic telemetry is malformed"
+                            )
+                        deterministic_count += 1
+                        deterministic_by_rule[rule_id] += 1
+                        continue
+                    if record.get("schema") != "planning-call-telemetry-v1":
                         raise PlanningJournalError("planning telemetry is malformed")
                     run_id = record.get("run_id")
                     ids = record.get("question_ids")
@@ -558,8 +652,11 @@ class LocalPlanningTelemetryStore:
                     count = len(ids)
                     elapsed = record.get("elapsed_ms")
                     calls = record.get("api_calls")
-                    if not isinstance(elapsed, int | float) or not isinstance(
-                        calls, int
+                    phase = record.get("phase")
+                    if (
+                        not isinstance(elapsed, int | float)
+                        or not isinstance(calls, int)
+                        or not isinstance(phase, str)
                     ):
                         raise PlanningJournalError("planning telemetry is malformed")
                     total_questions += count
@@ -596,6 +693,22 @@ class LocalPlanningTelemetryStore:
                             bucket["completion_tokens"] += completion_tokens
                         else:
                             bucket["token_usage_known"] = False
+                        phase_bucket = by_phase_and_kind[phase].setdefault(
+                            kind,
+                            {
+                                "questions": 0,
+                                "batches": 0,
+                                "api_calls": 0,
+                                "elapsed_ms": 0.0,
+                            },
+                        )
+                        phase_bucket["questions"] += count
+                        phase_bucket["batches"] += 1
+                        phase_bucket["api_calls"] += calls
+                        phase_bucket["elapsed_ms"] += elapsed
+                    for page in record.get("pagination", []):
+                        if isinstance(page, Mapping):
+                            pages.append(dict(page))
                     top.append(
                         {
                             "question_ids": ids,
@@ -613,6 +726,36 @@ class LocalPlanningTelemetryStore:
             "token_usage_known": tokens_known,
             "by_question_kind": {
                 kind: dict(values) for kind, values in sorted(by_kind.items())
+            },
+            "by_phase_and_question_kind": {
+                phase: {kind: dict(values) for kind, values in sorted(kinds.items())}
+                for phase, kinds in sorted(by_phase_and_kind.items())
+            },
+            "pagination": {
+                "pages": len(pages),
+                "returned_records": sum(
+                    int(page["returned_records"])
+                    for page in pages
+                    if isinstance(page.get("returned_records"), int)
+                ),
+                "unique_new_records": sum(
+                    int(page["unique_new_records"])
+                    for page in pages
+                    if isinstance(page.get("unique_new_records"), int)
+                ),
+                "no_progress_pages": sum(
+                    page.get("made_progress") is False for page in pages
+                ),
+                "largest_pages": sorted(
+                    pages,
+                    key=lambda page: int(page.get("returned_records") or 0),
+                    reverse=True,
+                )[:10],
+            },
+            "repository_search": search_summary,
+            "deterministic_answers": {
+                "count": deterministic_count,
+                "by_rule": dict(sorted(deterministic_by_rule.items())),
             },
             "runs": [
                 {

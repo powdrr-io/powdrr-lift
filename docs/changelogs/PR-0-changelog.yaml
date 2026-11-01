@@ -1,0 +1,26 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 0
+title: Coalesce shared planned file subjects
+intent:
+  problem: Structural subject enumeration rejects a valid answer when separate work units plan changes to the same file.
+  goal: Represent the shared file once while preserving every affected requirement, work unit, and source reference.
+human-decisions: []
+structured_files: []
+files:
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span: {start_line: 289, end_line: 322}
+  summary: Coalesce compatible duplicate planned file subjects within one enumerated page.
+  rationale: Allow multiple work units to support one shared file without retrying a structurally invalid duplicate.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span: {start_line: 793, end_line: 845}
+  summary: Cover shared planned files across units and ensure all references are retained.
+  rationale: Reproduce the duplicate file subject that blocked Gaterr plan issue 98.
+entities: []
+entity_relationships: []
+invariants:
+- id: shared-planned-file-subject-coalescing
+  description: Compatible duplicate planned-file subjects in one page become one record containing the union of requirements, units, and source references.
+  action: altered
+guidance: []

@@ -5,6 +5,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from powdrr_service.providers.config import LLMModelMapping
 
 from powdrr_lift.cli import build_parser, main
 from powdrr_lift.errors import PowdrrExecutionError
@@ -14,7 +15,6 @@ from powdrr_lift.workrr.credential_check import (
     configured_model_mapping,
 )
 from powdrr_lift.workrr.llm import WorkflowLLMHTTPError
-from powdrr_lift.workrr.provider_config import LLMModelMapping
 from powdrr_lift.workrr.providers import ProviderCredentials
 
 

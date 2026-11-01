@@ -1,5 +1,13 @@
 """Agent proposal interfaces and provider adapters."""
 
+from powdrr_service.providers.config import (
+    LLMModelLimits,
+    LLMModelMapping,
+    LLMProviderDefinition,
+    LLMProviderRole,
+    LLMProviderRoles,
+)
+
 from powdrr_lift.workrr.actions import (
     WorkflowAction,
     WorkflowEdit,
@@ -58,13 +66,6 @@ from powdrr_lift.workrr.protocol import (
     AgentProposalError,
     SchemaAwareWorkflowLLMClient,
     WorkflowLLMClient,
-)
-from powdrr_lift.workrr.provider_config import (
-    LLMModelLimits,
-    LLMModelMapping,
-    LLMProviderDefinition,
-    LLMProviderRole,
-    LLMProviderRoles,
 )
 from powdrr_lift.workrr.repair import (
     RepairContext,

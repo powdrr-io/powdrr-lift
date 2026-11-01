@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from powdrr_lift.workrr.provider_config import DEFAULT_MODEL, LLMModelMapping
+from powdrr_service.providers.config import DEFAULT_MODEL, LLMModelMapping
 
 
 @dataclass(frozen=True, slots=True)

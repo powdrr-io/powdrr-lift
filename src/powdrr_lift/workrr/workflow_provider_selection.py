@@ -6,8 +6,9 @@ import sys
 from collections.abc import Callable
 from typing import TextIO
 
+from powdrr_service.providers.config import provider_definition
+
 from powdrr_lift.errors import PowdrrExecutionError
-from powdrr_lift.workrr.provider_config import provider_definition
 from powdrr_lift.workrr.providers import available_provider_names
 
 

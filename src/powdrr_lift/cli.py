@@ -49,6 +49,11 @@ from powdrr_service.planning.service import (
 )
 from powdrr_service.planning.source import segment_markdown_source
 from powdrr_service.planning.workflow_ids import slugify_workflow_id
+from powdrr_service.providers.config import (
+    ALL_PROVIDERS,
+    default_llm_mappings,
+    provider_definition,
+)
 from powdrr_service.structrr.rebase import rebase_structrr_snapshot
 from powdrr_service.structrr.verification_health import (
     VerificationPolicyMode,
@@ -274,11 +279,6 @@ from powdrr_lift.workrr.procedrr_chat import run_procedrr_workflow_chat
 from powdrr_lift.workrr.prompt_benchmark_comparison import (
     PromptBenchmarkComparisonError,
     compare_prompt_benchmark,
-)
-from powdrr_lift.workrr.provider_config import (
-    ALL_PROVIDERS,
-    default_llm_mappings,
-    provider_definition,
 )
 from powdrr_lift.workrr.provider_runtime import resolve_workflow_provider
 from powdrr_lift.workrr.providers import (

@@ -979,7 +979,7 @@
         "powdrr_lift.workrr.planning.evidence",
         "powdrr_lift.workrr.procedrr_chat",
         "powdrr_lift.workrr.prompt_benchmark_comparison",
-        "powdrr_lift.workrr.provider_config",
+        "powdrr_service.providers.config",
         "powdrr_lift.workrr.provider_runtime",
         "powdrr_lift.workrr.providers",
         "powdrr_lift.workrr.repository_subject_binding",
@@ -2372,7 +2372,7 @@
         "powdrr_lift.workrr.loop",
         "powdrr_lift.workrr.progress",
         "powdrr_lift.workrr.protocol",
-        "powdrr_lift.workrr.provider_config",
+        "powdrr_service.providers.config",
         "powdrr_lift.workrr.repair",
         "powdrr_lift.workrr.runner",
         "powdrr_lift.workrr.verification_provider"
@@ -2485,7 +2485,7 @@
     {
       "extraction_pr": "5/7",
       "internal_imports": [
-        "powdrr_lift.workrr.provider_config"
+        "powdrr_service.providers.config"
       ],
       "kind": "python_module",
       "owner": "split",
@@ -2602,7 +2602,7 @@
         "powdrr_lift.errors",
         "powdrr_lift.workrr.jev_classifier",
         "powdrr_lift.workrr.llm",
-        "powdrr_lift.workrr.provider_config",
+        "powdrr_service.providers.config",
         "powdrr_lift.workrr.providers"
       ],
       "kind": "python_module",
@@ -3120,12 +3120,10 @@
     },
     {
       "extraction_pr": "6",
-      "internal_imports": [
-        "powdrr_lift.errors"
-      ],
+      "internal_imports": [],
       "kind": "python_module",
       "owner": "service",
-      "path": "src/powdrr_lift/workrr/provider_config.py",
+      "path": "packages/service/src/powdrr_service/providers/config.py",
       "rationale": "provider access, model routing, and inference policy",
       "reviewed": false
     },
@@ -3134,7 +3132,7 @@
       "internal_imports": [
         "powdrr_lift.workrr.exchanges",
         "powdrr_lift.workrr.llm",
-        "powdrr_lift.workrr.provider_config",
+        "powdrr_service.providers.config",
         "powdrr_lift.workrr.providers"
       ],
       "kind": "python_module",
@@ -3148,7 +3146,7 @@
       "internal_imports": [
         "powdrr_lift.errors",
         "powdrr_lift.workrr.llm",
-        "powdrr_lift.workrr.provider_config"
+        "powdrr_service.providers.config"
       ],
       "kind": "python_module",
       "owner": "service",
@@ -3294,7 +3292,7 @@
         "powdrr_lift.workrr.procedrr",
         "powdrr_lift.workrr.procedrr_chat",
         "powdrr_lift.workrr.procedrr_operations",
-        "powdrr_lift.workrr.provider_config",
+        "powdrr_service.providers.config",
         "powdrr_lift.workrr.provider_runtime",
         "powdrr_lift.workrr.providers",
         "powdrr_lift.workrr.test_obligations",
@@ -3370,7 +3368,7 @@
       "extraction_pr": "5/7",
       "internal_imports": [
         "powdrr_lift.errors",
-        "powdrr_lift.workrr.provider_config",
+        "powdrr_service.providers.config",
         "powdrr_lift.workrr.providers"
       ],
       "kind": "python_module",

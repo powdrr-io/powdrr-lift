@@ -26,6 +26,12 @@ from powdrr_service.planning.multipr_structrr import (
     structural_repair_findings,
 )
 from powdrr_service.planning.workflow_ids import slugify_workflow_id
+from powdrr_service.providers.config import (
+    DEFAULT_LLM_TYPE,
+    DEFAULT_MODEL,
+    LLMModelMapping,
+    default_llm_mappings,
+)
 from powdrr_service.structrr.snapshot import snapshot_digest
 
 from powdrr_lift.basedpyright_tools import is_basedpyright_tool
@@ -168,12 +174,6 @@ from powdrr_lift.workrr.paths import (
 )
 from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
 from powdrr_lift.workrr.procedrr_operations import WorkrrOperationExecutor
-from powdrr_lift.workrr.provider_config import (
-    DEFAULT_LLM_TYPE,
-    DEFAULT_MODEL,
-    LLMModelMapping,
-    default_llm_mappings,
-)
 from powdrr_lift.workrr.provider_runtime import (
     maybe_record_llm_exchanges,
     resolve_workflow_provider,

@@ -23,9 +23,9 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from powdrr_service.planning.semantic_decision import DECISION_VALUES
+from powdrr_service.providers.config import default_llm_mappings
 
 from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
-from powdrr_lift.workrr.provider_config import default_llm_mappings
 from powdrr_lift.workrr.providers import (
     build_workflow_client,
     resolve_provider_credentials,

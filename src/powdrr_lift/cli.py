@@ -233,27 +233,25 @@ from powdrr_lift.workrr.git import (
 from powdrr_lift.workrr.github_issue_queue import (
     GitHubIssueClient,
     GitHubIssueQueueError,
-    ReviewedExecutionPlan,
     TaskCheckpointCallback,
     continue_manual_prerequisite_issue,
     find_plan_issues,
     fulfill_issue_without_pr,
     load_reviewed_plan_at_commit,
     publish_plan_issues,
-    run_worker_once,
 )
 from powdrr_lift.workrr.human_task import (
     HumanTaskRunnerConfig,
     run_human_task,
 )
 from powdrr_lift.workrr.local_model import download_local_qwen_model
-from powdrr_lift.workrr.planned_workflow_task import (
-    PlannedWorkflowTaskOptions,
-    run_planned_workflow_task,
-)
 from powdrr_lift.workrr.planning_session import (
     PlanningSessionConfig,
     run_planning_session,
+)
+from powdrr_lift.workrr.pr_execution_session import (
+    PrExecutionSessionConfig,
+    run_pr_execution_worker,
 )
 from powdrr_lift.workrr.procedrr_chat import run_procedrr_workflow_chat
 from powdrr_lift.workrr.prompt_benchmark_comparison import (
@@ -3007,10 +3005,11 @@ def _run_fulfill_plan_issue_without_pr(args: argparse.Namespace) -> int:
 
 
 def _run_github_issue_worker(args: argparse.Namespace) -> int:
-    repo_root = resolve_repo_root(args.repo_root)
-    options = PlannedWorkflowTaskOptions(
-        provider=args.provider,
+    config = PrExecutionSessionConfig(
+        repo_root=args.repo_root,
         repository=args.repository,
+        worker_id=args.worker_id,
+        provider=args.provider,
         api_key=args.api_key,
         base_url=args.base_url,
         max_roundtrips=args.max_roundtrips,
@@ -3032,37 +3031,8 @@ def _run_github_issue_worker(args: argparse.Namespace) -> int:
             args, "coding_agent_validation_timeout_seconds", 1800.0
         ),
     )
-
-    def run_task(
-        workflow_path: Path,
-        workflow_id: str,
-        worker_id: str,
-        item: Any,
-        plan: ReviewedExecutionPlan,
-        fulfilled_without_pr_dependencies: tuple[str, ...],
-        checkpoint_callback: TaskCheckpointCallback,
-    ) -> int:
-        return run_planned_workflow_task(
-            workflow_path=workflow_path,
-            workflow_id=workflow_id,
-            worker_id=worker_id,
-            item=item,
-            plan=plan,
-            fulfilled_without_pr_dependencies=fulfilled_without_pr_dependencies,
-            checkpoint_callback=checkpoint_callback,
-            repo_root=repo_root,
-            options=options,
-            stdout=sys.stdout,
-            stderr=sys.stderr,
-        )
-
     try:
-        report = run_worker_once(
-            client=GitHubIssueClient(args.repository),
-            repo_root=repo_root,
-            worker_id=args.worker_id,
-            run_task=run_task,
-        )
+        report = run_pr_execution_worker(config)
     except GitHubIssueQueueError as error:
         print(str(error), file=sys.stderr)
         return 2

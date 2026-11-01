@@ -1,0 +1,100 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1271
+title: Extract reusable PR execution session application
+intent:
+  problem: The GitHub issue worker setup is embedded in CLI parsing and presentation, preventing a workspace dispatcher from invoking the execution flow directly.
+  goal: Provide a typed application function for one PR execution worker attempt while preserving the existing queue, task, checkpoint, and reporting semantics.
+human-decisions: []
+structured_files: []
+files:
+- path: src/powdrr_lift/workrr/pr_execution_session.py
+  type: added
+  span: {start_line: 1, end_line: 110}
+  summary: Add typed PR execution configuration and a reusable worker application function.
+  rationale: Allow CLI and workspace adapters to invoke existing worker behavior through a stable application boundary.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 236, end_line: 236}
+  summary: Import the PR execution application entry point.
+  rationale: Keep CLI execution delegated to the reusable application module.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 243, end_line: 243}
+  summary: Remove CLI ownership of the queue runner import.
+  rationale: The application module now owns worker invocation.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 250, end_line: 253}
+  summary: Import the typed PR execution application configuration.
+  rationale: Keep CLI argument parsing separate from worker orchestration.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 252, end_line: 255}
+  summary: Import the PR execution application configuration and runner.
+  rationale: Keep command parsing in the CLI and delegate execution to the application module.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 3008, end_line: 3009}
+  summary: Build typed worker configuration from CLI arguments.
+  rationale: Route PR execution through the reusable application boundary.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 3011, end_line: 3012}
+  summary: Build typed worker configuration from CLI arguments.
+  rationale: Route PR execution through the reusable application boundary.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 3035, end_line: 3058}
+  summary: Delegate worker execution and preserve CLI result rendering.
+  rationale: The application returns a structured report for CLI or workspace callers.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 3035, end_line: 3035}
+  summary: Convert parsed arguments to typed configuration, invoke the worker, and render its report.
+  rationale: Preserve terminal JSON and error behavior while extracting PR execution orchestration.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span: {start_line: 16, end_line: 20}
+  summary: Import the PR execution application module for deterministic integration injection.
+  rationale: Exercise PR execution through its new application boundary.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span: {start_line: 1481, end_line: 1481}
+  summary: Patch queue execution through the PR execution application module.
+  rationale: Preserve end-to-end coverage of scoped workflow creation and publication.
+- path: tests/test_pr_execution_session.py
+  type: added
+  span: {start_line: 1, end_line: 109}
+  summary: Verify typed configuration reaches the existing queue and task execution path.
+  rationale: Protect provider, mini-SWE model, checkpoint, repository, and output stream wiring.
+entities:
+- id: pr-execution-session-application
+  type: Function
+  action: added
+- id: pr-execution-session-configuration
+  type: Struct
+  action: added
+- id: pr-execution-session-application-tests
+  type: Unit test
+  action: added
+entity_relationships:
+- id: cli-uses-pr-execution-session-application
+  type: uses
+  source: pr-execution-session-application
+  target: pr-execution-session-configuration
+  action: added
+  description: The CLI maps worker options into typed configuration and renders the structured worker report.
+- id: pr-execution-session-tests-verify-application
+  type: verifies
+  source: pr-execution-session-application-tests
+  target: pr-execution-session-application
+  action: added
+  description: Tests exercise application configuration forwarding through the existing queue and workflow task boundary.
+invariants:
+- id: pr-execution-queue-semantics-preserved
+  description: Queue eligibility, GitHub effects, checkpointing, worktree management, retry behavior, and mini-SWE model configuration remain in their existing workflow owners.
+  action: added
+- id: pr-execution-application-returns-structured-report
+  description: Application callers receive a WorkerReport and do not need to parse CLI output.
+  action: added
+guidance: []

@@ -1,12 +1,18 @@
 from __future__ import annotations
 
+import io
+from pathlib import Path
 from types import SimpleNamespace
+from typing import Any, TextIO
+
+import pytest
 
 from powdrr_lift.workrr.github_issue_queue import PlannedWorkItem, ReviewedExecutionPlan
 from powdrr_lift.workrr.planned_workflow_task import (
     PlannedWorkflowTaskOptions,
     run_planned_workflow_task,
 )
+from powdrr_lift.workrr.task_agent import WorkflowTaskAgentConfig
 
 
 def _item() -> PlannedWorkItem:
@@ -41,18 +47,20 @@ def _options() -> PlannedWorkflowTaskOptions:
     )
 
 
-def test_existing_workflow_directory_uses_shared_task_runner(tmp_path, monkeypatch):
+def test_existing_workflow_directory_uses_shared_task_runner(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     workflow_dir = tmp_path / "workflow"
     workflow_dir.mkdir()
-    output = object()
-    errors = object()
+    output = io.StringIO()
+    errors = io.StringIO()
 
-    def callback(*_args):
+    def callback(*_args: Any) -> None:
         return None
 
-    captured = {}
+    captured: dict[str, Any] = {}
 
-    def run(config, *, stdout, stderr):
+    def run(config: WorkflowTaskAgentConfig, *, stdout: TextIO, stderr: TextIO) -> int:
         captured.update(config=config, stdout=stdout, stderr=stderr)
         return 7
 
@@ -88,14 +96,14 @@ def test_existing_workflow_directory_uses_shared_task_runner(tmp_path, monkeypat
 
 
 def test_plan_item_preparation_uses_unique_worktree_and_pinned_context(
-    tmp_path, monkeypatch
-):
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     workflow_descriptor = tmp_path / "workflow.yaml"
     workflow_descriptor.write_text("descriptor", encoding="utf-8")
     worktree = tmp_path / "worktree"
     workflow_dir = worktree / "docs" / "workflows" / "runtime" / "instance"
     workflow_dir.mkdir(parents=True)
-    captured = {}
+    captured: dict[str, Any] = {}
 
     monkeypatch.setattr(
         "powdrr_lift.workrr.planned_workflow_task.load_plan_workflow_instance",
@@ -106,7 +114,9 @@ def test_plan_item_preparation_uses_unique_worktree_and_pinned_context(
         ),
     )
 
-    def create_worktree(_root, _workflow_id, **kwargs):
+    def create_worktree(
+        _root: Path, _workflow_id: str, **kwargs: Any
+    ) -> tuple[Path, str]:
         captured["worktree_kwargs"] = kwargs
         worktree.mkdir(exist_ok=True)
         return worktree, kwargs["branch_name"]
@@ -116,7 +126,7 @@ def test_plan_item_preparation_uses_unique_worktree_and_pinned_context(
         create_worktree,
     )
 
-    def instantiate(**kwargs):
+    def instantiate(**kwargs: Any) -> tuple[Path, tuple[Any, ...]]:
         captured["workflow_inputs"] = kwargs["input_state"]
         captured["output_root"] = kwargs["output_root"]
         return workflow_dir, ()
@@ -144,8 +154,8 @@ def test_plan_item_preparation_uses_unique_worktree_and_pinned_context(
         checkpoint_callback=lambda *_args: None,
         repo_root=tmp_path,
         options=_options(),
-        stdout=object(),
-        stderr=object(),
+        stdout=io.StringIO(),
+        stderr=io.StringIO(),
     )
 
     assert result == 0

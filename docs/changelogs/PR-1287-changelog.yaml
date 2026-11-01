@@ -1,0 +1,29 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1287
+title: Document deterministic planning efficiency work
+intent:
+  problem: Planning can spend excessive time on repeated, unbatched, or overbroad
+    questions even when the plan and repository provide deterministic candidate data.
+  goal: Provide a staged implementation handoff for measuring planner cost, batching
+    independent questions, deriving safe decisions, and filtering model work through
+    evidence-backed candidates.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/plans/planning-efficiency-deterministic-filtering.md
+    type: added
+    span: {start_line: 1, end_line: 321}
+    summary: Specify a dependency-ordered plan for reducing planner latency while preserving evidence, durable answers, PR sizing, and semantic review.
+    rationale: Give implementation PRs bounded milestones, contracts, test cases, and a measurable two-hour target.
+entities:
+  - id: planning-efficiency-deterministic-filtering-plan
+    type: Design doc
+    action: added
+entity_relationships: []
+invariants:
+  - id: planner-performance-changes-preserve-evidence-and-replay
+    description: Deterministic planning answers and bounded model reviews retain input digests, provenance, per-question identity, and durable replay behavior.
+    action: added
+guidance: []
+features: []
+proposed_prs: []

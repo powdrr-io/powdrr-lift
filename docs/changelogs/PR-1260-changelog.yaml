@@ -1,0 +1,264 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1260
+title: Move provider credential resolution into service package
+intent:
+  problem: Provider credentials, local Codex token discovery, and credential provenance were implemented in the legacy agent package even though the service must own provider access and secrets.
+  goal: Move credential resolution and credential-based provider discovery into powdrr_service, then update consumers to use the service-owned API.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 3130, end_line: 3140}
+  summary: Record service ownership of provider credential resolution.
+  rationale: Keep the architecture inventory aligned with the new module and its dependency.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 3160, end_line: 3161}
+  summary: Update provider runtime dependencies to include service credentials.
+  rationale: Represent the service-owned credential boundary in the inventory.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 3384, end_line: 3384}
+  summary: Point workflow provider selection at service credential discovery.
+  rationale: Keep ownership metadata aligned with the new import.
+- path: packages/service/src/powdrr_service/providers/config.py
+  type: modified
+  span: {start_line: 11, end_line: 11}
+  summary: Clarify the service provider configuration error covers credential resolution.
+  rationale: Give credential errors a service-owned exception base.
+- path: packages/service/src/powdrr_service/providers/credentials.py
+  type: added
+  span: {start_line: 1, end_line: 150}
+  summary: Add service-owned provider credential resolution, Codex token discovery, provenance, and provider availability discovery.
+  rationale: Keep provider secrets and credential-dependent routing within the service boundary.
+- path: science/classifications/compare_jev_other_classifiers.py
+  type: modified
+  span: {start_line: 27, end_line: 27}
+  summary: Import credential resolution from the service package.
+  rationale: Make the classifier experiment use the service-owned credential API.
+- path: science/classifications/compare_jev_other_classifiers.py
+  type: modified
+  span: {start_line: 31, end_line: 31}
+  summary: Remove the legacy credential resolver import.
+  rationale: Keep consumers on the service-owned credential API.
+- path: science/classifications/root_disposition/build_dataset.py
+  type: modified
+  span: {start_line: 33, end_line: 33}
+  summary: Import credential resolution from the service package.
+  rationale: Make dataset generation use the service-owned credential API.
+- path: science/classifications/root_disposition/build_dataset.py
+  type: modified
+  span: {start_line: 37, end_line: 37}
+  summary: Remove the legacy credential resolver import.
+  rationale: Keep consumers on the service-owned credential API.
+- path: science/deepswe/acceptance_templates/cli.py
+  type: modified
+  span: {start_line: 13, end_line: 14}
+  summary: Import credential resolution from the service package.
+  rationale: Keep acceptance-template runs on the service-owned API.
+- path: science/deepswe/acceptance_templates/cli.py
+  type: modified
+  span: {start_line: 15, end_line: 15}
+  summary: Remove the legacy credential resolver import.
+  rationale: Keep consumers on the service-owned credential API.
+- path: science/deepswe/acceptance_templates/retrieval_experiment.py
+  type: modified
+  span: {start_line: 14, end_line: 15}
+  summary: Import credential resolution from the service package.
+  rationale: Keep retrieval experiments on the service-owned API.
+- path: science/deepswe/acceptance_templates/retrieval_experiment.py
+  type: modified
+  span: {start_line: 15, end_line: 15}
+  summary: Remove the legacy credential resolver import.
+  rationale: Keep consumers on the service-owned credential API.
+- path: science/deepswe/test_case_prediction/predictor.py
+  type: modified
+  span: {start_line: 13, end_line: 13}
+  summary: Import credential resolution from the service package.
+  rationale: Keep test-case prediction on the service-owned API.
+- path: science/deepswe/test_case_prediction/predictor.py
+  type: modified
+  span: {start_line: 18, end_line: 18}
+  summary: Remove the legacy credential resolver import.
+  rationale: Keep consumers on the service-owned credential API.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 54, end_line: 54}
+  summary: Import the service provider error type.
+  rationale: Route CLI credential handling through the service package.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 58, end_line: 58}
+  summary: Import service-owned credential resolution.
+  rationale: Route CLI credential handling through the service package.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 286, end_line: 286}
+  summary: Remove the legacy credential resolver import.
+  rationale: Keep CLI consumers on the service-owned credential API.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 4734, end_line: 4734}
+  summary: Handle service credential errors in credential checks.
+  rationale: Preserve CLI error reporting after moving the resolver.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 6456, end_line: 6456}
+  summary: Handle service credential errors when configuring workflow execution.
+  rationale: Preserve optional planning-client setup behavior.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 6617, end_line: 6617}
+  summary: Handle service credential errors in Harbor workflow setup.
+  rationale: Preserve optional planning-client setup behavior.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 6705, end_line: 6709}
+  summary: Handle service credential failures in DeepSWE design evaluation.
+  rationale: Preserve clear CLI failures after moving credential resolution.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 6770, end_line: 6774}
+  summary: Handle service credential failures in DeepSWE probe evaluation.
+  rationale: Preserve clear CLI failures after moving credential resolution.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 6820, end_line: 6824}
+  summary: Handle service credential failures in DeepSWE prompt evaluation.
+  rationale: Preserve clear CLI failures after moving credential resolution.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 6871, end_line: 6875}
+  summary: Handle service credential failures in generic prompt evaluation.
+  rationale: Preserve clear CLI failures after moving credential resolution.
+- path: src/powdrr_lift/workrr/credential_check.py
+  type: modified
+  span: {start_line: 15, end_line: 15}
+  summary: Import the service provider error type.
+  rationale: Keep provider credential checks on the service implementation.
+- path: src/powdrr_lift/workrr/credential_check.py
+  type: modified
+  span: {start_line: 18, end_line: 21}
+  summary: Import service-owned credential types and resolver.
+  rationale: Keep provider credential checks on the service implementation.
+- path: src/powdrr_lift/workrr/credential_check.py
+  type: modified
+  span: {start_line: 27, end_line: 27}
+  summary: Remove the legacy credential type import.
+  rationale: Keep credential checks on service-owned types.
+- path: src/powdrr_lift/workrr/credential_check.py
+  type: modified
+  span: {start_line: 29, end_line: 29}
+  summary: Remove the legacy credential resolver import.
+  rationale: Keep credential checks on the service-owned resolver.
+- path: src/powdrr_lift/workrr/credential_check.py
+  type: modified
+  span: {start_line: 105, end_line: 110}
+  summary: Handle the service provider configuration error during credential checks.
+  rationale: Preserve user-facing credential check reporting.
+- path: src/powdrr_lift/workrr/provider_runtime.py
+  type: modified
+  span: {start_line: 16, end_line: 19}
+  summary: Use service-owned provider credentials in runtime setup.
+  rationale: Remove the credential dependency on the legacy provider module.
+- path: src/powdrr_lift/workrr/provider_runtime.py
+  type: modified
+  span: {start_line: 20, end_line: 20}
+  summary: Remove the legacy credential type import.
+  rationale: Keep runtime setup on service-owned credential types.
+- path: src/powdrr_lift/workrr/provider_runtime.py
+  type: modified
+  span: {start_line: 24, end_line: 24}
+  summary: Remove the legacy credential resolver import.
+  rationale: Keep runtime setup on the service-owned resolver.
+- path: src/powdrr_lift/workrr/providers.py
+  type: modified
+  span: {start_line: 13, end_line: 14}
+  summary: Remove credential parsing imports from the legacy provider module.
+  rationale: Move credential parsing to the service package.
+- path: src/powdrr_lift/workrr/providers.py
+  type: modified
+  span: {start_line: 25, end_line: 25}
+  summary: Remove service credential discovery configuration from the legacy module.
+  rationale: Move provider discovery policy to the service package.
+- path: src/powdrr_lift/workrr/providers.py
+  type: modified
+  span: {start_line: 31, end_line: 36}
+  summary: Import credential types and auto-provider discovery from the service.
+  rationale: Leave provider client construction using service-owned credential inputs.
+- path: src/powdrr_lift/workrr/providers.py
+  type: modified
+  span: {start_line: 56, end_line: 186}
+  summary: Remove credential resolution and provider discovery implementations from the legacy module.
+  rationale: Make the service package the sole implementation owner.
+- path: src/powdrr_lift/workrr/providers.py
+  type: modified
+  span: {start_line: 68, end_line: 68}
+  summary: Resolve automatic provider roles through service discovery.
+  rationale: Keep credential-dependent provider selection behind the service boundary.
+- path: src/powdrr_lift/workrr/providers.py
+  type: modified
+  span: {start_line: 76, end_line: 76}
+  summary: Resolve adversarial provider roles through service discovery.
+  rationale: Keep credential-dependent provider selection behind the service boundary.
+- path: src/powdrr_lift/workrr/providers.py
+  type: modified
+  span: {start_line: 99, end_line: 99}
+  summary: Resolve automatic provider selection through service discovery.
+  rationale: Keep credential-dependent provider selection behind the service boundary.
+- path: src/powdrr_lift/workrr/providers.py
+  type: modified
+  span: {start_line: 1000, end_line: 1000}
+  summary: Accept the service-owned provider credentials type during client construction.
+  rationale: Keep the legacy client factory compatible with service-owned credentials.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 35, end_line: 35}
+  summary: Import credential resolution from the service package.
+  rationale: Keep task execution on the service-owned API.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 186, end_line: 186}
+  summary: Remove the legacy credential resolver import.
+  rationale: Keep task execution on the service-owned resolver.
+- path: src/powdrr_lift/workrr/workflow_provider_selection.py
+  type: modified
+  span: {start_line: 10, end_line: 10}
+  summary: Discover configured providers through the service package.
+  rationale: Keep provider availability decisions service-owned.
+- path: src/powdrr_lift/workrr/workflow_provider_selection.py
+  type: modified
+  span: {start_line: 12, end_line: 12}
+  summary: Remove the legacy provider availability import.
+  rationale: Keep provider availability decisions service-owned.
+- path: tests/test_credential_check.py
+  type: modified
+  span: {start_line: 9, end_line: 9}
+  summary: Import provider credential test types from the service package.
+  rationale: Exercise the service-owned credential contract.
+- path: tests/test_credential_check.py
+  type: modified
+  span: {start_line: 18, end_line: 18}
+  summary: Remove the legacy provider credential test import.
+  rationale: Keep tests on service-owned credential types.
+- path: tests/test_live_deepinfra_provider.py
+  type: modified
+  span: {start_line: 8, end_line: 8}
+  summary: Import provider credential resolution from the service package.
+  rationale: Keep the live provider test aligned with the new API.
+- path: tests/test_live_deepinfra_provider.py
+  type: modified
+  span: {start_line: 11, end_line: 11}
+  summary: Keep provider client construction imported from the agent module.
+  rationale: Separate the moved credential resolver from the client builder.
+- path: tests/test_module_boundaries.py
+  type: modified
+  span: {start_line: 141, end_line: 147}
+  summary: Enforce that provider credentials and configuration do not import legacy agent code.
+  rationale: Prevent service credential logic from regaining an agent dependency.
+- path: tests/test_provider_credentials.py
+  type: added
+  span: {start_line: 1, end_line: 79}
+  summary: Test credential precedence, provenance, Codex token lookup, and missing credentials.
+  rationale: Cover the service-owned credential resolution behavior.

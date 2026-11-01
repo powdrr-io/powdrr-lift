@@ -117,6 +117,15 @@ returns HTTP 409. The job remains in its current state until a supervisor
 consumes and applies the intent. The request handler never starts or cancels
 workflow code itself.
 
+The supervisor claims one intent under its active lease and sends it to the
+configured action dispatcher. A completed intent means the dispatcher accepted
+the action; the job may still be running. A retryable dispatch error returns the
+intent to the pending queue so the supervisor can apply its retry policy. Other
+dispatch errors mark the intent failed. Since a supervisor can crash after an
+external effect but before recording completion, dispatchers must deduplicate
+effects by `action_id`. Event notifications only wake readers; the durable event
+log remains authoritative.
+
 ```json
 {"schema_version":1,"job":{"schema_version":1,"job_id":"job-1","repository_id":"repo-1","kind":"planning","title":"Implement search","state":"pending","conversation_id":null,"dependency_ids":["job-2"],"artifact_refs":[],"detail":"","revision":1,"created_at":"<timestamp>","updated_at":"<timestamp>"},"latest_attempt":null,"attempts":[],"stage":null,"blockers":[{"schema_version":1,"job_id":"job-2","title":"Plan search","state":"ready"}],"question":null,"outputs":[],"allowed_actions":["cancel"]}
 ```

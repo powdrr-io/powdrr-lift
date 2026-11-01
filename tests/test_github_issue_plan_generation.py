@@ -13,7 +13,7 @@ from powdrr_service.planning.multipr_structrr import compile_multi_pr_proposal
 from powdrr_service.planning.plan_sizing import PlanSizingError, size_plan_items
 
 from powdrr_lift import cli
-from powdrr_lift.workrr import planned_workflow_task
+from powdrr_lift.workrr import planned_workflow_task, planning_session
 from powdrr_lift.workrr.github_issue_plan_generation import (
     PLAN_COVERAGE_AUDIT_RESPONSE_SCHEMA,
     PLAN_ITEMS_RESPONSE_SCHEMA,
@@ -1678,15 +1678,19 @@ def test_plan_cli_creates_tracking_issue_and_publishes_compiled_artifacts(
                 files=compiled_files,
             )
 
-    monkeypatch.setattr(cli, "resolve_repo_root", lambda _path: tmp_path)
+    monkeypatch.setattr(planning_session, "resolve_repo_root", lambda _path: tmp_path)
     monkeypatch.setattr(
-        cli, "_discover_github_repository", lambda _root: "example/repo"
+        planning_session, "_discover_github_repository", lambda _root: "example/repo"
     )
-    monkeypatch.setattr(cli, "_git_head", lambda _root: base_commit)
-    monkeypatch.setattr(cli, "_require_clean_planning_checkout", lambda *_args: None)
-    monkeypatch.setattr(cli, "_planning_repository_paths", lambda *_args: {})
+    monkeypatch.setattr(planning_session, "_git_head", lambda _root: base_commit)
     monkeypatch.setattr(
-        cli,
+        planning_session, "_require_clean_planning_checkout", lambda *_args: None
+    )
+    monkeypatch.setattr(
+        planning_session, "_planning_repository_paths", lambda *_args: {}
+    )
+    monkeypatch.setattr(
+        planning_session,
         "read_pinned_source",
         lambda *_args, **_kwargs: PinnedSourceDocument(
             repository="example/repo",
@@ -1697,25 +1701,33 @@ def test_plan_cli_creates_tracking_issue_and_publishes_compiled_artifacts(
             text=source_text,
         ),
     )
-    monkeypatch.setattr(cli, "resolve_workflow_provider", lambda value: value)
     monkeypatch.setattr(
-        cli,
+        planning_session, "resolve_workflow_provider", lambda value: value
+    )
+    monkeypatch.setattr(
+        planning_session,
         "configured_model_mapping",
         lambda _provider, _model: type(
             "Mapping", (), {"provider": "test", "model": "test-model"}
         )(),
     )
-    monkeypatch.setattr(cli, "resolve_provider_credentials", lambda *_args: object())
     monkeypatch.setattr(
-        cli, "build_workflow_client", lambda *_args, **_kwargs: object()
-    )
-    monkeypatch.setattr(cli, "GitHubIssueClient", lambda _repository: issue_client)
-    monkeypatch.setattr(cli, "SourceLedgerQuestionMachine", FakeMachine)
-    monkeypatch.setattr(
-        cli, "load_entity_taxonomy", lambda *_args: SimpleNamespace(entity_types=())
+        planning_session, "resolve_provider_credentials", lambda *_args: object()
     )
     monkeypatch.setattr(
-        cli,
+        planning_session, "build_workflow_client", lambda *_args, **_kwargs: object()
+    )
+    monkeypatch.setattr(
+        planning_session, "GitHubIssueClient", lambda _repository: issue_client
+    )
+    monkeypatch.setattr(planning_session, "SourceLedgerQuestionMachine", FakeMachine)
+    monkeypatch.setattr(
+        planning_session,
+        "load_entity_taxonomy",
+        lambda *_args: SimpleNamespace(entity_types=()),
+    )
+    monkeypatch.setattr(
+        planning_session,
         "bootstrap_structrr",
         lambda *_args, **_kwargs: SimpleNamespace(
             document={"entities": [], "entity_relationships": [], "files": []},
@@ -1723,7 +1735,7 @@ def test_plan_cli_creates_tracking_issue_and_publishes_compiled_artifacts(
         ),
     )
     monkeypatch.setattr(
-        cli,
+        planning_session,
         "LocalCheckpointStore",
         lambda *_args, **_kwargs: store,
     )
@@ -1733,7 +1745,7 @@ def test_plan_cli_creates_tracking_issue_and_publishes_compiled_artifacts(
         process_calls.append(kwargs)
         return SimpleNamespace(terminal_status=SimpleNamespace(value="succeeded"))
 
-    monkeypatch.setattr(cli, "run_planning_procedrr", run_process)
+    monkeypatch.setattr(planning_session, "run_planning_procedrr", run_process)
     monkeypatch.setattr(
         cli, "_stage_generated_file", lambda _root, path: staged.append(path)
     )
@@ -1748,7 +1760,9 @@ def test_plan_cli_creates_tracking_issue_and_publishes_compiled_artifacts(
             pull_request_url="https://github.com/example/repo/pull/42",
         )
 
-    monkeypatch.setattr(cli, "publish_execution_plan_pull_request", publish_plan)
+    monkeypatch.setattr(
+        planning_session, "publish_execution_plan_pull_request", publish_plan
+    )
 
     status = cli.main(
         [

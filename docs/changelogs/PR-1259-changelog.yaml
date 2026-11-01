@@ -1,5 +1,5 @@
 schema: https://powdrr.io/schema/changelog-v2
-change_id: 1256
+change_id: 1259
 title: Add supervisor-side job action delivery
 intent:
   problem: Durable actions can be claimed but lack a supervisor component to deliver them to an adapter and record the dispatch outcome.

@@ -1,0 +1,128 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1280
+title: Move execute-PR correction acceptance into service
+intent:
+  problem: The local task agent decides whether corrected integration tests preserve
+    the generated suite and still fail behaviorally against an untouched baseline.
+  goal: Put correction acceptance and baseline-failure rules in the service while the
+    local agent continues to manage worktrees and execute pytest.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 3247, end_line: 3264}
+  summary: Register the execute-PR quality and correction policy modules as service-owned.
+  rationale: Keep the staged ownership boundary visible to inventory validation.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 3414, end_line: 3416}
+  summary: Record the service verification policy imports used by task orchestration.
+  rationale: Reflect the local agent's new explicit calls into service policy modules.
+- path: packages/service/src/powdrr_service/verification/execute_pr_test_corrections.py
+  type: added
+  span: {start_line: 1, end_line: 112}
+  summary: Define service-owned correction case comparison and behavioral baseline
+    acceptance rules.
+  rationale: Centralize proprietary acceptance decisions and give them an explicit
+    service error type.
+- path: src/powdrr_lift/workrr/execute_pr_tests.py
+  type: modified
+  span: {start_line: 388, end_line: 425}
+  summary: Remove local behavioral-red acceptance policy after it moved to service.
+  rationale: Keep the local module focused on test execution and worktree operations.
+- path: src/powdrr_lift/workrr/execute_pr_tests.py
+  type: modified
+  span: {start_line: 504, end_line: 504}
+  summary: Remove the local behavioral-red policy from the module exports.
+  rationale: Avoid retaining a second local policy surface.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 3, end_line: 3}
+  summary: Drop the local AST import after moving case comparison policy.
+  rationale: Remove unused policy dependencies from workflow orchestration.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 45, end_line: 50}
+  summary: Import test correction policy from the service verification package.
+  rationale: Route acceptance decisions through the service boundary.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 139, end_line: 139}
+  summary: Stop importing behavioral-red policy from local test execution helpers.
+  rationale: Remove the duplicate local policy dependency.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 1351, end_line: 1351}
+  summary: Delegate comparison of original and corrected test cases to service policy.
+  rationale: Have the service decide whether a correction preserves and changes cases.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 1364, end_line: 1365}
+  summary: Delegate corrected-case baseline acceptance to the service.
+  rationale: Ensure each changed case fails through behavior on the clean baseline.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 1393, end_line: 1399}
+  summary: Handle the service verification error during test-author validation.
+  rationale: Preserve retry/report behavior while the service owns the rejection rule.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 1749, end_line: 1753}
+  summary: Use the service-owned verification error while handling invalid baselines.
+  rationale: Keep local workflow error handling aligned with the service policy.
+- path: tests/test_execute_pr_test_authoring.py
+  type: modified
+  span: {start_line: 10, end_line: 12}
+  summary: Import the service verification error for correction acceptance assertions.
+  rationale: Test the new explicit service-owned failure contract.
+- path: tests/test_execute_pr_test_authoring.py
+  type: modified
+  span: {start_line: 124, end_line: 124}
+  summary: Expect the service verification error when corrected tests pass on baseline.
+  rationale: Preserve coverage for rejecting non-regressing corrections.
+- path: tests/test_execute_pr_test_corrections_service.py
+  type: added
+  span: {start_line: 1, end_line: 82}
+  summary: Test case preservation, changed-case requirements, and behavioral baseline
+    acceptance.
+  rationale: Prove correction decisions independently of local Git and pytest execution.
+- path: tests/test_execute_pr_tests.py
+  type: modified
+  span: {start_line: 8, end_line: 11}
+  summary: Import the behavioral-red policy from the service module.
+  rationale: Point tests at the sole implementation of this acceptance rule.
+- path: tests/test_execute_pr_tests.py
+  type: modified
+  span: {start_line: 20, end_line: 20}
+  summary: Import the service-owned verification exception for baseline rejection tests.
+  rationale: Verify the new boundary's failure contract.
+- path: tests/test_execute_pr_tests.py
+  type: modified
+  span: {start_line: 219, end_line: 219}
+  summary: Expect the service error type for non-behavioral baseline failures.
+  rationale: Keep validation regression coverage aligned with the service API.
+entities:
+- id: execute-pr-test-correction-policy
+  type: Module
+  action: added
+- id: execute-pr-test-correction-acceptance
+  type: Function
+  action: added
+entity_relationships:
+- id: correction-acceptance-owned-by-service
+  type: part_of
+  source: execute-pr-test-correction-acceptance
+  target: execute-pr-test-correction-policy
+  action: added
+  description: The service verification module decides whether corrected generated
+    tests remain complete and behaviorally red on the untouched baseline.
+invariants:
+- id: corrected-tests-preserve-behavioral-baseline-failure
+  description: A test correction cannot remove existing cases, must change or add at
+    least one test case, and every changed case must fail through a behavior assertion
+    against the untouched baseline.
+  action: added
+guidance: []
+features: []
+proposed_prs: []

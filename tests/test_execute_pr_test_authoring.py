@@ -761,7 +761,7 @@ def test_quality_shortcoming_is_repaired_once_then_accepted_with_pr_note(
     assert artifact["quality_review"]["outcome"] == "advisory"
     assert len(artifact["quality_review"]["reviews"]) == 2
     assert "after a targeted repair attempt" in artifact["quality_review"]["notes"][0]
-    pr_notes = task_agent._render_execute_pr_test_quality_pr_notes(
+    pr_notes = task_agent.render_execute_pr_test_quality_pr_notes(
         artifact["quality_review"]["notes"]
     )
     assert "Test-quality review is advisory" in " ".join(pr_notes)

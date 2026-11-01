@@ -1,0 +1,230 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1269
+title: Extract reusable planning session application
+intent:
+  problem: Planning session creation and resumption are coupled to CLI parsing and presentation, preventing a workspace worker from invoking them directly.
+  goal: Move planning orchestration behind a typed application function that returns structured results while preserving existing service, provider, checkpoint, and PR publication behavior.
+human-decisions: []
+structured_files: []
+files:
+- path: src/powdrr_lift/workrr/planning_session.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 583
+  summary: Add typed planning session configuration and results with reusable create/resume orchestration.
+  rationale: Allow CLI and future workspace adapters to call the same planning flow without depending on argparse or terminal output.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 14, end_line: 14}
+  summary: Remove CLI-owned planning imports.
+  rationale: Move planning orchestration dependencies into the application module.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 29, end_line: 32}
+  summary: Remove CLI-owned planning imports.
+  rationale: Move planning orchestration dependencies into the application module.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 37, end_line: 49}
+  summary: Remove CLI-owned planning imports.
+  rationale: Move planning orchestration dependencies into the application module.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 230, end_line: 230}
+  summary: Remove the CLI-local Structrr taxonomy helper import.
+  rationale: Planning application now owns the helper dependency.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 252, end_line: 255}
+  summary: Import the typed planning application boundary.
+  rationale: Keep command parsing in the CLI and route execution through the reusable function.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 254, end_line: 256}
+  summary: Import the typed planning application boundary.
+  rationale: Keep command parsing in the CLI and route execution through the reusable function.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 2803, end_line: 2817}
+  summary: Delegate planning session work through typed configuration.
+  rationale: Preserve planning behavior behind an application boundary independent of argparse.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 2819, end_line: 2820}
+  summary: Delegate planning session work through typed configuration.
+  rationale: Preserve planning behavior behind an application boundary independent of argparse.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 2823, end_line: 2823}
+  summary: Delegate planning session work through typed configuration.
+  rationale: Preserve planning behavior behind an application boundary independent of argparse.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 2824, end_line: 2869}
+  summary: Remove CLI-owned planning orchestration.
+  rationale: Planning session lifecycle is now reusable outside the CLI.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 2830, end_line: 2839}
+  summary: Preserve command result presentation in the CLI.
+  rationale: Keep terminal and JSON output separate from planning execution.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 2848, end_line: 2852}
+  summary: Preserve command result presentation in the CLI.
+  rationale: Keep terminal and JSON output separate from planning execution.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 2871, end_line: 2875}
+  summary: Remove CLI-owned planning orchestration.
+  rationale: Planning session lifecycle is now reusable outside the CLI.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 3051, end_line: 3062}
+  summary: Remove CLI-local planning helpers.
+  rationale: Keep reusable planning operations in the application module.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 3126, end_line: 3164}
+  summary: Remove CLI-local planning helpers.
+  rationale: Keep reusable planning operations in the application module.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 3198, end_line: 3269}
+  summary: Remove CLI-local planning helpers.
+  rationale: Keep reusable planning operations in the application module.
+- path: tests/test_cli.py
+  type: modified
+  span: {start_line: 16, end_line: 17}
+  summary: Remove imports of helpers that moved out of the CLI.
+  rationale: Tests now import planning helpers from their application module.
+- path: tests/test_cli.py
+  type: modified
+  span: {start_line: 22, end_line: 25}
+  summary: Import planning helpers from the application module.
+  rationale: Keep helper coverage attached to the module that owns planning execution.
+- path: tests/test_cli.py
+  type: modified
+  span: {start_line: 107, end_line: 108}
+  summary: Move Structrr baseline test setup to the planning module.
+  rationale: Exercise the relocated helper in its new ownership location.
+- path: tests/test_cli.py
+  type: modified
+  span: {start_line: 111, end_line: 113}
+  summary: Redirect temporary-artifact configuration through the planning module.
+  rationale: Preserve repository isolation while testing the relocated helper.
+- path: tests/test_cli.py
+  type: modified
+  span: {start_line: 129, end_line: 129}
+  summary: Patch the planning module's Structrr bootstrap dependency.
+  rationale: Keep the baseline test focused on the new helper owner.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span: {start_line: 16, end_line: 16}
+  summary: Import the planning application module for dependency injection.
+  rationale: The integration test now patches the extracted boundary.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span: {start_line: 1681, end_line: 1685}
+  summary: Patch repository resolution and pinned base commit in the planning module.
+  rationale: Keep the planning integration scenario deterministic.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span: {start_line: 1685, end_line: 1687}
+  summary: Patch the clean-checkout guard in the planning module.
+  rationale: Isolate the integration test from the test runner checkout state.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span: {start_line: 1687, end_line: 1687}
+  summary: Patch the planning application's repository-path helper.
+  rationale: Keep source analysis deterministic in the integration test.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span: {start_line: 1690, end_line: 1693}
+  summary: Move dependency patches to the planning application module.
+  rationale: Exercise the same workflow through the new application boundary.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span: {start_line: 1700, end_line: 1700}
+  summary: Move provider setup patching to the planning module.
+  rationale: Keep provider configuration deterministic.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span: {start_line: 1705, end_line: 1708}
+  summary: Move provider and planning client patches to the planning module.
+  rationale: Exercise planning with predictable test dependencies.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span: {start_line: 1708, end_line: 1708}
+  summary: Patch planning client construction in the application module.
+  rationale: Keep the integration test independent of external providers.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span: {start_line: 1712, end_line: 1713}
+  summary: Remove CLI-local provider and issue client patches.
+  rationale: Those dependencies are now owned by the planning application.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span: {start_line: 1715, end_line: 1715}
+  summary: Patch provider credential resolution in the planning module.
+  rationale: Keep the integration scenario independent of live credentials.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span: {start_line: 1718, end_line: 1718}
+  summary: Move taxonomy loading patch to the application module.
+  rationale: Keep Structrr test taxonomy deterministic.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span: {start_line: 1721, end_line: 1730}
+  summary: Configure deterministic service, provider, and planning dependencies.
+  rationale: Validate the extracted flow without invoking external systems.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span: {start_line: 1738, end_line: 1738}
+  summary: Move the Procedrr planning stub to the application module.
+  rationale: Ensure the application boundary drives plan generation.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span: {start_line: 1748, end_line: 1748}
+  summary: Move the planning procedure stub to the application module.
+  rationale: Keep the integration test deterministic.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span: {start_line: 1763, end_line: 1765}
+  summary: Patch PR publication through the planning application module.
+  rationale: Verify publication remains part of the extracted workflow.
+entities:
+- id: planning-session-application
+  type: Function
+  action: added
+- id: planning-session-configuration
+  type: Struct
+  action: added
+- id: planning-session-result
+  type: Struct
+  action: added
+- id: planning-session-application-tests
+  type: Integration test
+  action: added
+entity_relationships:
+- id: cli-uses-planning-session-application
+  type: uses
+  source: planning-session-application
+  target: planning-session-configuration
+  action: added
+  description: The CLI maps parsed flags to the typed application configuration.
+- id: planning-session-application-is-tested
+  type: verifies
+  source: planning-session-application-tests
+  target: planning-session-application
+  action: added
+  description: Deterministic integration coverage exercises planning through the new application boundary.
+invariants:
+- id: planning-output-presentation-remains-in-cli
+  description: The planning application returns structured results and the CLI owns text and JSON rendering.
+  action: added
+- id: planning-service-and-recovery-semantics-are-preserved
+  description: Planning continues to use the service bridge, pinned source revision, provider configuration, local checkpoint store, GitHub checkpoint archive, Structrr baseline, generated-file staging, and review PR publication.
+  action: added
+guidance: []

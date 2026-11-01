@@ -28,7 +28,7 @@
 .topbar-right,
 .breadcrumb,
 .sidebar-section-heading,
-.jobs-placeholder__heading,
+.job-section__heading,
 .conversation-row,
 .conversation-row__meta,
 .new-chat-button,
@@ -81,7 +81,7 @@
 .repository-select-label,
 .eyebrow,
 .sidebar-section-heading,
-.jobs-placeholder__heading {
+.job-section__heading {
   color: var(--muted);
   font-size: 10px;
   font-weight: 700;
@@ -163,17 +163,35 @@
 .status-dot,.connection-dot { width: 6px; height: 6px; display: inline-block; background: #35ad7a; border-radius: 50%; }
 .sidebar-empty { padding: 2px 9px; color: var(--muted); font-size: 11px; line-height: 1.5; }
 
-.jobs-placeholder {
-  margin-top: auto;
-  padding: 13px 8px 14px;
+.job-section {
+  min-height: 150px;
+  flex: 0 1 35%;
+  display: flex;
+  flex-direction: column;
+  margin-top: 13px;
+  padding: 12px 1px 9px;
   border-top: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
 }
-.jobs-placeholder__heading { justify-content: space-between; }
-.coming-soon { padding: 3px 5px; color: var(--muted); background: var(--tag); border-radius: 4px; font-size: 8px; letter-spacing: .7px; }
-.jobs-placeholder__content { display: flex; align-items: center; gap: 10px; margin: 13px 2px 1px; }
-.jobs-placeholder__icon { width: 25px; height: 25px; display: grid; place-items: center; color: var(--quiet); background: var(--tag); border-radius: 7px; font-size: 19px; }
-.jobs-placeholder__content p { color: var(--muted); font-size: 10px; line-height: 1.5; }
+.job-section__heading { justify-content: space-between; margin: 0 7px 8px; }
+.job-section__heading span:last-child { color: var(--quiet); font-weight: 500; letter-spacing: 0; }
+.job-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; padding: 3px; background: var(--tag); border-radius: 7px; }
+.job-tabs button { display: flex; min-width: 0; align-items: center; justify-content: center; gap: 5px; padding: 6px 3px; color: var(--muted); background: transparent; border: 0; border-radius: 5px; font: inherit; font-size: 9px; cursor: pointer; }
+.job-tabs button[aria-selected="true"] { color: var(--ink); background: var(--control); box-shadow: 0 1px 3px rgb(25 26 38 / 9%); }
+.job-tabs button span { color: var(--quiet); font-size: 8px; }
+.job-list { min-height: 0; flex: 1; overflow-y: auto; margin-top: 6px; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+.job-row { width: 100%; display: flex; align-items: center; gap: 9px; padding: 7px 8px; color: var(--subtle); background: transparent; border: 0; border-radius: 7px; text-align: left; cursor: pointer; }
+.job-row:hover { background: var(--hover); }
+.job-row.is-active { color: var(--ink); background: var(--selected); }
+.job-row__dot { width: 7px; height: 7px; flex: 0 0 7px; background: var(--quiet); border-radius: 50%; }
+.job-row__dot--running { background: #35ad7a; animation: pulse 1.4s infinite; }
+.job-row__dot--waiting-for-input { background: #d99539; }
+.job-row__dot--waiting-for-external,.job-row__dot--interrupted { background: #9275e8; }
+.job-row__dot--ready { background: #6697dd; }
+.job-row__dot--pending { background: var(--quiet); }
+.job-row__text { min-width: 0; display: flex; flex: 1; flex-direction: column; gap: 3px; }
+.job-row__title { overflow: hidden; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.job-row__meta { color: var(--quiet); font-size: 8px; }
+.job-list__empty { margin: 9px 8px; color: var(--muted); font-size: 9px; line-height: 1.5; }
 .sidebar-footer { padding-top: 10px; }
 .repo-footer { min-width: 0; gap: 9px; padding: 5px 3px; }
 .repo-avatar { width: 27px; height: 27px; display: grid; place-items: center; color: var(--subtle); background: var(--tag); border-radius: 50%; font-size: 10px; font-weight: 700; }
@@ -201,6 +219,40 @@
 .app-footer i { margin-left: 4px; color: var(--accent); font-style: normal; }
 
 .conversation-view { min-height: 0; flex: 1; display: flex; flex-direction: column; }
+.job-status-view { min-height: 0; flex: 1; display: flex; flex-direction: column; overflow-y: auto; }
+.job-status-loading,.job-status-error { width: min(820px, calc(100% - 64px)); display: flex; align-items: center; gap: 9px; margin: 70px auto; color: var(--muted); font-size: 12px; }
+.job-status-error { padding: 12px; color: var(--error); background: var(--error-bg); border-radius: 8px; }
+.job-status { width: min(820px, calc(100% - 64px)); margin: 35px auto 20px; }
+.job-status__header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding-bottom: 21px; border-bottom: 1px solid var(--line); }
+.job-status__header .eyebrow { color: var(--accent); }
+.job-status__header h1 { margin: 8px 0 6px; color: var(--ink); font-size: 22px; font-weight: 650; letter-spacing: -.65px; }
+.job-status__kind { color: var(--muted); font-size: 10px; }
+.job-state { display: inline-flex; flex: 0 0 auto; align-items: center; gap: 7px; padding: 7px 10px; color: var(--subtle); background: var(--tag); border-radius: 99px; font-size: 10px; }
+.job-state > span { width: 6px; height: 6px; background: var(--quiet); border-radius: 50%; }
+.job-state--running > span { background: #35ad7a; animation: pulse 1.4s infinite; }
+.job-state--ready > span { background: #6697dd; }
+.job-state--waiting-for-input > span { background: #d99539; }
+.job-state--waiting-for-external > span,.job-state--interrupted > span { background: #9275e8; }
+.job-state--failed > span { background: var(--error); }
+.job-state--succeeded > span { background: #35ad7a; }
+.job-status__body { display: flex; flex-direction: column; gap: 25px; padding: 23px 0; }
+.job-status__section h2 { margin: 0 0 10px; color: var(--ink); font-size: 11px; font-weight: 650; }
+.job-status__detail,.job-status__notice p { margin: 0; color: var(--body); font-size: 12px; line-height: 1.65; white-space: pre-wrap; }
+.job-status__stage { display: inline-flex; align-items: center; gap: 8px; margin: 0; padding: 9px 12px; color: var(--subtle); background: var(--selected); border-radius: 8px; font-size: 11px; }
+.job-status__notice { padding: 13px; background: var(--control); border: 1px solid var(--line); border-radius: 9px; }
+.job-status__notice pre { overflow: auto; margin: 10px 0 0; padding: 9px; color: var(--code-ink); background: var(--code-bg); border-radius: 6px; font: 10px/1.5 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; }
+.job-status__list,.job-status__outputs { display: flex; flex-direction: column; gap: 7px; padding: 0; margin: 0; list-style: none; }
+.job-status__list li { display: flex; justify-content: space-between; gap: 14px; padding: 9px 11px; background: var(--control); border: 1px solid var(--line); border-radius: 7px; color: var(--subtle); font-size: 10px; }
+.job-state-label { flex: 0 0 auto; color: var(--muted); }
+.job-state-label--ready { color: #6697dd; }
+.job-state-label--succeeded { color: #35ad7a; }
+.job-state-label--failed { color: var(--error); }
+.job-status__metadata { display: flex; flex-wrap: wrap; gap: 9px; margin: 0; }
+.job-status__metadata div { min-width: 145px; display: flex; flex-direction: column; gap: 5px; padding: 10px 12px; background: var(--control); border: 1px solid var(--line); border-radius: 7px; }
+.job-status__metadata dt { color: var(--muted); font-size: 9px; }
+.job-status__metadata dd { margin: 0; color: var(--subtle); font: 10px var(--mono); overflow-wrap: anywhere; }
+.job-status__outputs code { display: block; padding: 10px 12px; color: var(--code-ink); background: var(--code-bg); border-radius: 7px; font: 10px var(--mono); overflow-wrap: anywhere; }
+.job-status__empty { margin: 25px 0; color: var(--muted); font-size: 12px; }
 .conversation-heading { width: min(790px, calc(100% - 64px)); justify-content: space-between; gap: 18px; margin: 34px auto 0; }
 .conversation-heading .eyebrow { color: var(--accent); font-size: 9px; letter-spacing: 1.2px; }
 .conversation-heading h1 { margin: 6px 0 0; overflow: hidden; color: var(--ink); font-size: 20px; font-weight: 650; letter-spacing: -.55px; text-overflow: ellipsis; white-space: nowrap; }
@@ -354,6 +406,11 @@ button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible,
   .topbar { height: 51px; flex-basis: 51px; }
   .connection-state { font-size: 9px; }
   .conversation-heading,.transcript,.composer-wrap,.conversation-error { width: calc(100% - 30px); }
+  .job-status { width: calc(100% - 30px); margin-top: 24px; }
+  .job-status-loading,.job-status-error { width: calc(100% - 30px); }
+  .job-status__header { flex-direction: column; gap: 12px; }
+  .job-status__header h1 { font-size: 19px; }
+  .job-status__metadata div { min-width: min(145px, 100%); }
   .conversation-heading { margin-top: 24px; }
   .conversation-heading h1 { font-size: 17px; }
   .working-pill { padding: 5px 7px; font-size: 9px; }

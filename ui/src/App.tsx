@@ -3,28 +3,32 @@ import type { FormEvent, KeyboardEvent } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { workspaceClient } from './api/client'
-import type { Conversation, Message, WorkspaceRepository, WorkspaceSnapshot } from './api/types'
+import type { Conversation, Message, WorkspaceJobDetail, WorkspaceRepository, WorkspaceSnapshot } from './api/types'
 import { WorkspaceApiError } from './api/types'
+import { JobStatus } from './components/JobStatus'
 import { QuestionCard } from './components/QuestionCard'
 import './App.css'
 
 type LoadState = 'checking' | 'signed-out' | 'loading' | 'ready'
 type Theme = 'light' | 'dark' | 'system'
 
-function readSelection(): { repositoryId: string | null; conversationId: string | null } {
+function readSelection(): { repositoryId: string | null; conversationId: string | null; jobId: string | null } {
   const params = new URLSearchParams(window.location.search)
   return {
     repositoryId: params.get('repository'),
     conversationId: params.get('conversation'),
+    jobId: params.get('job'),
   }
 }
 
-function updateUrl(repositoryId: string | null, conversationId: string | null): void {
+function updateUrl(repositoryId: string | null, conversationId: string | null, jobId: string | null = null): void {
   const url = new URL(window.location.href)
   if (repositoryId) url.searchParams.set('repository', repositoryId)
   else url.searchParams.delete('repository')
   if (conversationId) url.searchParams.set('conversation', conversationId)
   else url.searchParams.delete('conversation')
+  if (jobId) url.searchParams.set('job', jobId)
+  else url.searchParams.delete('job')
   window.history.pushState({}, '', url)
 }
 
@@ -77,12 +81,53 @@ function ConversationItem({
   )
 }
 
+function JobItem({
+  job,
+  active,
+  onClick,
+}: {
+  job: WorkspaceSnapshot['jobs'][number]
+  active: boolean
+  onClick: () => void
+}) {
+  const labels: Record<typeof job.state, string> = {
+    pending: 'Pending',
+    ready: 'Ready',
+    running: 'Running',
+    waiting_for_input: 'Needs input',
+    waiting_for_external: 'Waiting',
+    interrupted: 'Interrupted',
+    succeeded: 'Done',
+    failed: 'Failed',
+    cancelled: 'Cancelled',
+  }
+  return (
+    <button
+      className={`job-row${active ? ' is-active' : ''}`}
+      type="button"
+      onClick={onClick}
+      aria-current={active ? 'page' : undefined}
+      title={job.title}
+    >
+      <span className={`job-row__dot job-row__dot--${job.state.replaceAll('_', '-')}`} aria-hidden="true" />
+      <span className="job-row__text">
+        <span className="job-row__title">{job.title}</span>
+        <span className="job-row__meta">{job.kind === 'planning' ? 'Planning' : 'PR execution'} · {labels[job.state]}</span>
+      </span>
+    </button>
+  )
+}
+
 function App() {
   const [loadState, setLoadState] = useState<LoadState>('checking')
   const [repositories, setRepositories] = useState<WorkspaceRepository[]>([])
   const [repositoryId, setRepositoryId] = useState<string | null>(readSelection().repositoryId)
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [conversationId, setConversationId] = useState<string | null>(readSelection().conversationId)
+  const [selectedJobId, setSelectedJobId] = useState<string | null>(readSelection().jobId)
+  const [jobTab, setJobTab] = useState<'running' | 'ready'>('running')
+  const [jobDetail, setJobDetail] = useState<WorkspaceJobDetail | null>(null)
+  const [jobDetailError, setJobDetailError] = useState<{ jobId: string; message: string } | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
   const [snapshot, setSnapshot] = useState<WorkspaceSnapshot | null>(null)
   const [token, setToken] = useState('')
@@ -100,11 +145,13 @@ function App() {
   const transcriptRef = useRef<HTMLDivElement>(null)
   const followTranscriptRef = useRef(true)
   const conversationRef = useRef<string | null>(conversationId)
+  const selectedJobRef = useRef<string | null>(selectedJobId)
   const eventCursorRef = useRef(0)
 
   const draft = conversationId ? drafts[conversationId] ?? '' : ''
 
   const selectedConversation = conversations.find((item) => item.conversation_id === conversationId) ?? null
+  const selectedJob = snapshot?.jobs.find((item) => item.job_id === selectedJobId) ?? null
   const activeTurn = snapshot?.active_turns.find((item) => item.conversation_id === conversationId)
   const activeQuestion = snapshot?.active_questions.find((item) => item.conversation_id === conversationId)
   const filteredConversations = useMemo(() => {
@@ -122,13 +169,15 @@ function App() {
     eventCursorRef.current = nextSnapshot.event_cursor
     setConversations(nextConversations)
     const currentId = conversationRef.current
-    const nextId = nextConversations.some((item) => item.conversation_id === currentId)
+    const nextId = selectedJobRef.current
+      ? null
+      : nextConversations.some((item) => item.conversation_id === currentId)
       ? currentId
       : nextConversations[0]?.conversation_id ?? null
     if (nextId !== currentId) {
       conversationRef.current = nextId
       setConversationId(nextId)
-      updateUrl(selectedRepository, nextId)
+      updateUrl(selectedRepository, nextId, selectedJobRef.current)
     }
     if (nextId) {
       setMessages(await workspaceClient.messages(selectedRepository, nextId))
@@ -148,7 +197,7 @@ function App() {
     setRepositoryId(nextRepositoryId)
     if (nextRepositoryId) {
       await refreshWorkspace(nextRepositoryId)
-      updateUrl(nextRepositoryId, conversationRef.current)
+      updateUrl(nextRepositoryId, conversationRef.current, selectedJobRef.current)
     } else {
       setSnapshot(null)
       eventCursorRef.current = 0
@@ -188,6 +237,32 @@ function App() {
   useEffect(() => {
     conversationRef.current = conversationId
   }, [conversationId])
+
+  useEffect(() => {
+    selectedJobRef.current = selectedJobId
+  }, [selectedJobId])
+
+  useEffect(() => {
+    if (!repositoryId || !selectedJobId || loadState !== 'ready') return
+    let current = true
+    void workspaceClient.jobDetail(repositoryId, selectedJobId).then(
+      (detail) => {
+        if (current) {
+          setJobDetail(detail)
+          setJobDetailError(null)
+        }
+      },
+      (cause: unknown) => {
+        if (current) {
+          setJobDetailError({
+            jobId: selectedJobId,
+            message: cause instanceof Error ? cause.message : 'Job status could not be loaded.',
+          })
+        }
+      },
+    )
+    return () => { current = false }
+  }, [loadState, repositoryId, selectedJobId, selectedJob?.revision])
 
   useEffect(() => {
     localStorage.setItem('powdrr-chat-drafts', JSON.stringify(drafts))
@@ -245,6 +320,8 @@ function App() {
       const selected = readSelection()
       conversationRef.current = selected.conversationId
       setConversationId(selected.conversationId)
+      selectedJobRef.current = selected.jobId
+      setSelectedJobId(selected.jobId)
       if (selected.repositoryId && selected.repositoryId !== repositoryId) {
         setRepositoryId(selected.repositoryId)
         void refreshWorkspace(selected.repositoryId).catch((cause: unknown) => {
@@ -300,7 +377,9 @@ function App() {
       setRepositories(nextRepositories)
       setRepositoryId(repository.repository_id)
       setConversationId(null)
+      setSelectedJobId(null)
       conversationRef.current = null
+      selectedJobRef.current = null
       setRepoPath('')
       await refreshWorkspace(repository.repository_id)
       updateUrl(repository.repository_id, conversationRef.current)
@@ -318,6 +397,8 @@ function App() {
     try {
       const conversation = await workspaceClient.createConversation(repositoryId)
       conversationRef.current = conversation.conversation_id
+      selectedJobRef.current = null
+      setSelectedJobId(null)
       setConversationId(conversation.conversation_id)
       setMessages([])
       await refreshWorkspace(repositoryId)
@@ -333,10 +414,22 @@ function App() {
 
   const selectConversation = (id: string) => {
     conversationRef.current = id
+    selectedJobRef.current = null
+    setSelectedJobId(null)
     setConversationId(id)
     setDrafts((previous) => ({ ...previous, [id]: previous[id] ?? '' }))
     setMobileSidebarOpen(false)
     if (repositoryId) updateUrl(repositoryId, id)
+  }
+
+  const selectJob = (id: string) => {
+    conversationRef.current = null
+    selectedJobRef.current = id
+    setConversationId(null)
+    setSelectedJobId(id)
+    setMessages([])
+    setMobileSidebarOpen(false)
+    if (repositoryId) updateUrl(repositoryId, null, id)
   }
 
   const sendMessage = async () => {
@@ -386,6 +479,8 @@ function App() {
   const selectRepository = async (id: string) => {
     setRepositoryId(id)
     conversationRef.current = null
+    selectedJobRef.current = null
+    setSelectedJobId(null)
     setConversationId(null)
     updateUrl(id, null)
     setMobileSidebarOpen(false)
@@ -423,6 +518,11 @@ function App() {
   const hasRepository = Boolean(repositoryId)
   const currentConversationId = conversationId ?? ''
   const currentRepository = repositories.find((item) => item.repository_id === repositoryId)
+  const runningJobs = (snapshot?.jobs ?? []).filter((job) =>
+    ['running', 'waiting_for_input', 'waiting_for_external', 'interrupted'].includes(job.state),
+  )
+  const readyJobs = (snapshot?.jobs ?? []).filter((job) => ['ready', 'pending'].includes(job.state))
+  const visibleJobs = jobTab === 'running' ? runningJobs : readyJobs
 
   return (
     <div className={`workspace${mobileSidebarOpen ? ' sidebar-open' : ''}`}>
@@ -462,13 +562,21 @@ function App() {
               ))}
               {filteredConversations.length === 0 && <p className="sidebar-empty">{search ? 'No chats match your search.' : 'Your design chats will appear here.'}</p>}
             </nav>
-            <div className="jobs-placeholder">
-              <div className="jobs-placeholder__heading"><span>JOBS</span><span className="coming-soon">NEXT</span></div>
-              <div className="jobs-placeholder__content">
-                <span className="jobs-placeholder__icon" aria-hidden="true">⌁</span>
-                <p>Planning and PR work<br />will show up here.</p>
+            <section className="job-section" aria-label="Autonomous jobs">
+              <div className="job-section__heading"><span>JOBS</span><span>{runningJobs.length + readyJobs.length}</span></div>
+              <div className="job-tabs" role="tablist" aria-label="Job status">
+                <button type="button" role="tab" aria-selected={jobTab === 'running'} onClick={() => setJobTab('running')}>Running <span>{runningJobs.length}</span></button>
+                <button type="button" role="tab" aria-selected={jobTab === 'ready'} onClick={() => setJobTab('ready')}>Ready / pending <span>{readyJobs.length}</span></button>
               </div>
-            </div>
+              <nav className="job-list" aria-label={jobTab === 'running' ? 'Running jobs' : 'Ready and pending jobs'}>
+                {visibleJobs.map((job) => (
+                  <JobItem key={job.job_id} job={job} active={job.job_id === selectedJobId} onClick={() => selectJob(job.job_id)} />
+                ))}
+                {visibleJobs.length === 0 && (
+                  <p className="job-list__empty">{jobTab === 'running' ? 'No jobs are running.' : 'No jobs are ready or pending.'}</p>
+                )}
+              </nav>
+            </section>
             <div className="sidebar-footer">
               <div className="repo-footer">
                 <span className="repo-avatar" aria-hidden="true">{currentRepository?.display_name.slice(0, 1).toUpperCase() ?? 'W'}</span>
@@ -485,7 +593,7 @@ function App() {
       <main className="main-pane">
         <header className="topbar">
           <button className="icon-button mobile-menu" aria-label="Open navigation" onClick={() => setMobileSidebarOpen(true)}>☰</button>
-          <div className="breadcrumb"><span>{currentRepository?.display_name ?? 'Workspace'}</span><span className="breadcrumb-divider">/</span><span>{selectedConversation?.title ?? 'Design workspace'}</span></div>
+          <div className="breadcrumb"><span>{currentRepository?.display_name ?? 'Workspace'}</span><span className="breadcrumb-divider">/</span><span>{selectedJob?.title ?? selectedConversation?.title ?? 'Design workspace'}</span></div>
           <div className="topbar-right">
             <span className={`connection-state ${connection}`}><span className="connection-dot" />{connection === 'connected' ? 'Connected' : 'Reconnecting'}</span>
             <button className="icon-button topbar-theme" aria-label={`Theme: ${theme}`} onClick={() => setTheme(theme === 'system' ? 'light' : theme === 'light' ? 'dark' : 'system')}>{theme === 'dark' ? '☾' : theme === 'light' ? '☼' : '◐'}</button>
@@ -510,6 +618,14 @@ function App() {
               <small>Only the selected repository is available to this workspace.</small>
             </form>
           </section>
+        ) : selectedJobId ? (
+          <div className="job-status-view">
+            {jobDetail?.job.job_id === selectedJobId ? <JobStatus detail={jobDetail} /> : jobDetailError?.jobId === selectedJobId ? (
+              <div className="job-status-error" role="alert">{jobDetailError.message}</div>
+            ) : (
+              <div className="job-status-loading"><span className="pulse-dot" />Loading job status…</div>
+            )}
+          </div>
         ) : selectedConversation ? (
           <section className="conversation-view" aria-label="Design conversation">
             <div className="conversation-heading">

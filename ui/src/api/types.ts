@@ -58,11 +58,54 @@ export type WorkspaceQuestion = {
   updated_at: string
 }
 
+export type WorkspaceJob = {
+  schema_version: 1
+  job_id: string
+  repository_id: string
+  kind: 'planning' | 'pr_execution'
+  title: string
+  state: 'pending' | 'ready' | 'running' | 'waiting_for_input' | 'waiting_for_external' | 'interrupted' | 'succeeded' | 'failed' | 'cancelled'
+  conversation_id: string | null
+  dependency_ids: string[]
+  artifact_refs: string[]
+  detail: string
+  revision: number
+  created_at: string
+  updated_at: string
+}
+
+export type WorkspaceJobAttempt = {
+  schema_version: 1
+  attempt_id: string
+  run_id: string
+  source_spec_revision: string | null
+  created_at: string
+}
+
+export type WorkspaceJobBlocker = {
+  schema_version: 1
+  job_id: string
+  title: string
+  state: WorkspaceJob['state']
+}
+
+export type WorkspaceJobDetail = {
+  schema_version: 1
+  job: WorkspaceJob
+  latest_attempt: WorkspaceJobAttempt | null
+  attempts: WorkspaceJobAttempt[]
+  stage: string | null
+  blockers: WorkspaceJobBlocker[]
+  question: WorkspaceQuestion | null
+  outputs: string[]
+  allowed_actions: Array<'start' | 'cancel' | 'retry' | 'resume'>
+}
+
 export type WorkspaceSnapshot = {
   schema_version: 1
   repository_id: string
   conversations: Conversation[]
-  jobs: unknown[]
+  jobs: WorkspaceJob[]
   active_turns: WorkspaceTurn[]
   active_questions: WorkspaceQuestion[]
   event_cursor: number

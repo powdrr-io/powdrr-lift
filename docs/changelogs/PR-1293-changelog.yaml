@@ -1,0 +1,871 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1293
+title: Reduce planning calls with deterministic filtering
+intent:
+  problem: Large plan generation spends excessive time asking repeated or derivable questions and its operational cost is difficult to inspect.
+  goal: Batch independent planning questions, derive safe answers from pinned facts, reduce work-unit response size, and record privacy-conscious cost summaries.
+human-decisions: []
+structured_files: []
+files:
+- path: packages/local/src/powdrr_local/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 439
+    end_line: 439
+  summary: Aggregate bounded planning-call, deterministic-decision, pagination, and repository-search telemetry.
+  rationale: Keep compact cost and search summaries local without exposing journal answer content.
+- path: packages/local/src/powdrr_local/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 457
+    end_line: 457
+  summary: Aggregate bounded planning-call, deterministic-decision, pagination, and repository-search telemetry.
+  rationale: Keep compact cost and search summaries local without exposing journal answer content.
+- path: packages/local/src/powdrr_local/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 504
+    end_line: 552
+  summary: Aggregate bounded planning-call, deterministic-decision, pagination, and repository-search telemetry.
+  rationale: Keep compact cost and search summaries local without exposing journal answer content.
+- path: packages/local/src/powdrr_local/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 581
+    end_line: 594
+  summary: Aggregate bounded planning-call, deterministic-decision, pagination, and repository-search telemetry.
+  rationale: Keep compact cost and search summaries local without exposing journal answer content.
+- path: packages/local/src/powdrr_local/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 544
+    end_line: 544
+  summary: Aggregate bounded planning-call, deterministic-decision, pagination, and repository-search telemetry.
+  rationale: Keep compact cost and search summaries local without exposing journal answer content.
+- path: packages/local/src/powdrr_local/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 612
+    end_line: 641
+  summary: Aggregate bounded planning-call, deterministic-decision, pagination, and repository-search telemetry.
+  rationale: Keep compact cost and search summaries local without exposing journal answer content.
+- path: packages/local/src/powdrr_local/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 655
+    end_line: 659
+  summary: Aggregate bounded planning-call, deterministic-decision, pagination, and repository-search telemetry.
+  rationale: Keep compact cost and search summaries local without exposing journal answer content.
+- path: packages/local/src/powdrr_local/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 696
+    end_line: 711
+  summary: Aggregate bounded planning-call, deterministic-decision, pagination, and repository-search telemetry.
+  rationale: Keep compact cost and search summaries local without exposing journal answer content.
+- path: packages/local/src/powdrr_local/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 730
+    end_line: 759
+  summary: Aggregate bounded planning-call, deterministic-decision, pagination, and repository-search telemetry.
+  rationale: Keep compact cost and search summaries local without exposing journal answer content.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 42
+    end_line: 42
+  summary: Derive catalog and runtime fields and version the compact work-unit proposal contract.
+  rationale: Remove model-authored fields that are already determined by pinned paths and singleton catalogs.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 87
+    end_line: 88
+  summary: Derive catalog and runtime fields and version the compact work-unit proposal contract.
+  rationale: Remove model-authored fields that are already determined by pinned paths and singleton catalogs.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 92
+    end_line: 92
+  summary: Derive catalog and runtime fields and version the compact work-unit proposal contract.
+  rationale: Remove model-authored fields that are already determined by pinned paths and singleton catalogs.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 106
+    end_line: 110
+  summary: Derive catalog and runtime fields and version the compact work-unit proposal contract.
+  rationale: Remove model-authored fields that are already determined by pinned paths and singleton catalogs.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 109
+    end_line: 109
+  summary: Derive catalog and runtime fields and version the compact work-unit proposal contract.
+  rationale: Remove model-authored fields that are already determined by pinned paths and singleton catalogs.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 132
+    end_line: 135
+  summary: Derive catalog and runtime fields and version the compact work-unit proposal contract.
+  rationale: Remove model-authored fields that are already determined by pinned paths and singleton catalogs.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 159
+    end_line: 163
+  summary: Derive catalog and runtime fields and version the compact work-unit proposal contract.
+  rationale: Remove model-authored fields that are already determined by pinned paths and singleton catalogs.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 380
+    end_line: 381
+  summary: Derive catalog and runtime fields and version the compact work-unit proposal contract.
+  rationale: Remove model-authored fields that are already determined by pinned paths and singleton catalogs.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 385
+    end_line: 385
+  summary: Derive catalog and runtime fields and version the compact work-unit proposal contract.
+  rationale: Remove model-authored fields that are already determined by pinned paths and singleton catalogs.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 368
+    end_line: 368
+  summary: Derive catalog and runtime fields and version the compact work-unit proposal contract.
+  rationale: Remove model-authored fields that are already determined by pinned paths and singleton catalogs.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 370
+    end_line: 370
+  summary: Derive catalog and runtime fields and version the compact work-unit proposal contract.
+  rationale: Remove model-authored fields that are already determined by pinned paths and singleton catalogs.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 372
+    end_line: 372
+  summary: Derive catalog and runtime fields and version the compact work-unit proposal contract.
+  rationale: Remove model-authored fields that are already determined by pinned paths and singleton catalogs.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 427
+    end_line: 431
+  summary: Derive catalog and runtime fields and version the compact work-unit proposal contract.
+  rationale: Remove model-authored fields that are already determined by pinned paths and singleton catalogs.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 400
+    end_line: 405
+  summary: Derive catalog and runtime fields and version the compact work-unit proposal contract.
+  rationale: Remove model-authored fields that are already determined by pinned paths and singleton catalogs.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 427
+    end_line: 427
+  summary: Derive catalog and runtime fields and version the compact work-unit proposal contract.
+  rationale: Remove model-authored fields that are already determined by pinned paths and singleton catalogs.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 443
+    end_line: 443
+  summary: Derive catalog and runtime fields and version the compact work-unit proposal contract.
+  rationale: Remove model-authored fields that are already determined by pinned paths and singleton catalogs.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 490
+    end_line: 497
+  summary: Derive catalog and runtime fields and version the compact work-unit proposal contract.
+  rationale: Remove model-authored fields that are already determined by pinned paths and singleton catalogs.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 463
+    end_line: 466
+  summary: Derive catalog and runtime fields and version the compact work-unit proposal contract.
+  rationale: Remove model-authored fields that are already determined by pinned paths and singleton catalogs.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 469
+    end_line: 469
+  summary: Derive catalog and runtime fields and version the compact work-unit proposal contract.
+  rationale: Remove model-authored fields that are already determined by pinned paths and singleton catalogs.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 590
+    end_line: 605
+  summary: Derive catalog and runtime fields and version the compact work-unit proposal contract.
+  rationale: Remove model-authored fields that are already determined by pinned paths and singleton catalogs.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 608
+    end_line: 608
+  summary: Derive catalog and runtime fields and version the compact work-unit proposal contract.
+  rationale: Remove model-authored fields that are already determined by pinned paths and singleton catalogs.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 615
+    end_line: 615
+  summary: Derive catalog and runtime fields and version the compact work-unit proposal contract.
+  rationale: Remove model-authored fields that are already determined by pinned paths and singleton catalogs.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 626
+    end_line: 631
+  summary: Derive catalog and runtime fields and version the compact work-unit proposal contract.
+  rationale: Remove model-authored fields that are already determined by pinned paths and singleton catalogs.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 636
+    end_line: 636
+  summary: Derive catalog and runtime fields and version the compact work-unit proposal contract.
+  rationale: Remove model-authored fields that are already determined by pinned paths and singleton catalogs.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 639
+    end_line: 639
+  summary: Derive catalog and runtime fields and version the compact work-unit proposal contract.
+  rationale: Remove model-authored fields that are already determined by pinned paths and singleton catalogs.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 671
+    end_line: 676
+  summary: Derive catalog and runtime fields and version the compact work-unit proposal contract.
+  rationale: Remove model-authored fields that are already determined by pinned paths and singleton catalogs.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 787
+    end_line: 787
+  summary: Derive catalog and runtime fields and version the compact work-unit proposal contract.
+  rationale: Remove model-authored fields that are already determined by pinned paths and singleton catalogs.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 789
+    end_line: 789
+  summary: Derive catalog and runtime fields and version the compact work-unit proposal contract.
+  rationale: Remove model-authored fields that are already determined by pinned paths and singleton catalogs.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 791
+    end_line: 791
+  summary: Derive catalog and runtime fields and version the compact work-unit proposal contract.
+  rationale: Remove model-authored fields that are already determined by pinned paths and singleton catalogs.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 793
+    end_line: 793
+  summary: Derive catalog and runtime fields and version the compact work-unit proposal contract.
+  rationale: Remove model-authored fields that are already determined by pinned paths and singleton catalogs.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 842
+    end_line: 845
+  summary: Derive catalog and runtime fields and version the compact work-unit proposal contract.
+  rationale: Remove model-authored fields that are already determined by pinned paths and singleton catalogs.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 831
+    end_line: 832
+  summary: Derive catalog and runtime fields and version the compact work-unit proposal contract.
+  rationale: Remove model-authored fields that are already determined by pinned paths and singleton catalogs.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 837
+    end_line: 838
+  summary: Derive catalog and runtime fields and version the compact work-unit proposal contract.
+  rationale: Remove model-authored fields that are already determined by pinned paths and singleton catalogs.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 889
+    end_line: 896
+  summary: Derive catalog and runtime fields and version the compact work-unit proposal contract.
+  rationale: Remove model-authored fields that are already determined by pinned paths and singleton catalogs.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 5
+    end_line: 5
+  summary: Batch planning frontiers and derive safe source and zero-hit coverage answers.
+  rationale: Reduce provider round trips while preserving ambiguous cases for targeted review and durable answer replay.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 346
+    end_line: 346
+  summary: Batch planning frontiers and derive safe source and zero-hit coverage answers.
+  rationale: Reduce provider round trips while preserving ambiguous cases for targeted review and durable answer replay.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 370
+    end_line: 431
+  summary: Batch planning frontiers and derive safe source and zero-hit coverage answers.
+  rationale: Reduce provider round trips while preserving ambiguous cases for targeted review and durable answer replay.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 441
+    end_line: 441
+  summary: Batch planning frontiers and derive safe source and zero-hit coverage answers.
+  rationale: Reduce provider round trips while preserving ambiguous cases for targeted review and durable answer replay.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 472
+    end_line: 472
+  summary: Batch planning frontiers and derive safe source and zero-hit coverage answers.
+  rationale: Reduce provider round trips while preserving ambiguous cases for targeted review and durable answer replay.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 502
+    end_line: 502
+  summary: Batch planning frontiers and derive safe source and zero-hit coverage answers.
+  rationale: Reduce provider round trips while preserving ambiguous cases for targeted review and durable answer replay.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 522
+    end_line: 522
+  summary: Batch planning frontiers and derive safe source and zero-hit coverage answers.
+  rationale: Reduce provider round trips while preserving ambiguous cases for targeted review and durable answer replay.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 524
+    end_line: 543
+  summary: Batch planning frontiers and derive safe source and zero-hit coverage answers.
+  rationale: Reduce provider round trips while preserving ambiguous cases for targeted review and durable answer replay.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 548
+    end_line: 548
+  summary: Batch planning frontiers and derive safe source and zero-hit coverage answers.
+  rationale: Reduce provider round trips while preserving ambiguous cases for targeted review and durable answer replay.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 570
+    end_line: 573
+  summary: Batch planning frontiers and derive safe source and zero-hit coverage answers.
+  rationale: Reduce provider round trips while preserving ambiguous cases for targeted review and durable answer replay.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 595
+    end_line: 595
+  summary: Batch planning frontiers and derive safe source and zero-hit coverage answers.
+  rationale: Reduce provider round trips while preserving ambiguous cases for targeted review and durable answer replay.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 617
+    end_line: 617
+  summary: Batch planning frontiers and derive safe source and zero-hit coverage answers.
+  rationale: Reduce provider round trips while preserving ambiguous cases for targeted review and durable answer replay.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 628
+    end_line: 628
+  summary: Batch planning frontiers and derive safe source and zero-hit coverage answers.
+  rationale: Reduce provider round trips while preserving ambiguous cases for targeted review and durable answer replay.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 630
+    end_line: 635
+  summary: Batch planning frontiers and derive safe source and zero-hit coverage answers.
+  rationale: Reduce provider round trips while preserving ambiguous cases for targeted review and durable answer replay.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 792
+    end_line: 793
+  summary: Batch planning frontiers and derive safe source and zero-hit coverage answers.
+  rationale: Reduce provider round trips while preserving ambiguous cases for targeted review and durable answer replay.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 799
+    end_line: 800
+  summary: Batch planning frontiers and derive safe source and zero-hit coverage answers.
+  rationale: Reduce provider round trips while preserving ambiguous cases for targeted review and durable answer replay.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 805
+    end_line: 805
+  summary: Batch planning frontiers and derive safe source and zero-hit coverage answers.
+  rationale: Reduce provider round trips while preserving ambiguous cases for targeted review and durable answer replay.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 812
+    end_line: 812
+  summary: Batch planning frontiers and derive safe source and zero-hit coverage answers.
+  rationale: Reduce provider round trips while preserving ambiguous cases for targeted review and durable answer replay.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 1998
+    end_line: 2063
+  summary: Batch planning frontiers and derive safe source and zero-hit coverage answers.
+  rationale: Reduce provider round trips while preserving ambiguous cases for targeted review and durable answer replay.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 11
+    end_line: 11
+  summary: Journal deterministic answers and measure phase, pagination, and model-call costs.
+  rationale: Make automatic decisions replayable and expose planning execution cost by phase.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 274
+    end_line: 274
+  summary: Journal deterministic answers and measure phase, pagination, and model-call costs.
+  rationale: Make automatic decisions replayable and expose planning execution cost by phase.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 477
+    end_line: 535
+  summary: Journal deterministic answers and measure phase, pagination, and model-call costs.
+  rationale: Make automatic decisions replayable and expose planning execution cost by phase.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 588
+    end_line: 588
+  summary: Journal deterministic answers and measure phase, pagination, and model-call costs.
+  rationale: Make automatic decisions replayable and expose planning execution cost by phase.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 528
+    end_line: 529
+  summary: Journal deterministic answers and measure phase, pagination, and model-call costs.
+  rationale: Make automatic decisions replayable and expose planning execution cost by phase.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 580
+    end_line: 585
+  summary: Journal deterministic answers and measure phase, pagination, and model-call costs.
+  rationale: Make automatic decisions replayable and expose planning execution cost by phase.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 697
+    end_line: 697
+  summary: Journal deterministic answers and measure phase, pagination, and model-call costs.
+  rationale: Make automatic decisions replayable and expose planning execution cost by phase.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 741
+    end_line: 756
+  summary: Journal deterministic answers and measure phase, pagination, and model-call costs.
+  rationale: Make automatic decisions replayable and expose planning execution cost by phase.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 760
+    end_line: 760
+  summary: Journal deterministic answers and measure phase, pagination, and model-call costs.
+  rationale: Make automatic decisions replayable and expose planning execution cost by phase.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 799
+    end_line: 799
+  summary: Journal deterministic answers and measure phase, pagination, and model-call costs.
+  rationale: Make automatic decisions replayable and expose planning execution cost by phase.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 829
+    end_line: 927
+  summary: Journal deterministic answers and measure phase, pagination, and model-call costs.
+  rationale: Make automatic decisions replayable and expose planning execution cost by phase.
+- path: src/powdrr_lift/workrr/planning_session.py
+  type: modified
+  span:
+    start_line: 123
+    end_line: 124
+  summary: Record repository-search and deterministic-answer telemetry and report a compact planning summary.
+  rationale: Give resumed planning runs local cost and decision summaries without printing answer history.
+- path: src/powdrr_lift/workrr/planning_session.py
+  type: modified
+  span:
+    start_line: 240
+    end_line: 258
+  summary: Record repository-search and deterministic-answer telemetry and report a compact planning summary.
+  rationale: Give resumed planning runs local cost and decision summaries without printing answer history.
+- path: src/powdrr_lift/workrr/planning_session.py
+  type: modified
+  span:
+    start_line: 273
+    end_line: 273
+  summary: Record repository-search and deterministic-answer telemetry and report a compact planning summary.
+  rationale: Give resumed planning runs local cost and decision summaries without printing answer history.
+- path: src/powdrr_lift/workrr/planning_session.py
+  type: modified
+  span:
+    start_line: 280
+    end_line: 285
+  summary: Record repository-search and deterministic-answer telemetry and report a compact planning summary.
+  rationale: Give resumed planning runs local cost and decision summaries without printing answer history.
+- path: src/powdrr_lift/workrr/planning_session.py
+  type: modified
+  span:
+    start_line: 312
+    end_line: 312
+  summary: Record repository-search and deterministic-answer telemetry and report a compact planning summary.
+  rationale: Give resumed planning runs local cost and decision summaries without printing answer history.
+- path: src/powdrr_lift/workrr/planning_session.py
+  type: modified
+  span:
+    start_line: 316
+    end_line: 316
+  summary: Record repository-search and deterministic-answer telemetry and report a compact planning summary.
+  rationale: Give resumed planning runs local cost and decision summaries without printing answer history.
+- path: src/powdrr_lift/workrr/planning_session.py
+  type: modified
+  span:
+    start_line: 375
+    end_line: 376
+  summary: Record repository-search and deterministic-answer telemetry and report a compact planning summary.
+  rationale: Give resumed planning runs local cost and decision summaries without printing answer history.
+- path: src/powdrr_lift/workrr/planning_session.py
+  type: modified
+  span:
+    start_line: 440
+    end_line: 465
+  summary: Record repository-search and deterministic-answer telemetry and report a compact planning summary.
+  rationale: Give resumed planning runs local cost and decision summaries without printing answer history.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 84
+    end_line: 85
+  summary: Exercise the compact work-unit schema and deterministic runtime derivation.
+  rationale: Protect semantic proposal fields and retain parser enforcement for mixed or ambiguous runtimes.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 90
+    end_line: 90
+  summary: Exercise the compact work-unit schema and deterministic runtime derivation.
+  rationale: Protect semantic proposal fields and retain parser enforcement for mixed or ambiguous runtimes.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 97
+    end_line: 97
+  summary: Exercise the compact work-unit schema and deterministic runtime derivation.
+  rationale: Protect semantic proposal fields and retain parser enforcement for mixed or ambiguous runtimes.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 156
+    end_line: 156
+  summary: Exercise the compact work-unit schema and deterministic runtime derivation.
+  rationale: Protect semantic proposal fields and retain parser enforcement for mixed or ambiguous runtimes.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 195
+    end_line: 195
+  summary: Exercise the compact work-unit schema and deterministic runtime derivation.
+  rationale: Protect semantic proposal fields and retain parser enforcement for mixed or ambiguous runtimes.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 219
+    end_line: 219
+  summary: Exercise the compact work-unit schema and deterministic runtime derivation.
+  rationale: Protect semantic proposal fields and retain parser enforcement for mixed or ambiguous runtimes.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 242
+    end_line: 242
+  summary: Exercise the compact work-unit schema and deterministic runtime derivation.
+  rationale: Protect semantic proposal fields and retain parser enforcement for mixed or ambiguous runtimes.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 406
+    end_line: 408
+  summary: Exercise the compact work-unit schema and deterministic runtime derivation.
+  rationale: Protect semantic proposal fields and retain parser enforcement for mixed or ambiguous runtimes.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 410
+    end_line: 410
+  summary: Exercise the compact work-unit schema and deterministic runtime derivation.
+  rationale: Protect semantic proposal fields and retain parser enforcement for mixed or ambiguous runtimes.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 420
+    end_line: 422
+  summary: Exercise the compact work-unit schema and deterministic runtime derivation.
+  rationale: Protect semantic proposal fields and retain parser enforcement for mixed or ambiguous runtimes.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 441
+    end_line: 447
+  summary: Exercise the compact work-unit schema and deterministic runtime derivation.
+  rationale: Protect semantic proposal fields and retain parser enforcement for mixed or ambiguous runtimes.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 601
+    end_line: 602
+  summary: Exercise the compact work-unit schema and deterministic runtime derivation.
+  rationale: Protect semantic proposal fields and retain parser enforcement for mixed or ambiguous runtimes.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 606
+    end_line: 606
+  summary: Exercise the compact work-unit schema and deterministic runtime derivation.
+  rationale: Protect semantic proposal fields and retain parser enforcement for mixed or ambiguous runtimes.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 733
+    end_line: 733
+  summary: Exercise the compact work-unit schema and deterministic runtime derivation.
+  rationale: Protect semantic proposal fields and retain parser enforcement for mixed or ambiguous runtimes.
+- path: tests/test_planning_checkpoints.py
+  type: modified
+  span:
+    start_line: 804
+    end_line: 804
+  summary: Verify large-journal telemetry summaries include search and deterministic outcomes.
+  rationale: Ensure operational summaries aggregate bounded records without loading the checkpoint history.
+- path: tests/test_planning_checkpoints.py
+  type: modified
+  span:
+    start_line: 822
+    end_line: 832
+  summary: Verify large-journal telemetry summaries include search and deterministic outcomes.
+  rationale: Ensure operational summaries aggregate bounded records without loading the checkpoint history.
+- path: tests/test_planning_checkpoints.py
+  type: modified
+  span:
+    start_line: 837
+    end_line: 860
+  summary: Verify large-journal telemetry summaries include search and deterministic outcomes.
+  rationale: Ensure operational summaries aggregate bounded records without loading the checkpoint history.
+- path: tests/test_planning_checkpoints.py
+  type: modified
+  span:
+    start_line: 868
+    end_line: 881
+  summary: Verify large-journal telemetry summaries include search and deterministic outcomes.
+  rationale: Ensure operational summaries aggregate bounded records without loading the checkpoint history.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 19
+    end_line: 23
+  summary: Cover batched frontiers, deterministic source classification, zero-hit coverage, and durable provenance.
+  rationale: Prove automated answers preserve existing plan behavior and uncertain decisions still reach the model.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 135
+    end_line: 136
+  summary: Cover batched frontiers, deterministic source classification, zero-hit coverage, and durable provenance.
+  rationale: Prove automated answers preserve existing plan behavior and uncertain decisions still reach the model.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 141
+    end_line: 141
+  summary: Cover batched frontiers, deterministic source classification, zero-hit coverage, and durable provenance.
+  rationale: Prove automated answers preserve existing plan behavior and uncertain decisions still reach the model.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 148
+    end_line: 148
+  summary: Cover batched frontiers, deterministic source classification, zero-hit coverage, and durable provenance.
+  rationale: Prove automated answers preserve existing plan behavior and uncertain decisions still reach the model.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 582
+    end_line: 582
+  summary: Cover batched frontiers, deterministic source classification, zero-hit coverage, and durable provenance.
+  rationale: Prove automated answers preserve existing plan behavior and uncertain decisions still reach the model.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 605
+    end_line: 605
+  summary: Cover batched frontiers, deterministic source classification, zero-hit coverage, and durable provenance.
+  rationale: Prove automated answers preserve existing plan behavior and uncertain decisions still reach the model.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 909
+    end_line: 916
+  summary: Cover batched frontiers, deterministic source classification, zero-hit coverage, and durable provenance.
+  rationale: Prove automated answers preserve existing plan behavior and uncertain decisions still reach the model.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 926
+    end_line: 940
+  summary: Cover batched frontiers, deterministic source classification, zero-hit coverage, and durable provenance.
+  rationale: Prove automated answers preserve existing plan behavior and uncertain decisions still reach the model.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 947
+    end_line: 948
+  summary: Cover batched frontiers, deterministic source classification, zero-hit coverage, and durable provenance.
+  rationale: Prove automated answers preserve existing plan behavior and uncertain decisions still reach the model.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 953
+    end_line: 953
+  summary: Cover batched frontiers, deterministic source classification, zero-hit coverage, and durable provenance.
+  rationale: Prove automated answers preserve existing plan behavior and uncertain decisions still reach the model.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 960
+    end_line: 960
+  summary: Cover batched frontiers, deterministic source classification, zero-hit coverage, and durable provenance.
+  rationale: Prove automated answers preserve existing plan behavior and uncertain decisions still reach the model.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 973
+    end_line: 974
+  summary: Cover batched frontiers, deterministic source classification, zero-hit coverage, and durable provenance.
+  rationale: Prove automated answers preserve existing plan behavior and uncertain decisions still reach the model.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 979
+    end_line: 979
+  summary: Cover batched frontiers, deterministic source classification, zero-hit coverage, and durable provenance.
+  rationale: Prove automated answers preserve existing plan behavior and uncertain decisions still reach the model.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 986
+    end_line: 986
+  summary: Cover batched frontiers, deterministic source classification, zero-hit coverage, and durable provenance.
+  rationale: Prove automated answers preserve existing plan behavior and uncertain decisions still reach the model.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1035
+    end_line: 1096
+  summary: Cover batched frontiers, deterministic source classification, zero-hit coverage, and durable provenance.
+  rationale: Prove automated answers preserve existing plan behavior and uncertain decisions still reach the model.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1113
+    end_line: 1118
+  summary: Cover batched frontiers, deterministic source classification, zero-hit coverage, and durable provenance.
+  rationale: Prove automated answers preserve existing plan behavior and uncertain decisions still reach the model.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1163
+    end_line: 1163
+  summary: Cover batched frontiers, deterministic source classification, zero-hit coverage, and durable provenance.
+  rationale: Prove automated answers preserve existing plan behavior and uncertain decisions still reach the model.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1118
+    end_line: 1118
+  summary: Cover batched frontiers, deterministic source classification, zero-hit coverage, and durable provenance.
+  rationale: Prove automated answers preserve existing plan behavior and uncertain decisions still reach the model.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1170
+    end_line: 1183
+  summary: Cover batched frontiers, deterministic source classification, zero-hit coverage, and durable provenance.
+  rationale: Prove automated answers preserve existing plan behavior and uncertain decisions still reach the model.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1201
+    end_line: 1219
+  summary: Cover batched frontiers, deterministic source classification, zero-hit coverage, and durable provenance.
+  rationale: Prove automated answers preserve existing plan behavior and uncertain decisions still reach the model.
+entities:
+- id: planning-question-frontier
+  type: Workflow
+  action: modified
+- id: planning-work-unit-proposal-contract
+  type: Technical specification
+  action: added
+- id: planning-telemetry-store
+  type: Module
+  action: added
+- id: planning-efficiency-test-suite
+  type: Test suite
+  action: added
+entity_relationships: []
+invariants:
+- id: deterministic-planning-answers-are-journaled
+  description: Automatic source disposition and zero-hit coverage decisions use stable question identities and are recorded with their rule provenance.
+  action: added
+- id: ambiguous-source-evidence-is-reviewed
+  description: Related-only references, ambiguous duplicates, incomplete searches, and positive search matches remain on the question path.
+  action: added
+- id: work-unit-derived-fields-are-validated
+  description: Runtime, component, and validation values are derived from pinned paths and supplied catalogs while mixed runtimes and ambiguous paths remain rejected.
+  action: added
+guidance:
+- id: keep-planning-telemetry-content-free
+  description: Operational telemetry stores counts, identifiers, digests, provider metadata, and timings but does not persist prompts, source excerpts, or answer text.
+  action: added
+

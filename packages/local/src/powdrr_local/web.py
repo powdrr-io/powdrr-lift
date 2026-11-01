@@ -6,6 +6,8 @@ import hashlib
 import hmac
 import ipaddress
 import secrets
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
 from typing import Any
 from urllib.parse import urlsplit
@@ -21,6 +23,10 @@ from starlette.concurrency import run_in_threadpool
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.responses import JSONResponse
 
+from powdrr_local.turn_dispatch_runtime import (
+    WorkspaceTurnDispatchRuntime,
+)
+from powdrr_local.turn_dispatch_supervisor import WorkspaceTurnDispatcher
 from powdrr_local.workspace import WorkspaceConflict, WorkspaceStore
 from powdrr_local.workspace_api import (
     WorkspaceApiException,
@@ -56,6 +62,7 @@ def create_app(
     repository_registry: WorkspaceRepositoryRegistry | None = None,
     dispatcher: WorkspaceCommandDispatcher | None = None,
     event_source: WorkspaceEventSource | None = None,
+    turn_dispatcher: WorkspaceTurnDispatcher | None = None,
     session_max_age: int = _SESSION_MAX_AGE_SECONDS,
 ) -> FastAPI:
     """Build an app without starting global services or touching credentials."""
@@ -84,17 +91,41 @@ def create_app(
     if not 60 <= session_max_age <= 24 * 60 * 60:
         raise ValueError("session_max_age must be between one minute and one day")
 
+    repository_source = repository_registry or store
+    turn_runtime = (
+        WorkspaceTurnDispatchRuntime(
+            store,
+            repository_source,
+            turn_dispatcher,
+            event_source=event_source,
+        )
+        if turn_dispatcher is not None
+        else None
+    )
+
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
+        if turn_runtime is not None:
+            turn_runtime.start()
+        try:
+            yield
+        finally:
+            if turn_runtime is not None:
+                await turn_runtime.stop()
+
     app = FastAPI(
         title="Powdrr Local Workspace API",
         docs_url=None,
         redoc_url=None,
         openapi_url=None,
+        lifespan=lifespan,
     )
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=[parsed.hostname])
     app.state.store = store
     app.state.bootstrap_digest = _digest(bootstrap_secret)
     app.state.expected_origin = expected_origin.rstrip("/")
     app.state.cookie_secure = parsed.scheme == "https"
+    app.state.turn_dispatch_runtime = turn_runtime
 
     async def authorize_request(request: Request, *, mutating: bool) -> None:
         if mutating:
@@ -229,7 +260,7 @@ def create_app(
     install_workspace_routes(
         app,
         store=store,
-        repository_registry=repository_registry or store,
+        repository_registry=repository_source,
         dispatcher=dispatcher,
         event_source=event_source,
     )

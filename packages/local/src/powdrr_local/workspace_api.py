@@ -7,7 +7,7 @@ import inspect
 import json
 import re
 import time
-from collections.abc import AsyncGenerator, Mapping
+from collections.abc import AsyncGenerator, Callable, Mapping
 from pathlib import Path
 from typing import Annotated, Any, Literal, Protocol
 from uuid import NAMESPACE_URL, uuid5
@@ -131,7 +131,7 @@ _EVENT_HEARTBEAT_SECONDS = 15
 _EVENT_CURSOR_PATTERN = re.compile(r"^(0|[1-9][0-9]*)$")
 
 
-def require_session(*, mutating: bool = False):
+def require_session(*, mutating: bool = False) -> Callable[..., Any]:
     async def dependency(request: Request) -> None:
         await request.app.state.authorize_request(request, mutating=mutating)
 
@@ -212,13 +212,19 @@ def install_workspace_routes(
     router = APIRouter(prefix="/api/v1")
 
     @router.get("/health")
-    async def health() -> dict[str, Any]:
+    async def health(request: Request) -> dict[str, Any]:
         if dispatcher is None:
             scheduler: Mapping[str, Any] = {"status": "not_configured"}
         elif inspect.iscoroutinefunction(dispatcher.health):
             scheduler = await dispatcher.health()
         else:
             scheduler = await run_in_threadpool(dispatcher.health)
+        turn_runtime = getattr(request.app.state, "turn_dispatch_runtime", None)
+        if turn_runtime is not None:
+            scheduler = {
+                **dict(scheduler),
+                "turn_dispatch": turn_runtime.health(),
+            }
         return {
             "status": "ok",
             "schema_version": await run_in_threadpool(lambda: store.schema_version),

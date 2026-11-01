@@ -21,8 +21,27 @@ from powdrr_lift.workrr.paths import is_dedicated_worktree
 _WORKFLOW_CONTEXT_PATH = Path(".powdrr") / "workflow-context.json"
 
 
-def _workflow_context_path(project_root: Path) -> Path:
-    return project_root / _WORKFLOW_CONTEXT_PATH
+def _workflow_context_path(
+    project_root: Path, *, conversation_id: str | None = None
+) -> Path:
+    if conversation_id is None:
+        return project_root / _WORKFLOW_CONTEXT_PATH
+    if (
+        not conversation_id
+        or len(conversation_id) > 128
+        or not conversation_id.isascii()
+        or not all(
+            character.isalnum() or character in "-_" for character in conversation_id
+        )
+    ):
+        raise ValueError("conversation_id must be a safe path component")
+    return (
+        project_root
+        / ".powdrr"
+        / "conversations"
+        / conversation_id
+        / "workflow-context.json"
+    )
 
 
 def _workflow_context_runtime(
@@ -38,8 +57,10 @@ def _workflow_context_runtime(
     )
 
 
-def _load_workflow_context(project_root: Path) -> WorkflowContext | None:
-    path = _workflow_context_path(project_root)
+def _load_workflow_context(
+    project_root: Path, *, conversation_id: str | None = None
+) -> WorkflowContext | None:
+    path = _workflow_context_path(project_root, conversation_id=conversation_id)
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
@@ -76,6 +97,7 @@ def _persist_workflow_context(
     *,
     process_id: str,
     request: str,
+    conversation_id: str | None = None,
 ) -> None:
     if not (worktree_root / ".git").exists():
         return
@@ -115,7 +137,7 @@ def _persist_workflow_context(
         process_id=process_id,
         request=request,
     )
-    path = _workflow_context_path(project_root)
+    path = _workflow_context_path(project_root, conversation_id=conversation_id)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(context.to_data(), indent=2) + "\n", encoding="utf-8")
 

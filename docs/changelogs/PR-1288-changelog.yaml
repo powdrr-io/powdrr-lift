@@ -1,5 +1,5 @@
 schema: https://powdrr.io/schema/changelog-v2
-change_id: 1287
+change_id: 1288
 title: Document deterministic planning efficiency work
 intent:
   problem: Planning can spend excessive time on repeated, unbatched, or overbroad

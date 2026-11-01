@@ -1969,6 +1969,26 @@
       "reviewed": false
     },
     {
+      "extraction_pr": "6",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "agent",
+      "path": "src/powdrr_lift/inference_ipc.py",
+      "rationale": "local IPC transport between the MiniSWE worker and service process",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "6",
+      "internal_imports": [
+        "powdrr_lift.inference_ipc"
+      ],
+      "kind": "python_module",
+      "owner": "agent",
+      "path": "src/powdrr_lift/minisweagent_inference.py",
+      "rationale": "local MiniSWE model adapter that routes requests to the service process",
+      "reviewed": false
+    },
+    {
       "extraction_pr": "3/6",
       "internal_imports": [
         "powdrr_lift.opencode_monitor"

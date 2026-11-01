@@ -6,13 +6,18 @@ import json
 import os
 import selectors
 import signal
+import socket
 import subprocess
+import threading
 import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
+from powdrr_contracts.models import ChatCompletionRequest, ChatCompletionResponse
+
+from powdrr_lift.inference_ipc import InferenceIPCError, receive_frame, send_frame
 from powdrr_lift.opencode_monitor import append_diagnostic
 
 MiniLiveness = Literal["active", "slow", "stalled", "completed", "failed"]
@@ -148,6 +153,10 @@ def run_minisweagent(
     timeout_seconds: float = 300.0,
     poll_interval: float = 10.0,
     on_snapshot: Callable[[MiniSWEAgentSnapshot], None] | None = None,
+    inference_parent: socket.socket | None = None,
+    inference_child: socket.socket | None = None,
+    inference_handler: Callable[[ChatCompletionRequest], ChatCompletionResponse]
+    | None = None,
 ) -> subprocess.CompletedProcess[str]:
     """Run mini with an inactivity timeout and trajectory liveness snapshots.
 
@@ -159,6 +168,11 @@ def run_minisweagent(
         raise ValueError("timeout_seconds must be greater than zero")
     if poll_interval <= 0:
         raise ValueError("poll_interval must be greater than zero")
+    inference_channels = (inference_parent, inference_child, inference_handler)
+    if any(value is not None for value in inference_channels) and any(
+        value is None for value in inference_channels
+    ):
+        raise ValueError("inference IPC requires both sockets and a request handler")
     process = subprocess.Popen(
         list(command),
         cwd=cwd,
@@ -166,7 +180,19 @@ def run_minisweagent(
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         start_new_session=True,
+        pass_fds=(inference_child.fileno(),) if inference_child is not None else (),
     )
+    if inference_child is not None:
+        inference_child.close()
+    inference_thread: threading.Thread | None = None
+    if inference_parent is not None and inference_handler is not None:
+        inference_thread = threading.Thread(
+            target=_serve_inference_requests,
+            args=(inference_parent, inference_handler),
+            name="powdrr-miniswe-inference",
+            daemon=True,
+        )
+        inference_thread.start()
     selector = selectors.DefaultSelector()
     if process.stdout is not None:
         selector.register(process.stdout, selectors.EVENT_READ)
@@ -282,12 +308,59 @@ def run_minisweagent(
                 process.kill()
         selector.close()
         process.wait()
+        if inference_parent is not None:
+            inference_parent.close()
+        if inference_thread is not None:
+            inference_thread.join(timeout=1.0)
     return subprocess.CompletedProcess(
         list(command),
         returncode,
         output.decode(errors="replace"),
         "",
     )
+
+
+def _serve_inference_requests(
+    connection: socket.socket,
+    handler: Callable[[ChatCompletionRequest], ChatCompletionResponse],
+) -> None:
+    while True:
+        try:
+            envelope = receive_frame(connection)
+        except (EOFError, OSError, InferenceIPCError):
+            return
+        raw_request = envelope.get("request")
+        request_id = (
+            raw_request.get("request_id", "")
+            if isinstance(raw_request, Mapping)
+            else ""
+        )
+        try:
+            request = ChatCompletionRequest.from_dict(raw_request)
+            response = handler(request)
+            send_frame(
+                connection,
+                {
+                    "request_id": request.request_id,
+                    "ok": True,
+                    "response": response.to_dict(),
+                },
+            )
+        except Exception as error:  # noqa: BLE001
+            try:
+                send_frame(
+                    connection,
+                    {
+                        "request_id": request_id,
+                        "ok": False,
+                        "error": {
+                            "type": type(error).__name__,
+                            "message": str(error),
+                        },
+                    },
+                )
+            except (OSError, InferenceIPCError):
+                return
 
 
 __all__ = [

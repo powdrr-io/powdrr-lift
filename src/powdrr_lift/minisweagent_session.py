@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
 from typing import Any, cast
 
@@ -43,6 +44,15 @@ def main() -> int:
         messages = cast("list[dict[str, Any]]", previous_messages)
 
     config_specs = args.config or [str(builtin_config_dir / "mini.yaml")]
+    model_settings: dict[str, Any] = {"model_name": args.model or UNSET}
+    inference_fd = os.environ.get("POWDRR_MINISWE_INFERENCE_FD")
+    if inference_fd is not None:
+        model_settings.update(
+            {
+                "model_class": "powdrr_lift.minisweagent_inference.IPCModel",
+                "inference_fd": int(inference_fd),
+            }
+        )
     config = recursive_merge(
         *(get_config_from_spec(spec) for spec in config_specs),
         {
@@ -53,7 +63,7 @@ def main() -> int:
                 "cost_limit": 0,
                 "output_path": args.output or UNSET,
             },
-            "model": {"model_name": args.model or UNSET},
+            "model": model_settings,
         },
     )
     model = get_model(config=config.get("model", {}))

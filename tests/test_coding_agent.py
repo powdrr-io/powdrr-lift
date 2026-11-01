@@ -328,6 +328,7 @@ def test_minisweagent_provider_uses_targeted_prompt_and_diagnostics(
         prompt_suffix="Stop after implementing the requested change.",
         progress_callback=progress_messages.append,
     )
+    monkeypatch.setenv("DEEPINFRA_API_TOKEN", "must-not-enter-worker")
     captured: dict[str, object] = {}
 
     def fake_run(
@@ -365,7 +366,7 @@ def test_minisweagent_provider_uses_targeted_prompt_and_diagnostics(
 
     command = captured["command"]
     assert isinstance(command, list)
-    assert command[0] == "mini"
+    assert command[:3] == [sys.executable, "-m", "powdrr_lift.minisweagent_session"]
     assert "--task" in command
     task = command[command.index("--task") + 1]
     assert "Use the repository's local conventions." in task
@@ -374,9 +375,9 @@ def test_minisweagent_provider_uses_targeted_prompt_and_diagnostics(
     assert "Before inspecting or editing anything, run `pwd`" in task
     assert "Do not `cd` to, read from, or write to any other checkout" in task
     assert any(item.startswith("environment.cwd=") for item in command)
-    assert "--yolo" in command
-    assert "--exit-immediately" in command
-    assert command[command.index("--cost-limit") + 1] == "0"
+    assert "--yolo" not in command
+    assert "--exit-immediately" not in command
+    assert "--cost-limit" not in command
     assert command[command.index("--model") + 1] == "openai/gpt-5"
     assert command[command.index("--output") + 1].endswith("attempt-1.traj.json")
     kwargs = captured["kwargs"]
@@ -384,6 +385,10 @@ def test_minisweagent_provider_uses_targeted_prompt_and_diagnostics(
     environment = kwargs["env"]
     assert isinstance(environment, dict)
     assert environment["MSWEA_CONFIGURED"] == "true"
+    assert "must-not-enter-worker" not in environment.values()
+    assert "DEEPINFRA_API_TOKEN" not in environment
+    assert environment["POWDRR_MINISWE_INFERENCE_FD"]
+    assert callable(kwargs["inference_handler"])
     assert progress_messages == [
         "MiniSWE started.",
         "MiniSWE active (0m 10s elapsed; 2 model calls, 1 tool call).",
@@ -419,7 +424,7 @@ def test_minisweagent_provider_wraps_protected_runs_in_macos_sandbox(
     command = captured["command"]
     assert isinstance(command, list)
     assert command[:2] == ["/usr/bin/sandbox-exec", "-f"]
-    assert command[3] == "mini"
+    assert command[3:6] == [sys.executable, "-m", "powdrr_lift.minisweagent_session"]
     profile = captured["profile"]
     assert isinstance(profile, str)
     assert f'(deny file-write* (subpath "{protected_checkout}"))' in profile
@@ -542,8 +547,9 @@ def test_minisweagent_provider_continues_saved_session_on_next_attempt(
     provider.run(_request(_head(worktree)), worktree_root=worktree, attempt_id="first")
     provider.run(_request(_head(worktree)), worktree_root=worktree, attempt_id="repair")
 
-    assert commands[0][0] == "mini"
-    assert commands[1][1:3] == ["-m", "powdrr_lift.minisweagent_session"]
+    assert commands[0][:3] == [sys.executable, "-m", "powdrr_lift.minisweagent_session"]
+    assert commands[1][:3] == [sys.executable, "-m", "powdrr_lift.minisweagent_session"]
+    assert "--previous" not in commands[0]
     assert commands[1][commands[1].index("--previous") + 1].endswith("first.traj.json")
     assert commands[1][commands[1].index("--output") + 1].endswith("repair.traj.json")
 

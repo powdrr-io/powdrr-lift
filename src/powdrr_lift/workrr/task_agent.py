@@ -16,6 +16,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any, TextIO
 
 import yaml
+from powdrr_local import create_miniswe_inference_handler
 from powdrr_service.decision_classifier import JevSemanticClassifierClient
 from powdrr_service.planning.multipr_structrr import (
     active_decision_drift_findings,
@@ -2013,6 +2014,9 @@ def _author_execute_pr_tests(
             ),
         )
         test_provider = MiniSWEAgentProvider(
+            inference_handler=create_miniswe_inference_handler(
+                min(config.coding_agent_timeout_seconds, 600.0)
+            ),
             executable=config.minisweagent_executable,
             model=config.minisweagent_model,
             timeout_seconds=min(config.coding_agent_timeout_seconds, 600.0),
@@ -3584,6 +3588,13 @@ class _TaskWorkflowExecutionStrategy:
             timeout_seconds=self.config.coding_agent_timeout_seconds,
             diagnostics_root=store_root / self.config.code_agent,
             permission_policy=OpenCodePermissionPolicy(request.allowed_commands),
+            miniswe_inference_handler=(
+                create_miniswe_inference_handler(
+                    self.config.coding_agent_timeout_seconds
+                )
+                if self.config.code_agent == "minisweagent"
+                else None
+            ),
         )
         runner = CodingAgentRunner(
             provider=provider,

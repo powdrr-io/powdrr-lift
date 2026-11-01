@@ -1,0 +1,107 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1290
+title: Wire review feedback service into chat flow
+intent:
+  problem: The review workflow still asks its model to collect and assemble a ledger
+    from GitHub threads, despite the new service operation that owns deterministic
+    thread-state filtering.
+  goal: Capture GitHub evidence through local capabilities, prepare the ledger through
+    the serialized service boundary, and provide the verified result to Procedrr.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 3112, end_line: 3112}
+    summary: Record the review-feedback adapter dependency in the ownership inventory.
+    rationale: Keep module-boundary documentation synchronized with the caller.
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 3117, end_line: 3117}
+    summary: Record the review-feedback adapter dependency in the ownership inventory.
+    rationale: Keep module-boundary documentation synchronized with the caller.
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 3129, end_line: 3144}
+    summary: Register the local review-feedback capture and service adapter.
+    rationale: Distinguish local GitHub evidence collection from service-owned policy.
+  - path: docs/procedrr/processes/address-review-comments.yaml
+    type: modified
+    span: {start_line: 11, end_line: 11}
+    summary: Allow the prepared review ledger to reach the workflow as bounded context.
+    rationale: Preserve complete review conversations in the process input.
+  - path: docs/procedrr/processes/address-review-comments.yaml
+    type: modified
+    span: {start_line: 36, end_line: 51}
+    summary: Consume the service ledger and verify it matches the current PR head.
+    rationale: Avoid model-side thread filtering and stop on stale evidence.
+  - path: docs/procedrr/processes/address-review-comments.yaml
+    type: modified
+    span: {start_line: 79, end_line: 81}
+    summary: Classify informational feedback as requiring no action.
+    rationale: Keep informational threads from being treated as required changes.
+  - path: src/powdrr_lift/intrinsic_git_gh.py
+    type: modified
+    span: {start_line: 614, end_line: 619}
+    summary: Allow pr_view to resolve the pull request for the current branch.
+    rationale: Support review workflow setup when no PR identity is saved in context.
+  - path: src/powdrr_lift/workrr/procedrr_chat.py
+    type: modified
+    span: {start_line: 21, end_line: 21}
+    summary: Import typed failure handling for review-ledger preparation.
+    rationale: Stop the workflow with a clear failure when evidence cannot be prepared.
+  - path: src/powdrr_lift/workrr/procedrr_chat.py
+    type: modified
+    span: {start_line: 52, end_line: 52}
+    summary: Connect workflow chat to the review-feedback adapter.
+    rationale: Prepare review evidence before executing the review process.
+  - path: src/powdrr_lift/workrr/procedrr_chat.py
+    type: modified
+    span: {start_line: 586, end_line: 617}
+    summary: Bind the service ledger before starting the review workflow and preserve it on resume.
+    rationale: Ensure Procedrr sees the captured ledger and failures cannot appear empty.
+  - path: src/powdrr_lift/workrr/review_feedback.py
+    type: added
+    span: {start_line: 1, end_line: 145}
+    summary: Collect review threads through GitHub capabilities and call the service operation.
+    rationale: Keep GitHub access local while sending evidence through the public JSON contract.
+  - path: tests/test_intrinsic_git_gh.py
+    type: modified
+    span: {start_line: 87, end_line: 89}
+    summary: Verify pr_view can target the current branch.
+    rationale: Protect the branch-resolving GitHub capability used by review setup.
+  - path: tests/test_procedrr_chat.py
+    type: modified
+    span: {start_line: 191, end_line: 191}
+    summary: Rename the process test to reflect service-ledger consumption.
+    rationale: Keep the test name aligned with workflow behavior.
+  - path: tests/test_procedrr_chat.py
+    type: modified
+    span: {start_line: 198, end_line: 200}
+    summary: Assert the workflow consumes the service-prepared ledger and head identity.
+    rationale: Verify the prompt does not ask the model to re-filter the ledger.
+  - path: tests/test_procedrr_chat.py
+    type: modified
+    span: {start_line: 213, end_line: 285}
+    summary: Verify workflow chat binds the prepared ledger before process execution.
+    rationale: Exercise the agent-to-service workflow seam end to end.
+  - path: tests/test_review_feedback_agent_adapter.py
+    type: added
+    span: {start_line: 1, end_line: 124}
+    summary: Verify GitHub evidence collection, serialized service invocation, and failure handling.
+    rationale: Prove the adapter preserves thread filtering and fails when collection fails.
+entities:
+  - id: review-feedback-chat-adapter
+    type: Module
+    action: added
+  - id: prepare-review-feedback-ledger
+    type: Function
+    action: added
+entity_relationships: []
+invariants:
+  - id: review-workflow-requires-prepared-ledger
+    description: The address-review-comments process receives a service ledger before executing and fails if evidence collection or preparation fails.
+    action: added
+guidance: []
+features: []
+proposed_prs: []

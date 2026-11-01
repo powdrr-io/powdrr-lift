@@ -1,0 +1,57 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1290
+title: Record compact planning cost telemetry
+intent:
+  problem: Large planning runs expose too little structured timing and provider usage data to identify their slow phases and costly questions.
+  goal: Record local, privacy-bounded planning call metrics and summarize resumed work without expanding the GitHub answer journal.
+human-decisions: []
+structured_files: []
+files:
+  - path: packages/service/src/powdrr_service/planning/service.py
+    type: modified
+    span: {start_line: 263, end_line: 753}
+    summary: Capture per-question and batch call timing, sizes, retries, failures, provider route, and available token usage.
+    rationale: Attribute planning cost to concrete question kinds while keeping concurrent call measurements isolated.
+  - path: packages/service/src/powdrr_service/providers/clients.py
+    type: modified
+    span: {start_line: 57, end_line: 103}
+    summary: Keep OpenAI-compatible provider usage metadata thread-local for concurrent planning calls.
+    rationale: Prevent one question from reading another concurrent question's token counts.
+  - path: packages/local/src/powdrr_local/planning/checkpoints.py
+    type: modified
+    span: {start_line: 432, end_line: 628}
+    summary: Persist restricted local telemetry records and aggregate compact per-kind and per-run summaries.
+    rationale: Keep operational metrics out of the durable GitHub answer history and avoid serializing it to summarize a run.
+  - path: src/powdrr_lift/workrr/planning_session.py
+    type: modified
+    span: {start_line: 118, end_line: 418}
+    summary: Connect the planning executor to local telemetry and report totals, resumed executions, and slow calls.
+    rationale: Make planning cost visible on completion and failure while allowing planning to continue if telemetry cannot be written.
+  - path: tests/test_planning_service.py
+    type: modified
+    span: {start_line: 748, end_line: 798}
+    summary: Verify concurrent question calls emit separate provider and size metrics while missing token data stays unknown.
+    rationale: Protect concurrent instrumentation from dropping or inventing provider usage.
+  - path: tests/test_planning_checkpoints.py
+    type: modified
+    span: {start_line: 785, end_line: 840}
+    summary: Verify a thousand local records summarize by question kind and execution without exposing prompt or source text.
+    rationale: Keep summaries compact and make resumed versus current execution counts reviewable.
+entities:
+  - id: local-planning-telemetry-store
+    type: Class
+    action: added
+  - id: question-telemetry-client
+    type: Class
+    action: added
+entity_relationships: []
+invariants:
+  - id: planning-telemetry-excludes-prompts-and-source
+    description: Operational telemetry contains identifiers, digests, sizes, counts, timing, provider metadata, and token counts, but no prompts, source excerpts, repository evidence, or credentials.
+    action: added
+  - id: planning-telemetry-does-not-change-planning-outcomes
+    description: Telemetry persistence and summary failures are best-effort and do not block planning.
+    action: added
+guidance: []
+features: []
+proposed_prs: []

@@ -8,6 +8,7 @@ import json
 import math
 import os
 import re
+import threading
 import time
 from collections.abc import Mapping, Sequence
 from pathlib import Path
@@ -83,8 +84,19 @@ class OpenAIChatClient:
         self._progress_stream = progress_stream
         self._reasoning_effort = reasoning_effort
         self._unsupported_schema_keywords = unsupported_schema_keywords
+        self._usage_local = threading.local()
         self.last_usage: dict[str, Any] = {}
         self.last_serialized_messages: str | None = None
+
+    @property
+    def last_usage(self) -> dict[str, Any]:
+        """Usage for the current calling thread, safe for concurrent requests."""
+        value = getattr(self._usage_local, "last_usage", None)
+        return value if isinstance(value, dict) else {}
+
+    @last_usage.setter
+    def last_usage(self, value: dict[str, Any]) -> None:
+        self._usage_local.last_usage = value
 
     def set_structured_output_token_limit(self, token_limit: int) -> None:
         """Set a per-client structured-output budget for staged tasks."""

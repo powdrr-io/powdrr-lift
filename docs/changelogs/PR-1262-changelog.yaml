@@ -1,0 +1,186 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1262
+title: Extract reusable planned workflow task adapter
+intent:
+  problem: Plan-item execution is embedded in a CLI callback, preventing the workspace supervisor from invoking the same behavior directly.
+  goal: Expose a reusable application function for one reviewed plan item while leaving GitHub queue management and CLI presentation at the CLI boundary.
+human-decisions: []
+structured_files: []
+files:
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 6
+    end_line: 6
+  summary: Remove the fingerprinting import moved with the plan-item runtime helper.
+  rationale: Keep helper dependencies with the extracted application function.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 247
+    end_line: 247
+  summary: Remove the worktree branch helper import from the CLI module.
+  rationale: The extracted application adapter now owns plan-item worktree creation.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 256
+    end_line: 256
+  summary: Remove the workflow descriptor loader import from the CLI module.
+  rationale: The extracted application adapter now owns workflow descriptor loading.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 273
+    end_line: 276
+  summary: Import the planned workflow task options and application function.
+  rationale: Reuse the shared application path from existing queue-driven command execution.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 3391
+    end_line: 3414
+  summary: Map CLI provider and execution settings into the reusable task options.
+  rationale: Preserve existing command defaults while moving execution behavior into an application entry point.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 3425
+    end_line: 3434
+  summary: Delegate plan-item execution to the reusable application function.
+  rationale: Keep issue polling and terminal reporting in the CLI while moving execution behavior into an application entry point.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 3670
+    end_line: 3695
+  summary: Remove the plan-runtime identity and bundled-process helpers from the CLI module.
+  rationale: Keep these helpers alongside the extracted plan-item application adapter.
+- path: src/powdrr_lift/workrr/planned_workflow_task.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 219
+  summary: Add an application adapter that prepares and runs one reviewed plan item.
+  rationale: Make task execution callable without polling the GitHub issue queue.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 15
+    end_line: 15
+  summary: Import the extracted plan-item application module for direct unit coverage.
+  rationale: Keep process catalog coverage aligned with its new owner.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 1380
+    end_line: 1380
+  summary: Read the bundled Procedrr catalog helper from the extracted module.
+  rationale: Keep process catalog coverage aligned with its new owner.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 1446
+    end_line: 1446
+  summary: Patch worktree creation at the extracted adapter boundary.
+  rationale: Keep the adapter integration test isolated from real Git operations.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 1475
+    end_line: 1475
+  summary: Patch the task runner at the extracted adapter boundary.
+  rationale: Verify the CLI delegates through the reusable application function.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 1496
+    end_line: 1496
+  summary: Load the workflow descriptor through its direct module import.
+  rationale: Keep the behavior assertion independent of removed CLI helper exports.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 1500
+    end_line: 1500
+  summary: Derive the persisted workflow instance ID through the extracted module.
+  rationale: Verify runtime identity behavior at the application boundary.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 1524
+    end_line: 1524
+  summary: Move workflow instance identity assertions to the extracted module.
+  rationale: Keep identity helper coverage next to its application owner.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 1529
+    end_line: 1531
+  summary: Reformat the unchanged-input identity assertion for the new helper location.
+  rationale: Preserve the deterministic identity behavior check.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 1535
+    end_line: 1535
+  summary: Move changed-input identity assertion to the extracted module.
+  rationale: Preserve input-sensitive identity behavior coverage.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 1541
+    end_line: 1543
+  summary: Move changed-worker identity assertion to the extracted module.
+  rationale: Preserve worker-sensitive identity behavior coverage.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 1553
+    end_line: 1553
+  summary: Load the bundled process catalog through the extracted module.
+  rationale: Keep process catalog coverage aligned with its new owner.
+- path: tests/test_planned_workflow_task.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 168
+  summary: Cover task configuration mapping and plan-item context/worktree preparation.
+  rationale: Verify the reusable application entry point independently of CLI queue orchestration.
+entities:
+- id: planned-workflow-task-options
+  type: Class
+  action: added
+- id: run-planned-workflow-task
+  type: Function
+  action: added
+- id: planned-workflow-task-tests
+  type: Unit test
+  action: added
+entity_relationships:
+- id: planned-workflow-task-uses-options
+  type: uses
+  source: run-planned-workflow-task
+  target: planned-workflow-task-options
+  action: added
+  description: The application function receives provider and execution settings through a typed options record.
+- id: planned-workflow-task-is-verified-by-unit-tests
+  type: verifies
+  source: planned-workflow-task-tests
+  target: run-planned-workflow-task
+  action: added
+  description: Unit tests verify configuration mapping and per-attempt plan context preparation.
+invariants:
+- id: planned-task-keeps-reviewed-context
+  description: Execution continues to derive proposed PR context from the reviewed plan item and workflow descriptor.
+  action: added
+- id: planned-task-uses-attempt-specific-runtime
+  description: Generated plan workflows keep a distinct worktree branch and runtime directory for each attempt.
+  action: added
+- id: cli-retains-queue-ownership
+  description: The CLI remains responsible for polling the GitHub queue and reporting the worker outcome; the reusable adapter executes only the supplied plan item.
+  action: added
+guidance:
+- id: invoke-plan-item-without-queue-polling
+  description: Call run_planned_workflow_task with a pinned plan item, checkpoint callback, and explicit runtime options when adapting planned execution to another supervisor.
+  action: added

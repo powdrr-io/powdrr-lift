@@ -1,0 +1,106 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1284
+title: Move execute-PR final acceptance into service
+intent:
+  problem: The local task agent combines integration-test evidence and independently
+    decides whether an execute-PR implementation attempt succeeded.
+  goal: Move evidence aggregation and blocking final acceptance rules into the service
+    while retaining local execution and collection.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3273
+    end_line: 3281
+  summary: Register the service-owned execute-PR final acceptance module and its agent
+    caller.
+  rationale: Keep the staged ownership boundary visible to architecture checks.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3434
+    end_line: 3435
+  summary: Register the service-owned execute-PR final acceptance module and its agent
+    caller.
+  rationale: Keep the staged ownership boundary visible to architecture checks.
+- path: packages/service/src/powdrr_service/verification/execute_pr_acceptance.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 89
+  summary: Assemble generated-test review evidence and decide final execute-PR acceptance
+    from all blocking gates.
+  rationale: Centralize completion policy in a pure service use case while preserving
+    local evidence collection.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 42
+    end_line: 45
+  summary: Delegate integration-test report construction and the attempt success predicate
+    to service policy.
+  rationale: Keep the agent focused on gathering local results and handing them to
+    service acceptance.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 3542
+    end_line: 3547
+  summary: Delegate integration-test report construction and the attempt success predicate
+    to service policy.
+  rationale: Keep the agent focused on gathering local results and handing them to
+    service acceptance.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 3550
+    end_line: 3551
+  summary: Delegate integration-test report construction and the attempt success predicate
+    to service policy.
+  rationale: Keep the agent focused on gathering local results and handing them to
+    service acceptance.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 3550
+    end_line: 3556
+  summary: Delegate integration-test report construction and the attempt success predicate
+    to service policy.
+  rationale: Keep the agent focused on gathering local results and handing them to
+    service acceptance.
+- path: tests/test_execute_pr_acceptance_service.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 122
+  summary: Verify final acceptance gates, blocking test findings, and advisory quality-note
+    handling.
+  rationale: Prove the service decision contract directly across success and failure
+    evidence.
+entities:
+- id: execute-pr-final-acceptance
+  type: Module
+  action: added
+- id: execute-pr-acceptance-decision
+  type: Function
+  action: added
+entity_relationships:
+- id: final-acceptance-owned-by-service
+  type: part_of
+  source: execute-pr-acceptance-decision
+  target: execute-pr-final-acceptance
+  action: added
+  description: The service combines test evidence and applies blocking execute-PR
+    completion criteria.
+invariants:
+- id: execute-pr-success-requires-all-blocking-gates
+  description: An execute-PR attempt passes only when the worker completed with changes,
+    diff check and declared validation passed, generated integration tests passed
+    with complete coverage evidence, and Structrr has no findings. Test-quality review
+    notes remain advisory.
+  action: added
+guidance: []
+features: []
+proposed_prs: []

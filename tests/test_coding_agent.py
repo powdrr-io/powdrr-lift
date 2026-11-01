@@ -7,6 +7,7 @@ from dataclasses import replace
 from pathlib import Path
 
 import pytest
+from powdrr_contracts.models import ChatCompletionRequest, ChatCompletionResponse
 from powdrr_service.behavior_contract import BEHAVIOR_DIMENSIONS
 
 from powdrr_lift.cli import main
@@ -34,6 +35,12 @@ from powdrr_lift.workrr.coding_agent_validation import (
     ValidationRunner,
     parse_validation_profile,
 )
+
+
+def _unused_inference_handler(
+    _request: ChatCompletionRequest,
+) -> ChatCompletionResponse:
+    raise AssertionError("the test replaces MiniSWE process execution")
 
 
 class FakeProvider:
@@ -321,6 +328,7 @@ def test_minisweagent_provider_uses_targeted_prompt_and_diagnostics(
     diagnostics = tmp_path / "diagnostics"
     progress_messages: list[str] = []
     provider = MiniSWEAgentProvider(
+        inference_handler=_unused_inference_handler,
         executable="mini",
         model="openai/gpt-5",
         diagnostics_root=diagnostics,
@@ -401,7 +409,10 @@ def test_minisweagent_provider_wraps_protected_runs_in_macos_sandbox(
     worktree = _git_repo(tmp_path)
     protected_checkout = tmp_path / "primary-checkout"
     protected_checkout.mkdir()
-    provider = MiniSWEAgentProvider(write_denied_paths=(protected_checkout,))
+    provider = MiniSWEAgentProvider(
+        inference_handler=_unused_inference_handler,
+        write_denied_paths=(protected_checkout,),
+    )
     monkeypatch.setattr("powdrr_lift.workrr.coding_agent.sys.platform", "darwin")
     real_is_file = Path.is_file
     monkeypatch.setattr(
@@ -485,7 +496,10 @@ def test_minisweagent_provider_reads_large_task_prompt_from_file(
 ) -> None:
     worktree = _git_repo(tmp_path)
     diagnostics = tmp_path / "diagnostics"
-    provider = MiniSWEAgentProvider(diagnostics_root=diagnostics)
+    provider = MiniSWEAgentProvider(
+        inference_handler=_unused_inference_handler,
+        diagnostics_root=diagnostics,
+    )
     prompt = "Author pre-coding probes.\n" + ("scenario details\n" * 6000)
     request = replace(_request(_head(worktree)), prompt=prompt)
     captured: dict[str, object] = {}
@@ -526,7 +540,10 @@ def test_minisweagent_provider_continues_saved_session_on_next_attempt(
 ) -> None:
     worktree = _git_repo(tmp_path)
     diagnostics = tmp_path / "diagnostics"
-    provider = MiniSWEAgentProvider(diagnostics_root=diagnostics)
+    provider = MiniSWEAgentProvider(
+        inference_handler=_unused_inference_handler,
+        diagnostics_root=diagnostics,
+    )
     commands: list[list[str]] = []
 
     def fake_run(command: list[str], **_: object) -> subprocess.CompletedProcess[str]:
@@ -559,7 +576,10 @@ def test_minisweagent_provider_rejects_clean_exit_without_submission(
 ) -> None:
     worktree = _git_repo(tmp_path)
     diagnostics = tmp_path / "diagnostics"
-    provider = MiniSWEAgentProvider(diagnostics_root=diagnostics)
+    provider = MiniSWEAgentProvider(
+        inference_handler=_unused_inference_handler,
+        diagnostics_root=diagnostics,
+    )
     head = _head(worktree)
 
     def fake_run(command: list[str], **_: object) -> subprocess.CompletedProcess[str]:

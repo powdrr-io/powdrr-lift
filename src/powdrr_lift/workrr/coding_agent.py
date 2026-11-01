@@ -716,6 +716,9 @@ class OpenCodeProvider:
 class MiniSWEAgentProvider:
     """Invoke mini-SWE-agent in noninteractive local mode."""
 
+    inference_handler: Callable[[ChatCompletionRequest], ChatCompletionResponse] = (
+        field(repr=False)
+    )
     executable: str = "mini"
     model: str | None = None
     timeout_seconds: float = 300.0
@@ -725,9 +728,6 @@ class MiniSWEAgentProvider:
     prompt_suffix: str = ""
     progress_callback: Callable[[str], None] | None = None
     write_denied_paths: tuple[Path, ...] = ()
-    inference_handler: (
-        Callable[[ChatCompletionRequest], ChatCompletionResponse] | None
-    ) = None
     session_trajectory: Path | None = field(default=None, init=False)
 
     def prepare_request(self, request: ImplementationRequest) -> ImplementationRequest:
@@ -759,9 +759,6 @@ class MiniSWEAgentProvider:
         environment["MSWEA_GLOBAL_CONFIG_DIR"] = str(inference_config_root)
         inference_parent, inference_child = socket.socketpair()
         environment["POWDRR_MINISWE_INFERENCE_FD"] = str(inference_child.fileno())
-        inference_handler = self.inference_handler or _local_service_inference_handler(
-            self.timeout_seconds
-        )
         mini_config = _miniswe_builtin_config(self.executable)
         output_path = (
             self.diagnostics_root / f"{attempt_id}.traj.json"
@@ -881,7 +878,7 @@ class MiniSWEAgentProvider:
                 timeout_seconds=self.timeout_seconds,
                 inference_parent=inference_parent,
                 inference_child=inference_child,
-                inference_handler=inference_handler,
+                inference_handler=self.inference_handler,
                 on_snapshot=(
                     report_progress if self.progress_callback is not None else None
                 ),
@@ -960,20 +957,6 @@ def _remove_provider_credentials(environment: dict[str, str]) -> None:
         environment.pop(name, None)
 
 
-def _local_service_inference_handler(
-    worker_timeout_seconds: float,
-) -> Callable[[ChatCompletionRequest], ChatCompletionResponse]:
-    """Build the local service bridge used by the MiniSWE parent process."""
-    from powdrr_local import JsonServiceBridge, LocalPowdrrService
-    from powdrr_service.providers.inference import DeepInfraInferenceClient
-
-    request_timeout = max(0.1, min(120.0, worker_timeout_seconds * 0.8))
-    service = LocalPowdrrService(
-        inference_client=DeepInfraInferenceClient(timeout=request_timeout)
-    )
-    return JsonServiceBridge(service).infer
-
-
 def _miniswe_builtin_config(executable: str) -> Path | None:
     """Locate mini's built-in config so cwd overrides retain its defaults."""
     executable_path = Path(shutil.which(executable) or executable).resolve()
@@ -1018,6 +1001,8 @@ def build_coding_agent_provider(
     prompt_prefix: str = "",
     prompt_suffix: str = "",
     progress_callback: Callable[[str], None] | None = None,
+    miniswe_inference_handler: Callable[[ChatCompletionRequest], ChatCompletionResponse]
+    | None = None,
 ) -> CodingAgentProvider:
     """Build the configured provider behind the common coding-agent boundary."""
     if target == "opencode":
@@ -1032,7 +1017,12 @@ def build_coding_agent_provider(
             prompt_suffix=prompt_suffix,
         )
     if target == "minisweagent":
+        if miniswe_inference_handler is None:
+            raise ValueError(
+                "MiniSWE requires an inference handler from local composition"
+            )
         return MiniSWEAgentProvider(
+            inference_handler=miniswe_inference_handler,
             executable=minisweagent_executable,
             model=minisweagent_model,
             timeout_seconds=timeout_seconds,

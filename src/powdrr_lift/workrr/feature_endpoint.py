@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any, cast
 
 import yaml
+from powdrr_local import create_miniswe_inference_handler
 from powdrr_service.behavior_contract import (
     behavior_scenario_probe_findings,
     compile_behavior_scenarios,
@@ -2857,6 +2858,13 @@ def _run_code_agent_phase(
                 prompt_prefix=config.code_agent_prompt_prefix,
                 prompt_suffix=config.code_agent_prompt_suffix,
                 progress_callback=config.progress_callback,
+                miniswe_inference_handler=(
+                    create_miniswe_inference_handler(
+                        config.coding_agent_timeout_seconds
+                    )
+                    if config.code_agent == "minisweagent"
+                    else None
+                ),
             )
         except ValueError as error:
             raise PowdrrExecutionError(str(error)) from error
@@ -3468,6 +3476,7 @@ def _generate_miniswe_postrun_probes(
             context_refs=request.context_refs,
         )
         probe_provider = MiniSWEAgentProvider(
+            inference_handler=create_miniswe_inference_handler(300.0),
             executable=config.minisweagent_executable,
             model=config.minisweagent_model,
             timeout_seconds=300.0,

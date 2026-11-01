@@ -395,6 +395,19 @@
       "reviewed": true
     },
     {
+      "extraction_pr": "6",
+      "internal_imports": [
+        "powdrr_local.bridge",
+        "powdrr_service.local_service",
+        "powdrr_service.providers.inference"
+      ],
+      "kind": "python_module",
+      "owner": "split",
+      "path": "packages/local/src/powdrr_local/miniswe_inference.py",
+      "rationale": "compose the local service inference implementation for the MiniSWE worker boundary",
+      "reviewed": false
+    },
+    {
       "extraction_pr": "4",
       "internal_imports": [
         "powdrr_service.planning.contracts"

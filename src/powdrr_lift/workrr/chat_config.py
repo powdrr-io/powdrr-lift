@@ -26,3 +26,5 @@ class WorkflowChatConfig:
     provider_retry_delay_seconds: float = 30.0
     verbose: bool = False
     execution_id: str | None = None
+    conversation_id: str | None = None
+    initial_message: str | None = None

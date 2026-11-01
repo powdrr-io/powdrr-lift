@@ -5,6 +5,7 @@ import remarkGfm from 'remark-gfm'
 import { workspaceClient } from './api/client'
 import type { Conversation, Message, WorkspaceRepository, WorkspaceSnapshot } from './api/types'
 import { WorkspaceApiError } from './api/types'
+import { QuestionCard } from './components/QuestionCard'
 import './App.css'
 
 type LoadState = 'checking' | 'signed-out' | 'loading' | 'ready'
@@ -105,6 +106,7 @@ function App() {
 
   const selectedConversation = conversations.find((item) => item.conversation_id === conversationId) ?? null
   const activeTurn = snapshot?.active_turns.find((item) => item.conversation_id === conversationId)
+  const activeQuestion = snapshot?.active_questions.find((item) => item.conversation_id === conversationId)
   const filteredConversations = useMemo(() => {
     const query = search.trim().toLocaleLowerCase()
     if (!query) return conversations
@@ -354,6 +356,26 @@ function App() {
     }
   }
 
+  const answerQuestion = async (answer: unknown) => {
+    if (!repositoryId || !activeQuestion) return
+    setError(null)
+    try {
+      await workspaceClient.answerQuestion(
+        repositoryId,
+        activeQuestion.question_id,
+        activeQuestion.revision,
+        answer,
+      )
+      await refreshWorkspace(repositoryId)
+    } catch (cause) {
+      if (cause instanceof WorkspaceApiError && cause.code === 'stale_revision') {
+        await refreshWorkspace(repositoryId)
+        throw new Error('This question changed in another window. Review the latest version.')
+      }
+      throw cause
+    }
+  }
+
   const handleComposerKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
       event.preventDefault()
@@ -492,7 +514,7 @@ function App() {
           <section className="conversation-view" aria-label="Design conversation">
             <div className="conversation-heading">
               <div><span className="eyebrow">FEATURE SPECIFICATION</span><h1>{selectedConversation.title}</h1></div>
-              {activeTurn && <span className="working-pill"><span className="pulse-dot" />{activeTurn.state === 'waiting_for_input' ? 'Needs your input' : 'Thinking'}</span>}
+              {activeTurn && <span className="working-pill"><span className="pulse-dot" />{activeTurn.state === 'waiting_for_input' ? activeQuestion?.state === 'answered' ? 'Answer received' : 'Needs your input' : 'Thinking'}</span>}
             </div>
             <div
               className="transcript"
@@ -519,7 +541,8 @@ function App() {
                   </div>
                 </article>
               ))}
-              {activeTurn && <div className="assistant-pending"><span className="typing-indicator"><i /><i /><i /></span><span>{activeTurn.state === 'waiting_for_input' ? 'Waiting for your answer' : 'Working on your spec'}</span></div>}
+              {activeQuestion && <QuestionCard question={activeQuestion} onAnswer={answerQuestion} />}
+              {activeTurn && <div className="assistant-pending"><span className="typing-indicator"><i /><i /><i /></span><span>{activeTurn.state === 'waiting_for_input' ? activeQuestion?.state === 'answered' ? 'Continuing with your answer' : 'Waiting for your answer' : 'Working on your spec'}</span></div>}
             </div>
             {error && <div className="conversation-error" role="alert"><span>{error}</span><button onClick={() => setError(null)} aria-label="Dismiss error">×</button></div>}
             <div className="composer-wrap">

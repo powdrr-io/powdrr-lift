@@ -78,6 +78,12 @@ class MessageCreateRequest(WorkspaceApiRequest):
     content: str = Field(min_length=1, max_length=100_000)
 
 
+class QuestionAnswerRequest(WorkspaceApiRequest):
+    request_id: str = Field(min_length=1, max_length=128)
+    expected_revision: int = Field(ge=1)
+    answer: Any
+
+
 class JobCreateRequest(WorkspaceApiRequest):
     request_id: str = Field(min_length=1, max_length=128)
     kind: Literal["planning", "pr_execution"]
@@ -607,6 +613,68 @@ def install_workspace_routes(
             "turn_id": turn.turn_id,
             "state": turn.state.value,
         }
+
+    @router.post(
+        "/repositories/{repository_id}/questions/{question_id}/answer",
+        status_code=202,
+    )
+    async def answer_question(
+        repository_id: str,
+        question_id: str,
+        payload: QuestionAnswerRequest,
+        _: None = Depends(require_session(mutating=True)),
+    ) -> dict[str, Any]:
+        await _get_repository(repository_registry, repository_id)
+        try:
+            question = await run_in_threadpool(store.get_question, question_id)
+            conversation = await run_in_threadpool(
+                store.get_conversation, question.conversation_id
+            )
+        except KeyError as error:
+            raise WorkspaceApiException(
+                404, "not_found", "Question was not found."
+            ) from error
+        if conversation.repository_id != repository_id:
+            raise WorkspaceApiException(404, "not_found", "Question was not found.")
+        try:
+            answered = await run_in_threadpool(
+                store.answer_question,
+                question_id,
+                answer=payload.answer,
+                expected_revision=payload.expected_revision,
+                request_id=payload.request_id,
+            )
+        except KeyError as error:
+            raise WorkspaceApiException(
+                404, "not_found", "Question was not found."
+            ) from error
+        except WorkspaceConflict as error:
+            message = str(error)
+            code = (
+                "stale_revision"
+                if message == "Question revision has changed"
+                else "question_closed"
+                if "already been answered or closed" in message
+                else "request_conflict"
+            )
+            raise WorkspaceApiException(
+                409,
+                code,
+                "This question changed in another window."
+                if code == "stale_revision"
+                else "This question has already been answered or closed."
+                if code == "question_closed"
+                else "The request conflicts with saved data.",
+                current_revision=(
+                    await run_in_threadpool(store.get_question, question_id)
+                ).revision,
+            ) from error
+        except ValueError as error:
+            raise WorkspaceApiException(
+                422, "invalid_answer", "The answer does not match this question."
+            ) from error
+        await _notify(event_source, repository_id)
+        return answered.to_dict()
 
     app.include_router(router)
 

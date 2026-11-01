@@ -41,13 +41,30 @@ export type WorkspaceTurn = {
   updated_at: string
 }
 
+export type WorkspaceQuestion = {
+  schema_version: 1
+  question_id: string
+  conversation_id: string
+  turn_id: string
+  prompt: string
+  response_schema: Record<string, unknown>
+  run_id: string
+  attempt_id: string
+  state: 'open' | 'answered' | 'delivered' | 'cancelled'
+  answer: unknown | null
+  delivery_receipt_id: string | null
+  revision: number
+  created_at: string
+  updated_at: string
+}
+
 export type WorkspaceSnapshot = {
   schema_version: 1
   repository_id: string
   conversations: Conversation[]
   jobs: unknown[]
   active_turns: WorkspaceTurn[]
-  active_questions: unknown[]
+  active_questions: WorkspaceQuestion[]
   event_cursor: number
 }
 

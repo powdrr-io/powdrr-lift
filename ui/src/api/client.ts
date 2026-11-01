@@ -4,6 +4,7 @@ import type {
   ConversationMessages,
   Message,
   WorkspaceEvent,
+  WorkspaceQuestion,
   WorkspaceRepository,
   WorkspaceSnapshot,
 } from './types'
@@ -33,6 +34,7 @@ export class WorkspaceClient {
     string,
     { requestId: string; messageId: string }
   >()
+  private readonly pendingAnswers = new Map<string, string>()
 
   async bootstrap(token: string): Promise<void> {
     const response = await fetch(`${apiRoot}/session`, {
@@ -134,6 +136,31 @@ export class WorkspaceClient {
       },
     )
     this.pendingMessages.delete(pendingKey)
+  }
+
+  async answerQuestion(
+    repositoryId: string,
+    questionId: string,
+    expectedRevision: number,
+    answer: unknown,
+  ): Promise<WorkspaceQuestion> {
+    const payload = JSON.stringify(answer)
+    const pendingKey = JSON.stringify([questionId, payload])
+    const requestIdValue = this.pendingAnswers.get(pendingKey) ?? requestId()
+    this.pendingAnswers.set(pendingKey, requestIdValue)
+    const response = await this.mutate(
+      `${apiRoot}/repositories/${encodeURIComponent(repositoryId)}/questions/${encodeURIComponent(questionId)}/answer`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          request_id: requestIdValue,
+          expected_revision: expectedRevision,
+          answer,
+        }),
+      },
+    )
+    this.pendingAnswers.delete(pendingKey)
+    return (await response.json()) as WorkspaceQuestion
   }
 
   async *events(

@@ -91,6 +91,26 @@ conversation accepts at most one active turn. A 202 confirms durable acceptance;
 it does not mean the assistant has completed. The supervisor consumes the
 pending dispatch intent outside the HTTP request handler.
 
+When a design interview needs more detail, the repository snapshot exposes the
+open question in `active_questions`, including its response schema and revision.
+Submit an answer with that revision:
+
+```http
+POST /api/v1/repositories/{repository_id}/questions/{question_id}/answer
+Origin: http://127.0.0.1:8765
+X-CSRF-Token: <csrf-token>
+Content-Type: application/json
+
+{"request_id":"<uuid>","expected_revision":1,"answer":"Product names"}
+```
+
+The server validates the answer against the saved response schema and returns
+HTTP 202 after the answer and continuation intent are saved. Repeating the
+identical command with the same `request_id` is idempotent. A stale question
+revision or a question that was already answered returns HTTP 409; an answer
+that does not match the schema returns HTTP 422. The accepted answer appears
+in `active_questions` until the interview continuation closes or replaces it.
+
 List jobs with `GET /api/v1/repositories/{repository_id}/jobs`. Repeat the
 `states` query parameter to filter by one or more states, and use the returned
 `next_cursor` fields as `before_updated_at` and `before_job_id` for the next

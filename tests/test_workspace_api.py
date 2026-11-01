@@ -64,6 +64,47 @@ def test_health_is_public_and_session_bootstrap_is_single_use(tmp_path: Path) ->
     assert response.json()["error"]["code"] == "bootstrap_used"
 
 
+def test_session_refresh_rotates_csrf_for_the_existing_browser_cookie(
+    tmp_path: Path,
+) -> None:
+    client, _, repository_id, secret = _client(tmp_path)
+    original_csrf = _sign_in(client, secret)
+
+    wrong_origin = client.post(
+        "/api/v1/session/refresh",
+        headers={"Origin": "http://localhost:8765"},
+    )
+    assert wrong_origin.status_code == 403
+
+    refreshed = client.post(
+        "/api/v1/session/refresh",
+        headers={"Origin": "http://127.0.0.1:8765"},
+    )
+    assert refreshed.status_code == 200
+    refreshed_csrf = refreshed.json()["csrf_token"]
+    assert refreshed_csrf != original_csrf
+
+    stale_request = client.post(
+        f"/api/v1/repositories/{repository_id}/conversations",
+        headers={
+            "Origin": "http://127.0.0.1:8765",
+            "X-CSRF-Token": original_csrf,
+        },
+        json={"title": "Stale token", "request_id": "stale-token"},
+    )
+    assert stale_request.status_code == 403
+
+    current_request = client.post(
+        f"/api/v1/repositories/{repository_id}/conversations",
+        headers={
+            "Origin": "http://127.0.0.1:8765",
+            "X-CSRF-Token": refreshed_csrf,
+        },
+        json={"title": "Fresh token", "request_id": "fresh-token"},
+    )
+    assert current_request.status_code == 201
+
+
 def test_app_lifespan_dispatches_workspace_turns_under_supervisor_lease(
     tmp_path: Path,
 ) -> None:

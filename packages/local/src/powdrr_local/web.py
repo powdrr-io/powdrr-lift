@@ -247,6 +247,26 @@ def create_app(
         )
         return {"csrf_token": csrf_token}
 
+    @app.post("/api/v1/session/refresh")
+    async def refresh_session(request: Request) -> dict[str, str]:
+        """Issue a fresh in-memory CSRF token for an existing browser session."""
+        _require_origin(request, app.state.expected_origin)
+        session_token = request.cookies.get(_SESSION_COOKIE)
+        if session_token is None:
+            raise WorkspaceApiException(
+                401, "unauthorized", "Sign in to the local app."
+            )
+        csrf_token = secrets.token_urlsafe(32)
+        rotated = await run_in_threadpool(
+            store.rotate_api_session_csrf_digest,
+            _digest(session_token),
+            csrf_digest=_digest(csrf_token),
+            now=_now().isoformat(),
+        )
+        if not rotated:
+            raise WorkspaceApiException(401, "session_expired", "Sign in again.")
+        return {"csrf_token": csrf_token}
+
     @app.post("/api/v1/session/revoke", status_code=204)
     async def revoke_session(request: Request) -> Response:
         await authorize_request(request, mutating=True)

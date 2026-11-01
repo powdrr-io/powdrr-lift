@@ -20,6 +20,34 @@ permissions:
   contents: read
 
 jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci --prefix ui
+
+      - name: Test frontend
+        run: npm --prefix ui test
+
+      - name: Typecheck frontend
+        run: npm --prefix ui run typecheck
+
+      - name: Lint frontend
+        run: npm --prefix ui run lint
+
+      - name: Build frontend
+        run: npm --prefix ui run build
+
   portable-lock-tests:
     runs-on: windows-latest
     steps:

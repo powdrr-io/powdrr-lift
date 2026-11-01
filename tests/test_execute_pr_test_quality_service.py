@@ -1,5 +1,11 @@
 from __future__ import annotations
 
+import json
+from types import SimpleNamespace
+from typing import Any
+
+from powdrr_contracts.models import OperationRequest
+from powdrr_service.local_service import LocalPowdrrService
 from powdrr_service.verification.execute_pr_test_quality import (
     QUALITY_CHECKS,
     build_quality_question,
@@ -98,3 +104,74 @@ def test_pr_note_rendering_marks_advisory_and_preserves_each_note() -> None:
     assert "Test-quality review is advisory" in " ".join(rendered)
     assert "- tests/test_x.py::test_x: concern" in rendered
     assert "blocking validation failure" in " ".join(rendered)
+
+
+def test_verification_health_resolves_provider_credentials_inside_service(
+    monkeypatch: Any,
+) -> None:
+    provider_calls: list[dict[str, Any]] = []
+    llm_client = object()
+
+    def resolve_credentials(provider: str, *, base_url_override: str | None) -> Any:
+        assert provider == "deepinfra"
+        assert base_url_override == "https://provider.example/v1"
+        return SimpleNamespace(
+            api_key="service-secret", base_url="https://provider.example/v1"
+        )
+
+    def build_client(**kwargs: Any) -> object:
+        provider_calls.append(kwargs)
+        return llm_client
+
+    class FakeJevClient:
+        def __init__(self, fallback: object, *, fail_closed: bool) -> None:
+            assert fallback is llm_client
+            assert fail_closed
+
+        def complete_json(self, *_args: Any, **_kwargs: Any) -> dict[str, Any]:
+            return {"shortcoming_present": False}
+
+    monkeypatch.setattr(
+        "powdrr_service.providers.credentials.resolve_provider_credentials",
+        resolve_credentials,
+    )
+    monkeypatch.setattr(
+        "powdrr_service.providers.clients.build_provider_client", build_client
+    )
+    monkeypatch.setattr(
+        "powdrr_service.decision_classifier.JevSemanticClassifierClient",
+        FakeJevClient,
+    )
+
+    update = LocalPowdrrService().start(
+        OperationRequest(
+            request_id="quality-review-provider-wiring",
+            operation_kind="verification_health",
+            inputs={
+                "verification": "execute_pr_test_quality",
+                "suite_evidence": {
+                    "test_obligations": [
+                        {"obligation_id": "AC-01", "source_text": "Run the check."}
+                    ],
+                    "test_sources": {
+                        "tests/test_check.py": (
+                            "# Covers: AC-01 test_check\n"
+                            "def test_check():\n    assert check()\n"
+                        )
+                    },
+                },
+                "provider": "deepinfra",
+                "model": "deepinfra/deepseek-ai/example-model",
+                "base_url": "https://provider.example/v1",
+            },
+        )
+    )
+
+    assert update.status == "succeeded"
+    assert len(provider_calls) == 1
+    assert provider_calls[0]["provider"] == "deepinfra"
+    assert provider_calls[0]["model"] == "deepseek-ai/example-model"
+    assert provider_calls[0]["api_key"] == "service-secret"
+    report = json.loads(update.output_artifacts[0].data)
+    assert report["outcome"] == "advisory"
+    assert len(report["assessments"]) == 7

@@ -6,17 +6,21 @@ import os
 import re
 import shutil
 import subprocess
-import sys
 import tempfile
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass, field, replace
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from typing import Any, TextIO
+from uuid import uuid4
 
 import yaml
-from powdrr_local import create_miniswe_inference_handler
-from powdrr_service.decision_classifier import JevSemanticClassifierClient
+from powdrr_contracts.models import OperationRequest
+from powdrr_local import (
+    JsonServiceBridge,
+    LocalPowdrrService,
+    create_miniswe_inference_handler,
+)
 from powdrr_service.planning.multipr_structrr import (
     active_decision_drift_findings,
     inherited_decision_records,
@@ -54,17 +58,6 @@ from powdrr_service.verification.execute_pr_test_corrections import (
     require_execute_pr_test_correction_baseline,
 )
 from powdrr_service.verification.execute_pr_test_quality import (
-    DECISION_SCHEMA,
-    OPINION_SCHEMA,
-    QUALITY_CHECKS,
-    SUGGESTION_SCHEMA,
-    build_opinion_system_prompt,
-    build_quality_question,
-    build_suggestion_context,
-    build_suggestion_system_prompt,
-    execute_pr_test_quality_notes,
-    execute_pr_test_review_context,
-    execute_pr_test_review_targets,
     render_execute_pr_test_quality_pr_notes,
 )
 from powdrr_service.verification.execute_pr_test_validation import (
@@ -191,7 +184,6 @@ from powdrr_lift.workrr.llm import (
     WorkflowActionProgressStrategy,
     WorkflowLLMActionEngine,
     WorkflowLLMClient,
-    complete_json_with_timeout_retry,
     resolve_deterministic_repair,
     workflow_action_failure_signature,
     workflow_action_signature,
@@ -1352,133 +1344,53 @@ def _validate_execute_pr_test_correction(
 
 
 def _review_execute_pr_test_quality(
-    quality_client: WorkflowLLMClient,
     suite_evidence: Mapping[str, Any],
     *,
     config: WorkflowTaskAgentConfig,
     suggest_tests: bool = True,
+    service: Any | None = None,
 ) -> dict[str, Any]:
-    """Review each authored test with narrow Jev questions; findings are advisory."""
-    jev = JevSemanticClassifierClient(quality_client, fail_closed=True)
-    assessments: list[dict[str, Any]] = []
-    suggestions: list[dict[str, str]] = []
-
-    for target in execute_pr_test_review_targets(suite_evidence):
-        review_context = execute_pr_test_review_context(suite_evidence, target)
-        for check_id, question in QUALITY_CHECKS:
-            question_text = build_quality_question(question, review_context)
-            messages = [
-                {"role": "system", "content": ""},
-                {"role": "user", "content": question_text},
-            ]
-            assessment: dict[str, Any] = {
-                "test_id": target["test_id"],
-                "criterion_ids": target["criterion_ids"],
-                "check_id": check_id,
-                "question": question,
-                "jev_reports_shortcoming": None,
-                "llm_agrees_shortcoming": None,
-                "llm_explanation": None,
-                "suggestion": None,
-                "repair_suggestion_requested": suggest_tests,
-            }
-            try:
-                decision = jev.complete_json(messages, response_schema=DECISION_SCHEMA)
-                jev_reports_shortcoming = decision.get("shortcoming_present")
-                if not isinstance(jev_reports_shortcoming, bool):
-                    raise ExecutePrTestError(
-                        "Jev test-quality decision did not return a boolean"
-                    )
-                assessment["jev_reports_shortcoming"] = jev_reports_shortcoming
-            except Exception as error:  # Quality review is advisory, including outages.
-                assessment["jev_error"] = str(error)
-
-            if assessment["jev_reports_shortcoming"] is True:
-                try:
-                    opinion_messages = [
-                        {
-                            "role": "system",
-                            "content": build_opinion_system_prompt(),
-                        },
-                        {"role": "user", "content": question_text},
-                    ]
-                    opinion = complete_json_with_timeout_retry(
-                        quality_client,
-                        opinion_messages,
-                        model=config.minisweagent_model or config.provider,
-                        stderr=sys.stderr,
-                        max_timeout_retries=config.max_timeout_retries,
-                        timeout_backoff_seconds=config.timeout_backoff_seconds,
-                        response_schema=OPINION_SCHEMA,
-                    )
-                    agrees = opinion.get("shortcoming_present")
-                    if not isinstance(agrees, bool):
-                        raise ExecutePrTestError(
-                            "LLM test-quality opinion did not return a boolean"
-                        )
-                    assessment["llm_agrees_shortcoming"] = agrees
-                    assessment["llm_explanation"] = str(
-                        opinion.get("explanation", "")
-                    ).strip()
-                    if agrees and suggest_tests:
-                        suggestion_messages = [
-                            {
-                                "role": "system",
-                                "content": build_suggestion_system_prompt(),
-                            },
-                            {
-                                "role": "user",
-                                "content": (
-                                    f"Question with agreed shortcoming:\n{question}\n\n"
-                                    "Full evidence and target test:\n"
-                                    + build_suggestion_context(
-                                        suite_evidence,
-                                        target,
-                                        assessment["llm_explanation"],
-                                    )
-                                ),
-                            },
-                        ]
-                        suggestion_response = complete_json_with_timeout_retry(
-                            quality_client,
-                            suggestion_messages,
-                            model=config.minisweagent_model or config.provider,
-                            stderr=sys.stderr,
-                            max_timeout_retries=config.max_timeout_retries,
-                            timeout_backoff_seconds=config.timeout_backoff_seconds,
-                            response_schema=SUGGESTION_SCHEMA,
-                        )
-                        suggestion = {
-                            key: str(suggestion_response.get(key, "")).strip()
-                            for key in ("test_name", "test_code", "rationale")
-                        }
-                        if not all(suggestion.values()):
-                            raise ExecutePrTestError(
-                                "LLM test suggestion omitted required content"
-                            )
-                        assessment["suggestion"] = suggestion
-                        suggestions.append(
-                            {
-                                "test_id": target["test_id"],
-                                "check_id": check_id,
-                                "question": question,
-                                **suggestion,
-                            }
-                        )
-                except (
-                    Exception
-                ) as error:  # Keep review and repair advice non-blocking.
-                    assessment["llm_error"] = str(error)
-            assessments.append(assessment)
-
-    notes = execute_pr_test_quality_notes(assessments)
-    return {
-        "provider": "jev",
-        "outcome": "advisory",
-        "assessments": assessments,
-        "suggestions": suggestions,
-        "notes": notes,
-    }
+    """Request advisory test-quality review through the serialized service API."""
+    request = OperationRequest(
+        request_id=f"execute-pr-quality-{uuid4().hex}",
+        operation_kind="verification_health",
+        inputs={
+            "verification": "execute_pr_test_quality",
+            "suite_evidence": dict(suite_evidence),
+            "provider": config.provider,
+            "model": config.minisweagent_model or "fast_iteration",
+            "base_url": config.base_url,
+            "max_timeout_retries": config.max_timeout_retries,
+            "timeout_backoff_seconds": config.timeout_backoff_seconds,
+            "suggest_tests": suggest_tests,
+        },
+    )
+    try:
+        update = JsonServiceBridge(service or LocalPowdrrService()).start(request)
+        if update.status != "succeeded":
+            failure = update.failure
+            message = (
+                failure.message if failure is not None else "service operation failed"
+            )
+            raise ExecutePrTestError(message)
+        for artifact in update.output_artifacts:
+            if (
+                artifact.artifact_id == "verification/execute-pr-test-quality.json"
+                and artifact.media_type
+                == "application/vnd.powdrr.verification-health+json"
+            ):
+                report = json.loads(artifact.data)
+                if isinstance(report, dict):
+                    return report
+        raise ExecutePrTestError("service omitted the execute-PR quality report")
+    except Exception as error:  # Quality review remains advisory on service outages.
+        return {
+            "provider": "jev",
+            "outcome": "advisory",
+            "assessments": [],
+            "suggestions": [],
+            "notes": [f"Execute-PR test quality review was unavailable: {error}"],
+        }
 
 
 def _execute_pr_test_install_worktree_status(
@@ -1520,7 +1432,7 @@ def _author_execute_pr_tests(
     config: WorkflowTaskAgentConfig,
     store_root: Path,
     validation_profile: ValidationProfile,
-    quality_client: WorkflowLLMClient,
+    quality_review_service: Any | None = None,
 ) -> tuple[dict[str, str], dict[str, Any]]:
     """Ask MiniSWE to write and baseline-check independent integration tests."""
     test_root = store_root / "integration-tests"
@@ -1704,10 +1616,10 @@ def _author_execute_pr_tests(
                     "baseline_result": baseline_report,
                 }
                 quality_report = _review_execute_pr_test_quality(
-                    quality_client,
                     suite_evidence,
                     config=config,
                     suggest_tests=not quality_repair_attempted,
+                    service=quality_review_service,
                 )
                 quality_reviews.append(quality_report)
                 suggestions = quality_report.get("suggestions", [])
@@ -3101,7 +3013,6 @@ class _TaskWorkflowExecutionStrategy:
             config=self.config,
             store_root=store_root,
             validation_profile=validation_profile,
-            quality_client=self.client,
         )
         status_before_test_install = _execute_pr_test_install_worktree_status(
             self.repo_root, self.config.workflow_dir
@@ -3290,7 +3201,6 @@ class _TaskWorkflowExecutionStrategy:
                 )
             if test_correction_accepted:
                 correction_review = _review_execute_pr_test_quality(
-                    self.client,
                     {
                         "contract": test_authoring_context,
                         "test_obligations": integration_test_authoring[

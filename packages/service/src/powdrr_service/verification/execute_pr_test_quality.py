@@ -5,8 +5,9 @@ from __future__ import annotations
 import ast
 import json
 import re
+import time
 from collections.abc import Mapping, Sequence
-from typing import Any
+from typing import Any, Protocol
 
 QUALITY_CHECKS = (
     (
@@ -329,6 +330,168 @@ def execute_pr_test_quality_notes(
     return notes
 
 
+class JsonCompletionClient(Protocol):
+    """Structured completion client owned by the service provider layer."""
+
+    def complete_json(
+        self,
+        messages: list[dict[str, str]],
+        *,
+        response_schema: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]: ...
+
+
+def review_execute_pr_test_quality(
+    suite_evidence: Mapping[str, Any],
+    *,
+    jev_client: JsonCompletionClient,
+    llm_client: JsonCompletionClient,
+    max_timeout_retries: int = 8,
+    timeout_backoff_seconds: float = 10.0,
+    suggest_tests: bool = True,
+) -> dict[str, Any]:
+    """Run advisory, per-test quality review with service-owned prompts and policy."""
+    assessments: list[dict[str, Any]] = []
+    suggestions: list[dict[str, str]] = []
+
+    for target in execute_pr_test_review_targets(suite_evidence):
+        review_context = execute_pr_test_review_context(suite_evidence, target)
+        for check_id, question in QUALITY_CHECKS:
+            question_text = build_quality_question(question, review_context)
+            messages = [
+                {"role": "system", "content": ""},
+                {"role": "user", "content": question_text},
+            ]
+            assessment: dict[str, Any] = {
+                "test_id": target["test_id"],
+                "criterion_ids": target["criterion_ids"],
+                "check_id": check_id,
+                "question": question,
+                "jev_reports_shortcoming": None,
+                "llm_agrees_shortcoming": None,
+                "llm_explanation": None,
+                "suggestion": None,
+                "repair_suggestion_requested": suggest_tests,
+            }
+            try:
+                decision = jev_client.complete_json(
+                    messages, response_schema=DECISION_SCHEMA
+                )
+                verdict = decision.get("shortcoming_present")
+                if not isinstance(verdict, bool):
+                    raise ValueError(
+                        "Jev test-quality decision did not return a boolean"
+                    )
+                assessment["jev_reports_shortcoming"] = verdict
+            except Exception as error:  # Review outages remain advisory.
+                assessment["jev_error"] = str(error)
+
+            if assessment["jev_reports_shortcoming"] is True:
+                try:
+                    opinion = _complete_json_with_retry(
+                        llm_client,
+                        [
+                            {
+                                "role": "system",
+                                "content": build_opinion_system_prompt(),
+                            },
+                            {"role": "user", "content": question_text},
+                        ],
+                        response_schema=OPINION_SCHEMA,
+                        max_retries=max_timeout_retries,
+                        backoff_seconds=timeout_backoff_seconds,
+                    )
+                    agrees = opinion.get("shortcoming_present")
+                    if not isinstance(agrees, bool):
+                        raise ValueError(
+                            "LLM test-quality opinion did not return a boolean"
+                        )
+                    assessment["llm_agrees_shortcoming"] = agrees
+                    assessment["llm_explanation"] = str(
+                        opinion.get("explanation", "")
+                    ).strip()
+                    if agrees and suggest_tests:
+                        suggestion = _complete_json_with_retry(
+                            llm_client,
+                            [
+                                {
+                                    "role": "system",
+                                    "content": build_suggestion_system_prompt(),
+                                },
+                                {
+                                    "role": "user",
+                                    "content": (
+                                        "Question with agreed shortcoming:\n"
+                                        f"{question}\n\n"
+                                        "Full evidence and target test:\n"
+                                        + build_suggestion_context(
+                                            suite_evidence,
+                                            target,
+                                            assessment["llm_explanation"],
+                                        )
+                                    ),
+                                },
+                            ],
+                            response_schema=SUGGESTION_SCHEMA,
+                            max_retries=max_timeout_retries,
+                            backoff_seconds=timeout_backoff_seconds,
+                        )
+                        normalized = {
+                            key: str(suggestion.get(key, "")).strip()
+                            for key in ("test_name", "test_code", "rationale")
+                        }
+                        if not all(normalized.values()):
+                            raise ValueError(
+                                "LLM test suggestion omitted required content"
+                            )
+                        assessment["suggestion"] = normalized
+                        suggestions.append(
+                            {
+                                "test_id": target["test_id"],
+                                "check_id": check_id,
+                                "question": question,
+                                **normalized,
+                            }
+                        )
+                except Exception as error:  # Keep advice non-blocking.
+                    assessment["llm_error"] = str(error)
+            assessments.append(assessment)
+
+    return {
+        "provider": "jev",
+        "outcome": "advisory",
+        "assessments": assessments,
+        "suggestions": suggestions,
+        "notes": execute_pr_test_quality_notes(assessments),
+    }
+
+
+def _complete_json_with_retry(
+    client: JsonCompletionClient,
+    messages: list[dict[str, str]],
+    *,
+    response_schema: Mapping[str, Any],
+    max_retries: int,
+    backoff_seconds: float,
+) -> dict[str, Any]:
+    retries = 0
+    while True:
+        try:
+            return client.complete_json(messages, response_schema=response_schema)
+        except Exception as error:
+            if not _retryable_quality_error(error) or retries >= max(0, max_retries):
+                raise
+            retries += 1
+            time.sleep(max(0.0, backoff_seconds) * (2 ** (retries - 1)))
+
+
+def _retryable_quality_error(error: Exception) -> bool:
+    if isinstance(error, (TimeoutError, ConnectionError, OSError)):
+        return True
+    status = getattr(error, "status_code", getattr(error, "code", None))
+    return isinstance(status, int) and (status == 429 or status >= 500)
+
+
 def render_execute_pr_test_quality_pr_notes(notes: Sequence[str]) -> list[str]:
     return [
         "",
@@ -359,6 +522,7 @@ __all__ = [
     "build_suggestion_system_prompt",
     "execute_pr_test_baseline_failure_excerpt",
     "execute_pr_test_quality_notes",
+    "review_execute_pr_test_quality",
     "execute_pr_test_review_context",
     "execute_pr_test_review_targets",
     "render_execute_pr_test_quality_pr_notes",

@@ -2692,6 +2692,22 @@
     },
     {
       "extraction_pr": "7",
+      "internal_imports": [
+        "powdrr_contracts.models",
+        "powdrr_service.providers.clients",
+        "powdrr_service.providers.credentials",
+        "powdrr_service.providers.config",
+        "powdrr_service.providers.selection",
+        "powdrr_service.verification.execute_pr_test_quality"
+      ],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/local_service.py",
+      "rationale": "compose service-owned verification policy and provider calls behind serialized operations",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "7",
       "internal_imports": [],
       "kind": "python_module",
       "owner": "split",
@@ -3431,6 +3447,8 @@
         "powdrr_lift.intrinsic_git_gh",
         "powdrr_lift.pr_workflow_record",
         "powdrr_lift.process.tasks",
+        "powdrr_contracts.models",
+        "powdrr_local",
         "powdrr_lift.structrr.bootstrap",
         "powdrr_lift.structrr.proposal",
         "powdrr_lift.structrr.source_manifest",
@@ -3445,7 +3463,6 @@
         "powdrr_lift.workrr.git",
         "powdrr_lift.workrr.github_issue_plan_generation",
         "powdrr_lift.workrr.github_issue_queue",
-        "powdrr_service.decision_classifier",
         "powdrr_lift.workrr.llm",
         "powdrr_lift.workrr.observer",
         "powdrr_lift.workrr.operation_validation",

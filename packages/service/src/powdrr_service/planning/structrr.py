@@ -334,9 +334,7 @@ def parse_structural_subject_page(
                     "projected baseline",
                 )
         key = (section, subject_id)
-        if key in prior_subject_ids and not (
-            section == "files" and planned_path in planned_paths
-        ):
+        if key in prior_subject_ids:
             raise PlanningContractError(pointer, "subject was already enumerated")
         if key in page_keys:
             existing_index = page_record_indexes[key]
@@ -380,6 +378,10 @@ def parse_structural_subject_page(
     has_more = value["has_more"]
     if not isinstance(has_more, bool):
         raise PlanningContractError("/has_more", "must be a boolean")
+    if has_more and not records:
+        raise PlanningContractError(
+            "/records", "a non-final page must add at least one new subject"
+        )
     next_anchor = value["next_anchor"]
     expected_next = f"structural-page-{page_ordinal + 1:04d}"
     if has_more:
@@ -601,7 +603,7 @@ def build_subject_enumeration_request(
     )
 
     def parse(value: Mapping[str, Any]) -> StructuralSubjectPage:
-        return parse_structural_subject_page(
+        page = parse_structural_subject_page(
             value,
             plan_id=plan_id,
             item_id=item_id,
@@ -614,6 +616,11 @@ def build_subject_enumeration_request(
             },
             page_ordinal=page_ordinal,
         )
+        if any(subject.section == "files" for subject in page.records):
+            raise PlanningContractError(
+                "/records", "planned file paths are registered deterministically"
+            )
+        return page
 
     return QuestionRequest(
         question=Question(
@@ -635,19 +642,15 @@ def build_subject_enumeration_request(
             1,
         ),
         exact_question=(
-            "Enumerate the structural subjects this one plan item changes in "
-            "Structrr. Include only changes required by this item's allocated "
-            "units. Use a supplied existing subject reference, or describe one new "
-            "identity. A new file subject must name one of the supplied planned "
-            "write paths. For a new file subject, copy the exact planned write "
-            "path into new_identity_description with no added prose or prefix. "
+            "Enumerate the entity and relationship subjects this one plan item "
+            "changes in Structrr. Planned file paths have already been registered "
+            "deterministically; do not return file subjects. Include only changes "
+            "required by this item's allocated units. Use a supplied existing "
+            "entity or relationship reference, or describe one new entity or "
+            "relationship identity. "
             "Cite the requirements, units, and source anchors that "
             "justify each subject. Omit implementation details that do not change "
             "Structrr. "
-            "Use a supplied source_subjects stable_key to reference an existing "
-            "file subject. For a projected file without a source_subjects record, "
-            "use its supplied path::<path> key. Never describe an existing file "
-            "subject as new. "
             "For an existing subject, copy exactly one supplied subject_ref "
             "from accepted facts; never combine or construct identifiers. "
             "Use action added only when subject_ref is null and "
@@ -661,12 +664,11 @@ def build_subject_enumeration_request(
             "has_more false and next_anchor null."
         ),
         answer_field_definitions={
-            "section": "entities, entity_relationships, or files.",
+            "section": "entities or entity_relationships.",
             "subject_ref": "Existing subject ID/stable key, or null for a new subject.",
             "new_identity_description": (
-                "For a new file subject, the exact planned write path with no added "
-                "prose or prefix; for a new entity or relationship, a concise "
-                "identity description; otherwise null."
+                "For a new entity or relationship, a concise identity description; "
+                "otherwise null."
             ),
             "action": (
                 "added for a new_identity_description; changed, deleted, or removed "
@@ -688,7 +690,9 @@ def build_subject_enumeration_request(
         accepted_facts=facts,
         valid_example=example,
         empty_example={"records": [], "has_more": False, "next_anchor": None},
-        answer_schema=_subject_page_schema(),
+        answer_schema=_subject_page_schema(
+            sections=("entities", "entity_relationships")
+        ),
         parse_answer=parse,
     )
 
@@ -848,7 +852,6 @@ def _example_subject_page(
     page_ordinal: int,
 ) -> Mapping[str, Any]:
     unit = units[0]
-    paths = [write.path for candidate in units for write in candidate.planned_writes]
     prior_subject_ids = {
         (subject.section, subject.subject_id) for subject in prior_subjects
     }
@@ -864,36 +867,6 @@ def _example_subject_page(
             "subject_ref": sorted(existing_entities)[0],
             "new_identity_description": None,
             "action": "changed",
-            "requirement_ids": [unit.requirement_ids[0]],
-            "unit_ids": [unit.id],
-            "source_refs": [source_refs[0]],
-        }
-    elif existing_files := [
-        record
-        for record in subject_index["source_subjects"]
-        if ("files", str(record["stable_key"])) not in prior_subject_ids
-    ]:
-        existing_file = existing_files[0]
-        candidate = {
-            "section": "files",
-            "subject_ref": existing_file["stable_key"],
-            "new_identity_description": None,
-            "action": "changed",
-            "requirement_ids": [unit.requirement_ids[0]],
-            "unit_ids": [unit.id],
-            "source_refs": [source_refs[0]],
-        }
-    elif new_paths := [
-        path
-        for path in paths
-        if ("files", f"path::{path}") not in prior_subject_ids
-        and not _subject_exists("files", f"path::{path}", projected_baseline)
-    ]:
-        candidate = {
-            "section": "files",
-            "subject_ref": None,
-            "new_identity_description": new_paths[0],
-            "action": "added",
             "requirement_ids": [unit.requirement_ids[0]],
             "unit_ids": [unit.id],
             "source_refs": [source_refs[0]],
@@ -980,11 +953,14 @@ def _structural_subject_index(
     }
 
 
-def _subject_page_schema() -> dict[str, Any]:
+def _subject_page_schema(
+    *, sections: Sequence[str] = tuple(sorted(_SECTIONS))
+) -> dict[str, Any]:
     record_schema = {
         **SUBJECT_RECORD_SCHEMA,
         "properties": {
             **SUBJECT_RECORD_SCHEMA["properties"],
+            "section": {"type": "string", "enum": list(sections)},
             "subject_ref": {
                 "type": ["string", "null"],
             },

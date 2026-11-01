@@ -1,4 +1,4 @@
-import type { WorkspaceJobDetail } from '../api/types'
+import type { WorkspaceJobAction, WorkspaceJobDetail } from '../api/types'
 
 const stateLabels: Record<WorkspaceJobDetail['job']['state'], string> = {
   pending: 'Pending',
@@ -16,7 +16,17 @@ function formatKind(kind: WorkspaceJobDetail['job']['kind']): string {
   return kind === 'planning' ? 'Planning' : 'PR execution'
 }
 
-export function JobStatus({ detail }: { detail: WorkspaceJobDetail }) {
+export function JobStatus({
+  detail,
+  pendingActions,
+  actionMessage,
+  onAction,
+}: {
+  detail: WorkspaceJobDetail
+  pendingActions: WorkspaceJobAction[]
+  actionMessage: { kind: 'status' | 'error'; text: string } | null
+  onAction: (action: WorkspaceJobAction) => void
+}) {
   const { job } = detail
 
   return (
@@ -33,6 +43,38 @@ export function JobStatus({ detail }: { detail: WorkspaceJobDetail }) {
       </header>
 
       <div className="job-status__body">
+        {actionMessage && (
+          <p className={`job-status__action-message job-status__action-message--${actionMessage.kind}`} role={actionMessage.kind === 'error' ? 'alert' : 'status'}>
+            {actionMessage.text}
+          </p>
+        )}
+        {detail.allowed_actions.length > 0 && (
+          <section className="job-status__section" aria-label="Job actions">
+            <h2>Actions</h2>
+            <div className="job-status__actions">
+              {detail.allowed_actions.map((action) => {
+                const labels: Record<WorkspaceJobAction, string> = {
+                  start: 'Start',
+                  cancel: 'Request cancellation',
+                  retry: 'Retry',
+                  resume: 'Resume',
+                }
+                return (
+                  <button
+                    key={action}
+                    type="button"
+                    className={action === 'cancel' ? 'job-action job-action--secondary' : 'job-action'}
+                    disabled={pendingActions.includes(action)}
+                    onClick={() => onAction(action)}
+                  >
+                    {pendingActions.includes(action) ? 'Sending…' : labels[action]}
+                  </button>
+                )
+              })}
+            </div>
+          </section>
+        )}
+
         {job.detail && (
           <section className="job-status__section">
             <h2>Latest update</h2>

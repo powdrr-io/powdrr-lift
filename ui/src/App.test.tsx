@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 import type { Conversation, Message, WorkspaceJob, WorkspaceJobDetail, WorkspaceQuestion, WorkspaceRepository, WorkspaceSnapshot, WorkspaceTurn } from './api/types'
+import { WorkspaceApiError } from './api/types'
 
 const mocks = vi.hoisted(() => ({
   resumeSession: vi.fn(),
@@ -16,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   sendMessage: vi.fn(),
   answerQuestion: vi.fn(),
   jobDetail: vi.fn(),
+  requestJobAction: vi.fn(),
   events: vi.fn(),
 }))
 
@@ -77,6 +79,13 @@ describe('workspace shell', () => {
     mocks.sendMessage.mockResolvedValue(undefined)
     mocks.answerQuestion.mockResolvedValue(undefined)
     mocks.jobDetail.mockResolvedValue(undefined)
+    mocks.requestJobAction.mockResolvedValue({
+      action_id: 'action-1',
+      job_id: 'job-1',
+      action: 'cancel',
+      state: 'accepted',
+      job_revision: 2,
+    })
     mocks.events.mockImplementation((_repositoryId: string, _after: number, signal: AbortSignal) =>
       (async function* () {
         await new Promise<void>((resolve) => {
@@ -246,7 +255,19 @@ describe('workspace shell', () => {
     mocks.listConversations.mockResolvedValue([conversation])
     mocks.snapshot.mockResolvedValue({ ...emptySnapshot(), jobs: [runningJob, readyJob] })
     mocks.messages.mockResolvedValue([userMessage])
-    mocks.jobDetail.mockResolvedValue(detail)
+    mocks.jobDetail
+      .mockResolvedValueOnce(detail)
+      .mockResolvedValueOnce(detail)
+      .mockResolvedValue({ ...detail, allowed_actions: [] })
+    mocks.requestJobAction
+      .mockRejectedValueOnce(new WorkspaceApiError('Stale job', 409, 'stale_revision'))
+      .mockResolvedValueOnce({
+        action_id: 'action-1',
+        job_id: 'job-running',
+        action: 'cancel',
+        state: 'accepted',
+        job_revision: 3,
+      })
 
     const { container } = render(<App />)
 
@@ -264,5 +285,19 @@ describe('workspace shell', () => {
     expect(new URL(window.location.href).searchParams.get('job')).toBe('job-running')
     expect(new URL(window.location.href).searchParams.has('conversation')).toBe(false)
     expect(mocks.jobDetail).toHaveBeenCalledWith('repo-1', 'job-running')
+
+    await user.click(app.getByRole('button', { name: 'Request cancellation' }))
+    expect((await app.findByRole('alert')).textContent).toMatch(/changed in another window/)
+    expect(mocks.jobDetail).toHaveBeenCalledTimes(2)
+
+    await user.click(app.getByRole('button', { name: 'Request cancellation' }))
+    await waitFor(() => expect(mocks.requestJobAction).toHaveBeenCalledWith(
+      'repo-1',
+      'job-running',
+      2,
+      'cancel',
+    ))
+    expect((await app.findByRole('status')).textContent).toMatch(/Cancellation requested/)
+    await waitFor(() => expect(app.queryByRole('button', { name: 'Request cancellation' })).toBeNull())
   })
 })

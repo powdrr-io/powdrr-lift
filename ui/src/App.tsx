@@ -3,7 +3,7 @@ import type { FormEvent, KeyboardEvent } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { workspaceClient } from './api/client'
-import type { Conversation, Message, WorkspaceJobDetail, WorkspaceRepository, WorkspaceSnapshot } from './api/types'
+import type { Conversation, Message, WorkspaceJobAction, WorkspaceJobDetail, WorkspaceRepository, WorkspaceSnapshot } from './api/types'
 import { WorkspaceApiError } from './api/types'
 import { JobStatus } from './components/JobStatus'
 import { QuestionCard } from './components/QuestionCard'
@@ -128,6 +128,8 @@ function App() {
   const [jobTab, setJobTab] = useState<'running' | 'ready'>('running')
   const [jobDetail, setJobDetail] = useState<WorkspaceJobDetail | null>(null)
   const [jobDetailError, setJobDetailError] = useState<{ jobId: string; message: string } | null>(null)
+  const [pendingJobActions, setPendingJobActions] = useState<string[]>([])
+  const [jobActionMessage, setJobActionMessage] = useState<{ jobId: string; kind: 'status' | 'error'; text: string } | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
   const [snapshot, setSnapshot] = useState<WorkspaceSnapshot | null>(null)
   const [token, setToken] = useState('')
@@ -469,6 +471,59 @@ function App() {
     }
   }
 
+  const requestJobAction = async (action: WorkspaceJobAction) => {
+    if (!repositoryId || !selectedJobId || !jobDetail) return
+    const pendingKey = JSON.stringify([selectedJobId, action])
+    setPendingJobActions((previous) => previous.includes(pendingKey) ? previous : [...previous, pendingKey])
+    setJobActionMessage(null)
+    try {
+      await workspaceClient.requestJobAction(
+        repositoryId,
+        selectedJobId,
+        jobDetail.job.revision,
+        action,
+      )
+      setJobActionMessage({
+        jobId: selectedJobId,
+        kind: 'status',
+        text: action === 'cancel'
+          ? 'Cancellation requested. The job will stop after its worker confirms exit.'
+          : `${action[0].toUpperCase()}${action.slice(1)} request accepted. The job status will update when the supervisor applies it.`,
+      })
+      try {
+        await refreshWorkspace(repositoryId)
+        setJobDetail(await workspaceClient.jobDetail(repositoryId, selectedJobId))
+      } catch {
+        setJobActionMessage({
+          jobId: selectedJobId,
+          kind: 'status',
+          text: 'The action was accepted, but the latest job status could not be loaded. Reconnect to refresh it.',
+        })
+      }
+    } catch (cause) {
+      if (cause instanceof WorkspaceApiError && cause.code === 'stale_revision') {
+        try {
+          setJobDetail(await workspaceClient.jobDetail(repositoryId, selectedJobId))
+        } catch {
+          // Keep the current detail visible if the refresh also fails.
+        }
+        setJobActionMessage({
+          jobId: selectedJobId,
+          kind: 'error',
+          text: 'This job changed in another window. Review the latest status before requesting another action.',
+        })
+      } else {
+        setJobActionMessage({
+          jobId: selectedJobId,
+          kind: 'error',
+          text: cause instanceof Error ? cause.message : 'The job action could not be requested.',
+        })
+      }
+    } finally {
+      setPendingJobActions((previous) => previous.filter((item) => item !== pendingKey))
+    }
+  }
+
   const handleComposerKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) {
       event.preventDefault()
@@ -620,7 +675,7 @@ function App() {
           </section>
         ) : selectedJobId ? (
           <div className="job-status-view">
-            {jobDetail?.job.job_id === selectedJobId ? <JobStatus detail={jobDetail} /> : jobDetailError?.jobId === selectedJobId ? (
+            {jobDetail?.job.job_id === selectedJobId ? <JobStatus detail={jobDetail} pendingActions={jobDetail.allowed_actions.filter((action) => pendingJobActions.includes(JSON.stringify([selectedJobId, action])))} actionMessage={jobActionMessage?.jobId === selectedJobId ? jobActionMessage : null} onAction={(action) => void requestJobAction(action)} /> : jobDetailError?.jobId === selectedJobId ? (
               <div className="job-status-error" role="alert">{jobDetailError.message}</div>
             ) : (
               <div className="job-status-loading"><span className="pulse-dot" />Loading job status…</div>

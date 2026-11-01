@@ -6,6 +6,8 @@ import json
 import os
 import subprocess
 import tempfile
+import uuid
+from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any, Protocol
@@ -425,6 +427,205 @@ class LocalDiagnosticCache:
             return None
         value = json.loads(path.read_text(encoding="utf-8"))
         return value if isinstance(value, Mapping) else None
+
+
+class LocalPlanningTelemetryStore:
+    """Append-only, local-only planning cost records and compact summaries."""
+
+    _RECORD_FIELDS = frozenset(
+        {
+            "question_ids",
+            "question_kinds",
+            "input_digests",
+            "batch_member_count",
+            "request_chars",
+            "request_chars_all_attempts",
+            "answer_chars",
+            "attempts",
+            "validation_failures",
+            "api_calls",
+            "provider_failures",
+            "elapsed_ms",
+            "provider",
+            "model",
+            "outcome",
+            "deterministic",
+            "input_digest",
+            "prompt_tokens",
+            "completion_tokens",
+        }
+    )
+
+    def __init__(self, repo_root: Path, *, session_id: str) -> None:
+        validate_session_id(session_id)
+        root = Path(repo_root).resolve()
+        try:
+            result = subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(root),
+                    "rev-parse",
+                    "--path-format=absolute",
+                    "--git-common-dir",
+                ],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        except (OSError, subprocess.CalledProcessError) as error:
+            raise PlanningJournalError(
+                "could not locate Git metadata for planning telemetry"
+            ) from error
+        common_dir = Path(result.stdout.strip()).resolve()
+        self.directory = common_dir / "powdrr-lift" / "planning-runs" / session_id
+        self.directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+        os.chmod(self.directory, 0o700)
+        self.path = self.directory / "telemetry.jsonl"
+        self.lock_path = self.directory / "telemetry.lock"
+        self.session_id = session_id
+
+    def start_run(self) -> str:
+        return uuid.uuid4().hex
+
+    def record(self, run_id: str, metric: Mapping[str, Any]) -> None:
+        if not run_id or any(char not in "0123456789abcdef" for char in run_id):
+            raise PlanningJournalError("telemetry run ID is malformed")
+        if set(metric) != self._RECORD_FIELDS:
+            raise PlanningJournalError("planning telemetry fields are malformed")
+        record = {
+            "schema": "planning-call-telemetry-v1",
+            "session_id": self.session_id,
+            "run_id": run_id,
+            **metric,
+        }
+        serialized = _compact_json(record) + "\n"
+        with file_lock(self.lock_path):
+            file_descriptor = os.open(
+                self.path, os.O_CREAT | os.O_APPEND | os.O_WRONLY, 0o600
+            )
+            try:
+                with os.fdopen(file_descriptor, "a", encoding="utf-8") as stream:
+                    stream.write(serialized)
+                    stream.flush()
+                    os.fsync(stream.fileno())
+            finally:
+                os.chmod(self.path, 0o600)
+
+    def summary(self, *, current_run_id: str | None = None) -> Mapping[str, Any]:
+        by_kind: dict[str, dict[str, Any]] = defaultdict(
+            lambda: {
+                "questions": 0,
+                "batches": 0,
+                "api_calls": 0,
+                "elapsed_ms": 0.0,
+                "validation_failures": 0,
+                "provider_failures": 0,
+                "prompt_tokens": 0,
+                "completion_tokens": 0,
+                "token_usage_known": True,
+            }
+        )
+        top: list[dict[str, Any]] = []
+        runs: dict[str, dict[str, Any]] = defaultdict(
+            lambda: {"questions": 0, "batches": 0, "api_calls": 0, "elapsed_ms": 0.0}
+        )
+        total_questions = total_batches = total_calls = 0
+        total_elapsed = 0.0
+        tokens_known = True
+        if self.path.is_file():
+            with self.path.open("r", encoding="utf-8") as stream:
+                for line in stream:
+                    if not line.endswith("\n"):
+                        break
+                    record = json.loads(line)
+                    if (
+                        not isinstance(record, Mapping)
+                        or record.get("schema") != "planning-call-telemetry-v1"
+                        or record.get("session_id") != self.session_id
+                    ):
+                        raise PlanningJournalError("planning telemetry is malformed")
+                    run_id = record.get("run_id")
+                    ids = record.get("question_ids")
+                    kinds = record.get("question_kinds")
+                    if (
+                        not isinstance(run_id, str)
+                        or not isinstance(ids, list)
+                        or not isinstance(kinds, list)
+                        or not all(isinstance(kind, str) for kind in kinds)
+                    ):
+                        raise PlanningJournalError("planning telemetry is malformed")
+                    count = len(ids)
+                    elapsed = record.get("elapsed_ms")
+                    calls = record.get("api_calls")
+                    if not isinstance(elapsed, int | float) or not isinstance(
+                        calls, int
+                    ):
+                        raise PlanningJournalError("planning telemetry is malformed")
+                    total_questions += count
+                    total_batches += 1
+                    total_calls += calls
+                    total_elapsed += elapsed
+                    runs[run_id]["questions"] += count
+                    runs[run_id]["batches"] += 1
+                    runs[run_id]["api_calls"] += calls
+                    runs[run_id]["elapsed_ms"] += elapsed
+                    prompt_tokens = record.get("prompt_tokens")
+                    completion_tokens = record.get("completion_tokens")
+                    tokens_known = (
+                        tokens_known
+                        and isinstance(prompt_tokens, int)
+                        and isinstance(completion_tokens, int)
+                    )
+                    for kind in kinds:
+                        bucket = by_kind[kind]
+                        bucket["questions"] += count
+                        bucket["batches"] += 1
+                        bucket["api_calls"] += calls
+                        bucket["elapsed_ms"] += elapsed
+                        bucket["validation_failures"] += int(
+                            record.get("validation_failures") or 0
+                        )
+                        bucket["provider_failures"] += int(
+                            record.get("provider_failures") or 0
+                        )
+                        if isinstance(prompt_tokens, int) and isinstance(
+                            completion_tokens, int
+                        ):
+                            bucket["prompt_tokens"] += prompt_tokens
+                            bucket["completion_tokens"] += completion_tokens
+                        else:
+                            bucket["token_usage_known"] = False
+                    top.append(
+                        {
+                            "question_ids": ids,
+                            "question_kinds": kinds,
+                            "elapsed_ms": elapsed,
+                            "api_calls": calls,
+                        }
+                    )
+        return {
+            "session_id": self.session_id,
+            "questions": total_questions,
+            "batches": total_batches,
+            "api_calls": total_calls,
+            "elapsed_ms": round(total_elapsed, 3),
+            "token_usage_known": tokens_known,
+            "by_question_kind": {
+                kind: dict(values) for kind, values in sorted(by_kind.items())
+            },
+            "runs": [
+                {
+                    "run": "current" if run_id == current_run_id else "prior",
+                    **values,
+                    "elapsed_ms": round(values["elapsed_ms"], 3),
+                }
+                for run_id, values in runs.items()
+            ],
+            "largest_calls": sorted(
+                top, key=lambda item: item["elapsed_ms"], reverse=True
+            )[:10],
+        }
 
 
 class IssueCommentAPI(Protocol):

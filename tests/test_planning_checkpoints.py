@@ -12,6 +12,7 @@ from powdrr_local.planning.checkpoints import (
     GitHubCommentCheckpointStore,
     LocalCheckpointStore,
     LocalDiagnosticCache,
+    LocalPlanningTelemetryStore,
 )
 from powdrr_service.planning.checkpoints import (
     MAX_CHECKPOINT_COMMENT_CHARS,
@@ -782,6 +783,60 @@ def test_local_diagnostics_are_atomic_redacted_and_cache_only(tmp_path: Path) ->
         tmp_path / "repo-b" / ".git", session_id="planning-session-1"
     )
     assert other_machine_cache.read("q-000001") is None
+
+
+def test_local_planning_telemetry_summarizes_large_runs_without_journal_data(
+    tmp_path: Path,
+) -> None:
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    subprocess.run(
+        ["git", "init", str(repository)], check=True, capture_output=True, text=True
+    )
+    store = LocalPlanningTelemetryStore(repository, session_id="planning-session-1")
+    prior_run = store.start_run()
+    current_run = store.start_run()
+
+    def metric(index: int) -> dict[str, Any]:
+        return {
+            "question_ids": [f"extract-requirements-{index:05d}"],
+            "question_kinds": ["extract_requirements"],
+            "input_digests": ["sha256:" + "a" * 64],
+            "batch_member_count": 1,
+            "request_chars": 900,
+            "request_chars_all_attempts": 900,
+            "answer_chars": 120,
+            "attempts": 1,
+            "validation_failures": 0,
+            "api_calls": 1,
+            "provider_failures": 0,
+            "elapsed_ms": 25.0,
+            "provider": "test-provider",
+            "model": "test-model",
+            "outcome": "accepted",
+            "deterministic": False,
+            "input_digest": "sha256:" + "a" * 64,
+            "prompt_tokens": None,
+            "completion_tokens": None,
+        }
+
+    for index in range(1_000):
+        store.record(prior_run if index < 700 else current_run, metric(index))
+
+    summary = store.summary(current_run_id=current_run)
+
+    assert summary["questions"] == 1_000
+    assert summary["api_calls"] == 1_000
+    assert summary["token_usage_known"] is False
+    assert summary["by_question_kind"]["extract_requirements"]["questions"] == 1_000
+    assert [run["run"] for run in summary["runs"]] == ["prior", "current"]
+    assert summary["runs"][0]["questions"] == 700
+    assert summary["runs"][1]["questions"] == 300
+    assert len(summary["largest_calls"]) == 10
+    persisted = store.path.read_text(encoding="utf-8")
+    assert "source_text" not in persisted
+    assert "The exact question text" not in persisted
+    assert "answer text" not in persisted
 
 
 def test_checkpoint_data_rejects_tampering_and_non_finite_json() -> None:

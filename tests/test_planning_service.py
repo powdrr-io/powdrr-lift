@@ -748,12 +748,18 @@ def test_ready_question_frontier_runs_concurrently_and_checkpoints_serially() ->
             }
 
     client = ConcurrentClient()
+    telemetry: list[Mapping[str, Any]] = []
     transition = advance_planning_session(
         session=session,
         state_machine=BatchMachine(),
         checkpoint_store=store,
         client=client,
-        options=PlanningOptions(model="test-model", max_concurrent_questions=2),
+        options=PlanningOptions(
+            model="test-model",
+            max_concurrent_questions=2,
+            provider="test-provider",
+            telemetry_sink=telemetry.append,
+        ),
         stderr=None,
     )
     next_transition = advance_planning_session(
@@ -761,7 +767,12 @@ def test_ready_question_frontier_runs_concurrently_and_checkpoints_serially() ->
         state_machine=BatchMachine(),
         checkpoint_store=store,
         client=client,
-        options=PlanningOptions(model="test-model", max_concurrent_questions=2),
+        options=PlanningOptions(
+            model="test-model",
+            max_concurrent_questions=2,
+            provider="test-provider",
+            telemetry_sink=telemetry.append,
+        ),
         stderr=None,
     )
 
@@ -775,6 +786,12 @@ def test_ready_question_frontier_runs_concurrently_and_checkpoints_serially() ->
     )
     assert client.calls == 4
     assert [event.sequence for event in store.load().events] == [1, 2, 3, 4]
+    assert len(telemetry) == 4
+    assert all(metric["provider"] == "test-provider" for metric in telemetry)
+    assert all(metric["api_calls"] == 1 for metric in telemetry)
+    assert all(metric["prompt_tokens"] is None for metric in telemetry)
+    assert all(metric["completion_tokens"] is None for metric in telemetry)
+    assert all(metric["request_chars"] > 0 for metric in telemetry)
 
 
 def test_session_issue_is_created_as_a_non_queue_tracker_and_resumes_by_number() -> (

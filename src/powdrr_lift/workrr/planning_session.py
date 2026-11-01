@@ -19,6 +19,7 @@ from powdrr_local import JsonServiceBridge, LocalPowdrrService
 from powdrr_local.planning.checkpoints import (
     GitHubCommentCheckpointStore,
     LocalCheckpointStore,
+    LocalPlanningTelemetryStore,
 )
 from powdrr_local.planning.sessions import GitHubPlanningIssueStore
 from powdrr_local.planning.source import read_pinned_source
@@ -117,6 +118,8 @@ def run_planning_session(
     session: PlanningSession | None = None
     checkpoint_store: LocalCheckpointStore | None = None
     issue_checkpoint_store: GitHubCommentCheckpointStore | None = None
+    telemetry_store: LocalPlanningTelemetryStore | None = None
+    telemetry_run_id: str | None = None
     plan_id = config.plan_id or ""
     output_path: Path | None = None
     try:
@@ -238,6 +241,20 @@ def run_planning_session(
         issue_checkpoint_store = GitHubCommentCheckpointStore(
             github, session.issue.number, session_id=session.session_id
         )
+        try:
+            telemetry_store = LocalPlanningTelemetryStore(
+                repo_root, session_id=session.session_id
+            )
+            telemetry_run_id = telemetry_store.start_run()
+        except Exception as telemetry_error:
+            print(f"Planning telemetry unavailable: {telemetry_error}", file=stream)
+        record_telemetry = None
+        if telemetry_store is not None and telemetry_run_id is not None:
+
+            def record_telemetry(metric: Mapping[str, Any]) -> None:
+                assert telemetry_store is not None and telemetry_run_id is not None
+                telemetry_store.record(telemetry_run_id, metric)
+
         if config.resume and not checkpoint_store.path.exists():
             checkpoint_store.import_legacy_comments(
                 github.list_checkpoint_comments(
@@ -262,8 +279,13 @@ def run_planning_session(
                     1 if planning_mapping.provider == "local" else config.concurrency
                 ),
                 use_provider_schema=planning_mapping.provider != "deepinfra-cheap",
+                provider=planning_mapping.provider,
+                telemetry_sink=record_telemetry,
             ),
             stderr=stream,
+        )
+        _write_planning_telemetry_summary(
+            telemetry_store, stream, current_run_id=telemetry_run_id
         )
         if result.terminal_status.value != "succeeded":
             journal = checkpoint_store.load()
@@ -320,6 +342,10 @@ def run_planning_session(
             pull_request=pull_request,
         )
     except Exception as error:
+        if telemetry_store is not None:
+            _write_planning_telemetry_summary(
+                telemetry_store, stream, current_run_id=telemetry_run_id
+            )
         if checkpoint_store is not None and issue_checkpoint_store is not None:
             try:
                 journal = checkpoint_store.load()
@@ -348,6 +374,50 @@ def run_planning_session(
         raise PlanningSessionExecutionError(
             f"Could not create execution plan: {error}"
         ) from error
+
+
+def _write_planning_telemetry_summary(
+    store: LocalPlanningTelemetryStore | None,
+    stream: TextIO,
+    *,
+    current_run_id: str | None = None,
+) -> None:
+    if store is None:
+        return
+    try:
+        summary = store.summary(current_run_id=current_run_id)
+    except Exception as error:
+        print(f"Planning telemetry summary unavailable: {error}", file=stream)
+        return
+    by_kind = summary["by_question_kind"]
+    print(
+        "Planning telemetry: "
+        f"{summary['questions']} question members across {summary['batches']} batches, "
+        f"{summary['api_calls']} provider calls, {summary['elapsed_ms']} ms; "
+        f"token usage "
+        f"{'available' if summary['token_usage_known'] else 'partially unavailable'}; "
+        f"details in {store.path}",
+        file=stream,
+    )
+    for kind, values in by_kind.items():
+        print(
+            f"  {kind}: {values['questions']} questions, "
+            f"{values['api_calls']} calls, {round(values['elapsed_ms'], 3)} ms",
+            file=stream,
+        )
+    for run in summary["runs"]:
+        print(
+            f"  {run['run']} execution: {run['questions']} questions, "
+            f"{run['api_calls']} calls, {run['elapsed_ms']} ms",
+            file=stream,
+        )
+    for call in summary["largest_calls"]:
+        print(
+            f"  slow call ({call['elapsed_ms']} ms): "
+            f"{', '.join(call['question_kinds'])} / "
+            f"{', '.join(call['question_ids'])}",
+            file=stream,
+        )
 
 
 def _planning_session_operation(

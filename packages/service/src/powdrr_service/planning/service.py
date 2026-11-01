@@ -8,11 +8,13 @@ resume reconstructs the accepted answer set before asking for more work.
 
 from __future__ import annotations
 
+import inspect
 import json
 import re
 import sys
+import time
 import uuid
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from io import StringIO
@@ -32,6 +34,7 @@ from powdrr_service.planning.questions import (
     AcceptedQuestionAnswer,
     NeedsQuestionAnswer,
     QuestionRequest,
+    build_question_messages,
     run_question,
 )
 
@@ -265,10 +268,61 @@ class PlanningOptions:
     transport_backoff_seconds: float = 1.0
     max_concurrent_questions: int = 4
     use_provider_schema: bool = True
+    provider: str = "unknown"
+    telemetry_sink: Callable[[Mapping[str, Any]], None] | None = None
 
     def __post_init__(self) -> None:
         if self.max_concurrent_questions < 1:
             raise ValueError("max_concurrent_questions must be positive")
+
+
+class _QuestionTelemetryClient:
+    """Per-question client view that captures usage without shared-state races."""
+
+    def __init__(self, client: WorkflowLLMClient) -> None:
+        self._client = client
+        self.prompt_chars = 0
+        self.response_chars = 0
+        self.api_calls = 0
+        self.provider_failures = 0
+        self.prompt_tokens = 0
+        self.completion_tokens = 0
+        self.has_prompt_tokens = False
+        self.has_completion_tokens = False
+
+    def complete_json(self, messages: list[dict[str, str]], **kwargs: Any) -> Any:
+        self.prompt_chars += sum(
+            len(message.get("content", "")) for message in messages
+        )
+        self.api_calls += 1
+        try:
+            parameters = inspect.signature(self._client.complete_json).parameters
+            supports_schema = "response_schema" in parameters or any(
+                parameter.kind is inspect.Parameter.VAR_KEYWORD
+                for parameter in parameters.values()
+            )
+            answer = (
+                self._client.complete_json(messages, **kwargs)
+                if supports_schema and kwargs
+                else self._client.complete_json(messages)
+            )
+        except Exception:
+            self.provider_failures += 1
+            raise
+        self.response_chars += len(
+            json.dumps(answer, ensure_ascii=False, separators=(",", ":"))
+        )
+        usage = getattr(self._client, "last_usage", None)
+        if isinstance(usage, Mapping):
+            prompt = usage.get("prompt_tokens", usage.get("input_tokens"))
+            completion = usage.get("completion_tokens", usage.get("output_tokens"))
+            if isinstance(prompt, int) and not isinstance(prompt, bool):
+                self.prompt_tokens += prompt
+                self.has_prompt_tokens = True
+            if isinstance(completion, int) and not isinstance(completion, bool):
+                self.completion_tokens += completion
+                self.has_completion_tokens = True
+        return answer
 
 
 def create_planning_session(
@@ -591,11 +645,26 @@ def _run_question_batch(
 
     def run_one(
         request: QuestionRequest[Any],
-    ) -> tuple[QuestionRequest[Any], Any, Exception | None, str]:
+    ) -> tuple[QuestionRequest[Any], Any, Exception | None, str, dict[str, Any]]:
         output = StringIO()
+        started = time.monotonic()
+        telemetry_client = _QuestionTelemetryClient(client)
+        error: Exception | None = None
+        request_chars = None
+        try:
+            initial_messages = build_question_messages(
+                request, schema_in_response=options.use_provider_schema
+            )
+            request_chars = sum(
+                len(message.get("content", "")) for message in initial_messages
+            )
+        except Exception:
+            # The normal question runner owns validation and error reporting.
+            # Telemetry must never change its result.
+            pass
         try:
             result = run_question(
-                client,
+                telemetry_client,
                 request,
                 model=options.model,
                 stderr=output,
@@ -603,9 +672,60 @@ def _run_question_batch(
                 transport_backoff_seconds=options.transport_backoff_seconds,
                 use_provider_schema=options.use_provider_schema,
             )
-            return request, result, None, output.getvalue()
-        except Exception as error:
-            return request, None, error, output.getvalue()
+            error = None
+        except Exception as caught:
+            error = caught
+            result = None
+        raw_answer = (
+            result.raw_answer
+            if isinstance(result, (AcceptedQuestionAnswer, NeedsQuestionAnswer))
+            else None
+        )
+        question = request.question
+        members = request.batch_members or (request,)
+        metric = {
+            "question_ids": [member.question.question_id for member in members],
+            "question_kinds": sorted({member.question.kind for member in members}),
+            "input_digests": [member.question.input_digest for member in members],
+            "batch_member_count": len(members),
+            "request_chars": request_chars,
+            "request_chars_all_attempts": telemetry_client.prompt_chars,
+            "answer_chars": telemetry_client.response_chars
+            or (
+                None
+                if raw_answer is None
+                else len(
+                    json.dumps(raw_answer, ensure_ascii=False, separators=(",", ":"))
+                )
+            ),
+            "attempts": getattr(result, "attempts", None),
+            "validation_failures": max(0, getattr(result, "attempts", 1) - 1),
+            "api_calls": telemetry_client.api_calls,
+            "provider_failures": telemetry_client.provider_failures,
+            "elapsed_ms": round((time.monotonic() - started) * 1000, 3),
+            "provider": options.provider,
+            "model": options.model,
+            "outcome": (
+                "error"
+                if error is not None
+                else "accepted"
+                if isinstance(result, AcceptedQuestionAnswer)
+                else "needs_answer"
+            ),
+            "deterministic": False,
+            "input_digest": question.input_digest if len(members) == 1 else None,
+            "prompt_tokens": (
+                telemetry_client.prompt_tokens
+                if telemetry_client.has_prompt_tokens
+                else None
+            ),
+            "completion_tokens": (
+                telemetry_client.completion_tokens
+                if telemetry_client.has_completion_tokens
+                else None
+            ),
+        }
+        return request, result, error, output.getvalue(), metric
 
     with ThreadPoolExecutor(
         max_workers=min(options.max_concurrent_questions, len(requests))
@@ -614,13 +734,23 @@ def _run_question_batch(
         completed = [future.result() for future in futures]
 
     output_stream = stderr if stderr is not None else sys.stdout
-    for _request, _result, _error, output in completed:
+    for _request, _result, _error, output, metric in completed:
         if output:
             output_stream.write(output)
+        if options.telemetry_sink is not None:
+            try:
+                options.telemetry_sink(metric)
+            except Exception as telemetry_error:
+                output_stream.write(
+                    f"Planning telemetry could not be recorded: {telemetry_error}\n"
+                )
     flush = getattr(output_stream, "flush", None)
     if callable(flush):
         flush()
-    return tuple((request, result, error) for request, result, error, _ in completed)
+    return tuple(
+        (request, result, error)
+        for request, result, error, _output, _metric in completed
+    )
 
 
 def planning_operation_executor(

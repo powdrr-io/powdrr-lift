@@ -1,0 +1,275 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1273
+title: Compose MiniSWE inference in the local package
+intent:
+  problem: The MiniSWE agent provider still constructs the local service and DeepInfra
+    client, mixing agent worker code with service-side provider composition.
+  goal: Move inference handler construction to powdrr_local and require callers to
+    inject that handler into each MiniSWE worker path.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 397
+    end_line: 409
+  summary: Register the local MiniSWE inference composition module and its service/bridge
+    dependencies.
+  rationale: Make composition ownership explicit in the agent/service extraction inventory.
+- path: packages/local/src/powdrr_local/__init__.py
+  type: modified
+  span:
+    start_line: 6
+    end_line: 6
+  summary: Export the MiniSWE inference composition factory from the local package.
+  rationale: Allow application call sites to obtain service inference without constructing
+    provider clients in the worker.
+- path: packages/local/src/powdrr_local/__init__.py
+  type: modified
+  span:
+    start_line: 8
+    end_line: 12
+  summary: Export the MiniSWE inference composition factory from the local package.
+  rationale: Allow application call sites to obtain service inference without constructing
+    provider clients in the worker.
+- path: packages/local/src/powdrr_local/miniswe_inference.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 31
+  summary: Compose DeepInfra inference through LocalPowdrrService and JsonServiceBridge
+    with a bounded provider timeout.
+  rationale: Keep provider and service construction in the local composition layer
+    while preserving serialized contracts.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 719
+    end_line: 721
+  summary: Require an injected inference handler and remove local service/provider
+    construction from the MiniSWE adapter.
+  rationale: Keep service composition outside agent worker code and fail early when
+    no local handler is supplied.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 728
+    end_line: 730
+  summary: Require an injected inference handler and remove local service/provider
+    construction from the MiniSWE adapter.
+  rationale: Keep service composition outside agent worker code and fail early when
+    no local handler is supplied.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 762
+    end_line: 764
+  summary: Require an injected inference handler and remove local service/provider
+    construction from the MiniSWE adapter.
+  rationale: Keep service composition outside agent worker code and fail early when
+    no local handler is supplied.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 881
+    end_line: 881
+  summary: Require an injected inference handler and remove local service/provider
+    construction from the MiniSWE adapter.
+  rationale: Keep service composition outside agent worker code and fail early when
+    no local handler is supplied.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 963
+    end_line: 976
+  summary: Require an injected inference handler and remove local service/provider
+    construction from the MiniSWE adapter.
+  rationale: Keep service composition outside agent worker code and fail early when
+    no local handler is supplied.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 1004
+    end_line: 1005
+  summary: Require an injected inference handler and remove local service/provider
+    construction from the MiniSWE adapter.
+  rationale: Keep service composition outside agent worker code and fail early when
+    no local handler is supplied.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 1020
+    end_line: 1023
+  summary: Require an injected inference handler and remove local service/provider
+    construction from the MiniSWE adapter.
+  rationale: Keep service composition outside agent worker code and fail early when
+    no local handler is supplied.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 1025
+    end_line: 1025
+  summary: Require an injected inference handler and remove local service/provider
+    construction from the MiniSWE adapter.
+  rationale: Keep service composition outside agent worker code and fail early when
+    no local handler is supplied.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 17
+    end_line: 17
+  summary: Inject the local inference handler into feature implementation and probe-authoring
+    MiniSWE runs.
+  rationale: Route both worker paths through the same service boundary while leaving
+    OpenCode unchanged.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 2861
+    end_line: 2867
+  summary: Inject the local inference handler into feature implementation and probe-authoring
+    MiniSWE runs.
+  rationale: Route both worker paths through the same service boundary while leaving
+    OpenCode unchanged.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 3479
+    end_line: 3479
+  summary: Inject the local inference handler into feature implementation and probe-authoring
+    MiniSWE runs.
+  rationale: Route both worker paths through the same service boundary while leaving
+    OpenCode unchanged.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 19
+    end_line: 19
+  summary: Inject the local inference handler into test-authoring and implementation
+    MiniSWE runs.
+  rationale: Keep every task workflow MiniSWE invocation on the local service inference
+    path.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 2017
+    end_line: 2019
+  summary: Inject the local inference handler into test-authoring and implementation
+    MiniSWE runs.
+  rationale: Keep every task workflow MiniSWE invocation on the local service inference
+    path.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 3591
+    end_line: 3597
+  summary: Inject the local inference handler into test-authoring and implementation
+    MiniSWE runs.
+  rationale: Keep every task workflow MiniSWE invocation on the local service inference
+    path.
+- path: tests/test_coding_agent.py
+  type: modified
+  span:
+    start_line: 10
+    end_line: 10
+  summary: Provide an explicit unused inference stub to MiniSWE provider unit tests.
+  rationale: Keep subprocess-replacement tests isolated while requiring handler injection.
+- path: tests/test_coding_agent.py
+  type: modified
+  span:
+    start_line: 40
+    end_line: 45
+  summary: Provide an explicit unused inference stub to MiniSWE provider unit tests.
+  rationale: Keep subprocess-replacement tests isolated while requiring handler injection.
+- path: tests/test_coding_agent.py
+  type: modified
+  span:
+    start_line: 331
+    end_line: 331
+  summary: Provide an explicit unused inference stub to MiniSWE provider unit tests.
+  rationale: Keep subprocess-replacement tests isolated while requiring handler injection.
+- path: tests/test_coding_agent.py
+  type: modified
+  span:
+    start_line: 412
+    end_line: 415
+  summary: Provide an explicit unused inference stub to MiniSWE provider unit tests.
+  rationale: Keep subprocess-replacement tests isolated while requiring handler injection.
+- path: tests/test_coding_agent.py
+  type: modified
+  span:
+    start_line: 499
+    end_line: 502
+  summary: Provide an explicit unused inference stub to MiniSWE provider unit tests.
+  rationale: Keep subprocess-replacement tests isolated while requiring handler injection.
+- path: tests/test_coding_agent.py
+  type: modified
+  span:
+    start_line: 543
+    end_line: 546
+  summary: Provide an explicit unused inference stub to MiniSWE provider unit tests.
+  rationale: Keep subprocess-replacement tests isolated while requiring handler injection.
+- path: tests/test_coding_agent.py
+  type: modified
+  span:
+    start_line: 579
+    end_line: 582
+  summary: Provide an explicit unused inference stub to MiniSWE provider unit tests.
+  rationale: Keep subprocess-replacement tests isolated while requiring handler injection.
+- path: tests/test_local_miniswe_inference.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 74
+  summary: Verify serialized service bridge forwarding and bounded provider timeout
+    in local composition.
+  rationale: Prove handler construction with deterministic inference responses and
+    no network access.
+entities:
+- id: miniswe-local-inference-composition
+  type: Module
+  action: added
+- id: create-miniswe-inference-handler
+  type: Function
+  action: added
+- id: miniswe-agent-provider
+  type: Class
+  action: modified
+- id: local-miniswe-inference-tests
+  type: Test suite
+  action: added
+entity_relationships:
+- id: local-factory-builds-service-bridge
+  type: creates
+  source: create-miniswe-inference-handler
+  target: miniswe-local-inference-composition
+  action: added
+  description: The local composition factory wraps the service implementation and
+    provider client in the JSON bridge.
+- id: provider-receives-local-handler
+  type: uses
+  source: miniswe-agent-provider
+  target: create-miniswe-inference-handler
+  action: added
+  description: Application call sites inject the local service inference handler into
+    MiniSWE worker execution.
+- id: local-inference-tests-verify-composition
+  type: verifies
+  source: local-miniswe-inference-tests
+  target: create-miniswe-inference-handler
+  action: added
+  description: Tests verify serialized bridge forwarding and provider timeout bounds
+    with a deterministic client.
+invariants:
+- id: miniswe-provider-does-not-construct-service-clients
+  description: The MiniSWE agent provider requires an injected inference handler and
+    does not construct service or provider clients.
+  action: added
+- id: miniswe-local-inference-uses-serialized-bridge
+  description: The composed MiniSWE inference handler serializes requests and responses
+    through JsonServiceBridge before invoking the local service.
+  action: added
+guidance: []
+features: []
+proposed_prs: []

@@ -737,6 +737,9 @@ class MiniSWEAgentProvider:
         self, request: ImplementationRequest, *, worktree_root: Path, attempt_id: str
     ) -> subprocess.CompletedProcess[str]:
         workspace_root = worktree_root.resolve()
+        worker_prompt = request.prompt.replace(
+            "{{powdrr_workspace_root}}", str(workspace_root)
+        )
         task_prompt = (
             "Workspace boundary (mandatory preflight):\n"
             f"- The only repository workspace is `{workspace_root}`.\n"
@@ -745,7 +748,7 @@ class MiniSWEAgentProvider:
             "- If either path differs, stop immediately without inspecting or "
             "changing any files.\n"
             "- Do not `cd` to, read from, or write to any other checkout or path.\n\n"
-            f"{request.prompt}"
+            f"{worker_prompt}"
         )
         environment = os.environ.copy()
         environment.pop("VIRTUAL_ENV", None)

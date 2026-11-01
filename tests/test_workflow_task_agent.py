@@ -16,6 +16,10 @@ from powdrr_service.planning.multipr_structrr import (
     compile_multi_pr_proposal,
     write_multi_pr_proposal,
 )
+from powdrr_service.verification.execute_pr_test_authoring import (
+    WORKSPACE_ROOT_PLACEHOLDER,
+    build_execute_pr_test_author_prompt,
+)
 
 from powdrr_lift.core.spec_context import (
     gather_specification_context,
@@ -55,7 +59,6 @@ from powdrr_lift.workrr.task_agent import (
     _apply_task_edits,
     _build_workflow_client,
     _durable_task_action_output_state,
-    _execute_pr_test_author_prompt,
     _execute_pr_test_author_write_denied_paths,
     _handle_exhausted_timeout,
     _implementation_paths_against_base,
@@ -295,12 +298,11 @@ def test_execute_pr_test_findings_retry_provider_429_with_backoff(
     assert "retrying in 1.5 seconds (retry 1/2)" in capsys.readouterr().err
 
 
-def test_execute_pr_test_author_prompt_pins_authoring_worktree(
+def test_execute_pr_test_author_prompt_leaves_workspace_path_for_agent(
     tmp_path: Path,
 ) -> None:
     authoring_worktree = tmp_path / "isolated" / "authoring-worktree"
-    prompt = _execute_pr_test_author_prompt(
-        authoring_worktree=authoring_worktree,
+    prompt = build_execute_pr_test_author_prompt(
         test_path="attestation/tests/test_powdrr_execute_pr_abcdef123456.py",
         plan_context={"acceptance_criteria": ["The workflow runs on pull requests."]},
         obligations=acceptance_criteria_contract(
@@ -308,7 +310,11 @@ def test_execute_pr_test_author_prompt_pins_authoring_worktree(
         ),
     )
 
-    assert f"exact, only workspace for this attempt is:\n{authoring_worktree}" in prompt
+    assert (
+        f"exact, only workspace for this attempt is:\n{WORKSPACE_ROOT_PLACEHOLDER}"
+        in prompt
+    )
+    assert str(authoring_worktree) not in prompt
     assert "run `pwd` and `git rev-parse --show-toplevel`" in prompt
     assert "stop without making or staging any changes" in prompt
     assert (

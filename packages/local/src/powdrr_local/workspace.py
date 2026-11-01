@@ -495,7 +495,7 @@ class WorkspaceStore:
                 if db.execute("PRAGMA user_version").fetchone()[0] == 3:
                     db.execute(_REPOSITORY_TABLE)
                     db.execute("PRAGMA user_version = 4")
-            elif version not in {4, 5, 6, 7, 8, 9, 10, 11, 12, 13}:
+            elif version not in {4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14}:
                 raise ValueError(f"Unsupported workspace schema version: {version}")
             current_version = db.execute("PRAGMA user_version").fetchone()[0]
             if current_version == 4:
@@ -505,7 +505,7 @@ class WorkspaceStore:
                     for statement in _TURN_TABLES:
                         db.execute(statement)
                     db.execute("PRAGMA user_version = 5")
-            elif current_version not in {5, 6, 7, 8, 9, 10, 11, 12, 13}:
+            elif current_version not in {5, 6, 7, 8, 9, 10, 11, 12, 13, 14}:
                 raise ValueError(
                     f"Unsupported workspace schema version: {current_version}"
                 )
@@ -517,7 +517,7 @@ class WorkspaceStore:
                     for statement in _JOB_OPERATION_TABLES:
                         db.execute(statement)
                     db.execute("PRAGMA user_version = 6")
-            elif current_version not in {6, 7, 8, 9, 10, 11, 12, 13}:
+            elif current_version not in {6, 7, 8, 9, 10, 11, 12, 13, 14}:
                 raise ValueError(
                     f"Unsupported workspace schema version: {current_version}"
                 )
@@ -529,7 +529,7 @@ class WorkspaceStore:
                     for statement in _SUPERVISOR_TABLES:
                         db.execute(statement)
                     db.execute("PRAGMA user_version = 7")
-            elif current_version not in {7, 8, 9, 10, 11, 12, 13}:
+            elif current_version not in {7, 8, 9, 10, 11, 12, 13, 14}:
                 raise ValueError(
                     f"Unsupported workspace schema version: {current_version}"
                 )
@@ -559,7 +559,7 @@ class WorkspaceStore:
                         db.execute("ALTER TABLE events ADD COLUMN attempt_id TEXT")
                         db.execute("ALTER TABLE events ADD COLUMN revision INTEGER")
                     db.execute("PRAGMA user_version = 8")
-            elif current_version not in {8, 9, 10, 11, 12, 13}:
+            elif current_version not in {8, 9, 10, 11, 12, 13, 14}:
                 raise ValueError(
                     f"Unsupported workspace schema version: {current_version}"
                 )
@@ -581,7 +581,7 @@ class WorkspaceStore:
                         "CREATE INDEX api_session_expiry ON api_sessions(expires_at)"
                     )
                     db.execute("PRAGMA user_version = 9")
-            elif current_version not in {9, 10, 11, 12, 13}:
+            elif current_version not in {9, 10, 11, 12, 13, 14}:
                 raise ValueError(
                     f"Unsupported workspace schema version: {current_version}"
                 )
@@ -603,7 +603,7 @@ class WorkspaceStore:
                         "turn_dispatch_intents(repository_id, state, created_at)"
                     )
                     db.execute("PRAGMA user_version = 10")
-            elif current_version not in {10, 11, 12, 13}:
+            elif current_version not in {10, 11, 12, 13, 14}:
                 raise ValueError(
                     f"Unsupported workspace schema version: {current_version}"
                 )
@@ -661,7 +661,20 @@ class WorkspaceStore:
                     )
                     db.execute("PRAGMA user_version = 13")
             current_version = db.execute("PRAGMA user_version").fetchone()[0]
-            if current_version != 13:
+            if current_version == 13:
+                if not db.in_transaction:
+                    db.execute("BEGIN IMMEDIATE")
+                if db.execute("PRAGMA user_version").fetchone()[0] == 13:
+                    db.execute(
+                        "ALTER TABLE turn_dispatch_intents ADD COLUMN claimed_by TEXT"
+                    )
+                    db.execute(
+                        "ALTER TABLE turn_dispatch_intents "
+                        "ADD COLUMN claimed_generation INTEGER"
+                    )
+                    db.execute("PRAGMA user_version = 14")
+            current_version = db.execute("PRAGMA user_version").fetchone()[0]
+            if current_version != 14:
                 raise ValueError(
                     f"Unsupported workspace schema version: {current_version}"
                 )
@@ -1060,6 +1073,108 @@ class WorkspaceStore:
                 (repository_id, limit),
             ).fetchall()
             return tuple(self._turn(db, row["turn_id"]) for row in rows)
+
+    def claim_next_turn_dispatch(
+        self,
+        repository_id: str,
+        *,
+        claim_id: str,
+        supervisor_id: str,
+        supervisor_generation: int,
+        now: datetime | None = None,
+    ) -> WorkspaceTurn | None:
+        """Claim one eligible turn under the active supervisor generation."""
+        _required(repository_id, "repository_id")
+        _required(claim_id, "claim_id")
+        _required(supervisor_id, "supervisor_id")
+        instant = _utc_datetime(now)
+        with self._connection() as db:
+            db.execute("BEGIN IMMEDIATE")
+            lease = self._supervisor_lease(db)
+            if (
+                lease.supervisor_id != supervisor_id
+                or lease.generation != supervisor_generation
+                or _parse_timestamp(lease.lease_expires_at) <= instant
+            ):
+                raise WorkspaceConflict("Supervisor lease is stale or expired")
+            row = db.execute(
+                "SELECT intent.turn_id FROM turn_dispatch_intents AS intent "
+                "JOIN turns AS turn ON turn.turn_id=intent.turn_id "
+                "WHERE intent.repository_id=? AND "
+                "(intent.state='pending' OR intent.claimed_generation IS NULL "
+                "OR intent.claimed_generation!=?) AND "
+                "(turn.state='accepted' OR (turn.state='waiting_for_input' AND "
+                "EXISTS (SELECT 1 FROM questions AS question "
+                "WHERE question.turn_id=turn.turn_id AND question.state='answered'))) "
+                "ORDER BY intent.created_at,intent.turn_id LIMIT 1",
+                (repository_id, supervisor_generation),
+            ).fetchone()
+            if row is None:
+                return None
+            db.execute(
+                "UPDATE turn_dispatch_intents SET state='claimed',claimed_by=?,"
+                "claimed_generation=? WHERE turn_id=?",
+                (claim_id, supervisor_generation, row["turn_id"]),
+            )
+            return self._turn(db, row["turn_id"])
+
+    def finish_turn_dispatch(
+        self,
+        turn_id: str,
+        *,
+        claim_id: str,
+        supervisor_id: str,
+        supervisor_generation: int,
+        requeue: bool = False,
+        now: datetime | None = None,
+    ) -> WorkspaceTurn:
+        """Release an unstarted claim, park for input, or retire a finished turn."""
+        _required(claim_id, "claim_id")
+        instant = _utc_datetime(now)
+        with self._connection() as db:
+            db.execute("BEGIN IMMEDIATE")
+            lease = self._supervisor_lease(db)
+            if (
+                lease.supervisor_id != supervisor_id
+                or lease.generation != supervisor_generation
+                or _parse_timestamp(lease.lease_expires_at) <= instant
+            ):
+                raise WorkspaceConflict("Supervisor lease is stale or expired")
+            turn = self._turn(db, turn_id)
+            row = db.execute(
+                "SELECT * FROM turn_dispatch_intents WHERE turn_id=?", (turn_id,)
+            ).fetchone()
+            if row is None:
+                return turn
+            # A submitted answer may have requeued the claim while the worker was
+            # returning from its suspension. Leave that newer intent untouched.
+            if row["state"] == "pending" and row["claimed_by"] is None:
+                return turn
+            if (
+                row["state"] != "claimed"
+                or row["claimed_by"] != claim_id
+                or row["claimed_generation"] != supervisor_generation
+            ):
+                raise WorkspaceConflict(
+                    "Turn dispatch claim is stale or owned elsewhere"
+                )
+            if requeue and turn.state is TurnState.ACCEPTED:
+                db.execute(
+                    "UPDATE turn_dispatch_intents SET state='pending',claimed_by=NULL,"
+                    "claimed_generation=NULL WHERE turn_id=?",
+                    (turn_id,),
+                )
+            elif turn.state in {
+                TurnState.SUCCEEDED,
+                TurnState.FAILED,
+                TurnState.CANCELLED,
+            }:
+                db.execute(
+                    "DELETE FROM turn_dispatch_intents WHERE turn_id=?", (turn_id,)
+                )
+            # RUNNING remains claimed. A later supervisor must reconcile ownership
+            # before deciding whether it is safe to recover that execution.
+            return turn
 
     def list_turns(
         self, conversation_id: str, *, limit: int = 50
@@ -1537,6 +1652,11 @@ class WorkspaceStore:
                     timestamp,
                     question_id,
                 ),
+            )
+            db.execute(
+                "UPDATE turn_dispatch_intents SET state='pending',claimed_by=NULL,"
+                "claimed_generation=NULL WHERE turn_id=?",
+                (question.turn_id,),
             )
             self._event(
                 db,

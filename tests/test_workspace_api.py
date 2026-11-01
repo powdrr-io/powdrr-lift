@@ -38,7 +38,7 @@ def test_health_is_public_and_session_bootstrap_is_single_use(tmp_path: Path) ->
     client, store, _, secret = _client(tmp_path)
     assert client.get("/api/v1/health").json() == {
         "status": "ok",
-        "schema_version": 13,
+        "schema_version": 14,
         "scheduler": {"status": "not_configured"},
     }
 

@@ -255,3 +255,14 @@ class WorkspaceChatTurnRunner:
         result = self._event_notifier(repository_id)
         if inspect.isawaitable(result):
             raise TypeError("Workspace chat event notifier must be synchronous")
+
+
+class WorkspaceChatTurnDispatcher:
+    """Adapt the workflow runner to the local workspace supervisor protocol."""
+
+    def __init__(self, runner: WorkspaceChatTurnRunner) -> None:
+        self._runner = runner
+
+    def dispatch_turn(self, turn: WorkspaceTurn) -> WorkspaceTurn:
+        """Execute the claimed turn through its persisted workspace ID."""
+        return self._runner.run_turn(turn.turn_id)

@@ -39,6 +39,10 @@ from powdrr_service.providers.selection import (
     resolve_llm_mapping,
 )
 from powdrr_service.structrr.snapshot import snapshot_digest
+from powdrr_service.verification.execute_pr_acceptance import (
+    build_execute_pr_test_report,
+    execute_pr_attempt_passed,
+)
 from powdrr_service.verification.execute_pr_test_authoring import (
     build_execute_pr_test_author_prompt,
 )
@@ -3535,71 +3539,21 @@ class _TaskWorkflowExecutionStrategy:
                 implementation_paths = tuple(
                     sorted({*implementation_paths, report_path})
                 )
-            integration_test_findings: list[str] = []
-            if integration_test_result.get("passed") is not True:
-                integration_test_findings.append(
-                    "pre-coding generated integration tests did not pass: "
-                    + json.dumps(integration_test_result, sort_keys=True)
+            integration_test_report, integration_test_findings = (
+                build_execute_pr_test_report(
+                    integration_test_authoring,
+                    test_sources=integration_test_sources,
+                    candidate_result=integration_test_result,
+                    correction_error=test_correction_error,
                 )
-            if integration_test_result.get("coverage_evidence_error"):
-                integration_test_findings.append(
-                    "generated test execution did not satisfy the coverage evidence "
-                    "contract: "
-                    + str(integration_test_result["coverage_evidence_error"])
-                )
-            correction_quality_reviews = integration_test_authoring.get(
-                "correction_quality_reviews", []
             )
-            quality_notes = list(
-                integration_test_authoring.get("quality_review", {}).get("notes", [])
-            )
-            for review in correction_quality_reviews:
-                quality_notes.extend(review.get("notes", []))
-            if test_correction_error:
-                quality_notes.append(
-                    "A proposed generated-test correction was discarded because "
-                    "it did not pass the bounded correction checks; the original "
-                    "tests were retained. " + test_correction_error
-                )
-            integration_test_report = {
-                "passed": not integration_test_findings,
-                "generation_method": integration_test_authoring.get(
-                    "generation_method", "miniswe_pre_coding"
-                ),
-                "paths": sorted(integration_test_sources),
-                "test_sha256": integration_test_authoring.get("test_sha256", {}),
-                "test_obligations": integration_test_authoring.get(
-                    "test_obligations", []
-                ),
-                "coverage_references": integration_test_authoring.get(
-                    "coverage_references", {}
-                ),
-                "quality_review": integration_test_authoring.get("quality_review"),
-                "correction_quality_reviews": integration_test_authoring.get(
-                    "correction_quality_reviews", []
-                ),
-                "corrections": integration_test_authoring.get("corrections", []),
-                "quality_notes": quality_notes,
-                "baseline_execution_evidence": integration_test_authoring.get(
-                    "baseline_execution_evidence"
-                ),
-                "authoring_attempts": integration_test_authoring.get(
-                    "authoring_attempts", []
-                ),
-                "baseline": integration_test_authoring["baseline_result"],
-                "correction_baseline": integration_test_authoring.get(
-                    "correction_baseline"
-                ),
-                "candidate": integration_test_result,
-                "repair_findings": integration_test_findings,
-            }
-            passed = (
-                attempt.status.value == "completed"
-                and bool(implementation_paths)
-                and diff_check.returncode == 0
-                and validation.status is ValidationReportStatus.PASSED
-                and not integration_test_findings
-                and not structural_findings
+            passed = execute_pr_attempt_passed(
+                attempt_status=attempt.status.value,
+                changed_paths=implementation_paths,
+                diff_check_returncode=diff_check.returncode,
+                validation_status=validation.status.value,
+                integration_test_findings=integration_test_findings,
+                structural_findings=structural_findings,
             )
             return {
                 "attempt": attempt.to_data(),

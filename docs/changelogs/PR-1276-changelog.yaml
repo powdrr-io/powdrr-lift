@@ -1,0 +1,115 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1276
+title: Move execute-PR test review policy into service
+intent:
+  problem: The execute-PR test-quality rubric, prompt construction, evidence shaping,
+    and review-note policy live inside the local task orchestration module.
+  goal: Make the service verification package own test-review policy while the local
+    agent retains only provider calls, retries, and workflow orchestration.
+human-decisions: []
+structured_files: []
+files:
+- path: packages/service/src/powdrr_service/verification/execute_pr_test_quality.py
+  type: added
+  span: {start_line: 1, end_line: 365}
+  summary: Define the service-owned rubric, schemas, prompt builders, evidence extraction,
+    and advisory note rendering.
+  rationale: Keep proprietary review policy in the service layer and expose focused
+    functions for local workflow orchestration.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 46, end_line: 59}
+  summary: Import execute-PR test-quality policy functions from the service package.
+  rationale: Route local workflow execution through the service-owned policy module.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 1399, end_line: 1459}
+  summary: Replace embedded review checks and response schemas with service policy.
+  rationale: Remove rubric and JSON contract definitions from local agent code.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 1417, end_line: 1420}
+  summary: Delegate review question construction to service functions.
+  rationale: Keep prompt wording and scoped evidence formatting service-owned.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 1437, end_line: 1437}
+  summary: Use the service-owned decision response schema for Jev review.
+  rationale: Keep the model response policy alongside its rubric.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 1452, end_line: 1452}
+  summary: Use the service-owned opinion prompt and response schema.
+  rationale: Centralize review policy while retaining agent-side transport.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 1463, end_line: 1463}
+  summary: Use the service-owned test-suggestion prompt policy.
+  rationale: Keep repair advice constraints within verification policy.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 1478, end_line: 1478}
+  summary: Delegate suggestion evidence serialization to the service module.
+  rationale: Keep review input shaping in one service-owned implementation.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 1485, end_line: 1488}
+  summary: Use the service-owned test-suggestion response schema.
+  rationale: Keep the structured-output contract with the suggestion policy.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 1500, end_line: 1500}
+  summary: Delegate advisory review note generation to the service module.
+  rationale: Keep interpretation of review findings service-owned.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 1525, end_line: 1525}
+  summary: Render pull request review notes through the service policy module.
+  rationale: Maintain one source for advisory-review language shown to operators.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 1625, end_line: 1846}
+  summary: Remove local copies of target extraction, evidence shaping, baseline excerpts,
+    and advisory note rendering.
+  rationale: Ensure review policy and deterministic evidence preparation have one
+    service-owned implementation.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 3206, end_line: 3206}
+  summary: Call the service note renderer when adding review findings to the PR body.
+  rationale: Keep local orchestration connected to service-owned presentation policy.
+- path: tests/test_execute_pr_test_authoring.py
+  type: modified
+  span: {start_line: 764, end_line: 764}
+  summary: Exercise the imported service note renderer in the workflow regression test.
+  rationale: Preserve integration coverage after extracting review policy.
+- path: tests/test_execute_pr_test_quality_service.py
+  type: added
+  span: {start_line: 1, end_line: 100}
+  summary: Verify criterion-scoped targets, prompt evidence, baseline excerpts, and
+    advisory PR-note rendering.
+  rationale: Cover service policy independently of model and provider calls.
+entities:
+- id: execute-pr-test-quality-policy
+  type: Module
+  action: added
+- id: execute-pr-test-quality-review
+  type: Function
+  action: modified
+entity_relationships:
+- id: review-policy-owned-by-service
+  type: part_of
+  source: execute-pr-test-quality-review
+  target: execute-pr-test-quality-policy
+  action: added
+  description: The service module owns execute-PR review prompts, schemas, evidence
+    shaping, and advisory note policy.
+invariants:
+- id: execute-pr-test-review-policy-is-service-owned
+  description: The task agent performs provider calls and orchestration, while review
+    rubrics, prompt wording, evidence scoping, and advisory rendering are defined in
+    the service verification package.
+  action: added
+guidance: []
+features: []
+proposed_prs: []

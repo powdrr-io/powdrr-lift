@@ -13,7 +13,11 @@ from powdrr_service.planning.multipr_structrr import compile_multi_pr_proposal
 from powdrr_service.planning.plan_sizing import PlanSizingError, size_plan_items
 
 from powdrr_lift import cli
-from powdrr_lift.workrr import planned_workflow_task, planning_session
+from powdrr_lift.workrr import (
+    planned_workflow_task,
+    planning_session,
+    pr_execution_session,
+)
 from powdrr_lift.workrr.github_issue_plan_generation import (
     PLAN_COVERAGE_AUDIT_RESPONSE_SCHEMA,
     PLAN_ITEMS_RESPONSE_SCHEMA,
@@ -1474,7 +1478,7 @@ def test_issue_worker_runs_plan_task_from_durable_runtime_directory(
         )
 
     monkeypatch.setattr(planned_workflow_task, "run_workflow_task", run_workflow_task)
-    monkeypatch.setattr(cli, "run_worker_once", run_worker_once)
+    monkeypatch.setattr(pr_execution_session, "run_worker_once", run_worker_once)
 
     status = cli._run_github_issue_worker(
         Namespace(

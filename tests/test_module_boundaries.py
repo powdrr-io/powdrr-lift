@@ -122,7 +122,6 @@ def test_workrr_protocol_package_has_no_definition_or_execution_imports() -> Non
         "exchanges.py",
         "progress.py",
         "protocol.py",
-        "providers.py",
         "repair.py",
         "runner.py",
     )
@@ -136,12 +135,14 @@ def test_workrr_protocol_package_has_no_definition_or_execution_imports() -> Non
         ), path
 
 
-def test_service_provider_configuration_does_not_import_legacy_agent_modules() -> None:
+def test_service_provider_modules_do_not_import_legacy_agent_modules() -> None:
     repository = Path(__file__).parents[1]
     paths = (
         repository / "packages/service/src/powdrr_service/providers/config.py",
         repository / "packages/service/src/powdrr_service/providers/credentials.py",
+        repository / "packages/service/src/powdrr_service/providers/errors.py",
         repository / "packages/service/src/powdrr_service/providers/selection.py",
+        repository / "packages/service/src/powdrr_service/providers/clients.py",
     )
     for path in paths:
         imports = _imported_modules(path)

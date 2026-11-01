@@ -3,6 +3,8 @@ from pathlib import Path
 from typing import Any, cast
 
 import pytest
+from powdrr_service.providers.clients import _parse_json_object
+from powdrr_service.providers.errors import ProviderResponseError
 
 from powdrr_lift.errors import PowdrrExecutionError, ProviderExecutionError
 from powdrr_lift.workrr.procedrr import (
@@ -11,7 +13,6 @@ from powdrr_lift.workrr.procedrr import (
     WorkrrProcedrrClient,
     _is_retryable_provider_failure,
 )
-from powdrr_lift.workrr.providers import _parse_json_object
 
 
 class RepairingClient:
@@ -291,7 +292,7 @@ def test_procedrr_falls_back_for_unsupported_schema_grammar_and_validates_locall
 
 
 def test_provider_marks_non_object_json_as_repairable_output() -> None:
-    with pytest.raises(PowdrrExecutionError) as error:
+    with pytest.raises(ProviderResponseError) as error:
         _parse_json_object('"not an object"', "OpenAI response content")
 
     assert error.value.error_code == "invalid_json_response"

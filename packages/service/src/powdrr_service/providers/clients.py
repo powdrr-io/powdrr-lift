@@ -1,4 +1,4 @@
-"""Concrete provider clients and response handling for agent execution."""
+"""Concrete model provider clients and response handling."""
 
 from __future__ import annotations
 
@@ -11,32 +11,26 @@ import re
 import time
 from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any, TextIO, cast
+from typing import Any, Protocol, TextIO, cast
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 import laga
+
 from powdrr_service.providers.config import (
     DEFAULT_MODEL_LIMITS,
     MAX_COMPLETION_TOKENS,
     LLMModelLimits,
     provider_definition,
 )
-from powdrr_service.providers.credentials import (
-    ProviderCredentials as _ProviderCredentials,
+from powdrr_service.providers.errors import (
+    ProviderClientError,
+    ProviderHTTPError,
+    ProviderResponseError,
 )
 from powdrr_service.providers.selection import provider_model_limits
 
-from powdrr_lift.errors import PowdrrExecutionError
-from powdrr_lift.workrr.llm import (
-    ProviderExecutionError,
-    WorkflowLLMClient,
-    WorkflowLLMHTTPError,
-)
-
 _DEFAULT_LOCAL_MODEL_CONTEXT = 24576
-LOCAL_MODEL_CONTEXT_ENV = "POWDRR_LOCAL_MODEL_CONTEXT"
-LOCAL_MODEL_PATTERN = "qwen2.5-coder-14b-instruct-q5_k_m*.gguf"
 _TOKEN_ESTIMATE_CHARS_PER_TOKEN = 3
 _CONTEXT_SAFETY_MARGIN_TOKENS = 1024
 _MAX_STREAM_CHUNKS = 16384
@@ -48,42 +42,15 @@ _STREAM_PROGRESS_INTERVAL_SECONDS = 10.0
 _STREAM_CAPTURE_COUNTER = itertools.count(1)
 
 
-def resolve_local_model_path(model_cache_dir: Path) -> Path:
-    cached_model_paths = sorted(model_cache_dir.glob(LOCAL_MODEL_PATTERN))
-    if _has_all_local_model_shards(cached_model_paths):
-        return cached_model_paths[0]
-    raise PowdrrExecutionError(
-        "The local Qwen model is not fully cached. Run "
-        "`powdrr-lift download-qwen-model` before starting workflow-chat. "
-        f"Expected cache={model_cache_dir}."
-    )
+class ProviderClient(Protocol):
+    """Structural interface implemented by concrete provider clients."""
 
-
-def resolve_local_model_context() -> int:
-    configured_context = os.environ.get(LOCAL_MODEL_CONTEXT_ENV)
-    if configured_context is None or not configured_context.strip():
-        return _DEFAULT_LOCAL_MODEL_CONTEXT
-    try:
-        context = int(configured_context)
-    except ValueError as exc:
-        raise PowdrrExecutionError(
-            f"{LOCAL_MODEL_CONTEXT_ENV} must be a positive integer; got "
-            f"{configured_context!r}."
-        ) from exc
-    if context <= 0:
-        raise PowdrrExecutionError(
-            f"{LOCAL_MODEL_CONTEXT_ENV} must be a positive integer; got "
-            f"{configured_context!r}."
-        )
-    return context
-
-
-def _has_all_local_model_shards(model_paths: Sequence[Path]) -> bool:
-    if not model_paths:
-        return False
-    match = re.search(r"-00001-of-(\d+)\.gguf$", model_paths[0].name)
-    expected_shards = int(match.group(1)) if match else 1
-    return len(model_paths) >= expected_shards
+    def complete_json(
+        self,
+        messages: list[dict[str, str]],
+        *,
+        response_schema: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]: ...
 
 
 class OpenAIChatClient:
@@ -188,21 +155,19 @@ class OpenAIChatClient:
                     ),
                 )
         except HTTPError as exc:
-            raise WorkflowLLMHTTPError(
+            raise ProviderHTTPError(
                 "OpenAI",
                 exc.code,
                 exc.read().decode("utf-8", errors="replace"),
             ) from exc
         except URLError as exc:
-            raise ProviderExecutionError(
-                f"OpenAI request failed: {exc.reason}"
-            ) from exc
+            raise ProviderClientError(f"OpenAI request failed: {exc.reason}") from exc
         except ConnectionError as exc:
-            raise ProviderExecutionError(
+            raise ProviderClientError(
                 f"OpenAI request connection dropped: {exc}"
             ) from exc
         except TimeoutError as exc:
-            raise ProviderExecutionError(
+            raise ProviderClientError(
                 _provider_timeout_message(
                     provider="OpenAI-compatible",
                     model=self._model,
@@ -225,13 +190,13 @@ class OpenAIChatClient:
         self.last_usage = dict(usage) if isinstance(usage, dict) else {}
         choices = loaded_response.get("choices")
         if not isinstance(choices, list) or not choices:
-            raise PowdrrExecutionError("OpenAI response did not include any choices.")
+            raise ProviderResponseError("OpenAI response did not include any choices.")
         first_choice = choices[0]
         if not isinstance(first_choice, dict):
-            raise PowdrrExecutionError("OpenAI response choice was not an object.")
+            raise ProviderResponseError("OpenAI response choice was not an object.")
         message = first_choice.get("message")
         if not isinstance(message, dict):
-            raise PowdrrExecutionError(
+            raise ProviderResponseError(
                 "OpenAI response choice message was not an object."
             )
         content = message.get("content")
@@ -253,7 +218,7 @@ class OpenAIChatClient:
             finish_reason = first_choice.get("finish_reason")
             if finish_reason not in (None, ""):
                 detail += f"; finish_reason={finish_reason!r}"
-            raise PowdrrExecutionError(
+            raise ProviderResponseError(
                 f"OpenAI-compatible provider response message content was empty"
                 f"{detail}."
             )
@@ -314,7 +279,7 @@ def _read_openai_response(
         try:
             event = json.loads(event_payload)
         except json.JSONDecodeError as exc:
-            raise PowdrrExecutionError(
+            raise ProviderResponseError(
                 f"OpenAI streaming response contained invalid JSON: {exc.msg}"
             ) from exc
         if not isinstance(event, dict):
@@ -364,7 +329,7 @@ def _read_openai_response(
                 last_progress_report = now
 
     if response_metadata is None:
-        raise ProviderExecutionError(
+        raise ProviderClientError(
             "OpenAI streaming response did not include any events."
         )
     if not content_parts:
@@ -376,7 +341,7 @@ def _read_openai_response(
                 "; first event="
                 + json.dumps({"choices": choices}, ensure_ascii=False)[:1000]
             )
-        raise PowdrrExecutionError(
+        raise ProviderResponseError(
             f"OpenAI streaming response content was empty{detail}."
         )
     if not stream_complete:
@@ -417,7 +382,7 @@ def _raise_openai_provider_error(response: Mapping[str, Any]) -> None:
     rendered = json.dumps(details, ensure_ascii=False, default=str)
     if len(rendered) > 1500:
         rendered = rendered[:1497] + "..."
-    raise ProviderExecutionError(
+    raise ProviderClientError(
         f"OpenAI-compatible provider returned an error event: {rendered}"
     )
 
@@ -446,22 +411,22 @@ class LocalLlamaChatClient:
             Llama = llama_module.Llama
             llama_supports_gpu_offload = llama_module.llama_supports_gpu_offload
         except ImportError as exc:
-            raise PowdrrExecutionError(
+            raise ProviderResponseError(
                 "Local provider requires llama-cpp-python. Install the local "
                 "extra (with Metal support on macOS): "
                 "CMAKE_ARGS='-DGGML_METAL=on' uv sync --extra local."
             ) from exc
         if not model_path.is_file():
-            raise PowdrrExecutionError(
+            raise ProviderResponseError(
                 f"Local GGUF model file does not exist: {model_path}"
             )
         if "q5_k_m" not in model_path.name.casefold():
-            raise PowdrrExecutionError(
+            raise ProviderResponseError(
                 "Local Qwen model must be the Q5_K_M GGUF variant; expected a "
                 "model filename containing 'q5_k_m'."
             )
         if not llama_supports_gpu_offload():
-            raise PowdrrExecutionError(
+            raise ProviderResponseError(
                 "Local model execution requires GPU offload support, but the "
                 "installed llama-cpp-python build cannot use a GPU. Reinstall "
                 "the local extra with Metal or CUDA support."
@@ -509,18 +474,18 @@ class LocalLlamaChatClient:
             ) from exc
         choices = response.get("choices")
         if not isinstance(choices, list) or not choices:
-            raise PowdrrExecutionError(
+            raise ProviderResponseError(
                 "Local LLM response did not include any choices."
             )
         first_choice = choices[0]
         if not isinstance(first_choice, dict):
-            raise PowdrrExecutionError("Local LLM response choice was not an object.")
+            raise ProviderResponseError("Local LLM response choice was not an object.")
         message = first_choice.get("message")
         if not isinstance(message, dict):
-            raise PowdrrExecutionError("Local LLM response message was not an object.")
+            raise ProviderResponseError("Local LLM response message was not an object.")
         content = message.get("content")
         if not isinstance(content, str) or not content.strip():
-            raise PowdrrExecutionError("Local LLM response content was empty.")
+            raise ProviderResponseError("Local LLM response content was empty.")
         return _parse_json_object(content, "Local LLM response content")
 
 
@@ -583,21 +548,21 @@ class AnthropicChatClient:
             with urlopen(request, timeout=self._timeout) as response:
                 raw_response = response.read().decode("utf-8")
         except HTTPError as exc:
-            raise WorkflowLLMHTTPError(
+            raise ProviderHTTPError(
                 "Anthropic",
                 exc.code,
                 exc.read().decode("utf-8", errors="replace"),
             ) from exc
         except URLError as exc:
-            raise PowdrrExecutionError(
+            raise ProviderResponseError(
                 f"Anthropic request failed: {exc.reason}"
             ) from exc
         except ConnectionError as exc:
-            raise PowdrrExecutionError(
+            raise ProviderResponseError(
                 f"Anthropic request connection dropped: {exc}"
             ) from exc
         except TimeoutError as exc:
-            raise PowdrrExecutionError(
+            raise ProviderResponseError(
                 _provider_timeout_message(
                     provider="Anthropic",
                     model=self._model,
@@ -617,7 +582,7 @@ class AnthropicChatClient:
         )
         content = loaded_response.get("content")
         if not isinstance(content, list) or not content:
-            raise PowdrrExecutionError(
+            raise ProviderResponseError(
                 "Anthropic response did not include any content."
             )
 
@@ -639,7 +604,7 @@ class AnthropicChatClient:
 
         response_text = "".join(text_parts).strip()
         if not response_text:
-            raise PowdrrExecutionError("Anthropic response content was empty.")
+            raise ProviderResponseError("Anthropic response content was empty.")
 
         return _parse_json_object(response_text, "Anthropic response content")
 
@@ -755,7 +720,7 @@ def _request_token_budget(
         limits.context_window - estimated_input_tokens - _CONTEXT_SAFETY_MARGIN_TOKENS
     )
     if available_output_tokens < 1:
-        raise PowdrrExecutionError(
+        raise ProviderResponseError(
             "Model context window is exhausted: "
             f"estimated input is {estimated_input_tokens} tokens, "
             f"context window is {limits.context_window} tokens."
@@ -778,7 +743,7 @@ def _estimate_message_tokens(
     )
 
 
-class _ModelUnavailableError(ProviderExecutionError):
+class _ModelUnavailableError(ProviderClientError):
     pass
 
 
@@ -786,7 +751,7 @@ class _SemanticRepairExhaustedError(_ModelUnavailableError):
     """Raised when a model repeats an invalid structured response."""
 
 
-class _EmptyProviderResponseError(ProviderExecutionError):
+class _EmptyProviderResponseError(ProviderClientError):
     def __init__(
         self,
         message: str,
@@ -797,7 +762,7 @@ class _EmptyProviderResponseError(ProviderExecutionError):
         self.messages = messages
 
 
-class LocalModelRuntimeError(ProviderExecutionError):
+class LocalModelRuntimeError(ProviderClientError):
     """Raised when the required local GPU model cannot run."""
 
 
@@ -811,11 +776,11 @@ def build_provider_client(
     local_context: int = _DEFAULT_LOCAL_MODEL_CONTEXT,
     progress_stream: TextIO | None = None,
     timeout: float = 120.0,
-) -> WorkflowLLMClient:
+) -> ProviderClient:
     definition = provider_definition(provider)
     if definition.client_kind == "local":
         if local_model_path is None:
-            raise PowdrrExecutionError("A local model path is required.")
+            raise ProviderResponseError("A local model path is required.")
         return LocalLlamaChatClient(
             model_path=local_model_path,
             n_ctx=local_context,
@@ -849,33 +814,6 @@ def build_provider_client(
     )
 
 
-def build_workflow_client(
-    credentials: _ProviderCredentials,
-    *,
-    model: str,
-    model_cache_dir: Path,
-    progress_stream: TextIO | None = None,
-    timeout: float = 120.0,
-) -> WorkflowLLMClient:
-    """Build the workflow-facing client for resolved provider credentials."""
-    provider = provider_definition(credentials.provider)
-    local_context = resolve_local_model_context()
-    return build_provider_client(
-        provider=credentials.provider,
-        model=model,
-        api_key=credentials.api_key,
-        base_url=credentials.base_url,
-        local_model_path=(
-            resolve_local_model_path(model_cache_dir)
-            if provider.client_kind == "local"
-            else None
-        ),
-        local_context=local_context,
-        timeout=timeout,
-        progress_stream=progress_stream,
-    )
-
-
 def _parse_json_object(content: str, context: str) -> dict[str, Any]:
     normalized_content = content.strip()
     try:
@@ -886,13 +824,13 @@ def _parse_json_object(content: str, context: str) -> dict[str, Any]:
         except laga.LagaError:
             parsed_content = _extract_embedded_json_object(normalized_content)
             if parsed_content is None:
-                raise PowdrrExecutionError(
+                raise ProviderResponseError(
                     f"{context} was not valid JSON: {exc.msg} at line "
                     f"{exc.lineno}, column {exc.colno}.\nResponse content:\n{content}",
                     error_code="invalid_json_response",
                 ) from exc
     if not isinstance(parsed_content, dict):
-        raise PowdrrExecutionError(
+        raise ProviderResponseError(
             f"{context} must be a JSON object.",
             error_code="invalid_json_response",
         )
@@ -939,12 +877,12 @@ def _anthropic_message(message: dict[str, str]) -> dict[str, Any]:
     role = message.get("role")
     content = message.get("content")
     if role not in {"user", "assistant"}:
-        raise PowdrrExecutionError(
+        raise ProviderResponseError(
             "Anthropic messages must use user or assistant roles after splitting "
             "the system prompt."
         )
     if not isinstance(content, str):
-        raise PowdrrExecutionError("Anthropic message content must be a string.")
+        raise ProviderResponseError("Anthropic message content must be a string.")
     return {
         "role": role,
         "content": [{"type": "text", "text": content}],

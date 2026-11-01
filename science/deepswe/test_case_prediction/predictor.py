@@ -14,9 +14,7 @@ from powdrr_service.providers.credentials import resolve_provider_credentials
 
 from powdrr_lift.errors import ProviderExecutionError
 from powdrr_lift.workrr.llm import complete_json
-from powdrr_lift.workrr.providers import (
-    build_workflow_client,
-)
+from powdrr_lift.workrr.provider_runtime import build_workflow_client
 
 from . import PREDICTIONS_SCHEMA_VERSION
 from .records import load_task_record

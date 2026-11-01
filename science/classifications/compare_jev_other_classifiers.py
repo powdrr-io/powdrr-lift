@@ -27,9 +27,7 @@ from powdrr_service.providers.config import default_llm_mappings
 from powdrr_service.providers.credentials import resolve_provider_credentials
 
 from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
-from powdrr_lift.workrr.providers import (
-    build_workflow_client,
-)
+from powdrr_lift.workrr.provider_runtime import build_workflow_client
 from powdrr_lift.workrr.semantic_contract_compiler import CLASSIFIER_DEFINITIONS
 
 ROOT = Path(__file__).resolve().parents[2]

@@ -167,6 +167,7 @@ from powdrr_lift.workrr.llm import (
     workflow_action_signature,
     workflow_action_summary,
 )
+from powdrr_lift.workrr.local_model import resolve_local_model_path
 from powdrr_lift.workrr.observer import (
     ObserverActionRecommendation,
     ObserverDecision,
@@ -180,12 +181,9 @@ from powdrr_lift.workrr.paths import (
 from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
 from powdrr_lift.workrr.procedrr_operations import WorkrrOperationExecutor
 from powdrr_lift.workrr.provider_runtime import (
+    build_provider_client,
     maybe_record_llm_exchanges,
     resolve_workflow_provider,
-)
-from powdrr_lift.workrr.providers import (
-    build_provider_client,
-    resolve_local_model_path,
 )
 from powdrr_lift.workrr.test_obligations import acceptance_criteria_contract
 from procedrr import ProcessCatalog

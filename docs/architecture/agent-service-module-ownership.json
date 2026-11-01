@@ -981,7 +981,6 @@
         "powdrr_lift.workrr.prompt_benchmark_comparison",
         "powdrr_service.providers.config",
         "powdrr_lift.workrr.provider_runtime",
-        "powdrr_lift.workrr.providers",
         "powdrr_lift.workrr.repository_subject_binding",
         "powdrr_lift.workrr.run_artifacts",
         "powdrr_lift.workrr.scenario",
@@ -2603,7 +2602,7 @@
         "powdrr_lift.workrr.jev_classifier",
         "powdrr_lift.workrr.llm",
         "powdrr_service.providers.config",
-        "powdrr_lift.workrr.providers"
+        "powdrr_lift.workrr.provider_runtime"
       ],
       "kind": "python_module",
       "owner": "split",
@@ -2928,7 +2927,7 @@
       "extraction_pr": "6",
       "internal_imports": [
         "powdrr_lift.errors",
-        "powdrr_lift.workrr.providers"
+        "powdrr_lift.workrr.local_model"
       ],
       "kind": "python_module",
       "owner": "service",
@@ -3065,7 +3064,6 @@
         "powdrr_lift.workrr.procedrr",
         "powdrr_lift.workrr.procedrr_operations",
         "powdrr_lift.workrr.provider_runtime",
-        "powdrr_lift.workrr.providers",
         "powdrr_service.providers.selection",
         "procedrr",
         "procedrr_evaluator.runtime"
@@ -3155,30 +3153,41 @@
       "extraction_pr": "6",
       "internal_imports": [
         "powdrr_lift.workrr.exchanges",
+        "powdrr_lift.errors",
         "powdrr_lift.workrr.llm",
         "powdrr_service.providers.config",
+        "powdrr_service.providers.credentials",
+        "powdrr_service.providers.errors",
         "powdrr_service.providers.selection",
-        "powdrr_lift.workrr.providers"
+        "powdrr_service.providers.clients",
+        "powdrr_lift.workrr.local_model"
       ],
       "kind": "python_module",
-      "owner": "service",
+      "owner": "split",
       "path": "src/powdrr_lift/workrr/provider_runtime.py",
-      "rationale": "provider access, model routing, and inference policy",
+      "rationale": "agent-to-service provider client adapter and local exchange recording",
       "reviewed": false
     },
     {
       "extraction_pr": "6",
       "internal_imports": [
-        "powdrr_lift.errors",
-        "powdrr_lift.workrr.llm",
         "powdrr_service.providers.config",
-        "powdrr_service.providers.credentials",
+        "powdrr_service.providers.errors",
         "powdrr_service.providers.selection"
       ],
       "kind": "python_module",
       "owner": "service",
-      "path": "src/powdrr_lift/workrr/providers.py",
-      "rationale": "provider access, model routing, and inference policy",
+      "path": "packages/service/src/powdrr_service/providers/clients.py",
+      "rationale": "provider transport clients, response handling, and request policy",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "6",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/providers/errors.py",
+      "rationale": "service-owned provider client error types",
       "reviewed": false
     },
     {
@@ -3321,7 +3330,7 @@
         "powdrr_lift.workrr.procedrr_operations",
         "powdrr_service.providers.config",
         "powdrr_lift.workrr.provider_runtime",
-        "powdrr_lift.workrr.providers",
+        "powdrr_lift.workrr.local_model",
         "powdrr_lift.workrr.test_obligations",
         "powdrr_service.planning.multipr_structrr",
         "powdrr_service.planning.repair_service",

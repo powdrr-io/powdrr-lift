@@ -13,14 +13,16 @@ import yaml
 
 from powdrr_lift import parse_change_log, parse_validation_report
 from powdrr_lift.cli import (
-    _accepted_planning_answers,
-    _bootstrap_planning_structrr_baseline,
     _run_harbor_feature,
     _stage_generated_file,
     build_parser,
     main,
 )
 from powdrr_lift.workrr.human_task import HumanTaskRunnerConfig
+from powdrr_lift.workrr.planning_session import (
+    _accepted_planning_answers,
+    _bootstrap_planning_structrr_baseline,
+)
 from powdrr_lift.workrr.task_agent import WorkflowTaskAgentConfig
 
 
@@ -104,11 +106,11 @@ def test_plan_resume_cli_requires_repository_and_session_issue() -> None:
 def test_planning_structrr_baseline_uses_temporary_artifacts(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    import powdrr_lift.cli as cli
-
     repository = tmp_path / "repository"
     repository.mkdir()
-    monkeypatch.setattr(cli.tempfile, "tempdir", str(tmp_path))
+    import powdrr_lift.workrr.planning_session as planning_session
+
+    monkeypatch.setattr(planning_session.tempfile, "tempdir", str(tmp_path))
     captured: dict[str, Path] = {}
 
     def bootstrap(
@@ -124,7 +126,7 @@ def test_planning_structrr_baseline_uses_temporary_artifacts(
             document={"entities": []},
         )
 
-    monkeypatch.setattr(cli, "bootstrap_structrr", bootstrap)
+    monkeypatch.setattr(planning_session, "bootstrap_structrr", bootstrap)
 
     result = _bootstrap_planning_structrr_baseline(repository, "session-123")
 

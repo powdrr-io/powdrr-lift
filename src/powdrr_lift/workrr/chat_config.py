@@ -28,3 +28,5 @@ class WorkflowChatConfig:
     execution_id: str | None = None
     conversation_id: str | None = None
     initial_message: str | None = None
+    defer_user_input: bool = False
+    resume_value: str | None = None

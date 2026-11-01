@@ -1,41 +1,76 @@
 schema: https://powdrr.io/schema/changelog-v2
 change_id: 1256
-title: Normalize duplicated planned file references
+title: Add supervisor-side job action delivery
 intent:
-  problem: Structural subject enumeration can return a planned file path duplicated around the `::` reference separator, causing a valid planned file to be rejected as absent from the projected baseline.
-  goal: Resolve an exactly repeated path only when it matches an allocated planned write and is absent from the projected baseline.
+  problem: Durable actions can be claimed but lack a supervisor component to deliver them to an adapter and record the dispatch outcome.
+  goal: Provide a one-action-at-a-time supervisor delivery boundary with retryable, failed, and accepted outcomes.
 human-decisions: []
 structured_files: []
 files:
-- path: packages/service/src/powdrr_service/planning/structrr.py
+- path: docs/design/browser-workspace-api.md
   type: modified
-  span: {start_line: 177, end_line: 179}
-  summary: Resolve repeated planned file references when the subject is mislabeled as an entity.
-  rationale: Map an exact duplicated planned path to the plan's new file subject deterministically.
-- path: packages/service/src/powdrr_service/planning/structrr.py
-  type: modified
-  span: {start_line: 203, end_line: 204}
-  summary: Document the accepted planned file reference forms.
-  rationale: Keep the normalization rule aligned with the parser behavior.
-- path: packages/service/src/powdrr_service/planning/structrr.py
-  type: modified
-  span: {start_line: 206, end_line: 207}
-  summary: Normalize a duplicated planned path in a file subject reference.
-  rationale: Recover the exact path from the observed malformed model response.
-- path: packages/service/src/powdrr_service/planning/structrr.py
-  type: modified
-  span: {start_line: 1220, end_line: 1235}
-  summary: Recognize only prefixed references or a path repeated exactly twice.
-  rationale: Keep deterministic recovery bounded to a single unambiguous planned write.
-- path: tests/test_planning_structrr.py
-  type: modified
-  span: {start_line: 949, end_line: 976}
-  summary: Reproduce the duplicated path reference and verify it binds as a new file.
-  rationale: Prevent this observed planner response from blocking the full plan again.
-entities: []
-entity_relationships: []
-invariants:
-- id: malformed-planned-file-reference-is-resolved-only-unambiguously
-  description: A repeated path reference is normalized only when both sides are identical and name an allocated planned write absent from the projected baseline.
+  span:
+    start_line: 120
+    end_line: 128
+  summary: Document supervisor action delivery, retries, action idempotency, and event notification behavior.
+  rationale: Clarify the meaning of a completed action intent and the dispatcher responsibilities.
+- path: packages/local/src/powdrr_local/job_action_supervisor.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 129
+  summary: Add an async supervisor component that claims one intent, dispatches it, and records the outcome.
+  rationale: Keep workflow action execution behind a supervisor-owned boundary outside the HTTP request handler.
+- path: tests/test_workspace_action_supervisor.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 142
+  summary: Cover successful dispatch, retryable release, permanent failure, and notification errors.
+  rationale: Verify the durable claim lifecycle and ensure a failed wake-up does not wedge accepted work.
+entities:
+- id: workspace-job-action-supervisor
+  type: Class
   action: added
-guidance: []
+- id: workspace-job-action-dispatcher-interface
+  type: Interface
+  action: added
+- id: retryable-job-action-error
+  type: Class
+  action: added
+- id: workspace-job-action-supervisor-tests
+  type: Integration test
+  action: added
+entity_relationships:
+- id: supervisor-dispatches-through-injected-interface
+  type: uses
+  source: workspace-job-action-supervisor
+  target: workspace-job-action-dispatcher-interface
+  action: added
+  description: The supervisor delivers claimed action records through an injected dispatcher implementation.
+- id: supervisor-tests-verify-action-delivery
+  type: verifies
+  source: workspace-job-action-supervisor-tests
+  target: workspace-job-action-supervisor
+  action: added
+  description: Tests verify action delivery and persistence of retryable and terminal outcomes.
+invariants:
+- id: action-completion-means-dispatched-not-job-finished
+  description: A completed action intent confirms dispatcher acceptance; the associated job remains in its workflow state until a worker reports progress.
+  action: added
+- id: retryable-dispatch-returns-action-to-pending
+  description: Retryable dispatch failures release the claim and leave the action available for the supervisor's retry policy.
+  action: added
+- id: permanent-dispatch-errors-fail-action
+  description: Non-retryable dispatcher exceptions mark the intent failed and propagate to the caller.
+  action: added
+- id: action-dispatch-effects-deduplicate-by-action-id
+  description: Adapters deduplicate effects by action ID because a crash can occur after the effect and before durable completion.
+  action: added
+- id: event-wakeup-does-not-control-action-delivery
+  description: Durable events remain authoritative; notification errors do not block dispatch or outcome recording.
+  action: added
+guidance:
+- id: adapter-controls-action-specific-execution
+  description: Keep action-specific workflow behavior in the injected dispatcher; this supervisor only claims and records delivery outcomes.
+  action: added

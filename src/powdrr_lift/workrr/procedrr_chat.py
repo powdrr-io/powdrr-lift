@@ -33,6 +33,12 @@ from powdrr_lift.workrr.chat_context import (
     _workflow_context_pr_is_closed,
     _worktree_reuse_decision,
 )
+from powdrr_lift.workrr.chat_events import (
+    WorkflowChatEvent,
+    WorkflowChatEventCallback,
+    WorkflowChatEventEmitter,
+    WorkflowChatEventKind,
+)
 from powdrr_lift.workrr.chat_io import _prompt_user
 from powdrr_lift.workrr.execution_state import (
     ProcessExecutionReference,
@@ -63,6 +69,7 @@ def run_procedrr_workflow_chat(
     stderr: TextIO = sys.stderr,
     progress_callback: Callable[[Any, int, str, Any, int | None], None] | None = None,
     file_added_callback: Callable[[tuple[str, ...]], None] | None = None,
+    event_callback: WorkflowChatEventCallback | None = None,
 ) -> int:
     """Select and run a catalogued Procedrr process for one chat request."""
     configured_repo_root = resolve_repo_root(config.repo_root)
@@ -83,6 +90,7 @@ def run_procedrr_workflow_chat(
         return 1
     run_directory = configured_repo_root / ".powdrr" / "procedrr-runs"
     events_path = run_directory / f"{execution_id}.events.jsonl"
+    chat_events_path = run_directory / f"{execution_id}.chat-events.jsonl"
     manifest_path = run_directory / f"{execution_id}.json"
     resuming = config.resume_value is not None
     resume_kind: str | None = None
@@ -132,6 +140,7 @@ def run_procedrr_workflow_chat(
             and isinstance(saved_bindings.get("workflow_context", {}), Mapping)
             else {}
         )
+
     else:
         workflow_context = _load_workflow_context(
             configured_repo_root, conversation_id=config.conversation_id
@@ -152,6 +161,43 @@ def run_procedrr_workflow_chat(
                 print("The initial chat message must not be empty.", file=stderr)
                 return 1
 
+    saved_event_cursor = (
+        resume_manifest.get("chat_event_cursor", 0)
+        if isinstance(resume_manifest, Mapping)
+        else 0
+    )
+    if type(saved_event_cursor) is not int or saved_event_cursor < 0:
+        print("Execution manifest has an invalid chat event cursor.", file=stderr)
+        return 1
+    if chat_events_path.is_file():
+        with chat_events_path.open(encoding="utf-8") as stream:
+            saved_event_cursor = sum(1 for line in stream if line.strip())
+    active_manifest: dict[str, Any] | None = None
+
+    def persist_and_publish_chat_event(event: WorkflowChatEvent) -> None:
+        run_directory.mkdir(parents=True, exist_ok=True)
+        with chat_events_path.open("a", encoding="utf-8") as stream:
+            stream.write(json.dumps(event.to_dict(), ensure_ascii=False) + "\n")
+        if manifest_path.is_file():
+            try:
+                current_manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                current_manifest = None
+            if isinstance(current_manifest, dict):
+                current_manifest["chat_event_cursor"] = event.sequence + 1
+                _write_manifest(manifest_path, current_manifest)
+            if active_manifest is not None:
+                active_manifest["chat_event_cursor"] = event.sequence + 1
+        if event_callback is not None:
+            event_callback(event)
+
+    chat_events = WorkflowChatEventEmitter(
+        execution_id,
+        config.conversation_id,
+        persist_and_publish_chat_event,
+        first_sequence=saved_event_cursor,
+    )
+
     provider_roles = resolve_provider_roles(
         config.provider,
         normal_provider=config.normal_provider,
@@ -168,6 +214,23 @@ def run_procedrr_workflow_chat(
         )
     )
     process_clients: dict[str, WorkrrProcedrrClient] = {}
+
+    def record_provider_attempt(record: Mapping[str, Any]) -> None:
+        if record.get("outcome") != "retrying":
+            return
+        retry_data = {
+            key: record[key]
+            for key in (
+                "attempt",
+                "trace_id",
+                "provider_client",
+                "model",
+                "error_type",
+                "error_status_code",
+            )
+            if record.get(key) is not None
+        }
+        chat_events.emit(WorkflowChatEventKind.RETRY, data=retry_data)
 
     def procedrr_client(role: str) -> WorkrrProcedrrClient:
         if procedrr_client_factory is not None:
@@ -189,6 +252,7 @@ def run_procedrr_workflow_chat(
                 max_retries=config.max_stalled_roundtrips,
                 provider_retry_attempts=config.provider_retry_attempts,
                 provider_retry_delay_seconds=config.provider_retry_delay_seconds,
+                telemetry_sink=record_provider_attempt,
             )
         return process_clients[cache_key]
 
@@ -274,6 +338,12 @@ def run_procedrr_workflow_chat(
                 "new",
             }:
                 print("Please answer yes or no.", file=stderr)
+                chat_events.emit(
+                    WorkflowChatEventKind.QUESTION,
+                    process_id=process.name,
+                    text=str(resume_manifest.get("pending_question", "")),
+                    data={"input_name": "__worktree_reuse__", "resumable": True},
+                )
                 print(
                     str(resume_manifest.get("pending_question", "")),
                     file=stdout,
@@ -298,6 +368,12 @@ def run_procedrr_workflow_chat(
             except ValueError as error:
                 print(str(error), file=stderr)
                 question = str(resume_manifest.get("pending_question", ""))
+                chat_events.emit(
+                    WorkflowChatEventKind.QUESTION,
+                    process_id=process.name,
+                    text=question,
+                    data={"input_name": pending_name, "resumable": True},
+                )
                 print(question, file=stdout, flush=True)
                 return WORKFLOW_CHAT_WAITING_FOR_INPUT
             collected_bindings, pending_input = _collect_process_inputs(
@@ -320,6 +396,12 @@ def run_procedrr_workflow_chat(
                     suspension_kind="process_input",
                     process_input_transcript=process_input_transcript,
                 )
+                chat_events.emit(
+                    WorkflowChatEventKind.QUESTION,
+                    process_id=process.name,
+                    text=pending_input[1],
+                    data={"input_name": pending_input[0], "resumable": True},
+                )
                 print(pending_input[1], file=stdout, flush=True)
                 return WORKFLOW_CHAT_WAITING_FOR_INPUT
             if collected_bindings is None:
@@ -334,9 +416,18 @@ def run_procedrr_workflow_chat(
         )
         if selection is None:
             print("Could not select a Procedrr process.", file=stderr)
+            chat_events.emit(
+                WorkflowChatEventKind.OUTCOME,
+                data={"status": "failed", "reason": "process_selection_failed"},
+            )
             return 1
         process = catalog.get(selection)
         print(f"Matched process: {selection}", file=stdout)
+        chat_events.emit(
+            WorkflowChatEventKind.STAGE,
+            process_id=process.name,
+            data={"stage": "process_selected"},
+        )
 
         collected_bindings, pending_input = _collect_process_inputs(
             process,
@@ -364,6 +455,12 @@ def run_procedrr_workflow_chat(
                 pending_input,
                 suspension_kind="process_input",
                 process_input_transcript=process_input_transcript,
+            )
+            chat_events.emit(
+                WorkflowChatEventKind.QUESTION,
+                process_id=process.name,
+                text=pending_input[1],
+                data={"input_name": pending_input[0], "resumable": True},
             )
             print(pending_input[1], file=stdout, flush=True)
             return WORKFLOW_CHAT_WAITING_FOR_INPUT
@@ -430,6 +527,12 @@ def run_procedrr_workflow_chat(
                     suspension_kind="worktree_choice",
                     process_input_transcript=process_input_transcript,
                 )
+                chat_events.emit(
+                    WorkflowChatEventKind.QUESTION,
+                    process_id=process.name,
+                    text=question,
+                    data={"input_name": "__worktree_reuse__", "resumable": True},
+                )
                 print(question, file=stdout, flush=True)
                 return WORKFLOW_CHAT_WAITING_FOR_INPUT
             worktree_root = _resolve_worktree_for_request(
@@ -452,6 +555,16 @@ def run_procedrr_workflow_chat(
         user_request,
         source_ref=f"{execution_id}:user-request",
     )
+
+    def report_added_files(paths: tuple[str, ...]) -> None:
+        chat_events.emit(
+            WorkflowChatEventKind.ARTIFACT,
+            process_id=process.name,
+            data={"paths": list(paths)},
+        )
+        if file_added_callback is not None:
+            file_added_callback(paths)
+
     state = _WorkflowExecutionState(
         selected_process=selected_process,
         root_process=selected_process,
@@ -466,7 +579,7 @@ def run_procedrr_workflow_chat(
         worktree_root=worktree_root,
         error_log_root=configured_repo_root,
         handoff_records={},
-        file_added_callback=file_added_callback,
+        file_added_callback=report_added_files,
         runtime=runtime,
     )
     if resuming_interpreter and resume_manifest is not None:
@@ -479,6 +592,7 @@ def run_procedrr_workflow_chat(
         input_func=input_func,
         stdout=stdout,
         stderr=stderr,
+        event_emitter=chat_events,
     )
     operation_names = (
         "internal",
@@ -512,6 +626,7 @@ def run_procedrr_workflow_chat(
         max_retries=config.max_stalled_roundtrips,
         provider_retry_attempts=config.provider_retry_attempts,
         provider_retry_delay_seconds=config.provider_retry_delay_seconds,
+        telemetry_sink=record_provider_attempt,
     )
     judge_clients = {
         "planning": planning_client,
@@ -538,15 +653,29 @@ def run_procedrr_workflow_chat(
             "workflow_state": _chat_state_to_data(state),
             "status": "running",
             "event_cursor": 0,
+            "chat_event_cursor": chat_events.next_sequence,
             "started_at": datetime.now(UTC).isoformat(),
         }
+    active_manifest = manifest
     _write_manifest(manifest_path, manifest)
 
     def persist_event(event: ProcessExecutionEvent) -> None:
         with events_path.open("a", encoding="utf-8") as stream:
             stream.write(json.dumps(event.to_data(), ensure_ascii=False) + "\n")
         manifest["event_cursor"] = event.sequence + 1
+        manifest["chat_event_cursor"] = chat_events.next_sequence
         _write_manifest(manifest_path, manifest)
+        chat_events.emit(
+            WorkflowChatEventKind.STAGE,
+            process_id=selected_process.name,
+            path=event.path,
+            data={
+                "event_kind": event.kind,
+                "step_index": min(
+                    event.sequence, max(0, len(selected_process.steps) - 1)
+                ),
+            },
+        )
         if progress_callback is not None:
             progress_callback(
                 selected_process,
@@ -583,6 +712,11 @@ def run_procedrr_workflow_chat(
             conversation_id=config.conversation_id,
         )
         print(f"Procedrr process failed: {error}", file=stderr)
+        chat_events.emit(
+            WorkflowChatEventKind.OUTCOME,
+            process_id=process.name,
+            data={"status": "failed", "error_type": type(error).__name__},
+        )
         return 1
     if result.terminal_status is ProcessTerminalStatus.SUSPENDED:
         if result.checkpoint is None or operation_adapter.pending_question is None:
@@ -593,6 +727,11 @@ def run_procedrr_workflow_chat(
             manifest["finished_at"] = datetime.now(UTC).isoformat()
             _write_manifest(manifest_path, manifest)
             print(manifest["failure"], file=stderr)
+            chat_events.emit(
+                WorkflowChatEventKind.OUTCOME,
+                process_id=process.name,
+                data={"status": "failed", "reason": "missing_suspension_checkpoint"},
+            )
             return 1
         manifest["status"] = "suspended"
         manifest["suspension_kind"] = "interpreter"
@@ -602,6 +741,11 @@ def run_procedrr_workflow_chat(
         manifest["event_cursor"] = result.event_cursor
         manifest["suspended_at"] = datetime.now(UTC).isoformat()
         _write_manifest(manifest_path, manifest)
+        chat_events.emit(
+            WorkflowChatEventKind.OUTCOME,
+            process_id=process.name,
+            data={"status": "waiting_for_input"},
+        )
         print(operation_adapter.pending_question, file=stdout, flush=True)
         return WORKFLOW_CHAT_WAITING_FOR_INPUT
     manifest.pop("checkpoint", None)
@@ -620,10 +764,27 @@ def run_procedrr_workflow_chat(
         conversation_id=config.conversation_id,
     )
     if result.terminal_status is ProcessTerminalStatus.SUCCEEDED:
+        response = result.bindings.get("response")
+        if response is not None and not operation_adapter.assistant_messages:
+            chat_events.emit(
+                WorkflowChatEventKind.ASSISTANT_MESSAGE,
+                process_id=process.name,
+                text=str(response),
+            )
+        chat_events.emit(
+            WorkflowChatEventKind.OUTCOME,
+            process_id=process.name,
+            data={"status": ProcessTerminalStatus.SUCCEEDED.value},
+        )
         print(f"Process completed: {process.name}", file=stdout)
-        if result.bindings.get("response") is not None:
-            print(str(result.bindings["response"]), file=stdout)
+        if response is not None:
+            print(str(response), file=stdout)
         return 0
+    chat_events.emit(
+        WorkflowChatEventKind.OUTCOME,
+        process_id=process.name,
+        data={"status": result.terminal_status.value},
+    )
     print(
         f"Process ended with status {result.terminal_status.value}: {process.name}",
         file=stderr,
@@ -861,6 +1022,7 @@ class _ChatProcedrrOperations:
         input_func: Callable[[], str],
         stdout: TextIO,
         stderr: TextIO,
+        event_emitter: WorkflowChatEventEmitter | None = None,
     ) -> None:
         from powdrr_lift.workrr.chat_actions import _workflow_action_handlers
 
@@ -869,8 +1031,10 @@ class _ChatProcedrrOperations:
         self.input_func = input_func
         self.stdout = stdout
         self.stderr = stderr
+        self.event_emitter = event_emitter
         self.handlers = _workflow_action_handlers()
         self.pending_question: str | None = None
+        self.assistant_messages: list[str] = []
 
     def execute(self, operation: str, parameters: Mapping[str, Any]) -> Any:
         if operation == "prompt_user":
@@ -906,6 +1070,13 @@ class _ChatProcedrrOperations:
             if self.config.defer_user_input:
                 prompt = _string(parameters.get("text"), "text")
                 self.pending_question = prompt
+                if self.event_emitter is not None:
+                    self.event_emitter.emit(
+                        WorkflowChatEventKind.QUESTION,
+                        process_id=self.state.selected_process.name,
+                        text=prompt,
+                        data={"resumable": True},
+                    )
                 raise SuspendEvaluation(
                     {"answer": ""},
                     "waiting for a user response",
@@ -916,6 +1087,13 @@ class _ChatProcedrrOperations:
             text = parameters.get("text")
             if not isinstance(text, str):
                 raise ValueError("respond requires a text string")
+            self.assistant_messages.append(text)
+            if self.event_emitter is not None:
+                self.event_emitter.emit(
+                    WorkflowChatEventKind.ASSISTANT_MESSAGE,
+                    process_id=self.state.selected_process.name,
+                    text=text,
+                )
             print(text, file=self.stdout)
             return {"text": text}
         if operation == "workflow_chat_snapshot":

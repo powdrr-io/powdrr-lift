@@ -378,6 +378,10 @@ def parse_structural_subject_page(
     has_more = value["has_more"]
     if not isinstance(has_more, bool):
         raise PlanningContractError("/has_more", "must be a boolean")
+    if has_more and not records:
+        raise PlanningContractError(
+            "/records", "a non-final page must add at least one new subject"
+        )
     next_anchor = value["next_anchor"]
     expected_next = f"structural-page-{page_ordinal + 1:04d}"
     if has_more:

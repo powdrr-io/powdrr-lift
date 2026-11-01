@@ -657,6 +657,15 @@ def test_structural_subject_pages_cover_all_subjects_and_require_final_page() ->
         complete_subject_enumeration((first,))
 
 
+def test_nonfinal_structural_page_must_add_a_subject() -> None:
+    with pytest.raises(
+        PlanningContractError, match="must add at least one new subject"
+    ):
+        _parse_page(
+            _candidate_page([], has_more=True, next_anchor="structural-page-0002")
+        )
+
+
 def test_structural_page_example_does_not_repeat_prior_subjects() -> None:
     text = "# Plan\n\nUpdate the module.\n"
     source = segment_markdown_source(

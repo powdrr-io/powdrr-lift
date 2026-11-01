@@ -33,6 +33,10 @@ from powdrr_service.providers.config import (
     default_llm_mappings,
 )
 from powdrr_service.providers.credentials import resolve_provider_credentials
+from powdrr_service.providers.selection import (
+    long_context_backup_for,
+    resolve_llm_mapping,
+)
 from powdrr_service.structrr.snapshot import snapshot_digest
 
 from powdrr_lift.basedpyright_tools import is_basedpyright_tool
@@ -181,8 +185,6 @@ from powdrr_lift.workrr.provider_runtime import (
 )
 from powdrr_lift.workrr.providers import (
     build_provider_client,
-    long_context_backup_for,
-    resolve_llm_mapping,
     resolve_local_model_path,
 )
 from powdrr_lift.workrr.test_obligations import acceptance_criteria_contract

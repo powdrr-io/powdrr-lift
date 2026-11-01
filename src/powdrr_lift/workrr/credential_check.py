@@ -12,7 +12,12 @@ from urllib.error import HTTPError, URLError
 
 from powdrr_service.providers.config import (
     LLMModelMapping,
+    ProviderConfigurationError,
     default_llm_mappings,
+)
+from powdrr_service.providers.credentials import (
+    ProviderCredentials,
+    resolve_provider_credentials,
 )
 
 from powdrr_lift.errors import PowdrrExecutionError
@@ -24,9 +29,7 @@ from powdrr_lift.workrr.jev_classifier import (
 )
 from powdrr_lift.workrr.llm import WorkflowLLMHTTPError
 from powdrr_lift.workrr.providers import (
-    ProviderCredentials,
     build_workflow_client,
-    resolve_provider_credentials,
 )
 
 CredentialResolver = Callable[..., ProviderCredentials]
@@ -99,7 +102,12 @@ def check_model_access(
             status=status,
             message=f"Provider returned HTTP {error.status_code}.",
         )
-    except (PowdrrExecutionError, OSError, TimeoutError) as error:
+    except (
+        PowdrrExecutionError,
+        ProviderConfigurationError,
+        OSError,
+        TimeoutError,
+    ) as error:
         message = _safe_error_message(error)
         return CredentialCheck(
             role=role,

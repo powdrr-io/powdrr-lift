@@ -6,6 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 from powdrr_service.providers.config import LLMModelMapping
+from powdrr_service.providers.credentials import ProviderCredentials
 
 from powdrr_lift.cli import build_parser, main
 from powdrr_lift.errors import PowdrrExecutionError
@@ -15,7 +16,6 @@ from powdrr_lift.workrr.credential_check import (
     configured_model_mapping,
 )
 from powdrr_lift.workrr.llm import WorkflowLLMHTTPError
-from powdrr_lift.workrr.providers import ProviderCredentials
 
 
 def test_check_model_access_reports_success_without_exposing_credentials(

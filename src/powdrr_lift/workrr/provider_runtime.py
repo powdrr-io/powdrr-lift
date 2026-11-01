@@ -13,15 +13,17 @@ from pathlib import Path
 from typing import TextIO
 
 from powdrr_service.providers.config import LLMModelLimits
+from powdrr_service.providers.credentials import (
+    ProviderCredentials,
+    resolve_provider_credentials,
+)
 
 from powdrr_lift.workrr.exchanges import ExchangeRecordingClient
 from powdrr_lift.workrr.llm import WorkflowLLMClient, complete_json
 from powdrr_lift.workrr.providers import (
-    ProviderCredentials,
     build_workflow_client,
     provider_model_limits,
     resolve_local_model_context,
-    resolve_provider_credentials,
     resolve_provider_roles,
 )
 

@@ -10,12 +10,12 @@ from pathlib import Path
 from typing import Any
 
 from powdrr_service.planning.instruction_ledger import compile_instruction_ledger
+from powdrr_service.providers.credentials import resolve_provider_credentials
 
 from powdrr_lift.errors import ProviderExecutionError
 from powdrr_lift.workrr.llm import complete_json
 from powdrr_lift.workrr.providers import (
     build_workflow_client,
-    resolve_provider_credentials,
 )
 
 from . import PREDICTIONS_SCHEMA_VERSION

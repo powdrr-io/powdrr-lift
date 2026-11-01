@@ -138,9 +138,13 @@ def test_workrr_protocol_package_has_no_definition_or_execution_imports() -> Non
 
 def test_service_provider_configuration_does_not_import_legacy_agent_modules() -> None:
     repository = Path(__file__).parents[1]
-    path = repository / "packages/service/src/powdrr_service/providers/config.py"
-    imports = _imported_modules(path)
-    assert not any(module.startswith("powdrr_lift") for module in imports)
+    paths = (
+        repository / "packages/service/src/powdrr_service/providers/config.py",
+        repository / "packages/service/src/powdrr_service/providers/credentials.py",
+    )
+    for path in paths:
+        imports = _imported_modules(path)
+        assert not any(module.startswith("powdrr_lift") for module in imports), path
 
 
 def test_workflow_implementations_are_not_stranded_at_package_root() -> None:

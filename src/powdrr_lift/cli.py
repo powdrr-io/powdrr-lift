@@ -51,9 +51,11 @@ from powdrr_service.planning.source import segment_markdown_source
 from powdrr_service.planning.workflow_ids import slugify_workflow_id
 from powdrr_service.providers.config import (
     ALL_PROVIDERS,
+    ProviderConfigurationError,
     default_llm_mappings,
     provider_definition,
 )
+from powdrr_service.providers.credentials import resolve_provider_credentials
 from powdrr_service.structrr.rebase import rebase_structrr_snapshot
 from powdrr_service.structrr.verification_health import (
     VerificationPolicyMode,
@@ -283,7 +285,6 @@ from powdrr_lift.workrr.prompt_benchmark_comparison import (
 from powdrr_lift.workrr.provider_runtime import resolve_workflow_provider
 from powdrr_lift.workrr.providers import (
     build_workflow_client,
-    resolve_provider_credentials,
 )
 from powdrr_lift.workrr.repository_subject_binding import (
     replay_subject_binding_events,
@@ -4730,7 +4731,7 @@ def _run_check_credentials(args: argparse.Namespace) -> int:
         try:
             mapping = configured_model_mapping(provider, model)
             credentials = resolve_provider_credentials(provider, api_key, base_url)
-        except PowdrrExecutionError as error:
+        except (PowdrrExecutionError, ProviderConfigurationError) as error:
             result = {
                 "role": role,
                 "provider": provider,
@@ -6452,7 +6453,7 @@ def _run_workrr_feature(args: argparse.Namespace) -> int:
             args.planning_api_key,
             args.planning_base_url,
         )
-    except PowdrrExecutionError:
+    except (PowdrrExecutionError, ProviderConfigurationError):
         # Keep endpoint construction side-effect free when callers only need to
         # inspect or replace the runner (for example, CLI tests). The endpoint
         # itself still rejects a missing planning client before it can execute
@@ -6613,7 +6614,7 @@ def _run_harbor_feature_with_streams(
             args.planning_api_key,
             args.planning_base_url,
         )
-    except PowdrrExecutionError:
+    except (PowdrrExecutionError, ProviderConfigurationError):
         if args.planning_api_key or args.planning_base_url:
             raise
         planning_client = None
@@ -6701,7 +6702,11 @@ def _run_deepswe_design_evaluation(args: argparse.Namespace) -> int:
             rubric_path=args.rubric,
             judge_id=f"{mapping.provider}/{model}",
         )
-    except (DeepSWEEvaluationError, PowdrrExecutionError) as error:
+    except (
+        DeepSWEEvaluationError,
+        PowdrrExecutionError,
+        ProviderConfigurationError,
+    ) as error:
         print(f"DeepSWE design evaluation failed: {error}", file=sys.stderr)
         return 1
     report_path = args.report or args.run_dir / "design-quality-evaluation.json"
@@ -6762,7 +6767,11 @@ def _run_deepswe_probe_evaluation(args: argparse.Namespace) -> int:
             judge=judge,
             judge_id=judge_id,
         )
-    except (DeepSWEProbeEvaluationError, PowdrrExecutionError) as error:
+    except (
+        DeepSWEProbeEvaluationError,
+        PowdrrExecutionError,
+        ProviderConfigurationError,
+    ) as error:
         print(f"DeepSWE probe evaluation failed: {error}", file=sys.stderr)
         return 1
     report_path = args.report or args.run_dir / "probe-quality-evaluation.json"
@@ -6808,7 +6817,11 @@ def _run_deepswe_prompt_evaluation(args: argparse.Namespace) -> int:
             rubric_path=args.rubric,
             judge_id=f"{mapping.provider}/{model}",
         )
-    except (DeepSWEEvaluationError, PowdrrExecutionError) as error:
+    except (
+        DeepSWEEvaluationError,
+        PowdrrExecutionError,
+        ProviderConfigurationError,
+    ) as error:
         print(f"DeepSWE prompt evaluation failed: {error}", file=sys.stderr)
         return 1
     report_path = args.report or args.run_dir / "prompt-quality-evaluation.json"
@@ -6855,7 +6868,11 @@ def _run_generic_prompt_evaluation(args: argparse.Namespace) -> int:
             rubric_path=args.rubric,
             judge_id=f"{mapping.provider}/{model}",
         )
-    except (DeepSWEEvaluationError, PowdrrExecutionError) as error:
+    except (
+        DeepSWEEvaluationError,
+        PowdrrExecutionError,
+        ProviderConfigurationError,
+    ) as error:
         print(f"Prompt evaluation failed: {error}", file=sys.stderr)
         return 1
     report_path = args.report or args.run_dir / "prompt-quality-evaluation.json"

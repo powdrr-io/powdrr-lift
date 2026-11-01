@@ -10,9 +10,10 @@ import tomllib
 from pathlib import Path
 from typing import Any
 
+from powdrr_service.providers.credentials import resolve_provider_credentials
+
 from powdrr_lift.workrr.providers import (
     build_workflow_client,
-    resolve_provider_credentials,
 )
 
 from .common import (

@@ -5,12 +5,10 @@ from pathlib import Path
 from typing import cast
 
 import pytest
+from powdrr_service.providers.credentials import resolve_provider_credentials
 
 from powdrr_lift.workrr.protocol import SchemaAwareWorkflowLLMClient
-from powdrr_lift.workrr.providers import (
-    build_workflow_client,
-    resolve_provider_credentials,
-)
+from powdrr_lift.workrr.providers import build_workflow_client
 
 
 @pytest.mark.live_provider

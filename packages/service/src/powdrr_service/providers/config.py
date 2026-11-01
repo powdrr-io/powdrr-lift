@@ -8,7 +8,7 @@ from typing import Literal
 
 
 class ProviderConfigurationError(RuntimeError):
-    """Provider configuration is invalid or names an unsupported provider."""
+    """Provider configuration or credential resolution failed."""
 
 
 @dataclass(frozen=True, slots=True)

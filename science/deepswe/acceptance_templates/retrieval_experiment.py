@@ -11,8 +11,9 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
+from powdrr_service.providers.credentials import resolve_provider_credentials
+
 from powdrr_lift.workrr.jev_classifier import JevSemanticClassifierClient
-from powdrr_lift.workrr.providers import resolve_provider_credentials
 
 from . import PROMPT_VERSION
 from .cli import DEFAULT_JUDGE_MODEL, _client

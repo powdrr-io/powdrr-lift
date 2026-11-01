@@ -3130,6 +3130,17 @@
     {
       "extraction_pr": "6",
       "internal_imports": [
+        "powdrr_service.providers.config"
+      ],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/providers/credentials.py",
+      "rationale": "provider credential resolution, local auth discovery, and credential provenance",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "6",
+      "internal_imports": [
         "powdrr_lift.workrr.exchanges",
         "powdrr_lift.workrr.llm",
         "powdrr_service.providers.config",
@@ -3146,7 +3157,8 @@
       "internal_imports": [
         "powdrr_lift.errors",
         "powdrr_lift.workrr.llm",
-        "powdrr_service.providers.config"
+        "powdrr_service.providers.config",
+        "powdrr_service.providers.credentials"
       ],
       "kind": "python_module",
       "owner": "service",
@@ -3369,7 +3381,7 @@
       "internal_imports": [
         "powdrr_lift.errors",
         "powdrr_service.providers.config",
-        "powdrr_lift.workrr.providers"
+        "powdrr_service.providers.credentials"
       ],
       "kind": "python_module",
       "owner": "split",

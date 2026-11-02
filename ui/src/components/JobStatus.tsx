@@ -60,6 +60,8 @@ export function JobStatus({
   const { job } = detail
   const isActive = ['running', 'waiting_for_input', 'waiting_for_external'].includes(job.state)
   const isRecoveryState = ['failed', 'interrupted'].includes(job.state)
+  const checkpointAvailability = detail.recovery?.checkpoint_availability ?? 'unknown'
+  const recoveryMessage = detail.recovery?.message ?? 'Checkpoint validation is not reported by the workspace API.'
   const recoveryReviewKey = `${job.job_id}:${job.revision}:${job.state}`
   const [recoveryReview, setRecoveryReview] = useState<{ key: string; action: WorkspaceJobAction } | null>(null)
   const pendingRecoveryAction = recoveryReview?.key === recoveryReviewKey ? recoveryReview.action : null
@@ -120,13 +122,13 @@ export function JobStatus({
           <section className="job-status__section job-recovery" aria-labelledby="job-recovery-title">
             <h2 id="job-recovery-title">Recovery review</h2>
             <dl className="job-status__metadata">
-              <div><dt>Checkpoint availability</dt><dd>Not reported by the workspace API</dd></div>
+              <div><dt>Checkpoint availability</dt><dd>{checkpointAvailability}</dd></div>
               <div><dt>Latest attempt</dt><dd>{detail.latest_attempt?.attempt_id ?? 'No attempt recorded'}</dd></div>
               <div><dt>Saved outputs</dt><dd>{detail.outputs.length}</dd></div>
             </dl>
-            <p>The latest attempt, source revision, design chat, and saved outputs are shown below. Only actions listed by the backend are available here.</p>
+            <p>{recoveryMessage} The latest attempt, source revision, design chat, and saved outputs are shown below. Only actions listed by the backend are available here.</p>
             {detail.allowed_actions.some((action) => action === 'retry' || action === 'resume')
-              ? <p>Review the available context before requesting a retry or resume. The workspace does not expose checkpoint validation details in this response.</p>
+              ? <p>Review the available context before requesting a retry or resume.</p>
               : <p>The backend has not permitted retry or resume. Use the latest activity and saved outputs to decide what to do next.</p>}
           </section>
         )}
@@ -134,7 +136,7 @@ export function JobStatus({
         {pendingRecoveryAction && (
           <section className="job-status__section job-recovery-confirm" aria-labelledby="job-recovery-confirm-title" aria-describedby="job-recovery-confirm-description">
             <h2 id="job-recovery-confirm-title">Confirm {pendingRecoveryAction}</h2>
-            <p id="job-recovery-confirm-description">Checkpoint availability is not reported here. Confirm only after reviewing the attempt and outputs above. This request will be sent with the current job revision.</p>
+            <p id="job-recovery-confirm-description">Checkpoint availability: {checkpointAvailability}. Confirm only after reviewing the attempt and outputs above. This request will be sent with the current job revision.</p>
             <div className="job-status__actions">
               <button type="button" className="job-action job-action--secondary" onClick={() => setRecoveryReview(null)}>Keep reviewing</button>
               <button type="button" className="job-action" disabled={pendingActions.includes(pendingRecoveryAction)} onClick={() => onAction(pendingRecoveryAction)}>

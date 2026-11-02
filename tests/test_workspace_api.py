@@ -6,6 +6,8 @@ from pathlib import Path
 
 from fastapi.testclient import TestClient
 from powdrr_contracts.workspace import (
+    CheckpointAvailability,
+    JobState,
     MessageRole,
     QuestionState,
     TurnState,
@@ -19,7 +21,9 @@ from starlette.requests import Request
 from powdrr_lift.workrr.workspace_app import build_workspace_app
 
 
-def _client(tmp_path: Path) -> tuple[TestClient, WorkspaceStore, str, str]:
+def _client(
+    tmp_path: Path, *, checkpoint_inspector=None
+) -> tuple[TestClient, WorkspaceStore, str, str]:
     store = WorkspaceStore(tmp_path / "workspace.db")
     repository_path = tmp_path / "repository"
     repository_path.mkdir()
@@ -29,7 +33,12 @@ def _client(tmp_path: Path) -> tuple[TestClient, WorkspaceStore, str, str]:
     repository = store.register_repository(repository_path, request_id="register")
     origin = "http://127.0.0.1:8765"
     secret = "bootstrap-secret-value-that-is-at-least-32-characters"
-    app = create_app(store=store, bootstrap_secret=secret, expected_origin=origin)
+    app = create_app(
+        store=store,
+        bootstrap_secret=secret,
+        expected_origin=origin,
+        checkpoint_inspector=checkpoint_inspector,
+    )
     return TestClient(app, base_url=origin), store, repository.repository_id, secret
 
 
@@ -522,6 +531,54 @@ def test_job_detail_hides_local_paths_and_checks_repository_association(
     )
     assert response.status_code == 404
     assert response.json()["error"]["code"] == "not_found"
+
+
+def test_job_recovery_reports_checkpoint_assessment_without_exposing_reference(
+    tmp_path: Path,
+) -> None:
+    seen_operations = []
+
+    class Inspector:
+        def inspect_checkpoint(self, operation):
+            seen_operations.append(operation)
+            return CheckpointAvailability.AVAILABLE
+
+    client, store, repository_id, secret = _client(
+        tmp_path, checkpoint_inspector=Inspector()
+    )
+    _sign_in(client, secret)
+    job = store.create_job(
+        repository_id, kind="planning", title="Plan", request_id="recover-plan"
+    )
+    store.start_job_operation(
+        job.job_id,
+        expected_revision=job.revision,
+        run_id="run-recover",
+        attempt_id="attempt-recover",
+        workflow_directory=tmp_path / "private-worktree",
+        checkpoint_ref="private-checkpoint-reference",
+        job_inputs={"pinned_spec_ref": "spec:search"},
+        source_refs=["spec:search"],
+        source_spec_revision="revision-1",
+        provider_config_refs=["provider:deepinfra-flash"],
+    )
+    current = store.get_job(job.job_id)
+    store.transition_job(
+        job.job_id, expected_revision=current.revision, state=JobState.INTERRUPTED
+    )
+
+    response = client.get(f"/api/v1/repositories/{repository_id}/jobs/{job.job_id}")
+
+    assert response.status_code == 200
+    assert response.json()["recovery"] == {
+        "schema_version": 1,
+        "checkpoint_availability": "available",
+        "message": "A checkpoint is available to the worker.",
+    }
+    assert len(seen_operations) == 1
+    assert seen_operations[0].checkpoint_ref == "private-checkpoint-reference"
+    assert "private-checkpoint-reference" not in response.text
+    assert str(tmp_path / "private-worktree") not in response.text
 
 
 def test_job_detail_reports_dependency_blockers_and_allowed_actions(

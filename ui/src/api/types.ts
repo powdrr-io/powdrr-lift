@@ -89,6 +89,12 @@ export type WorkspaceJobBlocker = {
   state: WorkspaceJob['state']
 }
 
+export type WorkspaceJobRecovery = {
+  schema_version: 1
+  checkpoint_availability: 'available' | 'unavailable' | 'unknown'
+  message: string | null
+}
+
 export type WorkspaceJobDetail = {
   schema_version: 1
   job: WorkspaceJob
@@ -99,6 +105,7 @@ export type WorkspaceJobDetail = {
   question: WorkspaceQuestion | null
   outputs: string[]
   allowed_actions: WorkspaceJobAction[]
+  recovery?: WorkspaceJobRecovery | null
 }
 
 export type WorkspaceJobAction = 'start' | 'cancel' | 'retry' | 'resume'

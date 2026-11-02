@@ -37,6 +37,12 @@ class JobAction(StrEnum):
     RESUME = "resume"
 
 
+class CheckpointAvailability(StrEnum):
+    AVAILABLE = "available"
+    UNAVAILABLE = "unavailable"
+    UNKNOWN = "unknown"
+
+
 class JobActionIntentState(StrEnum):
     PENDING = "pending"
     CLAIMED = "claimed"
@@ -747,6 +753,37 @@ class WorkspaceJobActionIntent:
 
 
 @dataclass(frozen=True)
+class WorkspaceJobRecovery:
+    checkpoint_availability: CheckpointAvailability
+    message: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": _SCHEMA_VERSION,
+            "checkpoint_availability": self.checkpoint_availability.value,
+            "message": self.message,
+        }
+
+    @classmethod
+    def from_dict(cls, value: Any) -> Self:
+        data = _record(
+            value,
+            {"checkpoint_availability", "message"},
+            "workspace job recovery",
+        )
+        try:
+            availability = CheckpointAvailability(data["checkpoint_availability"])
+        except (TypeError, ValueError) as error:
+            raise WorkspaceContractError(
+                "Unsupported checkpoint availability"
+            ) from error
+        message = data["message"]
+        if message is not None:
+            message = _validate_text(message, "recovery message")
+        return cls(availability, message)
+
+
+@dataclass(frozen=True)
 class WorkspaceJobDetail:
     job: Job
     attempts: tuple[JobAttemptSummary, ...]
@@ -755,6 +792,7 @@ class WorkspaceJobDetail:
     question: WorkspaceQuestion | None
     outputs: tuple[str, ...]
     allowed_actions: tuple[JobAction, ...]
+    recovery: WorkspaceJobRecovery | None = None
 
     @property
     def latest_attempt(self) -> JobAttemptSummary | None:
@@ -772,22 +810,25 @@ class WorkspaceJobDetail:
             "question": None if self.question is None else self.question.to_dict(),
             "outputs": list(self.outputs),
             "allowed_actions": [item.value for item in self.allowed_actions],
+            "recovery": None if self.recovery is None else self.recovery.to_dict(),
         }
 
     @classmethod
     def from_dict(cls, value: Any) -> Self:
+        required_fields = {
+            "job",
+            "latest_attempt",
+            "attempts",
+            "stage",
+            "blockers",
+            "question",
+            "outputs",
+            "allowed_actions",
+        }
+        has_recovery = isinstance(value, dict) and "recovery" in value
         data = _record(
             value,
-            {
-                "job",
-                "latest_attempt",
-                "attempts",
-                "stage",
-                "blockers",
-                "question",
-                "outputs",
-                "allowed_actions",
-            },
+            required_fields | ({"recovery"} if has_recovery else set()),
             "workspace job detail",
         )
         for key in ("attempts", "blockers", "outputs", "allowed_actions"):
@@ -824,6 +865,9 @@ class WorkspaceJobDetail:
             question,
             _tuple_of_text(data["outputs"], "outputs"),
             tuple(actions),
+            None
+            if data.get("recovery") is None
+            else WorkspaceJobRecovery.from_dict(data["recovery"]),
         )
 
 

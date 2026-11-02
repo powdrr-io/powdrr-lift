@@ -14,6 +14,9 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
+from powdrr_service.procedrr import ProcessCatalog
+from powdrr_service.resources import bundled_process_directory
+
 from powdrr_lift.core.architecture_specification import (
     build_architecture_specification_validation_report,
 )
@@ -59,7 +62,6 @@ from powdrr_lift.workrr.scenario import (
     load_workflow_scenario,
     run_workflow_scenario,
 )
-from procedrr import ProcessCatalog
 
 REQUIRED_BUILTIN_MANIFESTS = frozenset(
     {
@@ -1120,9 +1122,7 @@ def _run_production_chat_adapter(workflow_directory: Path, repo_root: Path) -> A
 
     process_root = repo_root / "docs" / "procedrr" / "processes"
     if not process_root.is_dir():
-        process_root = (
-            Path(__file__).resolve().parents[3] / "docs" / "procedrr" / "processes"
-        )
+        process_root = bundled_process_directory()
     client = Client()
     selected = _select_process(
         ProcessCatalog.load(process_root),

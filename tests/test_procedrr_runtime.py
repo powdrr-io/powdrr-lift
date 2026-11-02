@@ -4,19 +4,19 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-
-from procedrr import ProcessCatalog, ProcessCatalogError, ProcessIdentity
-from procedrr_evaluator.evaluator import (
+from powdrr_service.procedrr import ProcessCatalog, ProcessCatalogError, ProcessIdentity
+from powdrr_service.procedrr_evaluator.evaluator import (
     EvaluationCheckpoint,
     EvaluationError,
     EvaluationEvent,
     SuspendEvaluation,
 )
-from procedrr_evaluator.runtime import (
+from powdrr_service.procedrr_evaluator.runtime import (
     ProcedrrExecutionService,
     ProcessExecutionCheckpoint,
     ProcessTerminalStatus,
 )
+from powdrr_service.resources import bundled_process_directory
 
 
 class NoCallLLM:
@@ -231,8 +231,8 @@ def test_process_checkpoint_rejects_a_changed_process_revision(tmp_path: Path) -
 
 
 def test_migrated_independent_review_runs_as_a_procedrr_process() -> None:
-    repository_root = Path(__file__).resolve().parents[1]
-    catalog = ProcessCatalog.load(repository_root / "docs/procedrr/processes")
+    Path(__file__).resolve().parents[1]
+    catalog = ProcessCatalog.load(bundled_process_directory())
     llm = SequenceLLM(
         [
             {

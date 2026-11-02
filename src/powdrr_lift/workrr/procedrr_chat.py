@@ -12,6 +12,14 @@ from typing import Any, TextIO
 from uuid import uuid4
 
 from powdrr_service.decision_classifier import JevSemanticClassifierClient
+from powdrr_service.procedrr import ProcessCatalog, ProcessDefinition
+from powdrr_service.procedrr_evaluator.evaluator import SuspendEvaluation
+from powdrr_service.procedrr_evaluator.runtime import (
+    ProcedrrExecutionService,
+    ProcessExecutionCheckpoint,
+    ProcessExecutionEvent,
+    ProcessTerminalStatus,
+)
 from powdrr_service.providers.selection import (
     initial_model_for_provider,
     resolve_provider_roles,
@@ -50,14 +58,6 @@ from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
 from powdrr_lift.workrr.procedrr_operations import WorkrrOperationExecutor
 from powdrr_lift.workrr.provider_runtime import WorkflowClientRegistry
 from powdrr_lift.workrr.review_feedback import prepare_review_feedback_ledger
-from procedrr import ProcessCatalog, ProcessDefinition
-from procedrr_evaluator.evaluator import SuspendEvaluation
-from procedrr_evaluator.runtime import (
-    ProcedrrExecutionService,
-    ProcessExecutionCheckpoint,
-    ProcessExecutionEvent,
-    ProcessTerminalStatus,
-)
 
 WORKFLOW_CHAT_WAITING_FOR_INPUT = 3
 

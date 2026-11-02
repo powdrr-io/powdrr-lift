@@ -1,6 +1,6 @@
 """Agent-side evaluator for testing procedrr declarations."""
 
-from procedrr_evaluator.evaluator import (
+from powdrr_service.procedrr_evaluator.evaluator import (
     EvaluationCheckpoint,
     EvaluationError,
     EvaluationResult,
@@ -8,7 +8,7 @@ from procedrr_evaluator.evaluator import (
     OperationExecutor,
     SuspendEvaluation,
 )
-from procedrr_evaluator.runtime import (
+from powdrr_service.procedrr_evaluator.runtime import (
     ProcedrrExecutionService,
     ProcessExecutionCheckpoint,
     ProcessExecutionEvent,

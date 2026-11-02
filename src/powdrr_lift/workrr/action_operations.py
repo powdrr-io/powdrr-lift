@@ -163,7 +163,9 @@ def _record_process_pull_request(
         base_branch="main",
         title="Agent-created pull request",
         workflow_name=record_process.name,
-        workflow_path=str(record_process.path),
+        workflow_path=(
+            "powdrr_service.resources/processes/" + record_process.path.name
+        ),
         steps=[dict(step) for step in record_process.steps],
         events=[*events, event],
         explanation=(

@@ -21,11 +21,12 @@ from powdrr_service.external_contract_research import (
     redact_external_contract_search_event,
     search_external_contract_sources,
 )
+from powdrr_service.procedrr.parser import parse_and_validate
+from powdrr_service.procedrr_evaluator import Evaluator
+from powdrr_service.resources import bundled_process_directory
 
 from powdrr_lift.workrr.command_catalog import feature_command_catalog
 from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
-from procedrr.parser import parse_and_validate
-from procedrr_evaluator import Evaluator
 
 
 def test_external_research_has_no_legacy_agent_module() -> None:
@@ -38,9 +39,9 @@ def test_external_research_has_no_legacy_agent_module() -> None:
 
 
 def test_external_contract_research_procedure_is_valid() -> None:
-    source = Path("docs/procedrr/processes/resolve-external-contracts.yaml").read_text(
-        encoding="utf-8"
-    )
+    source = (
+        bundled_process_directory() / "resolve-external-contracts.yaml"
+    ).read_text(encoding="utf-8")
 
     parse_and_validate(source, command_catalog=feature_command_catalog())
 
@@ -686,7 +687,7 @@ def test_external_research_gate_and_evidence_control_model_calls(
 ) -> None:
     from powdrr_service import decision_classifier as jev_classifier
 
-    process_directory = Path("docs/procedrr/processes")
+    process_directory = bundled_process_directory()
     document = parse_and_validate(
         (process_directory / "resolve-external-contracts.yaml").read_text(),
         command_catalog=feature_command_catalog(),

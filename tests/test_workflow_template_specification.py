@@ -4,6 +4,8 @@ import json
 import re
 from pathlib import Path
 
+from powdrr_service.resources import bundled_process_directory
+
 from powdrr_lift.process.task_step import ToolInvocation
 from powdrr_lift.process.tasks import TaskComplexity, WorkflowInstance
 from powdrr_lift.process.templates import (
@@ -317,11 +319,9 @@ def test_workflow_template_file_helpers_round_trip(tmp_path: Path) -> None:
 
 
 def test_execute_proposed_pr_is_a_procedrr_workflow_process() -> None:
-    from procedrr import ProcessCatalog
+    from powdrr_service.procedrr import ProcessCatalog
 
-    catalog = ProcessCatalog.load(
-        Path(__file__).resolve().parents[1] / "docs/procedrr/processes"
-    )
+    catalog = ProcessCatalog.load(bundled_process_directory())
     process = catalog.get("execute-proposed-pr-workflow").document
     steps = process["steps"]
     assert "tool_calls" not in process["limits"]
@@ -447,12 +447,10 @@ None."""
 def test_create_pull_request_preserves_runtime_state_and_accepts_committed_files() -> (
     None
 ):
-    from procedrr import ProcessCatalog
+    from powdrr_service.procedrr import ProcessCatalog
 
     process = (
-        ProcessCatalog.load(
-            Path(__file__).resolve().parents[1] / "docs/procedrr/processes"
-        )
+        ProcessCatalog.load(bundled_process_directory())
         .get("create-pull-request")
         .document
     )
@@ -468,7 +466,7 @@ def test_create_pull_request_preserves_runtime_state_and_accepts_committed_files
 
 
 def test_instantiate_procedrr_process_workflow_creates_task(tmp_path: Path) -> None:
-    process_directory = Path(__file__).resolve().parents[1] / "docs/procedrr/processes"
+    process_directory = bundled_process_directory()
     inputs = {
         "work_item_name": "Example Feature",
         "proposed_pr_id": "example-pr",
@@ -493,7 +491,7 @@ def test_instantiate_procedrr_process_workflow_creates_task(tmp_path: Path) -> N
 def test_instantiate_procedrr_process_workflow_reuses_task(
     tmp_path: Path,
 ) -> None:
-    process_directory = Path(__file__).resolve().parents[1] / "docs/procedrr/processes"
+    process_directory = bundled_process_directory()
     output_root = tmp_path / "workflows"
     inputs = {"work_item_name": "Example", "proposed_pr_id": "example-pr"}
 
@@ -570,9 +568,9 @@ def test_instantiate_workflow_template_accepts_generic_input_values(
 
 
 def test_fully_review_pr_is_a_sequential_procedrr_process() -> None:
-    from procedrr import ProcessCatalog
+    from powdrr_service.procedrr import ProcessCatalog
 
-    processes_path = Path(__file__).resolve().parents[1] / "docs/procedrr/processes"
+    processes_path = bundled_process_directory()
     process = ProcessCatalog.load(processes_path).get("fully-review-pr").document
     assert [item["name"] for item in process["inputs"]] == [
         "user_request",

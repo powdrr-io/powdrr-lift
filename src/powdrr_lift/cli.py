@@ -37,6 +37,7 @@ from powdrr_service.providers.config import (
     provider_definition,
 )
 from powdrr_service.providers.credentials import resolve_provider_credentials
+from powdrr_service.resources import bundled_process_directory
 from powdrr_service.structrr.rebase import rebase_structrr_snapshot
 from powdrr_service.structrr.verification_health import (
     VerificationPolicyMode,
@@ -1973,9 +1974,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     procedrr_validation_parser = subparsers.add_parser(
         "validate-procedrr-processes",
-        help="Validate every Procedrr process in one or more process directories.",
+        help="Validate the bundled catalog or explicit process directories.",
     )
-    procedrr_validation_parser.add_argument("paths", nargs="+", type=Path)
+    procedrr_validation_parser.add_argument("paths", nargs="*", type=Path)
     procedrr_validation_parser.add_argument("--json", action="store_true")
     procedrr_validation_parser.set_defaults(func=_run_validate_procedrr_processes)
 
@@ -2015,7 +2016,7 @@ def build_parser() -> argparse.ArgumentParser:
         dest="processes_dir",
         metavar="PROCESSES_DIR",
         type=Path,
-        default=Path("docs/procedrr/processes"),
+        default=bundled_process_directory(),
         help="Directory containing validated Procedrr process definitions.",
     )
     workflow_chat_parser.add_argument(
@@ -3335,7 +3336,7 @@ def _run_instantiate_workflow(args: argparse.Namespace) -> int:
             ).is_file()
             output_directory, tasks = instantiate_procedrr_process_workflow(
                 process_id=args.process,
-                process_directory=repo_root / "docs" / "procedrr" / "processes",
+                process_directory=bundled_process_directory(),
                 input_state=process_inputs,
                 work_item_name=args.work_item_name,
                 output_root=output_root,
@@ -4570,8 +4571,8 @@ def _run_validate_pr_files(args: argparse.Namespace) -> int:
             continue
 
         if relative_path.parts[:3] == ("docs", "procedrr", "processes"):
-            from procedrr import ProcessCatalog
-            from procedrr.catalog import ProcessCatalogError
+            from powdrr_service.procedrr import ProcessCatalog
+            from powdrr_service.procedrr.catalog import ProcessCatalogError
 
             try:
                 catalog = ProcessCatalog.load(path.parent)
@@ -6417,11 +6418,12 @@ def _extract_workflow_responses(args: argparse.Namespace) -> int:
 
 
 def _run_validate_procedrr_processes(args: argparse.Namespace) -> int:
-    from procedrr import ProcessCatalog
-    from procedrr.catalog import ProcessCatalogError
+    from powdrr_service.procedrr import ProcessCatalog
+    from powdrr_service.procedrr.catalog import ProcessCatalogError
 
     results: list[dict[str, Any]] = []
-    for directory in args.paths:
+    process_directories = args.paths or [bundled_process_directory()]
+    for directory in process_directories:
         try:
             catalog = ProcessCatalog.load(directory)
         except (OSError, ProcessCatalogError, ValueError) as error:

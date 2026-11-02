@@ -20,10 +20,10 @@ from powdrr_service.decision_classifier import (
     _classifier_request,
     _format_classifier_result,
 )
+from powdrr_service.procedrr import parse_and_validate
+from powdrr_service.procedrr_evaluator import Evaluator
 
 from powdrr_lift.workrr import WorkflowLLMClient
-from procedrr import parse_and_validate
-from procedrr_evaluator import Evaluator
 from science.deepswe.acceptance_templates.cli import DEFAULT_MODEL, _client
 from science.deepswe.acceptance_templates.common import digest, load_json, write_json
 from science.deepswe.acceptance_templates.repository_planning.prepare import inspect

@@ -424,7 +424,7 @@ def instantiate_procedrr_process_workflow(
     workflow_instance_name: str | None = None,
 ) -> tuple[Path, tuple[WorkflowTask, ...]]:
     """Create a durable one-task workflow that runs a catalogued Procedrr process."""
-    from procedrr import ProcessCatalog
+    from powdrr_service.procedrr import ProcessCatalog
 
     catalog = ProcessCatalog.load(Path(process_directory))
     process = catalog.get(process_id)

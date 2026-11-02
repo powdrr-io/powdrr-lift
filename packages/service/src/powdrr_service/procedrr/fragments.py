@@ -8,8 +8,8 @@ import re
 from collections.abc import Mapping, Sequence
 from typing import Any, cast
 
-from procedrr.editor import apply_json_edits
-from procedrr.parser import (
+from powdrr_service.procedrr.editor import apply_json_edits
+from powdrr_service.procedrr.parser import (
     DocumentDiagnostic,
     validate_document,
     validate_single_decision,

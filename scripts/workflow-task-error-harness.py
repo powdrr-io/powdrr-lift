@@ -588,7 +588,15 @@ def _mirror_repair_changes(
         capture_output=True,
         text=True,
     ).stdout.splitlines()
-    allowed_prefixes = ("src/", "docs/procedrr/processes/", "scripts/", "templates/")
+    allowed_prefixes = (
+        "src/",
+        "packages/service/pyproject.toml",
+        "packages/service/src/powdrr_service/procedrr/",
+        "packages/service/src/powdrr_service/procedrr_evaluator/",
+        "packages/service/src/powdrr_service/resources/processes/",
+        "scripts/",
+        "templates/",
+    )
     for relative_name in changed:
         if not relative_name.startswith(allowed_prefixes):
             continue

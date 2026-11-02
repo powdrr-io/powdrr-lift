@@ -1,4 +1,4 @@
-"""Interpret procedrr documents at the agent boundary.
+"""Interpret private Procedrr documents on the service side.
 
 This module deliberately does not implement repository tools.  The caller
 injects an operation executor, normally an adapter around powdrr-lift's
@@ -15,15 +15,18 @@ from collections.abc import Callable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any, Protocol
 
 from jsonschema import ValidationError as JsonSchemaError
 from jsonschema import validate as validate_json
 
-if TYPE_CHECKING:
-    from powdrr_lift.workrr.protocol import WorkflowLLMClient
-
 _REFERENCE = re.compile(r"\$\{([A-Za-z_][A-Za-z0-9_.-]*)\}")
+
+
+class WorkflowLLMClient(Protocol):
+    """Structured model client consumed by the process evaluator."""
+
+    def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]: ...
 
 
 class EvaluationError(RuntimeError):
@@ -176,7 +179,10 @@ class Evaluator:
         self.llm = llm
         self.operation_executor = operation_executor
         self.judge_clients = dict(judge_clients or {})
-        self.process_directory = process_directory or Path("docs/procedrr/processes")
+        self.process_directory = (
+            process_directory
+            or Path(__file__).resolve().parents[1] / "resources" / "processes"
+        )
         self.command_catalog = command_catalog
         self.event_sink = event_sink
         self._schemas_by_state: dict[int, dict[str, Mapping[str, Any]]] = {}
@@ -185,28 +191,6 @@ class Evaluator:
         self._suspension_reason: str | None = None
         self._resume_value: Any = None
         self._resume_path: str | None = None
-
-    @classmethod
-    def with_workrr(
-        cls,
-        client: WorkflowLLMClient,
-        operation_executor: OperationExecutor,
-        *,
-        process_directory: Path,
-        max_retries: int = 3,
-    ) -> Evaluator:
-        """Construct an evaluator using Workrr's structured repair boundary."""
-        from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
-
-        return cls(
-            WorkrrProcedrrClient(
-                client,
-                process_directory=process_directory,
-                max_retries=max_retries,
-            ),
-            operation_executor,
-            process_directory=Path("docs/procedrr/processes"),
-        )
 
     def evaluate(
         self,
@@ -424,7 +408,7 @@ class Evaluator:
         )
 
     def _load_process(self, name: str) -> Mapping[str, Any]:
-        from procedrr import parse_and_validate
+        from powdrr_service.procedrr import parse_and_validate
 
         if not re.fullmatch(r"[a-z][a-z0-9-]*", name):
             raise EvaluationError(f"invalid subprocess name: {name!r}")

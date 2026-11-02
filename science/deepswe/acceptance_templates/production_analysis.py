@@ -31,7 +31,10 @@ from .cli import DEFAULT_MODEL, _client
 from .common import HERE, Recorder, digest, generation_input, load_json, write_json
 from .generation import generate, load_catalog, save_generation
 
-DESIGN_FLOW = HERE.parents[2] / "docs/procedrr/processes/design-interview.yaml"
+DESIGN_FLOW = (
+    HERE.parents[2]
+    / "packages/service/src/powdrr_service/resources/processes/design-interview.yaml"
+)
 MAX_PARALLEL = 8
 
 

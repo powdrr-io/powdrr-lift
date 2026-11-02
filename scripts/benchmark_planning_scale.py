@@ -35,6 +35,7 @@ from powdrr_service.planning.service import (
     run_planning_procedrr,
 )
 from powdrr_service.planning.source import PinnedSourceDocument, segment_markdown_source
+from powdrr_service.resources import bundled_process_directory
 
 from powdrr_lift.workrr.github_issue_queue import QueueIssue
 from powdrr_lift.workrr.planning.evidence import RequirementEvidenceSearch
@@ -320,7 +321,7 @@ def run_profile(profile: Profile, *, repository_root: Path) -> dict[str, Any]:
     calls: list[Mapping[str, Any]] = []
     started = time.perf_counter()
     result = run_planning_procedrr(
-        process_directory=repository_root / "docs/procedrr/processes",
+        process_directory=bundled_process_directory(),
         session=session,
         state_machine=machine,
         checkpoint_store=store,

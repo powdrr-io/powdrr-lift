@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 from powdrr_local.planning.source import read_pinned_source
+from powdrr_service.planning.contracts import PlanningContractError
 from powdrr_service.planning.source import (
     EquivalenceDecision,
     PinnedSourceDocument,
@@ -16,6 +17,7 @@ from powdrr_service.planning.source import (
     build_equivalence_request,
     build_extract_requirements_request,
     build_fidelity_request,
+    deduplicate_requirement_records,
     merge_equivalent_requirements,
     parse_block_disposition,
     parse_equivalence_decision,
@@ -334,6 +336,39 @@ def test_requirement_ids_are_code_owned_and_related_anchors_are_retained() -> No
     assert drafts[0].related_source_refs == (first.anchor_ids[0],)
 
 
+def test_exact_duplicate_extractions_merge_related_refs_without_merging_locations() -> (
+    None
+):
+    duplicate_a = {
+        "statement": "Implement the requested behavior.",
+        "kind": "behavior",
+        "source_refs": ["anchor-a"],
+        "related_source_refs": ["context-a"],
+    }
+    duplicate_b = {
+        "statement": "  IMPLEMENT the requested behavior.  ",
+        "kind": "behavior",
+        "source_refs": ["anchor-a"],
+        "related_source_refs": ["context-b", "context-a"],
+    }
+    repeated_elsewhere = {
+        **duplicate_a,
+        "source_refs": ["anchor-b"],
+    }
+
+    result = deduplicate_requirement_records(
+        [duplicate_a, duplicate_b, repeated_elsewhere]
+    )
+
+    assert result == (
+        {
+            **duplicate_a,
+            "related_source_refs": ["context-a", "context-b"],
+        },
+        repeated_elsewhere,
+    )
+
+
 def test_source_question_builders_bind_context_examples_and_digests() -> None:
     text = (
         "# Plan\n\nThe first requirement must be implemented.\n\n"
@@ -434,18 +469,23 @@ def test_requirement_question_distinguishes_cursors_from_adjacent_citations() ->
     blocks = [block for block in segmented.blocks if block.kind == "paragraph"]
     assert len(blocks) == 2
     block, adjacent = blocks
+    anchor_by_id = {anchor.id: anchor for anchor in segmented.anchors}
+    obligation_anchors = tuple(
+        ref for ref in block.anchor_ids if anchor_by_id[ref].clause_id is not None
+    )
     request = build_extract_requirements_request(
         block,
-        anchors={anchor.id: anchor for anchor in segmented.anchors},
+        anchors=anchor_by_id,
         related_blocks=(adjacent,),
     )
 
-    candidates = ", ".join(block.anchor_ids)
+    candidates = ", ".join(obligation_anchors)
     assert candidates in request.exact_question
     assert "must never be used as pagination cursors" in request.exact_question
     assert "has_more=true requires a non-null next_anchor" in request.exact_question
     assert request.valid_example["has_more"] is True
-    assert request.valid_example["next_anchor"] == block.anchor_ids[0]
+    assert request.valid_example["next_anchor"] == obligation_anchors[0]
+    assert block.anchor_ids[0] not in request.question.context_ref_ids
     request.parse_answer(request.valid_example)
     assert adjacent.anchor_ids[0] not in block.anchor_ids
     with pytest.raises(ValueError, match="current source block"):
@@ -454,6 +494,40 @@ def test_requirement_question_distinguishes_cursors_from_adjacent_citations() ->
                 "records": [],
                 "has_more": True,
                 "next_anchor": adjacent.anchor_ids[0],
+            }
+        )
+
+
+def test_requirement_extraction_excludes_block_alias_when_clause_anchor_exists() -> (
+    None
+):
+    segmented = segment_markdown_source(
+        _document("# Plan\n\nImplement the requested behavior.\n")
+    )
+    block = next(item for item in segmented.blocks if item.kind == "paragraph")
+    anchors = {anchor.id: anchor for anchor in segmented.anchors}
+    clause_ids = tuple(
+        ref for ref in block.anchor_ids if anchors[ref].clause_id is not None
+    )
+    assert len(clause_ids) == 1
+
+    request = build_extract_requirements_request(block, anchors=anchors)
+
+    assert clause_ids[0] in request.question.context_ref_ids
+    assert block.anchor_ids[0] not in request.question.context_ref_ids
+    with pytest.raises(PlanningContractError, match="outside supplied context"):
+        request.parse_answer(
+            {
+                "records": [
+                    {
+                        "statement": "Implement the requested behavior.",
+                        "kind": "behavior",
+                        "source_refs": [block.anchor_ids[0]],
+                        "related_source_refs": [],
+                    }
+                ],
+                "has_more": False,
+                "next_anchor": None,
             }
         )
 

@@ -24,6 +24,7 @@ from pathlib import Path
 from threading import Lock
 from typing import Any
 
+from powdrr_service.planning.assembly import MAX_WORK_UNIT_REQUIREMENTS_PER_QUESTION
 from powdrr_service.planning.checkpoints import (
     JournalState,
     PlanningCheckpoint,
@@ -57,6 +58,13 @@ class Profile:
     plan_items: int
     structural_subjects: int = 0
 
+    @property
+    def min_work_units(self) -> int:
+        """Avoid requiring artificial splits when every unit can cover four reqs."""
+        return (
+            self.requirements + MAX_WORK_UNIT_REQUIREMENTS_PER_QUESTION - 1
+        ) // MAX_WORK_UNIT_REQUIREMENTS_PER_QUESTION
+
 
 PROFILES = {
     "typical": Profile("typical", requirements=40, work_units=16, plan_items=5),
@@ -69,6 +77,33 @@ PROFILES = {
         structural_subjects=2_051,
     ),
 }
+
+
+def fixture_shape_mismatches(
+    profile: Profile, report: Mapping[str, Any]
+) -> dict[str, tuple[Any, Any]]:
+    """Check exact plan shape plus a bounded, meaningful work-unit range."""
+    expected = {
+        "terminal_status": "succeeded",
+        "requirements": profile.requirements,
+        "plan_items": profile.plan_items,
+    }
+    mismatches = {
+        field: (report.get(field), value)
+        for field, value in expected.items()
+        if report.get(field) != value
+    }
+    work_units = report.get("work_units")
+    if (
+        isinstance(work_units, bool)
+        or not isinstance(work_units, int)
+        or not profile.min_work_units <= work_units <= profile.work_units
+    ):
+        mismatches["work_units"] = (
+            work_units,
+            [profile.min_work_units, profile.work_units],
+        )
+    return mismatches
 
 
 class _ProgressClient:
@@ -433,6 +468,8 @@ def run_profile(
         and isinstance(event.payload.get("question"), Mapping)
         and isinstance(event.payload.get("accepted_answer"), Mapping)
     }
+    compiled = None
+    compile_error: str | None = None
     try:
         compiled = machine.compile_accepted_plan(
             accepted,
@@ -440,11 +477,20 @@ def run_profile(
             plan_path="docs/plans/benchmark.yaml",
             proposal_path="docs/plans/benchmark-structrr-proposal.json",
         )
-    except Exception as error:
-        raise RuntimeError(
-            f"profile {profile.name} could not compile; terminal status="
-            f"{result.terminal_status.value}"
-        ) from error
+    except Exception as error:  # The live benchmark must preserve blocked runs.
+        compile_error = str(error)
+    try:
+        accepted_requirements = machine.accepted_ledger(accepted).requirements
+    except (ValueError, RuntimeError):
+        accepted_requirements = None
+    try:
+        accepted_units = machine.accepted_work_units(accepted)
+    except (ValueError, RuntimeError):
+        accepted_units = None
+    try:
+        pending_questions = machine.ready_questions(accepted)
+    except (ValueError, RuntimeError):
+        pending_questions = ()
     by_phase: dict[str, dict[str, float | int]] = defaultdict(
         lambda: {"questions": 0, "api_calls": 0, "elapsed_ms": 0.0}
     )
@@ -490,9 +536,23 @@ def run_profile(
         "terminal_status": result.terminal_status.value,
         "elapsed_seconds": round(elapsed_seconds, 3),
         "source_blocks": len(source.blocks),
-        "requirements": len(machine.accepted_ledger(accepted).requirements),
-        "work_units": len(machine.accepted_work_units(accepted)),
-        "plan_items": len(compiled.plan.items),
+        "requirements": (
+            None if accepted_requirements is None else len(accepted_requirements)
+        ),
+        "work_units": None if accepted_units is None else len(accepted_units),
+        "plan_items": None if compiled is None else len(compiled.plan.items),
+        "compile_error": compile_error,
+        "pending_questions": [
+            {
+                "question_id": request.question.question_id,
+                "kind": request.question.kind,
+                "subject_ids": list(request.question.subject_ids),
+                "member_ids": [
+                    member.question.question_id for member in request.batch_members
+                ],
+            }
+            for request in pending_questions
+        ],
         "baseline_structural_subjects": profile.structural_subjects,
         "accepted_answer_pages": pages,
         "deterministic_answers": sum(
@@ -514,19 +574,55 @@ def run_profile(
         "by_question_kind": dict(by_question_kind),
         "phases": dict(by_phase),
     }
-    expected = {
-        "terminal_status": "succeeded",
-        "requirements": profile.requirements,
-        "work_units": profile.work_units,
-        "plan_items": profile.plan_items,
-    }
-    mismatches = {
-        field: (report[field], value)
-        for field, value in expected.items()
-        if report[field] != value
-    }
+    mismatches = fixture_shape_mismatches(profile, report)
     report["fixture_shape_mismatches"] = mismatches
     report["fixture_shape_status"] = "mismatch" if mismatches else "matched"
+    report["expected_work_unit_range"] = [
+        profile.min_work_units,
+        profile.work_units,
+    ]
+    report["work_unit_requirement_counts"] = dict(
+        sorted(
+            Counter(
+                len(unit.requirement_ids) for unit in (accepted_units or ())
+            ).items()
+        )
+    )
+    if mismatches:
+        report["fixture_shape_diagnostics"] = {
+            "requirements_by_source_ref": dict(
+                Counter(
+                    source_ref
+                    for requirement in (accepted_requirements or ())
+                    for source_ref in requirement.source_refs
+                )
+            ),
+            "requirements": [
+                {
+                    "id": requirement.id,
+                    "statement": requirement.statement,
+                    "source_refs": list(requirement.source_refs),
+                }
+                for requirement in (accepted_requirements or ())
+            ],
+            "work_units": [
+                {
+                    "id": unit.id,
+                    "requirement_ids": list(unit.requirement_ids),
+                    "deliverable": unit.deliverable,
+                    "paths": [write.path for write in unit.planned_writes],
+                }
+                for unit in (accepted_units or ())
+            ],
+            "items": [
+                {
+                    "id": item.item_id,
+                    "title": item.title,
+                    "scope": list(item.scope),
+                }
+                for item in (() if compiled is None else compiled.plan.items)
+            ],
+        }
     if mismatches and enforce_fixture_shape:
         raise RuntimeError(f"profile {profile.name} failed expectations: {mismatches}")
     if max_questions_per_provider_call > 4:
@@ -631,7 +727,10 @@ def main() -> int:
     print(
         json.dumps({"schema": "planning-scale-report-v1", "profiles": report}, indent=2)
     )
-    if args.live and any(item["fixture_shape_mismatches"] for item in report):
+    if args.live and any(
+        item["terminal_status"] != "succeeded" or item["fixture_shape_mismatches"]
+        for item in report
+    ):
         return 1
     return 0
 

@@ -1,0 +1,253 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1307
+title: Improve live planning quality and source deduplication
+intent:
+  problem: Live planning duplicated obligations from aliased source anchors and fragmented cohesive requirements into one work unit per requirement, making benchmark results misleading.
+  goal: Preserve distinct source obligations, collapse exact duplicate extractions, guide cohesive work-unit proposals, and evaluate live plan shape against bounded sizing expectations.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/plans/planning-efficiency-deterministic-filtering.md
+    type: modified
+    span: {start_line: 3, end_line: 3}
+    summary: Update the planning-efficiency status to show remaining large-profile and dependency-recall work.
+    rationale: Keep the implementation handoff aligned with measured progress.
+  - path: docs/plans/planning-efficiency-deterministic-filtering.md
+    type: modified
+    span: {start_line: 347, end_line: 383}
+    summary: Record follow-up live runs, exact extraction deduplication, and bounded work-unit sizing.
+    rationale: Preserve measured provider behavior and the remaining large-plan limitation.
+  - path: packages/service/src/powdrr_service/planning/assembly.py
+    type: modified
+    span: {start_line: 787, end_line: 787}
+    summary: Version the work-unit proposal question identity.
+    rationale: Ensure saved answers from the old proposal guidance are not reused.
+  - path: packages/service/src/powdrr_service/planning/assembly.py
+    type: modified
+    span: {start_line: 789, end_line: 789}
+    summary: Increment the work-unit proposal contract version.
+    rationale: Mark the changed proposal guidance as a new answer contract.
+  - path: packages/service/src/powdrr_service/planning/assembly.py
+    type: modified
+    span: {start_line: 791, end_line: 791}
+    summary: Include the proposal contract version in the input digest.
+    rationale: Invalidate checkpointed answers when the contract changes.
+  - path: packages/service/src/powdrr_service/planning/assembly.py
+    type: modified
+    span: {start_line: 793, end_line: 793}
+    summary: Give the updated proposal schema a distinct name.
+    rationale: Keep serialized answers identifiable by contract version.
+  - path: packages/service/src/powdrr_service/planning/assembly.py
+    type: modified
+    span: {start_line: 828, end_line: 834}
+    summary: Prefer cohesive units covering related requirements together and discourage one-unit-per-requirement fragmentation.
+    rationale: Improve live work-unit and PR sizing without weakening runtime or deliverable separation.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 72, end_line: 72}
+    summary: Import deterministic requirement extraction deduplication.
+    rationale: Use one stable normalization path for active and resumed planning.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 540, end_line: 540}
+    summary: Deduplicate accepted extraction records before allocating requirement IDs.
+    rationale: Prevent exact duplicate model records from inflating the work plan.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 1017, end_line: 1017}
+    summary: Identify accepted work-unit answers using the new contract version.
+    rationale: Rebuild proposal state from answers matching the updated prompt.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 2097, end_line: 2097}
+    summary: Apply exact extraction deduplication when replaying the source ledger.
+    rationale: Make resumed runs reproduce the active planning ledger.
+  - path: packages/service/src/powdrr_service/planning/source.py
+    type: modified
+    span: {start_line: 753, end_line: 753}
+    summary: Remove the unconditional whole-block anchor as the extraction cursor.
+    rationale: Select pagination from canonical obligation anchors.
+  - path: packages/service/src/powdrr_service/planning/source.py
+    type: modified
+    span: {start_line: 755, end_line: 755}
+    summary: Validate all source anchors before selecting extraction anchors.
+    rationale: Preserve source integrity while excluding duplicate aliases from model context.
+  - path: packages/service/src/powdrr_service/planning/source.py
+    type: modified
+    span: {start_line: 758, end_line: 778}
+    summary: Choose canonical clause anchors for extraction, related context, and pagination.
+    rationale: Prevent models from citing both whole-block and clause aliases for one obligation.
+  - path: packages/service/src/powdrr_service/planning/source.py
+    type: modified
+    span: {start_line: 778, end_line: 779}
+    summary: Use the first canonical obligation anchor in valid examples.
+    rationale: Keep examples consistent with accepted source citations.
+  - path: packages/service/src/powdrr_service/planning/source.py
+    type: modified
+    span: {start_line: 880, end_line: 880}
+    summary: Restrict pagination cursors to canonical obligation anchors.
+    rationale: Avoid cursor advancement through a whole-block alias.
+  - path: packages/service/src/powdrr_service/planning/source.py
+    type: modified
+    span: {start_line: 886, end_line: 897}
+    summary: Add canonical extraction-anchor selection with a whole-block fallback.
+    rationale: Keep source blocks without clause anchors supported.
+  - path: packages/service/src/powdrr_service/planning/source.py
+    type: modified
+    span: {start_line: 1145, end_line: 1181}
+    summary: Collapse exact duplicate requirement records while unioning related-context references.
+    rationale: Retain separate obligations at distinct source locations and avoid duplicate records at the same location.
+  - path: packages/service/src/powdrr_service/planning/source.py
+    type: modified
+    span: {start_line: 1434, end_line: 1434}
+    summary: Export the exact extraction deduplication helper.
+    rationale: Let the planning driver share the source-ledger normalization rule.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 27, end_line: 27}
+    summary: Import the work-unit requirement limit used by planning.
+    rationale: Derive a meaningful lower bound from the shared proposal contract.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 61, end_line: 67}
+    summary: Derive the minimum valid work-unit count from the maximum requirements per unit.
+    rationale: Avoid treating cohesive plans as failures solely for using fewer units than the mock fixture.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 82, end_line: 108}
+    summary: Validate exact requirement and PR-item shape with a bounded work-unit range.
+    rationale: Detect missing requirements and extreme fragmentation while accepting cohesive groups.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 471, end_line: 472}
+    summary: Preserve partial results when live planning cannot compile.
+    rationale: Keep blocked runs diagnosable instead of raising away their state.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 480, end_line: 493}
+    summary: Capture compile errors and partial accepted requirement and work-unit state.
+    rationale: Report where a live planner run stopped.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 539, end_line: 555}
+    summary: Report partial requirements, work units, compile errors, and pending questions.
+    rationale: Make blocked runs actionable without exposing prompts or responses.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 577, end_line: 577}
+    summary: Apply shared bounded plan-shape validation.
+    rationale: Keep deterministic and live output evaluation consistent.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 580, end_line: 625}
+    summary: Report sizing expectations and detailed diagnostics when generated shape is outside bounds.
+    rationale: Identify duplicate requirements, fragmented units, or unexpected item scopes.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 730, end_line: 733}
+    summary: Fail live mode for unsuccessful terminal status or plan-shape mismatch.
+    rationale: Prevent incomplete live runs from appearing successful.
+  - path: tests/test_benchmark_planning_scale.py
+    type: added
+    span: {start_line: 1, end_line: 59}
+    summary: Load the standalone benchmark by path and test work-unit bounds plus exact requirement and PR-item expectations.
+    rationale: Keep CI collection independent of the checkout root being importable as a Python package, while verifying valid cohesion and rejecting malformed plan sizes.
+  - path: tests/test_planning_assembly.py
+    type: modified
+    span: {start_line: 446, end_line: 450}
+    summary: Assert the versioned work-unit question includes cohesion guidance.
+    rationale: Protect the behavior that improved live work-unit grouping.
+  - path: tests/test_planning_service.py
+    type: modified
+    span: {start_line: 627, end_line: 627}
+    summary: Update the oversized-answer fixture to the new work-unit question identity.
+    rationale: Exercise recovery with the current contract version.
+  - path: tests/test_planning_service.py
+    type: modified
+    span: {start_line: 633, end_line: 633}
+    summary: Update the oversized-answer fixture schema name.
+    rationale: Keep checkpoint replay tests aligned with the new contract.
+  - path: tests/test_planning_service.py
+    type: modified
+    span: {start_line: 650, end_line: 650}
+    summary: Update the single-requirement retry fixture identity.
+    rationale: Exercise split recovery using the current question prefix.
+  - path: tests/test_planning_service.py
+    type: modified
+    span: {start_line: 656, end_line: 656}
+    summary: Update the retry fixture schema name.
+    rationale: Keep retry parsing aligned with the new contract.
+  - path: tests/test_planning_service.py
+    type: modified
+    span: {start_line: 956, end_line: 967}
+    summary: Select clause-level anchors for source-ledger provider fixtures.
+    rationale: Make test responses cite the same canonical source anchors as live planning.
+  - path: tests/test_planning_service.py
+    type: modified
+    span: {start_line: 969, end_line: 969}
+    summary: Use the canonical anchor in the source requirement fixture.
+    rationale: Keep the simulated answer within the extraction context.
+  - path: tests/test_planning_service.py
+    type: modified
+    span: {start_line: 988, end_line: 988}
+    summary: Cite canonical anchors in generated source records.
+    rationale: Exercise the updated source citation contract.
+  - path: tests/test_planning_source.py
+    type: modified
+    span: {start_line: 9, end_line: 9}
+    summary: Import the planning contract error used by citation regression coverage.
+    rationale: Assert that whole-block aliases are rejected as unsupported citations.
+  - path: tests/test_planning_source.py
+    type: modified
+    span: {start_line: 20, end_line: 20}
+    summary: Import the exact extraction deduplication helper.
+    rationale: Directly test duplicate normalization behavior.
+  - path: tests/test_planning_source.py
+    type: modified
+    span: {start_line: 339, end_line: 371}
+    summary: Test exact duplicate extraction collapse and preservation of distinct source locations.
+    rationale: Cover the observed duplicate pattern while retaining provenance.
+  - path: tests/test_planning_source.py
+    type: modified
+    span: {start_line: 472, end_line: 475}
+    summary: Build the requirement question with a canonical anchor registry.
+    rationale: Validate the pagination cursor against clause anchors.
+  - path: tests/test_planning_source.py
+    type: modified
+    span: {start_line: 478, end_line: 478}
+    summary: Derive pagination candidates from canonical clause anchors.
+    rationale: Avoid including the whole-block alias as a cursor.
+  - path: tests/test_planning_source.py
+    type: modified
+    span: {start_line: 482, end_line: 482}
+    summary: Expect the next cursor to use a canonical clause anchor.
+    rationale: Protect correct pagination over obligation anchors.
+  - path: tests/test_planning_source.py
+    type: modified
+    span: {start_line: 487, end_line: 488}
+    summary: Assert the block-wide alias is absent from question context.
+    rationale: Prevent duplicate citations for the same source sentence.
+  - path: tests/test_planning_source.py
+    type: modified
+    span: {start_line: 501, end_line: 534}
+    summary: Reject extraction records that cite a whole-block alias when a clause anchor exists.
+    rationale: Enforce the canonical citation rule at answer parsing time.
+entities:
+  - id: planning-scale-benchmark
+    type: Script
+    action: modified
+entity_relationships: []
+invariants:
+  - id: only-exact-same-location-extractions-are-collapsed
+    description: Requirement extractions collapse only when normalized statement, kind, and source-anchor set match; related-context references are unioned.
+    action: added
+  - id: live-work-unit-count-is-bounded
+    description: Live scale validation accepts work-unit counts from the minimum implied by the four-requirement limit through the deterministic profile target, while keeping requirement and item counts exact.
+    action: added
+  - id: work-unit-prompt-contract-is-versioned
+    description: Changed cohesion guidance uses a new proposal question identity so journaled answers from the prior prompt are not silently reused.
+    action: added
+guidance:
+  - id: typical-live-result-does-not-prove-large-scale-target
+    description: The measured typical provider run validates plan shape only; a live large-profile run is still required to establish the under-two-hour objective.
+    action: added

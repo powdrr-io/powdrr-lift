@@ -1,6 +1,6 @@
 # Planning Efficiency Through Deterministic Filtering
 
-**Status:** Core reductions landed; candidate-recall and live-provider validation remain open  
+**Status:** Core reductions landed; static dependency-candidate recall and large-profile live validation remain open  
 **Date:** 2026-11-01  
 **Owner:** Powdrr-Lift planning service  
 **Related change:** [PR #1283](https://github.com/powdrr-io/powdrr-lift/pull/1283) starts deterministic Structrr candidate selection for path-bound existing subjects.
@@ -344,8 +344,43 @@ rejected in live mode so one invocation cannot unexpectedly run every provider
 profile. Do not treat a fixture-shape-different run as a quality pass; inspect
 its report and compare requirements, work units, dependencies, and structural
 operations with the deterministic fixture before declaring the two-hour target
-met. Live mode exits nonzero when the run completes but its requirement, work
-unit, or item counts differ from the profile fixture.
+met. Live mode exits nonzero when the run completes but its requirement or item
+counts differ from the profile, or its work-unit count falls outside the
+bounded range derived from the requirement limit and deterministic profile.
+
+### Follow-up live provider runs (2026-11-02)
+
+The first follow-up isolated two sources of poor plan shape. Source extraction
+was exposing both whole-block and clause anchors for the same sentence, and the
+model sometimes returned the same statement twice against one anchor. The
+planner now offers clause anchors as canonical citations and collapses only
+exact repeated statements with the same kind and source-anchor set, retaining
+the union of related-context references. Repeated statements at different
+source locations stay separate requirements.
+
+The next `typical` run completed with `deepinfra-cheap` /
+`deepseek-ai/DeepSeek-V4-Flash-0731`, concurrency 4, and a 30-second per-call
+timeout in 111.1 seconds. It produced 40 requirements, 40 work units, and 18
+items. This confirmed source extraction was repaired while work-unit proposals
+still fragmented each requirement into its own unit.
+
+The work-unit contract was then revised to favor a cohesive unit covering
+related requirements together, with an explicit warning against one unit per
+source requirement. The next run completed in 79.3 seconds with 49 provider
+calls and 126 question members. It produced 40 requirements, 10 work units, and
+5 plan items. The 10 work units each covered four requirements; this is within
+the bounded profile range of 10 to 16 units, and the plan retained the expected
+five reviewable PR items. The benchmark now checks this bounded unit-size range
+instead of rejecting a cohesive plan solely because it uses fewer units than
+the deterministic fixture. This typical-profile result does not establish the
+large-plan two-hour target.
+
+After PR #1304 merged and this branch was fast-forwarded to current `main`, the
+same live profile completed in 69.8 seconds with 53 provider calls and 134
+question members. It produced 40 requirements, 11 work units (nine covering
+four requirements and two covering two requirements), and 5 plan items. There
+were zero validation retries and no fixture-shape mismatch; provider token
+usage remained unavailable.
 
 ## Cross-cutting test requirements
 

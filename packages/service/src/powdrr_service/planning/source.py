@@ -750,16 +750,32 @@ def build_extract_requirements_request(
     accepted_records: Sequence[Mapping[str, Any]] = (),
 ) -> QuestionRequest[RequirementExtractionPage]:
     """Build one bounded obligation enumeration request for a source block."""
-    anchor_id = block.anchor_ids[0]
     empty = {"records": [], "has_more": False, "next_anchor": None}
     supplied_blocks = (block, *related_blocks)
-    if after_anchor is not None and after_anchor not in block.anchor_ids:
-        raise ValueError("after_anchor must identify an anchor in the current block")
-    supplied_anchor_ids = tuple(
+    all_supplied_anchor_ids = tuple(
         dict.fromkeys(ref for item in supplied_blocks for ref in item.anchor_ids)
     )
-    cursor_index = -1 if after_anchor is None else block.anchor_ids.index(after_anchor)
-    pagination_candidates = block.anchor_ids[cursor_index + 1 :]
+    if any(ref not in anchors for ref in all_supplied_anchor_ids):
+        raise PlanningSourceError("source block references a missing source anchor")
+    extraction_anchors_by_block = {
+        item.id: _canonical_extraction_anchor_ids(item, anchors)
+        for item in supplied_blocks
+    }
+    current_anchor_ids = extraction_anchors_by_block[block.id]
+    if after_anchor is not None and after_anchor not in current_anchor_ids:
+        raise ValueError("after_anchor must identify an obligation anchor in the block")
+    supplied_anchor_ids = tuple(
+        dict.fromkeys(
+            ref
+            for item in supplied_blocks
+            for ref in extraction_anchors_by_block[item.id]
+        )
+    )
+    cursor_index = (
+        -1 if after_anchor is None else current_anchor_ids.index(after_anchor)
+    )
+    pagination_candidates = current_anchor_ids[cursor_index + 1 :]
+    anchor_id = current_anchor_ids[0]
     pagination_candidate_text = (
         ", ".join(pagination_candidates) if pagination_candidates else "(none)"
     )
@@ -775,8 +791,6 @@ def build_extract_requirements_request(
         "has_more": bool(pagination_candidates),
         "next_anchor": (pagination_candidates[0] if pagination_candidates else None),
     }
-    if any(ref not in anchors for ref in supplied_anchor_ids):
-        raise PlanningSourceError("source block references a missing source anchor")
     excerpts = tuple(
         SourceExcerpt(item.id, item.text, item.start_offset) for item in supplied_blocks
     )
@@ -863,10 +877,22 @@ def build_extract_requirements_request(
         parse=lambda answer: parse_requirement_page(
             answer,
             allowed_source_refs=allowed_refs,
-            pagination_anchor_ids=block.anchor_ids,
+            pagination_anchor_ids=current_anchor_ids,
             after_anchor=after_anchor,
         ),
     )
+
+
+def _canonical_extraction_anchor_ids(
+    block: SourceBlock, anchors: Mapping[str, SourceAnchor]
+) -> tuple[str, ...]:
+    """Prefer clause anchors so block-wide aliases cannot duplicate obligations."""
+    clause_anchors = tuple(
+        anchor_id
+        for anchor_id in block.anchor_ids
+        if anchors[anchor_id].clause_id is not None
+    )
+    return clause_anchors or block.anchor_ids[:1]
 
 
 def build_block_disposition_request(
@@ -1114,6 +1140,43 @@ def allocate_requirements(
             )
         )
     return tuple(requirements), tuple(drafts)
+
+
+def deduplicate_requirement_records(
+    records: Sequence[Mapping[str, Any]],
+) -> tuple[dict[str, Any], ...]:
+    """Collapse exact repeated extractions tied to the same source anchors.
+
+    Repeated statements from different source locations remain separate
+    requirements. When duplicate records carry different related-context
+    anchors, retain the union so deduplication does not discard provenance.
+    """
+    deduplicated: list[dict[str, Any]] = []
+    positions: dict[tuple[str, str, frozenset[str]], int] = {}
+    for raw_record in records:
+        record = dict(raw_record)
+        statement = " ".join(str(record["statement"]).split()).casefold()
+        source_refs = tuple(record["source_refs"])
+        key = (statement, str(record["kind"]), frozenset(source_refs))
+        existing_index = positions.get(key)
+        if existing_index is None:
+            positions[key] = len(deduplicated)
+            record["source_refs"] = list(source_refs)
+            record["related_source_refs"] = list(
+                dict.fromkeys(record["related_source_refs"])
+            )
+            deduplicated.append(record)
+            continue
+        existing = deduplicated[existing_index]
+        existing["related_source_refs"] = list(
+            dict.fromkeys(
+                [
+                    *existing["related_source_refs"],
+                    *record["related_source_refs"],
+                ]
+            )
+        )
+    return tuple(deduplicated)
 
 
 def merge_equivalent_requirements(
@@ -1368,6 +1431,7 @@ __all__ = [
     "build_fidelity_request",
     "merge_equivalent_requirements",
     "allocate_requirements",
+    "deduplicate_requirement_records",
     "parse_equivalence_decision",
     "parse_fidelity_decision",
     "parse_requirement_page",

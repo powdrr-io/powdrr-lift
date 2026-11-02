@@ -443,9 +443,11 @@ def test_work_unit_question_has_a_parser_valid_example_and_exact_context() -> No
 
     request.validate()
     assert request.question.kind == "propose_work_units"
-    assert request.question.contract_version == 2
-    assert request.question.expected_answer_schema == "work-unit-proposals-v2"
-    assert request.question.question_id.startswith("propose-units-v2-")
+    assert request.question.contract_version == 3
+    assert request.question.expected_answer_schema == "work-unit-proposals-v3"
+    assert request.question.question_id.startswith("propose-units-v3-")
+    assert "several strongly related requirements together" in request.exact_question
+    assert "Do not create one unit per requirement" in request.exact_question
     assert "requirement's own source_refs" in request.exact_question
     assert "runtime are derived" in request.exact_question
     assert "If every supplied requirement is covered" in request.exact_question

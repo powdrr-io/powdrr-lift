@@ -5,12 +5,11 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-
-from powdrr_lift.structrr.candidate_comparison import (
+from powdrr_service.structrr.candidate_comparison import (
     CandidateScopeDecision,
     compare_candidate_snapshot,
 )
-from powdrr_lift.structrr.proposal import ProposalRevision, compile_proposal_revision
+from powdrr_service.structrr.proposal import ProposalRevision, compile_proposal_revision
 
 
 def _proposal(plan: Mapping[str, Any], baseline: Mapping[str, Any]) -> ProposalRevision:
@@ -279,8 +278,8 @@ def test_candidate_comparison_matches_planned_non_source_file_from_manifest(
 ) -> None:
     import hashlib
 
-    from powdrr_lift.structrr.actual_diff import compile_actual_structrr_diff
-    from powdrr_lift.structrr.source_manifest import compile_source_manifest
+    from powdrr_service.structrr.actual_diff import compile_actual_structrr_diff
+    from powdrr_service.structrr.source_manifest import compile_source_manifest
 
     relative = ".github/workflows/ci.yml"
     content = "name: CI\n\non: [pull_request]\n"
@@ -381,8 +380,8 @@ def test_candidate_comparison_classifies_nested_test_path_as_validation_change()
 def test_candidate_comparison_reports_in_scope_helpers_without_requiring_test_files(
     tmp_path: Path,
 ) -> None:
-    from powdrr_lift.structrr.actual_diff import compile_actual_structrr_diff
-    from powdrr_lift.structrr.source_manifest import compile_source_manifest
+    from powdrr_service.structrr.actual_diff import compile_actual_structrr_diff
+    from powdrr_service.structrr.source_manifest import compile_source_manifest
 
     root = tmp_path
     (root / "src").mkdir()
@@ -459,8 +458,8 @@ def test_candidate_comparison_reports_in_scope_helpers_without_requiring_test_fi
 def test_candidate_comparison_accepts_evidenced_in_scope_helper_detail(
     tmp_path: Path,
 ) -> None:
-    from powdrr_lift.structrr.actual_diff import compile_actual_structrr_diff
-    from powdrr_lift.structrr.source_manifest import compile_source_manifest
+    from powdrr_service.structrr.actual_diff import compile_actual_structrr_diff
+    from powdrr_service.structrr.source_manifest import compile_source_manifest
 
     root = tmp_path
     (root / "src").mkdir()

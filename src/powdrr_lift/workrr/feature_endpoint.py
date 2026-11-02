@@ -56,8 +56,20 @@ from powdrr_service.structrr.active_intent import (
     ActiveIntentResolutionError,
     resolve_active_intent,
 )
+from powdrr_service.structrr.actual_diff import (
+    StructrrActualDiff,
+    compile_actual_structrr_diff,
+)
+from powdrr_service.structrr.candidate_comparison import compare_candidate_snapshot
 from powdrr_service.structrr.obligation_evidence import ObligationEvidenceContract
+from powdrr_service.structrr.proposal import (
+    ProposalRevision,
+    compile_proposal_revision,
+    load_proposal_revision,
+    validate_proposal_revision,
+)
 from powdrr_service.structrr.snapshot import snapshot_digest
+from powdrr_service.structrr.source_manifest import SourceManifest
 
 from powdrr_lift.change_log_parser import parse_change_log
 from powdrr_lift.core.contract_closure import (
@@ -74,31 +86,19 @@ from powdrr_lift.core.spec_context import (
     render_gather_context_report,
 )
 from powdrr_lift.errors import PowdrrExecutionError
-from powdrr_lift.structrr.actual_diff import (
-    StructrrActualDiff,
-    compile_actual_structrr_diff,
-)
 from powdrr_lift.structrr.bootstrap import (
     bootstrap_structrr,
     validate_bootstrap_sections,
 )
-from powdrr_lift.structrr.candidate_comparison import compare_candidate_snapshot
 from powdrr_lift.structrr.gate_compiler import (
     compile_proposal_worklist,
     evaluate_structural_proposal_gate,
-)
-from powdrr_lift.structrr.proposal import (
-    ProposalRevision,
-    compile_proposal_revision,
-    load_proposal_revision,
-    validate_proposal_revision,
 )
 from powdrr_lift.structrr.proposal_review import (
     ProposalReviewReceipt,
     load_review_receipt,
     write_review_receipt,
 )
-from powdrr_lift.structrr.source_manifest import SourceManifest
 from powdrr_lift.structrr.validation import (
     DiscoveredValidationProfile,
 )

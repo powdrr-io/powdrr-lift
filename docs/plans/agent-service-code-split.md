@@ -485,7 +485,9 @@ required validation cannot be reported as success. Worker commits remain visible
 1. Migrate every remaining command/module/resource in the inventory: evaluation,
    template operations, changelogs, standalone validation, inspectors, and helpers.
    Update imports and monkeypatch targets explicitly; do not retain monkeypatch
-   compatibility through global `sys.modules` aliases.
+   compatibility through global `sys.modules` aliases. Move Structrr proposal,
+   source-manifest, actual-diff, and candidate-comparison policy into the service;
+   the agent supplies repository evidence and does local collection/materialization.
 2. Remove the legacy-import allowlist and private compatibility shims. An old
    executable entry point may remain as a thin local-composition delegator;
    the public agent package must not depend on it.

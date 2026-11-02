@@ -10,11 +10,6 @@ New product-language APIs belong in this package; this marker is intentionally
 small until each implementation has a clean ownership boundary.
 """
 
-from powdrr_lift.structrr.actual_diff import (
-    ACTUAL_DIFF_SCHEMA_VERSION,
-    StructrrActualDiff,
-    compile_actual_structrr_diff,
-)
 from powdrr_lift.structrr.bootstrap import (
     BOOTSTRAP_SECTION_VERSIONS,
     BootstrapIssue,
@@ -23,11 +18,6 @@ from powdrr_lift.structrr.bootstrap import (
     bootstrap_structrr,
     validate_bootstrap_document,
     validate_bootstrap_sections,
-)
-from powdrr_lift.structrr.candidate_comparison import (
-    CANDIDATE_COMPARISON_SCHEMA_VERSION,
-    CandidateScopeDecision,
-    compare_candidate_snapshot,
 )
 from powdrr_lift.structrr.intent_lineage import (
     INTENT_LINEAGE_HISTORY_SCHEMA,
@@ -53,14 +43,6 @@ from powdrr_lift.structrr.invariant_review import (
     write_invariant_review_receipt,
     write_invariant_review_run,
 )
-from powdrr_lift.structrr.proposal import (
-    PROPOSAL_REVISION_SCHEMA_VERSION,
-    ProposalOperation,
-    ProposalRevision,
-    compile_proposal_revision,
-    load_proposal_revision,
-    validate_proposal_revision,
-)
 from powdrr_lift.structrr.proposal_review import (
     PROPOSAL_REVIEW_RECEIPT_SCHEMA_VERSION,
     ProposalReviewReceipt,
@@ -68,14 +50,6 @@ from powdrr_lift.structrr.proposal_review import (
     compile_review_worklist,
     load_review_receipt,
     write_review_receipt,
-)
-from powdrr_lift.structrr.source_manifest import (
-    SOURCE_EXTRACTOR_VERSION,
-    SOURCE_MANIFEST_SCHEMA_VERSION,
-    SourceFileObservation,
-    SourceManifest,
-    compare_source_manifests,
-    compile_source_manifest,
 )
 from powdrr_lift.structrr.verification_obligations import (
     VERIFICATION_OBLIGATION_SCHEMA_VERSION,
@@ -86,9 +60,6 @@ from powdrr_lift.structrr.verification_obligations import (
 )
 
 __all__ = [
-    "ACTUAL_DIFF_SCHEMA_VERSION",
-    "StructrrActualDiff",
-    "compile_actual_structrr_diff",
     "BootstrapIssue",
     "BootstrapResult",
     "BootstrapValidationReport",
@@ -96,9 +67,6 @@ __all__ = [
     "bootstrap_structrr",
     "validate_bootstrap_sections",
     "validate_bootstrap_document",
-    "CANDIDATE_COMPARISON_SCHEMA_VERSION",
-    "CandidateScopeDecision",
-    "compare_candidate_snapshot",
     "INTENT_LINEAGE_HISTORY_SCHEMA",
     "audit_intent_lineage",
     "INVARIANT_REVIEW_PREDICATE_VERSION",
@@ -119,24 +87,12 @@ __all__ = [
     "review_candidate_invariants",
     "write_invariant_review_run",
     "write_invariant_review_receipt",
-    "PROPOSAL_REVISION_SCHEMA_VERSION",
-    "ProposalOperation",
-    "ProposalRevision",
-    "compile_proposal_revision",
-    "load_proposal_revision",
-    "validate_proposal_revision",
     "PROPOSAL_REVIEW_RECEIPT_SCHEMA_VERSION",
     "ProposalReviewReceipt",
     "build_structural_review_receipt",
     "compile_review_worklist",
     "load_review_receipt",
     "write_review_receipt",
-    "SOURCE_EXTRACTOR_VERSION",
-    "SOURCE_MANIFEST_SCHEMA_VERSION",
-    "SourceFileObservation",
-    "SourceManifest",
-    "compare_source_manifests",
-    "compile_source_manifest",
     "AffectedIntentClosure",
     "VERIFICATION_OBLIGATION_SCHEMA_VERSION",
     "VerificationObligation",

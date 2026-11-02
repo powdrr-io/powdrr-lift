@@ -3,10 +3,10 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from powdrr_lift.structrr.actual_diff import compile_actual_structrr_diff
-from powdrr_lift.structrr.candidate_comparison import compare_candidate_snapshot
-from powdrr_lift.structrr.proposal import compile_proposal_revision
-from powdrr_lift.structrr.source_manifest import (
+from powdrr_service.structrr.actual_diff import compile_actual_structrr_diff
+from powdrr_service.structrr.candidate_comparison import compare_candidate_snapshot
+from powdrr_service.structrr.proposal import compile_proposal_revision
+from powdrr_service.structrr.source_manifest import (
     SourceManifest,
     compile_source_manifest,
 )

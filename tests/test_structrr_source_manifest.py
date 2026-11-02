@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from powdrr_lift.structrr.source_manifest import (
+from powdrr_service.structrr.source_manifest import (
     SourceManifest,
     compare_source_manifests,
     compile_source_manifest,

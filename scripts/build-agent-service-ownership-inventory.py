@@ -13,6 +13,38 @@ from typing import Any
 
 def _owner(path: str) -> tuple[str, str, str]:
     """Assign a first-pass owner and extraction step for one tracked path."""
+    if path.startswith("packages/service/src/powdrr_service/structrr/"):
+        existing_prs = {
+            f"packages/service/src/powdrr_service/structrr/{module}.py": pr
+            for module, pr in {
+                "active_intent": "1228",
+                "obligation_evidence": "1234",
+                "rebase": "1224",
+                "snapshot": "1220",
+                "validation_models": "1233",
+                "verification_health": "1230",
+            }.items()
+        }
+        if path in existing_prs:
+            return (
+                "service",
+                "service-owned Structrr policy and artifact semantics",
+                existing_prs[path],
+            )
+        if path.endswith(
+            (
+                "/proposal.py",
+                "/actual_diff.py",
+                "/candidate_comparison.py",
+                "/source_manifest.py",
+            )
+        ):
+            return (
+                "service",
+                "Structrr proposal, source-manifest, and candidate-comparison policy",
+                "8",
+            )
+        return "service", "service-owned Structrr policy and artifact semantics", "8"
     if path.startswith("src/powdrr_lift/workrr/planning/"):
         if path.endswith(("/source.py", "/evidence.py", "/driver.py")):
             return "split", "service policy; agent evidence collection", "4"
@@ -200,6 +232,7 @@ def main() -> int:
                 "src/powdrr_lift",
                 "packages/service/src/powdrr_service/procedrr",
                 "packages/service/src/powdrr_service/procedrr_evaluator",
+                "packages/service/src/powdrr_service/structrr",
                 "packages/service/src/powdrr_service/resources/processes",
                 "docs/procedrr",
                 "scripts",

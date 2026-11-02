@@ -14,12 +14,12 @@ from powdrr_service.decision_obligation import (
     DecisionWorklist,
     evidence_fingerprint,
 )
+from powdrr_service.structrr.proposal import ProposalRevision
 
 from powdrr_lift.structrr.gate_compiler import (
     compile_proposal_worklist,
     evaluate_structural_proposal_gate,
 )
-from powdrr_lift.structrr.proposal import ProposalRevision
 
 PROPOSAL_REVIEW_RECEIPT_SCHEMA_VERSION = "proposal-review-receipt-v1"
 

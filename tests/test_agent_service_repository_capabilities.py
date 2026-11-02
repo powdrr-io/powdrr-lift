@@ -17,11 +17,11 @@ from powdrr_agent.repository import (
 )
 from powdrr_contracts.models import Artifact, OperationRequest
 from powdrr_local import JsonServiceBridge, LocalPowdrrService
+from powdrr_service.structrr.actual_diff import compile_actual_structrr_diff
+from powdrr_service.structrr.source_manifest import SourceManifest
 
 from powdrr_lift.cli import main as cli_main
-from powdrr_lift.structrr.actual_diff import compile_actual_structrr_diff
 from powdrr_lift.structrr.bootstrap import bootstrap_structrr
-from powdrr_lift.structrr.source_manifest import SourceManifest
 
 
 def _git(root: Path, *args: str) -> str:

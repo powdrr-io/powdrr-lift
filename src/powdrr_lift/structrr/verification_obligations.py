@@ -9,8 +9,9 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
+from powdrr_service.structrr.proposal import ProposalRevision
+
 from powdrr_lift.core.verification_contract import VerificationContract
-from powdrr_lift.structrr.proposal import ProposalRevision
 
 VERIFICATION_OBLIGATION_SCHEMA_VERSION = "verification-obligation-v1"
 

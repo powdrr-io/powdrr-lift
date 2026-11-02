@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from powdrr_service.structrr.source_manifest import SourceManifest
 
 from powdrr_lift.agent_runtime import (
     AgentWorktree,
@@ -28,7 +29,6 @@ from powdrr_lift.structrr.bootstrap import (
     bootstrap_structrr,
     validate_bootstrap_document,
 )
-from powdrr_lift.structrr.source_manifest import SourceManifest
 from powdrr_lift.workrr.run_artifacts import (
     write_json_artifact,
     write_run_report,

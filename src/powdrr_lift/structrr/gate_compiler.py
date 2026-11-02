@@ -11,8 +11,8 @@ from powdrr_service.decision_obligation import (
     DecisionSpecification,
     DecisionWorklist,
 )
+from powdrr_service.structrr.proposal import ProposalRevision
 
-from powdrr_lift.structrr.proposal import ProposalRevision
 from powdrr_lift.structrr.verification_obligations import (
     VerificationObligationCompilation,
 )

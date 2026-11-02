@@ -1,0 +1,197 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1308
+title: Report checkpoint availability in job recovery details
+intent:
+  problem: The recovery review shows checkpoint status as unreported because the workspace job detail API has no recovery assessment.
+  goal: Add a safe, optional checkpoint inspection boundary and expose its availability to the browser without revealing internal checkpoint or worktree references.
+human-decisions: []
+structured_files: []
+files:
+  - path: packages/contracts/src/powdrr_contracts/workspace.py
+    type: modified
+    span: {start_line: 40, end_line: 45}
+    summary: Define checkpoint availability states for job recovery assessments.
+    rationale: Share a constrained status vocabulary between the workspace API and browser contract.
+  - path: packages/contracts/src/powdrr_contracts/workspace.py
+    type: modified
+    span: {start_line: 755, end_line: 785}
+    summary: Add an optional recovery assessment to job detail serialization and parsing.
+    rationale: Carry checkpoint availability through the versioned API while accepting older detail payloads.
+  - path: packages/contracts/src/powdrr_contracts/workspace.py
+    type: modified
+    span: {start_line: 795, end_line: 795}
+    summary: Add recovery data to the job detail model.
+    rationale: Keep recovery status in the canonical job detail projection.
+  - path: packages/contracts/src/powdrr_contracts/workspace.py
+    type: modified
+    span: {start_line: 813, end_line: 813}
+    summary: Serialize optional recovery data in job detail responses.
+    rationale: Return the assessment to the browser when present.
+  - path: packages/contracts/src/powdrr_contracts/workspace.py
+    type: modified
+    span: {start_line: 818, end_line: 828}
+    summary: Parse job detail fields while preserving compatibility with older payloads.
+    rationale: Accept responses created before recovery assessments were added.
+  - path: packages/contracts/src/powdrr_contracts/workspace.py
+    type: modified
+    span: {start_line: 831, end_line: 831}
+    summary: Permit the optional recovery field during contract validation.
+    rationale: Keep strict field validation while supporting the new field.
+  - path: packages/contracts/src/powdrr_contracts/workspace.py
+    type: modified
+    span: {start_line: 868, end_line: 870}
+    summary: Deserialize the optional recovery assessment.
+    rationale: Reconstruct typed recovery status from API payloads.
+  - path: packages/local/src/powdrr_local/workspace_api.py
+    type: modified
+    span: {start_line: 57, end_line: 62}
+    summary: Define an optional checkpoint inspector interface.
+    rationale: Allow an integration to validate checkpoint availability without exposing its internal operation record.
+  - path: packages/local/src/powdrr_local/workspace_api.py
+    type: modified
+    span: {start_line: 418, end_line: 452}
+    summary: Attach a safe checkpoint assessment to failed and interrupted job details.
+    rationale: Report unknown when inspection is unavailable or fails, and translate inspector outcomes into fixed messages.
+  - path: packages/local/src/powdrr_local/workspace_api.py
+    type: modified
+    span: {start_line: 728, end_line: 737}
+    summary: Map checkpoint outcomes to fixed user-facing messages.
+    rationale: Prevent local paths, checkpoint references, or inspector error text from leaking into API responses.
+  - path: packages/local/src/powdrr_local/workspace_api.py
+    type: modified
+    span: {start_line: 6, end_line: 6}
+    summary: Import dataclass replacement support for enriched job details.
+    rationale: Attach recovery status without mutating the stored projection.
+  - path: packages/local/src/powdrr_local/workspace_api.py
+    type: modified
+    span: {start_line: 11, end_line: 11}
+    summary: Add awaitable inspector return typing.
+    rationale: Support synchronous and asynchronous checkpoint inspectors.
+  - path: packages/local/src/powdrr_local/workspace_api.py
+    type: modified
+    span: {start_line: 18, end_line: 18}
+    summary: Import the checkpoint availability contract.
+    rationale: Restrict inspector results to the shared status enum.
+  - path: packages/local/src/powdrr_local/workspace_api.py
+    type: modified
+    span: {start_line: 21, end_line: 21}
+    summary: Import the internal job operation passed to the inspector.
+    rationale: Keep path and checkpoint references inside the local service boundary.
+  - path: packages/local/src/powdrr_local/workspace_api.py
+    type: modified
+    span: {start_line: 25, end_line: 25}
+    summary: Import the public recovery assessment contract.
+    rationale: Return a typed status in job detail responses.
+  - path: packages/local/src/powdrr_local/workspace_api.py
+    type: modified
+    span: {start_line: 227, end_line: 227}
+    summary: Accept the optional checkpoint inspector when installing routes.
+    rationale: Keep the inspection integration optional for existing applications.
+  - path: packages/local/src/powdrr_local/web.py
+    type: modified
+    span: {start_line: 33, end_line: 33}
+    summary: Import the checkpoint inspector interface.
+    rationale: Type the app factory integration boundary.
+  - path: packages/local/src/powdrr_local/web.py
+    type: modified
+    span: {start_line: 67, end_line: 67}
+    summary: Accept an optional checkpoint inspector in the app factory.
+    rationale: Allow deployments to provide checkpoint validation.
+  - path: packages/local/src/powdrr_local/web.py
+    type: modified
+    span: {start_line: 288, end_line: 288}
+    summary: Accept and pass an optional checkpoint inspector through app construction.
+    rationale: Make checkpoint validation configurable at the workspace API boundary.
+  - path: ui/src/api/types.ts
+    type: modified
+    span: {start_line: 92, end_line: 97}
+    summary: Add the recovery assessment to the browser job detail type.
+    rationale: Keep frontend types aligned with the API response while preserving compatibility with older payloads.
+  - path: ui/src/api/types.ts
+    type: modified
+    span: {start_line: 108, end_line: 108}
+    summary: Add the optional recovery field to job detail.
+    rationale: Read new API assessments without requiring them from older servers.
+  - path: ui/src/components/JobStatus.tsx
+    type: modified
+    span: {start_line: 63, end_line: 64}
+    summary: Read checkpoint availability and message from the recovery assessment.
+    rationale: Show the backend assessment in the recovery review and confirmation panels.
+  - path: ui/src/components/JobStatus.test.tsx
+    type: modified
+    span: {start_line: 65, end_line: 65}
+    summary: Expect unknown status when a legacy detail payload has no recovery assessment.
+    rationale: Preserve an honest fallback for older API responses.
+  - path: tests/test_workspace_api.py
+    type: modified
+    span: {start_line: 536, end_line: 583}
+    summary: Verify checkpoint inspection is attached to recovery details without revealing internal references.
+    rationale: Protect the API's privacy boundary and checkpoint status mapping.
+  - path: tests/test_ui_workspace.py
+    type: modified
+    span: {start_line: 384, end_line: 395}
+    summary: Verify recovery detail round-trips and accepts legacy payloads without the new field.
+    rationale: Keep the Python workspace contract backward compatible.
+  - path: docs/design/browser-workspace-api.md
+    type: modified
+    span: {start_line: 123, end_line: 131}
+    summary: Document checkpoint assessment behavior and inspector failure handling.
+    rationale: Specify the safe status vocabulary and clarify that assessment alone does not enable resume.
+  - path: ui/src/components/JobStatus.tsx
+    type: modified
+    span: {start_line: 125, end_line: 125}
+    summary: Display the checkpoint availability status.
+    rationale: Show the specific assessment returned by the workspace API.
+  - path: ui/src/components/JobStatus.tsx
+    type: modified
+    span: {start_line: 129, end_line: 129}
+    summary: Display the fixed user-facing recovery message.
+    rationale: Explain the assessment without exposing checkpoint internals.
+  - path: ui/src/components/JobStatus.tsx
+    type: modified
+    span: {start_line: 131, end_line: 131}
+    summary: Remove the obsolete statement that the API never reports checkpoint status.
+    rationale: Keep recovery instructions aligned with the new response field.
+  - path: ui/src/components/JobStatus.tsx
+    type: modified
+    span: {start_line: 139, end_line: 139}
+    summary: Repeat checkpoint status at the recovery confirmation step.
+    rationale: Keep the user informed before sending an action request.
+  - path: tests/test_ui_workspace.py
+    type: modified
+    span: {start_line: 10, end_line: 10}
+    summary: Import the checkpoint status enum in contract tests.
+    rationale: Build typed recovery assessment test values.
+  - path: tests/test_ui_workspace.py
+    type: modified
+    span: {start_line: 35, end_line: 35}
+    summary: Import the recovery assessment contract in contract tests.
+    rationale: Verify contract serialization behavior.
+  - path: tests/test_workspace_api.py
+    type: modified
+    span: {start_line: 9, end_line: 10}
+    summary: Import the checkpoint enum and job state used by API tests.
+    rationale: Set up and assert recovery inspection scenarios.
+  - path: tests/test_workspace_api.py
+    type: modified
+    span: {start_line: 24, end_line: 26}
+    summary: Allow API test setup to inject a checkpoint inspector.
+    rationale: Exercise configured and unconfigured inspection boundaries.
+  - path: tests/test_workspace_api.py
+    type: modified
+    span: {start_line: 36, end_line: 41}
+    summary: Forward the test checkpoint inspector to the app factory.
+    rationale: Wire the test integration as production code does.
+entities: []
+entity_relationships: []
+invariants:
+  - id: checkpoint-inspection-is-private
+    description: The browser-facing recovery assessment never includes the stored checkpoint reference, worktree path, or raw inspector error text.
+    action: added
+  - id: checkpoint-status-is-conservative
+    description: Recovery details report unknown when checkpoint validation is not configured or fails.
+    action: added
+  - id: checkpoint-status-does-not-enable-resume
+    description: A checkpoint availability assessment does not add a resume action; available actions remain controlled by the backend job state.
+    action: added
+guidance: []

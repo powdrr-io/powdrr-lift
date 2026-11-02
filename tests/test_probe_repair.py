@@ -7,8 +7,7 @@ from typing import Any
 
 from powdrr_service import decision_classifier as jev_classifier
 from powdrr_service.behavior_contract import BEHAVIOR_DIMENSIONS
-
-from powdrr_lift.workrr import probe_repair
+from powdrr_service.verification import probe_repair
 
 
 class RepairClient:
@@ -78,7 +77,7 @@ def test_probe_repair_revises_only_flagged_scenario_after_faithfulness(
         client,
         instruction="Deferred fields merge at the path given.",
         scenarios=(_scenario(),),
-        contract_directory=tmp_path,
+        faithfulness_evidence={},
         ledger_clauses=(
             {
                 "clause_id": "instruction-001",
@@ -143,7 +142,7 @@ def test_probe_repair_adds_related_source_and_typed_obligation_guidance(
         client,
         instruction=instruction,
         scenarios=(scenario,),
-        contract_directory=tmp_path,
+        faithfulness_evidence={},
         ledger_clauses=source_clauses,
         faithfulness_client=client,
     )
@@ -283,7 +282,7 @@ def test_probe_repair_discards_candidate_rejected_by_faithfulness(
         client,
         instruction="Deferred fields merge at the path given.",
         scenarios=(_scenario(),),
-        contract_directory=tmp_path,
+        faithfulness_evidence={},
         ledger_clauses=(),
         faithfulness_client=client,
     )
@@ -361,7 +360,7 @@ def test_probe_repair_retries_rejected_claim_with_review_feedback(
         client,
         instruction="Deferred fields merge at the path given.",
         scenarios=(_scenario(),),
-        contract_directory=tmp_path,
+        faithfulness_evidence={},
         ledger_clauses=(
             {
                 "clause_id": "instruction-001",
@@ -394,7 +393,7 @@ def test_probe_repair_records_empty_response_as_partial_not_failure(
         client,
         instruction="Deferred fields merge at the path given.",
         scenarios=(_scenario(),),
-        contract_directory=tmp_path,
+        faithfulness_evidence={},
         ledger_clauses=(),
         faithfulness_client=client,
     )
@@ -448,7 +447,7 @@ def test_probe_repair_keeps_valid_revisions_from_partial_batches(
         client,
         instruction="Deferred fields merge at the path given.",
         scenarios=scenarios,
-        contract_directory=tmp_path,
+        faithfulness_evidence={},
         ledger_clauses=(),
         faithfulness_client=client,
     )
@@ -488,7 +487,7 @@ def test_probe_repair_marks_failed_response_unavailable(
         FailedClient(),
         instruction="Deferred fields merge at the path given.",
         scenarios=(_scenario(),),
-        contract_directory=tmp_path,
+        faithfulness_evidence={},
         ledger_clauses=(),
         faithfulness_client=None,
     )
@@ -515,7 +514,7 @@ def test_probe_repair_keeps_original_when_revision_fails_validation(
         client,
         instruction="Deferred fields merge at the path given.",
         scenarios=(_scenario(),),
-        contract_directory=tmp_path,
+        faithfulness_evidence={},
         ledger_clauses=(),
         faithfulness_client=client,
     )
@@ -661,7 +660,6 @@ def test_faithfulness_recheck_accepts_canonicalized_original_scenario(
             "scenario_id": "instruction-001",
             "subject": "The source instruction",
             "faithfulness_ref": {
-                "artifact_path": str(artifact_path),
                 "fingerprint": fingerprint,
             },
         },
@@ -670,7 +668,15 @@ def test_faithfulness_recheck_accepts_canonicalized_original_scenario(
             "subject": "The source instruction",
             "then": "Revised supported claim.",
         },
-        contract_directory=tmp_path,
+        faithfulness_evidence={
+            "instruction-001": {
+                "faithfulness_artifact": {
+                    **artifact_body,
+                    "fingerprint": fingerprint,
+                },
+                "partial_contract": {},
+            }
+        },
         ledger_clauses=(),
         client=CategorizerClient(),
         detail_client=DetailClient(),

@@ -14,7 +14,13 @@ from pathlib import Path
 from typing import Any, cast
 
 import yaml
-from powdrr_local import create_miniswe_inference_handler
+from powdrr_contracts.models import OperationRequest
+from powdrr_contracts.service import PowdrrService
+from powdrr_local import (
+    JsonServiceBridge,
+    LocalPowdrrService,
+    create_miniswe_inference_handler,
+)
 from powdrr_service.behavior_contract import (
     behavior_scenario_probe_findings,
     compile_behavior_scenarios,
@@ -142,7 +148,6 @@ from powdrr_lift.workrr.postrun_probes import (
     required_probe_coverage_gaps,
     run_postrun_probes,
 )
-from powdrr_lift.workrr.probe_repair import repair_behavior_probes
 from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
 from powdrr_lift.workrr.procedrr_operations import WorkrrOperationExecutor
 from powdrr_lift.workrr.protocol import WorkflowLLMClient
@@ -162,6 +167,48 @@ from procedrr_evaluator.evaluator import EvaluationError
 from procedrr_evaluator.runtime import ProcedrrExecutionService
 
 Runner = Callable[..., subprocess.CompletedProcess[str]]
+
+
+def _load_probe_faithfulness_evidence(
+    scenarios: Sequence[Mapping[str, Any]], contract_directory: Path
+) -> tuple[list[dict[str, Any]], dict[str, dict[str, Any]]]:
+    """Load local faithfulness files and strip filesystem paths before RPC."""
+    service_scenarios: list[dict[str, Any]] = []
+    evidence: dict[str, dict[str, Any]] = {}
+    resolved_contract_root = contract_directory.resolve()
+    for raw_scenario in scenarios:
+        scenario = dict(raw_scenario)
+        scenario_id = str(scenario.get("scenario_id", ""))
+        reference = scenario.get("faithfulness_ref")
+        if isinstance(reference, Mapping):
+            artifact_path = reference.get("artifact_path")
+            if isinstance(artifact_path, str):
+                try:
+                    artifact = json.loads(
+                        Path(artifact_path).read_text(encoding="utf-8")
+                    )
+                    if isinstance(artifact, Mapping):
+                        source_ref = artifact.get("source_ref")
+                        if isinstance(source_ref, str) and source_ref:
+                            contract_path = (
+                                resolved_contract_root
+                                / source_ref
+                                / "partial-contract.json"
+                            ).resolve()
+                            if contract_path.is_relative_to(resolved_contract_root):
+                                contract = json.loads(
+                                    contract_path.read_text(encoding="utf-8")
+                                )
+                                if isinstance(contract, Mapping):
+                                    evidence[scenario_id] = {
+                                        "faithfulness_artifact": dict(artifact),
+                                        "partial_contract": dict(contract),
+                                    }
+                except (OSError, json.JSONDecodeError, ValueError):
+                    pass
+            scenario["faithfulness_ref"] = {"fingerprint": reference.get("fingerprint")}
+        service_scenarios.append(scenario)
+    return service_scenarios, evidence
 
 
 @dataclass(frozen=True, slots=True)
@@ -184,6 +231,10 @@ class FeatureEndpointConfig:
     push_changes: bool = True
     cleanup_temporary_artifacts: bool = False
     planning_client: WorkflowLLMClient | None = None
+    verification_service: PowdrrService | None = None
+    verification_provider: str = "auto"
+    verification_model: str | None = None
+    verification_base_url: str | None = None
     progress_callback: Callable[[str], None] | None = None
     task_id: str | None = None
     design_only: bool = False
@@ -2673,7 +2724,6 @@ def _run_code_agent_phase(
             implementation_packet, contract_closure=dict(closure)
         )
     if implementation_packet.behavior_scenarios:
-        repair_client = state.get("probe_generation_client")
         ledger_clauses: Sequence[Mapping[str, Any]] = ()
         ledger_path = state.get("instruction_ledger_path")
         if isinstance(ledger_path, Path) and ledger_path.is_file():
@@ -2690,24 +2740,92 @@ def _run_code_agent_phase(
                     ledger_clauses = tuple(raw_clauses)
             except (OSError, json.JSONDecodeError):
                 ledger_clauses = ()
-        repaired_scenarios, repair_artifact = repair_behavior_probes(
-            cast(WorkflowLLMClient | None, repair_client),
-            instruction=feature_description,
-            scenarios=tuple(
-                item.to_data() for item in implementation_packet.behavior_scenarios
-            ),
-            contract_directory=output_root / "semantic-contracts",
-            ledger_clauses=ledger_clauses,
-            faithfulness_client=cast(
-                WorkflowLLMClient | None,
-                state.get("scenario_claim_faithfulness_client"),
-            ),
-            faithfulness_detail_client=cast(
-                WorkflowLLMClient | None,
-                state.get("probe_generation_client"),
-            ),
-            repository_contract=implementation_packet.contract_closure,
+        original_scenarios = tuple(
+            item.to_data() for item in implementation_packet.behavior_scenarios
         )
+        repair_scenarios, faithfulness_evidence = _load_probe_faithfulness_evidence(
+            original_scenarios,
+            output_root / "semantic-contracts",
+        )
+        repair_request_body = {
+            "instruction": feature_description,
+            "scenarios": repair_scenarios,
+            "faithfulness_evidence": faithfulness_evidence,
+            "ledger_clauses": list(ledger_clauses),
+            "repository_contract": dict(implementation_packet.contract_closure or {}),
+            "provider": config.verification_provider,
+            "model": config.verification_model,
+            "base_url": config.verification_base_url,
+        }
+        repair_request_body = {
+            key: value
+            for key, value in repair_request_body.items()
+            if value is not None
+        }
+        repair_operation = OperationRequest(
+            request_id="behavior-probe-repair-"
+            + content_fingerprint(repair_request_body),
+            operation_kind="verification_health",
+            inputs={"verification": "behavior_probe_repair", **repair_request_body},
+        )
+        update = JsonServiceBridge(
+            config.verification_service or LocalPowdrrService()
+        ).start(repair_operation)
+        if update.status == "succeeded" and update.output_artifacts:
+            repair_document = json.loads(update.output_artifacts[0].data)
+            raw_repaired_scenarios = repair_document.get("scenarios")
+            repair_artifact = repair_document.get("report", {})
+            if (
+                not isinstance(repair_artifact, dict)
+                or not isinstance(raw_repaired_scenarios, list)
+                or not all(isinstance(item, Mapping) for item in raw_repaired_scenarios)
+            ):
+                repair_artifact = {
+                    "status": "unavailable",
+                    "error": "service returned a malformed report",
+                }
+                repaired_scenarios = original_scenarios
+            else:
+                repaired_scenarios = tuple(
+                    cast(dict[str, Any], item) for item in raw_repaired_scenarios
+                )
+            original_by_id = {
+                str(item.get("scenario_id", "")): item for item in original_scenarios
+            }
+
+            def restore_faithfulness_reference(
+                item: Mapping[str, Any],
+            ) -> dict[str, Any]:
+                restored = dict(item)
+                original = original_by_id.get(str(item.get("scenario_id", "")), {})
+                if "faithfulness_ref" in original:
+                    restored["faithfulness_ref"] = original["faithfulness_ref"]
+                return restored
+
+            repaired_scenarios = tuple(
+                restore_faithfulness_reference(item) for item in repaired_scenarios
+            )
+            for field in ("original_scenarios", "used_scenarios"):
+                report_scenarios = repair_artifact.get(field)
+                if isinstance(report_scenarios, list) and all(
+                    isinstance(item, Mapping) for item in report_scenarios
+                ):
+                    repair_artifact[field] = [
+                        restore_faithfulness_reference(item)
+                        for item in report_scenarios
+                    ]
+        else:
+            repaired_scenarios = original_scenarios
+            repair_artifact = {
+                "status": "unavailable",
+                "error": (
+                    update.failure.message
+                    if update.failure is not None
+                    else "verification service returned no repair artifact"
+                ),
+                "original_scenarios": list(original_scenarios),
+                "used_scenarios": list(original_scenarios),
+            }
         if (
             tuple(item.to_data() for item in implementation_packet.behavior_scenarios)
             != repaired_scenarios

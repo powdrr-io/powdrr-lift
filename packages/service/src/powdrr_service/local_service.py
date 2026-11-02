@@ -36,10 +36,12 @@ class LocalPowdrrService:
         planning_issue_store: Any | None = None,
         inference_client: InferenceClient | None = None,
         quality_review_clients: tuple[Any, Any] | None = None,
+        probe_repair_clients: tuple[Any, Any] | None = None,
     ) -> None:
         self._planning_issue_store = planning_issue_store
         self._inference_client = inference_client or DeepInfraInferenceClient()
         self._quality_review_clients = quality_review_clients
+        self._probe_repair_clients = probe_repair_clients
 
     def start(self, request: OperationRequest) -> OperationUpdate:
         if request.operation_kind == "review_feedback":
@@ -127,11 +129,13 @@ class LocalPowdrrService:
         )
 
     def _verification_health(self, request: OperationRequest) -> OperationUpdate:
+        verification = request.inputs.get("verification")
+        if verification == "behavior_probe_repair":
+            return self._behavior_probe_repair(request)
         from powdrr_service.verification.execute_pr_test_quality import (
             review_execute_pr_test_quality,
         )
 
-        verification = request.inputs.get("verification")
         evidence = request.inputs.get("suite_evidence")
         provider = request.inputs.get("provider")
         model = request.inputs.get("model")
@@ -265,6 +269,124 @@ class LocalPowdrrService:
             output_artifacts=(
                 Artifact(
                     artifact_id="verification/execute-pr-test-quality.json",
+                    media_type="application/vnd.powdrr.verification-health+json",
+                    data=payload,
+                ),
+            ),
+        )
+
+    def _behavior_probe_repair(self, request: OperationRequest) -> OperationUpdate:
+        from powdrr_service.verification.probe_repair import repair_behavior_probes
+
+        inputs = request.inputs
+        instruction = inputs.get("instruction")
+        scenarios = inputs.get("scenarios")
+        faithfulness_evidence = inputs.get("faithfulness_evidence", {})
+        ledger_clauses = inputs.get("ledger_clauses", [])
+        repository_contract = inputs.get("repository_contract", {})
+        provider = inputs.get("provider")
+        model = inputs.get("model")
+        if not isinstance(instruction, str) or not isinstance(scenarios, list):
+            return _failed(
+                request.request_id,
+                "invalid_probe_repair_input",
+                "instruction and scenarios are required.",
+            )
+        if not all(isinstance(item, dict) for item in scenarios):
+            return _failed(
+                request.request_id,
+                "invalid_probe_repair_input",
+                "scenarios must contain JSON objects.",
+            )
+        if (
+            not isinstance(faithfulness_evidence, dict)
+            or not isinstance(ledger_clauses, list)
+            or not all(isinstance(item, dict) for item in ledger_clauses)
+        ):
+            return _failed(
+                request.request_id,
+                "invalid_probe_repair_input",
+                "faithfulness_evidence and ledger_clauses have invalid shapes.",
+            )
+        if not isinstance(repository_contract, dict):
+            return _failed(
+                request.request_id,
+                "invalid_probe_repair_input",
+                "repository_contract must be an object.",
+            )
+        if (
+            not isinstance(provider, str)
+            or not provider
+            or not isinstance(model, str)
+            or not model
+        ):
+            return _failed(
+                request.request_id,
+                "invalid_review_configuration",
+                "provider and model must be non-empty strings.",
+            )
+
+        try:
+            if self._probe_repair_clients is None:
+                from powdrr_service.decision_classifier import (
+                    JevSemanticClassifierClient,
+                )
+                from powdrr_service.providers.clients import build_provider_client
+                from powdrr_service.providers.credentials import (
+                    resolve_provider_credentials,
+                )
+                from powdrr_service.providers.selection import (
+                    initial_model_for_provider,
+                    resolve_provider,
+                )
+
+                base_url = inputs.get("base_url")
+                if base_url is not None and not isinstance(base_url, str):
+                    raise ValueError("base_url must be a string")
+                provider = resolve_provider(provider, model)
+                model = initial_model_for_provider(provider, model)
+                credentials = resolve_provider_credentials(
+                    provider,
+                    base_url_override=base_url,
+                )
+                llm_client = build_provider_client(
+                    provider=provider,
+                    model=model,
+                    api_key=credentials.api_key,
+                    base_url=credentials.base_url,
+                    progress_stream=None,
+                )
+                jev_client = JevSemanticClassifierClient(llm_client, fail_closed=True)
+            else:
+                jev_client, llm_client = self._probe_repair_clients
+            revised, report = repair_behavior_probes(
+                llm_client,
+                instruction=instruction,
+                scenarios=scenarios,
+                faithfulness_evidence=faithfulness_evidence,
+                ledger_clauses=ledger_clauses,
+                faithfulness_client=jev_client,
+                faithfulness_detail_client=llm_client,
+                repository_contract=repository_contract,
+            )
+            result = {"scenarios": list(revised), "report": report}
+        except Exception as exc:
+            return _failed(request.request_id, "probe_repair_failed", str(exc))
+
+        payload = json.dumps(result, sort_keys=True, separators=(",", ":")).encode()
+        return OperationUpdate(
+            operation_id=request.request_id,
+            revision=1,
+            status="succeeded",
+            progress=(
+                {
+                    "phase": "verification_review_completed",
+                    "profile": "behavior_probe_repair",
+                },
+            ),
+            output_artifacts=(
+                Artifact(
+                    artifact_id="verification/behavior-probe-repair.json",
                     media_type="application/vnd.powdrr.verification-health+json",
                     data=payload,
                 ),

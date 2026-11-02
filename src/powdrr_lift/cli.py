@@ -5863,6 +5863,11 @@ def _run_implement(args: argparse.Namespace) -> int:
         open_pr=False,
         push_changes=False,
         planning_client=planning_client,
+        verification_provider=planning_mapping.provider,
+        verification_model=planning_mapping.model,
+        verification_base_url=getattr(
+            planning_credentials, "base_url", args.planning_base_url
+        ),
         task_id=work_item_name,
         uncertainty_policy="normative_default",
         max_repair_attempts=args.max_repair_attempts,
@@ -5950,6 +5955,13 @@ def _run_workrr_feature(args: argparse.Namespace) -> int:
                 output_root=args.output_root,
                 open_pr=not args.no_open_pr,
                 planning_client=planning_client,
+                verification_provider=planning_mapping.provider,
+                verification_model=args.planning_model or planning_mapping.model,
+                verification_base_url=(
+                    getattr(planning_credentials, "base_url", args.planning_base_url)
+                    if planning_client is not None
+                    else None
+                ),
                 task_id=args.task_id or args.work_item_name,
             )
         )
@@ -6099,6 +6111,13 @@ def _run_harbor_feature_with_streams(
             push_changes=False,
             cleanup_temporary_artifacts=True,
             planning_client=planning_client,
+            verification_provider=planning_mapping.provider,
+            verification_model=args.planning_model or planning_mapping.model,
+            verification_base_url=(
+                getattr(planning_credentials, "base_url", args.planning_base_url)
+                if planning_client is not None
+                else None
+            ),
             progress_callback=(
                 None
                 if args.json

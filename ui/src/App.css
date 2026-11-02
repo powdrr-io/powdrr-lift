@@ -274,6 +274,10 @@
 .job-status__dependencies li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 11px; background: var(--control); border: 1px solid var(--line); border-radius: 7px; font-size: 10px; }
 .job-status__dependencies button { min-width: 0; overflow: hidden; padding: 0; color: var(--accent); background: transparent; border: 0; font: inherit; text-align: left; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
 .job-status__outputs code { display: block; padding: 10px 12px; color: var(--code-ink); background: var(--code-bg); border-radius: 7px; font: 10px var(--mono); overflow-wrap: anywhere; }
+.job-status__outputs li { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; min-width: 0; padding: 10px 12px; background: var(--control); border: 1px solid var(--line); border-radius: 7px; }
+.job-output__kind { color: var(--muted); font-size: 9px; font-weight: 600; }
+.job-status__outputs a { max-width: 100%; color: var(--accent); font: 10px var(--mono); overflow-wrap: anywhere; text-decoration: underline; text-underline-offset: 2px; }
+.job-output__status-note { margin: 8px 0 0; color: var(--muted); font-size: 9px; line-height: 1.45; }
 .job-timeline__list { display: flex; flex-direction: column; gap: 8px; padding: 0; margin: 0; list-style: none; }
 .job-timeline__item { display: flex; align-items: flex-start; gap: 10px; }
 .job-timeline__marker { width: 7px; height: 7px; flex: 0 0 7px; margin: 12px 0 0 3px; background: var(--quiet); border: 2px solid var(--control); border-radius: 50%; box-shadow: 0 0 0 1px var(--line-dark); }

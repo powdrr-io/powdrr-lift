@@ -1,4 +1,5 @@
 import type { Conversation, WorkspaceJob, WorkspaceJobAction, WorkspaceJobDetail } from '../api/types'
+import { ArtifactLinks } from './ArtifactLinks'
 import { JobTimeline } from './JobTimeline'
 
 const stateLabels: Record<WorkspaceJobDetail['job']['state'], string> = {
@@ -162,14 +163,7 @@ export function JobStatus({
 
         {(detail.attempts.length > 0 || detail.stage || job.detail) && <JobTimeline detail={detail} />}
 
-        {detail.outputs.length > 0 && (
-          <section className="job-status__section">
-            <h2>Outputs</h2>
-            <ul className="job-status__outputs">
-              {detail.outputs.map((output) => <li key={output}><code>{output}</code></li>)}
-            </ul>
-          </section>
-        )}
+        <ArtifactLinks outputs={detail.outputs} />
 
         {!job.detail && !detail.stage && !detail.question && detail.blockers.length === 0 && !detail.latest_attempt && detail.outputs.length === 0 && (
           <p className="job-status__empty">Status details will appear here as work progresses.</p>

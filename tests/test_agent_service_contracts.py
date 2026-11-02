@@ -266,6 +266,41 @@ def test_changelog_validation_policy_is_service_owned_without_agent_imports() ->
     assert not hasattr(agent_validation, "_validate_v2_state_change")
 
 
+def test_system_specification_validation_policy_is_service_owned() -> None:
+    from powdrr_service.specifications.system import (
+        build_system_specification_validation_report,
+    )
+
+    import powdrr_lift
+    import powdrr_lift.core as core
+    import powdrr_lift.core.system_specification as agent_system_specification
+
+    repository = Path(__file__).parents[1]
+    validator = (
+        repository / "packages/service/src/powdrr_service/specifications/system.py"
+    )
+    tree = ast.parse(validator.read_text(encoding="utf-8"))
+    imports: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            imports.update(alias.name.split(".")[0] for alias in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            imports.add(node.module.split(".")[0])
+
+    assert "powdrr_lift" not in imports
+    assert not hasattr(agent_system_specification, "_validate_section_item")
+    assert not hasattr(agent_system_specification, "_collect_section_items")
+    assert not hasattr(
+        agent_system_specification, "build_system_specification_validation_report"
+    )
+    assert core.build_system_specification_validation_report is (
+        build_system_specification_validation_report
+    )
+    assert powdrr_lift.build_system_specification_validation_report is (
+        build_system_specification_validation_report
+    )
+
+
 def test_legacy_service_imports_are_explicitly_owned() -> None:
     repository = Path(__file__).parents[1]
     allowlist = json.loads(

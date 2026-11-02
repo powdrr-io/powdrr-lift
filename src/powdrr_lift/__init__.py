@@ -242,6 +242,12 @@ def __getattr__(name: str) -> Any:
         "search_proposed_pr_specifications",
         "show_proposed_pr_specification",
     }:
+        from powdrr_service.specifications.system import (
+            SystemSpecificationValidationIssue,
+            SystemSpecificationValidationReport,
+            build_system_specification_validation_report,
+        )
+
         from powdrr_lift.core.architecture_specification import (
             ArchitectureSpecificationValidationIssue,
             ArchitectureSpecificationValidationReport,
@@ -291,9 +297,6 @@ def __getattr__(name: str) -> Any:
             validate_pr_specification_yaml,
         )
         from powdrr_lift.core.system_specification import (
-            SystemSpecificationValidationIssue,
-            SystemSpecificationValidationReport,
-            build_system_specification_validation_report,
             create_system_specification_template,
             render_system_specification_template,
             system_specification_default_output_path,

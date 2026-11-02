@@ -84,6 +84,12 @@ def _owner(path: str) -> tuple[str, str, str]:
             "service-owned changelog parsing, rendering, and validation policy",
             "8",
         )
+    if path.startswith("packages/service/src/powdrr_service/specifications/"):
+        return (
+            "service",
+            "service-owned structured specification validation policy",
+            "8",
+        )
     if path.startswith("packages/service/src/powdrr_service/resources/evaluations/"):
         return "service", "bundled private evaluation rubric", "8"
     if path.startswith(
@@ -266,6 +272,7 @@ def main() -> int:
                 "packages/service/src/powdrr_service/evaluations",
                 "packages/service/src/powdrr_service/planning",
                 "packages/service/src/powdrr_service/changelog",
+                "packages/service/src/powdrr_service/specifications",
                 "packages/service/src/powdrr_service/procedrr",
                 "packages/service/src/powdrr_service/procedrr_evaluator",
                 "packages/service/src/powdrr_service/structrr",

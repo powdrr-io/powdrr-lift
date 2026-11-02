@@ -1,0 +1,64 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1318
+title: Set browser workspace cache policies
+intent:
+  problem: The packaged workspace relies on default static and API cache behavior, so app updates may be stale and sensitive API responses may be retained by browsers or intermediaries.
+  goal: Revalidate the app shell, cache fingerprinted assets immutably, and mark every API response as non-storable.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/design/browser-workspace-api.md
+    type: modified
+    span: {start_line: 22, end_line: 24}
+    summary: Document static asset and API cache behavior.
+    rationale: Make the browser update and response retention contract explicit.
+  - path: packages/local/src/powdrr_local/web.py
+    type: modified
+    span: {start_line: 8, end_line: 9}
+    summary: Import path and regular expression helpers for static asset caching.
+    rationale: Identify fingerprinted asset filenames when serving frontend files.
+  - path: packages/local/src/powdrr_local/web.py
+    type: modified
+    span: {start_line: 29, end_line: 29}
+    summary: Import the ASGI scope type for the static file response override.
+    rationale: Preserve the Starlette response method interface.
+  - path: packages/local/src/powdrr_local/web.py
+    type: modified
+    span: {start_line: 47, end_line: 69}
+    summary: Set revalidation headers on app shell files and immutable caching on fingerprinted assets.
+    rationale: Ensure clients discover new app builds while safely reusing content-addressed assets.
+  - path: packages/local/src/powdrr_local/web.py
+    type: modified
+    span: {start_line: 155, end_line: 162}
+    summary: Set no-store on every API response.
+    rationale: Prevent browsers and intermediaries from retaining session, health, event, or workspace data responses.
+  - path: packages/local/src/powdrr_local/web.py
+    type: modified
+    span: {start_line: 334, end_line: 334}
+    summary: Serve frontend files with the workspace cache policy.
+    rationale: Apply app shell and hashed asset caching to packaged UI responses.
+  - path: tests/test_workspace_api.py
+    type: modified
+    span: {start_line: 58, end_line: 58}
+    summary: Use a fingerprinted JavaScript asset in the static hosting test.
+    rationale: Exercise the immutable asset policy against a Vite-style filename.
+  - path: tests/test_workspace_api.py
+    type: modified
+    span: {start_line: 63, end_line: 73}
+    summary: Verify app shell revalidation, immutable asset caching, and API no-store behavior.
+    rationale: Protect the expected cache headers for static and API responses.
+  - path: tests/test_workspace_api.py
+    type: modified
+    span: {start_line: 83, end_line: 83}
+    summary: Verify session bootstrap responses are not cached.
+    rationale: Ensure session credentials and CSRF values are not retained in caches.
+entities: []
+entity_relationships: []
+invariants:
+  - id: workspace-fingerprinted-assets-are-immutable
+    description: Fingerprinted files served from the Vite assets directory receive a one-year immutable cache policy while the app shell must be revalidated.
+    action: added
+  - id: workspace-api-responses-are-not-stored
+    description: Every response under the workspace API path receives Cache-Control no-store, including session and error responses.
+    action: added
+guidance: []

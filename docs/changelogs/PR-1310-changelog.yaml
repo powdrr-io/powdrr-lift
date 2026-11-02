@@ -1,0 +1,241 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1310
+title: Move DeepSWE evaluation policy into service
+intent:
+  problem: DeepSWE prompt/probe evaluation and prompt-to-benchmark comparison logic, including the default state-data
+    rubric, still shipped from the agent source tree and documentation path.
+  goal: Package evaluation policy and its bundled default rubric with the service, update CLI and tests to use service
+    imports, and document the new resource location.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 999
+    end_line: 1000
+  summary: Assign DeepSWE evaluation policy and its default rubric to the service package.
+  rationale: Keep the ownership inventory aligned with the package move and new import edges.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 1011
+    end_line: 1011
+  summary: Assign DeepSWE evaluation policy and its default rubric to the service package.
+  rationale: Keep the ownership inventory aligned with the package move and new import edges.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 1015
+    end_line: 1017
+  summary: Assign DeepSWE evaluation policy and its default rubric to the service package.
+  rationale: Keep the ownership inventory aligned with the package move and new import edges.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2660
+    end_line: 2660
+  summary: Assign DeepSWE evaluation policy and its default rubric to the service package.
+  rationale: Keep the ownership inventory aligned with the package move and new import edges.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2663
+    end_line: 2665
+  summary: Assign DeepSWE evaluation policy and its default rubric to the service package.
+  rationale: Keep the ownership inventory aligned with the package move and new import edges.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2669
+    end_line: 2669
+  summary: Assign DeepSWE evaluation policy and its default rubric to the service package.
+  rationale: Keep the ownership inventory aligned with the package move and new import edges.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2672
+    end_line: 2674
+  summary: Assign DeepSWE evaluation policy and its default rubric to the service package.
+  rationale: Keep the ownership inventory aligned with the package move and new import edges.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3166
+    end_line: 3166
+  summary: Assign DeepSWE evaluation policy and its default rubric to the service package.
+  rationale: Keep the ownership inventory aligned with the package move and new import edges.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3168
+    end_line: 3168
+  summary: Assign DeepSWE evaluation policy and its default rubric to the service package.
+  rationale: Keep the ownership inventory aligned with the package move and new import edges.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3171
+    end_line: 3173
+  summary: Assign DeepSWE evaluation policy and its default rubric to the service package.
+  rationale: Keep the ownership inventory aligned with the package move and new import edges.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3713
+    end_line: 3730
+  summary: Assign DeepSWE evaluation policy and its default rubric to the service package.
+  rationale: Keep the ownership inventory aligned with the package move and new import edges.
+- path: docs/evaluations/deepswe-design-evaluation.md
+  type: modified
+  span:
+    start_line: 71
+    end_line: 71
+  summary: Update the evaluation guide to use the service-packaged default rubric.
+  rationale: Keep the documented CLI invocation valid after relocating the rubric.
+- path: docs/evaluations/deepswe-python-statemachine-backward-example.md
+  type: modified
+  span:
+    start_line: 26
+    end_line: 26
+  summary: Point the rubric reference at its service resource location.
+  rationale: Preserve the task-design reference after moving the default rubric into the service distribution.
+- path: docs/plans/agent-service-code-split.md
+  type: modified
+  span:
+    start_line: 493
+    end_line: 494
+  summary: Add evaluation policy and its bundled rubric to the service ownership work.
+  rationale: Make the final ownership plan reflect this completed extraction slice.
+- path: docs/plans/prompt-grader-and-benchmark-feedback-plan.md
+  type: modified
+  span:
+    start_line: 40
+    end_line: 40
+  summary: Update the prompt grader plan to point to the packaged state-data rubric.
+  rationale: Keep the source inventory in the plan current.
+- path: docs/plans/solution-grounded-prompt-improvement.md
+  type: modified
+  span:
+    start_line: 51
+    end_line: 51
+  summary: Update the grounding plan to point to the packaged state-data rubric.
+  rationale: Keep the benchmark reference aligned with the new resource path.
+- path: packages/service/src/powdrr_service/evaluations/__init__.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 1
+  summary: Create the service evaluation-policy package.
+  rationale: Give the moved design, probe, and benchmark evaluators a clear service-owned namespace.
+- path: packages/service/src/powdrr_service/evaluations/deepswe_design_evaluation.py
+  type: renamed
+  span:
+    start_line: 1
+    end_line: 1018
+  summary: Move DeepSWE design and worker-prompt evaluation into the service package.
+  rationale: Keep rubric interpretation and scoring policy with the proprietary service code.
+- path: packages/service/src/powdrr_service/evaluations/prompt_benchmark_comparison.py
+  type: renamed
+  span:
+    start_line: 1
+    end_line: 446
+  summary: Move prompt-score versus benchmark-validation comparison into the service package.
+  rationale: Keep comparison and shortcoming attribution policy with service evaluation.
+- path: scripts/build-agent-service-ownership-inventory.py
+  type: modified
+  span:
+    start_line: 71
+    end_line: 74
+  summary: Discover and classify service evaluation modules and rubric resources in the ownership inventory.
+  rationale: Make subsequent inventory runs include the new package paths.
+- path: scripts/build-agent-service-ownership-inventory.py
+  type: modified
+  span:
+    start_line: 252
+    end_line: 252
+  summary: Discover and classify service evaluation modules and rubric resources in the ownership inventory.
+  rationale: Make subsequent inventory runs include the new package paths.
+- path: scripts/build-agent-service-ownership-inventory.py
+  type: modified
+  span:
+    start_line: 256
+    end_line: 256
+  summary: Discover and classify service evaluation modules and rubric resources in the ownership inventory.
+  rationale: Make subsequent inventory runs include the new package paths.
+- path: scripts/build-agent-service-ownership-inventory.py
+  type: modified
+  span:
+    start_line: 276
+    end_line: 276
+  summary: Discover and classify service evaluation modules and rubric resources in the ownership inventory.
+  rationale: Make subsequent inventory runs include the new package paths.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 32
+    end_line: 46
+  summary: Import evaluation functions and the default rubric from the service package.
+  rationale: Keep CLI entry points working through the new module boundary.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 196
+    end_line: 206
+  summary: Import evaluation functions and the default rubric from the service package.
+  rationale: Keep CLI entry points working through the new module boundary.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 258
+    end_line: 261
+  summary: Import evaluation functions and the default rubric from the service package.
+  rationale: Keep CLI entry points working through the new module boundary.
+- path: tests/test_agent_service_contracts.py
+  type: modified
+  span:
+    start_line: 258
+    end_line: 291
+  summary: Update evaluation tests to import service-owned policy and verify its default rubric is present.
+  rationale: Preserve behavioral coverage and guard the package boundary after the move.
+- path: tests/test_deepswe_design_evaluation.py
+  type: modified
+  span:
+    start_line: 10
+    end_line: 11
+  summary: Update evaluation tests to import service-owned policy and verify its default rubric is present.
+  rationale: Preserve behavioral coverage and guard the package boundary after the move.
+- path: tests/test_deepswe_design_evaluation.py
+  type: modified
+  span:
+    start_line: 192
+    end_line: 192
+  summary: Update evaluation tests to import service-owned policy and verify its default rubric is present.
+  rationale: Preserve behavioral coverage and guard the package boundary after the move.
+- path: tests/test_deepswe_probe_evaluation.py
+  type: modified
+  span:
+    start_line: 8
+    end_line: 8
+  summary: Update evaluation tests to import service-owned policy and verify its default rubric is present.
+  rationale: Preserve behavioral coverage and guard the package boundary after the move.
+- path: tests/test_prompt_benchmark_comparison.py
+  type: modified
+  span:
+    start_line: 8
+    end_line: 9
+  summary: Update evaluation tests to import service-owned policy and verify its default rubric is present.
+  rationale: Preserve behavioral coverage and guard the package boundary after the move.
+- path: tests/test_prompt_benchmark_comparison.py
+  type: modified
+  span:
+    start_line: 14
+    end_line: 15
+  summary: Update evaluation tests to import service-owned policy and verify its default rubric is present.
+  rationale: Preserve behavioral coverage and guard the package boundary after the move.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []
+features: []
+proposed_prs: []

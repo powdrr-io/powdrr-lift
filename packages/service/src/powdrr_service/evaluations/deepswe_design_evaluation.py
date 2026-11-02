@@ -13,8 +13,8 @@ from typing import Any, Protocol
 import yaml
 
 DEFAULT_STATE_DATA_RUBRIC = (
-    Path(__file__).resolve().parents[3]
-    / "docs"
+    Path(__file__).resolve().parents[1]
+    / "resources"
     / "evaluations"
     / "deepswe-python-statemachine-state-data.yaml"
 )

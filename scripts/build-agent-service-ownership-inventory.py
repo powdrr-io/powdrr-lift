@@ -68,6 +68,10 @@ def _owner(path: str) -> tuple[str, str, str]:
             "bounded planning, question, dependency, or repair policy",
             "4",
         )
+    if path.startswith("packages/service/src/powdrr_service/evaluations/"):
+        return "service", "service-owned prompt and benchmark evaluation policy", "8"
+    if path.startswith("packages/service/src/powdrr_service/resources/evaluations/"):
+        return "service", "bundled private evaluation rubric", "8"
     if path.startswith(
         "packages/service/src/powdrr_service/resources/processes/"
     ) or path.startswith("src/powdrr_lift/process/"):
@@ -245,9 +249,11 @@ def main() -> int:
                 "-z",
                 "--",
                 "src/powdrr_lift",
+                "packages/service/src/powdrr_service/evaluations",
                 "packages/service/src/powdrr_service/procedrr",
                 "packages/service/src/powdrr_service/procedrr_evaluator",
                 "packages/service/src/powdrr_service/structrr",
+                "packages/service/src/powdrr_service/resources/evaluations",
                 "packages/service/src/powdrr_service/resources/processes",
                 "docs/procedrr",
                 "scripts",
@@ -267,6 +273,7 @@ def main() -> int:
             path.endswith(".py")
             or path.startswith(
                 (
+                    "packages/service/src/powdrr_service/resources/evaluations/",
                     "packages/service/src/powdrr_service/resources/processes/",
                     "docs/procedrr/",
                     "src/powdrr_lift/resources/",

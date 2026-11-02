@@ -255,6 +255,40 @@ def test_structrr_review_and_verification_policy_is_service_owned() -> None:
     )
 
 
+def test_prompt_and_benchmark_evaluation_policy_is_service_owned() -> None:
+    repository = Path(__file__).parents[1]
+    service_root = repository / "packages/service/src/powdrr_service/evaluations"
+    agent_root = repository / "src/powdrr_lift/workrr"
+    modules = (
+        "deepswe_design_evaluation.py",
+        "deepswe_probe_evaluation.py",
+        "prompt_benchmark_comparison.py",
+    )
+    for module in modules:
+        source = service_root / module
+        assert source.is_file()
+        assert not (agent_root / module).exists()
+        tree = ast.parse(source.read_text(encoding="utf-8"))
+        imports = {
+            node.module
+            for node in ast.walk(tree)
+            if isinstance(node, ast.ImportFrom) and node.module is not None
+        }
+        imports.update(
+            alias.name
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Import)
+            for alias in node.names
+        )
+        assert not any(name.startswith("powdrr_lift") for name in imports), source
+
+    from powdrr_service.evaluations.deepswe_design_evaluation import (
+        DEFAULT_STATE_DATA_RUBRIC,
+    )
+
+    assert DEFAULT_STATE_DATA_RUBRIC.is_file()
+
+
 def test_service_owned_planning_has_no_agent_reexport_modules() -> None:
     repository = Path(__file__).parents[1]
     legacy_reexports = (

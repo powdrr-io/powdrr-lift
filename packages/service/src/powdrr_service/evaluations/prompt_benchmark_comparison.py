@@ -8,7 +8,7 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
-from powdrr_lift.workrr.deepswe_design_evaluation import _content_fingerprint
+from powdrr_service.evaluations.deepswe_design_evaluation import _content_fingerprint
 
 COMPARISON_SCHEMA_VERSION = "prompt-benchmark-comparison-v1"
 _VALIDATION_REPORT_SCHEMA = "coding-agent-validation-report-v1"

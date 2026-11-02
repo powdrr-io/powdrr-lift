@@ -5,8 +5,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-
-from powdrr_lift.workrr.deepswe_probe_evaluation import (
+from powdrr_service.evaluations.deepswe_probe_evaluation import (
     DeepSWEProbeEvaluationError,
     _discover_test_ids,
     evaluate_deepswe_probes,

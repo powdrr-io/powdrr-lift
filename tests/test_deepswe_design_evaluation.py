@@ -7,8 +7,8 @@ from typing import Any
 
 import pytest
 import yaml
-
-from powdrr_lift.workrr.deepswe_design_evaluation import (
+from powdrr_service.evaluations.deepswe_design_evaluation import (
+    DEFAULT_STATE_DATA_RUBRIC,
     DeepSWEEvaluationError,
     _summarize_prompt_findings,
     evaluate_deepswe_design,
@@ -189,7 +189,7 @@ def _capture_prompt_artifacts(run_dir: Path, prompt: str) -> None:
 def test_checked_in_prompt_rubrics_assign_supported_dimensions() -> None:
     repo_root = Path(__file__).resolve().parents[1]
     rubric_paths = (
-        repo_root / "docs/evaluations/deepswe-python-statemachine-state-data.yaml",
+        DEFAULT_STATE_DATA_RUBRIC,
         repo_root / "docs/evaluations/deepswe-skrub-duration-encoding.yaml",
         repo_root / "docs/evaluations/deepswe-ytt-jsonpath-query-api.yaml",
     )

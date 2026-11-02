@@ -27,6 +27,7 @@ def build_workspace_app(
     base_url: str | None = None,
     repository_root: Path | None = None,
     static_directory: Path | None = None,
+    workspace_instance_id: str | None = None,
 ) -> FastAPI:
     """Build a runnable workspace API with repository-aware chat dispatch.
 
@@ -66,4 +67,5 @@ def build_workspace_app(
         repository_registry=store,
         turn_dispatcher=turn_dispatcher,
         static_directory=resolved_static_directory,
+        workspace_instance_id=workspace_instance_id,
     )

@@ -242,11 +242,15 @@ def install_workspace_routes(
                 **dict(scheduler),
                 "turn_dispatch": turn_runtime.health(),
             }
-        return {
+        result = {
             "status": "ok",
             "schema_version": await run_in_threadpool(lambda: store.schema_version),
             "scheduler": dict(scheduler),
         }
+        instance_id = getattr(request.app.state, "workspace_instance_id", None)
+        if isinstance(instance_id, str):
+            result["workspace_instance_id"] = instance_id
+        return result
 
     @router.get("/repositories")
     async def list_repositories(

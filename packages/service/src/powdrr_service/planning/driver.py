@@ -69,6 +69,7 @@ from powdrr_service.planning.source import (
     build_block_disposition_request,
     build_extract_requirements_request,
     build_fidelity_request,
+    deduplicate_requirement_records,
 )
 from powdrr_service.planning.structrr import (
     BoundStructuralSubject,
@@ -536,7 +537,7 @@ class SourceLedgerQuestionMachine:
             return self._batch_requests(pending_extractions)
 
         requirements, drafts = allocate_requirements(
-            raw_records,
+            deduplicate_requirement_records(raw_records),
             first_ordinal=1,
             anchors=anchor_by_id,
             ledger=self.source.instruction_ledger,
@@ -1013,7 +1014,7 @@ class SourceLedgerQuestionMachine:
         proposal_answers = {
             question_id: answer
             for question_id, answer in accepted_answers.items()
-            if question_id.startswith("propose-units-v2-")
+            if question_id.startswith("propose-units-v3-")
         }
         cache_key = hashlib.sha256(
             json.dumps(
@@ -2093,7 +2094,7 @@ class SourceLedgerQuestionMachine:
             raw_records.extend(records)
 
         requirements, drafts = allocate_requirements(
-            raw_records,
+            deduplicate_requirement_records(raw_records),
             first_ordinal=1,
             anchors=anchor_by_id,
             ledger=self.source.instruction_ledger,

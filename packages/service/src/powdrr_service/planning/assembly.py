@@ -784,13 +784,13 @@ def build_work_unit_proposal_request(
         question_identity["maximum_proposals"] = maximum_proposals
     question_key = _digest(question_identity)[-12:]
     question = Question(
-        question_id=f"propose-units-v2-{requirement_ids[0]}-{question_key}",
+        question_id=f"propose-units-v3-{requirement_ids[0]}-{question_key}",
         kind="propose_work_units",
-        contract_version=2,
+        contract_version=3,
         subject_ids=tuple(requirement_ids),
-        input_digest=_digest({"schema_version": 2, **input_facts}),
+        input_digest=_digest({"schema_version": 3, **input_facts}),
         context_ref_ids=all_refs,
-        expected_answer_schema="work-unit-proposals-v2",
+        expected_answer_schema="work-unit-proposals-v3",
         attempt=1,
     )
 
@@ -825,7 +825,13 @@ def build_work_unit_proposal_request(
         question=question,
         exact_question=(
             "Enumerate concrete implementation work units for only the supplied "
-            "unresolved requirements. Each unit must describe one implementation "
+            "unresolved requirements. Prefer a cohesive unit that addresses "
+            "several strongly related requirements together, up to four, when "
+            "they share a deliverable, code area, or validation boundary. Do not "
+            "create one unit per requirement merely because the source lists them "
+            "separately. Split requirements when they have independent deliverables "
+            "that are clearer to implement and review separately, or when runtime "
+            "constraints require it. Each unit must describe one implementation "
             "step, at most two acceptance criteria, actual planned file writes, "
             "and required outputs that later work may consume. Do not invent "
             "requirement, evidence, or source IDs. Component, validation, and "

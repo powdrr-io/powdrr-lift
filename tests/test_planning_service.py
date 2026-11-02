@@ -624,13 +624,13 @@ def test_oversized_work_unit_answer_replays_as_a_smaller_question_group() -> Non
         ),
     )
     question = Question(
-        question_id="propose-units-req-0057-example",
+        question_id="propose-units-v3-req-0057-example",
         kind="propose_work_units",
         contract_version=1,
         subject_ids=("req-0057", "req-0058", "req-0059", "req-0060"),
         input_digest="sha256:" + "0" * 64,
         context_ref_ids=(),
-        expected_answer_schema="work-unit-proposals-v2",
+        expected_answer_schema="work-unit-proposals-v3",
         attempt=1,
     )
     event = PlanningCheckpoint.needs_answer(
@@ -647,13 +647,13 @@ def test_oversized_work_unit_answer_replays_as_a_smaller_question_group() -> Non
     )
     store.append(event, expected_parent_digest=None)
     single_question = Question(
-        question_id="propose-units-req-0058-single",
+        question_id="propose-units-v3-req-0058-single",
         kind="propose_work_units",
         contract_version=1,
         subject_ids=("req-0058",),
         input_digest="sha256:" + "1" * 64,
         context_ref_ids=(),
-        expected_answer_schema="work-unit-proposals-v2",
+        expected_answer_schema="work-unit-proposals-v3",
         attempt=1,
     )
     single_event = PlanningCheckpoint.needs_answer(
@@ -953,8 +953,20 @@ def test_source_question_machine_accounts_for_normative_and_context_blocks() -> 
     )
     answers: dict[str, dict[str, Any]] = {}
     block_by_id = {block.id: block for block in source.blocks}
+    source_anchor_by_id = {anchor.id: anchor for anchor in source.anchors}
+
+    def obligation_anchor(block: Any) -> str:
+        return next(
+            (
+                anchor_id
+                for anchor_id in block.anchor_ids
+                if source_anchor_by_id[anchor_id].clause_id is not None
+            ),
+            block.anchor_ids[0],
+        )
+
     requirement_anchor = next(
-        block.anchor_ids[0] for block in source.blocks if "Implement" in block.text
+        obligation_anchor(block) for block in source.blocks if "Implement" in block.text
     )
 
     while True:
@@ -973,7 +985,7 @@ def test_source_question_machine_accounts_for_normative_and_context_blocks() -> 
                     {
                         "statement": "Implement the requested behavior.",
                         "kind": "behavior",
-                        "source_refs": [block.anchor_ids[0]],
+                        "source_refs": [obligation_anchor(block)],
                         "related_source_refs": [],
                     }
                 ]

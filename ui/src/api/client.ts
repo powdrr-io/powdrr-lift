@@ -4,6 +4,8 @@ import type {
   ConversationMessages,
   Message,
   WorkspaceEvent,
+  WorkspaceJobAction,
+  WorkspaceJobActionResult,
   WorkspaceJobDetail,
   WorkspaceQuestion,
   WorkspaceRepository,
@@ -36,6 +38,7 @@ export class WorkspaceClient {
     { requestId: string; messageId: string }
   >()
   private readonly pendingAnswers = new Map<string, string>()
+  private readonly pendingJobActions = new Map<string, string>()
 
   async bootstrap(token: string): Promise<void> {
     const response = await fetch(`${apiRoot}/session`, {
@@ -91,6 +94,38 @@ export class WorkspaceClient {
       `${apiRoot}/repositories/${encodeURIComponent(repositoryId)}/jobs/${encodeURIComponent(jobId)}`,
     )
     return (await response.json()) as WorkspaceJobDetail
+  }
+
+  async requestJobAction(
+    repositoryId: string,
+    jobId: string,
+    expectedRevision: number,
+    action: WorkspaceJobAction,
+  ): Promise<WorkspaceJobActionResult> {
+    const pendingKey = JSON.stringify([repositoryId, jobId, action])
+    const requestIdValue = this.pendingJobActions.get(pendingKey) ?? requestId()
+    this.pendingJobActions.set(pendingKey, requestIdValue)
+    try {
+      const response = await this.mutate(
+        `${apiRoot}/repositories/${encodeURIComponent(repositoryId)}/jobs/${encodeURIComponent(jobId)}/actions`,
+        {
+          method: 'POST',
+          body: JSON.stringify({
+            request_id: requestIdValue,
+            expected_revision: expectedRevision,
+            action,
+          }),
+        },
+      )
+      const result = (await response.json()) as WorkspaceJobActionResult
+      this.pendingJobActions.delete(pendingKey)
+      return result
+    } catch (error) {
+      // Keep the request ID after network failures so an uncertain acceptance
+      // can be retried idempotently. A server response is definitive.
+      if (error instanceof WorkspaceApiError) this.pendingJobActions.delete(pendingKey)
+      throw error
+    }
   }
 
   async listConversations(repositoryId: string): Promise<Conversation[]> {

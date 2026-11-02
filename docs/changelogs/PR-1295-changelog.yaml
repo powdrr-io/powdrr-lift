@@ -1,0 +1,155 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1295
+title: Add revision-safe actions to workspace jobs
+intent:
+  problem: The workspace displays job status but does not let users request actions supported by the job API.
+  goal: Let users start, cancel, retry, or resume a job when the backend allows it, while preserving revision checks and idempotent retries.
+human-decisions: []
+structured_files: []
+files:
+- path: ui/src/App.css
+  type: modified
+  span:
+    start_line: 240
+    end_line: 246
+  summary: Style job action buttons and their accepted or error messages.
+  rationale: Make action requests and their outcomes clear in the job status view.
+- path: ui/src/App.test.tsx
+  type: modified
+  span:
+    start_line: 6
+    end_line: 6
+  summary: Import the API error type used to simulate stale job revisions.
+  rationale: Verify the UI reconciles concurrent job updates.
+- path: ui/src/App.test.tsx
+  type: modified
+  span:
+    start_line: 20
+    end_line: 20
+  summary: Add the job action request mock.
+  rationale: Test job controls without a live service.
+- path: ui/src/App.test.tsx
+  type: modified
+  span:
+    start_line: 82
+    end_line: 88
+  summary: Reset job action responses between UI tests.
+  rationale: Keep action interactions deterministic.
+- path: ui/src/App.test.tsx
+  type: modified
+  span:
+    start_line: 258
+    end_line: 270
+  summary: Simulate a stale action conflict, refreshed detail, and successful cancellation request.
+  rationale: Ensure users review the latest revision before requesting the action again.
+- path: ui/src/App.test.tsx
+  type: modified
+  span:
+    start_line: 288
+    end_line: 301
+  summary: Verify the cancellation action uses the current job revision and reports accepted status.
+  rationale: Cover the user-visible action flow without optimistic job-state changes.
+- path: ui/src/App.tsx
+  type: modified
+  span:
+    start_line: 6
+    end_line: 6
+  summary: Import the shared job action type.
+  rationale: Keep action handling aligned with the workspace API contract.
+- path: ui/src/App.tsx
+  type: modified
+  span:
+    start_line: 131
+    end_line: 132
+  summary: Track job action requests and their visible outcomes.
+  rationale: Disable only unresolved requests and show their status in the selected job.
+- path: ui/src/App.tsx
+  type: modified
+  span:
+    start_line: 474
+    end_line: 526
+  summary: Submit allowed actions with the current revision and refresh after acceptance or stale conflicts.
+  rationale: Keep the status view accurate without retrying an action against an unseen revision.
+- path: ui/src/App.tsx
+  type: modified
+  span:
+    start_line: 678
+    end_line: 678
+  summary: Connect job status controls to the action request handler.
+  rationale: Make backend-approved actions available from the selected job view.
+- path: ui/src/api/client.ts
+  type: modified
+  span:
+    start_line: 7
+    end_line: 8
+  summary: Import the action request and response types.
+  rationale: Keep action mutations typed at the API boundary.
+- path: ui/src/api/client.ts
+  type: modified
+  span:
+    start_line: 41
+    end_line: 41
+  summary: Track stable request IDs for job action retries.
+  rationale: Preserve idempotency when a request may have been accepted despite a network failure.
+- path: ui/src/api/client.ts
+  type: modified
+  span:
+    start_line: 99
+    end_line: 130
+  summary: Add an idempotent client method for requesting revision-checked job actions.
+  rationale: Reuse request IDs after uncertain failures and discard them after definitive server responses.
+- path: ui/src/api/types.ts
+  type: modified
+  span:
+    start_line: 101
+    end_line: 111
+  summary: Define the supported job action names and accepted action result.
+  rationale: Match the response shape of durable job action acceptance.
+- path: ui/src/components/JobStatus.tsx
+  type: modified
+  span:
+    start_line: 1
+    end_line: 1
+  summary: Import the workspace job action type.
+  rationale: Use the same action contract as the API client.
+- path: ui/src/components/JobStatus.tsx
+  type: modified
+  span:
+    start_line: 19
+    end_line: 29
+  summary: Accept action callbacks, pending actions, and action status messages.
+  rationale: Keep action presentation separate from job state changes.
+- path: ui/src/components/JobStatus.tsx
+  type: modified
+  span:
+    start_line: 46
+    end_line: 77
+  summary: Render only backend-allowed actions and show request feedback.
+  rationale: Prevent unsupported actions and explain accepted or conflicted requests.
+entities:
+- id: workspace-browser-ui
+  type: Module
+  action: modified
+- id: workspace-job-status-view
+  type: Frontend component
+  action: modified
+- id: workspace-job-action-controls
+  type: Frontend component
+  action: added
+entity_relationships:
+- id: job-action-controls-part-of-status-view
+  type: part_of
+  source: workspace-job-action-controls
+  target: workspace-job-status-view
+  action: added
+  description: The job action controls are rendered within the selected job status view.
+invariants:
+- id: job-actions-use-current-revision
+  description: Job actions include the currently displayed job revision; a stale revision refreshes the detail and requires a new user action.
+  action: added
+- id: uncertain-job-actions-reuse-request-id
+  description: If the action response is uncertain due to a network failure, retrying that same action reuses its request ID so durable acceptance is idempotent.
+  action: added
+guidance: []
+features: []
+proposed_prs: []

@@ -98,7 +98,17 @@ export type WorkspaceJobDetail = {
   blockers: WorkspaceJobBlocker[]
   question: WorkspaceQuestion | null
   outputs: string[]
-  allowed_actions: Array<'start' | 'cancel' | 'retry' | 'resume'>
+  allowed_actions: WorkspaceJobAction[]
+}
+
+export type WorkspaceJobAction = 'start' | 'cancel' | 'retry' | 'resume'
+
+export type WorkspaceJobActionResult = {
+  action_id: string
+  job_id: string
+  action: WorkspaceJobAction
+  state: 'accepted'
+  job_revision: number
 }
 
 export type WorkspaceSnapshot = {

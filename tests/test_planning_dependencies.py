@@ -324,6 +324,91 @@ def test_dependency_discovery_uses_reference_evidence_without_lexical_overlap() 
     assert "src/catalog.py -> src/dashboard.py" in question.exact_question
 
 
+def test_candidate_recall_fixture_keeps_chain_and_reviews_false_positive() -> None:
+    storage = replace(
+        _unit("unit-storage"),
+        deliverable="Persist operation records.",
+        implementation_step="Write records to the durable store.",
+        planned_writes=(
+            PlannedWrite("src/storage.py", "implementation", "python", (), ()),
+        ),
+    )
+    service = replace(
+        _unit("unit-service", "req-0002"),
+        deliverable="Serve operation requests.",
+        implementation_step="Expose the record endpoint.",
+        planned_writes=(
+            PlannedWrite("src/service.py", "implementation", "python", (), ()),
+        ),
+    )
+    cli = replace(
+        _unit("unit-cli", "req-0003"),
+        deliverable="Render command results.",
+        implementation_step="Format response rows in the terminal.",
+        planned_writes=(
+            PlannedWrite("src/cli.py", "implementation", "python", (), ()),
+        ),
+    )
+    metrics = replace(
+        _unit("unit-metrics", "req-0004"),
+        deliverable="Count process events.",
+        implementation_step="Update counters for accepted operations.",
+        planned_writes=(
+            PlannedWrite("src/metrics.py", "implementation", "python", (), ()),
+        ),
+    )
+    units = (storage, service, cli, metrics)
+    outputs = (
+        PendingUnitOutput(
+            storage.id, "Stored operation records", storage.requirement_ids
+        ),
+        PendingUnitOutput(
+            service.id, "Operation response payload", service.requirement_ids
+        ),
+        PendingUnitOutput(metrics.id, "Operation counters", metrics.requirement_ids),
+    )
+    known_dependencies = {
+        (storage.id, service.id),
+        (service.id, cli.id),
+    }
+    # Labeled source relationships: the CLI consumes the service response, and
+    # the service consumes stored records. Metrics happens to reference storage
+    # code, but the reference is incidental and should be rejected on review.
+    reference_paths = {
+        (storage.id, service.id): ("src/storage.py -> src/service.py",),
+        (service.id, cli.id): ("src/service.py -> src/cli.py",),
+        (storage.id, metrics.id): ("src/storage.py -> src/metrics.py",),
+    }
+
+    discovery = discover_dependency_candidates(
+        units,
+        outputs,
+        code_reference_paths=reference_paths,
+    )
+    candidate_pairs = {
+        (output.unit_id, consumer.id)
+        for output, consumer in discovery.confirmation_pairs
+    }
+
+    assert known_dependencies <= candidate_pairs
+    assert candidate_pairs == set(reference_paths)
+    false_positive = build_dependency_confirmation_request(
+        storage,
+        metrics,
+        outputs[0].description,
+        allowed_requirement_ids=set(storage.requirement_ids)
+        | set(metrics.requirement_ids),
+        code_reference_paths=reference_paths[(storage.id, metrics.id)],
+    )
+    rejected = false_positive.parse_answer(
+        {
+            "result": "independent",
+            "reason": "The metrics counter does not consume persisted records.",
+        }
+    )
+    assert not rejected.required
+
+
 def test_dependency_discovery_keeps_named_output_path_in_deliverable() -> None:
     producer = replace(
         _unit("unit-0001"),

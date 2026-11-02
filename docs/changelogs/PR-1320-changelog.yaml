@@ -1,0 +1,346 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1320
+title: Move changelog validation policy into service
+intent:
+  problem: Changelog structure and cross-reference validation still lived in the agent module alongside
+    Git, filesystem, and repository-evidence collection.
+  goal: Move deterministic changelog structure, span, entity, lifecycle, and reference rules into service
+    policy while keeping repository evidence collection and CLI report composition in the agent.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 924
+    end_line: 925
+  summary: Record the service-owned changelog validation policy and update the agent import edge.
+  rationale: Keep the ownership inventory aligned with the extracted policy module.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 930
+    end_line: 930
+  summary: Record the service-owned changelog validation policy and update the agent import edge.
+  rationale: Keep the ownership inventory aligned with the extracted policy module.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3736
+    end_line: 3748
+  summary: Record the service-owned changelog validation policy and update the agent import edge.
+  rationale: Keep the ownership inventory aligned with the extracted policy module.
+- path: docs/plans/agent-service-code-split.md
+  type: modified
+  span:
+    start_line: 488
+    end_line: 491
+  summary: Update the split plan with the completed changelog validation-policy move and remaining local
+    evidence responsibilities.
+  rationale: Keep the migration boundary and remaining work accurate.
+- path: docs/project_structure/project-structure.yaml
+  type: modified
+  span:
+    start_line: 28
+    end_line: 28
+  summary: Describe the service changelog package as owning parsing, rendering, and validation policy.
+  rationale: Keep the project structure aligned with the service package responsibilities.
+- path: packages/service/src/powdrr_service/changelog/validation_policy.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 808
+  summary: Implement service-owned changelog section, cross-reference, entity, lifecycle, rationale, and
+    span validation.
+  rationale: Make deterministic Powdrr changelog rules run in the service without filesystem or agent
+    imports.
+- path: scripts/build-agent-service-ownership-inventory.py
+  type: modified
+  span:
+    start_line: 82
+    end_line: 86
+  summary: Classify changelog validation policy as service-owned.
+  rationale: Keep generated ownership reports consistent with the extracted module.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 3
+    end_line: 3
+  summary: Collect local Git and specification evidence, call service policy, and adapt issue records
+    for the existing CLI report.
+  rationale: Keep repository access in the agent while removing embedded changelog validation rules.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 5
+    end_line: 5
+  summary: Collect local Git and specification evidence, call service policy, and adapt issue records
+    for the existing CLI report.
+  rationale: Keep repository access in the agent while removing embedded changelog validation rules.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 14
+    end_line: 16
+  summary: Collect local Git and specification evidence, call service policy, and adapt issue records
+    for the existing CLI report.
+  rationale: Keep repository access in the agent while removing embedded changelog validation rules.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 18
+    end_line: 31
+  summary: Collect local Git and specification evidence, call service policy, and adapt issue records
+    for the existing CLI report.
+  rationale: Keep repository access in the agent while removing embedded changelog validation rules.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 38
+    end_line: 38
+  summary: Collect local Git and specification evidence, call service policy, and adapt issue records
+    for the existing CLI report.
+  rationale: Keep repository access in the agent while removing embedded changelog validation rules.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 80
+    end_line: 91
+  summary: Collect local Git and specification evidence, call service policy, and adapt issue records
+    for the existing CLI report.
+  rationale: Keep repository access in the agent while removing embedded changelog validation rules.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 260
+    end_line: 260
+  summary: Collect local Git and specification evidence, call service policy, and adapt issue records
+    for the existing CLI report.
+  rationale: Keep repository access in the agent while removing embedded changelog validation rules.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 270
+    end_line: 270
+  summary: Collect local Git and specification evidence, call service policy, and adapt issue records
+    for the existing CLI report.
+  rationale: Keep repository access in the agent while removing embedded changelog validation rules.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 282
+    end_line: 326
+  summary: Collect local Git and specification evidence, call service policy, and adapt issue records
+    for the existing CLI report.
+  rationale: Keep repository access in the agent while removing embedded changelog validation rules.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 338
+    end_line: 343
+  summary: Collect local Git and specification evidence, call service policy, and adapt issue records
+    for the existing CLI report.
+  rationale: Keep repository access in the agent while removing embedded changelog validation rules.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 433
+    end_line: 439
+  summary: Collect local Git and specification evidence, call service policy, and adapt issue records
+    for the existing CLI report.
+  rationale: Keep repository access in the agent while removing embedded changelog validation rules.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 500
+    end_line: 505
+  summary: Collect local Git and specification evidence, call service policy, and adapt issue records
+    for the existing CLI report.
+  rationale: Keep repository access in the agent while removing embedded changelog validation rules.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 512
+    end_line: 518
+  summary: Collect local Git and specification evidence, call service policy, and adapt issue records
+    for the existing CLI report.
+  rationale: Keep repository access in the agent while removing embedded changelog validation rules.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 525
+    end_line: 561
+  summary: Collect local Git and specification evidence, call service policy, and adapt issue records
+    for the existing CLI report.
+  rationale: Keep repository access in the agent while removing embedded changelog validation rules.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 568
+    end_line: 604
+  summary: Collect local Git and specification evidence, call service policy, and adapt issue records
+    for the existing CLI report.
+  rationale: Keep repository access in the agent while removing embedded changelog validation rules.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 614
+    end_line: 631
+  summary: Collect local Git and specification evidence, call service policy, and adapt issue records
+    for the existing CLI report.
+  rationale: Keep repository access in the agent while removing embedded changelog validation rules.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 637
+    end_line: 654
+  summary: Collect local Git and specification evidence, call service policy, and adapt issue records
+    for the existing CLI report.
+  rationale: Keep repository access in the agent while removing embedded changelog validation rules.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 735
+    end_line: 743
+  summary: Collect local Git and specification evidence, call service policy, and adapt issue records
+    for the existing CLI report.
+  rationale: Keep repository access in the agent while removing embedded changelog validation rules.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 775
+    end_line: 783
+  summary: Collect local Git and specification evidence, call service policy, and adapt issue records
+    for the existing CLI report.
+  rationale: Keep repository access in the agent while removing embedded changelog validation rules.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 893
+    end_line: 895
+  summary: Collect local Git and specification evidence, call service policy, and adapt issue records
+    for the existing CLI report.
+  rationale: Keep repository access in the agent while removing embedded changelog validation rules.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 899
+    end_line: 901
+  summary: Collect local Git and specification evidence, call service policy, and adapt issue records
+    for the existing CLI report.
+  rationale: Keep repository access in the agent while removing embedded changelog validation rules.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 905
+    end_line: 905
+  summary: Collect local Git and specification evidence, call service policy, and adapt issue records
+    for the existing CLI report.
+  rationale: Keep repository access in the agent while removing embedded changelog validation rules.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 911
+    end_line: 911
+  summary: Collect local Git and specification evidence, call service policy, and adapt issue records
+    for the existing CLI report.
+  rationale: Keep repository access in the agent while removing embedded changelog validation rules.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 920
+    end_line: 920
+  summary: Collect local Git and specification evidence, call service policy, and adapt issue records
+    for the existing CLI report.
+  rationale: Keep repository access in the agent while removing embedded changelog validation rules.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 885
+    end_line: 904
+  summary: Collect local Git and specification evidence, call service policy, and adapt issue records
+    for the existing CLI report.
+  rationale: Keep repository access in the agent while removing embedded changelog validation rules.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 951
+    end_line: 1212
+  summary: Collect local Git and specification evidence, call service policy, and adapt issue records
+    for the existing CLI report.
+  rationale: Keep repository access in the agent while removing embedded changelog validation rules.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 1408
+    end_line: 1667
+  summary: Collect local Git and specification evidence, call service policy, and adapt issue records
+    for the existing CLI report.
+  rationale: Keep repository access in the agent while removing embedded changelog validation rules.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 1203
+    end_line: 1203
+  summary: Collect local Git and specification evidence, call service policy, and adapt issue records
+    for the existing CLI report.
+  rationale: Keep repository access in the agent while removing embedded changelog validation rules.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 1283
+    end_line: 1283
+  summary: Collect local Git and specification evidence, call service policy, and adapt issue records
+    for the existing CLI report.
+  rationale: Keep repository access in the agent while removing embedded changelog validation rules.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 1341
+    end_line: 1342
+  summary: Collect local Git and specification evidence, call service policy, and adapt issue records
+    for the existing CLI report.
+  rationale: Keep repository access in the agent while removing embedded changelog validation rules.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 1902
+    end_line: 2142
+  summary: Collect local Git and specification evidence, call service policy, and adapt issue records
+    for the existing CLI report.
+  rationale: Keep repository access in the agent while removing embedded changelog validation rules.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 1427
+    end_line: 1428
+  summary: Collect local Git and specification evidence, call service policy, and adapt issue records
+    for the existing CLI report.
+  rationale: Keep repository access in the agent while removing embedded changelog validation rules.
+- path: tests/test_agent_service_contracts.py
+  type: modified
+  span:
+    start_line: 248
+    end_line: 268
+  summary: Assert the service validation policy has no agent import and its old agent helpers are gone.
+  rationale: Protect the service ownership boundary and prevent a private compatibility path from returning.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 7
+    end_line: 10
+  summary: Verify changelog reports retain existing behavior and exercise a service policy check directly.
+  rationale: Preserve end-to-end validation coverage while proving the moved service rule works independently.
+- path: tests/test_change_log_validation.py
+  type: modified
+  span:
+    start_line: 20
+    end_line: 39
+  summary: Verify changelog reports retain existing behavior and exercise a service policy check directly.
+  rationale: Preserve end-to-end validation coverage while proving the moved service rule works independently.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []
+features: []
+proposed_prs: []

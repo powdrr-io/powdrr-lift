@@ -112,10 +112,10 @@ jobs:
         run: uv run mypy src tests
 
       - name: Validate Procedrr process catalog
-        run: uv run powdrr-lift validate-procedrr-processes docs/procedrr/processes
+        run: uv run powdrr-lift validate-procedrr-processes
 
       - name: Run tests
-        run: uv run pytest -n auto --cov=powdrr_lift --cov-branch --cov-report=term-missing --cov-report=xml tests
+        run: uv run pytest -n auto --cov=powdrr_lift --cov=powdrr_service --cov=powdrr_contracts --cov=powdrr_local --cov=powdrr_agent --cov-branch --cov-report=term-missing --cov-report=xml tests
 
       - name: Upload coverage report
         if: always()

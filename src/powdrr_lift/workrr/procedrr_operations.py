@@ -5,8 +5,9 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from typing import Any
 
+from powdrr_service.procedrr.command_catalog import CommandCatalog
+
 from powdrr_lift.errors import PowdrrExecutionError
-from procedrr.command_catalog import CommandCatalog
 
 OperationHandler = Callable[[Mapping[str, Any]], Any]
 

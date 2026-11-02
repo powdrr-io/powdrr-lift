@@ -1,8 +1,7 @@
 from typing import Any, cast
 
 import pytest
-
-from procedrr import (
+from powdrr_service.procedrr import (
     CallNode,
     CommandCatalog,
     CommandSpec,
@@ -33,6 +32,7 @@ from procedrr import (
     validate_document,
     validate_single_decision,
 )
+from powdrr_service.resources import bundled_process_directory
 
 
 def decision(name: str = "choice") -> DecisionContract:
@@ -602,9 +602,8 @@ def test_fragment_builder_rejects_edit_not_grounded_in_source_context() -> None:
 
 
 def test_checked_in_generate_fragment_definition_is_single_decision() -> None:
-    from pathlib import Path
 
-    source = Path("docs/procedrr/processes/generate-fragment.yaml").read_text()
+    source = (bundled_process_directory() / "generate-fragment.yaml").read_text()
     document = parse_and_validate(source)
 
     assert document["name"] == "generate-fragment"
@@ -619,9 +618,8 @@ def test_checked_in_generate_fragment_definition_is_single_decision() -> None:
 
 
 def test_checked_in_design_interview_definition_parses() -> None:
-    from pathlib import Path
 
-    source = Path("docs/procedrr/processes/design-interview.yaml").read_text()
+    source = (bundled_process_directory() / "design-interview.yaml").read_text()
     document = parse_and_validate(source)
     judge_providers: dict[str, list[str]] = {"classify_one": [], "construct_one": []}
 
@@ -645,10 +643,9 @@ def test_checked_in_design_interview_definition_parses() -> None:
 
 
 def test_design_interview_has_no_behavioral_contract_result_stage() -> None:
-    from pathlib import Path
 
     document = parse_and_validate(
-        Path("docs/procedrr/processes/design-interview.yaml").read_text()
+        (bundled_process_directory() / "design-interview.yaml").read_text()
     )
     schemas: list[dict[str, Any]] = []
 
@@ -672,9 +669,8 @@ def test_design_interview_has_no_behavioral_contract_result_stage() -> None:
 
 
 def test_design_interview_uses_single_field_source_classification() -> None:
-    from pathlib import Path
 
-    source = Path("docs/procedrr/processes/design-interview.yaml").read_text()
+    source = (bundled_process_directory() / "design-interview.yaml").read_text()
     document = parse_and_validate(source)
     atomicity_body = document["steps"][2]["for_each"]["body"]
     atomicity_judge = atomicity_body[0]["judge"]
@@ -753,10 +749,9 @@ def test_design_interview_uses_single_field_source_classification() -> None:
 
 
 def test_design_interview_gathers_decisions_for_relevant_modules_only() -> None:
-    from pathlib import Path
 
     document = parse_and_validate(
-        Path("docs/procedrr/processes/design-interview.yaml").read_text()
+        (bundled_process_directory() / "design-interview.yaml").read_text()
     )
     assert document["steps"][0]["operation"] == {
         "tool": "gather_context",
@@ -779,12 +774,11 @@ def test_design_interview_gathers_decisions_for_relevant_modules_only() -> None:
 
 
 def test_design_interview_has_no_acceptance_criteria_compiler_stage() -> None:
-    from pathlib import Path
 
-    from procedrr import parse_and_validate
+    from powdrr_service.procedrr import parse_and_validate
 
     document = parse_and_validate(
-        Path("docs/procedrr/processes/design-interview.yaml").read_text()
+        (bundled_process_directory() / "design-interview.yaml").read_text()
     )
     operation_names = [
         step.get("operation", {}).get("command", [None])[0]
@@ -796,9 +790,8 @@ def test_design_interview_has_no_acceptance_criteria_compiler_stage() -> None:
 
 
 def test_checked_in_implement_feature_has_bounded_task_reviews() -> None:
-    from pathlib import Path
 
-    source = Path("docs/procedrr/processes/implement-feature.yaml").read_text()
+    source = (bundled_process_directory() / "implement-feature.yaml").read_text()
     document = parse_and_validate(source)
 
     assert document["name"] == "implement-feature"
@@ -825,13 +818,11 @@ def test_checked_in_implement_feature_has_bounded_task_reviews() -> None:
 
 
 def test_feature_plan_gets_complexity_and_quality_reviews_before_final_plan() -> None:
-    from pathlib import Path
 
     import yaml
+    from powdrr_service.procedrr import ProcessCatalog
 
-    from procedrr import ProcessCatalog
-
-    processes_path = Path(__file__).resolve().parents[1] / "docs/procedrr/processes"
+    processes_path = bundled_process_directory()
     catalog = ProcessCatalog.load(processes_path)
     process = catalog.get("start-implementing-feature").document
     question = process["steps"][0]["specialize"]["question"]

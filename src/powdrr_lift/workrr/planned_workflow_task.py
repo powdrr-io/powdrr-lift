@@ -216,4 +216,6 @@ def _plan_workflow_instance_id(
 
 def _bundled_procedrr_process_directory() -> Path:
     """Locate Powdrr-Lift's process catalog, independent of target repository."""
-    return Path(__file__).resolve().parents[3] / "docs" / "procedrr" / "processes"
+    from powdrr_service.resources import bundled_process_directory
+
+    return bundled_process_directory()

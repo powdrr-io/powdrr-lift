@@ -4,10 +4,14 @@ from collections.abc import Mapping
 from typing import Any
 
 import pytest
+from powdrr_service.procedrr.command_catalog import (
+    CommandCatalog,
+    CommandSpec,
+    object_schema,
+)
 
 from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.workrr.procedrr_operations import WorkrrOperationExecutor
-from procedrr.command_catalog import CommandCatalog, CommandSpec, object_schema
 
 
 def test_executor_dispatches_only_to_caller_authorized_handler() -> None:

@@ -31,6 +31,7 @@ from powdrr_service.planning.instruction_ledger import (
 from powdrr_service.planning.semantic_decision import DECISION_VALUES
 from powdrr_service.providers.config import default_llm_mappings
 from powdrr_service.providers.credentials import resolve_provider_credentials
+from powdrr_service.resources import bundled_process_directory
 
 from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
 from powdrr_lift.workrr.provider_runtime import build_workflow_client
@@ -573,7 +574,7 @@ def main() -> int:
         )
         task_client = WorkrrProcedrrClient(
             workflow_client,
-            process_directory=ROOT_DIR / "docs/procedrr/processes",
+            process_directory=bundled_process_directory(),
         )
         try:
             result = _label_task(

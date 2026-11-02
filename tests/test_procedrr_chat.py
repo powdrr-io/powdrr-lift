@@ -12,6 +12,8 @@ from typing import Any
 
 import pytest
 from powdrr_service.decision_classifier import JevSemanticClassifierClient
+from powdrr_service.procedrr import ProcessCatalog
+from powdrr_service.resources import bundled_process_directory
 
 from powdrr_lift.workrr import chat_context, procedrr_chat
 from powdrr_lift.workrr.chat_config import WorkflowChatConfig
@@ -26,7 +28,6 @@ from powdrr_lift.workrr.procedrr_chat import (
     _select_process,
     run_procedrr_workflow_chat,
 )
-from procedrr import ProcessCatalog
 
 
 class _SelectingClient:
@@ -58,7 +59,7 @@ class _SelectingProvider:
 
 
 def test_process_selector_returns_only_a_catalogued_process() -> None:
-    process_dir = Path("docs/procedrr/processes")
+    process_dir = bundled_process_directory()
     catalog = ProcessCatalog.load(process_dir)
 
     selected = _select_process(
@@ -81,7 +82,7 @@ def test_process_selector_returns_only_a_catalogued_process() -> None:
 
 
 def test_all_supported_workflow_names_have_procedrr_processes() -> None:
-    catalog = ProcessCatalog.load(Path("docs/procedrr/processes"))
+    catalog = ProcessCatalog.load(bundled_process_directory())
     names = {process.name for process in catalog.list()}
     assert {
         "address-review-comments",
@@ -116,7 +117,7 @@ def test_specify_feature_interviews_until_structured_spec_has_no_open_assumption
 ):
     import yaml
 
-    catalog = ProcessCatalog.load(Path("docs/procedrr/processes"))
+    catalog = ProcessCatalog.load(bundled_process_directory())
     specialize = catalog.get("specify-a-feature").document["steps"][0]["specialize"]
     question = specialize["question"]
     workflow = yaml.safe_load(
@@ -158,7 +159,7 @@ def test_specify_feature_interviews_until_structured_spec_has_no_open_assumption
 def test_feature_planning_retrieves_module_scoped_decisions() -> None:
     import yaml
 
-    catalog = ProcessCatalog.load(Path("docs/procedrr/processes"))
+    catalog = ProcessCatalog.load(bundled_process_directory())
     specialize = catalog.get("start-implementing-feature").document["steps"][0][
         "specialize"
     ]
@@ -189,7 +190,7 @@ def test_feature_planning_retrieves_module_scoped_decisions() -> None:
 
 
 def test_address_review_comments_flow_uses_service_prepared_thread_ledger() -> None:
-    process = ProcessCatalog.load(Path("docs/procedrr/processes")).get(
+    process = ProcessCatalog.load(bundled_process_directory()).get(
         "address-review-comments"
     )
     specialize = process.document["steps"][0]["specialize"]
@@ -215,7 +216,7 @@ def test_chat_prepares_review_ledger_before_running_review_process(
 ) -> None:
     process_dir = tmp_path / "processes"
     process_dir.mkdir()
-    shutil.copy(Path("docs/procedrr/processes/select-process.yaml"), process_dir)
+    shutil.copy(bundled_process_directory() / "select-process.yaml", process_dir)
     (process_dir / "address-review-comments.yaml").write_text(
         """\
 version: 1
@@ -310,7 +311,7 @@ def test_chat_entrypoint_executes_a_catalogued_procedrr_process(
     repo_root = tmp_path / ".worktrees" / "chat"
     repo_root.mkdir(parents=True)
     subprocess.run(["git", "init", "-q"], cwd=repo_root, check=True)
-    source_process_dir = Path("docs/procedrr/processes")
+    source_process_dir = bundled_process_directory()
     shutil.copy(source_process_dir / "select-process.yaml", process_dir)
     (process_dir / "echo-process.yaml").write_text(
         """\
@@ -368,7 +369,7 @@ def test_chat_suspends_and_resumes_prompt_without_replaying_prior_operation(
     repo_root = tmp_path / ".worktrees" / "chat"
     repo_root.mkdir(parents=True)
     subprocess.run(["git", "init", "-q"], cwd=repo_root, check=True)
-    source_process_dir = Path("docs/procedrr/processes")
+    source_process_dir = bundled_process_directory()
     shutil.copy(source_process_dir / "select-process.yaml", process_dir)
     (process_dir / "echo-process.yaml").write_text(
         """\
@@ -501,7 +502,7 @@ def test_chat_suspends_and_resumes_required_process_inputs(
     repo_root = tmp_path / ".worktrees" / "chat"
     repo_root.mkdir(parents=True)
     subprocess.run(["git", "init", "-q"], cwd=repo_root, check=True)
-    shutil.copy(Path("docs/procedrr/processes/select-process.yaml"), process_dir)
+    shutil.copy(bundled_process_directory() / "select-process.yaml", process_dir)
     process_path = process_dir / "echo-process.yaml"
     process_path.write_text(
         """\
@@ -635,7 +636,7 @@ def test_chat_jev_provider_uses_the_decision_classifier(
     repo_root = tmp_path / ".worktrees" / "chat"
     repo_root.mkdir(parents=True)
     subprocess.run(["git", "init", "-q"], cwd=repo_root, check=True)
-    source_process_dir = Path("docs/procedrr/processes")
+    source_process_dir = bundled_process_directory()
     shutil.copy(source_process_dir / "select-process.yaml", process_dir)
     (process_dir / "echo-process.yaml").write_text(
         """\

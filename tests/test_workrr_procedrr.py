@@ -481,10 +481,12 @@ def test_procedrr_requires_a_schema() -> None:
 
 
 def test_evaluator_can_be_constructed_with_workrr_transport(tmp_path: Path) -> None:
-    from procedrr_evaluator import Evaluator
+    from powdrr_service.procedrr_evaluator import Evaluator
 
-    evaluator = Evaluator.with_workrr(
-        RepairingClient([{"complete": True}]),
+    evaluator = Evaluator(
+        WorkrrProcedrrClient(
+            RepairingClient([{"complete": True}]), process_directory=tmp_path
+        ),
         lambda _tool, _parameters: None,
         process_directory=tmp_path,
     )

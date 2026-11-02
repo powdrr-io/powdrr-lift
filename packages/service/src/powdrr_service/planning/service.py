@@ -1009,8 +1009,8 @@ def run_planning_procedrr(
     stderr: Any,
 ) -> Any:
     """Execute the bundled plan process around the durable question service."""
-    from procedrr import ProcessCatalog
-    from procedrr_evaluator.runtime import ProcedrrExecutionService
+    from powdrr_service.procedrr import ProcessCatalog
+    from powdrr_service.procedrr_evaluator.runtime import ProcedrrExecutionService
 
     catalog = ProcessCatalog.load(Path(process_directory))
     process_client = WorkrrProcedrrClient(

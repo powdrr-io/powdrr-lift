@@ -3,7 +3,7 @@
 from pathlib import Path
 from typing import Any
 
-from procedrr import parse_and_validate
+from powdrr_service.procedrr import parse_and_validate
 
 
 def definition() -> dict[str, Any]:

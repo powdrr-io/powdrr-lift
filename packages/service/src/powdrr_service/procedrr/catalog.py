@@ -11,7 +11,7 @@ from typing import Any
 
 from jsonschema import Draft202012Validator
 
-from procedrr.parser import parse_and_validate
+from powdrr_service.procedrr.parser import parse_and_validate
 
 
 class ProcessCatalogError(ValueError):

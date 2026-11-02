@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 from collections.abc import Mapping
 from dataclasses import replace
-from pathlib import Path
 from typing import Any
 
 import pytest
@@ -22,9 +21,10 @@ from powdrr_service.planning.repair import (
     item_input_contract_digest,
     plan_revision_digest,
 )
+from powdrr_service.procedrr import ProcessCatalog
+from powdrr_service.resources import bundled_process_directory
 
 from powdrr_lift.workrr.github_issue_queue import PlannedWorkItem, ReviewedExecutionPlan
-from procedrr import ProcessCatalog
 
 
 def _item(item_id: str, *, dependencies: tuple[str, ...] = ()) -> PlannedWorkItem:
@@ -424,7 +424,7 @@ def test_repair_rejects_compiler_changes_to_an_unrelated_workflow() -> None:
 
 
 def test_repair_procedrr_process_is_catalogued() -> None:
-    process_dir = Path(__file__).parents[1] / "docs/procedrr/processes"
+    process_dir = bundled_process_directory()
     process = ProcessCatalog.load(process_dir).get("plan-repair-execution")
     assert process.name == "plan-repair-execution"
 

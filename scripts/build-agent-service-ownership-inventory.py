@@ -21,11 +21,11 @@ def _owner(path: str) -> tuple[str, str, str]:
             "bounded planning, question, dependency, or repair policy",
             "4",
         )
-    if path.startswith("docs/procedrr/processes/") or path.startswith(
-        "src/powdrr_lift/process/"
-    ):
+    if path.startswith(
+        "packages/service/src/powdrr_service/resources/processes/"
+    ) or path.startswith("src/powdrr_lift/process/"):
         return "service", "private process-language implementation and resources", "8"
-    if path.startswith("src/procedrr"):
+    if path.startswith("packages/service/src/powdrr_service/procedrr"):
         return "service", "private process-language runtime", "8"
     if path.startswith("src/powdrr_lift/structrr/"):
         return (
@@ -169,17 +169,17 @@ def _internal_imports(source: str, module: str) -> list[str]:
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
             for alias in node.names:
-                if alias.name.startswith(("powdrr_lift", "procedrr")):
+                if alias.name.startswith(("powdrr_lift", "powdrr_service", "procedrr")):
                     found.add(alias.name)
         elif isinstance(node, ast.ImportFrom) and node.module:
-            if node.module.startswith(("powdrr_lift", "procedrr")):
+            if node.module.startswith(("powdrr_lift", "powdrr_service", "procedrr")):
                 found.add(node.module)
             elif node.level:
                 package = module.rpartition(".")[0]
                 segments = package.split(".")
                 keep = max(0, len(segments) - node.level + 1)
                 relative = ".".join((*segments[:keep], node.module))
-                if relative.startswith(("powdrr_lift", "procedrr")):
+                if relative.startswith(("powdrr_lift", "powdrr_service", "procedrr")):
                     found.add(relative)
     return sorted(found)
 
@@ -198,8 +198,9 @@ def main() -> int:
                 "-z",
                 "--",
                 "src/powdrr_lift",
-                "src/procedrr",
-                "src/procedrr_evaluator",
+                "packages/service/src/powdrr_service/procedrr",
+                "packages/service/src/powdrr_service/procedrr_evaluator",
+                "packages/service/src/powdrr_service/resources/processes",
                 "docs/procedrr",
                 "scripts",
             ],
@@ -218,6 +219,7 @@ def main() -> int:
             path.endswith(".py")
             or path.startswith(
                 (
+                    "packages/service/src/powdrr_service/resources/processes/",
                     "docs/procedrr/",
                     "src/powdrr_lift/resources/",
                     "scripts/",

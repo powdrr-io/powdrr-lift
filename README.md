@@ -326,7 +326,7 @@ Use the terminal workflow chat agent to select a checked-in Procedrr process,
 ask follow-up questions, and run its authorized operations.
 
 ```bash
-powdrr-lift workflow-chat --repo-root . --processes-dir docs/procedrr/processes
+powdrr-lift workflow-chat --repo-root .
 ```
 
 Durable tasks can be processed with `process-workflow-task`. Its `auto` default
@@ -426,15 +426,14 @@ continue to handle Command shortcuts itself; use `Ctrl+C`, `Ctrl+X`, and
 
 ### Procedrr processes
 
-Reusable workflow definitions live as validated Procedrr processes in
-[docs/procedrr/processes/](docs/procedrr/processes/). Workflow chat, feature
-execution, and durable workflow tasks use this process catalog for planning,
-implementation, validation, review, and nested process calls.
+Reusable workflow definitions live in the service package's validated Procedrr
+catalog. Workflow chat, feature execution, and durable workflow tasks use this
+catalog for planning, implementation, validation, review, and nested process calls.
 
-From a repository checkout, validate the process catalog with:
+Validate the bundled process catalog with:
 
 ```bash
-powdrr-lift validate-procedrr-processes docs/procedrr/processes
+powdrr-lift validate-procedrr-processes
 ```
 
 For local DeepSWE runs, follow [the benchmark instructions](BENCHMARKS.md).

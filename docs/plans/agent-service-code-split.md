@@ -338,7 +338,7 @@ inventory; every production module and packaged resource needs a final owner.
 | `execution/*` | Agent local effect enforcement/journal vs service process transitions, compaction, persona/prompt and semantic acceptance; audit each module |
 | `intrinsic_*`, `file_management.py`, `basedpyright_tools.py`, `workrr/git.py` | Extract mechanical local tools to agent; domain enrichment/validation stays service |
 | `artifact_state.py`, changelog parsers, specification loaders | Service reconstruction and semantic validation; agent can collect bytes and display service projections |
-| `procedrr/*`, `procedrr_evaluator/*`, `process/*`, `docs/procedrr/processes/*` | Private service language/runtime/resources; service resource lookup independent of user's repository path |
+| `powdrr_service.procedrr`, `powdrr_service.procedrr_evaluator`, and `powdrr_service.resources/processes` | Private service language/runtime/resources; service resource lookup independent of user's repository path |
 | `openai_proxy.py` | Existing diagnostic tool stays in private development/local tooling; not the future authenticated service gateway |
 | `integrations/harbor/*`, benchmark/evaluation CLI | Agent harness for repository operations; service-owned scoring/prompts/benchmark analysis; preserve verifier-as-tests boundary |
 
@@ -577,7 +577,7 @@ export PYTHONPATH="$PWD/packages/contracts/src:$PWD/packages/agent/src:$PWD/pack
 rtk proxy python -m ruff format --check .
 rtk proxy python -m ruff check .
 rtk proxy python -m mypy packages src tests
-rtk proxy python -m powdrr_local.cli validate-procedrr-processes docs/procedrr/processes
+rtk proxy python -m powdrr_local.cli validate-procedrr-processes
 rtk proxy python -m pytest -n auto --cov=powdrr_agent --cov=powdrr_service --cov=powdrr_contracts --cov=powdrr_local --cov-branch --cov-report=term-missing --cov-report=xml tests
 rtk proxy bash scripts/run-deterministic-workflow-suite.sh
 ```

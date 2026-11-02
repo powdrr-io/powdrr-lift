@@ -37,7 +37,7 @@ Relevant implementation and evidence:
 - `src/powdrr_lift/cli.py` (`evaluate-deepswe-prompt` command)
 - `docs/evaluations/deepswe-design-evaluation.md`
 - `docs/evaluations/semantic-prompt-baseline-2026-10-04/README.md`
-- `docs/evaluations/deepswe-python-statemachine-state-data.yaml`
+- `packages/service/src/powdrr_service/resources/evaluations/deepswe-python-statemachine-state-data.yaml`
 - `docs/evaluations/deepswe-ytt-jsonpath-query-api.yaml`
 - `docs/evaluations/deepswe-skrub-duration-encoding.yaml`
 

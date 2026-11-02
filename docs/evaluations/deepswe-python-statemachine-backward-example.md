@@ -23,7 +23,7 @@ for this after-the-fact analysis. They were not inputs to the captured prompt.
 | Instruction | 1,957 bytes, SHA-256 `17e0781f9837bebd7304d5f1594dbf7de9a147a3ba8f03111e005f8376b3126a` |
 | Reference solution patch | SHA-256 `4197380535a2e67258afbdac3a7cb91d6a2c9ab1cd70c4cc09e973b739e4f81d` |
 | Verifier patch | SHA-256 `fcf7628db832d77da0f31fb287d5f016e27c02550ca54aa6fd19c9aa4d8bf0ec` |
-| Existing task rubric | `docs/evaluations/deepswe-python-statemachine-state-data.yaml`, 19 product behaviors plus a delivery-instruction absence criterion |
+| Existing task rubric | `packages/service/src/powdrr_service/resources/evaluations/deepswe-python-statemachine-state-data.yaml`, 19 product behaviors plus a delivery-instruction absence criterion |
 | Captured prompt | 52,726 bytes, SHA-256 `a6c7e2848edeb29eeb7c682c944840ee8407e3de2e96213a2ce8ab5440744202` |
 | Reference content draft | 3,241 bytes, SHA-256 `a90e5d3fd2597aaf102e1a9da7caab0be8e0c17dd889a6a1f5da68b3b73c8993` |
 | Capture revision | Powdrr `ef8d51d1e8e30de733b1eae17706424e882abc33`; the checked-out `origin/main` for this analysis is `dafca23c` |

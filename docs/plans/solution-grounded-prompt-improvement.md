@@ -48,7 +48,7 @@ Reuse these components rather than introduce a parallel compiler:
   worker-prompt capture mode.
 - `src/powdrr_lift/workrr/deepswe_design_evaluation.py`: task identity, artifact
   integrity, source anchors, and evidence-based behavior judging.
-- `docs/evaluations/deepswe-python-statemachine-state-data.yaml`: an existing
+- `packages/service/src/powdrr_service/resources/evaluations/deepswe-python-statemachine-state-data.yaml`: an existing
   task-grounded rubric, usable as the first worked example.
 - `docs/harbor/python-instruction-prompt-audit-2026-09-29.md`: six additional
   families exposing ambiguity, decomposition, metadata, and extraction failures.

@@ -490,6 +490,8 @@ required validation cannot be reported as success. Worker commits remain visible
    the agent supplies repository evidence and does local collection/materialization.
    Keep verification-contract compilation, proposal review, intent lineage, and
    invariant review in the service with those Structrr policy modules.
+   Move DeepSWE prompt/probe evaluation and prompt-to-benchmark comparison
+   policy into the service with its bundled default rubric.
 2. Remove the legacy-import allowlist and private compatibility shims. An old
    executable entry point may remain as a thin local-composition delegator;
    the public agent package must not depend on it.

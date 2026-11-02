@@ -5,13 +5,13 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-
-from powdrr_lift.cli import main
-from powdrr_lift.workrr.deepswe_design_evaluation import _content_fingerprint
-from powdrr_lift.workrr.prompt_benchmark_comparison import (
+from powdrr_service.evaluations.deepswe_design_evaluation import _content_fingerprint
+from powdrr_service.evaluations.prompt_benchmark_comparison import (
     PromptBenchmarkComparisonError,
     compare_prompt_benchmark,
 )
+
+from powdrr_lift.cli import main
 
 
 def _prompt_report() -> dict[str, Any]:

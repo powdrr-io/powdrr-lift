@@ -68,7 +68,7 @@ Evaluate the captured prompts after generation:
 uv run powdrr-lift evaluate-deepswe-prompt \
   --task-dir /path/to/deep-swe/tasks/python-statemachine-state-data-scoping \
   --run-dir /tmp/state-data-prompt-run \
-  --rubric docs/evaluations/deepswe-python-statemachine-state-data.yaml \
+  --rubric packages/service/src/powdrr_service/resources/evaluations/deepswe-python-statemachine-state-data.yaml \
   --report /tmp/state-data-prompt-run/prompt-quality-evaluation.json
 ```
 

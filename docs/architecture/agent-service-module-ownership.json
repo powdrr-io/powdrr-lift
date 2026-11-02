@@ -996,8 +996,6 @@
         "powdrr_lift.workrr.coding_agent",
         "powdrr_lift.workrr.coding_agent_validation",
         "powdrr_lift.workrr.credential_check",
-        "powdrr_lift.workrr.deepswe_design_evaluation",
-        "powdrr_lift.workrr.deepswe_probe_evaluation",
         "powdrr_lift.workrr.differential_verification",
         "powdrr_lift.workrr.feature_endpoint",
         "powdrr_lift.workrr.feature_run",
@@ -1008,13 +1006,15 @@
         "powdrr_lift.workrr.planning_session",
         "powdrr_lift.workrr.pr_execution_session",
         "powdrr_lift.workrr.procedrr_chat",
-        "powdrr_lift.workrr.prompt_benchmark_comparison",
         "powdrr_lift.workrr.provider_runtime",
         "powdrr_lift.workrr.repository_subject_binding",
         "powdrr_lift.workrr.run_artifacts",
         "powdrr_lift.workrr.scenario",
         "powdrr_lift.workrr.task_agent",
         "powdrr_lift.workrr.workflow_provider_selection",
+        "powdrr_service.evaluations.deepswe_design_evaluation",
+        "powdrr_service.evaluations.deepswe_probe_evaluation",
+        "powdrr_service.evaluations.prompt_benchmark_comparison",
         "powdrr_service.planning.workflow_ids",
         "powdrr_service.procedrr",
         "powdrr_service.procedrr.catalog",
@@ -2657,21 +2657,21 @@
       "reviewed": false
     },
     {
-      "extraction_pr": "5/7",
+      "extraction_pr": "8",
       "internal_imports": [],
       "kind": "python_module",
-      "owner": "split",
-      "path": "src/powdrr_lift/workrr/deepswe_design_evaluation.py",
-      "rationale": "separate service decisions from agent I/O and orchestration",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/evaluations/deepswe_design_evaluation.py",
+      "rationale": "service-owned prompt and benchmark evaluation policy",
       "reviewed": false
     },
     {
-      "extraction_pr": "5/7",
+      "extraction_pr": "8",
       "internal_imports": [],
       "kind": "python_module",
-      "owner": "split",
-      "path": "src/powdrr_lift/workrr/deepswe_probe_evaluation.py",
-      "rationale": "separate service decisions from agent I/O and orchestration",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/evaluations/deepswe_probe_evaluation.py",
+      "rationale": "service-owned prompt and benchmark evaluation policy",
       "reviewed": false
     },
     {
@@ -3163,14 +3163,14 @@
       "reviewed": false
     },
     {
-      "extraction_pr": "5/7",
+      "extraction_pr": "8",
       "internal_imports": [
-        "powdrr_lift.workrr.deepswe_design_evaluation"
+        "powdrr_service.evaluations.deepswe_design_evaluation"
       ],
       "kind": "python_module",
-      "owner": "split",
-      "path": "src/powdrr_lift/workrr/prompt_benchmark_comparison.py",
-      "rationale": "separate service decisions from agent I/O and orchestration",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/evaluations/prompt_benchmark_comparison.py",
+      "rationale": "service-owned prompt and benchmark evaluation policy",
       "reviewed": false
     },
     {
@@ -3710,6 +3710,24 @@
       "path": "packages/service/src/powdrr_service/structrr/snapshot.py",
       "rationale": "Canonical Structrr snapshot normalization and content fingerprinting.",
       "reviewed": true
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/evaluations/__init__.py",
+      "rationale": "service-owned prompt and benchmark evaluation policy",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [],
+      "kind": "resource",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/resources/evaluations/deepswe-python-statemachine-state-data.yaml",
+      "rationale": "bundled private evaluation rubric",
+      "reviewed": false
     }
   ],
   "inventory_scope": [

@@ -29,6 +29,21 @@ from powdrr_local.planning.repair_publication import (
     RepairPublicationError,
     publish_repair_pull_request,
 )
+from powdrr_service.evaluations.deepswe_design_evaluation import (
+    DEFAULT_STATE_DATA_RUBRIC,
+    DeepSWEEvaluationError,
+    evaluate_deepswe_design,
+    evaluate_deepswe_worker_prompt,
+    evaluate_prompt_case,
+)
+from powdrr_service.evaluations.deepswe_probe_evaluation import (
+    DeepSWEProbeEvaluationError,
+    evaluate_deepswe_probes,
+)
+from powdrr_service.evaluations.prompt_benchmark_comparison import (
+    PromptBenchmarkComparisonError,
+    compare_prompt_benchmark,
+)
 from powdrr_service.planning.workflow_ids import slugify_workflow_id
 from powdrr_service.providers.config import (
     ALL_PROVIDERS,
@@ -193,17 +208,6 @@ from powdrr_lift.workrr.credential_check import (
     check_model_access,
     configured_model_mapping,
 )
-from powdrr_lift.workrr.deepswe_design_evaluation import (
-    DEFAULT_STATE_DATA_RUBRIC,
-    DeepSWEEvaluationError,
-    evaluate_deepswe_design,
-    evaluate_deepswe_worker_prompt,
-    evaluate_prompt_case,
-)
-from powdrr_lift.workrr.deepswe_probe_evaluation import (
-    DeepSWEProbeEvaluationError,
-    evaluate_deepswe_probes,
-)
 from powdrr_lift.workrr.differential_verification import (
     classify_differential_result,
     detect_verifier_changes,
@@ -255,10 +259,6 @@ from powdrr_lift.workrr.pr_execution_session import (
     run_pr_execution_worker,
 )
 from powdrr_lift.workrr.procedrr_chat import run_procedrr_workflow_chat
-from powdrr_lift.workrr.prompt_benchmark_comparison import (
-    PromptBenchmarkComparisonError,
-    compare_prompt_benchmark,
-)
 from powdrr_lift.workrr.provider_runtime import (
     build_workflow_client,
     resolve_workflow_provider,

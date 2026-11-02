@@ -81,20 +81,16 @@ def _proposal(
     return {
         "requirement_ids": ["req-0001"],
         "deliverable": "A focused acceptance test.",
-        "component": "tests",
-        "implementation_runtime": runtime,
         "planned_writes": [
             {
                 "path": path,
                 "role": "test",
-                "runtime": runtime,
                 "source_refs": [anchor],
                 "evidence_ids": [],
             }
         ],
         "implementation_step": "Add the acceptance test for the behavior.",
         "acceptance_criteria": ["The test covers the required behavior."],
-        "validation_ids": ["validation-0001"],
         "required_outputs": [],
     }
 
@@ -157,7 +153,7 @@ def test_actual_python_and_swift_writes_cannot_share_a_unit() -> None:
     context, anchor = _context()
     answer = _proposal(context, anchor)
     python_write = dict(answer["planned_writes"][0])  # type: ignore[index]
-    python_write.update(path="tests/test_helper.py", runtime="python")
+    python_write.update(path="tests/test_helper.py")
     context = replace(
         context,
         repository_paths={
@@ -196,7 +192,7 @@ def test_new_extensionless_data_file_can_be_explicitly_runtime_neutral() -> None
     )
     planned_writes = answer["planned_writes"]
     assert isinstance(planned_writes, list)
-    planned_writes[0]["runtime"] = None
+    planned_writes[0]["role"] = "configuration"
 
     proposal = parse_work_unit_proposal(answer, context=context)
 
@@ -220,7 +216,7 @@ def test_platform_data_file_extensions_are_runtime_neutral(path: str) -> None:
     answer = _proposal(context, anchor, path=path, runtime="neutral")
     planned_writes = answer["planned_writes"]
     assert isinstance(planned_writes, list)
-    planned_writes[0]["runtime"] = None
+    planned_writes[0]["role"] = "configuration"
 
     proposal = parse_work_unit_proposal(answer, context=context)
 
@@ -243,7 +239,7 @@ def test_gitkeep_is_neutral_inside_a_source_named_directory() -> None:
     context = replace(context, requirements={requirement.id: requirement})
     answer = _proposal(context, anchor, path=path, runtime="neutral")
     answer["planned_writes"][0]["source_refs"] = [path_anchor]  # type: ignore[index]
-    answer["planned_writes"][0]["runtime"] = None  # type: ignore[index]
+    answer["planned_writes"][0]["role"] = "configuration"  # type: ignore[index]
 
     proposal = parse_work_unit_proposal(answer, context=context)
 
@@ -332,30 +328,25 @@ def test_standalone_units_are_not_grouped_with_product_work() -> None:
     ).unit_ids == ("unit-0002",)
 
 
-def test_scope_description_must_assign_each_unit_once() -> None:
+def test_item_scope_membership_is_derived_from_allocated_units() -> None:
     group = AllocationGroup(
         "allocation-0001", ("unit-0001", "unit-0002"), (), (), "neutral", 2
     )
     valid = {
         "title": "Add the parser behavior",
         "objective": "Implement and validate the parser behavior.",
-        "scope": [
-            {"description": "Build both units.", "unit_ids": ["unit-0001", "unit-0002"]}
-        ],
     }
 
-    assert parse_item_description(valid, group=group).title == "Add the parser behavior"
-    invalid = {
-        **valid,
-        "scope": [{"description": "Only one.", "unit_ids": ["unit-0001"]}],
-    }
-    with pytest.raises(
-        PlanningContractError, match="cover each allocated unit exactly once"
-    ):
-        parse_item_description(invalid, group=group)
+    parsed = parse_item_description(valid, group=group)
+
+    assert parsed.title == "Add the parser behavior"
+    assert tuple(unit for scope in parsed.scope for unit in scope.unit_ids) == (
+        "unit-0001",
+        "unit-0002",
+    )
 
 
-def test_item_description_combines_excess_scope_entries_without_losing_units() -> None:
+def test_item_description_groups_deterministic_scopes_by_component() -> None:
     group = AllocationGroup(
         "allocation-0001",
         ("unit-0001", "unit-0002", "unit-0003", "unit-0004"),
@@ -367,20 +358,24 @@ def test_item_description_combines_excess_scope_entries_without_losing_units() -
     answer = {
         "title": "Implement the verification script",
         "objective": "Validate all configured attestation steps.",
-        "scope": [
-            {"description": f"Implement part {index}.", "unit_ids": [unit_id]}
-            for index, unit_id in enumerate(group.unit_ids, start=1)
-        ],
+    }
+    units = {
+        unit_id: _unit(
+            index,
+            component="tests" if index > 2 else "implementation",
+        )
+        for index, unit_id in enumerate(group.unit_ids, start=1)
     }
 
-    parsed = parse_item_description(answer, group=group)
+    parsed = parse_item_description(answer, group=group, units=units)
 
-    assert len(parsed.scope) == 3
+    assert len(parsed.scope) == 2
     assert (
         tuple(unit_id for scope in parsed.scope for unit_id in scope.unit_ids)
         == group.unit_ids
     )
-    assert "Implement part 1.; Implement part 2." == parsed.scope[0].description
+    assert parsed.scope[0].unit_ids == ("unit-0001", "unit-0002")
+    assert parsed.scope[1].unit_ids == ("unit-0003", "unit-0004")
 
 
 def test_item_description_question_example_passes_its_parser() -> None:
@@ -390,6 +385,47 @@ def test_item_description_question_example_passes_its_parser() -> None:
     request = build_item_description_request(group, {"unit-0001": _unit(1)})
 
     request.validate()
+    assert request.question.contract_version == 2
+    assert request.question.expected_answer_schema == "describe-item-v2"
+    assert "scope" not in request.answer_schema["properties"]
+
+
+def test_item_description_title_quality_is_specific_and_distinct() -> None:
+    group = AllocationGroup(
+        "allocation-0001", ("unit-0001",), ("req-0001",), ("core",), "neutral", 1
+    )
+    unit = replace(
+        _unit(1),
+        deliverable="A signed manifest verification script",
+        implementation_step="Verify signed manifest contents before publishing.",
+    )
+    request = build_item_description_request(group, {unit.id: unit})
+
+    request.parse_answer(
+        {
+            "title": "Verify signed manifest contents",
+            "objective": "Reject unsigned or malformed manifests before publishing.",
+        }
+    )
+    with pytest.raises(PlanningContractError, match="concrete outcome"):
+        request.parse_answer(
+            {"title": "Implement code", "objective": "Implement the allocated work."}
+        )
+
+    next_group = replace(group, id="allocation-0002", unit_ids=("unit-0002",))
+    next_unit = replace(unit, id="unit-0002", requirement_ids=("req-0002",))
+    duplicate_request = build_item_description_request(
+        next_group,
+        {next_unit.id: next_unit},
+        already_used_titles=((group.id, "Verify signed manifest contents"),),
+    )
+    with pytest.raises(PlanningContractError, match="distinct"):
+        duplicate_request.parse_answer(
+            {
+                "title": "Verify signed manifest contents",
+                "objective": "Verify the next allocated unit.",
+            }
+        )
 
 
 def test_work_unit_question_has_a_parser_valid_example_and_exact_context() -> None:
@@ -407,8 +443,11 @@ def test_work_unit_question_has_a_parser_valid_example_and_exact_context() -> No
 
     request.validate()
     assert request.question.kind == "propose_work_units"
+    assert request.question.contract_version == 2
+    assert request.question.expected_answer_schema == "work-unit-proposals-v2"
+    assert request.question.question_id.startswith("propose-units-v2-")
     assert "requirement's own source_refs" in request.exact_question
-    assert "runtime to null for non-executable artifacts" in request.exact_question
+    assert "runtime are derived" in request.exact_question
     assert "If every supplied requirement is covered" in request.exact_question
     assert (
         "requirements remain uncovered" in request.answer_field_definitions["has_more"]
@@ -418,9 +457,9 @@ def test_work_unit_question_has_a_parser_valid_example_and_exact_context() -> No
         == MAX_WORK_UNIT_PROPOSALS_PER_PAGE
     )
     record_schema = request.answer_schema["properties"]["records"]["items"]
-    assert record_schema["properties"]["validation_ids"]["items"]["enum"] == [
-        "validation-0001"
-    ]
+    assert "component" not in record_schema["properties"]
+    assert "implementation_runtime" not in record_schema["properties"]
+    assert "validation_ids" not in record_schema["properties"]
     assert MAX_WORK_UNIT_REQUIREMENTS_PER_QUESTION == 4
     with pytest.raises(PlanningContractError, match="must contain"):
         request.parse_answer(
@@ -436,13 +475,6 @@ def test_work_unit_question_has_a_parser_valid_example_and_exact_context() -> No
             context,
             ["req-0001"] * 5,
             valid_example=example,
-        )
-
-    prefixed_validation = dict(example_proposal)
-    prefixed_validation["validation_ids"] = ["validation:validation-0001"]
-    with pytest.raises(PlanningContractError, match="unknown references"):
-        request.parse_answer(
-            {"records": [prefixed_validation], "has_more": False, "next_anchor": None}
         )
 
     second_requirement = replace(context.requirements["req-0001"], id="req-0002")
@@ -598,12 +630,9 @@ def test_work_unit_continuation_only_includes_uncovered_requirements(
     assert set(example_records[0]) == {
         "requirement_ids",
         "deliverable",
-        "component",
-        "implementation_runtime",
         "planned_writes",
         "implementation_step",
         "acceptance_criteria",
-        "validation_ids",
         "required_outputs",
     }
     proposals = []
@@ -741,7 +770,7 @@ def test_cohesion_split_can_allocate_one_requirement_to_multiple_units() -> None
     split = {
         "decision": "split",
         "reason": "Implementation and focused acceptance test are separate steps.",
-        "replacements": [proposal.to_data(), proposal.to_data()],
+        "replacements": [_proposal(context, anchor), _proposal(context, anchor)],
     }
 
     from powdrr_service.planning.assembly import parse_cohesion_decision

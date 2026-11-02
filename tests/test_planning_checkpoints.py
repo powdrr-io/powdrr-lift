@@ -801,6 +801,7 @@ def test_local_planning_telemetry_summarizes_large_runs_without_journal_data(
         return {
             "question_ids": [f"extract-requirements-{index:05d}"],
             "question_kinds": ["extract_requirements"],
+            "phase": "source-ledger",
             "input_digests": ["sha256:" + "a" * 64],
             "batch_member_count": 1,
             "request_chars": 900,
@@ -818,10 +819,45 @@ def test_local_planning_telemetry_summarizes_large_runs_without_journal_data(
             "input_digest": "sha256:" + "a" * 64,
             "prompt_tokens": None,
             "completion_tokens": None,
+            "pagination": [
+                {
+                    "question_id": f"extract-requirements-{index:05d}",
+                    "subject_id": "block-1",
+                    "page_ordinal": 1,
+                    "has_more": False,
+                    "returned_records": 2,
+                    "unique_new_records": 2,
+                    "made_progress": True,
+                }
+            ],
         }
 
     for index in range(1_000):
         store.record(prior_run if index < 700 else current_run, metric(index))
+    store.record_deterministic_answer(
+        current_run,
+        {
+            "question_id": "coverage-req-0001",
+            "question_kind": "assess_requirement_coverage",
+            "phase": "repository-coverage",
+            "input_digest": "sha256:" + "b" * 64,
+            "rule_id": "completed-zero-hit-search-v1",
+        },
+    )
+    store.record_repository_search(
+        current_run,
+        "req-0001",
+        {
+            "matching_line_count": 0,
+            "matching_path_count": 0,
+            "evidence_count": 0,
+            "basedpyright_query_count": 2,
+            "basedpyright_match_count": 0,
+            "rg_match_count": 0,
+            "basedpyright_available": True,
+            "base_commit": "a" * 40,
+        },
+    )
 
     summary = store.summary(current_run_id=current_run)
 
@@ -829,6 +865,20 @@ def test_local_planning_telemetry_summarizes_large_runs_without_journal_data(
     assert summary["api_calls"] == 1_000
     assert summary["token_usage_known"] is False
     assert summary["by_question_kind"]["extract_requirements"]["questions"] == 1_000
+    assert (
+        summary["by_phase_and_question_kind"]["source-ledger"]["extract_requirements"][
+            "questions"
+        ]
+        == 1_000
+    )
+    assert summary["pagination"]["pages"] == 1_000
+    assert summary["pagination"]["unique_new_records"] == 2_000
+    assert summary["deterministic_answers"] == {
+        "count": 1,
+        "by_rule": {"completed-zero-hit-search-v1": 1},
+    }
+    assert summary["repository_search"]["requirements"] == 1
+    assert summary["repository_search"]["basedpyright_queries"] == 2
     assert [run["run"] for run in summary["runs"]] == ["prior", "current"]
     assert summary["runs"][0]["questions"] == 700
     assert summary["runs"][1]["questions"] == 300

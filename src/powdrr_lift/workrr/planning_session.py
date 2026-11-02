@@ -120,6 +120,8 @@ def run_planning_session(
     issue_checkpoint_store: GitHubCommentCheckpointStore | None = None
     telemetry_store: LocalPlanningTelemetryStore | None = None
     telemetry_run_id: str | None = None
+    machine: SourceLedgerQuestionMachine | None = None
+    recorded_search_ids: set[str] = set()
     plan_id = config.plan_id or ""
     output_path: Path | None = None
     try:
@@ -235,6 +237,25 @@ def run_planning_session(
             structrr_baseline=structrr_baseline,
             taxonomy_entity_types=taxonomy.entity_types,
         )
+
+        def record_repository_search_metrics() -> None:
+            if telemetry_store is None or telemetry_run_id is None or machine is None:
+                return
+            for requirement_id, metrics in machine.repository_search_metrics():
+                if requirement_id in recorded_search_ids:
+                    continue
+                try:
+                    telemetry_store.record_repository_search(
+                        telemetry_run_id, requirement_id, metrics
+                    )
+                except Exception as telemetry_error:
+                    print(
+                        f"Planning search telemetry could not be recorded: "
+                        f"{telemetry_error}",
+                        file=stream,
+                    )
+                recorded_search_ids.add(requirement_id)
+
         checkpoint_store = LocalCheckpointStore(
             repo_root, session_id=session.session_id
         )
@@ -249,11 +270,18 @@ def run_planning_session(
         except Exception as telemetry_error:
             print(f"Planning telemetry unavailable: {telemetry_error}", file=stream)
         record_telemetry = None
+        record_deterministic_telemetry = None
         if telemetry_store is not None and telemetry_run_id is not None:
 
             def record_telemetry(metric: Mapping[str, Any]) -> None:
                 assert telemetry_store is not None and telemetry_run_id is not None
                 telemetry_store.record(telemetry_run_id, metric)
+
+            def record_deterministic_telemetry(
+                metric: Mapping[str, Any],
+            ) -> None:
+                assert telemetry_store is not None and telemetry_run_id is not None
+                telemetry_store.record_deterministic_answer(telemetry_run_id, metric)
 
         if config.resume and not checkpoint_store.path.exists():
             checkpoint_store.import_legacy_comments(
@@ -281,9 +309,11 @@ def run_planning_session(
                 use_provider_schema=planning_mapping.provider != "deepinfra-cheap",
                 provider=planning_mapping.provider,
                 telemetry_sink=record_telemetry,
+                deterministic_telemetry_sink=record_deterministic_telemetry,
             ),
             stderr=stream,
         )
+        record_repository_search_metrics()
         _write_planning_telemetry_summary(
             telemetry_store, stream, current_run_id=telemetry_run_id
         )
@@ -342,6 +372,8 @@ def run_planning_session(
             pull_request=pull_request,
         )
     except Exception as error:
+        if machine is not None:
+            record_repository_search_metrics()
         if telemetry_store is not None:
             _write_planning_telemetry_summary(
                 telemetry_store, stream, current_run_id=telemetry_run_id
@@ -405,6 +437,32 @@ def _write_planning_telemetry_summary(
             f"{values['api_calls']} calls, {round(values['elapsed_ms'], 3)} ms",
             file=stream,
         )
+    for phase, kinds in summary["by_phase_and_question_kind"].items():
+        totals = sum(values["questions"] for values in kinds.values())
+        print(f"  phase {phase}: {totals} questions", file=stream)
+    deterministic = summary["deterministic_answers"]
+    rules = ", ".join(
+        f"{rule}={count}" for rule, count in deterministic["by_rule"].items()
+    )
+    print(
+        f"  deterministic answers: {deterministic['count']} ({rules})",
+        file=stream,
+    )
+    print(
+        f"  pagination: {summary['pagination']['pages']} pages, "
+        f"{summary['pagination']['returned_records']} records, "
+        f"{summary['pagination']['no_progress_pages']} no-progress pages",
+        file=stream,
+    )
+    search = summary["repository_search"]
+    print(
+        f"  repository search: {search['requirements']} requirements, "
+        f"{search['matching_lines']} matching lines, "
+        f"{search['evidence_records']} evidence records; "
+        f"BasedPyright queries {search['basedpyright_queries']}, "
+        f"ripgrep matches {search['rg_matches']}",
+        file=stream,
+    )
     for run in summary["runs"]:
         print(
             f"  {run['run']} execution: {run['questions']} questions, "

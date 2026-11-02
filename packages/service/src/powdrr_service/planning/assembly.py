@@ -39,7 +39,6 @@ MAX_WORK_UNIT_PROPOSALS_PER_PAGE = 3
 MAX_ITEM_CRITERIA = 5
 MAX_ITEM_SCOPE_ENTRIES = 3
 _ROLES = frozenset({"implementation", "test", "configuration", "documentation"})
-_RUNTIME_VALUES = frozenset({*CANONICAL_RUNTIMES, "neutral"})
 _NEUTRAL_SUFFIXES = frozenset(
     {
         ".cfg",
@@ -84,12 +83,9 @@ WORK_UNIT_PROPOSAL_PAGE_JSON_SCHEMA: dict[str, Any] = {
                 "required": [
                     "requirement_ids",
                     "deliverable",
-                    "component",
-                    "implementation_runtime",
                     "planned_writes",
                     "implementation_step",
                     "acceptance_criteria",
-                    "validation_ids",
                     "required_outputs",
                 ],
                 "properties": {
@@ -103,11 +99,6 @@ WORK_UNIT_PROPOSAL_PAGE_JSON_SCHEMA: dict[str, Any] = {
                         "minLength": 1,
                         "maxLength": 1_000,
                     },
-                    "component": {"type": "string", "minLength": 1, "maxLength": 120},
-                    "implementation_runtime": {
-                        "type": "string",
-                        "enum": sorted(_RUNTIME_VALUES),
-                    },
                     "planned_writes": {
                         "type": "array",
                         "minItems": 1,
@@ -115,13 +106,7 @@ WORK_UNIT_PROPOSAL_PAGE_JSON_SCHEMA: dict[str, Any] = {
                         "items": {
                             "type": "object",
                             "additionalProperties": False,
-                            "required": [
-                                "path",
-                                "role",
-                                "runtime",
-                                "source_refs",
-                                "evidence_ids",
-                            ],
+                            "required": ["path", "role", "source_refs", "evidence_ids"],
                             "properties": {
                                 "path": {
                                     "type": "string",
@@ -129,10 +114,6 @@ WORK_UNIT_PROPOSAL_PAGE_JSON_SCHEMA: dict[str, Any] = {
                                     "maxLength": 500,
                                 },
                                 "role": {"type": "string", "enum": sorted(_ROLES)},
-                                "runtime": {
-                                    "type": ["string", "null"],
-                                    "enum": [*sorted(CANONICAL_RUNTIMES), None],
-                                },
                                 "source_refs": {
                                     "type": "array",
                                     "minItems": 1,
@@ -155,11 +136,6 @@ WORK_UNIT_PROPOSAL_PAGE_JSON_SCHEMA: dict[str, Any] = {
                         "minItems": 1,
                         "maxItems": MAX_WORK_UNIT_CRITERIA,
                         "items": {"type": "string", "minLength": 1},
-                    },
-                    "validation_ids": {
-                        "type": "array",
-                        "minItems": 1,
-                        "items": {"type": "string"},
                     },
                     "required_outputs": {
                         "type": "array",
@@ -377,12 +353,9 @@ def parse_work_unit_proposal(
     expected = {
         "requirement_ids",
         "deliverable",
-        "component",
-        "implementation_runtime",
         "planned_writes",
         "implementation_step",
         "acceptance_criteria",
-        "validation_ids",
         "required_outputs",
     }
     _exact_fields(value, expected, "/")
@@ -392,18 +365,11 @@ def parse_work_unit_proposal(
         known=set(context.unresolved_requirement_ids),
         minimum=1,
     )
-    component = _text(value["component"], "/component", max_length=120)
-    if component not in context.component_ids:
+    if len(context.component_ids) != 1:
         raise PlanningContractError(
-            "/component", "component is not in the supplied catalog"
+            "/component", "component cannot be derived from the supplied catalog"
         )
-    declared_runtime = _text(
-        value["implementation_runtime"], "/implementation_runtime", max_length=40
-    )
-    if declared_runtime not in _RUNTIME_VALUES:
-        raise PlanningContractError(
-            "/implementation_runtime", "runtime is not in the canonical registry"
-        )
+    component = next(iter(context.component_ids))
     raw_writes = _array(value["planned_writes"], "/planned_writes", maximum=20)
     if not raw_writes:
         raise PlanningContractError(
@@ -424,11 +390,6 @@ def parse_work_unit_proposal(
             "one work unit cannot mix implementation runtimes; split the work",
         )
     derived_runtime = next(iter(non_neutral_runtimes), "neutral")
-    if declared_runtime != derived_runtime:
-        raise PlanningContractError(
-            "/implementation_runtime",
-            f"runtime must be derived from planned writes ({derived_runtime})",
-        )
     step = _text(value["implementation_step"], "/implementation_step")
     criteria = _text_list(
         value["acceptance_criteria"],
@@ -436,12 +397,12 @@ def parse_work_unit_proposal(
         minimum=1,
         maximum=MAX_WORK_UNIT_CRITERIA,
     )
-    validation_ids = _reference_list(
-        value["validation_ids"],
-        "/validation_ids",
-        known=set(context.validation_catalog),
-        minimum=1,
-    )
+    if len(context.validation_catalog) != 1:
+        raise PlanningContractError(
+            "/validation_ids",
+            "validation cannot be derived from the supplied catalog",
+        )
+    validation_ids = (next(iter(context.validation_catalog)),)
     raw_outputs = _array(value["required_outputs"], "/required_outputs", maximum=8)
     outputs = tuple(
         _parse_required_output(
@@ -463,7 +424,7 @@ def parse_work_unit_proposal(
         requirement_ids,
         _text(value["deliverable"], "/deliverable", max_length=1_000),
         component,
-        declared_runtime,
+        derived_runtime,
         writes,
         step,
         criteria,
@@ -479,7 +440,7 @@ def _parse_planned_write(
         raise PlanningContractError(pointer, "must be an object")
     _exact_fields(
         value,
-        {"path", "role", "runtime", "source_refs", "evidence_ids"},
+        {"path", "role", "source_refs", "evidence_ids"},
         pointer,
     )
     path = _text(value["path"], f"{pointer}/path", max_length=500)
@@ -487,14 +448,6 @@ def _parse_planned_write(
     role = _text(value["role"], f"{pointer}/role", max_length=40)
     if role not in _ROLES:
         raise PlanningContractError(f"{pointer}/role", "unknown planned-write role")
-    runtime_raw = value["runtime"]
-    runtime = (
-        None
-        if runtime_raw is None
-        else _text(runtime_raw, f"{pointer}/runtime", max_length=40)
-    )
-    if runtime is not None and runtime not in CANONICAL_RUNTIMES:
-        raise PlanningContractError(f"{pointer}/runtime", "runtime is not canonical")
     source_refs = _reference_list(
         value["source_refs"],
         f"{pointer}/source_refs",
@@ -507,9 +460,13 @@ def _parse_planned_write(
         known=set(context.evidence),
         minimum=0,
     )
+    role_value = cast(
+        Literal["implementation", "test", "configuration", "documentation"], role
+    )
+    runtime = _derive_planned_write_runtime(path, role_value, context)
     write = PlannedWrite(
         path,
-        cast(Literal["implementation", "test", "configuration", "documentation"], role),
+        role_value,
         runtime,
         source_refs,
         evidence_ids,
@@ -630,17 +587,32 @@ def parse_work_unit_proposal_page(
 
 def _write_runtime(write: PlannedWrite, context: WorkUnitContext) -> str | None:
     """Derive a write's runtime from its path and pinned repository facts."""
-    fact = context.repository_paths.get(write.path)
+    derived = _derive_planned_write_runtime(write.path, write.role, context)
+    if write.runtime != derived:
+        raise PlanningContractError(
+            "/planned_writes/runtime",
+            f"runtime for {write.path} must be {derived!r} based on the path "
+            "and repository facts",
+        )
+    return derived
+
+
+def _derive_planned_write_runtime(
+    path: str,
+    role: Literal["implementation", "test", "configuration", "documentation"],
+    context: WorkUnitContext,
+) -> str | None:
+    fact = context.repository_paths.get(path)
     if fact is not None and fact.is_symlink:
         raise PlanningContractError("/planned_writes/path", "write path is a symlink")
-    suffix = PurePosixPath(write.path).suffix.lower()
+    suffix = PurePosixPath(path).suffix.lower()
     derived = None if suffix == ".h" else PATH_RUNTIME_SUFFIXES.get(suffix)
     if derived is None and suffix in _NEUTRAL_SUFFIXES:
         derived = None
     elif (
         derived is None
         and not suffix
-        and PurePosixPath(write.path).name
+        and PurePosixPath(path).name
         in {
             "Makefile",
             "Dockerfile",
@@ -651,29 +623,25 @@ def _write_runtime(write: PlannedWrite, context: WorkUnitContext) -> str | None:
         }
     ):
         derived = None
-    elif derived is None and fact is None and not suffix and write.runtime is None:
-        # New extensionless files explicitly marked without a runtime are data
-        # artifacts. Source files should use a recognized extension or cite a
-        # repository fact that identifies their runtime.
+    elif (
+        derived is None
+        and fact is None
+        and not suffix
+        and role in {"configuration", "documentation"}
+    ):
         derived = None
     elif derived is None:
         derived = (
             fact.runtime if fact is not None else None
-        ) or context.ambiguous_runtime_resolutions.get(write.path)
+        ) or context.ambiguous_runtime_resolutions.get(path)
         if derived is None:
             raise RuntimeClassificationRequired(
-                f"runtime for planned path {write.path!r} needs repository evidence"
+                f"runtime for planned path {path!r} needs repository evidence"
             )
         if derived not in CANONICAL_RUNTIMES:
             raise PlanningContractError(
                 "/planned_writes/path", "repository runtime is not canonical"
             )
-    if write.runtime != derived:
-        raise PlanningContractError(
-            "/planned_writes/runtime",
-            f"runtime for {write.path} must be {derived!r} based on the path "
-            "and repository facts",
-        )
     return derived
 
 
@@ -816,13 +784,13 @@ def build_work_unit_proposal_request(
         question_identity["maximum_proposals"] = maximum_proposals
     question_key = _digest(question_identity)[-12:]
     question = Question(
-        question_id=f"propose-units-{requirement_ids[0]}-{question_key}",
+        question_id=f"propose-units-v2-{requirement_ids[0]}-{question_key}",
         kind="propose_work_units",
-        contract_version=1,
+        contract_version=2,
         subject_ids=tuple(requirement_ids),
-        input_digest=_digest(input_facts),
+        input_digest=_digest({"schema_version": 2, **input_facts}),
         context_ref_ids=all_refs,
-        expected_answer_schema="work-unit-proposals-v1",
+        expected_answer_schema="work-unit-proposals-v2",
         attempt=1,
     )
 
@@ -839,10 +807,6 @@ def build_work_unit_proposal_request(
     answer_schema["properties"]["records"]["maxItems"] = maximum_proposals
     record_properties = answer_schema["properties"]["records"]["items"]["properties"]
     record_properties["requirement_ids"]["items"]["enum"] = list(requirement_ids)
-    record_properties["component"]["enum"] = sorted(context.component_ids)
-    record_properties["validation_ids"]["items"]["enum"] = sorted(
-        context.validation_catalog
-    )
     write_properties = record_properties["planned_writes"]["items"]["properties"]
     write_properties["source_refs"]["items"]["enum"] = list(source_refs)
     write_properties["evidence_ids"]["items"]["enum"] = sorted(context.evidence)
@@ -864,16 +828,14 @@ def build_work_unit_proposal_request(
             "unresolved requirements. Each unit must describe one implementation "
             "step, at most two acceptance criteria, actual planned file writes, "
             "and required outputs that later work may consume. Do not invent "
-            "requirement, component, validation, evidence, or source IDs. Split "
+            "requirement, evidence, or source IDs. Component, validation, and "
+            "runtime are derived from supplied catalogs and planned paths. Split "
             "different implementation runtimes into separate units. "
             "For each requirement ID in a unit, at least one planned write must "
             "cite one of that requirement's own source_refs from its requirement "
             "fact; do not cite only a neighboring requirement's anchors. "
-            "Set a planned write's runtime to null for non-executable artifacts "
-            "such as documentation, configuration, logs, and fixtures; use a "
-            "language runtime only for executable or source files. "
-            "IDs must exactly match catalog ID values: put `validation-0001` in "
-            "validation_ids, not the context reference `validation:validation-0001`. "
+            "Use pinned repository facts for paths whose runtime cannot be "
+            "derived from their extension. Do not mix implementation runtimes. "
             "Use the valid example for field shape only; do not copy its "
             "placeholder path or example wording. "
             f"Keep descriptions concise. Return at most {maximum_proposals} records "
@@ -886,14 +848,6 @@ def build_work_unit_proposal_request(
         ),
         answer_field_definitions={
             "records": "WorkUnitProposal records with the exact fields in the schema.",
-            "implementation_runtime": (
-                "Canonical runtime derived from the actual planned writes, or "
-                "neutral when all writes are non-executable."
-            ),
-            "validation_ids": (
-                "Exact bare IDs from the supplied validation catalog, such as "
-                "validation-0001; do not add the context prefix `validation:`."
-            ),
             "required_outputs": (
                 "Concrete outputs needed by later work, with references only to "
                 "requirements this unit addresses."
@@ -1158,175 +1112,236 @@ def build_unit_cohesion_request(
 
 
 def parse_item_description(
-    value: Mapping[str, Any], *, group: AllocationGroup
+    value: Mapping[str, Any],
+    *,
+    group: AllocationGroup,
+    units: Mapping[str, WorkUnit] | None = None,
 ) -> ItemDescription:
-    _exact_fields(value, {"title", "objective", "scope"}, "/")
+    _exact_fields(value, {"title", "objective"}, "/")
     title = _text(value["title"], "/title", max_length=160)
     objective = _text(value["objective"], "/objective", max_length=1_000)
-    raw_scope = _array(
-        _combine_excess_scope_entries(value["scope"]),
-        "/scope",
-        minimum=1,
-        maximum=MAX_ITEM_SCOPE_ENTRIES,
-    )
-    scope: list[ItemScope] = []
-    mentioned: list[str] = []
-    known = set(group.unit_ids)
-    for index, item in enumerate(raw_scope):
-        pointer = f"/scope/{index}"
-        if not isinstance(item, Mapping):
-            raise PlanningContractError(pointer, "must be an object")
-        _exact_fields(item, {"description", "unit_ids"}, pointer)
-        refs = _reference_list(
-            item["unit_ids"], f"{pointer}/unit_ids", known=known, minimum=1
-        )
-        mentioned.extend(refs)
-        scope.append(
-            ItemScope(
-                _text(item["description"], f"{pointer}/description", max_length=500),
-                refs,
-            )
-        )
-    if set(mentioned) != known or len(mentioned) != len(set(mentioned)):
+    return ItemDescription(title, objective, _derive_item_scopes(group, units))
+
+
+def _derive_item_scopes(
+    group: AllocationGroup, units: Mapping[str, WorkUnit] | None
+) -> tuple[ItemScope, ...]:
+    if units is None:
+        return (ItemScope("Implement the allocated work units.", group.unit_ids),)
+    by_component: dict[str, list[str]] = {}
+    for unit_id in group.unit_ids:
+        unit = units[unit_id]
+        by_component.setdefault(unit.component, []).append(unit_id)
+    if not by_component:
+        raise PlanningContractError("/scope", "allocation has no work units")
+    if len(by_component) > MAX_ITEM_SCOPE_ENTRIES:
         raise PlanningContractError(
-            "/scope", "must cover each allocated unit exactly once"
+            "/scope", "allocation has too many component scopes"
         )
-    return ItemDescription(title, objective, tuple(scope))
-
-
-def _combine_excess_scope_entries(value: Any) -> Any:
-    """Combine adjacent scope records when they exceed the contract limit."""
-    if not isinstance(value, list) or len(value) <= MAX_ITEM_SCOPE_ENTRIES:
-        return value
-    scope = list(value)
-    while len(scope) > MAX_ITEM_SCOPE_ENTRIES:
-        candidates: list[tuple[int, int, str]] = []
-        for index, (left, right) in enumerate(zip(scope, scope[1:], strict=False)):
-            if not isinstance(left, Mapping) or not isinstance(right, Mapping):
-                return value
-            if set(left) != {"description", "unit_ids"} or set(right) != {
-                "description",
-                "unit_ids",
-            }:
-                return value
-            left_description = left["description"]
-            right_description = right["description"]
-            left_unit_ids = left["unit_ids"]
-            right_unit_ids = right["unit_ids"]
-            if (
-                not isinstance(left_description, str)
-                or not isinstance(right_description, str)
-                or not isinstance(left_unit_ids, list)
-                or not isinstance(right_unit_ids, list)
-                or not all(isinstance(unit_id, str) for unit_id in left_unit_ids)
-                or not all(isinstance(unit_id, str) for unit_id in right_unit_ids)
-            ):
-                return value
-            description = f"{left_description}; {right_description}"
-            if len(description) <= 500:
-                candidates.append((len(description), index, description))
-        if not candidates:
-            return value
-        _combined_length, index, description = min(candidates)
-        left = scope[index]
-        right = scope[index + 1]
-        scope[index : index + 2] = [
-            {
-                "description": description,
-                "unit_ids": [*left["unit_ids"], *right["unit_ids"]],
-            }
-        ]
-    return scope
+    return tuple(
+        ItemScope(f"Implement {component} work units.", tuple(unit_ids))
+        for component, unit_ids in by_component.items()
+    )
 
 
 def build_item_description_request(
-    group: AllocationGroup, units: Mapping[str, WorkUnit]
+    group: AllocationGroup,
+    units: Mapping[str, WorkUnit],
+    *,
+    already_used_titles: Sequence[tuple[str, str]] = (),
+    title_issue: str | None = None,
 ) -> QuestionRequest[ItemDescription]:
     """Build the singular, frozen-group item-description question."""
     selected = [units[unit_id] for unit_id in group.unit_ids]
     accepted = tuple(ContextRecord(unit.id, unit.to_data()) for unit in selected)
     context_ids = tuple(record.ref_id for record in accepted)
+    title_review_facts = (
+        ContextRecord(
+            "prior-item-titles",
+            {"titles": [title for _item_id, title in already_used_titles]},
+        ),
+    )
+    if title_issue is not None:
+        title_review_facts = (
+            *title_review_facts,
+            ContextRecord("title-quality-review", {"issue": title_issue}),
+        )
     question = Question(
-        question_id=f"describe-{group.id}",
+        question_id=f"describe-v2-{group.id}",
         kind="describe_item",
-        contract_version=1,
+        contract_version=2,
         subject_ids=(group.id,),
         input_digest=_digest(
             {
                 "group": group.__dict__
                 if hasattr(group, "__dict__")
-                else {"id": group.id, "unit_ids": group.unit_ids}
+                else {
+                    "id": group.id,
+                    "unit_ids": group.unit_ids,
+                    "component_ids": group.component_ids,
+                    "implementation_runtime": group.implementation_runtime,
+                },
+                "units": [units[unit_id].to_data() for unit_id in group.unit_ids],
+                "schema_version": 2,
+                "already_used_titles": [list(item) for item in already_used_titles],
+                "title_issue": title_issue,
             }
         ),
-        context_ref_ids=context_ids,
-        expected_answer_schema="describe-item-v1",
+        context_ref_ids=(*context_ids, *(item.ref_id for item in title_review_facts)),
+        expected_answer_schema="describe-item-v2",
         attempt=1,
     )
-    example = {
-        "title": "Implement bounded work-unit group",
-        "objective": "Deliver the allocated implementation units.",
-        "scope": [
-            {
-                "description": "Implement and validate the grouped units.",
-                "unit_ids": list(group.unit_ids),
-            }
-        ],
+    generic_title_words = {
+        "add",
+        "and",
+        "change",
+        "changes",
+        "code",
+        "complete",
+        "feature",
+        "for",
+        "implement",
+        "implementation",
+        "item",
+        "make",
+        "plan",
+        "requested",
+        "the",
+        "update",
+        "work",
+        "unit",
+        "units",
     }
+    title_tokens = tuple(
+        dict.fromkeys(
+            token
+            for unit_id in group.unit_ids
+            for token in re.findall(
+                r"[a-z0-9]+",
+                " ".join(
+                    (
+                        units[unit_id].deliverable,
+                        units[unit_id].implementation_step,
+                        *units[unit_id].acceptance_criteria,
+                    )
+                ).casefold(),
+            )
+            if token not in generic_title_words and not token.isdigit()
+        )
+    )
+    example_title = "Implement " + " ".join(title_tokens[:3])
+    if len(title_tokens) < 2:
+        example_title = f"Implement {selected[0].deliverable} outcome"
+    if " ".join(example_title.casefold().split()) in {
+        " ".join(title.casefold().split()) for _item_id, title in already_used_titles
+    }:
+        example_title = f"{example_title} for {group.id}"
+    example = {
+        "title": example_title,
+        "objective": "Deliver the allocated implementation units.",
+    }
+
+    def parse(value: Mapping[str, Any]) -> ItemDescription:
+        description = parse_item_description(value, group=group, units=units)
+        issue = _item_title_quality_issue(
+            description.title,
+            group=group,
+            units=units,
+            already_used_titles=already_used_titles,
+        )
+        if issue is not None:
+            raise PlanningContractError("/title", issue)
+        return description
+
     return QuestionRequest(
         question=question,
         exact_question=(
             "Describe this frozen work-unit group as a reviewable implementation "
-            "item. Do not add, remove, or reorder work units. Return a concise "
-            "title, objective, and at most three scope entries. For four supplied "
-            "units, combine related units in one entry rather than returning four "
-            "one-unit entries."
+            "item. Do not add, remove, or reorder work units. Return only a "
+            "concise title and objective. Scope membership is derived from the "
+            "allocated units and their components. Make the title specific to the "
+            "group's deliverable and distinct from prior item titles."
+            + (f" Repair the title issue: {title_issue}" if title_issue else "")
         ),
         answer_field_definitions={
             "title": "Specific, outcome-oriented PR title.",
             "objective": "One concise statement of the group's result.",
-            "scope": (
-                "One to three scope records that assign every supplied unit "
-                "exactly once."
-            ),
         },
         source_excerpts=(),
         repository_evidence=(),
-        accepted_facts=accepted,
+        accepted_facts=(*accepted, *title_review_facts),
         valid_example=example,
         empty_example=example,
         answer_schema={
             "type": "object",
             "additionalProperties": False,
-            "required": ["title", "objective", "scope"],
+            "required": ["title", "objective"],
             "properties": {
                 "title": {"type": "string", "minLength": 1, "maxLength": 160},
                 "objective": {"type": "string", "minLength": 1, "maxLength": 1000},
-                "scope": {
-                    "type": "array",
-                    "minItems": 1,
-                    "maxItems": MAX_ITEM_SCOPE_ENTRIES,
-                    "items": {
-                        "type": "object",
-                        "additionalProperties": False,
-                        "required": ["description", "unit_ids"],
-                        "properties": {
-                            "description": {
-                                "type": "string",
-                                "minLength": 1,
-                                "maxLength": 500,
-                            },
-                            "unit_ids": {
-                                "type": "array",
-                                "minItems": 1,
-                                "items": {"type": "string"},
-                            },
-                        },
-                    },
-                },
             },
         },
-        parse_answer=lambda value: parse_item_description(value, group=group),
+        parse_answer=parse,
     )
+
+
+def _item_title_quality_issue(
+    title: str,
+    *,
+    group: AllocationGroup,
+    units: Mapping[str, WorkUnit],
+    already_used_titles: Sequence[tuple[str, str]],
+) -> str | None:
+    normalized = " ".join(title.casefold().split())
+    if normalized in {
+        " ".join(prior_title.casefold().split())
+        for item_id, prior_title in already_used_titles
+        if item_id != group.id
+    }:
+        return "title must be distinct from the other generated plan items"
+    tokens = set(re.findall(r"[a-z0-9]+", normalized))
+    generic = {
+        "a",
+        "add",
+        "and",
+        "change",
+        "changes",
+        "code",
+        "complete",
+        "feature",
+        "for",
+        "implement",
+        "implementation",
+        "item",
+        "make",
+        "plan",
+        "requested",
+        "the",
+        "update",
+        "work",
+        "unit",
+        "units",
+    }
+    meaningful = tokens - generic
+    if len(meaningful) < 2:
+        return "title must name a concrete outcome, not a generic implementation task"
+    outcome_tokens = {
+        token
+        for unit_id in group.unit_ids
+        for token in re.findall(
+            r"[a-z0-9]+",
+            " ".join(
+                (
+                    units[unit_id].deliverable,
+                    units[unit_id].implementation_step,
+                )
+            ).casefold(),
+        )
+        if token not in generic
+    }
+    if not meaningful.intersection(outcome_tokens):
+        return "title must name an outcome from this group's concrete deliverables"
+    return None
 
 
 def _digest(value: Any) -> str:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from pathlib import Path
@@ -210,7 +211,7 @@ def _planned_existing_structural_subjects(
         else []
     )
     source_subjects = projected_baseline.get("source_subjects", [])
-    entity_path_by_id: dict[str, str] = {}
+    entity_paths_by_id: dict[str, set[str]] = {}
     if isinstance(source_subjects, list):
         for source_subject in source_subjects:
             if not isinstance(source_subject, Mapping):
@@ -222,20 +223,44 @@ def _planned_existing_structural_subjects(
                 and path in owners_by_path
                 and isinstance(entity_id, str)
             ):
-                entity_path_by_id[entity_id] = path
+                entity_paths_by_id.setdefault(entity_id, set()).add(path)
+    source_bindings = projected_baseline.get("source_bindings", [])
+    if isinstance(source_bindings, list):
+        for binding in source_bindings:
+            if not isinstance(binding, Mapping):
+                continue
+            path = binding.get("path")
+            entity_id = binding.get("entity_id")
+            if (
+                isinstance(path, str)
+                and path in owners_by_path
+                and isinstance(entity_id, str)
+            ):
+                entity_paths_by_id.setdefault(entity_id, set()).add(path)
     candidates: dict[str, dict[str, set[str]]] = {}
     for entity in entities:
         entity_id = entity.get("id")
         if not isinstance(entity_id, str):
             continue
         path = entity.get("path")
-        if not isinstance(path, str):
-            path = entity_path_by_id.get(entity_id)
-        if not isinstance(path, str) and entity_id.startswith("file:"):
-            path = entity_id.removeprefix("file:")
-        if path not in path_owner:
+        entity_paths = (
+            {path}
+            if isinstance(path, str)
+            else set(entity_paths_by_id.get(entity_id, ()))
+        )
+        if not entity_paths and entity_id.startswith("file:"):
+            entity_paths.add(entity_id.removeprefix("file:"))
+        related_owners = [
+            path_owner[candidate_path]
+            for candidate_path in sorted(entity_paths)
+            if candidate_path in path_owner
+        ]
+        if not related_owners:
             continue
-        owner = path_owner[path]
+        owner = {
+            key: set().union(*(candidate[key] for candidate in related_owners))
+            for key in ("requirements", "units", "sources")
+        }
         candidates[entity_id] = owner
 
     result: list[BoundStructuralSubject] = []
@@ -342,6 +367,7 @@ class SourceLedgerQuestionMachine:
         self._oversized_work_unit_groups: set[tuple[str, ...]] = set()
         self._single_proposal_requirements: set[str] = set()
         self._supplemental_work_unit_requirements: set[str] = set()
+        self._pending_deterministic_answers: dict[str, Mapping[str, Any]] = {}
         self._accepted_assembly_cache_key: tuple[Any, ...] | None = None
         self._accepted_assembly_cache_value: PlanningAssembly | None = None
 
@@ -365,6 +391,68 @@ class SourceLedgerQuestionMachine:
         """Set digests recorded with answers so changed question inputs are reasked."""
         self._accepted_question_input_digests = dict(input_digests)
 
+    def repository_search_metrics(self) -> tuple[tuple[str, Mapping[str, Any]], ...]:
+        """Return counts from completed searches without exposing evidence text."""
+        return tuple(
+            (
+                requirement_id,
+                {
+                    "matching_line_count": search.matching_line_count,
+                    "matching_path_count": search.matching_path_count,
+                    "evidence_count": len(search.evidence),
+                    "basedpyright_query_count": search.basedpyright_query_count,
+                    "basedpyright_match_count": search.basedpyright_match_count,
+                    "rg_match_count": search.rg_match_count,
+                    "basedpyright_available": search.basedpyright_available,
+                    "base_commit": search.base_commit,
+                },
+            )
+            for requirement_id, search in sorted(self._evidence_search_cache.items())
+        )
+
+    def deterministic_answers(
+        self, accepted_answers: Mapping[str, Mapping[str, Any]]
+    ) -> tuple[Mapping[str, Any], ...]:
+        """Derive only source and coverage answers proven by pinned facts."""
+        self._pending_deterministic_answers.clear()
+        requests = self.ready_questions(accepted_answers)
+        derived = list(self._pending_deterministic_answers.values())
+        for request in requests:
+            for member in request.batch_members or (request,):
+                if member.question.kind != "assess_requirement_coverage":
+                    continue
+                question_id = member.question.question_id
+                if question_id in accepted_answers:
+                    continue
+                requirement_id = member.question.subject_ids[0]
+                search = self._evidence_search_cache.get(requirement_id)
+                if not _is_completed_zero_hit_search(
+                    search, pinned_commit=self.source.document.commit_sha
+                ):
+                    continue
+                answer = {
+                    "status": "missing",
+                    "evidence_ids": [],
+                    "reason": (
+                        "The completed BasedPyright and ripgrep search on pinned "
+                        f"base {search.base_commit} found zero matching lines, "
+                        "paths, or evidence records."
+                    ),
+                }
+                member.parse_answer(answer)
+                derived.append(
+                    {
+                        "question": member.question,
+                        "answer": answer,
+                        "rule_id": "completed-zero-hit-search-v1",
+                        "reason": (
+                            "The pinned repository search completed with zero line "
+                            "and path matches and returned no evidence."
+                        ),
+                    }
+                )
+        return tuple(derived)
+
     def _next_source_question(
         self, accepted_answers: Mapping[str, Mapping[str, Any]]
     ) -> QuestionRequest[Any] | None:
@@ -374,6 +462,7 @@ class SourceLedgerQuestionMachine:
     def _next_source_questions(
         self, accepted_answers: Mapping[str, Mapping[str, Any]]
     ) -> tuple[QuestionRequest[Any], ...]:
+        self._pending_deterministic_answers.clear()
         raw_records: list[dict[str, Any]] = []
         anchor_by_id = {anchor.id: anchor for anchor in self.source.anchors}
         pending_extractions: list[QuestionRequest[Any]] = []
@@ -404,7 +493,7 @@ class SourceLedgerQuestionMachine:
                 raw_records.extend(page_records)
 
         if pending_extractions:
-            return tuple(pending_extractions)
+            return batch_question_requests(pending_extractions)
 
         requirements, drafts = allocate_requirements(
             raw_records,
@@ -434,6 +523,7 @@ class SourceLedgerQuestionMachine:
         )
 
         pending_source_questions: list[QuestionRequest[Any]] = []
+        prior_direct_by_fingerprint: dict[str, list[tuple[str, ...]]] = {}
         for block in self.source.blocks:
             direct_ids = tuple(
                 dict.fromkeys(
@@ -453,12 +543,33 @@ class SourceLedgerQuestionMachine:
             disposition_request = build_block_disposition_request(
                 block, requirement_ids=known_ids
             )
+            fingerprint = _normalized_block_fingerprint(block.text)
             if disposition_request.question.question_id not in accepted_answers:
-                pending_source_questions.append(disposition_request)
+                automatic = _deterministic_block_disposition(
+                    block_id=block.id,
+                    direct_ids=direct_ids,
+                    related_ids=related_ids_for_block,
+                    prior_direct_ids=prior_direct_by_fingerprint.get(fingerprint, ()),
+                    has_exact_duplicate=fingerprint in prior_direct_by_fingerprint,
+                )
+                if automatic is None:
+                    pending_source_questions.append(disposition_request)
+                else:
+                    answer, rule_id, reason = automatic
+                    disposition_request.parse_answer(answer)
+                    self._pending_deterministic_answers[
+                        disposition_request.question.question_id
+                    ] = {
+                        "question": disposition_request.question,
+                        "answer": answer,
+                        "rule_id": rule_id,
+                        "reason": reason,
+                    }
             else:
                 disposition_request.parse_answer(
                     accepted_answers[disposition_request.question.question_id]
                 )
+            prior_direct_by_fingerprint.setdefault(fingerprint, []).append(direct_ids)
 
         for requirement in requirements:
             fidelity_request = build_fidelity_request(
@@ -480,7 +591,10 @@ class SourceLedgerQuestionMachine:
             for request in pending_source_questions
             if request.question.kind != "classify_source_block"
         )
-        return (*disposition_requests, *batch_question_requests(fidelity_requests))
+        return (
+            *batch_question_requests(disposition_requests),
+            *batch_question_requests(fidelity_requests),
+        )
 
     def next_question(
         self, accepted_answers: Mapping[str, Mapping[str, Any]]
@@ -502,7 +616,7 @@ class SourceLedgerQuestionMachine:
         ledger = self._parse_source_ledger(accepted_answers)
         setup_requests = self._explicit_human_setup_requests(ledger, accepted_answers)
         if setup_requests:
-            return setup_requests
+            return batch_question_requests(setup_requests)
         self._search_requirements_evidence(ledger.requirements)
         coverage_requests: list[QuestionRequest[Any]] = []
         for requirement in ledger.requirements:
@@ -524,7 +638,7 @@ class SourceLedgerQuestionMachine:
             if request is not None
         )
         if work_unit_requests:
-            return work_unit_requests
+            return batch_question_requests(work_unit_requests)
 
         downstream_requests: list[QuestionRequest[Any]] = []
         for request in self._item_description_requests(accepted_answers):
@@ -535,12 +649,14 @@ class SourceLedgerQuestionMachine:
             if request.question.question_id not in accepted_answers:
                 downstream_requests.append(request)
         if downstream_requests:
-            return tuple(downstream_requests)
+            return batch_question_requests(downstream_requests)
 
-        return tuple(
-            request
-            for request in self._structrr_requests(accepted_answers)
-            if self._request_is_pending(request, accepted_answers)
+        return batch_question_requests(
+            tuple(
+                request
+                for request in self._structrr_requests(accepted_answers)
+                if self._request_is_pending(request, accepted_answers)
+            )
         )
 
     def _request_is_pending(
@@ -789,27 +905,21 @@ class SourceLedgerQuestionMachine:
     ) -> Mapping[str, Any]:
         requirement_id = requirement_ids[0]
         requirement = context.requirements[requirement_id]
-        component_id = sorted(context.component_ids)[0]
-        validation_id = sorted(context.validation_catalog)[0]
         return {
             "records": [
                 {
                     "requirement_ids": [requirement_id],
                     "deliverable": "Concise example deliverable",
-                    "component": component_id,
-                    "implementation_runtime": "neutral",
                     "planned_writes": [
                         {
                             "path": "example-output.txt",
                             "role": "documentation",
-                            "runtime": None,
                             "source_refs": [requirement.source_refs[0]],
                             "evidence_ids": [],
                         }
                     ],
                     "implementation_step": "Describe one concrete implementation step.",
                     "acceptance_criteria": ["State one observable result."],
-                    "validation_ids": [validation_id],
                     "required_outputs": [],
                 }
             ],
@@ -901,10 +1011,50 @@ class SourceLedgerQuestionMachine:
         if not units:
             return ()
         by_id = {unit.id: unit for unit in units}
-        return tuple(
-            build_item_description_request(group, by_id)
-            for group in allocate_work_unit_groups(units).groups
-        )
+        requests: list[QuestionRequest[Any]] = []
+        accepted_titles: list[tuple[str, str]] = []
+        for group in allocate_work_unit_groups(units).groups:
+            request = build_item_description_request(
+                group, by_id, already_used_titles=accepted_titles
+            )
+            answer = accepted_answers.get(request.question.question_id)
+            if answer is None:
+                requests.append(request)
+                continue
+            if (
+                self._accepted_question_input_digests is not None
+                and self._accepted_question_input_digests.get(
+                    request.question.question_id
+                )
+                != request.question.input_digest
+            ):
+                issue = "the work-unit details or prior item titles changed"
+                self._invalid_accepted_question_ids.add(request.question.question_id)
+                requests.append(
+                    build_item_description_request(
+                        group,
+                        by_id,
+                        already_used_titles=accepted_titles,
+                        title_issue=issue,
+                    )
+                )
+                continue
+            try:
+                description = request.parse_answer(answer)
+            except PlanningContractError as error:
+                self._invalid_accepted_question_ids.add(request.question.question_id)
+                requests.append(
+                    build_item_description_request(
+                        group,
+                        by_id,
+                        already_used_titles=accepted_titles,
+                        title_issue=str(error),
+                    )
+                )
+                continue
+            accepted_titles.append((group.id, description.title))
+            requests.append(request)
+        return tuple(requests)
 
     def accepted_item_descriptions(
         self, accepted_answers: Mapping[str, Mapping[str, Any]]
@@ -976,8 +1126,14 @@ class SourceLedgerQuestionMachine:
     ) -> tuple[AllocatedWorkUnits, DependencyCandidateDiscovery]:
         context, proposals = self._accepted_work_unit_proposals(accepted_answers)
         allocation = allocate_work_units(proposals, context=context)
+        related_requirement_ids = {
+            requirement_id: requirement.related_requirement_ids
+            for requirement_id, requirement in context.requirements.items()
+        }
         discovery = discover_dependency_candidates(
-            allocation.units, allocation.pending_outputs
+            allocation.units,
+            allocation.pending_outputs,
+            related_requirement_ids=related_requirement_ids,
         )
         return allocation, discovery
 
@@ -1907,6 +2063,72 @@ class SourceLedgerQuestionMachine:
             if adjacent is not None:
                 result.append(adjacent)
         return tuple(result)
+
+
+def _normalized_block_fingerprint(text: str) -> str:
+    normalized = " ".join(text.split())
+    return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+
+
+def _deterministic_block_disposition(
+    *,
+    block_id: str,
+    direct_ids: Sequence[str],
+    related_ids: Sequence[str],
+    prior_direct_ids: Sequence[tuple[str, ...]],
+    has_exact_duplicate: bool,
+) -> tuple[Mapping[str, Any], str, str] | None:
+    if direct_ids:
+        answer: Mapping[str, Any] = {
+            "disposition": "normative",
+            "requirement_ids": list(dict.fromkeys(direct_ids)),
+        }
+        return (
+            answer,
+            "source-block-disposition-v1/direct-citation",
+            f"Block {block_id} has direct citations from accepted requirements.",
+        )
+    if related_ids:
+        return None
+    if has_exact_duplicate:
+        candidates = {tuple(ids) for ids in prior_direct_ids if ids}
+        if len(candidates) != 1:
+            return None
+        requirement_ids = next(iter(candidates))
+        return (
+            {
+                "disposition": "duplicate",
+                "requirement_ids": list(requirement_ids),
+                "reason": (
+                    "This block exactly repeats a block represented by these "
+                    "requirements."
+                ),
+            },
+            "source-block-disposition-v1/exact-content-duplicate",
+            "Whitespace-normalized exact content maps unambiguously to accepted "
+            "requirements.",
+        )
+    return (
+        {
+            "disposition": "context",
+            "reason": "No extracted requirement cites this block.",
+        },
+        "source-block-disposition-v1/unreferenced-context",
+        "Extraction found no direct or related requirement and no exact duplicate "
+        "candidate.",
+    )
+
+
+def _is_completed_zero_hit_search(search: Any, *, pinned_commit: str) -> bool:
+    """Accept only explicit complete, pinned, available searches with no hits."""
+    return (
+        search is not None
+        and search.base_commit == pinned_commit
+        and search.basedpyright_available is True
+        and not search.evidence
+        and search.matching_line_count == 0
+        and search.matching_path_count == 0
+    )
 
 
 __all__ = ["SourceLedger", "SourceLedgerQuestionMachine"]

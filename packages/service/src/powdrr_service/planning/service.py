@@ -8,6 +8,7 @@ resume reconstructs the accepted answer set before asking for more work.
 
 from __future__ import annotations
 
+import hashlib
 import inspect
 import json
 import re
@@ -270,6 +271,7 @@ class PlanningOptions:
     use_provider_schema: bool = True
     provider: str = "unknown"
     telemetry_sink: Callable[[Mapping[str, Any]], None] | None = None
+    deterministic_telemetry_sink: Callable[[Mapping[str, Any]], None] | None = None
 
     def __post_init__(self) -> None:
         if self.max_concurrent_questions < 1:
@@ -472,6 +474,65 @@ def advance_planning_session(
     if callable(set_accepted_input_digests):
         set_accepted_input_digests(accepted_input_digests)
 
+    parent = journal.head.digest if journal.head is not None else None
+    sequence = 1 if journal.head is None else journal.head.sequence + 1
+
+    def append_checkpoint(checkpoint: PlanningCheckpoint) -> None:
+        nonlocal parent, sequence
+        state = checkpoint_store.append(checkpoint, expected_parent_digest=parent)
+        parent = state.head.digest if state.head is not None else None
+        sequence = 1 if state.head is None else state.head.sequence + 1
+
+    derive_deterministic_answers = getattr(state_machine, "deterministic_answers", None)
+    if callable(derive_deterministic_answers):
+        for deterministic in derive_deterministic_answers(accepted):
+            question = deterministic["question"]
+            answer = deterministic["answer"]
+            if question.question_id in accepted:
+                continue
+            if not isinstance(answer, Mapping):
+                raise PlanningServiceError(
+                    "deterministic planning answer must be an object"
+                )
+            append_checkpoint(
+                PlanningCheckpoint.answer_accepted(
+                    session_id=session.session_id,
+                    event_id=f"deterministic-answer-{sequence:06d}",
+                    sequence=sequence,
+                    parent_digest=parent,
+                    question=question,
+                    accepted_answer=answer,
+                    validation_result={
+                        "accepted": True,
+                        "origin": "deterministic",
+                        "rule_id": deterministic["rule_id"],
+                        "reason": deterministic["reason"],
+                    },
+                    id_counters=journal.id_counters,
+                )
+            )
+            if options.deterministic_telemetry_sink is not None:
+                try:
+                    options.deterministic_telemetry_sink(
+                        {
+                            "question_id": question.question_id,
+                            "question_kind": question.kind,
+                            "phase": _question_phase(question.kind),
+                            "input_digest": question.input_digest,
+                            "rule_id": deterministic["rule_id"],
+                        }
+                    )
+                except Exception as telemetry_error:
+                    if stderr is not None:
+                        stderr.write(
+                            "Planning deterministic telemetry could not be "
+                            f"recorded: {telemetry_error}\n"
+                        )
+            accepted[question.question_id] = dict(answer)
+            accepted_input_digests[question.question_id] = question.input_digest
+        if callable(set_accepted_input_digests):
+            set_accepted_input_digests(accepted_input_digests)
+
     ready_questions = getattr(state_machine, "ready_questions", None)
     if callable(ready_questions):
         requests = tuple(ready_questions(accepted))
@@ -524,9 +585,8 @@ def advance_planning_session(
         client=client,
         options=options,
         stderr=stderr,
+        prior_events=journal.events,
     )
-    parent = journal.head.digest if journal.head is not None else None
-    sequence = 1 if journal.head is None else journal.head.sequence + 1
     accepted_results: list[AcceptedQuestionAnswer[Any]] = []
     needs_answers: list[NeedsQuestionAnswer] = []
     errors: list[Exception] = []
@@ -576,12 +636,6 @@ def advance_planning_session(
                 accepted_results.append(result)
         elif isinstance(result, NeedsQuestionAnswer):
             needs_answers.append(result)
-
-    def append_checkpoint(checkpoint: PlanningCheckpoint) -> None:
-        nonlocal parent, sequence
-        state = checkpoint_store.append(checkpoint, expected_parent_digest=parent)
-        parent = state.head.digest if state.head is not None else None
-        sequence = 1 if state.head is None else state.head.sequence + 1
 
     # Results are committed in frontier order through one writer. The providers
     # run concurrently, but checkpoint heads never race.
@@ -640,6 +694,7 @@ def _run_question_batch(
     client: WorkflowLLMClient,
     options: PlanningOptions,
     stderr: Any,
+    prior_events: Sequence[Any] = (),
 ) -> tuple[tuple[QuestionRequest[Any], Any, Exception | None], ...]:
     """Execute ready questions concurrently while keeping progress output ordered."""
 
@@ -678,14 +733,33 @@ def _run_question_batch(
             result = None
         raw_answer = (
             result.raw_answer
-            if isinstance(result, (AcceptedQuestionAnswer, NeedsQuestionAnswer))
+            if isinstance(result, AcceptedQuestionAnswer)
+            else result.previous_answer
+            if isinstance(result, NeedsQuestionAnswer)
             else None
         )
         question = request.question
         members = request.batch_members or (request,)
+        raw_answers = (
+            raw_answer.get("answers")
+            if isinstance(raw_answer, Mapping)
+            and isinstance(raw_answer.get("answers"), Mapping)
+            else None
+        )
+        pagination = []
+        for member in members:
+            member_answer = (
+                raw_answers.get(member.question.question_id)
+                if raw_answers is not None
+                else raw_answer
+            )
+            pagination_metric = _pagination_metric(member, member_answer, prior_events)
+            if pagination_metric is not None:
+                pagination.append(pagination_metric)
         metric = {
             "question_ids": [member.question.question_id for member in members],
             "question_kinds": sorted({member.question.kind for member in members}),
+            "phase": _question_phase(members[0].question.kind),
             "input_digests": [member.question.input_digest for member in members],
             "batch_member_count": len(members),
             "request_chars": request_chars,
@@ -724,6 +798,7 @@ def _run_question_batch(
                 if telemetry_client.has_completion_tokens
                 else None
             ),
+            "pagination": pagination,
         }
         return request, result, error, output.getvalue(), metric
 
@@ -751,6 +826,105 @@ def _run_question_batch(
         (request, result, error)
         for request, result, error, _output, _metric in completed
     )
+
+
+def _question_phase(kind: str) -> str:
+    """Map typed planning questions to the planner phase they measure."""
+    if kind in {
+        "extract_requirements",
+        "classify_source_block",
+        "check_requirement_fidelity",
+        "compare_requirement_equivalence",
+    }:
+        return "source-ledger"
+    if kind in {"assess_requirement_coverage", "assess_setup_state"}:
+        return "repository-coverage"
+    if kind in {
+        "propose_work_units",
+        "check_unit_cohesion",
+        "describe_human_setup",
+        "requires_human_setup",
+    }:
+        return "work-unit-design"
+    if kind in {
+        "describe_item",
+        "resolve_prerequisite_output",
+        "confirm_dependency",
+        "review_dependency_graph",
+    }:
+        return "dependency-and-pr-slicing"
+    if kind in {
+        "enumerate_structural_subjects",
+        "describe_structural_change",
+        "check_validation_coverage",
+    }:
+        return "structural-review"
+    return "other"
+
+
+def _pagination_metric(
+    request: QuestionRequest[Any], answer: Any, prior_events: Sequence[Any]
+) -> Mapping[str, Any] | None:
+    kind = request.question.kind
+    if kind not in {"extract_requirements", "enumerate_structural_subjects"}:
+        return None
+    subject_id = request.question.subject_ids[0]
+    if not isinstance(answer, Mapping):
+        return {
+            "question_id": request.question.question_id,
+            "subject_id": subject_id,
+            "page_ordinal": None,
+            "has_more": None,
+            "returned_records": None,
+            "unique_new_records": None,
+            "made_progress": None,
+        }
+    current_records = answer.get("records")
+    if not isinstance(current_records, list):
+        current_records = []
+    prior_records: set[str] = set()
+    prior_pages = 0
+    for event in prior_events:
+        question = event.payload.get("question")
+        accepted_answer = event.payload.get("accepted_answer")
+        if (
+            event.event_type != "answer_accepted"
+            or not isinstance(question, Mapping)
+            or question.get("kind") != kind
+            or not isinstance(question.get("subject_ids"), list)
+            or not question["subject_ids"]
+            or question["subject_ids"][0] != subject_id
+            or not isinstance(accepted_answer, Mapping)
+        ):
+            continue
+        prior_pages += 1
+        previous_records = accepted_answer.get("records")
+        if isinstance(previous_records, list):
+            prior_records.update(
+                _planning_record_digest(record) for record in previous_records
+            )
+    unique_new = len(
+        {_planning_record_digest(record) for record in current_records} - prior_records
+    )
+    has_more = answer.get("has_more")
+    return {
+        "question_id": request.question.question_id,
+        "subject_id": subject_id,
+        "page_ordinal": prior_pages + 1,
+        "has_more": has_more if isinstance(has_more, bool) else None,
+        "returned_records": len(current_records),
+        "unique_new_records": unique_new,
+        "made_progress": (
+            None if not isinstance(has_more, bool) else not has_more or unique_new > 0
+        ),
+    }
+
+
+def _planning_record_digest(record: Any) -> str:
+    encoded = json.dumps(
+        record, sort_keys=True, ensure_ascii=False, separators=(",", ":")
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
 
 
 def planning_operation_executor(

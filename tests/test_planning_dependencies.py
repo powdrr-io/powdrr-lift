@@ -298,6 +298,93 @@ def test_dependency_discovery_keeps_named_output_path_in_deliverable() -> None:
     assert discovery.confirmation_pairs == ((output, consumer),)
 
 
+def test_dependency_discovery_finds_explicit_short_output_reference() -> None:
+    producer = replace(
+        _unit("unit-0001"),
+        deliverable="Prepare artifacts.",
+        implementation_step="Generate the required data.",
+    )
+    consumer = replace(
+        _unit("unit-0002", "req-0002"),
+        deliverable="Update the downstream check.",
+        implementation_step="Consume the signed manifest before verification.",
+    )
+    output = PendingUnitOutput(producer.id, "Signed manifest", producer.requirement_ids)
+
+    discovery = discover_dependency_candidates([producer, consumer], [output])
+
+    assert discovery.confirmation_pairs == ((output, consumer),)
+
+
+def test_dependency_discovery_uses_explicit_related_requirement_edges() -> None:
+    producer = replace(_unit("unit-0001"), deliverable="Prepare the setup.")
+    consumer = replace(
+        _unit("unit-0002", "req-0002"),
+        deliverable="Run the integration check.",
+        implementation_step="Read the configured endpoint.",
+    )
+    output = PendingUnitOutput(
+        producer.id, "Operator-installed endpoint", producer.requirement_ids
+    )
+
+    discovery = discover_dependency_candidates(
+        [producer, consumer],
+        [output],
+        related_requirement_ids={"req-0001": ("req-0002",)},
+    )
+
+    assert discovery.confirmation_pairs == ((output, consumer),)
+
+
+def test_dependency_discovery_finds_each_edge_in_a_transitive_output_chain() -> None:
+    producer = replace(
+        _unit("unit-0001"),
+        deliverable="Create artifact A.",
+        implementation_step="Generate a signed manifest.",
+        acceptance_criteria=("The signed manifest is written.",),
+    )
+    middle = replace(
+        _unit("unit-0002", "req-0002"),
+        deliverable="Create artifact B.",
+        implementation_step=(
+            "Read the signed manifest and write a verification summary."
+        ),
+        acceptance_criteria=("The verification summary is complete.",),
+    )
+    final = replace(
+        _unit("unit-0003", "req-0003"),
+        deliverable="Create artifact C.",
+        implementation_step="Consume the verification summary to publish the result.",
+        acceptance_criteria=("The published result includes the verification status.",),
+    )
+    manifest = PendingUnitOutput(
+        producer.id, "signed manifest", producer.requirement_ids
+    )
+    summary = PendingUnitOutput(
+        middle.id, "verification summary", middle.requirement_ids
+    )
+
+    discovery = discover_dependency_candidates(
+        [producer, middle, final], [manifest, summary]
+    )
+
+    assert discovery.confirmation_pairs == ((manifest, middle), (summary, final))
+
+
+def test_dependency_discovery_deduplicates_repeated_output_candidates() -> None:
+    producer = replace(_unit("unit-0001"), deliverable="Prepare artifacts.")
+    consumer = replace(
+        _unit("unit-0002", "req-0002"),
+        deliverable="Update the downstream check.",
+        implementation_step="Consume the signed manifest before verification.",
+    )
+    output = PendingUnitOutput(producer.id, "Signed manifest", producer.requirement_ids)
+
+    discovery = discover_dependency_candidates([producer, consumer], [output, output])
+
+    assert discovery.confirmation_pairs == ((output, consumer),)
+
+
 def test_dependency_confirmation_has_exact_required_and_independent_variants() -> None:
     required = parse_dependency_confirmation(
         {

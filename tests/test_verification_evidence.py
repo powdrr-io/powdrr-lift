@@ -4,7 +4,8 @@ import json
 from pathlib import Path
 from typing import Any
 
-from powdrr_lift.structrr.verification_obligations import VerificationObligation
+from powdrr_service.structrr.verification_obligations import VerificationObligation
+
 from powdrr_lift.workrr.verification_evidence import (
     EvidenceStatus,
     VerificationEvidenceRunner,

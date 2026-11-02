@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from powdrr_lift.core.verification_contract import VerificationContract
+from powdrr_service.structrr.verification_contract import VerificationContract
 
 
 def _contract(**overrides: object) -> VerificationContract:

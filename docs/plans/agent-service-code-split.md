@@ -488,6 +488,8 @@ required validation cannot be reported as success. Worker commits remain visible
    compatibility through global `sys.modules` aliases. Move Structrr proposal,
    source-manifest, actual-diff, and candidate-comparison policy into the service;
    the agent supplies repository evidence and does local collection/materialization.
+   Keep verification-contract compilation, proposal review, intent lineage, and
+   invariant review in the service with those Structrr policy modules.
 2. Remove the legacy-import allowlist and private compatibility shims. An old
    executable entry point may remain as a thin local-composition delegator;
    the public agent package must not depend on it.

@@ -198,13 +198,19 @@ def test_legacy_service_imports_are_explicitly_owned() -> None:
     assert all(entry["owner_pr"] > 0 for entry in allowlist["entries"])
 
 
-def test_structrr_proposal_and_comparison_policy_is_service_owned() -> None:
+def test_structrr_review_and_verification_policy_is_service_owned() -> None:
     repository = Path(__file__).parents[1]
     modules = (
         "proposal.py",
         "actual_diff.py",
         "candidate_comparison.py",
         "source_manifest.py",
+        "verification_contract.py",
+        "verification_obligations.py",
+        "gate_compiler.py",
+        "proposal_review.py",
+        "intent_lineage.py",
+        "invariant_review.py",
     )
     service_root = repository / "packages/service/src/powdrr_service/structrr"
     agent_root = repository / "src/powdrr_lift/structrr"
@@ -226,11 +232,27 @@ def test_structrr_proposal_and_comparison_policy_is_service_owned() -> None:
         )
         assert not any(name.startswith("powdrr_lift") for name in imports), source
 
+    from powdrr_service.structrr.invariant_review import InvariantReviewReceipt
     from powdrr_service.structrr.proposal import ProposalRevision
+    from powdrr_service.structrr.proposal_review import ProposalReviewReceipt
     from powdrr_service.structrr.source_manifest import SourceManifest
+    from powdrr_service.structrr.verification_contract import VerificationContract
+    from powdrr_service.structrr.verification_obligations import VerificationObligation
 
     assert ProposalRevision.__module__ == "powdrr_service.structrr.proposal"
     assert SourceManifest.__module__ == "powdrr_service.structrr.source_manifest"
+    assert ProposalReviewReceipt.__module__ == "powdrr_service.structrr.proposal_review"
+    assert (
+        VerificationContract.__module__
+        == "powdrr_service.structrr.verification_contract"
+    )
+    assert (
+        VerificationObligation.__module__
+        == "powdrr_service.structrr.verification_obligations"
+    )
+    assert (
+        InvariantReviewReceipt.__module__ == "powdrr_service.structrr.invariant_review"
+    )
 
 
 def test_service_owned_planning_has_no_agent_reexport_modules() -> None:

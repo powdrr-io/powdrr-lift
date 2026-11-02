@@ -21,6 +21,7 @@ from powdrr_service.procedrr import parse_and_validate
 from powdrr_service.procedrr_evaluator import Evaluator
 from powdrr_service.resources import bundled_process_directory
 from powdrr_service.structrr.actual_diff import StructrrActualDiff
+from powdrr_service.structrr.gate_compiler import compile_proposal_worklist
 from powdrr_service.structrr.obligation_evidence import (
     NormativeStrength,
     compile_obligation_evidence_contract,
@@ -31,7 +32,6 @@ from powdrr_lift.cli import main
 from powdrr_lift.core.execution_plan import ExecutionUnit
 from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.structrr.bootstrap import BOOTSTRAP_SECTION_VERSIONS
-from powdrr_lift.structrr.gate_compiler import compile_proposal_worklist
 from powdrr_lift.structrr.validation import DiscoveredValidationProfile
 from powdrr_lift.workrr.coding_agent import (
     CodingAgentAttempt,

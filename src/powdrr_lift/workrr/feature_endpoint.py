@@ -61,6 +61,10 @@ from powdrr_service.structrr.actual_diff import (
     compile_actual_structrr_diff,
 )
 from powdrr_service.structrr.candidate_comparison import compare_candidate_snapshot
+from powdrr_service.structrr.gate_compiler import (
+    compile_proposal_worklist,
+    evaluate_structural_proposal_gate,
+)
 from powdrr_service.structrr.obligation_evidence import ObligationEvidenceContract
 from powdrr_service.structrr.proposal import (
     ProposalRevision,
@@ -68,8 +72,17 @@ from powdrr_service.structrr.proposal import (
     load_proposal_revision,
     validate_proposal_revision,
 )
+from powdrr_service.structrr.proposal_review import (
+    ProposalReviewReceipt,
+    load_review_receipt,
+    write_review_receipt,
+)
 from powdrr_service.structrr.snapshot import snapshot_digest
 from powdrr_service.structrr.source_manifest import SourceManifest
+from powdrr_service.structrr.verification_obligations import (
+    VerificationObligationCompilation,
+    compile_verification_obligations,
+)
 
 from powdrr_lift.change_log_parser import parse_change_log
 from powdrr_lift.core.contract_closure import (
@@ -90,21 +103,8 @@ from powdrr_lift.structrr.bootstrap import (
     bootstrap_structrr,
     validate_bootstrap_sections,
 )
-from powdrr_lift.structrr.gate_compiler import (
-    compile_proposal_worklist,
-    evaluate_structural_proposal_gate,
-)
-from powdrr_lift.structrr.proposal_review import (
-    ProposalReviewReceipt,
-    load_review_receipt,
-    write_review_receipt,
-)
 from powdrr_lift.structrr.validation import (
     DiscoveredValidationProfile,
-)
-from powdrr_lift.structrr.verification_obligations import (
-    VerificationObligationCompilation,
-    compile_verification_obligations,
 )
 from powdrr_lift.workrr.actualization import reconcile_actualization
 from powdrr_lift.workrr.candidate_checkpoint import checkpoint_candidate_changes
@@ -1739,7 +1739,7 @@ def _run_verification_evidence(
         isinstance(item, Mapping) for item in raw_obligations
     ):
         raise PowdrrExecutionError("verification obligations must be a list")
-    from powdrr_lift.structrr.verification_obligations import VerificationObligation
+    from powdrr_service.structrr.verification_obligations import VerificationObligation
 
     obligations = tuple(
         VerificationObligation.from_data(item) for item in raw_obligations
@@ -1948,7 +1948,7 @@ def _reconcile_verification_evidence(
 def _verification_contracts(
     values: Sequence[Mapping[str, Any]],
 ) -> tuple[Any, ...]:
-    from powdrr_lift.core.verification_contract import VerificationContract
+    from powdrr_service.structrr.verification_contract import VerificationContract
 
     return tuple(VerificationContract.from_mapping(value) for value in values)
 

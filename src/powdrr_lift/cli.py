@@ -38,6 +38,7 @@ from powdrr_service.providers.config import (
 )
 from powdrr_service.providers.credentials import resolve_provider_credentials
 from powdrr_service.resources import bundled_process_directory
+from powdrr_service.structrr.intent_lineage import audit_intent_lineage
 from powdrr_service.structrr.rebase import rebase_structrr_snapshot
 from powdrr_service.structrr.verification_health import (
     VerificationPolicyMode,
@@ -171,7 +172,6 @@ from powdrr_lift.structrr.intent import (
     IntentTrigger,
     make_intent_source,
 )
-from powdrr_lift.structrr.intent_lineage import audit_intent_lineage
 from powdrr_lift.workrr.chat_config import WorkflowChatConfig
 from powdrr_lift.workrr.chat_tui import run_workflow_chat_tui
 from powdrr_lift.workrr.coding_agent import (

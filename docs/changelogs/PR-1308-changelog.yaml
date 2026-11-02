@@ -1,0 +1,634 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1308
+title: Move Structrr verification and review policy into service
+intent:
+  problem: Structrr verification-contract, obligation, proposal-gate, intent-lineage, and invariant-review policy
+    still lived under the agent package, with agent package exports preserving the old import surface.
+  goal: Move the policy modules into powdrr_service, update production and test callers to use service imports directly,
+    remove old re-exports, and record the ownership boundary.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 994
+    end_line: 994
+  summary: Assign Structrr verification and review policy to the service package and update the affected import
+    edges.
+  rationale: Keep the machine-readable ownership record aligned with the direct imports and module moves.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 1006
+    end_line: 1006
+  summary: Assign Structrr verification and review policy to the service package and update the affected import
+    edges.
+  rationale: Keep the machine-readable ownership record aligned with the direct imports and module moves.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 1008
+    end_line: 1009
+  summary: Assign Structrr verification and review policy to the service package and update the affected import
+    edges.
+  rationale: Keep the machine-readable ownership record aligned with the direct imports and module moves.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 1013
+    end_line: 1013
+  summary: Assign Structrr verification and review policy to the service package and update the affected import
+    edges.
+  rationale: Keep the machine-readable ownership record aligned with the direct imports and module moves.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 1020
+    end_line: 1027
+  summary: Assign Structrr verification and review policy to the service package and update the affected import
+    edges.
+  rationale: Keep the machine-readable ownership record aligned with the direct imports and module moves.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 1029
+    end_line: 1030
+  summary: Assign Structrr verification and review policy to the service package and update the affected import
+    edges.
+  rationale: Keep the machine-readable ownership record aligned with the direct imports and module moves.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 1020
+    end_line: 1026
+  summary: Assign Structrr verification and review policy to the service package and update the affected import
+    edges.
+  rationale: Keep the machine-readable ownership record aligned with the direct imports and module moves.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 1086
+    end_line: 1086
+  summary: Assign Structrr verification and review policy to the service package and update the affected import
+    edges.
+  rationale: Keep the machine-readable ownership record aligned with the direct imports and module moves.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 1402
+    end_line: 1402
+  summary: Assign Structrr verification and review policy to the service package and update the affected import
+    edges.
+  rationale: Keep the machine-readable ownership record aligned with the direct imports and module moves.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 1590
+    end_line: 1590
+  summary: Assign Structrr verification and review policy to the service package and update the affected import
+    edges.
+  rationale: Keep the machine-readable ownership record aligned with the direct imports and module moves.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 1593
+    end_line: 1595
+  summary: Assign Structrr verification and review policy to the service package and update the affected import
+    edges.
+  rationale: Keep the machine-readable ownership record aligned with the direct imports and module moves.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2155
+    end_line: 2155
+  summary: Assign Structrr verification and review policy to the service package and update the affected import
+    edges.
+  rationale: Keep the machine-readable ownership record aligned with the direct imports and module moves.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2221
+    end_line: 2221
+  summary: Assign Structrr verification and review policy to the service package and update the affected import
+    edges.
+  rationale: Keep the machine-readable ownership record aligned with the direct imports and module moves.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2224
+    end_line: 2225
+  summary: Assign Structrr verification and review policy to the service package and update the affected import
+    edges.
+  rationale: Keep the machine-readable ownership record aligned with the direct imports and module moves.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2228
+    end_line: 2230
+  summary: Assign Structrr verification and review policy to the service package and update the affected import
+    edges.
+  rationale: Keep the machine-readable ownership record aligned with the direct imports and module moves.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2245
+    end_line: 2245
+  summary: Assign Structrr verification and review policy to the service package and update the affected import
+    edges.
+  rationale: Keep the machine-readable ownership record aligned with the direct imports and module moves.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2248
+    end_line: 2248
+  summary: Assign Structrr verification and review policy to the service package and update the affected import
+    edges.
+  rationale: Keep the machine-readable ownership record aligned with the direct imports and module moves.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2252
+    end_line: 2254
+  summary: Assign Structrr verification and review policy to the service package and update the affected import
+    edges.
+  rationale: Keep the machine-readable ownership record aligned with the direct imports and module moves.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2258
+    end_line: 2258
+  summary: Assign Structrr verification and review policy to the service package and update the affected import
+    edges.
+  rationale: Keep the machine-readable ownership record aligned with the direct imports and module moves.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2261
+    end_line: 2262
+  summary: Assign Structrr verification and review policy to the service package and update the affected import
+    edges.
+  rationale: Keep the machine-readable ownership record aligned with the direct imports and module moves.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2264
+    end_line: 2264
+  summary: Assign Structrr verification and review policy to the service package and update the affected import
+    edges.
+  rationale: Keep the machine-readable ownership record aligned with the direct imports and module moves.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2267
+    end_line: 2269
+  summary: Assign Structrr verification and review policy to the service package and update the affected import
+    edges.
+  rationale: Keep the machine-readable ownership record aligned with the direct imports and module moves.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2293
+    end_line: 2293
+  summary: Assign Structrr verification and review policy to the service package and update the affected import
+    edges.
+  rationale: Keep the machine-readable ownership record aligned with the direct imports and module moves.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2296
+    end_line: 2297
+  summary: Assign Structrr verification and review policy to the service package and update the affected import
+    edges.
+  rationale: Keep the machine-readable ownership record aligned with the direct imports and module moves.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2300
+    end_line: 2302
+  summary: Assign Structrr verification and review policy to the service package and update the affected import
+    edges.
+  rationale: Keep the machine-readable ownership record aligned with the direct imports and module moves.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2377
+    end_line: 2377
+  summary: Assign Structrr verification and review policy to the service package and update the affected import
+    edges.
+  rationale: Keep the machine-readable ownership record aligned with the direct imports and module moves.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2379
+    end_line: 2380
+  summary: Assign Structrr verification and review policy to the service package and update the affected import
+    edges.
+  rationale: Keep the machine-readable ownership record aligned with the direct imports and module moves.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2383
+    end_line: 2385
+  summary: Assign Structrr verification and review policy to the service package and update the affected import
+    edges.
+  rationale: Keep the machine-readable ownership record aligned with the direct imports and module moves.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2834
+    end_line: 2834
+  summary: Assign Structrr verification and review policy to the service package and update the affected import
+    edges.
+  rationale: Keep the machine-readable ownership record aligned with the direct imports and module moves.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2836
+    end_line: 2836
+  summary: Assign Structrr verification and review policy to the service package and update the affected import
+    edges.
+  rationale: Keep the machine-readable ownership record aligned with the direct imports and module moves.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2839
+    end_line: 2839
+  summary: Assign Structrr verification and review policy to the service package and update the affected import
+    edges.
+  rationale: Keep the machine-readable ownership record aligned with the direct imports and module moves.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2841
+    end_line: 2841
+  summary: Assign Structrr verification and review policy to the service package and update the affected import
+    edges.
+  rationale: Keep the machine-readable ownership record aligned with the direct imports and module moves.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2843
+    end_line: 2843
+  summary: Assign Structrr verification and review policy to the service package and update the affected import
+    edges.
+  rationale: Keep the machine-readable ownership record aligned with the direct imports and module moves.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2845
+    end_line: 2850
+  summary: Assign Structrr verification and review policy to the service package and update the affected import
+    edges.
+  rationale: Keep the machine-readable ownership record aligned with the direct imports and module moves.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2852
+    end_line: 2852
+  summary: Assign Structrr verification and review policy to the service package and update the affected import
+    edges.
+  rationale: Keep the machine-readable ownership record aligned with the direct imports and module moves.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2860
+    end_line: 2860
+  summary: Assign Structrr verification and review policy to the service package and update the affected import
+    edges.
+  rationale: Keep the machine-readable ownership record aligned with the direct imports and module moves.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2862
+    end_line: 2862
+  summary: Assign Structrr verification and review policy to the service package and update the affected import
+    edges.
+  rationale: Keep the machine-readable ownership record aligned with the direct imports and module moves.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2864
+    end_line: 2864
+  summary: Assign Structrr verification and review policy to the service package and update the affected import
+    edges.
+  rationale: Keep the machine-readable ownership record aligned with the direct imports and module moves.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2841
+    end_line: 2845
+  summary: Assign Structrr verification and review policy to the service package and update the affected import
+    edges.
+  rationale: Keep the machine-readable ownership record aligned with the direct imports and module moves.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2872
+    end_line: 2873
+  summary: Assign Structrr verification and review policy to the service package and update the affected import
+    edges.
+  rationale: Keep the machine-readable ownership record aligned with the direct imports and module moves.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2850
+    end_line: 2861
+  summary: Assign Structrr verification and review policy to the service package and update the affected import
+    edges.
+  rationale: Keep the machine-readable ownership record aligned with the direct imports and module moves.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3514
+    end_line: 3515
+  summary: Assign Structrr verification and review policy to the service package and update the affected import
+    edges.
+  rationale: Keep the machine-readable ownership record aligned with the direct imports and module moves.
+- path: docs/plans/agent-service-code-split.md
+  type: modified
+  span:
+    start_line: 491
+    end_line: 492
+  summary: Extend the extraction plan to include verification compilation, proposal review, intent lineage, and
+    invariant review.
+  rationale: Keep this policy with the service-owned Structrr proposal and comparison semantics.
+- path: packages/service/src/powdrr_service/structrr/gate_compiler.py
+  type: renamed
+  span:
+    start_line: 1
+    end_line: 213
+  summary: Move proposal worklist and structural-gate compilation into the service package.
+  rationale: Keep proposal acceptance policy with the service-owned verification and review modules.
+- path: packages/service/src/powdrr_service/structrr/proposal_review.py
+  type: renamed
+  span:
+    start_line: 1
+    end_line: 186
+  summary: Move proposal review receipts and validation into the service package.
+  rationale: Keep review receipt semantics and policy inside the service boundary.
+- path: packages/service/src/powdrr_service/structrr/verification_obligations.py
+  type: renamed
+  span:
+    start_line: 1
+    end_line: 512
+  summary: Move verification-obligation compilation into the service package.
+  rationale: Compile required checks from service-owned contracts before the agent runs local commands.
+- path: scripts/build-agent-service-ownership-inventory.py
+  type: modified
+  span:
+    start_line: 47
+    end_line: 61
+  summary: Classify the moved Structrr verification and review modules as service-owned.
+  rationale: Ensure future inventory builds preserve the new ownership boundary.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 41
+    end_line: 41
+  summary: Import intent-lineage audit policy from the service package.
+  rationale: Remove the CLI dependency on the legacy agent module path.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 174
+    end_line: 174
+  summary: Import intent-lineage audit policy from the service package.
+  rationale: Remove the CLI dependency on the legacy agent module path.
+- path: src/powdrr_lift/core/__init__.py
+  type: modified
+  span:
+    start_line: 217
+    end_line: 224
+  summary: Remove the legacy core re-export for VerificationContract.
+  rationale: Callers now use the service-owned contract module directly, without a compatibility re-export.
+- path: src/powdrr_lift/core/__init__.py
+  type: modified
+  span:
+    start_line: 268
+    end_line: 268
+  summary: Remove the legacy core re-export for VerificationContract.
+  rationale: Callers now use the service-owned contract module directly, without a compatibility re-export.
+- path: src/powdrr_lift/core/__init__.py
+  type: modified
+  span:
+    start_line: 315
+    end_line: 320
+  summary: Remove the legacy core re-export for VerificationContract.
+  rationale: Callers now use the service-owned contract module directly, without a compatibility re-export.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 12
+    end_line: 15
+  summary: Use the service-owned verification contract parser while reading proposed specifications.
+  rationale: Keep contract validation semantics in the service module.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 22
+    end_line: 25
+  summary: Use the service-owned verification contract parser while reading proposed specifications.
+  rationale: Keep contract validation semantics in the service module.
+- path: src/powdrr_lift/structrr/__init__.py
+  type: modified
+  span:
+    start_line: 22
+    end_line: 60
+  summary: Remove root-package exports for the moved Structrr review and verification modules.
+  rationale: Require callers to import service-owned policy directly, with no compatibility shim.
+- path: src/powdrr_lift/structrr/__init__.py
+  type: modified
+  span:
+    start_line: 70
+    end_line: 100
+  summary: Remove root-package exports for the moved Structrr review and verification modules.
+  rationale: Require callers to import service-owned policy directly, with no compatibility shim.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 64
+    end_line: 67
+  summary: Route proposal-gate, review-receipt, obligation, and contract operations through service-owned modules.
+  rationale: Keep implementation orchestration on the agent while policy and acceptance semantics live in service.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 75
+    end_line: 79
+  summary: Route proposal-gate, review-receipt, obligation, and contract operations through service-owned modules.
+  rationale: Keep implementation orchestration on the agent while policy and acceptance semantics live in service.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 82
+    end_line: 85
+  summary: Route proposal-gate, review-receipt, obligation, and contract operations through service-owned modules.
+  rationale: Keep implementation orchestration on the agent while policy and acceptance semantics live in service.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 93
+    end_line: 101
+  summary: Route proposal-gate, review-receipt, obligation, and contract operations through service-owned modules.
+  rationale: Keep implementation orchestration on the agent while policy and acceptance semantics live in service.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 105
+    end_line: 108
+  summary: Route proposal-gate, review-receipt, obligation, and contract operations through service-owned modules.
+  rationale: Keep implementation orchestration on the agent while policy and acceptance semantics live in service.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 1742
+    end_line: 1742
+  summary: Route proposal-gate, review-receipt, obligation, and contract operations through service-owned modules.
+  rationale: Keep implementation orchestration on the agent while policy and acceptance semantics live in service.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 1951
+    end_line: 1951
+  summary: Route proposal-gate, review-receipt, obligation, and contract operations through service-owned modules.
+  rationale: Keep implementation orchestration on the agent while policy and acceptance semantics live in service.
+- path: src/powdrr_lift/workrr/verification_evidence.py
+  type: modified
+  span:
+    start_line: 14
+    end_line: 15
+  summary: Use the service-owned verification-obligation type when persisting local execution evidence.
+  rationale: Keep the local evidence runner interoperable with service-compiled obligations.
+- path: tests/test_agent_service_contracts.py
+  type: modified
+  span:
+    start_line: 201
+    end_line: 201
+  summary: Update verification and review tests to import the service-owned modules directly.
+  rationale: Prove the moved policy remains covered through its new package paths.
+- path: tests/test_agent_service_contracts.py
+  type: modified
+  span:
+    start_line: 208
+    end_line: 213
+  summary: Update verification and review tests to import the service-owned modules directly.
+  rationale: Prove the moved policy remains covered through its new package paths.
+- path: tests/test_agent_service_contracts.py
+  type: modified
+  span:
+    start_line: 235
+    end_line: 235
+  summary: Update verification and review tests to import the service-owned modules directly.
+  rationale: Prove the moved policy remains covered through its new package paths.
+- path: tests/test_agent_service_contracts.py
+  type: modified
+  span:
+    start_line: 237
+    end_line: 237
+  summary: Update verification and review tests to import the service-owned modules directly.
+  rationale: Prove the moved policy remains covered through its new package paths.
+- path: tests/test_agent_service_contracts.py
+  type: modified
+  span:
+    start_line: 239
+    end_line: 240
+  summary: Update verification and review tests to import the service-owned modules directly.
+  rationale: Prove the moved policy remains covered through its new package paths.
+- path: tests/test_agent_service_contracts.py
+  type: modified
+  span:
+    start_line: 244
+    end_line: 255
+  summary: Update verification and review tests to import the service-owned modules directly.
+  rationale: Prove the moved policy remains covered through its new package paths.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 24
+    end_line: 24
+  summary: Update verification and review tests to import the service-owned modules directly.
+  rationale: Prove the moved policy remains covered through its new package paths.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 34
+    end_line: 34
+  summary: Update verification and review tests to import the service-owned modules directly.
+  rationale: Prove the moved policy remains covered through its new package paths.
+- path: tests/test_intent_lineage.py
+  type: modified
+  span:
+    start_line: 9
+    end_line: 12
+  summary: Update verification and review tests to import the service-owned modules directly.
+  rationale: Prove the moved policy remains covered through its new package paths.
+- path: tests/test_intent_lineage.py
+  type: modified
+  span:
+    start_line: 13
+    end_line: 16
+  summary: Update verification and review tests to import the service-owned modules directly.
+  rationale: Prove the moved policy remains covered through its new package paths.
+- path: tests/test_intent_verification_acceptance.py
+  type: modified
+  span:
+    start_line: 6
+    end_line: 7
+  summary: Update verification and review tests to import the service-owned modules directly.
+  rationale: Prove the moved policy remains covered through its new package paths.
+- path: tests/test_invariant_review.py
+  type: modified
+  span:
+    start_line: 16
+    end_line: 16
+  summary: Update verification and review tests to import the service-owned modules directly.
+  rationale: Prove the moved policy remains covered through its new package paths.
+- path: tests/test_invariant_review.py
+  type: modified
+  span:
+    start_line: 31
+    end_line: 33
+  summary: Update verification and review tests to import the service-owned modules directly.
+  rationale: Prove the moved policy remains covered through its new package paths.
+- path: tests/test_structrr_gate_compiler.py
+  type: modified
+  span:
+    start_line: 7
+    end_line: 7
+  summary: Update verification and review tests to import the service-owned modules directly.
+  rationale: Prove the moved policy remains covered through its new package paths.
+- path: tests/test_structrr_gate_compiler.py
+  type: modified
+  span:
+    start_line: 11
+    end_line: 12
+  summary: Update verification and review tests to import the service-owned modules directly.
+  rationale: Prove the moved policy remains covered through its new package paths.
+- path: tests/test_verification_contract.py
+  type: modified
+  span:
+    start_line: 3
+    end_line: 3
+  summary: Update verification and review tests to import the service-owned modules directly.
+  rationale: Prove the moved policy remains covered through its new package paths.
+- path: tests/test_verification_evidence.py
+  type: modified
+  span:
+    start_line: 7
+    end_line: 8
+  summary: Update verification and review tests to import the service-owned modules directly.
+  rationale: Prove the moved policy remains covered through its new package paths.
+- path: tests/test_verification_obligations.py
+  type: modified
+  span:
+    start_line: 4
+    end_line: 5
+  summary: Update verification and review tests to import the service-owned modules directly.
+  rationale: Prove the moved policy remains covered through its new package paths.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []
+features: []
+proposed_prs: []

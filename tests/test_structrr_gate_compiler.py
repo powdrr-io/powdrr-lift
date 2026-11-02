@@ -4,13 +4,12 @@ from dataclasses import replace
 from pathlib import Path
 
 import pytest
-from powdrr_service.structrr.proposal import ProposalRevision, compile_proposal_revision
-
-from powdrr_lift.structrr.gate_compiler import (
+from powdrr_service.structrr.gate_compiler import (
     compile_proposal_worklist,
     evaluate_structural_proposal_gate,
 )
-from powdrr_lift.structrr.proposal_review import (
+from powdrr_service.structrr.proposal import ProposalRevision, compile_proposal_revision
+from powdrr_service.structrr.proposal_review import (
     build_structural_review_receipt,
     load_review_receipt,
     write_review_receipt,

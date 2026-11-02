@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 from powdrr_contracts.workspace import (
+    CheckpointAvailability,
     Conversation,
     DispatchIntent,
     EventType,
@@ -31,6 +32,7 @@ from powdrr_contracts.workspace import (
     WorkspaceEvent,
     WorkspaceJobActionIntent,
     WorkspaceJobDetail,
+    WorkspaceJobRecovery,
     WorkspaceQuestion,
     WorkspaceRepository,
     WorkspaceSnapshot,
@@ -379,6 +381,18 @@ def test_workspace_contracts_round_trip_and_reject_unknown_fields() -> None:
         allowed_actions=(JobAction.CANCEL,),
     )
     assert WorkspaceJobDetail.from_dict(detail.to_dict()) == detail
+    recovered = WorkspaceJobDetail(
+        **{
+            **detail.__dict__,
+            "recovery": WorkspaceJobRecovery(
+                CheckpointAvailability.UNKNOWN, "Validation is not configured."
+            ),
+        }
+    )
+    assert WorkspaceJobDetail.from_dict(recovered.to_dict()) == recovered
+    legacy_payload = detail.to_dict()
+    legacy_payload.pop("recovery")
+    assert WorkspaceJobDetail.from_dict(legacy_payload) == detail
     action_intent = WorkspaceJobActionIntent(
         "action-1",
         "repo-a",

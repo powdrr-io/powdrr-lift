@@ -3,22 +3,26 @@
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import inspect
 import json
 import re
 import time
-from collections.abc import AsyncGenerator, Callable, Mapping
+from collections.abc import AsyncGenerator, Awaitable, Callable, Mapping
 from pathlib import Path
 from typing import Annotated, Any, Literal, Protocol
 from uuid import NAMESPACE_URL, uuid5
 
 from fastapi import APIRouter, Depends, FastAPI, Header, Query, Request
 from powdrr_contracts.workspace import (
+    CheckpointAvailability,
     Conversation,
     JobAction,
+    JobOperation,
     JobState,
     WorkspaceApiError,
     WorkspaceApiErrorResponse,
+    WorkspaceJobRecovery,
     WorkspaceRepository,
 )
 from pydantic import BaseModel, ConfigDict, Field
@@ -48,6 +52,12 @@ class WorkspaceEventSource(Protocol):
 
 class WorkspaceCommandDispatcher(Protocol):
     def health(self) -> Mapping[str, Any]: ...
+
+
+class WorkspaceCheckpointInspector(Protocol):
+    def inspect_checkpoint(
+        self, operation: JobOperation
+    ) -> CheckpointAvailability | Awaitable[CheckpointAvailability]: ...
 
 
 class WorkspaceApiRequest(BaseModel):
@@ -214,6 +224,7 @@ def install_workspace_routes(
     repository_registry: WorkspaceRepositoryRegistry,
     dispatcher: WorkspaceCommandDispatcher | None,
     event_source: WorkspaceEventSource | None,
+    checkpoint_inspector: WorkspaceCheckpointInspector | None = None,
 ) -> None:
     router = APIRouter(prefix="/api/v1")
 
@@ -404,6 +415,41 @@ def install_workspace_routes(
             raise WorkspaceApiException(
                 404, "not_found", "Job was not found."
             ) from error
+        if detail.job.state in {JobState.FAILED, JobState.INTERRUPTED}:
+            recovery = WorkspaceJobRecovery(
+                CheckpointAvailability.UNKNOWN,
+                "Checkpoint validation is not configured.",
+            )
+            if detail.latest_attempt is None:
+                recovery = WorkspaceJobRecovery(
+                    CheckpointAvailability.UNAVAILABLE,
+                    "No job attempt or checkpoint is recorded.",
+                )
+            elif checkpoint_inspector is not None:
+                try:
+                    operation = await run_in_threadpool(
+                        store.get_job_operation,
+                        job_id,
+                        detail.latest_attempt.attempt_id,
+                    )
+                    inspection = checkpoint_inspector.inspect_checkpoint
+                    if inspect.iscoroutinefunction(inspection):
+                        availability = await inspection(operation)
+                    else:
+                        availability = await run_in_threadpool(inspection, operation)
+                        if inspect.isawaitable(availability):
+                            availability = await availability
+                    recovery = WorkspaceJobRecovery(
+                        CheckpointAvailability(availability),
+                        _checkpoint_message(CheckpointAvailability(availability)),
+                    )
+                except Exception:
+                    # Inspector details can contain local paths or provider data.
+                    recovery = WorkspaceJobRecovery(
+                        CheckpointAvailability.UNKNOWN,
+                        "Checkpoint validation failed.",
+                    )
+            detail = dataclasses.replace(detail, recovery=recovery)
         return detail.to_dict()
 
     @router.post("/repositories/{repository_id}/jobs/{job_id}/actions", status_code=202)
@@ -677,6 +723,16 @@ def install_workspace_routes(
         return answered.to_dict()
 
     app.include_router(router)
+
+
+def _checkpoint_message(availability: CheckpointAvailability) -> str:
+    return {
+        CheckpointAvailability.AVAILABLE: "A checkpoint is available to the worker.",
+        CheckpointAvailability.UNAVAILABLE: "No usable checkpoint is available.",
+        CheckpointAvailability.UNKNOWN: (
+            "Checkpoint availability could not be determined."
+        ),
+    }[availability]
 
 
 async def _get_repository(

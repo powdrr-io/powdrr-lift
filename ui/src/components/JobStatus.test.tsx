@@ -62,7 +62,7 @@ describe('JobStatus recovery review', () => {
     )
 
     expect(screen.getByText('Checkpoint availability')).toBeTruthy()
-    expect(screen.getByText('Not reported by the workspace API')).toBeTruthy()
+    expect(screen.getByText('unknown')).toBeTruthy()
     expect(screen.getByText('run-2')).toBeTruthy()
     expect(screen.getByText('revision-7')).toBeTruthy()
     expect(screen.getByText('artifacts/search-plan.md')).toBeTruthy()

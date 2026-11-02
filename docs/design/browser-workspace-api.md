@@ -120,7 +120,15 @@ latest attempt, a bounded attempt history, dependency blockers, artifact outputs
 and actions allowed by the current job state. Stage and question are `null` until
 the workflow adapter records structured stage or job-specific question data.
 Attempt details omit local worktree paths, checkpoint paths, and provider
-configuration data. The detail projection is read in one SQLite transaction.
+configuration data. Recovery states (`failed` and `interrupted`) include a
+`recovery` assessment with checkpoint availability (`available`, `unavailable`,
+or `unknown`) and a user-safe message. Without a configured
+`WorkspaceCheckpointInspector`, availability is `unknown`; an inspector receives
+the internal job operation, while its response never includes checkpoint or
+worktree references. Inspector failures are reduced to a generic `unknown`
+assessment. The detail projection is read in one SQLite transaction. A
+checkpoint assessment does not itself enable resume: only actions the backend
+reports are available, and no resume action is currently offered.
 
 Request an allowed job action with `POST /api/v1/repositories/{repository_id}/jobs/{job_id}/actions`, including the current job revision and a stable request ID:
 

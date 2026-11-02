@@ -30,6 +30,7 @@ from powdrr_local.turn_dispatch_supervisor import WorkspaceTurnDispatcher
 from powdrr_local.workspace import WorkspaceConflict, WorkspaceStore
 from powdrr_local.workspace_api import (
     WorkspaceApiException,
+    WorkspaceCheckpointInspector,
     WorkspaceCommandDispatcher,
     WorkspaceEventSource,
     WorkspaceRepositoryRegistry,
@@ -63,6 +64,7 @@ def create_app(
     dispatcher: WorkspaceCommandDispatcher | None = None,
     event_source: WorkspaceEventSource | None = None,
     turn_dispatcher: WorkspaceTurnDispatcher | None = None,
+    checkpoint_inspector: WorkspaceCheckpointInspector | None = None,
     session_max_age: int = _SESSION_MAX_AGE_SECONDS,
 ) -> FastAPI:
     """Build an app without starting global services or touching credentials."""
@@ -283,6 +285,7 @@ def create_app(
         repository_registry=repository_source,
         dispatcher=dispatcher,
         event_source=event_source,
+        checkpoint_inspector=checkpoint_inspector,
     )
     return app
 

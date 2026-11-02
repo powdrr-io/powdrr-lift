@@ -1,0 +1,338 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1312
+title: Move semantic instruction policy into service
+intent:
+  problem: Semantic instruction classification, contract compilation, prompt-case evaluation, and their corpus still
+    lived in the agent source tree or docs.
+  goal: Move semantic instruction policy and its evaluation corpus into the service package, update all runtime
+    and research imports directly, and verify both distributions package the intended boundary.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 1160
+    end_line: 1160
+  summary: Move semantic compiler, case evaluation, classifier formatter, and corpus ownership to service and update
+    import edges.
+  rationale: Keep the machine-readable ownership inventory aligned with module locations and direct callers.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 1163
+    end_line: 1165
+  summary: Move semantic compiler, case evaluation, classifier formatter, and corpus ownership to service and update
+    import edges.
+  rationale: Keep the machine-readable ownership inventory aligned with module locations and direct callers.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2614
+    end_line: 2614
+  summary: Move semantic compiler, case evaluation, classifier formatter, and corpus ownership to service and update
+    import edges.
+  rationale: Keep the machine-readable ownership inventory aligned with module locations and direct callers.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3383
+    end_line: 3383
+  summary: Move semantic compiler, case evaluation, classifier formatter, and corpus ownership to service and update
+    import edges.
+  rationale: Keep the machine-readable ownership inventory aligned with module locations and direct callers.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3385
+    end_line: 3385
+  summary: Move semantic compiler, case evaluation, classifier formatter, and corpus ownership to service and update
+    import edges.
+  rationale: Keep the machine-readable ownership inventory aligned with module locations and direct callers.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3388
+    end_line: 3389
+  summary: Move semantic compiler, case evaluation, classifier formatter, and corpus ownership to service and update
+    import edges.
+  rationale: Keep the machine-readable ownership inventory aligned with module locations and direct callers.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3392
+    end_line: 3394
+  summary: Move semantic compiler, case evaluation, classifier formatter, and corpus ownership to service and update
+    import edges.
+  rationale: Keep the machine-readable ownership inventory aligned with module locations and direct callers.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3398
+    end_line: 3398
+  summary: Move semantic compiler, case evaluation, classifier formatter, and corpus ownership to service and update
+    import edges.
+  rationale: Keep the machine-readable ownership inventory aligned with module locations and direct callers.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3401
+    end_line: 3403
+  summary: Move semantic compiler, case evaluation, classifier formatter, and corpus ownership to service and update
+    import edges.
+  rationale: Keep the machine-readable ownership inventory aligned with module locations and direct callers.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3407
+    end_line: 3407
+  summary: Move semantic compiler, case evaluation, classifier formatter, and corpus ownership to service and update
+    import edges.
+  rationale: Keep the machine-readable ownership inventory aligned with module locations and direct callers.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3409
+    end_line: 3409
+  summary: Move semantic compiler, case evaluation, classifier formatter, and corpus ownership to service and update
+    import edges.
+  rationale: Keep the machine-readable ownership inventory aligned with module locations and direct callers.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3412
+    end_line: 3414
+  summary: Move semantic compiler, case evaluation, classifier formatter, and corpus ownership to service and update
+    import edges.
+  rationale: Keep the machine-readable ownership inventory aligned with module locations and direct callers.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3731
+    end_line: 3739
+  summary: Move semantic compiler, case evaluation, classifier formatter, and corpus ownership to service and update
+    import edges.
+  rationale: Keep the machine-readable ownership inventory aligned with module locations and direct callers.
+- path: docs/evaluations/deepswe-design-evaluation.md
+  type: modified
+  span:
+    start_line: 209
+    end_line: 209
+  summary: Point semantic prompt corpus documentation and validation command at the service package.
+  rationale: Keep evaluator instructions accurate after moving the corpus and loader.
+- path: docs/evaluations/deepswe-design-evaluation.md
+  type: modified
+  span:
+    start_line: 234
+    end_line: 235
+  summary: Point semantic prompt corpus documentation and validation command at the service package.
+  rationale: Keep evaluator instructions accurate after moving the corpus and loader.
+- path: docs/plans/agent-service-code-split.md
+  type: modified
+  span:
+    start_line: 494
+    end_line: 498
+  summary: Add semantic instruction analysis and prompt-case evaluation to the remaining service extraction scope.
+  rationale: Keep the staged implementation plan synchronized with the completed code split.
+- path: packages/service/src/powdrr_service/evaluations/semantic_prompt_cases.py
+  type: renamed
+  span:
+    start_line: 1
+    end_line: 279
+  summary: Move semantic prompt-case schema validation and bundled-corpus loading into the service.
+  rationale: Keep evaluation policy and its default data owned and packaged by the service.
+- path: packages/service/src/powdrr_service/evaluations/semantic_prompt_variants.py
+  type: renamed
+  span:
+    start_line: 1
+    end_line: 271
+  summary: Move semantic prompt paraphrase and contrast-variant generation policy into the service.
+  rationale: Keep prompt evaluation and variant review logic within the proprietary service package.
+- path: packages/service/src/powdrr_service/planning/semantic_contract_compiler.py
+  type: renamed
+  span:
+    start_line: 1
+    end_line: 1989
+  summary: Move semantic instruction decisions and source-anchored contract compilation into the service.
+  rationale: Keep instruction interpretation policy in the service while the agent supplies runtime inputs.
+- path: science/classifications/compare_jev_other_classifiers.py
+  type: modified
+  span:
+    start_line: 25
+    end_line: 25
+  summary: Update classifier comparison code to import routing definitions from the service.
+  rationale: Keep research scripts runnable after removing the agent-side module.
+- path: science/classifications/compare_jev_other_classifiers.py
+  type: modified
+  span:
+    start_line: 32
+    end_line: 32
+  summary: Update classifier comparison code to import routing definitions from the service.
+  rationale: Keep research scripts runnable after removing the agent-side module.
+- path: science/classifications/root_disposition/build_dataset.py
+  type: modified
+  span:
+    start_line: 31
+    end_line: 34
+  summary: Update dataset construction to use service-owned semantic interpretation modules.
+  rationale: Keep analysis scripts aligned with the new package boundary.
+- path: science/classifications/root_disposition/build_dataset.py
+  type: modified
+  span:
+    start_line: 38
+    end_line: 41
+  summary: Update dataset construction to use service-owned semantic interpretation modules.
+  rationale: Keep analysis scripts aligned with the new package boundary.
+- path: science/classifications/root_disposition/predict.py
+  type: modified
+  span:
+    start_line: 12
+    end_line: 12
+  summary: Update prediction input formatting to use the service module.
+  rationale: Use one canonical classifier-input formatter after the move.
+- path: science/classifications/root_disposition/predict.py
+  type: modified
+  span:
+    start_line: 14
+    end_line: 15
+  summary: Update prediction input formatting to use the service module.
+  rationale: Use one canonical classifier-input formatter after the move.
+- path: science/classifications/root_disposition/train_classifier.py
+  type: modified
+  span:
+    start_line: 17
+    end_line: 17
+  summary: Update classifier training to use the service input formatter.
+  rationale: Use one canonical classifier-input formatter after the move.
+- path: science/classifications/root_disposition/train_classifier.py
+  type: modified
+  span:
+    start_line: 25
+    end_line: 26
+  summary: Update classifier training to use the service input formatter.
+  rationale: Use one canonical classifier-input formatter after the move.
+- path: science/classifications/routing/evaluate_jev_smoke.py
+  type: modified
+  span:
+    start_line: 20
+    end_line: 20
+  summary: Update routing smoke evaluation imports and source path to the service module.
+  rationale: Keep the research check working after the old source file is removed.
+- path: science/classifications/routing/evaluate_jev_smoke.py
+  type: modified
+  span:
+    start_line: 25
+    end_line: 25
+  summary: Update routing smoke evaluation imports and source path to the service module.
+  rationale: Keep the research check working after the old source file is removed.
+- path: science/classifications/routing/evaluate_jev_smoke.py
+  type: modified
+  span:
+    start_line: 235
+    end_line: 239
+  summary: Update routing smoke evaluation imports and source path to the service module.
+  rationale: Keep the research check working after the old source file is removed.
+- path: science/deepswe/acceptance_templates/production_analysis.py
+  type: modified
+  span:
+    start_line: 22
+    end_line: 22
+  summary: Update production analysis to import semantic decisions from the service.
+  rationale: Keep acceptance-analysis scripts on the direct service API.
+- path: science/deepswe/acceptance_templates/production_analysis.py
+  type: modified
+  span:
+    start_line: 27
+    end_line: 28
+  summary: Update production analysis to import semantic decisions from the service.
+  rationale: Keep acceptance-analysis scripts on the direct service API.
+- path: scripts/build-agent-service-ownership-inventory.py
+  type: modified
+  span:
+    start_line: 73
+    end_line: 80
+  summary: Include and classify service planning modules in generated ownership inventories.
+  rationale: Ensure future inventory generation discovers the moved semantic compiler and formatter.
+- path: scripts/build-agent-service-ownership-inventory.py
+  type: modified
+  span:
+    start_line: 261
+    end_line: 261
+  summary: Include and classify service planning modules in generated ownership inventories.
+  rationale: Ensure future inventory generation discovers the moved semantic compiler and formatter.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span:
+    start_line: 48
+    end_line: 62
+  summary: Call semantic contract compilation through the service package.
+  rationale: Keep local command orchestration in the agent and policy implementation in the service.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span:
+    start_line: 92
+    end_line: 106
+  summary: Call semantic contract compilation through the service package.
+  rationale: Keep local command orchestration in the agent and policy implementation in the service.
+- path: tests/test_agent_service_contracts.py
+  type: modified
+  span:
+    start_line: 180
+    end_line: 209
+  summary: Assert semantic policy modules and corpus are service-owned and old agent paths are absent.
+  rationale: Prevent regressions in the package boundary and corpus relocation.
+- path: tests/test_instruction_context.py
+  type: modified
+  span:
+    start_line: 3
+    end_line: 3
+  summary: Import classifier-input behavior directly from service planning.
+  rationale: Keep context-formatting tests exercising the canonical service implementation.
+- path: tests/test_instruction_context.py
+  type: modified
+  span:
+    start_line: 12
+    end_line: 13
+  summary: Import classifier-input behavior directly from service planning.
+  rationale: Keep context-formatting tests exercising the canonical service implementation.
+- path: tests/test_semantic_contract_compiler.py
+  type: modified
+  span:
+    start_line: 15
+    end_line: 29
+  summary: Run semantic contract compiler tests against the service module.
+  rationale: Preserve behavior coverage while removing the agent-side import path.
+- path: tests/test_semantic_contract_compiler.py
+  type: modified
+  span:
+    start_line: 33
+    end_line: 47
+  summary: Run semantic contract compiler tests against the service module.
+  rationale: Preserve behavior coverage while removing the agent-side import path.
+- path: tests/test_semantic_prompt_cases.py
+  type: modified
+  span:
+    start_line: 8
+    end_line: 9
+  summary: Run prompt-case and variant tests against the service loader and packaged default corpus.
+  rationale: Preserve evaluation coverage and verify the new resource location.
+- path: tests/test_semantic_prompt_cases.py
+  type: modified
+  span:
+    start_line: 14
+    end_line: 14
+  summary: Run prompt-case and variant tests against the service loader and packaged default corpus.
+  rationale: Preserve evaluation coverage and verify the new resource location.
+- path: tests/test_semantic_prompt_cases.py
+  type: modified
+  span:
+    start_line: 18
+    end_line: 18
+  summary: Run prompt-case and variant tests against the service loader and packaged default corpus.
+  rationale: Preserve evaluation coverage and verify the new resource location.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []
+features: []
+proposed_prs: []

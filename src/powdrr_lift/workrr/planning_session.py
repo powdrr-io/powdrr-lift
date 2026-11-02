@@ -23,9 +23,10 @@ from powdrr_local.planning.checkpoints import (
 )
 from powdrr_local.planning.sessions import GitHubPlanningIssueStore
 from powdrr_local.planning.source import read_pinned_source
-from powdrr_service.planning.assembly import PathFact
+from powdrr_service.planning.assembly import PathFact, WorkUnit
 from powdrr_service.planning.compiler import PlanningCompilationError
 from powdrr_service.planning.driver import SourceLedgerQuestionMachine
+from powdrr_service.planning.evidence import EvidenceError
 from powdrr_service.planning.plan_sizing import PATH_RUNTIME_SUFFIXES
 from powdrr_service.planning.service import (
     PlanningOptions,
@@ -53,6 +54,7 @@ from powdrr_lift.workrr.github_issue_queue import (
 )
 from powdrr_lift.workrr.planning.evidence import (
     read_evidence_excerpt,
+    search_dependency_reference_paths,
     search_requirements_evidence,
 )
 from powdrr_lift.workrr.provider_runtime import (
@@ -220,6 +222,36 @@ def run_planning_session(
 
         source = segment_markdown_source(pinned_source)
         taxonomy = load_entity_taxonomy(repo_root, _structrr_taxonomy_path(repo_root))
+        dependency_reference_cache_key: tuple[Any, ...] | None = None
+        dependency_reference_cache: Mapping[tuple[str, str], tuple[str, ...]] = {}
+
+        def search_dependency_references(
+            units: Sequence[WorkUnit],
+        ) -> Mapping[tuple[str, str], tuple[str, ...]]:
+            nonlocal dependency_reference_cache_key, dependency_reference_cache
+            paths_by_unit = {
+                unit.id: tuple(
+                    sorted({write.path for write in unit.planned_writes if write.path})
+                )
+                for unit in units
+            }
+            cache_key = tuple(sorted(paths_by_unit.items()))
+            if cache_key == dependency_reference_cache_key:
+                return dependency_reference_cache
+            try:
+                dependency_reference_cache = search_dependency_reference_paths(
+                    repo_root, base_commit, paths_by_unit
+                )
+            except (EvidenceError, PowdrrExecutionError) as error:
+                print(
+                    "BasedPyright dependency reference search unavailable; "
+                    f"continuing with other candidate evidence: {error}",
+                    file=stream,
+                )
+                dependency_reference_cache = {}
+            dependency_reference_cache_key = cache_key
+            return dependency_reference_cache
+
         machine = SourceLedgerQuestionMachine(
             source,
             evidence_search=lambda requirements: search_requirements_evidence(
@@ -230,6 +262,7 @@ def run_planning_session(
             evidence_excerpt_reader=lambda evidence: read_evidence_excerpt(
                 repo_root, evidence
             ),
+            dependency_reference_search=search_dependency_references,
             verification_command=verification_command,
             repository_paths=_planning_repository_paths(
                 repo_root, base_commit, pinned_source.text

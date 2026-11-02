@@ -213,6 +213,17 @@ def find_workspace_symbols(
     return find(queries, worktree_root=worktree_root, limit=limit)
 
 
+def find_workspace_reference_paths(
+    paths: list[str], *, worktree_root: Path
+) -> dict[str, tuple[str, ...]]:
+    """Run BasedPyright references over a bounded set of planned Python files."""
+    from powdrr_lift.basedpyright_tools import (
+        find_workspace_reference_paths as find,
+    )
+
+    return find(paths, worktree_root=worktree_root)
+
+
 def digest_at_path(repo_root: str | Path, relative_path: str) -> str | None:
     """Observe a safe in-repository file digest for an optimistic precondition."""
     root = Path(repo_root).resolve()

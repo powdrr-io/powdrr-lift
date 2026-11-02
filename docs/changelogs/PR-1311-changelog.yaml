@@ -1,0 +1,196 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1311
+title: Add BasedPyright dependency candidates
+intent:
+  problem: Dependency candidate discovery can miss real code dependencies when planned work-unit prose has little lexical overlap.
+  goal: Add bounded BasedPyright references between planned Python files as evidence for focused dependency confirmation.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/plans/planning-efficiency-deterministic-filtering.md
+    type: modified
+    span: {start_line: 221, end_line: 226}
+    summary: Record the BasedPyright dependency-evidence progress and remaining recall work.
+    rationale: Keep the implementation plan aligned with the dependency-candidate behavior.
+  - path: packages/agent/src/powdrr_agent/repository.py
+    type: modified
+    span: {start_line: 216, end_line: 226}
+    summary: Expose the bounded BasedPyright reference search through the repository adapter.
+    rationale: Let planning use language-server evidence through the existing repository boundary.
+  - path: packages/service/src/powdrr_service/planning/dependencies.py
+    type: modified
+    span: {start_line: 334, end_line: 334}
+    summary: Add code references to dependency-candidate discovery output.
+    rationale: Preserve reference evidence alongside candidate pairs for targeted confirmation.
+  - path: packages/service/src/powdrr_service/planning/dependencies.py
+    type: modified
+    span: {start_line: 342, end_line: 342}
+    summary: Accept BasedPyright code-reference paths as optional candidate evidence.
+    rationale: Add symbol-reference discovery without changing existing callers.
+  - path: packages/service/src/powdrr_service/planning/dependencies.py
+    type: modified
+    span: {start_line: 380, end_line: 380}
+    summary: Collect the references associated with each candidate pair.
+    rationale: Carry exact code evidence forward to the reviewer question.
+  - path: packages/service/src/powdrr_service/planning/dependencies.py
+    type: modified
+    span: {start_line: 419, end_line: 421}
+    summary: Look up cross-file reference evidence for each producer-consumer pair.
+    rationale: Discover likely dependencies even when the plan prose has no lexical overlap.
+  - path: packages/service/src/powdrr_service/planning/dependencies.py
+    type: modified
+    span: {start_line: 427, end_line: 427}
+    summary: Include reference-backed pairs in targeted dependency confirmation.
+    rationale: Expand candidate recall without allowing references to accept an edge.
+  - path: packages/service/src/powdrr_service/planning/dependencies.py
+    type: modified
+    span: {start_line: 438, end_line: 444}
+    summary: Return reference evidence with the deduplicated dependency candidates.
+    rationale: Keep code-reference context attached to the pair selected for review.
+  - path: packages/service/src/powdrr_service/planning/dependencies.py
+    type: modified
+    span: {start_line: 1400, end_line: 1400}
+    summary: Accept reference paths in the dependency confirmation request builder.
+    rationale: Expose static evidence to the focused dependency decision.
+  - path: packages/service/src/powdrr_service/planning/dependencies.py
+    type: modified
+    span: {start_line: 1417, end_line: 1426}
+    summary: Include BasedPyright path references in question context and input digest.
+    rationale: Make the evidence available and bind accepted answers to the exact candidate context.
+  - path: packages/service/src/powdrr_service/planning/dependencies.py
+    type: modified
+    span: {start_line: 1444, end_line: 1444}
+    summary: Add reference-evidence guidance to the dependency confirmation prompt.
+    rationale: Tell the reviewer references support candidacy but do not prove dependency.
+  - path: packages/service/src/powdrr_service/planning/dependencies.py
+    type: modified
+    span: {start_line: 1455, end_line: 1462}
+    summary: Explain that references are candidate evidence rather than accepted edges.
+    rationale: Prevent a code reference alone from creating a semantic dependency.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 350, end_line: 353}
+    summary: Add an injectable dependency-reference search to the planning machine.
+    rationale: Connect repository analysis to dependency candidate generation through a testable boundary.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 366, end_line: 368}
+    summary: Store the reference-search callback and its reusable result cache.
+    rationale: Avoid repeating unchanged repository analysis during one planning session.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 1205, end_line: 1207}
+    summary: Pass code-reference evidence into dependency confirmation requests.
+    rationale: Give the focused reviewer question the evidence that caused the pair to be considered.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 1226, end_line: 1228}
+    summary: Preserve reference evidence while binding confirmed dependency edges.
+    rationale: Use the same candidate context for initial review and accepted-answer compilation.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 1255, end_line: 1266}
+    summary: Cache BasedPyright references by allocated unit IDs and planned write paths.
+    rationale: Recompute only when the proposed file set changes.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 1271, end_line: 1271}
+    summary: Supply cached code references to deterministic candidate discovery.
+    rationale: Add static evidence while retaining existing candidate filters.
+  - path: src/powdrr_lift/basedpyright_tools.py
+    type: modified
+    span: {start_line: 5, end_line: 5}
+    summary: Import regular-expression support for symbol-name prefiltering.
+    rationale: Avoid language-server reference requests for names absent from other planned files.
+  - path: src/powdrr_lift/basedpyright_tools.py
+    type: modified
+    span: {start_line: 19, end_line: 21}
+    summary: Bound planned files, symbols per file, and total reference queries.
+    rationale: Keep reference discovery bounded as plans grow.
+  - path: src/powdrr_lift/basedpyright_tools.py
+    type: modified
+    span: {start_line: 68, end_line: 216}
+    summary: Find cross-file references between bounded sets of planned Python files.
+    rationale: Use BasedPyright symbol resolution and query only names appearing in other planned files.
+  - path: src/powdrr_lift/workrr/planning/evidence.py
+    type: modified
+    span: {start_line: 17, end_line: 17}
+    summary: Import the BasedPyright planned-file reference search adapter.
+    rationale: Reuse repository analysis from the pinned planning-evidence layer.
+  - path: src/powdrr_lift/workrr/planning/evidence.py
+    type: modified
+    span: {start_line: 386, end_line: 415}
+    summary: Map references between planned file paths to work-unit pairs.
+    rationale: Keep dependency evidence bound to the same clean base commit used by planning.
+  - path: src/powdrr_lift/workrr/planning_session.py
+    type: modified
+    span: {start_line: 26, end_line: 26}
+    summary: Import planned work-unit data for reference-search integration.
+    rationale: Build the repository search input from allocated planned writes.
+  - path: src/powdrr_lift/workrr/planning_session.py
+    type: modified
+    span: {start_line: 29, end_line: 29}
+    summary: Import the evidence error used by optional static-reference search.
+    rationale: Keep an unavailable analysis tool from blocking other dependency evidence.
+  - path: src/powdrr_lift/workrr/planning_session.py
+    type: modified
+    span: {start_line: 57, end_line: 57}
+    summary: Import the pinned dependency-reference search function.
+    rationale: Invoke static analysis through the planning repository evidence boundary.
+  - path: src/powdrr_lift/workrr/planning_session.py
+    type: modified
+    span: {start_line: 225, end_line: 254}
+    summary: Cache repository references for the planned Python paths.
+    rationale: Avoid repeat searches and continue with other evidence if BasedPyright is unavailable or exceeds its bound.
+  - path: src/powdrr_lift/workrr/planning_session.py
+    type: modified
+    span: {start_line: 265, end_line: 265}
+    summary: Inject dependency-reference search into the planning machine.
+    rationale: Enable code-reference candidates in normal plan generation.
+  - path: tests/test_basedpyright_tools.py
+    type: modified
+    span: {start_line: 12, end_line: 12}
+    summary: Import the BasedPyright planned-file reference search.
+    rationale: Exercise its behavior through mocked language-server responses.
+  - path: tests/test_basedpyright_tools.py
+    type: modified
+    span: {start_line: 128, end_line: 178}
+    summary: Verify references map to planned consumers and exclude unrelated paths.
+    rationale: Exercise language-server results and planned-path filtering with nontrivial mocked references.
+  - path: tests/test_planning_dependencies.py
+    type: modified
+    span: {start_line: 281, end_line: 326}
+    summary: Verify reference evidence discovers a dependency with no lexical overlap and reaches its reviewer.
+    rationale: Prove code references add a candidate without directly accepting a dependency edge.
+  - path: tests/test_planning_evidence.py
+    type: modified
+    span: {start_line: 35, end_line: 35}
+    summary: Import the work-unit reference evidence adapter.
+    rationale: Test mapping pinned repository paths to dependency candidate pairs.
+  - path: tests/test_planning_evidence.py
+    type: modified
+    span: {start_line: 106, end_line: 136}
+    summary: Verify repository reference paths map to their owning work units.
+    rationale: Cover the evidence adapter from pinned repository paths to dependency candidate pairs.
+entities:
+  - id: basedpyright-planned-file-reference-search
+    type: Function
+    action: added
+  - id: planning-dependency-reference-candidate
+    type: Function
+    action: added
+  - id: basedpyright-dependency-candidate-regression
+    type: Regression test
+    action: added
+entity_relationships:
+  - id: reference-candidate-is-reviewed
+    type: verifies
+    source: basedpyright-dependency-candidate-regression
+    target: planning-dependency-reference-candidate
+    action: added
+    description: Regression coverage verifies code references add a candidate and provide evidence to the focused dependency question.
+invariants:
+  - id: code-references-do-not-accept-dependencies
+    description: BasedPyright references may add a work-unit pair for confirmation but cannot by themselves create an accepted dependency edge.
+    action: added
+guidance: []

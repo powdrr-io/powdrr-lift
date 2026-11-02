@@ -278,6 +278,52 @@ def test_dependency_discovery_keeps_specific_cross_path_candidates() -> None:
     assert discovery.confirmation_pairs == ((output, consumer),)
 
 
+def test_dependency_discovery_uses_reference_evidence_without_lexical_overlap() -> None:
+    producer = replace(
+        _unit("unit-0001"),
+        deliverable="Build the catalog adapter.",
+        implementation_step="Expose the existing catalog lookup API.",
+        acceptance_criteria=("The adapter returns catalog records.",),
+        planned_writes=(
+            PlannedWrite("src/catalog.py", "implementation", "python", (), ()),
+        ),
+    )
+    consumer = replace(
+        _unit("unit-0002", "req-0002"),
+        deliverable="Validate the task dashboard.",
+        implementation_step="Render the dashboard task overview.",
+        acceptance_criteria=("The overview includes completion state.",),
+        planned_writes=(
+            PlannedWrite("src/dashboard.py", "implementation", "python", (), ()),
+        ),
+    )
+    output = PendingUnitOutput(
+        producer.id, "Catalog lookup API", producer.requirement_ids
+    )
+    reference_paths = {
+        (producer.id, consumer.id): ("src/catalog.py -> src/dashboard.py",)
+    }
+
+    discovery = discover_dependency_candidates(
+        [producer, consumer],
+        [output],
+        code_reference_paths=reference_paths,
+    )
+
+    assert discovery.confirmation_pairs == ((output, consumer),)
+    assert discovery.code_reference_paths == reference_paths
+    question = build_dependency_confirmation_request(
+        producer,
+        consumer,
+        output.description,
+        allowed_requirement_ids=set(producer.requirement_ids)
+        | set(consumer.requirement_ids),
+        code_reference_paths=reference_paths[(producer.id, consumer.id)],
+    )
+    assert "BasedPyright found references" in question.exact_question
+    assert "src/catalog.py -> src/dashboard.py" in question.exact_question
+
+
 def test_dependency_discovery_keeps_named_output_path_in_deliverable() -> None:
     producer = replace(
         _unit("unit-0001"),

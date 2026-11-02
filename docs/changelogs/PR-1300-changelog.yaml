@@ -1,0 +1,572 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1300
+title: Measure and bound large planning runs
+intent:
+  problem: Planning runtime had no deterministic full-flow scale measurement, and large runs repeatedly
+    rebuilt accepted state and oversized Structrr context.
+  goal: Add reproducible scale profiles, bound question construction to the active concurrency window,
+    and avoid repeated work while reviewing large projected baselines.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/plans/planning-efficiency-deterministic-filtering.md
+  type: modified
+  span:
+    start_line: 273
+    end_line: 275
+  summary: Record executable planning scale profiles and their deterministic local results.
+  rationale: Make the two-hour performance objective measurable without treating mocked timings as live-provider
+    proof.
+- path: docs/plans/planning-efficiency-deterministic-filtering.md
+  type: modified
+  span:
+    start_line: 287
+    end_line: 305
+  summary: Record executable planning scale profiles and their deterministic local results.
+  rationale: Make the two-hour performance objective measurable without treating mocked timings as live-provider
+    proof.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 6
+    end_line: 6
+  summary: Cache stable planning state and construct only the next bounded question frontier.
+  rationale: Reduce repeated parsing, request construction, and full-baseline scans as the journal grows.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 75
+    end_line: 75
+  summary: Cache stable planning state and construct only the next bounded question frontier.
+  rationale: Reduce repeated parsing, request construction, and full-baseline scans as the journal grows.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 84
+    end_line: 84
+  summary: Cache stable planning state and construct only the next bounded question frontier.
+  rationale: Reduce repeated parsing, request construction, and full-baseline scans as the journal grows.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 357
+    end_line: 357
+  summary: Cache stable planning state and construct only the next bounded question frontier.
+  rationale: Reduce repeated parsing, request construction, and full-baseline scans as the journal grows.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 372
+    end_line: 372
+  summary: Cache stable planning state and construct only the next bounded question frontier.
+  rationale: Reduce repeated parsing, request construction, and full-baseline scans as the journal grows.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 376
+    end_line: 391
+  summary: Cache stable planning state and construct only the next bounded question frontier.
+  rationale: Reduce repeated parsing, request construction, and full-baseline scans as the journal grows.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 415
+    end_line: 427
+  summary: Cache stable planning state and construct only the next bounded question frontier.
+  rationale: Reduce repeated parsing, request construction, and full-baseline scans as the journal grows.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 503
+    end_line: 503
+  summary: Cache stable planning state and construct only the next bounded question frontier.
+  rationale: Reduce repeated parsing, request construction, and full-baseline scans as the journal grows.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 506
+    end_line: 510
+  summary: Cache stable planning state and construct only the next bounded question frontier.
+  rationale: Reduce repeated parsing, request construction, and full-baseline scans as the journal grows.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 536
+    end_line: 536
+  summary: Cache stable planning state and construct only the next bounded question frontier.
+  rationale: Reduce repeated parsing, request construction, and full-baseline scans as the journal grows.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 613
+    end_line: 653
+  summary: Cache stable planning state and construct only the next bounded question frontier.
+  rationale: Reduce repeated parsing, request construction, and full-baseline scans as the journal grows.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 666
+    end_line: 667
+  summary: Cache stable planning state and construct only the next bounded question frontier.
+  rationale: Reduce repeated parsing, request construction, and full-baseline scans as the journal grows.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 687
+    end_line: 687
+  summary: Cache stable planning state and construct only the next bounded question frontier.
+  rationale: Reduce repeated parsing, request construction, and full-baseline scans as the journal grows.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 690
+    end_line: 690
+  summary: Cache stable planning state and construct only the next bounded question frontier.
+  rationale: Reduce repeated parsing, request construction, and full-baseline scans as the journal grows.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 698
+    end_line: 703
+  summary: Cache stable planning state and construct only the next bounded question frontier.
+  rationale: Reduce repeated parsing, request construction, and full-baseline scans as the journal grows.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 707
+    end_line: 707
+  summary: Cache stable planning state and construct only the next bounded question frontier.
+  rationale: Reduce repeated parsing, request construction, and full-baseline scans as the journal grows.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 715
+    end_line: 715
+  summary: Cache stable planning state and construct only the next bounded question frontier.
+  rationale: Reduce repeated parsing, request construction, and full-baseline scans as the journal grows.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 726
+    end_line: 726
+  summary: Cache stable planning state and construct only the next bounded question frontier.
+  rationale: Reduce repeated parsing, request construction, and full-baseline scans as the journal grows.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 728
+    end_line: 728
+  summary: Cache stable planning state and construct only the next bounded question frontier.
+  rationale: Reduce repeated parsing, request construction, and full-baseline scans as the journal grows.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 823
+    end_line: 823
+  summary: Cache stable planning state and construct only the next bounded question frontier.
+  rationale: Reduce repeated parsing, request construction, and full-baseline scans as the journal grows.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 1012
+    end_line: 1045
+  summary: Cache stable planning state and construct only the next bounded question frontier.
+  rationale: Reduce repeated parsing, request construction, and full-baseline scans as the journal grows.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 1448
+    end_line: 1453
+  summary: Cache stable planning state and construct only the next bounded question frontier.
+  rationale: Reduce repeated parsing, request construction, and full-baseline scans as the journal grows.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 1509
+    end_line: 1509
+  summary: Cache stable planning state and construct only the next bounded question frontier.
+  rationale: Reduce repeated parsing, request construction, and full-baseline scans as the journal grows.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 1547
+    end_line: 1547
+  summary: Cache stable planning state and construct only the next bounded question frontier.
+  rationale: Reduce repeated parsing, request construction, and full-baseline scans as the journal grows.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 1592
+    end_line: 1594
+  summary: Cache stable planning state and construct only the next bounded question frontier.
+  rationale: Reduce repeated parsing, request construction, and full-baseline scans as the journal grows.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 1596
+    end_line: 1617
+  summary: Cache stable planning state and construct only the next bounded question frontier.
+  rationale: Reduce repeated parsing, request construction, and full-baseline scans as the journal grows.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 1627
+    end_line: 1627
+  summary: Cache stable planning state and construct only the next bounded question frontier.
+  rationale: Reduce repeated parsing, request construction, and full-baseline scans as the journal grows.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 2028
+    end_line: 2052
+  summary: Cache stable planning state and construct only the next bounded question frontier.
+  rationale: Reduce repeated parsing, request construction, and full-baseline scans as the journal grows.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 2058
+    end_line: 2068
+  summary: Cache stable planning state and construct only the next bounded question frontier.
+  rationale: Reduce repeated parsing, request construction, and full-baseline scans as the journal grows.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 2059
+    end_line: 2059
+  summary: Cache stable planning state and construct only the next bounded question frontier.
+  rationale: Reduce repeated parsing, request construction, and full-baseline scans as the journal grows.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 2180
+    end_line: 2203
+  summary: Cache stable planning state and construct only the next bounded question frontier.
+  rationale: Reduce repeated parsing, request construction, and full-baseline scans as the journal grows.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 2205
+    end_line: 2207
+  summary: Cache stable planning state and construct only the next bounded question frontier.
+  rationale: Reduce repeated parsing, request construction, and full-baseline scans as the journal grows.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 2209
+    end_line: 2209
+  summary: Cache stable planning state and construct only the next bounded question frontier.
+  rationale: Reduce repeated parsing, request construction, and full-baseline scans as the journal grows.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 2239
+    end_line: 2243
+  summary: Cache stable planning state and construct only the next bounded question frontier.
+  rationale: Reduce repeated parsing, request construction, and full-baseline scans as the journal grows.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 477
+    end_line: 482
+  summary: Bound planning question generation to the configured concurrency window.
+  rationale: Avoid preparing questions that cannot execute before the next durable checkpoint.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 75
+    end_line: 87
+  summary: Keep Structrr pagination and per-subject review context compact through indexed baseline lookups.
+  rationale: Prevent oversized prompts and repeated full-snapshot scans for large candidate sets.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 562
+    end_line: 562
+  summary: Keep Structrr pagination and per-subject review context compact through indexed baseline lookups.
+  rationale: Prevent oversized prompts and repeated full-snapshot scans for large candidate sets.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 586
+    end_line: 606
+  summary: Keep Structrr pagination and per-subject review context compact through indexed baseline lookups.
+  rationale: Prevent oversized prompts and repeated full-snapshot scans for large candidate sets.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 608
+    end_line: 608
+  summary: Keep Structrr pagination and per-subject review context compact through indexed baseline lookups.
+  rationale: Prevent oversized prompts and repeated full-snapshot scans for large candidate sets.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 611
+    end_line: 619
+  summary: Keep Structrr pagination and per-subject review context compact through indexed baseline lookups.
+  rationale: Prevent oversized prompts and repeated full-snapshot scans for large candidate sets.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 621
+    end_line: 622
+  summary: Keep Structrr pagination and per-subject review context compact through indexed baseline lookups.
+  rationale: Prevent oversized prompts and repeated full-snapshot scans for large candidate sets.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 640
+    end_line: 640
+  summary: Keep Structrr pagination and per-subject review context compact through indexed baseline lookups.
+  rationale: Prevent oversized prompts and repeated full-snapshot scans for large candidate sets.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 750
+    end_line: 751
+  summary: Keep Structrr pagination and per-subject review context compact through indexed baseline lookups.
+  rationale: Prevent oversized prompts and repeated full-snapshot scans for large candidate sets.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 753
+    end_line: 763
+  summary: Keep Structrr pagination and per-subject review context compact through indexed baseline lookups.
+  rationale: Prevent oversized prompts and repeated full-snapshot scans for large candidate sets.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 770
+    end_line: 773
+  summary: Keep Structrr pagination and per-subject review context compact through indexed baseline lookups.
+  rationale: Prevent oversized prompts and repeated full-snapshot scans for large candidate sets.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 791
+    end_line: 791
+  summary: Keep Structrr pagination and per-subject review context compact through indexed baseline lookups.
+  rationale: Prevent oversized prompts and repeated full-snapshot scans for large candidate sets.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 819
+    end_line: 819
+  summary: Keep Structrr pagination and per-subject review context compact through indexed baseline lookups.
+  rationale: Prevent oversized prompts and repeated full-snapshot scans for large candidate sets.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 874
+    end_line: 874
+  summary: Keep Structrr pagination and per-subject review context compact through indexed baseline lookups.
+  rationale: Prevent oversized prompts and repeated full-snapshot scans for large candidate sets.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 911
+    end_line: 911
+  summary: Keep Structrr pagination and per-subject review context compact through indexed baseline lookups.
+  rationale: Prevent oversized prompts and repeated full-snapshot scans for large candidate sets.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 921
+    end_line: 921
+  summary: Keep Structrr pagination and per-subject review context compact through indexed baseline lookups.
+  rationale: Prevent oversized prompts and repeated full-snapshot scans for large candidate sets.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 950
+    end_line: 953
+  summary: Keep Structrr pagination and per-subject review context compact through indexed baseline lookups.
+  rationale: Prevent oversized prompts and repeated full-snapshot scans for large candidate sets.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 1001
+    end_line: 1001
+  summary: Keep Structrr pagination and per-subject review context compact through indexed baseline lookups.
+  rationale: Prevent oversized prompts and repeated full-snapshot scans for large candidate sets.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 1055
+    end_line: 1058
+  summary: Keep Structrr pagination and per-subject review context compact through indexed baseline lookups.
+  rationale: Prevent oversized prompts and repeated full-snapshot scans for large candidate sets.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 1061
+    end_line: 1061
+  summary: Keep Structrr pagination and per-subject review context compact through indexed baseline lookups.
+  rationale: Prevent oversized prompts and repeated full-snapshot scans for large candidate sets.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 1064
+    end_line: 1064
+  summary: Keep Structrr pagination and per-subject review context compact through indexed baseline lookups.
+  rationale: Prevent oversized prompts and repeated full-snapshot scans for large candidate sets.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 1075
+    end_line: 1079
+  summary: Keep Structrr pagination and per-subject review context compact through indexed baseline lookups.
+  rationale: Prevent oversized prompts and repeated full-snapshot scans for large candidate sets.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 1081
+    end_line: 1081
+  summary: Keep Structrr pagination and per-subject review context compact through indexed baseline lookups.
+  rationale: Prevent oversized prompts and repeated full-snapshot scans for large candidate sets.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 1083
+    end_line: 1089
+  summary: Keep Structrr pagination and per-subject review context compact through indexed baseline lookups.
+  rationale: Prevent oversized prompts and repeated full-snapshot scans for large candidate sets.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 1095
+    end_line: 1106
+  summary: Keep Structrr pagination and per-subject review context compact through indexed baseline lookups.
+  rationale: Prevent oversized prompts and repeated full-snapshot scans for large candidate sets.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 1108
+    end_line: 1109
+  summary: Keep Structrr pagination and per-subject review context compact through indexed baseline lookups.
+  rationale: Prevent oversized prompts and repeated full-snapshot scans for large candidate sets.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 1112
+    end_line: 1126
+  summary: Keep Structrr pagination and per-subject review context compact through indexed baseline lookups.
+  rationale: Prevent oversized prompts and repeated full-snapshot scans for large candidate sets.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 1128
+    end_line: 1130
+  summary: Keep Structrr pagination and per-subject review context compact through indexed baseline lookups.
+  rationale: Prevent oversized prompts and repeated full-snapshot scans for large candidate sets.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 1133
+    end_line: 1135
+  summary: Keep Structrr pagination and per-subject review context compact through indexed baseline lookups.
+  rationale: Prevent oversized prompts and repeated full-snapshot scans for large candidate sets.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 1137
+    end_line: 1137
+  summary: Keep Structrr pagination and per-subject review context compact through indexed baseline lookups.
+  rationale: Prevent oversized prompts and repeated full-snapshot scans for large candidate sets.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 1171
+    end_line: 1218
+  summary: Keep Structrr pagination and per-subject review context compact through indexed baseline lookups.
+  rationale: Prevent oversized prompts and repeated full-snapshot scans for large candidate sets.
+- path: scripts/benchmark_planning_scale.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 446
+  summary: Add deterministic end-to-end typical, large, and Structrr stress profiles.
+  rationale: Measure the real Procedrr flow and enforce output and bounded-batch expectations without
+    live provider calls.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 619
+    end_line: 619
+  summary: Update the work-unit continuation fixture to patch the accepted-ledger boundary.
+  rationale: Keep the test aligned with the planner's cached entry point.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span:
+    start_line: 751
+    end_line: 765
+  summary: Exercise compact Structrr continuation context with 2,051 prior entities and 100 relationships.
+  rationale: Catch prompt growth and repeated-subject regressions at the scale implicated by the old failure.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span:
+    start_line: 768
+    end_line: 768
+  summary: Exercise compact Structrr continuation context with 2,051 prior entities and 100 relationships.
+  rationale: Catch prompt growth and repeated-subject regressions at the scale implicated by the old failure.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span:
+    start_line: 778
+    end_line: 791
+  summary: Exercise compact Structrr continuation context with 2,051 prior entities and 100 relationships.
+  rationale: Catch prompt growth and repeated-subject regressions at the scale implicated by the old failure.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span:
+    start_line: 799
+    end_line: 804
+  summary: Exercise compact Structrr continuation context with 2,051 prior entities and 100 relationships.
+  rationale: Catch prompt growth and repeated-subject regressions at the scale implicated by the old failure.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span:
+    start_line: 811
+    end_line: 811
+  summary: Exercise compact Structrr continuation context with 2,051 prior entities and 100 relationships.
+  rationale: Catch prompt growth and repeated-subject regressions at the scale implicated by the old failure.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span:
+    start_line: 813
+    end_line: 827
+  summary: Exercise compact Structrr continuation context with 2,051 prior entities and 100 relationships.
+  rationale: Catch prompt growth and repeated-subject regressions at the scale implicated by the old failure.
+entities:
+- id: source-ledger-question-machine
+  type: Class
+  action: modified
+- id: structural-baseline-index
+  type: Class
+  action: added
+- id: planning-scale-benchmark
+  type: Script
+  action: added
+entity_relationships:
+- id: source-ledger-uses-structural-baseline-index
+  type: uses
+  source: source-ledger-question-machine
+  target: structural-baseline-index
+  action: added
+invariants:
+- id: planning-frontier-respects-concurrency-window
+  description: The planning state machine constructs at most four candidate questions per configured concurrent
+    request, preserving the existing four-question batch limit.
+  action: added
+- id: structural-review-context-is-subject-scoped
+  description: Existing Structrr subjects already accepted for an item are summarized rather than repeated
+    in later enumeration prompts, and candidate review context contains only the subject and its direct
+    references.
+  action: added
+guidance:
+- id: mocked-planning-timings-are-not-live-provider-proof
+  description: Deterministic scale profiles measure local planner overhead and interaction counts; the
+    two-hour target requires a separate run with documented live provider settings, concurrency, and hardware.
+  action: added
+features: []
+proposed_prs: []

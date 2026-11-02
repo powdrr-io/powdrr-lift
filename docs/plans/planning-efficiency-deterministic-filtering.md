@@ -363,6 +363,17 @@ exact repeated statements with the same kind and source-anchor set, retaining
 the union of related-context references. Repeated statements at different
 source locations stay separate requirements.
 
+### Large live-provider run (2026-11-02)
+
+The `large` synthetic profile completed with `deepinfra-cheap` /
+`deepseek-ai/DeepSeek-V4-Flash-0731`, concurrency 4, and a 30-second per-call
+timeout. It took 972.3 seconds (16.2 minutes) and made 778 provider calls. The
+run completed successfully and produced 500 requirements, but generated 60 plan
+items against the profile target of 50. Treat this as a timing datapoint, not a
+plan-shape quality pass. The report did not provide provider token usage. The
+run was synthetic and did not publish a plan or create GitHub issues. Hardware:
+Apple Silicon MacBook Air, arm64, Darwin 25.5.0.
+
 The next `typical` run completed with `deepinfra-cheap` /
 `deepseek-ai/DeepSeek-V4-Flash-0731`, concurrency 4, and a 30-second per-call
 timeout in 111.1 seconds. It produced 40 requirements, 40 work units, and 18

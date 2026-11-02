@@ -1,0 +1,29 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1315
+title: Record large planning run and dependency recall fixture
+intent:
+  problem: Dependency-reference candidate coverage lacked a nontrivial labeled chain with an incidental reference, and the two-hour planning goal had no large live-provider measurement.
+  goal: Add a candidate-recall fixture and record the large live-profile timing and shape result.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/plans/planning-efficiency-deterministic-filtering.md
+    type: modified
+    span: {start_line: 366, end_line: 376}
+    summary: Record the large live-provider profile settings, elapsed time, calls, and plan-shape mismatch.
+    rationale: Distinguish measured elapsed time from a quality pass when the generated item count differs from the fixture target.
+  - path: tests/test_planning_dependencies.py
+    type: modified
+    span: {start_line: 327, end_line: 411}
+    summary: Add a hand-labeled dependency chain with an irrelevant reference candidate.
+    rationale: Require candidate discovery to retain both known edges while leaving the incidental reference for independent review.
+entities:
+  - id: dependency-candidate-recall-fixture
+    type: Regression test
+    action: added
+entity_relationships: []
+invariants:
+  - id: live-timing-does-not-imply-plan-quality
+    description: A live profile that completes within the time target is not a plan-shape quality pass when output counts differ from the fixture target.
+    action: added
+guidance: []

@@ -1,0 +1,205 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1303
+title: Add live planning scale benchmark
+intent:
+  problem: Deterministic profiles measured local planner overhead but could not record live provider latency or expose differences between fixture and model-generated planning results.
+  goal: Add an opt-in single-profile provider run that reports execution metrics and fails when generated requirement, work-unit, or item counts differ from the fixture.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/plans/planning-efficiency-deterministic-filtering.md
+    type: modified
+    span:
+      start_line: 3
+      end_line: 3
+    summary: Update plan status to show remaining live performance and dependency recall validation.
+    rationale: Distinguish implemented planner reductions from outstanding acceptance evidence.
+  - path: docs/plans/planning-efficiency-deterministic-filtering.md
+    type: modified
+    span:
+      start_line: 37
+      end_line: 43
+    summary: Describe the implemented planning optimizations and remaining validation work.
+    rationale: Keep the planning handoff aligned with the current implementation.
+  - path: docs/plans/planning-efficiency-deterministic-filtering.md
+    type: modified
+    span:
+      start_line: 49
+      end_line: 57
+    summary: Record which planning reductions have landed and which acceptance items remain.
+    rationale: Make implementation status and unresolved evidence explicit.
+  - path: docs/plans/planning-efficiency-deterministic-filtering.md
+    type: modified
+    span:
+      start_line: 319
+      end_line: 349
+    summary: Record the live provider smoke result and document the opt-in benchmark command.
+    rationale: Preserve provider timing, output-shape mismatch, and the remaining large-profile target.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span:
+      start_line: 18
+      end_line: 18
+    summary: Add provider support and progress reporting for live planning benchmarks.
+    rationale: Allow explicit live runs to reuse Powdrr provider routing without exposing prompt contents.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span:
+      start_line: 24
+      end_line: 24
+    summary: Add provider support and progress reporting for live planning benchmarks.
+    rationale: Allow explicit live runs to reuse Powdrr provider routing without exposing prompt contents.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span:
+      start_line: 40
+      end_line: 40
+    summary: Import configured provider credential resolution.
+    rationale: Reuse provider credentials without adding benchmark-specific secret handling.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span:
+      start_line: 42
+      end_line: 42
+    summary: Import the configured model mapping helper.
+    rationale: Select the same default or overridden model as planning sessions.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span:
+      start_line: 45
+      end_line: 48
+    summary: Import provider client construction and provider routing helpers.
+    rationale: Run benchmarks through the same provider stack used by planning sessions.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span:
+      start_line: 73
+      end_line: 140
+    summary: Add thread-safe live request progress without printing prompt or answer data.
+    rationale: Show progress during slow provider calls while keeping concurrent call counts accurate.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span:
+      start_line: 359
+      end_line: 370
+    summary: Allow a profile to run through either deterministic or live provider clients.
+    rationale: Measure provider latency and usage on the same planning flow as deterministic profiles.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span:
+      start_line: 405
+      end_line: 405
+    summary: Use an injected provider or the deterministic answer fixture.
+    rationale: Preserve mock mode while allowing live provider execution.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span:
+      start_line: 414
+      end_line: 414
+    summary: Pass the selected answer client to the planning driver.
+    rationale: Run both benchmark modes through the same planning path.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span:
+      start_line: 416
+      end_line: 419
+    summary: Pass provider, concurrency, and schema settings into the planning run.
+    rationale: Make benchmark configuration match the selected live provider.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span:
+      start_line: 450
+      end_line: 454
+    summary: Initialize per-question-kind and token totals for the benchmark report.
+    rationale: Report the metrics required to compare provider profiles.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span:
+      start_line: 460
+      end_line: 472
+    summary: Aggregate provider calls and question members by phase and question kind.
+    rationale: Identify which planning stages and questions contribute most to live runtime.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span:
+      start_line: 485
+      end_line: 488
+    summary: Include provider configuration in each benchmark report.
+    rationale: Preserve the concurrency and timeout context needed to compare runs.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span:
+      start_line: 506
+      end_line: 508
+    summary: Report token availability and fixture-shape differences.
+    rationale: Mark usage as unknown when the provider does not return token counts.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span:
+      start_line: 513
+      end_line: 513
+    summary: Report provider calls grouped by planning question kind.
+    rationale: Distinguish costs across question types.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span:
+      start_line: 527
+      end_line: 529
+    summary: Keep deterministic fixture checks strict and report live fixture mismatches.
+    rationale: Prevent a validly parsed but unexpectedly fragmented plan from appearing as a quality pass.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span:
+      start_line: 547
+      end_line: 581
+    summary: Add CLI options for provider selection, concurrency, and call timeout.
+    rationale: Make live benchmarking explicit and bound profile cost and call duration.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span:
+      start_line: 583
+      end_line: 588
+    summary: Reject unbounded live profiles and invalid concurrency or timeout values.
+    rationale: Keep live benchmark selection explicit and settings valid.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span:
+      start_line: 593
+      end_line: 615
+    summary: Construct a live provider client through Powdrr's configured provider path.
+    rationale: Avoid a separate provider implementation or command-line credential handling.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span:
+      start_line: 617
+      end_line: 628
+    summary: Execute selected profiles with reported provider and concurrency settings.
+    rationale: Keep live and deterministic runs on the same planning driver.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span:
+      start_line: 633
+      end_line: 634
+    summary: Return a failing status for live runs with fixture-shape mismatches.
+    rationale: Make mismatched live planning output visible to scripts and CI callers.
+entities:
+  - id: planning-scale-benchmark
+    type: Script
+    action: modified
+  - id: live-planning-progress-client
+    type: Class
+    action: added
+entity_relationships: []
+invariants:
+  - id: live-planning-benchmark-is-explicit-and-single-profile
+    description: Live mode requires one selected profile and never runs every profile in one invocation.
+    action: added
+  - id: live-planning-shape-mismatch-fails
+    description: Live benchmark execution exits nonzero when requirement, work-unit, or plan-item counts differ from the deterministic profile fixture.
+    action: added
+guidance:
+  - id: live-profile-is-not-a-provider-independent-speed-proof
+    description: Record provider, model, concurrency, timeout, and hardware; compare fixture shape and token availability before treating elapsed time as a planning-quality result.
+    action: added
+features: []
+proposed_prs: []

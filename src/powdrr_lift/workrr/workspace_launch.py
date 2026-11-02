@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import socket
 import sys
@@ -66,14 +67,33 @@ def run_workspace_ui(args: argparse.Namespace) -> int:
         print(f"Cannot create workspace data directory: {error}", file=sys.stderr)
         return 2
 
+    try:
+        instance_id = _load_or_create_instance_id(data_directory)
+    except OSError as error:
+        print(f"Cannot identify workspace instance: {error}", file=sys.stderr)
+        return 2
+
     host = "127.0.0.1"
     origin = f"http://{host}:{args.port}"
+    listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as listener:
-            listener.bind((host, args.port))
+        listener.bind((host, args.port))
+        listener.listen(socket.SOMAXCONN)
     except OSError as error:
+        listener.close()
+        if _workspace_instance_is_running(origin, instance_id):
+            print(f"Reusing the running workspace for {data_directory}: {origin}")
+            if args.no_open:
+                print(
+                    "Open the workspace URL in your browser and use "
+                    "its existing session."
+                )
+            elif not webbrowser.open_new_tab(origin):
+                print(f"Open the workspace in your browser: {origin}")
+            return 0
         print(
             f"Cannot use workspace port {args.port}: {error}. "
+            "The service on that port is not the workspace for this data directory. "
             "Choose another port with --port.",
             file=sys.stderr,
         )
@@ -86,6 +106,7 @@ def run_workspace_ui(args: argparse.Namespace) -> int:
         expected_origin=origin,
         repository_root=args.repo_root,
         static_directory=static_directory,
+        workspace_instance_id=instance_id,
     )
     print(f"Workspace: {origin}")
     print(f"One-use workspace token: {bootstrap_secret}")
@@ -106,10 +127,58 @@ def run_workspace_ui(args: argparse.Namespace) -> int:
         uvicorn.Config(app, host=host, port=args.port, log_level="info")
     )
     try:
-        server.run()
+        server.run(sockets=[listener])
     except KeyboardInterrupt:
         server.should_exit = True
+    finally:
+        listener.close()
     return 0
+
+
+def _load_or_create_instance_id(data_directory: Path) -> str:
+    """Persist a stable identity for the workspace backed by this data directory."""
+    marker = data_directory / ".workspace-instance-id"
+    try:
+        descriptor = os.open(marker, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+    except FileExistsError:
+        pass
+    else:
+        instance_id = token_urlsafe(32)
+        with os.fdopen(descriptor, "w", encoding="ascii") as stream:
+            stream.write(instance_id)
+            stream.flush()
+            os.fsync(stream.fileno())
+        return instance_id
+
+    # Another launcher can win O_EXCL and still be writing the marker. Wait a
+    # short, bounded interval for its complete value rather than treating that
+    # normal startup race as a corrupt workspace.
+    deadline = time.monotonic() + 2
+    while True:
+        try:
+            instance_id = marker.read_text(encoding="ascii").strip()
+        except OSError:
+            instance_id = ""
+        if len(instance_id) >= 32:
+            return instance_id
+        if time.monotonic() >= deadline:
+            raise OSError(f"workspace instance marker is empty or invalid: {marker}")
+        time.sleep(0.02)
+
+
+def _workspace_instance_is_running(origin: str, instance_id: str) -> bool:
+    """Return true only when the health endpoint proves the instance identity."""
+    try:
+        with urllib.request.urlopen(f"{origin}/api/v1/health", timeout=1) as response:
+            if response.status != 200:
+                return False
+            payload = json.loads(response.read())
+    except (OSError, urllib.error.URLError, json.JSONDecodeError, UnicodeDecodeError):
+        return False
+    return (
+        isinstance(payload, dict)
+        and payload.get("workspace_instance_id") == instance_id
+    )
 
 
 def _open_when_healthy(origin: str) -> None:

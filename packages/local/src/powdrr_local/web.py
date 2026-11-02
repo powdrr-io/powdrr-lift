@@ -68,6 +68,7 @@ def create_app(
     turn_dispatcher: WorkspaceTurnDispatcher | None = None,
     checkpoint_inspector: WorkspaceCheckpointInspector | None = None,
     static_directory: Path | None = None,
+    workspace_instance_id: str | None = None,
     session_max_age: int = _SESSION_MAX_AGE_SECONDS,
 ) -> FastAPI:
     """Build an app without starting global services or touching credentials."""
@@ -125,6 +126,7 @@ def create_app(
         openapi_url=None,
         lifespan=lifespan,
     )
+    app.state.workspace_instance_id = workspace_instance_id
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=[parsed.hostname])
     app.state.store = store
     app.state.bootstrap_digest = _digest(bootstrap_secret)

@@ -12,9 +12,12 @@ launcher prints a one-use token in the terminal; enter it in the browser to
 bootstrap the session. Workspace databases stay outside the repository by
 default. macOS uses `~/Library/Application Support/powdrr-lift`, Windows uses
 `%LOCALAPPDATA%/powdrr-lift`, and Linux uses `$XDG_DATA_HOME/powdrr-lift` or
-`~/.local/share/powdrr-lift` when that variable is unset. Port conflicts fail
-with an instruction to choose another port; the launcher does not connect to an
-unverified service on the requested port.
+`~/.local/share/powdrr-lift` when that variable is unset. Relaunching with the
+same data directory and port reuses an already-running workspace only when its
+health endpoint reports the matching persisted instance identity. A different
+or unverified service on the port is rejected with an instruction to choose
+another port. Reuse does not issue a new one-use token; use the existing browser
+session or stop the original process before restarting it.
 
 ## Session bootstrap
 

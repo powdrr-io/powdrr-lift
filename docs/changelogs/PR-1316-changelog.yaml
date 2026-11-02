@@ -1,0 +1,134 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1316
+title: Reuse a running local workspace safely
+intent:
+  problem: Launching a second local workspace process fails even when the same workspace is already healthy, while blindly connecting to an occupied port could attach to an unrelated service.
+  goal: Persist a per-data-directory instance identity, reuse only a healthy matching instance, and keep the selected port reserved through server startup.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/design/browser-workspace-api.md
+    type: modified
+    span: {start_line: 15, end_line: 20}
+    summary: Document verified workspace reuse and its session behavior.
+    rationale: Explain how relaunch handles an existing instance and unrelated port occupants.
+  - path: packages/local/src/powdrr_local/web.py
+    type: modified
+    span: {start_line: 71, end_line: 71}
+    summary: Accept an optional workspace instance identity when building the API app.
+    rationale: Allow the launcher identity to be reported by the local health endpoint.
+  - path: packages/local/src/powdrr_local/web.py
+    type: modified
+    span: {start_line: 129, end_line: 129}
+    summary: Store the configured workspace instance identity on app state.
+    rationale: Make the identity available to the health route without changing API-only app behavior.
+  - path: packages/local/src/powdrr_local/workspace_api.py
+    type: modified
+    span: {start_line: 245, end_line: 245}
+    summary: Build the health response before adding optional workspace identity.
+    rationale: Preserve the existing health fields while extending the response conditionally.
+  - path: packages/local/src/powdrr_local/workspace_api.py
+    type: modified
+    span: {start_line: 250, end_line: 253}
+    summary: Include configured instance identity in the public health response.
+    rationale: Let relaunch distinguish its own healthy workspace from any other service on the port.
+  - path: src/powdrr_lift/workrr/workspace_app.py
+    type: modified
+    span: {start_line: 30, end_line: 30}
+    summary: Accept the optional identity in the workspace application factory.
+    rationale: Forward launch identity to the local API app.
+  - path: src/powdrr_lift/workrr/workspace_app.py
+    type: modified
+    span: {start_line: 70, end_line: 70}
+    summary: Pass the workspace identity into local API app construction.
+    rationale: Connect persistent launcher identity to the health endpoint.
+  - path: src/powdrr_lift/workrr/workspace_launch.py
+    type: modified
+    span: {start_line: 6, end_line: 6}
+    summary: Import JSON decoding for health identity checks.
+    rationale: Parse the existing server's health response safely.
+  - path: src/powdrr_lift/workrr/workspace_launch.py
+    type: modified
+    span: {start_line: 70, end_line: 75}
+    summary: Load or create the persistent identity for the selected data directory.
+    rationale: Give repeated launches a stable identity to verify.
+  - path: src/powdrr_lift/workrr/workspace_launch.py
+    type: modified
+    span: {start_line: 78, end_line: 78}
+    summary: Create the launcher listener before attempting to reserve the requested port.
+    rationale: Keep the socket available for direct handoff to Uvicorn.
+  - path: src/powdrr_lift/workrr/workspace_launch.py
+    type: modified
+    span: {start_line: 80, end_line: 81}
+    summary: Bind and listen on the selected loopback port.
+    rationale: Reserve the port before probing and starting the application.
+  - path: src/powdrr_lift/workrr/workspace_launch.py
+    type: modified
+    span: {start_line: 83, end_line: 93}
+    summary: Reuse only a matching healthy workspace when the port is occupied.
+    rationale: Prevent connection to unrelated services and avoid releasing the port before Uvicorn starts.
+  - path: src/powdrr_lift/workrr/workspace_launch.py
+    type: modified
+    span: {start_line: 96, end_line: 96}
+    summary: Explain that an occupied port is not the matching workspace.
+    rationale: Make safe port-conflict handling clear to the user.
+  - path: src/powdrr_lift/workrr/workspace_launch.py
+    type: modified
+    span: {start_line: 109, end_line: 109}
+    summary: Configure the app with its persistent instance identity.
+    rationale: Allow the health endpoint to identify this workspace process.
+  - path: src/powdrr_lift/workrr/workspace_launch.py
+    type: modified
+    span: {start_line: 130, end_line: 130}
+    summary: Give Uvicorn the already-bound socket.
+    rationale: Remove the race between checking a port and binding the server.
+  - path: src/powdrr_lift/workrr/workspace_launch.py
+    type: modified
+    span: {start_line: 133, end_line: 134}
+    summary: Close the listener during shutdown.
+    rationale: Remove the race between checking a port and binding the server.
+  - path: src/powdrr_lift/workrr/workspace_launch.py
+    type: modified
+    span: {start_line: 138, end_line: 183}
+    summary: Persist the workspace identity atomically and verify running instances through health.
+    rationale: Support concurrent launches and reject responses that do not prove an exact identity match.
+  - path: tests/test_workspace_api.py
+    type: modified
+    span: {start_line: 30, end_line: 30}
+    summary: Allow API test setup to configure an instance identity.
+    rationale: Exercise the launcher-specific health response.
+  - path: tests/test_workspace_api.py
+    type: modified
+    span: {start_line: 47, end_line: 47}
+    summary: Forward the optional identity in test app setup.
+    rationale: Match the production app factory behavior in tests.
+  - path: tests/test_workspace_api.py
+    type: modified
+    span: {start_line: 104, end_line: 111}
+    summary: Verify that configured instance identity appears in health responses.
+    rationale: Protect the identity signal used for safe workspace reuse.
+  - path: tests/test_workspace_launch.py
+    type: modified
+    span: {start_line: 4, end_line: 4}
+    summary: Import JSON support for health response test fixtures.
+    rationale: Build simulated health endpoint responses.
+  - path: tests/test_workspace_launch.py
+    type: modified
+    span: {start_line: 11, end_line: 12}
+    summary: Import workspace identity and health verification helpers.
+    rationale: Test persistence and safe matching behavior directly.
+  - path: tests/test_workspace_launch.py
+    type: modified
+    span: {start_line: 88, end_line: 135}
+    summary: Test persistent identity and accept only healthy matching workspace responses.
+    rationale: Cover relaunch identity stability and rejection of unrelated or unhealthy services.
+entities: []
+entity_relationships: []
+invariants:
+  - id: workspace-reuse-requires-identity-match
+    description: A launcher reuses an occupied workspace port only when the healthy endpoint reports the persistent identity for the selected data directory.
+    action: added
+  - id: workspace-port-remains-reserved-through-startup
+    description: The launcher passes its already-bound listening socket to Uvicorn so another process cannot claim the port between validation and startup.
+    action: added
+guidance: []

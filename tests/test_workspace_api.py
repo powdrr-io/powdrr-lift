@@ -27,6 +27,7 @@ def _client(
     *,
     checkpoint_inspector: WorkspaceCheckpointInspector | None = None,
     static_directory: Path | None = None,
+    workspace_instance_id: str | None = None,
 ) -> tuple[TestClient, WorkspaceStore, str, str]:
     store = WorkspaceStore(tmp_path / "workspace.db")
     repository_path = tmp_path / "repository"
@@ -43,6 +44,7 @@ def _client(
         expected_origin=origin,
         checkpoint_inspector=checkpoint_inspector,
         static_directory=static_directory,
+        workspace_instance_id=workspace_instance_id,
     )
     return TestClient(app, base_url=origin), store, repository.repository_id, secret
 
@@ -97,6 +99,14 @@ def test_health_is_public_and_session_bootstrap_is_single_use(tmp_path: Path) ->
     )
     assert response.status_code == 401
     assert response.json()["error"]["code"] == "bootstrap_used"
+
+
+def test_health_reports_configured_workspace_instance_id(tmp_path: Path) -> None:
+    client, _, _, _ = _client(tmp_path, workspace_instance_id="instance-123")
+
+    assert (
+        client.get("/api/v1/health").json()["workspace_instance_id"] == "instance-123"
+    )
 
 
 def test_session_refresh_rotates_csrf_for_the_existing_browser_cookie(

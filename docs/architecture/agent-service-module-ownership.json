@@ -922,12 +922,13 @@
         "powdrr_lift.core.validation_messages",
         "powdrr_service.changelog",
         "powdrr_service.changelog.template",
+        "powdrr_service.changelog.structured_document",
         "powdrr_service.changelog.validation_policy"
       ],
       "kind": "python_module",
       "owner": "split",
       "path": "src/powdrr_lift/change_log_validation.py",
-      "rationale": "agent collects branch/specification evidence and composes service-owned changelog validation policy",
+      "rationale": "agent collects branch and specification evidence, reads structured-file content, and composes service-owned validation policy",
       "reviewed": false
     },
     {
@@ -3710,7 +3711,8 @@
     {
       "extraction_pr": "8",
       "internal_imports": [
-        "powdrr_service.changelog.parser"
+        "powdrr_service.changelog.parser",
+        "powdrr_service.changelog.structured_document"
       ],
       "kind": "python_module",
       "owner": "service",
@@ -3734,6 +3736,17 @@
       "owner": "service",
       "path": "packages/service/src/powdrr_service/changelog/template.py",
       "rationale": "service-owned changelog parsing, rendering, and validation policy",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [
+        "powdrr_service.changelog.validation_policy"
+      ],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/changelog/structured_document.py",
+      "rationale": "service-owned YAML parsing, schema-envelope validation, and changelog issue normalization for structured-document content",
       "reviewed": false
     },
     {

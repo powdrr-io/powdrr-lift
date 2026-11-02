@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import subprocess
 from collections import Counter
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, cast
@@ -11,6 +11,8 @@ import yaml
 from powdrr_service.changelog import (
     ChangeEntity,
     parse_change_log,
+    parse_structured_document,
+    qualify_structured_document_issues,
 )
 from powdrr_service.changelog.template import (
     is_structured_document_path as _is_structured_document_path,
@@ -1004,46 +1006,28 @@ def _validate_v2_structured_file_contents(
         return
 
     try:
-        raw_structured_content = yaml.safe_load(
-            structured_file.read_text(encoding="utf-8")
-        )
-    except Exception as exc:  # noqa: BLE001
+        raw_yaml = structured_file.read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as exc:
         issues.append(
             ValidationIssue(
                 code="structured_file_invalid_yaml",
                 message=(
-                    f"Structured file {structured_file_path} could not be parsed "
-                    f"as YAML: {exc}"
+                    f"Structured file {structured_file_path} could not be read "
+                    f"as UTF-8 YAML: {exc}"
                 ),
                 path=structured_file_path,
             )
         )
         return
-
-    if not isinstance(raw_structured_content, Mapping):
-        issues.append(
-            ValidationIssue(
-                code="structured_file_invalid_yaml",
-                message=(
-                    f"Structured file {structured_file_path} must decode to a YAML "
-                    "mapping."
-                ),
-                path=structured_file_path,
-            )
-        )
-        return
-
-    schema_value = raw_structured_content.get("schema")
-    if not isinstance(schema_value, str) or schema_value != SPECIFICATION_SCHEMA_URL:
-        issues.append(
-            ValidationIssue(
-                code="structured_file_invalid_schema",
-                message=(
-                    f"Structured file {structured_file_path} must define a schema "
-                    "value of https://powdrr.io/schemas/specification-v1."
-                ),
-                path=structured_file_path,
-            )
+    parse_result = parse_structured_document(
+        raw_yaml,
+        path=structured_file_path,
+        expected_schema=SPECIFICATION_SCHEMA_URL,
+    )
+    if parse_result.issues:
+        issues.extend(
+            ValidationIssue(code=issue.code, message=issue.message, path=issue.path)
+            for issue in parse_result.issues
         )
         return
 
@@ -1051,6 +1035,7 @@ def _validate_v2_structured_file_contents(
         issues=issues,
         repo_root=repo_root,
         structured_file_path=structured_file_path,
+        raw_yaml=raw_yaml,
         allowed_entity_types=allowed_entity_types,
     )
 
@@ -1060,22 +1045,23 @@ def _validate_v2_structured_file_specification(
     issues: list[ValidationIssue],
     repo_root: Path,
     structured_file_path: str,
+    raw_yaml: str,
     allowed_entity_types: set[str] | None,
 ) -> None:
     structured_file_name = Path(structured_file_path).name
     work_item_name = Path(structured_file_path).parent.name
-    raw_yaml = (repo_root / structured_file_path).read_text(encoding="utf-8")
-
     if structured_file_name == "system-specification.yaml":
         system_report = build_system_specification_validation_report(
             raw_yaml,
             work_item_name=work_item_name,
         )
-        _append_structured_file_validation_issues(
-            issues=issues,
-            structured_file_path=structured_file_path,
-            validator_name="system_specification",
-            report_issues=system_report.issues,
+        issues.extend(
+            ValidationIssue(code=issue.code, message=issue.message, path=issue.path)
+            for issue in qualify_structured_document_issues(
+                path=structured_file_path,
+                validator_name="system_specification",
+                report_issues=system_report.issues,
+            )
         )
         return
 
@@ -1115,11 +1101,13 @@ def _validate_v2_structured_file_specification(
             work_item_name=work_item_name,
             repo_root=repo_root,
         )
-        _append_structured_file_validation_issues(
-            issues=issues,
-            structured_file_path=structured_file_path,
-            validator_name="architecture_specification",
-            report_issues=architecture_report.issues,
+        issues.extend(
+            ValidationIssue(code=issue.code, message=issue.message, path=issue.path)
+            for issue in qualify_structured_document_issues(
+                path=structured_file_path,
+                validator_name="architecture_specification",
+                report_issues=architecture_report.issues,
+            )
         )
         return
 
@@ -1129,11 +1117,13 @@ def _validate_v2_structured_file_specification(
             work_item_name=work_item_name,
             repo_root=repo_root,
         )
-        _append_structured_file_validation_issues(
-            issues=issues,
-            structured_file_path=structured_file_path,
-            validator_name="implementation_specification",
-            report_issues=implementation_report.issues,
+        issues.extend(
+            ValidationIssue(code=issue.code, message=issue.message, path=issue.path)
+            for issue in qualify_structured_document_issues(
+                path=structured_file_path,
+                validator_name="implementation_specification",
+                report_issues=implementation_report.issues,
+            )
         )
         return
 
@@ -1144,37 +1134,15 @@ def _validate_v2_structured_file_specification(
             repo_root=repo_root,
             file_path=structured_file_path,
         )
-        _append_structured_file_validation_issues(
-            issues=issues,
-            structured_file_path=structured_file_path,
-            validator_name="pr_specification",
-            report_issues=proposed_pr_report.issues,
-        )
-        return
-
-
-def _append_structured_file_validation_issues(
-    *,
-    issues: list[ValidationIssue],
-    structured_file_path: str,
-    validator_name: str,
-    report_issues: Sequence[Any],
-) -> None:
-    for report_issue in report_issues:
-        issue_code = getattr(report_issue, "code", "structured_file_validation_failed")
-        issue_message = getattr(
-            report_issue, "message", "Structured file validation failed."
-        )
-        issues.append(
-            ValidationIssue(
-                code=f"structured_file_{validator_name}_{issue_code}",
-                message=(
-                    f"Structured file {structured_file_path} failed "
-                    f"{validator_name} validation: {issue_message}"
-                ),
+        issues.extend(
+            ValidationIssue(code=issue.code, message=issue.message, path=issue.path)
+            for issue in qualify_structured_document_issues(
                 path=structured_file_path,
+                validator_name="pr_specification",
+                report_issues=proposed_pr_report.issues,
             )
         )
+        return
 
 
 def _load_available_proposed_pr_detail_ids(repo_root: Path) -> set[str]:

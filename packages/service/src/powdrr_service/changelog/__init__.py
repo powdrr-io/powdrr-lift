@@ -13,6 +13,11 @@ from powdrr_service.changelog.parser import (
     Span,
     parse_change_log,
 )
+from powdrr_service.changelog.structured_document import (
+    StructuredDocumentParseResult,
+    parse_structured_document,
+    qualify_structured_document_issues,
+)
 
 __all__ = [
     "ChangeEntity",
@@ -27,5 +32,8 @@ __all__ = [
     "Intent",
     "RelatedSection",
     "Span",
+    "StructuredDocumentParseResult",
+    "parse_structured_document",
+    "qualify_structured_document_issues",
     "parse_change_log",
 ]

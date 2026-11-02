@@ -1,0 +1,181 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1321
+title: Move structured-document envelope validation to service
+intent:
+  problem: Structured-file YAML parsing, schema checks, and changelog issue shaping still lived in the local agent.
+  goal: Keep file reads and repository evidence local while moving content-based envelope validation and issue normalization into the service.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 925
+    end_line: 925
+  summary: Add the structured-document policy service import to the agent ownership edge.
+  rationale: Keep the ownership map aligned with the new service call.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 931
+    end_line: 931
+  summary: Clarify that the agent collects specification evidence and file content.
+  rationale: Document the local evidence boundary accurately.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3714
+    end_line: 3715
+  summary: Register the structured-document service module as an import of the changelog package.
+  rationale: Keep package ownership relationships explicit.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3741
+    end_line: 3751
+  summary: Classify structured-document parsing and issue normalization as service-owned policy.
+  rationale: Track the extraction in the code-split inventory.
+- path: docs/plans/agent-service-code-split.md
+  type: modified
+  span:
+    start_line: 491
+    end_line: 496
+  summary: Record service-owned structured-document envelope checks and remaining spec-specific validator work.
+  rationale: Keep the migration plan's completed boundary and remaining work clear.
+- path: docs/project_structure/project-structure.yaml
+  type: modified
+  span:
+    start_line: 28
+    end_line: 28
+  summary: Describe structured-document envelope checks as part of the service changelog package.
+  rationale: Keep the project structure aligned with current package responsibilities.
+- path: packages/service/src/powdrr_service/changelog/__init__.py
+  type: modified
+  span:
+    start_line: 16
+    end_line: 20
+  summary: Export the structured-document parse result, parser, and issue normalizer.
+  rationale: Make the service policy callable through its public changelog package.
+- path: packages/service/src/powdrr_service/changelog/__init__.py
+  type: modified
+  span:
+    start_line: 35
+    end_line: 37
+  summary: Add the structured-document policy exports to the public module API.
+  rationale: Keep package exports explicit.
+- path: packages/service/src/powdrr_service/changelog/structured_document.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 96
+  summary: Parse structured YAML documents, enforce their schema envelope, and normalize specification issues into changelog issues.
+  rationale: Make deterministic content policies portable and service-owned without filesystem access.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 5
+    end_line: 5
+  summary: Remove the agent's dependency on sequence types used only by the old issue wrapper.
+  rationale: Keep imports aligned with the agent's remaining responsibilities.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 14
+    end_line: 15
+  summary: Import service-owned structured-document parsing and issue normalization.
+  rationale: Route content policy through the service boundary.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 1009
+    end_line: 1010
+  summary: Keep UTF-8 file reading local and pass the resulting content to the service parser.
+  rationale: Preserve local filesystem access while moving parsing policy to service.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 1015
+    end_line: 1016
+  summary: Report local file-read errors before invoking the content-based service validator.
+  rationale: Keep missing or unreadable repository evidence distinct from service parsing.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 1022
+    end_line: 1030
+  summary: Replace local mapping and schema checks with the service parser result.
+  rationale: Avoid agent-owned structured-document envelope policy.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 1038
+    end_line: 1038
+  summary: Pass already-read YAML content into specification dispatch instead of reopening the file.
+  rationale: Keep filesystem evidence collection in the agent and avoid duplicate reads.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 1048
+    end_line: 1048
+  summary: Add the YAML content argument to specification validation dispatch.
+  rationale: Pass collected content across the boundary without a second filesystem read.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 1067
+    end_line: 1068
+  summary: Remove the second local file read from specification dispatch.
+  rationale: Reuse the content already collected by the agent.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 1058
+    end_line: 1064
+  summary: Normalize system specification issues through the service policy.
+  rationale: Keep changelog issue formatting consistent across specification types.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 1104
+    end_line: 1110
+  summary: Normalize architecture specification issues through the service policy.
+  rationale: Keep changelog issue formatting consistent across specification types.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 1120
+    end_line: 1126
+  summary: Normalize implementation specification issues through the service policy.
+  rationale: Keep changelog issue formatting consistent across specification types.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 1137
+    end_line: 1139
+  summary: Normalize proposed PR specification issues through the service and remove the old agent wrapper.
+  rationale: Keep issue-code and message composition service-owned.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 1141
+    end_line: 1142
+  summary: Replace the agent wrapper with a call to service issue normalization.
+  rationale: Keep issue-code and message composition service-owned.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 1145
+    end_line: 1145
+  summary: End the proposed PR specification branch after service normalization.
+  rationale: Preserve the existing validation flow after removing the local wrapper.
+- path: tests/test_changelog_structured_document.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 63
+  summary: Cover valid and invalid structured-document envelopes and stable issue normalization.
+  rationale: Prove service behavior directly with focused policy tests.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []

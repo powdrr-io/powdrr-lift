@@ -488,7 +488,12 @@ required validation cannot be reported as success. Worker commits remain visible
    plan-diff enrichment, and core cross-reference/span validation are
    service-owned. Branch diff collection, specification and structured-file
    evidence collection, and output-file handling remain local agent work; the
-   agent assembles that evidence and calls service validation policy.
+   agent assembles that evidence and calls service validation policy. Structured
+   document YAML parsing, schema-envelope checks, and normalization of
+   spec-validation issues into changelog issues are service-owned; the agent
+   supplies the file content and pinned taxonomy/specification evidence.
+   Spec-specific semantic validators remain to be extracted from the legacy core
+   modules with their referenced repository evidence passed explicitly.
    Update imports and monkeypatch targets explicitly; do not retain monkeypatch
    compatibility through global `sys.modules` aliases. Move Structrr proposal,
    source-manifest, actual-diff, and candidate-comparison policy into the service;

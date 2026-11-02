@@ -1,0 +1,403 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1298
+title: Move behavior probe repair policy into service
+intent:
+  problem: Behavior-probe repair and scenario-faithfulness decisions still run in the agent with direct client dependencies.
+  goal: Route repair and faithfulness review through the service while keeping local evidence loading and executable probe generation on the agent side.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 1469
+    end_line: 1469
+  summary: Record service module ownership and the serialized verification dependency.
+  rationale: Keep the architecture inventory aligned with this staged boundary change.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 1475
+    end_line: 1478
+  summary: Record service module ownership and the serialized verification dependency.
+  rationale: Keep the architecture inventory aligned with this staged boundary change.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2624
+    end_line: 2624
+  summary: Record service module ownership and the serialized verification dependency.
+  rationale: Keep the architecture inventory aligned with this staged boundary change.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2865
+    end_line: 2865
+  summary: Record service module ownership and the serialized verification dependency.
+  rationale: Keep the architecture inventory aligned with this staged boundary change.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2877
+    end_line: 2879
+  summary: Record service module ownership and the serialized verification dependency.
+  rationale: Keep the architecture inventory aligned with this staged boundary change.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2884
+    end_line: 2884
+  summary: Record service module ownership and the serialized verification dependency.
+  rationale: Keep the architecture inventory aligned with this staged boundary change.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3097
+    end_line: 3098
+  summary: Record service module ownership and the serialized verification dependency.
+  rationale: Keep the architecture inventory aligned with this staged boundary change.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3101
+    end_line: 3104
+  summary: Record service module ownership and the serialized verification dependency.
+  rationale: Keep the architecture inventory aligned with this staged boundary change.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3406
+    end_line: 3406
+  summary: Record service module ownership and the serialized verification dependency.
+  rationale: Keep the architecture inventory aligned with this staged boundary change.
+- path: packages/service/src/powdrr_service/behavior_contract.py
+  type: modified
+  span:
+    start_line: 232
+    end_line: 235
+  summary: Allow fingerprint-only faithfulness references in serialized scenarios.
+  rationale: Preserve scenario provenance without transmitting local filesystem paths.
+- path: packages/service/src/powdrr_service/local_service.py
+  type: modified
+  span:
+    start_line: 39
+    end_line: 39
+  summary: Dispatch behavior-probe repair through verification_health.
+  rationale: Keep provider construction, repair prompts, and faithfulness decisions in service code.
+- path: packages/service/src/powdrr_service/local_service.py
+  type: modified
+  span:
+    start_line: 44
+    end_line: 44
+  summary: Dispatch behavior-probe repair through verification_health.
+  rationale: Keep provider construction, repair prompts, and faithfulness decisions in service code.
+- path: packages/service/src/powdrr_service/local_service.py
+  type: modified
+  span:
+    start_line: 132
+    end_line: 134
+  summary: Dispatch behavior-probe repair through verification_health.
+  rationale: Keep provider construction, repair prompts, and faithfulness decisions in service code.
+- path: packages/service/src/powdrr_service/local_service.py
+  type: modified
+  span:
+    start_line: 134
+    end_line: 134
+  summary: Dispatch behavior-probe repair through verification_health.
+  rationale: Keep provider construction, repair prompts, and faithfulness decisions in service code.
+- path: packages/service/src/powdrr_service/local_service.py
+  type: modified
+  span:
+    start_line: 278
+    end_line: 395
+  summary: Dispatch behavior-probe repair through verification_health.
+  rationale: Keep provider construction, repair prompts, and faithfulness decisions in service code.
+- path: packages/service/src/powdrr_service/verification/probe_repair.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 1106
+  summary: Use service provider clients and supplied JSON evidence for bounded scenario repair.
+  rationale: Preserve repair policy while removing local paths and agent-only client dependencies.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 5866
+    end_line: 5870
+  summary: Pass resolved provider settings to feature verification.
+  rationale: Let the service configure review clients using the selected provider and model.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 5958
+    end_line: 5964
+  summary: Pass resolved provider settings to feature verification.
+  rationale: Let the service configure review clients using the selected provider and model.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 6114
+    end_line: 6120
+  summary: Pass resolved provider settings to feature verification.
+  rationale: Let the service configure review clients using the selected provider and model.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span:
+    start_line: 53
+    end_line: 59
+  summary: Import faithfulness helpers from the service package.
+  rationale: Remove the agent dependency on the relocated module.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span:
+    start_line: 70
+    end_line: 76
+  summary: Import faithfulness helpers from the service package.
+  rationale: Remove the agent dependency on the relocated module.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 17
+    end_line: 23
+  summary: Load local evidence and invoke the service repair profile.
+  rationale: Keep filesystem access agent-side and route repair policy through the serialized service boundary.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 145
+    end_line: 145
+  summary: Load local evidence and invoke the service repair profile.
+  rationale: Keep filesystem access agent-side and route repair policy through the serialized service boundary.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 172
+    end_line: 213
+  summary: Load local evidence and invoke the service repair profile.
+  rationale: Keep filesystem access agent-side and route repair policy through the serialized service boundary.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 234
+    end_line: 237
+  summary: Load local evidence and invoke the service repair profile.
+  rationale: Keep filesystem access agent-side and route repair policy through the serialized service boundary.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 2676
+    end_line: 2676
+  summary: Load local evidence and invoke the service repair profile.
+  rationale: Keep filesystem access agent-side and route repair policy through the serialized service boundary.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 2743
+    end_line: 2828
+  summary: Load local evidence and invoke the service repair profile.
+  rationale: Keep filesystem access agent-side and route repair policy through the serialized service boundary.
+- path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+  type: modified
+  span:
+    start_line: 29
+    end_line: 29
+  summary: Update faithfulness imports to the service package.
+  rationale: Keep existing semantic compilation behavior working after the module move.
+- path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+  type: modified
+  span:
+    start_line: 32
+    end_line: 32
+  summary: Update faithfulness imports to the service package.
+  rationale: Keep existing semantic compilation behavior working after the module move.
+- path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+  type: modified
+  span:
+    start_line: 35
+    end_line: 35
+  summary: Update faithfulness imports to the service package.
+  rationale: Keep existing semantic compilation behavior working after the module move.
+- path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+  type: modified
+  span:
+    start_line: 38
+    end_line: 38
+  summary: Update faithfulness imports to the service package.
+  rationale: Keep existing semantic compilation behavior working after the module move.
+- path: src/powdrr_lift/workrr/semantic_contract_compiler.py
+  type: modified
+  span:
+    start_line: 42
+    end_line: 43
+  summary: Update faithfulness imports to the service package.
+  rationale: Keep existing semantic compilation behavior working after the module move.
+- path: tests/test_implement_feature_e2e.py
+  type: modified
+  span:
+    start_line: 16
+    end_line: 16
+  summary: Exercise pre-coding repair through service composition in the complete feature flow.
+  rationale: Verify service repair, coding, post-run probes, and validation operate together.
+- path: tests/test_implement_feature_e2e.py
+  type: modified
+  span:
+    start_line: 19
+    end_line: 19
+  summary: Exercise pre-coding repair through service composition in the complete feature flow.
+  rationale: Verify service repair, coding, post-run probes, and validation operate together.
+- path: tests/test_implement_feature_e2e.py
+  type: modified
+  span:
+    start_line: 30
+    end_line: 56
+  summary: Exercise pre-coding repair through service composition in the complete feature flow.
+  rationale: Verify service repair, coding, post-run probes, and validation operate together.
+- path: tests/test_implement_feature_e2e.py
+  type: modified
+  span:
+    start_line: 1275
+    end_line: 1282
+  summary: Exercise pre-coding repair through service composition in the complete feature flow.
+  rationale: Verify service repair, coding, post-run probes, and validation operate together.
+- path: tests/test_implement_feature_e2e.py
+  type: modified
+  span:
+    start_line: 1305
+    end_line: 1312
+  summary: Exercise pre-coding repair through service composition in the complete feature flow.
+  rationale: Verify service repair, coding, post-run probes, and validation operate together.
+- path: tests/test_implement_feature_e2e.py
+  type: modified
+  span:
+    start_line: 1333
+    end_line: 1333
+  summary: Exercise pre-coding repair through service composition in the complete feature flow.
+  rationale: Verify service repair, coding, post-run probes, and validation operate together.
+- path: tests/test_probe_repair.py
+  type: modified
+  span:
+    start_line: 10
+    end_line: 10
+  summary: Run probe repair unit coverage against JSON evidence inputs.
+  rationale: Preserve repair, retry, failure, and faithfulness behavior coverage after the move.
+- path: tests/test_probe_repair.py
+  type: modified
+  span:
+    start_line: 80
+    end_line: 80
+  summary: Run probe repair unit coverage against JSON evidence inputs.
+  rationale: Preserve repair, retry, failure, and faithfulness behavior coverage after the move.
+- path: tests/test_probe_repair.py
+  type: modified
+  span:
+    start_line: 145
+    end_line: 145
+  summary: Run probe repair unit coverage against JSON evidence inputs.
+  rationale: Preserve repair, retry, failure, and faithfulness behavior coverage after the move.
+- path: tests/test_probe_repair.py
+  type: modified
+  span:
+    start_line: 285
+    end_line: 285
+  summary: Run probe repair unit coverage against JSON evidence inputs.
+  rationale: Preserve repair, retry, failure, and faithfulness behavior coverage after the move.
+- path: tests/test_probe_repair.py
+  type: modified
+  span:
+    start_line: 363
+    end_line: 363
+  summary: Run probe repair unit coverage against JSON evidence inputs.
+  rationale: Preserve repair, retry, failure, and faithfulness behavior coverage after the move.
+- path: tests/test_probe_repair.py
+  type: modified
+  span:
+    start_line: 396
+    end_line: 396
+  summary: Run probe repair unit coverage against JSON evidence inputs.
+  rationale: Preserve repair, retry, failure, and faithfulness behavior coverage after the move.
+- path: tests/test_probe_repair.py
+  type: modified
+  span:
+    start_line: 450
+    end_line: 450
+  summary: Run probe repair unit coverage against JSON evidence inputs.
+  rationale: Preserve repair, retry, failure, and faithfulness behavior coverage after the move.
+- path: tests/test_probe_repair.py
+  type: modified
+  span:
+    start_line: 490
+    end_line: 490
+  summary: Run probe repair unit coverage against JSON evidence inputs.
+  rationale: Preserve repair, retry, failure, and faithfulness behavior coverage after the move.
+- path: tests/test_probe_repair.py
+  type: modified
+  span:
+    start_line: 517
+    end_line: 517
+  summary: Run probe repair unit coverage against JSON evidence inputs.
+  rationale: Preserve repair, retry, failure, and faithfulness behavior coverage after the move.
+- path: tests/test_probe_repair.py
+  type: modified
+  span:
+    start_line: 664
+    end_line: 664
+  summary: Run probe repair unit coverage against JSON evidence inputs.
+  rationale: Preserve repair, retry, failure, and faithfulness behavior coverage after the move.
+- path: tests/test_probe_repair.py
+  type: modified
+  span:
+    start_line: 671
+    end_line: 679
+  summary: Run probe repair unit coverage against JSON evidence inputs.
+  rationale: Preserve repair, retry, failure, and faithfulness behavior coverage after the move.
+- path: tests/test_probe_repair_service.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 149
+  summary: Test the verification_health bridge and local evidence-loading boundary.
+  rationale: Prove the service operation works over JSON and that local paths stay out of its request.
+- path: tests/test_semantic_contract_compiler.py
+  type: modified
+  span:
+    start_line: 20
+    end_line: 20
+  summary: Update compiler coverage to import service faithfulness helpers.
+  rationale: Keep tests aligned with the relocated policy module.
+- path: tests/test_semantic_contract_compiler.py
+  type: modified
+  span:
+    start_line: 28
+    end_line: 28
+  summary: Update compiler coverage to import service faithfulness helpers.
+  rationale: Keep tests aligned with the relocated policy module.
+entities:
+- id: behavior-probe-repair-profile
+  type: Internal API
+  action: added
+- id: service-semantic-faithfulness-module
+  type: Module
+  action: added
+- id: service-probe-repair-module
+  type: Module
+  action: added
+entity_relationships:
+- id: behavior-probe-repair-profile-handled-by-service
+  type: handled_by
+  source: behavior-probe-repair-profile
+  target: service-probe-repair-module
+  action: added
+  description: The verification_health behavior_probe_repair profile delegates repair and faithfulness decisions to service code.
+invariants:
+- id: executable-probes-authored-by-miniswe
+  action: added
+  description: MiniSWE remains the only author of executable behavior probes; service repair only revises pre-coding scenario text.
+- id: local-faithfulness-paths-stay-agent-side
+  action: added
+  description: The agent reads local faithfulness artifacts and contracts, and sends JSON evidence plus fingerprints without filesystem paths to the service.
+- id: source-faithfulness-before-scenario-acceptance
+  action: added
+  description: A revised scenario is included only after the service faithfulness policy accepts it; rejected or unavailable reviews retain the original scenario.
+guidance: []
+features: []
+proposed_prs: []

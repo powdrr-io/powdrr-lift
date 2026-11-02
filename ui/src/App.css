@@ -173,6 +173,9 @@
   border-top: 1px solid var(--line);
 }
 .job-section__heading { justify-content: space-between; margin: 0 7px 8px; }
+.job-section__heading-actions { display: flex; align-items: center; gap: 7px; }
+.job-section__heading-actions button { width: 20px; height: 20px; padding: 0; color: var(--accent); background: var(--accent-wash); border: 0; border-radius: 5px; font: inherit; font-size: 15px; line-height: 18px; cursor: pointer; }
+.job-section__heading-actions button:hover { background: var(--selected); }
 .job-section__heading span:last-child { color: var(--quiet); font-weight: 500; letter-spacing: 0; }
 .job-tabs { display: grid; grid-template-columns: 1fr 1.2fr .8fr; gap: 3px; padding: 3px; background: var(--tag); border-radius: 7px; }
 .job-tabs button { display: flex; min-width: 0; align-items: center; justify-content: center; gap: 5px; padding: 6px 3px; color: var(--muted); background: transparent; border: 0; border-radius: 5px; font: inherit; font-size: 9px; cursor: pointer; }
@@ -396,6 +399,25 @@
 .loading-screen { gap: 12px; color: var(--muted); font-size: 12px; }
 .loading-screen .brand-mark { width: 34px; height: 34px; font-size: 22px; }
 .mobile-backdrop { display: none; }
+
+.job-create-backdrop { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 20px; background: rgb(14 15 22 / 48%); }
+.job-create-dialog { width: min(540px, 100%); max-height: min(90vh, 780px); overflow-y: auto; padding: 23px; color: var(--ink); background: var(--control); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 20px 80px rgb(8 10 22 / 28%); }
+.job-create-dialog__heading { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 16px; }
+.job-create-dialog__heading h2 { margin: 5px 0 0; font-size: 20px; font-weight: 650; }
+.job-create-dialog form { display: flex; flex-direction: column; gap: 12px; }
+.job-create-dialog form > label { display: flex; flex-direction: column; gap: 5px; color: var(--subtle); font-size: 11px; font-weight: 600; }
+.job-create-dialog input:not([type="checkbox"]),.job-create-dialog select { width: 100%; box-sizing: border-box; min-height: 36px; padding: 8px 10px; color: var(--ink); background: var(--canvas); border: 1px solid var(--line-dark); border-radius: 7px; font: inherit; font-size: 11px; }
+.job-create-dialog form > label small { color: var(--quiet); font-size: 9px; font-weight: 400; line-height: 1.4; }
+.job-create-dialog__check { display: flex; align-items: flex-start; gap: 8px; color: var(--subtle); font-size: 10px; line-height: 1.45; }
+.job-create-dialog__check input { margin: 2px 0 0; accent-color: var(--accent); }
+.job-create-dialog__hint { margin: 0; color: var(--muted); font-size: 10px; line-height: 1.5; }
+.job-create-dialog__error { margin: 0; color: var(--error); font-size: 10px; line-height: 1.45; }
+.job-create-review { display: flex; flex-direction: column; gap: 5px; padding: 10px 11px; color: var(--muted); background: var(--canvas); border: 1px solid var(--line); border-radius: 8px; font-size: 9px; line-height: 1.4; overflow-wrap: anywhere; }
+.job-create-review strong { color: var(--subtle); font-size: 10px; }
+.job-create-dialog__actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 3px; }
+.job-create-dialog__actions .primary-button { min-width: 130px; }
+.secondary-button { min-height: 36px; padding: 0 12px; color: var(--subtle); background: var(--canvas); border: 1px solid var(--line); border-radius: 8px; font: inherit; font-size: 11px; cursor: pointer; }
+.secondary-button:disabled { opacity: .6; cursor: wait; }
 
 button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 

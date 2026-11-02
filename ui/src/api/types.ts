@@ -111,6 +111,18 @@ export type WorkspaceJobActionResult = {
   job_revision: number
 }
 
+export type WorkspaceJobCreateInput = {
+  request_id: string
+  kind: WorkspaceJob['kind']
+  title: string
+  conversation_id: string | null
+  dependency_ids: string[]
+  job_inputs: Record<string, unknown>
+  source_refs: string[]
+  source_spec_revision: string | null
+  provider_config_refs: string[]
+}
+
 export type WorkspaceSnapshot = {
   schema_version: 1
   repository_id: string

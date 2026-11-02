@@ -374,6 +374,7 @@ def discover_dependency_candidates(
     )
     rare_token_limit = max(3, len(units) // 200)
     pairs: list[tuple[PendingUnitOutput, WorkUnit]] = []
+    seen_pairs: set[tuple[str, str, tuple[str, ...], str]] = set()
     for pending in pending_outputs:
         producer = by_id.get(pending.unit_id)
         if producer is None:
@@ -418,7 +419,15 @@ def discover_dependency_candidates(
                 or shared_requirement_relation
                 or len(shared_rare_tokens) >= 3
             ):
-                pairs.append((pending, consumer))
+                pair_key = (
+                    pending.unit_id,
+                    pending.description,
+                    pending.requirement_ids,
+                    consumer.id,
+                )
+                if pair_key not in seen_pairs:
+                    seen_pairs.add(pair_key)
+                    pairs.append((pending, consumer))
     return DependencyCandidateDiscovery(write_order_edges, tuple(pairs))
 
 

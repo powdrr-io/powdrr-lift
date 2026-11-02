@@ -371,6 +371,20 @@ def test_dependency_discovery_finds_each_edge_in_a_transitive_output_chain() -> 
     assert discovery.confirmation_pairs == ((manifest, middle), (summary, final))
 
 
+def test_dependency_discovery_deduplicates_repeated_output_candidates() -> None:
+    producer = replace(_unit("unit-0001"), deliverable="Prepare artifacts.")
+    consumer = replace(
+        _unit("unit-0002", "req-0002"),
+        deliverable="Update the downstream check.",
+        implementation_step="Consume the signed manifest before verification.",
+    )
+    output = PendingUnitOutput(producer.id, "Signed manifest", producer.requirement_ids)
+
+    discovery = discover_dependency_candidates([producer, consumer], [output, output])
+
+    assert discovery.confirmation_pairs == ((output, consumer),)
+
+
 def test_dependency_confirmation_has_exact_required_and_independent_variants() -> None:
     required = parse_dependency_confirmation(
         {

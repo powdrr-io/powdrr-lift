@@ -467,57 +467,57 @@ files:
   span:
     start_line: 339
     end_line: 340
-  summary: Discover dependency candidates from explicit output references and related requirement links.
-  rationale: Surface likely producer-consumer edges without constructing or asking the model to discover an all-pairs dependency graph.
+  summary: Discover and deduplicate dependency candidates from explicit outputs and related requirements.
+  rationale: Surface likely producer-consumer edges without asking the model to discover an all-pairs graph or repeating the same candidate.
 - path: packages/service/src/powdrr_service/planning/dependencies.py
   type: modified
   span:
     start_line: 382
     end_line: 382
-  summary: Discover dependency candidates from explicit output references and related requirement links.
-  rationale: Surface likely producer-consumer edges without constructing or asking the model to discover an all-pairs dependency graph.
+  summary: Discover and deduplicate dependency candidates from explicit outputs and related requirements.
+  rationale: Surface likely producer-consumer edges without asking the model to discover an all-pairs graph or repeating the same candidate.
 - path: packages/service/src/powdrr_service/planning/dependencies.py
   type: modified
   span:
     start_line: 394
     end_line: 394
-  summary: Discover dependency candidates from explicit output references and related requirement links.
-  rationale: Surface likely producer-consumer edges without constructing or asking the model to discover an all-pairs dependency graph.
+  summary: Discover and deduplicate dependency candidates from explicit outputs and related requirements.
+  rationale: Surface likely producer-consumer edges without asking the model to discover an all-pairs graph or repeating the same candidate.
 - path: packages/service/src/powdrr_service/planning/dependencies.py
   type: modified
   span:
     start_line: 396
     end_line: 396
-  summary: Discover dependency candidates from explicit output references and related requirement links.
-  rationale: Surface likely producer-consumer edges without constructing or asking the model to discover an all-pairs dependency graph.
+  summary: Discover and deduplicate dependency candidates from explicit outputs and related requirements.
+  rationale: Surface likely producer-consumer edges without asking the model to discover an all-pairs graph or repeating the same candidate.
 - path: packages/service/src/powdrr_service/planning/dependencies.py
   type: modified
   span:
     start_line: 400
     end_line: 413
-  summary: Discover dependency candidates from explicit output references and related requirement links.
-  rationale: Surface likely producer-consumer edges without constructing or asking the model to discover an all-pairs dependency graph.
+  summary: Discover and deduplicate dependency candidates from explicit outputs and related requirements.
+  rationale: Surface likely producer-consumer edges without asking the model to discover an all-pairs graph or repeating the same candidate.
 - path: packages/service/src/powdrr_service/planning/dependencies.py
   type: modified
   span:
     start_line: 415
     end_line: 420
-  summary: Discover dependency candidates from explicit output references and related requirement links.
-  rationale: Surface likely producer-consumer edges without constructing or asking the model to discover an all-pairs dependency graph.
+  summary: Discover and deduplicate dependency candidates from explicit outputs and related requirements.
+  rationale: Surface likely producer-consumer edges without asking the model to discover an all-pairs graph or repeating the same candidate.
 - path: packages/service/src/powdrr_service/planning/dependencies.py
   type: modified
   span:
     start_line: 436
     end_line: 440
-  summary: Discover dependency candidates from explicit output references and related requirement links.
-  rationale: Surface likely producer-consumer edges without constructing or asking the model to discover an all-pairs dependency graph.
+  summary: Discover and deduplicate dependency candidates from explicit outputs and related requirements.
+  rationale: Surface likely producer-consumer edges without asking the model to discover an all-pairs graph or repeating the same candidate.
 - path: packages/service/src/powdrr_service/planning/dependencies.py
   type: modified
   span:
     start_line: 444
     end_line: 451
-  summary: Discover dependency candidates from explicit output references and related requirement links.
-  rationale: Surface likely producer-consumer edges without constructing or asking the model to discover an all-pairs dependency graph.
+  summary: Discover and deduplicate dependency candidates from explicit outputs and related requirements.
+  rationale: Surface likely producer-consumer edges without asking the model to discover an all-pairs graph or repeating the same candidate.
 - path: packages/service/src/powdrr_service/planning/driver.py
   type: modified
   span:
@@ -1033,9 +1033,9 @@ files:
   type: modified
   span:
     start_line: 301
-    end_line: 338
-  summary: Cover explicit producer-output references, related requirements, and transitive dependency chains.
-  rationale: Prove discovery finds known multi-step edges with concrete evidence while excluding unrelated pairs.
+    end_line: 373
+  summary: Cover explicit output references, related requirements, transitive chains, and candidate deduplication.
+  rationale: Prove discovery finds known multi-step edges with concrete evidence, excludes unrelated pairs, and emits each candidate once.
 - path: tests/test_planning_service.py
   type: modified
   span:

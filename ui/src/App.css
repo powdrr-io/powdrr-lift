@@ -274,6 +274,21 @@
 .job-status__dependencies li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 11px; background: var(--control); border: 1px solid var(--line); border-radius: 7px; font-size: 10px; }
 .job-status__dependencies button { min-width: 0; overflow: hidden; padding: 0; color: var(--accent); background: transparent; border: 0; font: inherit; text-align: left; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
 .job-status__outputs code { display: block; padding: 10px 12px; color: var(--code-ink); background: var(--code-bg); border-radius: 7px; font: 10px var(--mono); overflow-wrap: anywhere; }
+.job-timeline__list { display: flex; flex-direction: column; gap: 8px; padding: 0; margin: 0; list-style: none; }
+.job-timeline__item { display: flex; align-items: flex-start; gap: 10px; }
+.job-timeline__marker { width: 7px; height: 7px; flex: 0 0 7px; margin: 12px 0 0 3px; background: var(--quiet); border: 2px solid var(--control); border-radius: 50%; box-shadow: 0 0 0 1px var(--line-dark); }
+.job-timeline__item--current .job-timeline__marker { background: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.job-timeline__content { min-width: 0; flex: 1; padding: 9px 11px; background: var(--control); border: 1px solid var(--line); border-radius: 8px; }
+.job-timeline__heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; color: var(--subtle); font-size: 10px; }
+.job-timeline__heading time { color: var(--quiet); font-size: 9px; text-align: right; }
+.job-timeline__metadata { display: flex; flex-wrap: wrap; gap: 8px 14px; margin: 8px 0 0; }
+.job-timeline__metadata div { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.job-timeline__metadata dt { color: var(--muted); font-size: 8px; }
+.job-timeline__metadata dd { margin: 0; color: var(--subtle); font: 9px var(--mono); overflow-wrap: anywhere; }
+.job-timeline__content p { margin: 6px 0 0; color: var(--body); font-size: 10px; line-height: 1.5; white-space: pre-wrap; }
+.job-timeline__previous { margin: 9px 0 0 20px; padding: 8px 10px; background: var(--canvas); border: 1px solid var(--line); border-radius: 8px; }
+.job-timeline__previous summary { color: var(--accent); font-size: 10px; cursor: pointer; }
+.job-timeline__previous .job-timeline__list { margin-top: 9px; }
 .job-status__empty { margin: 25px 0; color: var(--muted); font-size: 12px; }
 .conversation-heading { width: min(790px, calc(100% - 64px)); justify-content: space-between; gap: 18px; margin: 34px auto 0; }
 .conversation-heading .eyebrow { color: var(--accent); font-size: 9px; letter-spacing: 1.2px; }

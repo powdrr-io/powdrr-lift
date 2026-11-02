@@ -353,6 +353,12 @@ describe('workspace shell', () => {
       },
       attempts: [{
         schema_version: 1,
+        attempt_id: 'attempt-0',
+        run_id: 'run-0',
+        source_spec_revision: 'spec-r2',
+        created_at: '2026-10-31T23:30:00Z',
+      }, {
+        schema_version: 1,
         attempt_id: 'attempt-1',
         run_id: 'run-1',
         source_spec_revision: 'spec-r3',
@@ -396,6 +402,10 @@ describe('workspace shell', () => {
     expect(await app.findByRole('heading', { name: 'Plan search' })).toBeTruthy()
     expect(app.getByText('Gathering repository context')).toBeTruthy()
     expect(app.getByText('run-1')).toBeTruthy()
+    const previousAttempts = app.getByText('Previous attempts (1)')
+    await user.click(previousAttempts)
+    expect(app.getByText('run-0')).toBeTruthy()
+    expect(app.getByText('attempt-0')).toBeTruthy()
     expect(app.getByRole('button', { name: 'Build search index' })).toBeTruthy()
     expect(new URL(window.location.href).searchParams.get('job')).toBe('job-running')
     expect(new URL(window.location.href).searchParams.has('conversation')).toBe(false)

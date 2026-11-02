@@ -1,4 +1,5 @@
 import type { Conversation, WorkspaceJob, WorkspaceJobAction, WorkspaceJobDetail } from '../api/types'
+import { JobTimeline } from './JobTimeline'
 
 const stateLabels: Record<WorkspaceJobDetail['job']['state'], string> = {
   pending: 'Pending',
@@ -103,13 +104,6 @@ export function JobStatus({
           </section>
         )}
 
-        {job.detail && (
-          <section className="job-status__section">
-            <h2>Latest update</h2>
-            <p className="job-status__detail">{job.detail}</p>
-          </section>
-        )}
-
         <section className="job-status__section">
           <h2>Run overview</h2>
           <dl className="job-status__metadata">
@@ -125,13 +119,6 @@ export function JobStatus({
             )}
           </dl>
         </section>
-
-        {detail.stage && (
-          <section className="job-status__section">
-            <h2>Current stage</h2>
-            <p className="job-status__stage"><span className="pulse-dot" />{detail.stage}</p>
-          </section>
-        )}
 
         {detail.question && (
           <section className="job-status__section job-status__notice">
@@ -173,21 +160,7 @@ export function JobStatus({
           </section>
         )}
 
-        {detail.latest_attempt && (
-          <section className="job-status__section">
-            <h2>Latest attempt</h2>
-            <dl className="job-status__metadata">
-              <div><dt>Run</dt><dd>{detail.latest_attempt.run_id}</dd></div>
-              <div><dt>Attempt</dt><dd>{detail.latest_attempt.attempt_id}</dd></div>
-              {detail.latest_attempt.source_spec_revision && (
-                <div><dt>Specification</dt><dd>{detail.latest_attempt.source_spec_revision}</dd></div>
-              )}
-              {detail.attempts.length > 1 && (
-                <div><dt>Attempts</dt><dd>{detail.attempts.length}</dd></div>
-              )}
-            </dl>
-          </section>
-        )}
+        {(detail.attempts.length > 0 || detail.stage || job.detail) && <JobTimeline detail={detail} />}
 
         {detail.outputs.length > 0 && (
           <section className="job-status__section">

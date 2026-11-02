@@ -1,0 +1,451 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1314
+title: Move changelog parsing into service
+intent:
+  problem: Changelog schema parsing and its result models were implemented in the agent-side Powdrr Lift package
+    and re-exported through legacy package APIs.
+  goal: Move parsing and models into the service package, switch all callers to direct service imports, remove old
+    parser modules and exports, and update ownership records.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 787
+    end_line: 787
+  summary: Assign changelog parsing and schema models to service and update the callers’ import edges.
+  rationale: Keep the ownership inventory aligned with the service package move and removal of legacy modules.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 855
+    end_line: 855
+  summary: Assign changelog parsing and schema models to service and update the callers’ import edges.
+  rationale: Keep the ownership inventory aligned with the service package move and removal of legacy modules.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 855
+    end_line: 856
+  summary: Assign changelog parsing and schema models to service and update the callers’ import edges.
+  rationale: Keep the ownership inventory aligned with the service package move and removal of legacy modules.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 899
+    end_line: 918
+  summary: Assign changelog parsing and schema models to service and update the callers’ import edges.
+  rationale: Keep the ownership inventory aligned with the service package move and removal of legacy modules.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 934
+    end_line: 934
+  summary: Assign changelog parsing and schema models to service and update the callers’ import edges.
+  rationale: Keep the ownership inventory aligned with the service package move and removal of legacy modules.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 921
+    end_line: 922
+  summary: Assign changelog parsing and schema models to service and update the callers’ import edges.
+  rationale: Keep the ownership inventory aligned with the service package move and removal of legacy modules.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 1075
+    end_line: 1075
+  summary: Assign changelog parsing and schema models to service and update the callers’ import edges.
+  rationale: Keep the ownership inventory aligned with the service package move and removal of legacy modules.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 1171
+    end_line: 1171
+  summary: Assign changelog parsing and schema models to service and update the callers’ import edges.
+  rationale: Keep the ownership inventory aligned with the service package move and removal of legacy modules.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 1151
+    end_line: 1152
+  summary: Assign changelog parsing and schema models to service and update the callers’ import edges.
+  rationale: Keep the ownership inventory aligned with the service package move and removal of legacy modules.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 1340
+    end_line: 1340
+  summary: Assign changelog parsing and schema models to service and update the callers’ import edges.
+  rationale: Keep the ownership inventory aligned with the service package move and removal of legacy modules.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 1319
+    end_line: 1320
+  summary: Assign changelog parsing and schema models to service and update the callers’ import edges.
+  rationale: Keep the ownership inventory aligned with the service package move and removal of legacy modules.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 1371
+    end_line: 1371
+  summary: Assign changelog parsing and schema models to service and update the callers’ import edges.
+  rationale: Keep the ownership inventory aligned with the service package move and removal of legacy modules.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 1351
+    end_line: 1352
+  summary: Assign changelog parsing and schema models to service and update the callers’ import edges.
+  rationale: Keep the ownership inventory aligned with the service package move and removal of legacy modules.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 1450
+    end_line: 1460
+  summary: Assign changelog parsing and schema models to service and update the callers’ import edges.
+  rationale: Keep the ownership inventory aligned with the service package move and removal of legacy modules.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2189
+    end_line: 2190
+  summary: Assign changelog parsing and schema models to service and update the callers’ import edges.
+  rationale: Keep the ownership inventory aligned with the service package move and removal of legacy modules.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2192
+    end_line: 2192
+  summary: Assign changelog parsing and schema models to service and update the callers’ import edges.
+  rationale: Keep the ownership inventory aligned with the service package move and removal of legacy modules.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2194
+    end_line: 2194
+  summary: Assign changelog parsing and schema models to service and update the callers’ import edges.
+  rationale: Keep the ownership inventory aligned with the service package move and removal of legacy modules.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2159
+    end_line: 2163
+  summary: Assign changelog parsing and schema models to service and update the callers’ import edges.
+  rationale: Keep the ownership inventory aligned with the service package move and removal of legacy modules.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2818
+    end_line: 2818
+  summary: Assign changelog parsing and schema models to service and update the callers’ import edges.
+  rationale: Keep the ownership inventory aligned with the service package move and removal of legacy modules.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2807
+    end_line: 2807
+  summary: Assign changelog parsing and schema models to service and update the callers’ import edges.
+  rationale: Keep the ownership inventory aligned with the service package move and removal of legacy modules.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3706
+    end_line: 3725
+  summary: Assign changelog parsing and schema models to service and update the callers’ import edges.
+  rationale: Keep the ownership inventory aligned with the service package move and removal of legacy modules.
+- path: docs/plans/agent-service-code-split.md
+  type: modified
+  span:
+    start_line: 486
+    end_line: 488
+  summary: Record changelog parsing as service-owned and generation/validation as future boundary work.
+  rationale: Keep the staged extraction plan accurate after this parser slice.
+- path: docs/plans/intent-linked-verification-implementation-plan.md
+  type: modified
+  span:
+    start_line: 270
+    end_line: 270
+  summary: Update the changelog parser touchpoint to its service package path.
+  rationale: Prevent active implementation guidance from pointing at the removed agent module.
+- path: docs/project_structure/project-structure.yaml
+  type: modified
+  span:
+    start_line: 27
+    end_line: 28
+  summary: Update the project structure entry to the service changelog package.
+  rationale: Keep the current repository structure specification aligned with the move.
+- path: packages/service/src/powdrr_service/changelog/__init__.py
+  type: renamed
+  span:
+    start_line: 1
+    end_line: 31
+  summary: Expose changelog schema models and parsing from the service namespace.
+  rationale: Give service callers one direct import path for changelog parsing.
+- path: scripts/build-agent-service-ownership-inventory.py
+  type: modified
+  span:
+    start_line: 81
+    end_line: 82
+  summary: Discover and classify the service changelog package in generated inventories.
+  rationale: Make future ownership reports include the moved parser modules.
+- path: scripts/build-agent-service-ownership-inventory.py
+  type: modified
+  span:
+    start_line: 264
+    end_line: 264
+  summary: Discover and classify the service changelog package in generated inventories.
+  rationale: Make future ownership reports include the moved parser modules.
+- path: src/powdrr_lift/__init__.py
+  type: modified
+  span:
+    start_line: 3
+    end_line: 18
+  summary: Remove changelog parser models and function from the agent package exports.
+  rationale: Avoid retaining the old public import path after moving parser policy.
+- path: src/powdrr_lift/__init__.py
+  type: modified
+  span:
+    start_line: 20
+    end_line: 28
+  summary: Remove changelog parser models and function from the agent package exports.
+  rationale: Avoid retaining the old public import path after moving parser policy.
+- path: src/powdrr_lift/__init__.py
+  type: modified
+  span:
+    start_line: 31
+    end_line: 31
+  summary: Remove changelog parser models and function from the agent package exports.
+  rationale: Avoid retaining the old public import path after moving parser policy.
+- path: src/powdrr_lift/__init__.py
+  type: modified
+  span:
+    start_line: 108
+    end_line: 108
+  summary: Remove changelog parser models and function from the agent package exports.
+  rationale: Avoid retaining the old public import path after moving parser policy.
+- path: src/powdrr_lift/__init__.py
+  type: modified
+  span:
+    start_line: 110
+    end_line: 110
+  summary: Remove changelog parser models and function from the agent package exports.
+  rationale: Avoid retaining the old public import path after moving parser policy.
+- path: src/powdrr_lift/__init__.py
+  type: modified
+  span:
+    start_line: 126
+    end_line: 126
+  summary: Remove changelog parser models and function from the agent package exports.
+  rationale: Avoid retaining the old public import path after moving parser policy.
+- path: src/powdrr_lift/artifact_state.py
+  type: modified
+  span:
+    start_line: 14
+    end_line: 14
+  summary: Read changelog artifacts through the service parser.
+  rationale: Keep artifact reconstruction callers aligned with service-owned schema interpretation.
+- path: src/powdrr_lift/artifact_state.py
+  type: modified
+  span:
+    start_line: 15
+    end_line: 15
+  summary: Read changelog artifacts through the service parser.
+  rationale: Keep artifact reconstruction callers aligned with service-owned schema interpretation.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 12
+    end_line: 12
+  summary: Use service-owned changelog models and parsing.
+  rationale: Keep validation on the canonical schema parser while its broader policy move remains separate.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 19
+    end_line: 19
+  summary: Use service-owned changelog models and parsing.
+  rationale: Keep validation on the canonical schema parser while its broader policy move remains separate.
+- path: src/powdrr_lift/core/__init__.py
+  type: modified
+  span:
+    start_line: 217
+    end_line: 231
+  summary: Remove changelog schema exports from the old core namespace.
+  rationale: Ensure the removed parser module is not exposed through a second legacy path.
+- path: src/powdrr_lift/core/__init__.py
+  type: modified
+  span:
+    start_line: 260
+    end_line: 260
+  summary: Remove changelog schema exports from the old core namespace.
+  rationale: Ensure the removed parser module is not exposed through a second legacy path.
+- path: src/powdrr_lift/core/__init__.py
+  type: modified
+  span:
+    start_line: 325
+    end_line: 333
+  summary: Remove changelog schema exports from the old core namespace.
+  rationale: Ensure the removed parser module is not exposed through a second legacy path.
+- path: src/powdrr_lift/core/__init__.py
+  type: modified
+  span:
+    start_line: 336
+    end_line: 338
+  summary: Remove changelog schema exports from the old core namespace.
+  rationale: Ensure the removed parser module is not exposed through a second legacy path.
+- path: src/powdrr_lift/core/__init__.py
+  type: modified
+  span:
+    start_line: 385
+    end_line: 385
+  summary: Remove changelog schema exports from the old core namespace.
+  rationale: Ensure the removed parser module is not exposed through a second legacy path.
+- path: src/powdrr_lift/core/code_index.py
+  type: modified
+  span:
+    start_line: 9
+    end_line: 9
+  summary: Use the service parser and models when indexing changelog history.
+  rationale: Keep the code index compatible with the moved parser without maintaining aliases.
+- path: src/powdrr_lift/core/code_index.py
+  type: modified
+  span:
+    start_line: 24
+    end_line: 24
+  summary: Use the service parser and models when indexing changelog history.
+  rationale: Keep the code index compatible with the moved parser without maintaining aliases.
+- path: src/powdrr_lift/core/index.py
+  type: modified
+  span:
+    start_line: 11
+    end_line: 11
+  summary: Use service-owned changelog models and parsing during repository indexing.
+  rationale: Keep entity and source indexing on the canonical schema implementation.
+- path: src/powdrr_lift/core/index.py
+  type: modified
+  span:
+    start_line: 19
+    end_line: 20
+  summary: Use service-owned changelog models and parsing during repository indexing.
+  rationale: Keep entity and source indexing on the canonical schema implementation.
+- path: src/powdrr_lift/core/plan_diff_specification.py
+  type: modified
+  span:
+    start_line: 9
+    end_line: 9
+  summary: Parse changelog documents through the service package.
+  rationale: Keep plan-diff comparison aligned with service-owned changelog interpretation.
+- path: src/powdrr_lift/core/plan_diff_specification.py
+  type: modified
+  span:
+    start_line: 10
+    end_line: 10
+  summary: Parse changelog documents through the service package.
+  rationale: Keep plan-diff comparison aligned with service-owned changelog interpretation.
+- path: src/powdrr_lift/core/schemas.py
+  type: deleted
+  span:
+    start_line: 1
+    end_line: 31
+  summary: Delete the legacy core re-export module for changelog schema types.
+  rationale: Remove the second old import path instead of preserving a compatibility shim.
+- path: src/powdrr_lift/structrr/bootstrap.py
+  type: modified
+  span:
+    start_line: 16
+    end_line: 16
+  summary: Validate bootstrap changelog data through the service parser.
+  rationale: Keep bootstrap compilation aligned with the moved schema rules.
+- path: src/powdrr_lift/structrr/bootstrap.py
+  type: modified
+  span:
+    start_line: 26
+    end_line: 26
+  summary: Validate bootstrap changelog data through the service parser.
+  rationale: Keep bootstrap compilation aligned with the moved schema rules.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 28
+    end_line: 28
+  summary: Validate feature plans through the service changelog parser.
+  rationale: Keep workflow plan loading on the canonical parser implementation.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 87
+    end_line: 87
+  summary: Validate feature plans through the service changelog parser.
+  rationale: Keep workflow plan loading on the canonical parser implementation.
+- path: tests/test_agent_service_contracts.py
+  type: modified
+  span:
+    start_line: 210
+    end_line: 227
+  summary: Verify parser ownership, absence of Powdrr Lift imports, and removal of legacy exports.
+  rationale: Guard the new service boundary and prevent old module paths from returning.
+- path: tests/test_change_log_template.py
+  type: modified
+  span:
+    start_line: 6
+    end_line: 7
+  summary: Import changelog result models and parser directly from service.
+  rationale: Keep template round-trip tests exercising the canonical parser.
+- path: tests/test_change_log_template.py
+  type: modified
+  span:
+    start_line: 7
+    end_line: 7
+  summary: Import changelog result models and parser directly from service.
+  rationale: Keep template round-trip tests exercising the canonical parser.
+- path: tests/test_change_log_template.py
+  type: modified
+  span:
+    start_line: 10
+    end_line: 10
+  summary: Import changelog result models and parser directly from service.
+  rationale: Keep template round-trip tests exercising the canonical parser.
+- path: tests/test_cli.py
+  type: modified
+  span:
+    start_line: 13
+    end_line: 13
+  summary: Use the service parser to read generated changelog output.
+  rationale: Preserve CLI round-trip coverage without the removed top-level parser export.
+- path: tests/test_cli.py
+  type: modified
+  span:
+    start_line: 15
+    end_line: 15
+  summary: Use the service parser to read generated changelog output.
+  rationale: Preserve CLI round-trip coverage without the removed top-level parser export.
+- path: tests/test_code_index.py
+  type: modified
+  span:
+    start_line: 8
+    end_line: 8
+  summary: Import changelog span models from service.
+  rationale: Keep index tests aligned with the relocated result models.
+- path: tests/test_code_index.py
+  type: modified
+  span:
+    start_line: 12
+    end_line: 12
+  summary: Import changelog span models from service.
+  rationale: Keep index tests aligned with the relocated result models.
+- path: tests/test_parse_change_log.py
+  type: modified
+  span:
+    start_line: 1
+    end_line: 1
+  summary: Run changelog parsing behavior tests against the service module.
+  rationale: Preserve v1/v2 parser regression coverage at its new ownership boundary.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []
+features: []
+proposed_prs: []

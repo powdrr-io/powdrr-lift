@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 from powdrr_service.structrr.proposal import ProposalRevision, compile_proposal_revision
-
-from powdrr_lift.core.verification_contract import VerificationContract
-from powdrr_lift.structrr.verification_obligations import (
+from powdrr_service.structrr.verification_contract import VerificationContract
+from powdrr_service.structrr.verification_obligations import (
     compile_verification_obligations,
 )
 

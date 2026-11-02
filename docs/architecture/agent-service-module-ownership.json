@@ -991,7 +991,6 @@
         "powdrr_lift.repository_state",
         "powdrr_lift.structrr.bootstrap",
         "powdrr_lift.structrr.intent",
-        "powdrr_lift.structrr.intent_lineage",
         "powdrr_lift.workrr.chat_config",
         "powdrr_lift.workrr.chat_tui",
         "powdrr_lift.workrr.coding_agent",
@@ -1003,33 +1002,28 @@
         "powdrr_lift.workrr.feature_endpoint",
         "powdrr_lift.workrr.feature_run",
         "powdrr_lift.workrr.git",
-        "powdrr_lift.workrr.github_issue_plan_generation",
         "powdrr_lift.workrr.github_issue_queue",
         "powdrr_lift.workrr.human_task",
         "powdrr_lift.workrr.local_model",
-        "powdrr_lift.workrr.planning.evidence",
+        "powdrr_lift.workrr.planning_session",
+        "powdrr_lift.workrr.pr_execution_session",
         "powdrr_lift.workrr.procedrr_chat",
         "powdrr_lift.workrr.prompt_benchmark_comparison",
-        "powdrr_service.providers.config",
         "powdrr_lift.workrr.provider_runtime",
         "powdrr_lift.workrr.repository_subject_binding",
         "powdrr_lift.workrr.run_artifacts",
         "powdrr_lift.workrr.scenario",
         "powdrr_lift.workrr.task_agent",
         "powdrr_lift.workrr.workflow_provider_selection",
-        "powdrr_local.planning.checkpoints",
-        "powdrr_service.planning.assembly",
-        "powdrr_service.planning.compiler",
-        "powdrr_service.planning.driver",
-        "powdrr_service.planning.plan_sizing",
-        "powdrr_service.planning.repair_service",
-        "powdrr_service.planning.service",
-        "powdrr_service.planning.source",
         "powdrr_service.planning.workflow_ids",
-        "powdrr_service.structrr.rebase",
-        "powdrr_service.structrr.verification_health",
         "powdrr_service.procedrr",
-        "powdrr_service.procedrr.catalog"
+        "powdrr_service.procedrr.catalog",
+        "powdrr_service.providers.config",
+        "powdrr_service.providers.credentials",
+        "powdrr_service.resources",
+        "powdrr_service.structrr.intent_lineage",
+        "powdrr_service.structrr.rebase",
+        "powdrr_service.structrr.verification_health"
       ],
       "kind": "python_module",
       "owner": "split",
@@ -1083,7 +1077,6 @@
         "powdrr_lift.core.template",
         "powdrr_lift.core.tool_manifest",
         "powdrr_lift.core.validate",
-        "powdrr_lift.core.verification_contract",
         "powdrr_lift.structrr.intent"
       ],
       "kind": "python_module",
@@ -1406,7 +1399,7 @@
         "powdrr_lift.core.specification_v1",
         "powdrr_lift.core.template_generation",
         "powdrr_lift.core.validation_messages",
-        "powdrr_lift.core.verification_contract"
+        "powdrr_service.structrr.verification_contract"
       ],
       "kind": "python_module",
       "owner": "split",
@@ -1594,12 +1587,12 @@
       "reviewed": false
     },
     {
-      "extraction_pr": "3/8",
+      "extraction_pr": "8",
       "internal_imports": [],
       "kind": "python_module",
-      "owner": "split",
-      "path": "src/powdrr_lift/core/verification_contract.py",
-      "rationale": "classify each symbol as service policy or public exchanged data",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/structrr/verification_contract.py",
+      "rationale": "Structrr verification, proposal-review, and invariant-review policy",
       "reviewed": false
     },
     {
@@ -2159,15 +2152,7 @@
     {
       "extraction_pr": "3",
       "internal_imports": [
-        "powdrr_lift.structrr.actual_diff",
-        "powdrr_lift.structrr.bootstrap",
-        "powdrr_lift.structrr.candidate_comparison",
-        "powdrr_lift.structrr.intent_lineage",
-        "powdrr_lift.structrr.invariant_review",
-        "powdrr_lift.structrr.proposal",
-        "powdrr_lift.structrr.proposal_review",
-        "powdrr_lift.structrr.source_manifest",
-        "powdrr_lift.structrr.verification_obligations"
+        "powdrr_lift.structrr.bootstrap"
       ],
       "kind": "python_module",
       "owner": "split",
@@ -2233,16 +2218,16 @@
       "reviewed": false
     },
     {
-      "extraction_pr": "3",
+      "extraction_pr": "8",
       "internal_imports": [
         "powdrr_service.decision_obligation",
-        "powdrr_lift.structrr.proposal",
-        "powdrr_lift.structrr.verification_obligations"
+        "powdrr_service.structrr.proposal",
+        "powdrr_service.structrr.verification_obligations"
       ],
       "kind": "python_module",
-      "owner": "split",
-      "path": "src/powdrr_lift/structrr/gate_compiler.py",
-      "rationale": "service semantics; agent supplies pinned repository evidence",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/structrr/gate_compiler.py",
+      "rationale": "Structrr verification, proposal-review, and invariant-review policy",
       "reviewed": false
     },
     {
@@ -2257,31 +2242,31 @@
       "reviewed": false
     },
     {
-      "extraction_pr": "3",
+      "extraction_pr": "8",
       "internal_imports": [
         "powdrr_service.decision_obligation",
-        "powdrr_lift.structrr.proposal",
+        "powdrr_service.structrr.proposal",
         "powdrr_service.structrr.snapshot"
       ],
       "kind": "python_module",
-      "owner": "split",
-      "path": "src/powdrr_lift/structrr/intent_lineage.py",
-      "rationale": "service semantics; agent supplies pinned repository evidence",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/structrr/intent_lineage.py",
+      "rationale": "Structrr verification, proposal-review, and invariant-review policy",
       "reviewed": false
     },
     {
-      "extraction_pr": "3",
+      "extraction_pr": "8",
       "internal_imports": [
         "powdrr_service.decision_obligation",
-        "powdrr_lift.structrr.actual_diff",
-        "powdrr_lift.structrr.candidate_comparison",
+        "powdrr_service.structrr.actual_diff",
+        "powdrr_service.structrr.candidate_comparison",
         "powdrr_service.structrr.obligation_evidence",
-        "powdrr_lift.structrr.proposal"
+        "powdrr_service.structrr.proposal"
       ],
       "kind": "python_module",
-      "owner": "split",
-      "path": "src/powdrr_lift/structrr/invariant_review.py",
-      "rationale": "service semantics; agent supplies pinned repository evidence",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/structrr/invariant_review.py",
+      "rationale": "Structrr verification, proposal-review, and invariant-review policy",
       "reviewed": false
     },
     {
@@ -2305,16 +2290,16 @@
       "reviewed": false
     },
     {
-      "extraction_pr": "3",
+      "extraction_pr": "8",
       "internal_imports": [
         "powdrr_service.decision_obligation",
-        "powdrr_lift.structrr.gate_compiler",
-        "powdrr_lift.structrr.proposal"
+        "powdrr_service.structrr.gate_compiler",
+        "powdrr_service.structrr.proposal"
       ],
       "kind": "python_module",
-      "owner": "split",
-      "path": "src/powdrr_lift/structrr/proposal_review.py",
-      "rationale": "service semantics; agent supplies pinned repository evidence",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/structrr/proposal_review.py",
+      "rationale": "Structrr verification, proposal-review, and invariant-review policy",
       "reviewed": false
     },
     {
@@ -2389,15 +2374,15 @@
       "reviewed": true
     },
     {
-      "extraction_pr": "3",
+      "extraction_pr": "8",
       "internal_imports": [
-        "powdrr_lift.core.verification_contract",
-        "powdrr_lift.structrr.proposal"
+        "powdrr_service.structrr.proposal",
+        "powdrr_service.structrr.verification_contract"
       ],
       "kind": "python_module",
-      "owner": "split",
-      "path": "src/powdrr_lift/structrr/verification_obligations.py",
-      "rationale": "service semantics; agent supplies pinned repository evidence",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/structrr/verification_obligations.py",
+      "rationale": "Structrr verification, proposal-review, and invariant-review policy",
       "reviewed": false
     },
     {
@@ -2831,25 +2816,13 @@
       "extraction_pr": "5/7",
       "internal_imports": [
         "powdrr_lift.change_log_parser",
-        "powdrr_service.behavior_contract",
         "powdrr_lift.core.contract_closure",
-        "powdrr_service.decision_obligation",
         "powdrr_lift.core.execution_plan",
         "powdrr_lift.core.implementation_packet",
-        "powdrr_service.obligation_review",
         "powdrr_lift.core.spec_context",
-        "powdrr_lift.core.verification_contract",
         "powdrr_lift.errors",
-        "powdrr_lift.structrr.actual_diff",
         "powdrr_lift.structrr.bootstrap",
-        "powdrr_lift.structrr.candidate_comparison",
-        "powdrr_lift.structrr.gate_compiler",
-        "powdrr_service.structrr.obligation_evidence",
-        "powdrr_lift.structrr.proposal",
-        "powdrr_lift.structrr.proposal_review",
-        "powdrr_lift.structrr.source_manifest",
         "powdrr_lift.structrr.validation",
-        "powdrr_lift.structrr.verification_obligations",
         "powdrr_lift.workrr.actualization",
         "powdrr_lift.workrr.candidate_checkpoint",
         "powdrr_lift.workrr.candidate_safety",
@@ -2857,25 +2830,35 @@
         "powdrr_lift.workrr.coding_agent_validation",
         "powdrr_lift.workrr.command_catalog",
         "powdrr_lift.workrr.evidence_reconciliation",
-        "powdrr_service.external_contract_research",
         "powdrr_lift.workrr.git",
-        "powdrr_service.decision_classifier",
         "powdrr_lift.workrr.postrun_probes",
-        "powdrr_local.bridge",
         "powdrr_lift.workrr.procedrr",
         "powdrr_lift.workrr.procedrr_operations",
         "powdrr_lift.workrr.protocol",
         "powdrr_lift.workrr.run_artifacts",
         "powdrr_lift.workrr.verification_evidence",
         "powdrr_lift.workrr.verification_provider",
+        "powdrr_service.behavior_contract",
+        "powdrr_service.decision_classifier",
+        "powdrr_service.decision_obligation",
+        "powdrr_service.external_contract_research",
+        "powdrr_service.obligation_review",
         "powdrr_service.planning.workflow_ids",
-        "powdrr_service.structrr.active_intent",
-        "powdrr_service.structrr.snapshot",
         "powdrr_service.procedrr",
         "powdrr_service.procedrr_evaluator.evaluator",
         "powdrr_service.procedrr_evaluator.runtime",
-        "powdrr_contracts.models",
-        "powdrr_contracts.service"
+        "powdrr_service.resources",
+        "powdrr_service.structrr.active_intent",
+        "powdrr_service.structrr.actual_diff",
+        "powdrr_service.structrr.candidate_comparison",
+        "powdrr_service.structrr.gate_compiler",
+        "powdrr_service.structrr.obligation_evidence",
+        "powdrr_service.structrr.proposal",
+        "powdrr_service.structrr.proposal_review",
+        "powdrr_service.structrr.snapshot",
+        "powdrr_service.structrr.source_manifest",
+        "powdrr_service.structrr.verification_contract",
+        "powdrr_service.structrr.verification_obligations"
       ],
       "kind": "python_module",
       "owner": "split",
@@ -3528,8 +3511,8 @@
     {
       "extraction_pr": "7",
       "internal_imports": [
-        "powdrr_lift.structrr.verification_obligations",
-        "powdrr_lift.workrr.verification_provider"
+        "powdrr_lift.workrr.verification_provider",
+        "powdrr_service.structrr.verification_obligations"
       ],
       "kind": "python_module",
       "owner": "split",

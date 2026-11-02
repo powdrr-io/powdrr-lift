@@ -44,6 +44,21 @@ def _owner(path: str) -> tuple[str, str, str]:
                 "Structrr proposal, source-manifest, and candidate-comparison policy",
                 "8",
             )
+        if path.endswith(
+            (
+                "/verification_contract.py",
+                "/verification_obligations.py",
+                "/gate_compiler.py",
+                "/proposal_review.py",
+                "/intent_lineage.py",
+                "/invariant_review.py",
+            )
+        ):
+            return (
+                "service",
+                "Structrr verification, proposal-review, and invariant-review policy",
+                "8",
+            )
         return "service", "service-owned Structrr policy and artifact semantics", "8"
     if path.startswith("src/powdrr_lift/workrr/planning/"):
         if path.endswith(("/source.py", "/evidence.py", "/driver.py")):

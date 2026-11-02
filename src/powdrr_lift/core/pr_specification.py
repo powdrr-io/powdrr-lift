@@ -9,6 +9,10 @@ from pathlib import Path
 from typing import Any, cast
 
 import yaml
+from powdrr_service.structrr.verification_contract import (
+    VERIFICATION_CONTRACT_FIELDS,
+    VerificationContract,
+)
 
 from powdrr_lift.core.codebase_state import build_codebase_state_report
 from powdrr_lift.core.repo import resolve_repo_root as _resolve_repo_root
@@ -18,10 +22,6 @@ from powdrr_lift.core.template_generation import merge_existing_template_content
 from powdrr_lift.core.validation_messages import (
     ValidationError,
     validation_error_to_data,
-)
-from powdrr_lift.core.verification_contract import (
-    VERIFICATION_CONTRACT_FIELDS,
-    VerificationContract,
 )
 
 _DEFAULT_OUTPUT_PATH = PROPOSALS_ROOT

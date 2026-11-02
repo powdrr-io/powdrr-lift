@@ -11,7 +11,8 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
-from powdrr_lift.structrr.verification_obligations import VerificationObligation
+from powdrr_service.structrr.verification_obligations import VerificationObligation
+
 from powdrr_lift.workrr.verification_provider import (
     ProviderExecutionResult,
     VerificationProviderRegistry,

@@ -10,8 +10,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from powdrr_service.structrr.proposal import ProposalRevision
-
-from powdrr_lift.core.verification_contract import VerificationContract
+from powdrr_service.structrr.verification_contract import VerificationContract
 
 VERIFICATION_OBLIGATION_SCHEMA_VERSION = "verification-obligation-v1"
 

@@ -211,8 +211,8 @@ describe('workspace shell', () => {
       kind: 'planning',
       title: 'Plan search',
       state: 'running',
-      conversation_id: null,
-      dependency_ids: [],
+      conversation_id: 'conversation-1',
+      dependency_ids: ['job-complete'],
       artifact_refs: [],
       detail: 'Reviewing related modules.',
       revision: 2,
@@ -226,6 +226,22 @@ describe('workspace shell', () => {
       title: 'Create search PR',
       state: 'ready',
       detail: '',
+    }
+    const completedJob: WorkspaceJob = {
+      ...readyJob,
+      job_id: 'job-complete',
+      title: 'Build search index',
+      state: 'succeeded',
+      detail: 'Created the search index.',
+      updated_at: '2026-11-01T00:02:00Z',
+    }
+    const failedJob: WorkspaceJob = {
+      ...readyJob,
+      job_id: 'job-failed',
+      title: 'Publish search changes',
+      state: 'failed',
+      detail: 'Validation failed.',
+      updated_at: '2026-11-01T00:03:00Z',
     }
     const detail: WorkspaceJobDetail = {
       schema_version: 1,
@@ -253,7 +269,7 @@ describe('workspace shell', () => {
     mocks.resumeSession.mockResolvedValue(undefined)
     mocks.listRepositories.mockResolvedValue([repository])
     mocks.listConversations.mockResolvedValue([conversation])
-    mocks.snapshot.mockResolvedValue({ ...emptySnapshot(), jobs: [runningJob, readyJob] })
+    mocks.snapshot.mockResolvedValue({ ...emptySnapshot(), jobs: [runningJob, readyJob, completedJob, failedJob] })
     mocks.messages.mockResolvedValue([userMessage])
     mocks.jobDetail
       .mockResolvedValueOnce(detail)
@@ -282,6 +298,7 @@ describe('workspace shell', () => {
     expect(await app.findByRole('heading', { name: 'Plan search' })).toBeTruthy()
     expect(app.getByText('Gathering repository context')).toBeTruthy()
     expect(app.getByText('run-1')).toBeTruthy()
+    expect(app.getByRole('button', { name: 'Build search index' })).toBeTruthy()
     expect(new URL(window.location.href).searchParams.get('job')).toBe('job-running')
     expect(new URL(window.location.href).searchParams.has('conversation')).toBe(false)
     expect(mocks.jobDetail).toHaveBeenCalledWith('repo-1', 'job-running')
@@ -299,5 +316,13 @@ describe('workspace shell', () => {
     ))
     expect((await app.findByRole('status')).textContent).toMatch(/Cancellation requested/)
     await waitFor(() => expect(app.queryByRole('button', { name: 'Request cancellation' })).toBeNull())
+
+    await user.click(app.getByRole('tab', { name: /History/ }))
+    const historyFilter = app.getByLabelText('Filter job history')
+    const historyList = within(app.getByRole('navigation', { name: 'Job history' }))
+    expect(historyList.getByRole('button', { name: /Build search index/ })).toBeTruthy()
+    await user.selectOptions(historyFilter, 'failed')
+    expect(historyList.getByRole('button', { name: /Publish search changes/ })).toBeTruthy()
+    expect(historyList.queryByRole('button', { name: /Build search index/ })).toBeNull()
   })
 })

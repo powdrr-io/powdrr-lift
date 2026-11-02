@@ -112,7 +112,11 @@ function JobItem({
       <span className={`job-row__dot job-row__dot--${job.state.replaceAll('_', '-')}`} aria-hidden="true" />
       <span className="job-row__text">
         <span className="job-row__title">{job.title}</span>
-        <span className="job-row__meta">{job.kind === 'planning' ? 'Planning' : 'PR execution'} · {labels[job.state]}</span>
+        <span className="job-row__meta">
+          <span>{job.kind === 'planning' ? 'Planning' : 'PR execution'} · {labels[job.state]}</span>
+          <time dateTime={job.updated_at} title={new Date(job.updated_at).toLocaleString()}>{relativeTime(job.updated_at)}</time>
+        </span>
+        {job.detail && <span className="job-row__detail">{job.detail}</span>}
       </span>
     </button>
   )
@@ -125,7 +129,8 @@ function App() {
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [conversationId, setConversationId] = useState<string | null>(readSelection().conversationId)
   const [selectedJobId, setSelectedJobId] = useState<string | null>(readSelection().jobId)
-  const [jobTab, setJobTab] = useState<'running' | 'ready'>('running')
+  const [jobTab, setJobTab] = useState<'running' | 'ready' | 'history'>('running')
+  const [historyFilter, setHistoryFilter] = useState<'all' | 'succeeded' | 'failed' | 'cancelled' | 'interrupted'>('all')
   const [jobDetail, setJobDetail] = useState<WorkspaceJobDetail | null>(null)
   const [jobDetailError, setJobDetailError] = useState<{ jobId: string; message: string } | null>(null)
   const [pendingJobActions, setPendingJobActions] = useState<string[]>([])
@@ -154,6 +159,12 @@ function App() {
 
   const selectedConversation = conversations.find((item) => item.conversation_id === conversationId) ?? null
   const selectedJob = snapshot?.jobs.find((item) => item.job_id === selectedJobId) ?? null
+  const jobDependencies = selectedJob
+    ? (snapshot?.jobs ?? []).filter((item) => selectedJob.dependency_ids.includes(item.job_id))
+    : []
+  const jobOriginConversation = selectedJob?.conversation_id
+    ? conversations.find((item) => item.conversation_id === selectedJob.conversation_id) ?? null
+    : null
   const activeTurn = snapshot?.active_turns.find((item) => item.conversation_id === conversationId)
   const activeQuestion = snapshot?.active_questions.find((item) => item.conversation_id === conversationId)
   const filteredConversations = useMemo(() => {
@@ -574,10 +585,15 @@ function App() {
   const currentConversationId = conversationId ?? ''
   const currentRepository = repositories.find((item) => item.repository_id === repositoryId)
   const runningJobs = (snapshot?.jobs ?? []).filter((job) =>
-    ['running', 'waiting_for_input', 'waiting_for_external', 'interrupted'].includes(job.state),
+    ['running', 'waiting_for_input', 'waiting_for_external'].includes(job.state),
   )
   const readyJobs = (snapshot?.jobs ?? []).filter((job) => ['ready', 'pending'].includes(job.state))
-  const visibleJobs = jobTab === 'running' ? runningJobs : readyJobs
+  const historyJobs = (snapshot?.jobs ?? []).filter((job) =>
+    ['succeeded', 'failed', 'cancelled', 'interrupted'].includes(job.state),
+  )
+  const visibleJobs = (jobTab === 'running' ? runningJobs : jobTab === 'ready' ? readyJobs : historyJobs)
+    .filter((job) => jobTab !== 'history' || historyFilter === 'all' || job.state === historyFilter)
+    .sort((left, right) => right.updated_at.localeCompare(left.updated_at))
 
   return (
     <div className={`workspace${mobileSidebarOpen ? ' sidebar-open' : ''}`}>
@@ -618,17 +634,30 @@ function App() {
               {filteredConversations.length === 0 && <p className="sidebar-empty">{search ? 'No chats match your search.' : 'Your design chats will appear here.'}</p>}
             </nav>
             <section className="job-section" aria-label="Autonomous jobs">
-              <div className="job-section__heading"><span>JOBS</span><span>{runningJobs.length + readyJobs.length}</span></div>
+              <div className="job-section__heading"><span>JOBS</span><span>{runningJobs.length + readyJobs.length + historyJobs.length}</span></div>
               <div className="job-tabs" role="tablist" aria-label="Job status">
                 <button type="button" role="tab" aria-selected={jobTab === 'running'} onClick={() => setJobTab('running')}>Running <span>{runningJobs.length}</span></button>
                 <button type="button" role="tab" aria-selected={jobTab === 'ready'} onClick={() => setJobTab('ready')}>Ready / pending <span>{readyJobs.length}</span></button>
+                <button type="button" role="tab" aria-selected={jobTab === 'history'} onClick={() => setJobTab('history')}>History <span>{historyJobs.length}</span></button>
               </div>
-              <nav className="job-list" aria-label={jobTab === 'running' ? 'Running jobs' : 'Ready and pending jobs'}>
+              {jobTab === 'history' && (
+                <label className="job-history-filter">
+                  <span>Filter history</span>
+                  <select aria-label="Filter job history" value={historyFilter} onChange={(event) => setHistoryFilter(event.target.value as typeof historyFilter)}>
+                    <option value="all">All history</option>
+                    <option value="failed">Failed</option>
+                    <option value="interrupted">Interrupted</option>
+                    <option value="succeeded">Completed</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
+                </label>
+              )}
+              <nav className="job-list" aria-label={jobTab === 'running' ? 'Running jobs' : jobTab === 'ready' ? 'Ready and pending jobs' : 'Job history'}>
                 {visibleJobs.map((job) => (
                   <JobItem key={job.job_id} job={job} active={job.job_id === selectedJobId} onClick={() => selectJob(job.job_id)} />
                 ))}
                 {visibleJobs.length === 0 && (
-                  <p className="job-list__empty">{jobTab === 'running' ? 'No jobs are running.' : 'No jobs are ready or pending.'}</p>
+                  <p className="job-list__empty">{jobTab === 'running' ? 'No jobs are running.' : jobTab === 'ready' ? 'No jobs are ready or pending.' : 'No jobs match this history filter.'}</p>
                 )}
               </nav>
             </section>
@@ -675,7 +704,7 @@ function App() {
           </section>
         ) : selectedJobId ? (
           <div className="job-status-view">
-            {jobDetail?.job.job_id === selectedJobId ? <JobStatus detail={jobDetail} pendingActions={jobDetail.allowed_actions.filter((action) => pendingJobActions.includes(JSON.stringify([selectedJobId, action])))} actionMessage={jobActionMessage?.jobId === selectedJobId ? jobActionMessage : null} onAction={(action) => void requestJobAction(action)} /> : jobDetailError?.jobId === selectedJobId ? (
+            {jobDetail?.job.job_id === selectedJobId ? <JobStatus detail={jobDetail} pendingActions={jobDetail.allowed_actions.filter((action) => pendingJobActions.includes(JSON.stringify([selectedJobId, action])))} actionMessage={jobActionMessage?.jobId === selectedJobId ? jobActionMessage : null} onAction={(action) => void requestJobAction(action)} dependencies={jobDependencies} originatingConversation={jobOriginConversation} onSelectJob={selectJob} onSelectConversation={selectConversation} /> : jobDetailError?.jobId === selectedJobId ? (
               <div className="job-status-error" role="alert">{jobDetailError.message}</div>
             ) : (
               <div className="job-status-loading"><span className="pulse-dot" />Loading job status…</div>

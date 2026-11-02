@@ -174,10 +174,12 @@
 }
 .job-section__heading { justify-content: space-between; margin: 0 7px 8px; }
 .job-section__heading span:last-child { color: var(--quiet); font-weight: 500; letter-spacing: 0; }
-.job-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; padding: 3px; background: var(--tag); border-radius: 7px; }
+.job-tabs { display: grid; grid-template-columns: 1fr 1.2fr .8fr; gap: 3px; padding: 3px; background: var(--tag); border-radius: 7px; }
 .job-tabs button { display: flex; min-width: 0; align-items: center; justify-content: center; gap: 5px; padding: 6px 3px; color: var(--muted); background: transparent; border: 0; border-radius: 5px; font: inherit; font-size: 9px; cursor: pointer; }
 .job-tabs button[aria-selected="true"] { color: var(--ink); background: var(--control); box-shadow: 0 1px 3px rgb(25 26 38 / 9%); }
 .job-tabs button span { color: var(--quiet); font-size: 8px; }
+.job-history-filter { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 7px 5px 2px; color: var(--muted); font-size: 8px; }
+.job-history-filter select { max-width: 135px; padding: 5px 7px; color: var(--subtle); background: var(--control); border: 1px solid var(--line); border-radius: 6px; font: inherit; font-size: 8px; }
 .job-list { min-height: 0; flex: 1; overflow-y: auto; margin-top: 6px; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
 .job-row { width: 100%; display: flex; align-items: center; gap: 9px; padding: 7px 8px; color: var(--subtle); background: transparent; border: 0; border-radius: 7px; text-align: left; cursor: pointer; }
 .job-row:hover { background: var(--hover); }
@@ -190,7 +192,13 @@
 .job-row__dot--pending { background: var(--quiet); }
 .job-row__text { min-width: 0; display: flex; flex: 1; flex-direction: column; gap: 3px; }
 .job-row__title { overflow: hidden; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
-.job-row__meta { color: var(--quiet); font-size: 8px; }
+.job-row__meta { display: flex; justify-content: space-between; gap: 5px; color: var(--quiet); font-size: 8px; }
+.job-row__meta time { flex: 0 0 auto; }
+.job-row__detail { overflow: hidden; color: var(--muted); font-size: 8px; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
+.job-row__dot--succeeded { background: #35ad7a; }
+.job-row__dot--failed { background: var(--error); }
+.job-row__dot--cancelled { background: var(--quiet); }
+.job-row__dot--interrupted { background: #9275e8; }
 .job-list__empty { margin: 9px 8px; color: var(--muted); font-size: 9px; line-height: 1.5; }
 .sidebar-footer { padding-top: 10px; }
 .repo-footer { min-width: 0; gap: 9px; padding: 5px 3px; }
@@ -258,6 +266,10 @@
 .job-status__metadata div { min-width: 145px; display: flex; flex-direction: column; gap: 5px; padding: 10px 12px; background: var(--control); border: 1px solid var(--line); border-radius: 7px; }
 .job-status__metadata dt { color: var(--muted); font-size: 9px; }
 .job-status__metadata dd { margin: 0; color: var(--subtle); font: 10px var(--mono); overflow-wrap: anywhere; }
+.job-status__metadata-action dd button { padding: 0; color: var(--accent); background: transparent; border: 0; font: inherit; text-align: left; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.job-status__dependencies { display: flex; flex-direction: column; gap: 7px; padding: 0; margin: 0; list-style: none; }
+.job-status__dependencies li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 11px; background: var(--control); border: 1px solid var(--line); border-radius: 7px; font-size: 10px; }
+.job-status__dependencies button { min-width: 0; overflow: hidden; padding: 0; color: var(--accent); background: transparent; border: 0; font: inherit; text-align: left; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
 .job-status__outputs code { display: block; padding: 10px 12px; color: var(--code-ink); background: var(--code-bg); border-radius: 7px; font: 10px var(--mono); overflow-wrap: anywhere; }
 .job-status__empty { margin: 25px 0; color: var(--muted); font-size: 12px; }
 .conversation-heading { width: min(790px, calc(100% - 64px)); justify-content: space-between; gap: 18px; margin: 34px auto 0; }

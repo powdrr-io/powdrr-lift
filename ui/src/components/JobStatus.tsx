@@ -1,4 +1,4 @@
-import type { WorkspaceJobAction, WorkspaceJobDetail } from '../api/types'
+import type { Conversation, WorkspaceJob, WorkspaceJobAction, WorkspaceJobDetail } from '../api/types'
 
 const stateLabels: Record<WorkspaceJobDetail['job']['state'], string> = {
   pending: 'Pending',
@@ -16,18 +16,46 @@ function formatKind(kind: WorkspaceJobDetail['job']['kind']): string {
   return kind === 'planning' ? 'Planning' : 'PR execution'
 }
 
+function elapsedLabel(start: string, end: string): string {
+  const totalMinutes = Math.floor(Math.max(0, new Date(end).getTime() - new Date(start).getTime()) / 60_000)
+  const days = Math.floor(totalMinutes / 1440)
+  const hours = Math.floor((totalMinutes % 1440) / 60)
+  const minutes = totalMinutes % 60
+  if (days > 0) return `${days}d ${hours}h`
+  if (hours > 0) return `${hours}h ${minutes}m`
+  return `${minutes}m`
+}
+
+function timeSince(value: string): string {
+  const minutes = Math.floor(Math.max(0, Date.now() - Date.parse(value)) / 60_000)
+  if (minutes < 1) return 'Started just now'
+  if (minutes < 60) return `Started ${minutes}m ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `Started ${hours}h ago`
+  return `Started ${Math.floor(hours / 24)}d ago`
+}
+
 export function JobStatus({
   detail,
   pendingActions,
   actionMessage,
   onAction,
+  dependencies,
+  originatingConversation,
+  onSelectJob,
+  onSelectConversation,
 }: {
   detail: WorkspaceJobDetail
   pendingActions: WorkspaceJobAction[]
   actionMessage: { kind: 'status' | 'error'; text: string } | null
   onAction: (action: WorkspaceJobAction) => void
+  dependencies: WorkspaceJob[]
+  originatingConversation: Conversation | null
+  onSelectJob: (jobId: string) => void
+  onSelectConversation: (conversationId: string) => void
 }) {
   const { job } = detail
+  const isActive = ['running', 'waiting_for_input', 'waiting_for_external'].includes(job.state)
 
   return (
     <section className="job-status" aria-label="Autonomous job status">
@@ -82,6 +110,22 @@ export function JobStatus({
           </section>
         )}
 
+        <section className="job-status__section">
+          <h2>Run overview</h2>
+          <dl className="job-status__metadata">
+            <div><dt>Elapsed</dt><dd>{isActive ? timeSince(job.created_at) : elapsedLabel(job.created_at, job.updated_at)}</dd></div>
+            <div><dt>Last activity</dt><dd>{new Date(job.updated_at).toLocaleString()}</dd></div>
+            {job.conversation_id && (
+              <div className="job-status__metadata-action">
+                <dt>Design chat</dt>
+                <dd>{originatingConversation
+                  ? <button type="button" onClick={() => onSelectConversation(originatingConversation.conversation_id)}>{originatingConversation.title}</button>
+                  : job.conversation_id}</dd>
+              </div>
+            )}
+          </dl>
+        </section>
+
         {detail.stage && (
           <section className="job-status__section">
             <h2>Current stage</h2>
@@ -109,6 +153,20 @@ export function JobStatus({
                   <span className={`job-state-label job-state-label--${blocker.state.replaceAll('_', '-')}`}>
                     {stateLabels[blocker.state]}
                   </span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {dependencies.length > 0 && (
+          <section className="job-status__section">
+            <h2>Dependencies</h2>
+            <ul className="job-status__dependencies">
+              {dependencies.map((dependency) => (
+                <li key={dependency.job_id}>
+                  <button type="button" onClick={() => onSelectJob(dependency.job_id)}>{dependency.title}</button>
+                  <span className={`job-state-label job-state-label--${dependency.state.replaceAll('_', '-')}`}>{stateLabels[dependency.state]}</span>
                 </li>
               ))}
             </ul>

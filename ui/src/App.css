@@ -278,6 +278,11 @@
 .job-output__kind { color: var(--muted); font-size: 9px; font-weight: 600; }
 .job-status__outputs a { max-width: 100%; color: var(--accent); font: 10px var(--mono); overflow-wrap: anywhere; text-decoration: underline; text-underline-offset: 2px; }
 .job-output__status-note { margin: 8px 0 0; color: var(--muted); font-size: 9px; line-height: 1.45; }
+.job-recovery { padding: 13px; background: var(--selected); border: 1px solid var(--line); border-radius: 9px; }
+.job-recovery p,.job-recovery-confirm p { margin: 8px 0 0; color: var(--body); font-size: 10px; line-height: 1.55; }
+.job-recovery .job-status__metadata { margin-bottom: 10px; }
+.job-recovery-confirm { background: var(--selected); border: 1px solid var(--accent); border-radius: 9px; }
+.job-recovery-confirm .job-status__actions { justify-content: flex-end; margin-top: 12px; }
 .job-timeline__list { display: flex; flex-direction: column; gap: 8px; padding: 0; margin: 0; list-style: none; }
 .job-timeline__item { display: flex; align-items: flex-start; gap: 10px; }
 .job-timeline__marker { width: 7px; height: 7px; flex: 0 0 7px; margin: 12px 0 0 3px; background: var(--quiet); border: 2px solid var(--control); border-radius: 50%; box-shadow: 0 0 0 1px var(--line-dark); }

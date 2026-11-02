@@ -1,0 +1,52 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1302
+title: Display typed GitHub job outputs as safe links
+intent:
+  problem: Job outputs are shown only as plain code references, so users cannot open GitHub issues or pull requests and cannot distinguish PR purposes.
+  goal: Render supported GitHub outputs as safe links and preserve explicit implementation or alteration purpose labels.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/design/browser-workspace-api.md
+    type: modified
+    span: {start_line: 156, end_line: 164}
+    summary: Document purpose-tagged PR output references and their status limits.
+    rationale: Give workflow adapters a backward-compatible convention that lets the UI distinguish implementation and alteration PR links.
+  - path: ui/src/App.css
+    type: modified
+    span: {start_line: 277, end_line: 280}
+    summary: Style typed output labels, safe links, and the status note.
+    rationale: Make external references identifiable and readable in job details.
+  - path: ui/src/components/JobStatus.tsx
+    type: modified
+    span: {start_line: 2, end_line: 2}
+    summary: Import the artifact link renderer.
+    rationale: Render job output references with their supported purpose metadata.
+  - path: ui/src/components/JobStatus.tsx
+    type: modified
+    span: {start_line: 166, end_line: 166}
+    summary: Replace inline code-only outputs with the shared artifact link view.
+    rationale: Keep output rendering consistent while enabling safe GitHub navigation.
+  - path: ui/src/components/ArtifactLinks.tsx
+    type: added
+    span: {start_line: 1, end_line: 74}
+    summary: Parse purpose-tagged PR references and render only validated HTTPS GitHub issue/PR URLs as links.
+    rationale: Distinguish implementation and alteration PRs, keep bare PR purpose unknown, and avoid unsafe external destinations.
+  - path: ui/src/components/ArtifactLinks.test.tsx
+    type: added
+    span: {start_line: 1, end_line: 45}
+    summary: Test PR purpose labels, issue links, unknown purpose, and unsafe URL rejection.
+    rationale: Protect the rendering contract and safe link behavior.
+entities: []
+entity_relationships: []
+invariants:
+  - id: github-job-output-links-require-safe-hosts
+    description: Only HTTPS GitHub issue and pull request URLs without credentials or custom ports become links.
+    action: added
+  - id: pull-request-purpose-is-explicit
+    description: The UI labels implementation and alteration PRs only when their output references declare that purpose; untagged PRs remain purpose-unknown.
+    action: added
+  - id: publication-does-not-imply-merge
+    description: Job output links do not imply review completion or merge state when the API provides no such status.
+    action: added
+guidance: []

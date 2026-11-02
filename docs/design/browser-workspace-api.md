@@ -153,6 +153,15 @@ log remains authoritative.
 {"schema_version":1,"job":{"schema_version":1,"job_id":"job-1","repository_id":"repo-1","kind":"planning","title":"Implement search","state":"pending","conversation_id":null,"dependency_ids":["job-2"],"artifact_refs":[],"detail":"","revision":1,"created_at":"<timestamp>","updated_at":"<timestamp>"},"latest_attempt":null,"attempts":[],"stage":null,"blockers":[{"schema_version":1,"job_id":"job-2","title":"Plan search","state":"ready"}],"question":null,"outputs":[],"allowed_actions":["cancel"]}
 ```
 
+Job output references can identify pull request purpose with the prefixes
+`implementation-pr:` and `alteration-pr:` followed by an HTTPS GitHub pull
+request URL. For example, `implementation-pr:https://github.com/acme/app/pull/17`.
+The workspace renders these as separate link types. A bare pull request URL stays
+purpose-unknown. These references do not report review or merge state; the UI
+does not infer either state from publication alone. Other output references remain
+plain artifact identifiers.
+Bare HTTPS GitHub issue URLs are rendered as issue links.
+
 Create a planning job from an explicit pinned specification and a provider
 configuration reference:
 

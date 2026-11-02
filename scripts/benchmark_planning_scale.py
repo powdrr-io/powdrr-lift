@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 """Run deterministic end-to-end planning scale profiles without live providers.
 
-Run with the repository's shared Python environment, for example:
+Run with the repository's shared Python environment and the PYTHONPATH entries
+listed in AGENTS.md:
 
-    PYTHONPATH=src:packages/service/src:packages/agent/src:packages/contracts/src \
-      :packages/local/src \
-      python scripts/benchmark_planning_scale.py --profile all
+    python scripts/benchmark_planning_scale.py --profile all
 
 The generated reports measure local planning overhead and interaction counts.
 They do not predict live provider latency or establish the two-hour target.
@@ -61,15 +60,6 @@ PROFILES = {
         structural_subjects=2_051,
     ),
 }
-
-
-class _BenchmarkIssue:
-    number = 1
-    title = "Planning benchmark"
-    body = "Synthetic planning profile; no GitHub writes are performed."
-    state = "open"
-    labels = ("powdrr:planning",)
-    url = "https://example.invalid/issues/1"
 
 
 class _BenchmarkCheckpointStore:

@@ -1,6 +1,6 @@
 # Planning Efficiency Through Deterministic Filtering
 
-**Status:** Implementation handoff  
+**Status:** Core reductions landed; candidate-recall and live-provider validation remain open  
 **Date:** 2026-11-01  
 **Owner:** Powdrr-Lift planning service  
 **Related change:** [PR #1283](https://github.com/powdrr-io/powdrr-lift/pull/1283) starts deterministic Structrr candidate selection for path-bound existing subjects.
@@ -34,13 +34,26 @@ The source-ledger question machine currently moves through these phases:
 7. Derive planned file subjects, enumerate remaining Structrr subjects, and review structural changes.
 8. Compile the accepted answers into the plan, dependency graph, and Structrr proposal.
 
-The flow already batches fidelity, coverage, and some Structrr questions. Other independent question types are still returned individually. Work-unit proposals ask for several fields that the parser later derives or constrains to a single catalog choice. Source-block disposition repeats accounting that can often be derived from the requirement-to-anchor map. Coverage asks a model about requirements even when a completed repository search found no matches. Structrr enumeration still asks the model to discover subjects that static repository analysis may be able to name.
-
-The planning service already has a bounded batch mechanism in `planning/questions.py`, a BasedPyright plus ripgrep evidence-search record in `planning/coverage.py`, deterministic work-unit/PR allocation in `planning/assembly.py`, and deterministic candidate pruning in `planning/dependencies.py`. Reuse those boundaries rather than introducing a second batching or search implementation.
+The implementation now batches independent questions through the source,
+coverage, work-unit, item, dependency, and Structrr stages. It derives
+unambiguous block dispositions and completed zero-hit coverage results, omits
+catalog-derived work-unit fields, binds baseline Structrr subjects by planned
+path, and prunes/deduplicates dependency candidates. Durable telemetry includes
+phase and question-kind summaries, repository-search counts, pagination, and
+deterministic-answer provenance.
 
 ## Work sequence
 
 The tasks below are ordered by dependency and implementation risk. Each numbered milestone should be a separate reviewable PR unless implementation evidence shows two adjacent tasks are inseparable. PR #1283 is the first path-bound Structrr candidate slice; merge it before the later symbol-index expansion.
+
+The main code reductions have since landed across PRs #1291, #1293, and #1300.
+PR #1300 added scale profiles and reduced large-run prompt/frontier costs. Two
+acceptance items remain: complete the hand-labeled dependency-candidate recall
+coverage for static code references, and record a large-profile run against the
+configured live provider. The current BasedPyright adapter exposes workspace
+symbols and per-file structure; dependency discovery currently uses planned
+paths, named outputs, related requirements, and lexical candidates. The
+synthetic timings below do not establish the two-hour target.
 
 ### Milestone 0: Record a baseline and expose planning cost
 
@@ -302,6 +315,37 @@ structural-review decisions and completes without oversized prompts. These
 figures measure deterministic local overhead only; they do not establish the
 two-hour target with live provider latency. The live-provider run still needs to
 record provider/model settings, concurrency, token usage, and hardware.
+
+### First live provider smoke (2026-11-02)
+
+The `typical` profile completed with `deepinfra-cheap` / `deepseek-ai/DeepSeek-V4-Flash-0731`,
+concurrency 4, and a 30-second per-call timeout. It took 142.7 seconds and made
+90 provider calls for 227 question members. The planner returned 52 requirements,
+47 work units, and 23 PR items against fixture expectations of 40, 16, and 5.
+There were no validation retries, but provider token usage was unavailable in
+the client response. The run therefore proves the live path executes; it fails
+the fixture-shape quality check and does not establish the large-plan time
+target. The additional extraction and work-unit fragmentation must be analyzed
+before using this run as a planning-quality or scale result. Hardware: Apple
+Silicon MacBook Air, arm64, Darwin 25.5.0.
+
+The benchmark accepts an explicit live-provider mode. It makes real provider
+calls, does not publish a plan or create GitHub issues, and emits the same JSON
+report with the selected provider/model, elapsed time, phase and question-kind
+counts, token totals when the provider returns usage, validation retries, and
+fixture-shape differences:
+
+```sh
+python scripts/benchmark_planning_scale.py --profile large --live --provider auto
+```
+
+Choose `typical`, `large`, or `structrr-stress` explicitly. `--profile all` is
+rejected in live mode so one invocation cannot unexpectedly run every provider
+profile. Do not treat a fixture-shape-different run as a quality pass; inspect
+its report and compare requirements, work units, dependencies, and structural
+operations with the deterministic fixture before declaring the two-hour target
+met. Live mode exits nonzero when the run completes but its requirement, work
+unit, or item counts differ from the profile fixture.
 
 ## Cross-cutting test requirements
 

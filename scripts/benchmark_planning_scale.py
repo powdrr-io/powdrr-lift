@@ -15,11 +15,13 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import sys
 import time
 from collections import Counter, defaultdict
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
+from threading import Lock
 from typing import Any
 
 from powdrr_service.planning.checkpoints import (
@@ -35,9 +37,15 @@ from powdrr_service.planning.service import (
     run_planning_procedrr,
 )
 from powdrr_service.planning.source import PinnedSourceDocument, segment_markdown_source
+from powdrr_service.providers.credentials import resolve_provider_credentials
 
+from powdrr_lift.workrr.credential_check import configured_model_mapping
 from powdrr_lift.workrr.github_issue_queue import QueueIssue
 from powdrr_lift.workrr.planning.evidence import RequirementEvidenceSearch
+from powdrr_lift.workrr.provider_runtime import (
+    build_workflow_client,
+    resolve_workflow_provider,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -60,6 +68,74 @@ PROFILES = {
         structural_subjects=2_051,
     ),
 }
+
+
+class _ProgressClient:
+    """Expose provider-call progress without printing prompt or response data."""
+
+    def __init__(self, client: Any) -> None:
+        self._client = client
+        self._call_number = 0
+        self._call_number_lock = Lock()
+
+    @property
+    def last_usage(self) -> Any:
+        return getattr(self._client, "last_usage", None)
+
+    def complete_json(
+        self,
+        messages: list[dict[str, str]],
+        *,
+        response_schema: Mapping[str, Any] | None = None,
+    ) -> Any:
+        with self._call_number_lock:
+            self._call_number += 1
+            call_number = self._call_number
+        kind = "unknown"
+        if messages:
+            try:
+                packet = json.loads(messages[-1]["content"])
+                question = packet.get("exact_question", {})
+                kind = str(question.get("kind", kind))
+                if kind == "planning_question_batch":
+                    kinds = {
+                        str(fact["value"]["exact_question"]["kind"])
+                        for fact in packet.get("accepted_facts", [])
+                        if isinstance(fact, Mapping)
+                        and isinstance(fact.get("value"), Mapping)
+                        and isinstance(fact["value"].get("exact_question"), Mapping)
+                    }
+                    if kinds:
+                        kind = ",".join(sorted(kinds))
+            except (KeyError, TypeError, json.JSONDecodeError):
+                pass
+        started = time.perf_counter()
+        print(
+            f"Live benchmark request {call_number} started ({kind}).",
+            file=sys.stderr,
+            flush=True,
+        )
+        try:
+            result = self._client.complete_json(
+                messages, response_schema=response_schema
+            )
+        except Exception:
+            elapsed = time.perf_counter() - started
+            print(
+                f"Live benchmark request {call_number} failed after "
+                f"{elapsed:.1f}s ({kind}).",
+                file=sys.stderr,
+                flush=True,
+            )
+            raise
+        elapsed = time.perf_counter() - started
+        print(
+            f"Live benchmark request {call_number} finished in "
+            f"{elapsed:.1f}s ({kind}).",
+            file=sys.stderr,
+            flush=True,
+        )
+        return result
 
 
 class _BenchmarkCheckpointStore:
@@ -280,7 +356,18 @@ def _planned_paths(profile: Profile) -> tuple[str, ...]:
     return tuple(paths)
 
 
-def run_profile(profile: Profile, *, repository_root: Path) -> dict[str, Any]:
+def run_profile(
+    profile: Profile,
+    *,
+    repository_root: Path,
+    client: Any | None = None,
+    provider: str = "deterministic-profile",
+    model: str = "deterministic-profile",
+    concurrency: int = 4,
+    timeout_seconds: float = 120,
+    use_provider_schema: bool = True,
+    enforce_fixture_shape: bool = True,
+) -> dict[str, Any]:
     document = _source_document(profile)
     source = segment_markdown_source(document)
 
@@ -315,7 +402,7 @@ def run_profile(profile: Profile, *, repository_root: Path) -> dict[str, Any]:
             "https://example.invalid/issues/1",
         ),
     )
-    client = _ExampleAnswerClient(profile)
+    answer_client = client or _ExampleAnswerClient(profile)
     store = _BenchmarkCheckpointStore(session_id=session_id)
     calls: list[Mapping[str, Any]] = []
     started = time.perf_counter()
@@ -324,10 +411,12 @@ def run_profile(profile: Profile, *, repository_root: Path) -> dict[str, Any]:
         session=session,
         state_machine=machine,
         checkpoint_store=store,
-        client=client,
+        client=answer_client,
         options=PlanningOptions(
-            model="deterministic-profile",
-            provider="deterministic-profile",
+            model=model,
+            provider=provider,
+            max_concurrent_questions=concurrency,
+            use_provider_schema=use_provider_schema,
             telemetry_sink=calls.append,
         ),
         stderr=None,
@@ -358,11 +447,29 @@ def run_profile(profile: Profile, *, repository_root: Path) -> dict[str, Any]:
     by_phase: dict[str, dict[str, float | int]] = defaultdict(
         lambda: {"questions": 0, "api_calls": 0, "elapsed_ms": 0.0}
     )
+    by_question_kind: dict[str, dict[str, int]] = defaultdict(
+        lambda: {"questions": 0, "api_calls": 0}
+    )
+    prompt_tokens = completion_tokens = 0
+    token_usage_known = True
     for metric in calls:
         phase = str(metric["phase"])
         by_phase[phase]["questions"] += len(metric["question_ids"])
         by_phase[phase]["api_calls"] += int(metric["api_calls"])
         by_phase[phase]["elapsed_ms"] += float(metric["elapsed_ms"])
+        kinds = metric.get("question_kinds", [])
+        if isinstance(kinds, list):
+            for kind in kinds:
+                if isinstance(kind, str):
+                    by_question_kind[kind]["questions"] += len(metric["question_ids"])
+                    by_question_kind[kind]["api_calls"] += int(metric["api_calls"])
+        prompt = metric.get("prompt_tokens")
+        completion = metric.get("completion_tokens")
+        if isinstance(prompt, int) and isinstance(completion, int):
+            prompt_tokens += prompt
+            completion_tokens += completion
+        else:
+            token_usage_known = False
     max_questions_per_provider_call = max(
         (len(metric["question_ids"]) for metric in calls), default=0
     )
@@ -375,6 +482,10 @@ def run_profile(profile: Profile, *, repository_root: Path) -> dict[str, Any]:
     )
     report = {
         "profile": profile.name,
+        "provider": provider,
+        "model": model,
+        "concurrency": concurrency,
+        "provider_timeout_seconds": timeout_seconds if client is not None else None,
         "terminal_status": result.terminal_status.value,
         "elapsed_seconds": round(elapsed_seconds, 3),
         "source_blocks": len(source.blocks),
@@ -392,11 +503,14 @@ def run_profile(profile: Profile, *, repository_root: Path) -> dict[str, Any]:
         ),
         "provider_api_calls": sum(int(metric["api_calls"]) for metric in calls),
         "provider_requests": sum(len(metric["question_ids"]) for metric in calls),
+        "prompt_tokens": prompt_tokens if token_usage_known else None,
+        "completion_tokens": completion_tokens if token_usage_known else None,
+        "token_usage_known": token_usage_known,
         "max_questions_per_provider_call": max_questions_per_provider_call,
         "validation_retries": sum(
             int(metric["validation_failures"]) for metric in calls
         ),
-        "api_calls_by_question_kind": dict(client.calls_by_kind),
+        "by_question_kind": dict(by_question_kind),
         "phases": dict(by_phase),
     }
     expected = {
@@ -410,7 +524,9 @@ def run_profile(profile: Profile, *, repository_root: Path) -> dict[str, Any]:
         for field, value in expected.items()
         if report[field] != value
     }
-    if mismatches:
+    report["fixture_shape_mismatches"] = mismatches
+    report["fixture_shape_status"] = "mismatch" if mismatches else "matched"
+    if mismatches and enforce_fixture_shape:
         raise RuntimeError(f"profile {profile.name} failed expectations: {mismatches}")
     if max_questions_per_provider_call > 4:
         raise RuntimeError(
@@ -428,17 +544,94 @@ def main() -> int:
         default="typical",
         help="Synthetic scale profile to execute.",
     )
+    parser.add_argument(
+        "--live",
+        action="store_true",
+        help=(
+            "Use Powdrr's configured live provider. This makes real provider calls; "
+            "select one profile to control cost."
+        ),
+    )
+    parser.add_argument(
+        "--provider",
+        default="auto",
+        help="Provider for --live (default: Powdrr's configured provider).",
+    )
+    parser.add_argument(
+        "--model",
+        help="Optional model override for --live.",
+    )
+    parser.add_argument(
+        "--base-url",
+        help=(
+            "Optional provider endpoint override for --live (credentials stay in env)."
+        ),
+    )
+    parser.add_argument(
+        "--concurrency",
+        type=int,
+        default=4,
+        help="Maximum concurrent planning questions (default: 4).",
+    )
+    parser.add_argument(
+        "--timeout-seconds",
+        type=float,
+        default=120,
+        help="Per-provider-call timeout in live mode (default: 120).",
+    )
     args = parser.parse_args()
+    if args.live and args.profile == "all":
+        parser.error("--live requires one explicit --profile to control provider cost")
+    if args.concurrency < 1:
+        parser.error("--concurrency must be positive")
+    if args.timeout_seconds <= 0:
+        parser.error("--timeout-seconds must be positive")
     repository_root = Path(__file__).resolve().parents[1]
     selected = (
         tuple(PROFILES.values()) if args.profile == "all" else (PROFILES[args.profile],)
     )
+    live_client = None
+    provider = "deterministic-profile"
+    model = "deterministic-profile"
+    if args.live:
+        provider = resolve_workflow_provider(args.provider)
+        mapping = configured_model_mapping(provider, args.model)
+        credentials = resolve_provider_credentials(
+            provider, base_url_override=args.base_url
+        )
+        live_client = build_workflow_client(
+            credentials,
+            model=mapping.model,
+            model_cache_dir=repository_root / ".powdrr" / "models",
+            progress_stream=None,
+            timeout=args.timeout_seconds,
+        )
+        set_output_limit = getattr(
+            live_client, "set_structured_output_token_limit", None
+        )
+        if callable(set_output_limit):
+            set_output_limit(8192)
+        live_client = _ProgressClient(live_client)
+        model = mapping.model
     report = [
-        run_profile(profile, repository_root=repository_root) for profile in selected
+        run_profile(
+            profile,
+            repository_root=repository_root,
+            client=live_client,
+            provider=provider,
+            model=model,
+            concurrency=args.concurrency,
+            timeout_seconds=args.timeout_seconds,
+            use_provider_schema=provider != "deepinfra-cheap",
+            enforce_fixture_shape=not args.live,
+        )
+        for profile in selected
     ]
     print(
         json.dumps({"schema": "planning-scale-report-v1", "profiles": report}, indent=2)
     )
+    if args.live and any(item["fixture_shape_mismatches"] for item in report):
+        return 1
     return 0
 
 

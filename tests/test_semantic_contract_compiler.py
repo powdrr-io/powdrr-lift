@@ -17,8 +17,7 @@ from powdrr_service.planning.semantic_decision import (
     SEMANTIC_DIMENSION_DECISION_KINDS,
     SemanticDecision,
 )
-
-from powdrr_lift.core.semantic_faithfulness import (
+from powdrr_service.semantic_faithfulness import (
     FaithfulnessError,
     bind_field_entailment_reviews,
     finalize_scenario_claim_reviews,
@@ -26,6 +25,7 @@ from powdrr_lift.core.semantic_faithfulness import (
     prepare_field_entailment_reviews,
     prepare_scenario_claim_reviews,
 )
+
 from powdrr_lift.workrr.command_catalog import (
     FeatureCommandRuntime,
     feature_command_catalog,

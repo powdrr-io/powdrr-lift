@@ -50,6 +50,13 @@ from powdrr_service.planning.semantic_decision import (
     SemanticDecision,
     SemanticDecisionError,
 )
+from powdrr_service.semantic_faithfulness import (
+    FaithfulnessError,
+    FieldEntailmentReview,
+    FieldEntailmentSpec,
+    finalize_scenario_claim_reviews,
+    prepare_scenario_claim_reviews,
+)
 from powdrr_service.structrr.obligation_evidence import (
     ObligationEvidenceContract,
     assert_obligation_evidence_complete,
@@ -66,13 +73,6 @@ from powdrr_lift.core.repository_inventory import (
     build_python_lookup_context,
     enumerate_population,
     inventory_from_source_subjects,
-)
-from powdrr_lift.core.semantic_faithfulness import (
-    FaithfulnessError,
-    FieldEntailmentReview,
-    FieldEntailmentSpec,
-    finalize_scenario_claim_reviews,
-    prepare_scenario_claim_reviews,
 )
 from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.workrr.repository_subject_binding import (

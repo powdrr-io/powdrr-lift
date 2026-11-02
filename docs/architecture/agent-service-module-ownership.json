@@ -1466,16 +1466,16 @@
       "reviewed": false
     },
     {
-      "extraction_pr": "3/8",
+      "extraction_pr": "7",
       "internal_imports": [
         "powdrr_service.planning.semantic_contract",
         "powdrr_service.planning.semantic_decision"
       ],
       "kind": "python_module",
-      "owner": "split",
-      "path": "src/powdrr_lift/core/semantic_faithfulness.py",
-      "rationale": "classify each symbol as service policy or public exchanged data",
-      "reviewed": false
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/semantic_faithfulness.py",
+      "rationale": "service-owned source-faithfulness and behavior-probe repair policy",
+      "reviewed": true
     },
     {
       "extraction_pr": "3/8",
@@ -2621,7 +2621,7 @@
         "powdrr_lift.core.repository_inventory",
         "powdrr_service.planning.semantic_contract",
         "powdrr_service.planning.semantic_decision",
-        "powdrr_lift.core.semantic_faithfulness",
+        "powdrr_service.semantic_faithfulness",
         "powdrr_lift.errors",
         "powdrr_service.structrr.obligation_evidence",
         "powdrr_lift.workrr",
@@ -2862,7 +2862,7 @@
         "powdrr_lift.workrr.git",
         "powdrr_service.decision_classifier",
         "powdrr_lift.workrr.postrun_probes",
-        "powdrr_lift.workrr.probe_repair",
+        "powdrr_local.bridge",
         "powdrr_lift.workrr.procedrr",
         "powdrr_lift.workrr.procedrr_operations",
         "powdrr_lift.workrr.protocol",
@@ -2874,12 +2874,14 @@
         "powdrr_service.structrr.snapshot",
         "procedrr",
         "procedrr_evaluator.evaluator",
-        "procedrr_evaluator.runtime"
+        "procedrr_evaluator.runtime",
+        "powdrr_contracts.models",
+        "powdrr_contracts.service"
       ],
       "kind": "python_module",
       "owner": "split",
       "path": "src/powdrr_lift/workrr/feature_endpoint.py",
-      "rationale": "separate service decisions from agent I/O and orchestration",
+      "rationale": "agent orchestration and local effects; verification policy is requested from the service",
       "reviewed": false
     },
     {
@@ -3092,15 +3094,14 @@
         "powdrr_service.behavior_contract",
         "powdrr_service.decision_obligation",
         "powdrr_service.planning.semantic_contract",
-        "powdrr_lift.core.semantic_faithfulness",
-        "powdrr_lift.workrr.llm",
-        "powdrr_lift.workrr.protocol"
+        "powdrr_service.semantic_faithfulness",
+        "powdrr_service.providers.clients"
       ],
       "kind": "python_module",
-      "owner": "split",
-      "path": "src/powdrr_lift/workrr/probe_repair.py",
-      "rationale": "service probe/verification policy; agent runs local commands",
-      "reviewed": false
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/verification/probe_repair.py",
+      "rationale": "service-owned source-faithfulness and behavior-probe repair policy",
+      "reviewed": true
     },
     {
       "extraction_pr": "5/7",
@@ -3402,7 +3403,7 @@
         "powdrr_lift.core.classifier_input",
         "powdrr_service.planning.semantic_contract",
         "powdrr_service.planning.semantic_decision",
-        "powdrr_lift.core.semantic_faithfulness",
+        "powdrr_service.semantic_faithfulness",
         "powdrr_service.semantic_classifier"
       ],
       "kind": "python_module",

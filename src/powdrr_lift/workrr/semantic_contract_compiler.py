@@ -26,20 +26,20 @@ from powdrr_service.semantic_classifier import (
     has_explicit_prohibition_directive,
     resolve_deterministic_source_decision,
 )
-
-from powdrr_lift.core.classifier_input import format_classifier_input
-from powdrr_lift.core.semantic_faithfulness import (
+from powdrr_service.semantic_faithfulness import (
     FieldEntailmentReview,
 )
-from powdrr_lift.core.semantic_faithfulness import (
+from powdrr_service.semantic_faithfulness import (
     bind_field_entailment_reviews as bind_field_reviews,
 )
-from powdrr_lift.core.semantic_faithfulness import (
+from powdrr_service.semantic_faithfulness import (
     finalize_source_faithfulness as finalize_faithfulness,
 )
-from powdrr_lift.core.semantic_faithfulness import (
+from powdrr_service.semantic_faithfulness import (
     prepare_field_entailment_reviews as prepare_field_reviews,
 )
+
+from powdrr_lift.core.classifier_input import format_classifier_input
 
 SOURCE_CLASSIFIER_REVISION = (
     "source-classifier-v3-bounded-context-no-obligation-fallback"

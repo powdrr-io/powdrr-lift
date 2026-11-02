@@ -13,8 +13,10 @@ from typing import Any
 
 import pytest
 import yaml
+from powdrr_local import LocalPowdrrService
 from powdrr_service.decision_obligation import evidence_fingerprint
 from powdrr_service.planning.semantic_decision import SEMANTIC_DIMENSION_DECISION_KINDS
+from powdrr_service.verification import probe_repair
 
 from powdrr_lift.workrr.coding_agent import MiniSWEAgentProvider
 from powdrr_lift.workrr.feature_endpoint import (
@@ -23,6 +25,33 @@ from powdrr_lift.workrr.feature_endpoint import (
 )
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+
+
+class ProbeRepairServiceClient:
+    def complete_json(
+        self,
+        messages: list[dict[str, str]],
+        *,
+        response_schema: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        assert response_schema is not None
+        if "category" in response_schema.get("properties", {}):
+            return {"category": "behavioral_result"}
+        payload = json.loads(messages[-1]["content"])
+        return {
+            "revisions": [
+                {
+                    "scenario_id": item["scenario"]["scenario_id"],
+                    "given": "The hello_world program is available to run.",
+                    "when": "Run hello_world.py and capture its output.",
+                    "then": (
+                        "The stdout lines equal Hello, world! followed by "
+                        "Hello from Powdrr!."
+                    ),
+                }
+                for item in payload["flagged_scenarios"]
+            ]
+        }
 
 
 def _write_supported_probe_module(
@@ -1243,6 +1272,14 @@ def test_implement_feature_runs_the_complete_flow_with_a_deterministic_worker(
         return subprocess.CompletedProcess(["miniswe-test-double"], 0, "", "")
 
     monkeypatch.setattr(MiniSWEAgentProvider, "run", author_stdout_probe)
+    monkeypatch.setattr(
+        probe_repair,
+        "_check_revised_scenario_faithfulness",
+        lambda original, candidate, **kwargs: (
+            True,
+            {"scenario_id": original["scenario_id"], "status": "accepted"},
+        ),
+    )
     result = run_feature_in_place(
         FeatureEndpointConfig(
             feature_description=(
@@ -1265,6 +1302,14 @@ def test_implement_feature_runs_the_complete_flow_with_a_deterministic_worker(
             open_pr=False,
             push_changes=False,
             planning_client=WeakProbePlanningClient(),
+            verification_service=LocalPowdrrService(
+                probe_repair_clients=(
+                    ProbeRepairServiceClient(),
+                    ProbeRepairServiceClient(),
+                )
+            ),
+            verification_provider="test-provider",
+            verification_model="test-model",
         )
     )
 
@@ -1285,7 +1330,7 @@ def test_implement_feature_runs_the_complete_flow_with_a_deterministic_worker(
         "The instruction's behavior is exercised"
     )
     assert repair_document["used_scenarios"][0]["when"] == (
-        "Run hello_world.py and capture stdout."
+        "Run hello_world.py and capture its output."
     )
     assert result.review["postrun_probe_results"]
     assert all(

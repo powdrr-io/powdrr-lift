@@ -229,10 +229,10 @@ def compile_behavior_scenarios(
             raise BehaviorContractError(
                 f"scenario {scenario_id} faithfulness_ref is malformed"
             )
-        if faithfulness_raw and set(faithfulness_raw) != {
-            "artifact_path",
-            "fingerprint",
-        }:
+        if faithfulness_raw and set(faithfulness_raw) not in (
+            {"artifact_path", "fingerprint"},
+            {"fingerprint"},
+        ):
             raise BehaviorContractError(
                 f"scenario {scenario_id} faithfulness_ref is malformed"
             )

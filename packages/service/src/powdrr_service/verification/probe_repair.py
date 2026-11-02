@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping, Sequence
-from pathlib import Path
 from typing import Any
 
 from powdrr_service.behavior_contract import (
@@ -13,13 +12,11 @@ from powdrr_service.behavior_contract import (
 )
 from powdrr_service.decision_obligation import content_fingerprint
 from powdrr_service.planning.semantic_contract import PartialSemanticContract
-
-from powdrr_lift.core.semantic_faithfulness import (
+from powdrr_service.providers.clients import ProviderClient
+from powdrr_service.semantic_faithfulness import (
     finalize_scenario_claim_reviews,
     prepare_scenario_claim_reviews,
 )
-from powdrr_lift.workrr.llm import complete_json
-from powdrr_lift.workrr.protocol import WorkflowLLMClient
 
 PROBE_REPAIR_SCHEMA_VERSION = "behavior-probe-repair-v5"
 PROBE_REPAIR_BATCH_SIZE = 8
@@ -161,14 +158,14 @@ PROBE_REPAIR_EXAMPLES: tuple[dict[str, str], ...] = (
 
 
 def repair_behavior_probes(
-    client: WorkflowLLMClient | None,
+    client: ProviderClient | None,
     *,
     instruction: str,
     scenarios: Sequence[Mapping[str, Any]],
-    contract_directory: Path,
+    faithfulness_evidence: Mapping[str, Mapping[str, Any]] | None = None,
     ledger_clauses: Sequence[Mapping[str, Any]],
-    faithfulness_client: WorkflowLLMClient | None,
-    faithfulness_detail_client: WorkflowLLMClient | None = None,
+    faithfulness_client: ProviderClient | None,
+    faithfulness_detail_client: ProviderClient | None = None,
     repository_contract: Mapping[str, Any] | None = None,
 ) -> tuple[tuple[dict[str, Any], ...], dict[str, Any]]:
     """Revise degraded probes once, retaining only source-faithful candidates."""
@@ -251,8 +248,8 @@ def repair_behavior_probes(
             "error": None,
         }
         try:
-            response = complete_json(
-                client, messages, response_schema=PROBE_REPAIR_RESPONSE_SCHEMA
+            response = client.complete_json(
+                messages, response_schema=PROBE_REPAIR_RESPONSE_SCHEMA
             )
             batch_revisions, parse_errors = _parse_revision_batch(
                 response, set(batch_ids)
@@ -323,7 +320,7 @@ def repair_behavior_probes(
             accepted, review = _check_revised_scenario_faithfulness(
                 original,
                 candidate,
-                contract_directory=contract_directory,
+                faithfulness_evidence=faithfulness_evidence or {},
                 ledger_clauses=_faithfulness_source_context(
                     instruction, ledger_clauses
                 ),
@@ -343,7 +340,7 @@ def repair_behavior_probes(
                 ledger_clauses=_faithfulness_source_context(
                     instruction, ledger_clauses
                 ),
-                contract_directory=contract_directory,
+                faithfulness_evidence=faithfulness_evidence or {},
                 faithfulness_client=faithfulness_client,
                 faithfulness_detail_client=faithfulness_detail_client or client,
             )
@@ -612,7 +609,7 @@ def _source_evidence_is_valid(evidence: Any, *, context_text: str) -> bool:
 
 def _obligation_guidance(
     *,
-    client: WorkflowLLMClient | None,
+    client: ProviderClient | None,
     scenarios: Mapping[str, Mapping[str, Any]],
     ledger_clauses: Sequence[Mapping[str, Any]],
     scenario_ids: set[str],
@@ -632,8 +629,7 @@ def _obligation_guidance(
         kind = "uncertain"
         if client is not None:
             try:
-                response = complete_json(
-                    client,
+                response = client.complete_json(
                     _build_jev_obligation_category_messages(source),
                     response_schema=OBLIGATION_CATEGORY_RESPONSE_SCHEMA,
                 )
@@ -732,16 +728,16 @@ def _build_jev_obligation_category_messages(source: str) -> list[dict[str, str]]
 
 
 def _retry_faithfulness_rejection(
-    client: WorkflowLLMClient | None,
+    client: ProviderClient | None,
     *,
     instruction: str,
     repository_contract: Mapping[str, Any],
     scenario: Mapping[str, Any],
     review: Mapping[str, Any],
     ledger_clauses: Sequence[Mapping[str, Any]],
-    contract_directory: Path,
-    faithfulness_client: WorkflowLLMClient | None,
-    faithfulness_detail_client: WorkflowLLMClient | None,
+    faithfulness_evidence: Mapping[str, Mapping[str, Any]],
+    faithfulness_client: ProviderClient | None,
+    faithfulness_detail_client: ProviderClient | None,
 ) -> tuple[dict[str, Any] | None, dict[str, Any]]:
     """Give one rejected revision a targeted, source-only repair attempt."""
     scenario_id = str(scenario.get("scenario_id", "unknown"))
@@ -756,8 +752,7 @@ def _retry_faithfulness_rejection(
         record["error"] = "revision was not rejected or repair client is unavailable"
         return None, record
     try:
-        response = complete_json(
-            client,
+        response = client.complete_json(
             _build_faithfulness_retry_messages(
                 instruction=instruction,
                 repository_contract=repository_contract,
@@ -783,7 +778,7 @@ def _retry_faithfulness_rejection(
         accepted, retry_review = _check_revised_scenario_faithfulness(
             scenario,
             candidate,
-            contract_directory=contract_directory,
+            faithfulness_evidence=faithfulness_evidence,
             ledger_clauses=ledger_clauses,
             client=faithfulness_client,
             detail_client=faithfulness_detail_client,
@@ -909,26 +904,28 @@ def _check_revised_scenario_faithfulness(
     original: Mapping[str, Any],
     candidate: Mapping[str, Any],
     *,
-    contract_directory: Path,
+    faithfulness_evidence: Mapping[str, Mapping[str, Any]],
     ledger_clauses: Sequence[Mapping[str, Any]],
-    client: WorkflowLLMClient | None,
-    detail_client: WorkflowLLMClient | None = None,
+    client: ProviderClient | None,
+    detail_client: ProviderClient | None = None,
 ) -> tuple[bool, dict[str, Any]]:
     """Run the scenario-claim entailment check used during prompt planning."""
     detail_client = detail_client or client
     reference = original.get("faithfulness_ref")
     scenario_id = str(original.get("scenario_id", "unknown"))
     if not isinstance(reference, Mapping) or not isinstance(
-        reference.get("artifact_path"), str
+        reference.get("fingerprint"), str
     ):
         return False, {
             "scenario_id": scenario_id,
             "status": "unavailable",
-            "reason": "original scenario has no faithfulness artifact reference",
+            "reason": "original scenario has no faithfulness artifact fingerprint",
         }
     try:
-        reference_path = Path(str(reference["artifact_path"]))
-        faithfulness_artifact = json.loads(reference_path.read_text(encoding="utf-8"))
+        scenario_evidence = faithfulness_evidence.get(scenario_id)
+        if not isinstance(scenario_evidence, Mapping):
+            raise ValueError("scenario faithfulness evidence was not supplied")
+        faithfulness_artifact = scenario_evidence.get("faithfulness_artifact")
         if not isinstance(faithfulness_artifact, Mapping):
             raise ValueError("faithfulness artifact is malformed")
         fingerprint = faithfulness_artifact.get("fingerprint")
@@ -944,8 +941,7 @@ def _check_revised_scenario_faithfulness(
         source_ref = faithfulness_artifact.get("source_ref")
         if not isinstance(source_ref, str) or not source_ref.strip():
             raise ValueError("faithfulness artifact has no source reference")
-        contract_path = contract_directory / source_ref / "partial-contract.json"
-        contract_document = json.loads(contract_path.read_text(encoding="utf-8"))
+        contract_document = scenario_evidence.get("partial_contract")
         if not isinstance(contract_document, Mapping):
             raise ValueError("partial semantic contract is malformed")
         contract = PartialSemanticContract.from_data(contract_document)
@@ -977,8 +973,7 @@ def _check_revised_scenario_faithfulness(
             if client is None:
                 raise ValueError("faithfulness classifier is unavailable")
             category_results = [
-                complete_json(
-                    client,
+                client.complete_json(
                     _build_jev_claim_category_messages(request),
                     response_schema=CLAIM_CATEGORY_RESPONSE_SCHEMA,
                 )
@@ -989,8 +984,7 @@ def _check_revised_scenario_faithfulness(
                 raise ValueError("scenario claim request is malformed")
             if detail_client is None:
                 raise ValueError("faithfulness detail LLM is unavailable")
-            detail_response = complete_json(
-                detail_client,
+            detail_response = detail_client.complete_json(
                 [
                     {
                         "role": "system",

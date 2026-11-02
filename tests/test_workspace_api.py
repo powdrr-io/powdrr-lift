@@ -7,6 +7,7 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 from powdrr_contracts.workspace import (
     CheckpointAvailability,
+    JobOperation,
     JobState,
     MessageRole,
     QuestionState,
@@ -15,14 +16,16 @@ from powdrr_contracts.workspace import (
 )
 from powdrr_local.web import create_app
 from powdrr_local.workspace import WorkspaceStore
-from powdrr_local.workspace_api import _event_stream
+from powdrr_local.workspace_api import WorkspaceCheckpointInspector, _event_stream
 from starlette.requests import Request
 
 from powdrr_lift.workrr.workspace_app import build_workspace_app
 
 
 def _client(
-    tmp_path: Path, *, checkpoint_inspector=None
+    tmp_path: Path,
+    *,
+    checkpoint_inspector: WorkspaceCheckpointInspector | None = None,
 ) -> tuple[TestClient, WorkspaceStore, str, str]:
     store = WorkspaceStore(tmp_path / "workspace.db")
     repository_path = tmp_path / "repository"
@@ -536,10 +539,10 @@ def test_job_detail_hides_local_paths_and_checks_repository_association(
 def test_job_recovery_reports_checkpoint_assessment_without_exposing_reference(
     tmp_path: Path,
 ) -> None:
-    seen_operations = []
+    seen_operations: list[JobOperation] = []
 
     class Inspector:
-        def inspect_checkpoint(self, operation):
+        def inspect_checkpoint(self, operation: JobOperation) -> CheckpointAvailability:
             seen_operations.append(operation)
             return CheckpointAvailability.AVAILABLE
 

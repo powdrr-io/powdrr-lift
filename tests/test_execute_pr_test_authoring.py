@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from powdrr_local import LocalPowdrrService
 from powdrr_service.verification.execute_pr_test_corrections import (
     ExecutePrTestVerificationError,
 )
@@ -237,9 +238,6 @@ def test_execute_pr_test_repair_uses_nested_root_and_clean_baseline(
     jev_calls: list[tuple[list[dict[str, str]], dict[str, Any]]] = []
 
     class FakeJevClient:
-        def __init__(self, _fallback: Any, *, fail_closed: bool) -> None:
-            assert fail_closed
-
         def complete_json(
             self,
             messages: list[dict[str, str]],
@@ -247,7 +245,11 @@ def test_execute_pr_test_repair_uses_nested_root_and_clean_baseline(
             response_schema: dict[str, Any],
         ) -> dict[str, Any]:
             jev_calls.append((messages, response_schema))
-            return {"passed": False}
+            return {"shortcoming_present": False}
+
+    class UnusedLLMClient:
+        def complete_json(self, *_args: Any, **_kwargs: Any) -> dict[str, Any]:
+            pytest.fail("the LLM must not be asked when Jev finds no shortcoming")
 
     class FakeMiniSWEAgentProvider:
         provider_name = "fake-miniswe"
@@ -284,13 +286,8 @@ def test_execute_pr_test_repair_uses_nested_root_and_clean_baseline(
             return subprocess.CompletedProcess(["fake-miniswe"], 0, "done\n", "")
 
     monkeypatch.setattr(task_agent, "MiniSWEAgentProvider", FakeMiniSWEAgentProvider)
-    monkeypatch.setattr(task_agent, "JevSemanticClassifierClient", FakeJevClient)
-    monkeypatch.setattr(
-        task_agent,
-        "complete_json_with_timeout_retry",
-        lambda *_args, **_kwargs: pytest.fail(
-            "the LLM must not be asked when Jev finds no shortcoming"
-        ),
+    quality_review_service = LocalPowdrrService(
+        quality_review_clients=(FakeJevClient(), UnusedLLMClient())
     )
 
     request = ImplementationRequest(
@@ -330,7 +327,7 @@ def test_execute_pr_test_repair_uses_nested_root_and_clean_baseline(
         validation_profile=ValidationProfile(
             name="verify", command=(sys.executable, "-m", "pytest")
         ),
-        quality_client=object(),  # type: ignore[arg-type]
+        quality_review_service=quality_review_service,
     )
 
     assert provider_calls == [(expected_test_path,), (expected_test_path,)]
@@ -412,9 +409,6 @@ def test_execute_pr_test_quality_asks_individual_questions_and_suggests_a_fix(
     jev_results = iter([True, False, False, False, False, False])
 
     class FakeJevClient:
-        def __init__(self, _fallback: Any, *, fail_closed: bool) -> None:
-            assert fail_closed
-
         def complete_json(
             self,
             messages: list[dict[str, str]],
@@ -425,31 +419,28 @@ def test_execute_pr_test_quality_asks_individual_questions_and_suggests_a_fix(
             assert response_schema["required"] == ["shortcoming_present"]
             return {"shortcoming_present": next(jev_results)}
 
-    def request_llm(
-        _client: Any,
-        messages: list[dict[str, str]],
-        *,
-        model: str,
-        stderr: Any,
-        max_timeout_retries: int,
-        timeout_backoff_seconds: float,
-        response_schema: dict[str, Any],
-    ) -> dict[str, Any]:
-        del model, stderr, max_timeout_retries, timeout_backoff_seconds
-        llm_calls.append((messages, response_schema))
-        if response_schema["required"] == ["shortcoming_present", "explanation"]:
+    class FakeLLMClient:
+        def complete_json(
+            self,
+            messages: list[dict[str, str]],
+            *,
+            response_schema: dict[str, Any],
+        ) -> dict[str, Any]:
+            llm_calls.append((messages, response_schema))
+            if response_schema["required"] == ["shortcoming_present", "explanation"]:
+                return {
+                    "shortcoming_present": True,
+                    "explanation": "The assertion is vacuous.",
+                }
             return {
-                "shortcoming_present": True,
-                "explanation": "The assertion is vacuous.",
+                "test_name": "test_rejects_invalid_payload",
+                "test_code": "def test_rejects_invalid_payload():\n    ...",
+                "rationale": "Exercise the invalid request through the public API.",
             }
-        return {
-            "test_name": "test_rejects_invalid_payload",
-            "test_code": "def test_rejects_invalid_payload():\n    ...",
-            "rationale": "Exercise the invalid request through the public API.",
-        }
 
-    monkeypatch.setattr(task_agent, "JevSemanticClassifierClient", FakeJevClient)
-    monkeypatch.setattr(task_agent, "complete_json_with_timeout_retry", request_llm)
+    service = LocalPowdrrService(
+        quality_review_clients=(FakeJevClient(), FakeLLMClient())
+    )
     evidence = {
         "contract": {
             "title": "Validate public API inputs",
@@ -494,9 +485,9 @@ def test_execute_pr_test_quality_asks_individual_questions_and_suggests_a_fix(
     }
 
     review = task_agent._review_execute_pr_test_quality(
-        object(),  # type: ignore[arg-type]
         evidence,
         config=task_agent.WorkflowTaskAgentConfig(workflow_dir=Path(".")),
+        service=service,
     )
 
     assert len(jev_calls) == 7
@@ -521,8 +512,7 @@ def test_execute_pr_test_quality_accepts_jev_concern_as_advisory_on_disagreement
     llm_calls = 0
 
     class FakeJevClient:
-        def __init__(self, _fallback: Any, *, fail_closed: bool) -> None:
-            assert fail_closed
+        calls = 0
 
         def complete_json(
             self,
@@ -532,18 +522,19 @@ def test_execute_pr_test_quality_accepts_jev_concern_as_advisory_on_disagreement
         ) -> dict[str, Any]:
             return {"shortcoming_present": True}
 
-    def request_llm(*_args: Any, **_kwargs: Any) -> dict[str, Any]:
-        nonlocal llm_calls
-        llm_calls += 1
-        return {
-            "shortcoming_present": False,
-            "explanation": "The assertion checks public behavior.",
-        }
+    class FakeLLMClient:
+        def complete_json(self, *_args: Any, **_kwargs: Any) -> dict[str, Any]:
+            nonlocal llm_calls
+            llm_calls += 1
+            return {
+                "shortcoming_present": False,
+                "explanation": "The assertion checks public behavior.",
+            }
 
-    monkeypatch.setattr(task_agent, "JevSemanticClassifierClient", FakeJevClient)
-    monkeypatch.setattr(task_agent, "complete_json_with_timeout_retry", request_llm)
+    service = LocalPowdrrService(
+        quality_review_clients=(FakeJevClient(), FakeLLMClient())
+    )
     review = task_agent._review_execute_pr_test_quality(
-        object(),  # type: ignore[arg-type]
         {
             "test_obligations": [
                 {"obligation_id": "AC-01", "source_text": "Run the verifier."}
@@ -556,6 +547,7 @@ def test_execute_pr_test_quality_accepts_jev_concern_as_advisory_on_disagreement
             },
         },
         config=task_agent.WorkflowTaskAgentConfig(workflow_dir=Path(".")),
+        service=service,
     )
     assert review["outcome"] == "advisory"
     assert llm_calls == 7
@@ -580,12 +572,13 @@ def test_execute_pr_test_quality_review_outage_is_advisory(
         llm_calls += 1
         raise AssertionError("LLM must not replace a failed Jev judgment")
 
-    monkeypatch.setattr(task_agent, "JevSemanticClassifierClient", BrokenJevClient)
-    monkeypatch.setattr(
-        task_agent, "complete_json_with_timeout_retry", must_not_replace_jev
+    service = LocalPowdrrService(
+        quality_review_clients=(
+            BrokenJevClient(None, fail_closed=True),
+            type("UnusedLLMClient", (), {"complete_json": must_not_replace_jev})(),
+        )
     )
     review = task_agent._review_execute_pr_test_quality(
-        object(),  # type: ignore[arg-type]
         {
             "test_obligations": [
                 {"obligation_id": "AC-01", "source_text": "Run the verifier."}
@@ -598,6 +591,7 @@ def test_execute_pr_test_quality_review_outage_is_advisory(
             },
         },
         config=task_agent.WorkflowTaskAgentConfig(workflow_dir=Path(".")),
+        service=service,
     )
     assert review["outcome"] == "advisory"
     assert len(review["assessments"]) == 7
@@ -648,9 +642,7 @@ def test_quality_shortcoming_is_repaired_once_then_accepted_with_pr_note(
     author_prompts: list[str] = []
 
     class FakeJevClient:
-        def __init__(self, _fallback: Any, *, fail_closed: bool) -> None:
-            assert fail_closed
-            self.calls = 0
+        calls = 0
 
         def complete_json(
             self,
@@ -660,7 +652,7 @@ def test_quality_shortcoming_is_repaired_once_then_accepted_with_pr_note(
         ) -> dict[str, Any]:
             self.calls += 1
             assert response_schema["required"] == ["shortcoming_present"]
-            return {"shortcoming_present": self.calls == 1}
+            return {"shortcoming_present": self.calls in {1, 8}}
 
     class FakeMiniSWEAgentProvider:
         provider_name = "fake-miniswe"
@@ -687,33 +679,30 @@ def test_quality_shortcoming_is_repaired_once_then_accepted_with_pr_note(
 
     llm_calls = 0
 
-    def request_llm(
-        _client: Any,
-        _messages: list[dict[str, str]],
-        *,
-        model: str,
-        stderr: Any,
-        max_timeout_retries: int,
-        timeout_backoff_seconds: float,
-        response_schema: dict[str, Any],
-    ) -> dict[str, Any]:
-        del model, stderr, max_timeout_retries, timeout_backoff_seconds
-        nonlocal llm_calls
-        llm_calls += 1
-        if response_schema["required"] == ["shortcoming_present", "explanation"]:
+    class FakeLLMClient:
+        def complete_json(
+            self,
+            _messages: list[dict[str, str]],
+            *,
+            response_schema: dict[str, Any],
+        ) -> dict[str, Any]:
+            nonlocal llm_calls
+            llm_calls += 1
+            if response_schema["required"] == ["shortcoming_present", "explanation"]:
+                return {
+                    "shortcoming_present": True,
+                    "explanation": "The test needs stronger evidence.",
+                }
             return {
-                "shortcoming_present": True,
-                "explanation": "The test needs stronger evidence.",
+                "test_name": "test_observes_expected_value",
+                "test_code": "def test_observes_expected_value():\n    ...",
+                "rationale": "Assert the externally visible result.",
             }
-        return {
-            "test_name": "test_observes_expected_value",
-            "test_code": "def test_observes_expected_value():\n    ...",
-            "rationale": "Assert the externally visible result.",
-        }
 
     monkeypatch.setattr(task_agent, "MiniSWEAgentProvider", FakeMiniSWEAgentProvider)
-    monkeypatch.setattr(task_agent, "JevSemanticClassifierClient", FakeJevClient)
-    monkeypatch.setattr(task_agent, "complete_json_with_timeout_retry", request_llm)
+    quality_review_service = LocalPowdrrService(
+        quality_review_clients=(FakeJevClient(), FakeLLMClient())
+    )
     monkeypatch.setattr(
         task_agent,
         "run_generated_pytest",
@@ -759,7 +748,7 @@ def test_quality_shortcoming_is_repaired_once_then_accepted_with_pr_note(
         validation_profile=ValidationProfile(
             name="verify", command=(sys.executable, "-m", "pytest")
         ),
-        quality_client=object(),  # type: ignore[arg-type]
+        quality_review_service=quality_review_service,
     )
 
     assert tuple(sources) == (test_path,)

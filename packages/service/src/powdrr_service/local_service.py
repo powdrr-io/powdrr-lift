@@ -35,13 +35,17 @@ class LocalPowdrrService:
         *,
         planning_issue_store: Any | None = None,
         inference_client: InferenceClient | None = None,
+        quality_review_clients: tuple[Any, Any] | None = None,
     ) -> None:
         self._planning_issue_store = planning_issue_store
         self._inference_client = inference_client or DeepInfraInferenceClient()
+        self._quality_review_clients = quality_review_clients
 
     def start(self, request: OperationRequest) -> OperationUpdate:
         if request.operation_kind == "review_feedback":
             return self._review_feedback(request)
+        if request.operation_kind == "verification_health":
+            return self._verification_health(request)
         if request.operation_kind == "plan":
             return self._planning_session(request)
         if request.operation_kind == "replan":
@@ -117,6 +121,151 @@ class LocalPowdrrService:
                 Artifact(
                     artifact_id="review/review-feedback-ledger.json",
                     media_type="application/vnd.powdrr.review-feedback+json",
+                    data=payload,
+                ),
+            ),
+        )
+
+    def _verification_health(self, request: OperationRequest) -> OperationUpdate:
+        from powdrr_service.verification.execute_pr_test_quality import (
+            review_execute_pr_test_quality,
+        )
+
+        verification = request.inputs.get("verification")
+        evidence = request.inputs.get("suite_evidence")
+        provider = request.inputs.get("provider")
+        model = request.inputs.get("model")
+        if verification != "execute_pr_test_quality":
+            return _failed(
+                request.request_id,
+                "unsupported_verification",
+                "verification_health does not support this verification profile.",
+            )
+        if not isinstance(evidence, dict):
+            return _failed(
+                request.request_id,
+                "invalid_review_evidence",
+                "suite_evidence must be an object.",
+            )
+        if not isinstance(provider, str) or not provider:
+            return _failed(
+                request.request_id,
+                "invalid_review_configuration",
+                "provider must be a non-empty service provider name.",
+            )
+        if not isinstance(model, str) or not model:
+            return _failed(
+                request.request_id,
+                "invalid_review_configuration",
+                "model must be a non-empty model name.",
+            )
+        retries = request.inputs.get("max_timeout_retries", 8)
+        backoff = request.inputs.get("timeout_backoff_seconds", 10.0)
+        suggest_tests = request.inputs.get("suggest_tests", True)
+        if (
+            not isinstance(retries, int)
+            or isinstance(retries, bool)
+            or retries < 0
+            or not isinstance(backoff, (int, float))
+            or isinstance(backoff, bool)
+            or backoff < 0
+            or not isinstance(suggest_tests, bool)
+        ):
+            return _failed(
+                request.request_id,
+                "invalid_review_configuration",
+                "review retry settings or suggest_tests are invalid.",
+            )
+
+        try:
+            if self._quality_review_clients is None:
+                from powdrr_service.decision_classifier import (
+                    JevSemanticClassifierClient,
+                )
+                from powdrr_service.providers.clients import build_provider_client
+                from powdrr_service.providers.config import (
+                    ProviderConfigurationError,
+                    default_llm_mappings,
+                    provider_definition,
+                )
+                from powdrr_service.providers.credentials import (
+                    resolve_provider_credentials,
+                )
+                from powdrr_service.providers.selection import (
+                    initial_model_for_provider,
+                    resolve_provider,
+                )
+
+                base_url = request.inputs.get("base_url")
+                if base_url is not None and not isinstance(base_url, str):
+                    raise ValueError("base_url must be a string")
+                provider_prefix, separator, unprefixed_model = model.partition("/")
+                if provider == "auto" and separator:
+                    try:
+                        provider_definition(provider_prefix)
+                    except ProviderConfigurationError:
+                        pass
+                    else:
+                        provider, model = provider_prefix, unprefixed_model
+                provider = resolve_provider(provider, model)
+                if model.startswith(f"{provider}/"):
+                    model = model.removeprefix(f"{provider}/")
+                if model == "fast_iteration":
+                    mapping = default_llm_mappings(provider).get("fast_iteration")
+                    if mapping is None:
+                        raise ValueError(
+                            f"No fast_iteration model is configured for {provider!r}"
+                        )
+                    provider, model = mapping.provider, mapping.model
+                    if provider == "local":
+                        raise ValueError(
+                            "Local quality-review model requires an explicit "
+                            "model path."
+                        )
+                model = initial_model_for_provider(provider, model)
+                credentials = resolve_provider_credentials(
+                    provider,
+                    base_url_override=base_url,
+                )
+                llm_client = build_provider_client(
+                    provider=provider,
+                    model=model,
+                    api_key=credentials.api_key,
+                    base_url=credentials.base_url,
+                    progress_stream=None,
+                )
+                jev_client = JevSemanticClassifierClient(llm_client, fail_closed=True)
+            else:
+                jev_client, llm_client = self._quality_review_clients
+            report = review_execute_pr_test_quality(
+                evidence,
+                jev_client=jev_client,
+                llm_client=llm_client,
+                max_timeout_retries=retries,
+                timeout_backoff_seconds=float(backoff),
+                suggest_tests=suggest_tests,
+            )
+        except Exception as exc:  # Quality review is advisory, including outages.
+            report = {
+                "provider": "jev",
+                "outcome": "advisory",
+                "assessments": [],
+                "suggestions": [],
+                "notes": [f"Execute-PR test quality review was unavailable: {exc}"],
+            }
+
+        payload = json.dumps(report, sort_keys=True, separators=(",", ":")).encode()
+        return OperationUpdate(
+            operation_id=request.request_id,
+            revision=1,
+            status="succeeded",
+            progress=(
+                {"phase": "verification_review_completed", "profile": verification},
+            ),
+            output_artifacts=(
+                Artifact(
+                    artifact_id="verification/execute-pr-test-quality.json",
+                    media_type="application/vnd.powdrr.verification-health+json",
                     data=payload,
                 ),
             ),

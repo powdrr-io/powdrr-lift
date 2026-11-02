@@ -1,0 +1,465 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1296
+title: Move execute-PR quality review calls into service
+intent:
+  problem: The execute-PR agent still owns Jev and LLM review orchestration, including provider access
+    and retry handling, after the rubric itself moved into the service.
+  goal: Route pre-coding and correction quality reviews through the serialized service operation so provider
+    calls, credentials, and retry policy stay service-side while findings remain advisory.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2693
+    end_line: 2708
+  summary: Record service ownership and the task agent serialized dependency.
+  rationale: Keep the module inventory aligned with the new boundary.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3450
+    end_line: 3451
+  summary: Record service ownership and the task agent serialized dependency.
+  rationale: Keep the module inventory aligned with the new boundary.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3448
+    end_line: 3448
+  summary: Record service ownership and the task agent serialized dependency.
+  rationale: Keep the module inventory aligned with the new boundary.
+- path: packages/service/src/powdrr_service/local_service.py
+  type: modified
+  span:
+    start_line: 38
+    end_line: 38
+  summary: Dispatch execute-PR quality review through the service and return its advisory artifact.
+  rationale: Keep operation handling, provider configuration, and secret resolution in service code.
+- path: packages/service/src/powdrr_service/local_service.py
+  type: modified
+  span:
+    start_line: 42
+    end_line: 42
+  summary: Dispatch execute-PR quality review through the service and return its advisory artifact.
+  rationale: Keep operation handling, provider configuration, and secret resolution in service code.
+- path: packages/service/src/powdrr_service/local_service.py
+  type: modified
+  span:
+    start_line: 47
+    end_line: 48
+  summary: Dispatch execute-PR quality review through the service and return its advisory artifact.
+  rationale: Keep operation handling, provider configuration, and secret resolution in service code.
+- path: packages/service/src/powdrr_service/local_service.py
+  type: modified
+  span:
+    start_line: 129
+    end_line: 273
+  summary: Dispatch execute-PR quality review through the service and return its advisory artifact.
+  rationale: Keep operation handling, provider configuration, and secret resolution in service code.
+- path: packages/service/src/powdrr_service/verification/execute_pr_test_quality.py
+  type: modified
+  span:
+    start_line: 8
+    end_line: 8
+  summary: Run Jev decisions, LLM comparisons, retry handling, and optional suggestions in service.
+  rationale: Preserve review behavior while moving the complete decision loop behind the service boundary.
+- path: packages/service/src/powdrr_service/verification/execute_pr_test_quality.py
+  type: modified
+  span:
+    start_line: 10
+    end_line: 10
+  summary: Run Jev decisions, LLM comparisons, retry handling, and optional suggestions in service.
+  rationale: Preserve review behavior while moving the complete decision loop behind the service boundary.
+- path: packages/service/src/powdrr_service/verification/execute_pr_test_quality.py
+  type: modified
+  span:
+    start_line: 333
+    end_line: 494
+  summary: Run Jev decisions, LLM comparisons, retry handling, and optional suggestions in service.
+  rationale: Preserve review behavior while moving the complete decision loop behind the service boundary.
+- path: packages/service/src/powdrr_service/verification/execute_pr_test_quality.py
+  type: modified
+  span:
+    start_line: 525
+    end_line: 525
+  summary: Run Jev decisions, LLM comparisons, retry handling, and optional suggestions in service.
+  rationale: Preserve review behavior while moving the complete decision loop behind the service boundary.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 9
+    end_line: 9
+  summary: Submit execute-PR quality-review evidence through the serialized operation.
+  rationale: Keep local evidence collection in the agent and review decisions and provider calls in service.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 15
+    end_line: 15
+  summary: Submit execute-PR quality-review evidence through the serialized operation.
+  rationale: Keep local evidence collection in the agent and review decisions and provider calls in service.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 18
+    end_line: 23
+  summary: Submit execute-PR quality-review evidence through the serialized operation.
+  rationale: Keep local evidence collection in the agent and review decisions and provider calls in service.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 57
+    end_line: 67
+  summary: Submit execute-PR quality-review evidence through the serialized operation.
+  rationale: Keep local evidence collection in the agent and review decisions and provider calls in service.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 194
+    end_line: 194
+  summary: Submit execute-PR quality-review evidence through the serialized operation.
+  rationale: Keep local evidence collection in the agent and review decisions and provider calls in service.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 1355
+    end_line: 1355
+  summary: Submit execute-PR quality-review evidence through the serialized operation.
+  rationale: Keep local evidence collection in the agent and review decisions and provider calls in service.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 1351
+    end_line: 1351
+  summary: Submit execute-PR quality-review evidence through the serialized operation.
+  rationale: Keep local evidence collection in the agent and review decisions and provider calls in service.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 1353
+    end_line: 1393
+  summary: Submit execute-PR quality-review evidence through the serialized operation.
+  rationale: Keep local evidence collection in the agent and review decisions and provider calls in service.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 1435
+    end_line: 1435
+  summary: Submit execute-PR quality-review evidence through the serialized operation.
+  rationale: Keep local evidence collection in the agent and review decisions and provider calls in service.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 1707
+    end_line: 1707
+  summary: Submit execute-PR quality-review evidence through the serialized operation.
+  rationale: Keep local evidence collection in the agent and review decisions and provider calls in service.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 1622
+    end_line: 1622
+  summary: Submit execute-PR quality-review evidence through the serialized operation.
+  rationale: Keep local evidence collection in the agent and review decisions and provider calls in service.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 3104
+    end_line: 3104
+  summary: Submit execute-PR quality-review evidence through the serialized operation.
+  rationale: Keep local evidence collection in the agent and review decisions and provider calls in service.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 3293
+    end_line: 3293
+  summary: Submit execute-PR quality-review evidence through the serialized operation.
+  rationale: Keep local evidence collection in the agent and review decisions and provider calls in service.
+- path: tests/test_execute_pr_test_authoring.py
+  type: modified
+  span:
+    start_line: 10
+    end_line: 10
+  summary: Exercise authoring, review, repair, disagreement, and outage cases through local service composition.
+  rationale: Prove behavior is preserved across the serialized operation boundary.
+- path: tests/test_execute_pr_test_authoring.py
+  type: modified
+  span:
+    start_line: 240
+    end_line: 242
+  summary: Exercise authoring, review, repair, disagreement, and outage cases through local service composition.
+  rationale: Prove behavior is preserved across the serialized operation boundary.
+- path: tests/test_execute_pr_test_authoring.py
+  type: modified
+  span:
+    start_line: 248
+    end_line: 252
+  summary: Exercise authoring, review, repair, disagreement, and outage cases through local service composition.
+  rationale: Prove behavior is preserved across the serialized operation boundary.
+- path: tests/test_execute_pr_test_authoring.py
+  type: modified
+  span:
+    start_line: 289
+    end_line: 290
+  summary: Exercise authoring, review, repair, disagreement, and outage cases through local service composition.
+  rationale: Prove behavior is preserved across the serialized operation boundary.
+- path: tests/test_execute_pr_test_authoring.py
+  type: modified
+  span:
+    start_line: 330
+    end_line: 330
+  summary: Exercise authoring, review, repair, disagreement, and outage cases through local service composition.
+  rationale: Prove behavior is preserved across the serialized operation boundary.
+- path: tests/test_execute_pr_test_authoring.py
+  type: modified
+  span:
+    start_line: 415
+    end_line: 417
+  summary: Exercise authoring, review, repair, disagreement, and outage cases through local service composition.
+  rationale: Prove behavior is preserved across the serialized operation boundary.
+- path: tests/test_execute_pr_test_authoring.py
+  type: modified
+  span:
+    start_line: 422
+    end_line: 434
+  summary: Exercise authoring, review, repair, disagreement, and outage cases through local service composition.
+  rationale: Prove behavior is preserved across the serialized operation boundary.
+- path: tests/test_execute_pr_test_authoring.py
+  type: modified
+  span:
+    start_line: 436
+    end_line: 438
+  summary: Exercise authoring, review, repair, disagreement, and outage cases through local service composition.
+  rationale: Prove behavior is preserved across the serialized operation boundary.
+- path: tests/test_execute_pr_test_authoring.py
+  type: modified
+  span:
+    start_line: 440
+    end_line: 443
+  summary: Exercise authoring, review, repair, disagreement, and outage cases through local service composition.
+  rationale: Prove behavior is preserved across the serialized operation boundary.
+- path: tests/test_execute_pr_test_authoring.py
+  type: modified
+  span:
+    start_line: 497
+    end_line: 497
+  summary: Exercise authoring, review, repair, disagreement, and outage cases through local service composition.
+  rationale: Prove behavior is preserved across the serialized operation boundary.
+- path: tests/test_execute_pr_test_authoring.py
+  type: modified
+  span:
+    start_line: 490
+    end_line: 490
+  summary: Exercise authoring, review, repair, disagreement, and outage cases through local service composition.
+  rationale: Prove behavior is preserved across the serialized operation boundary.
+- path: tests/test_execute_pr_test_authoring.py
+  type: modified
+  span:
+    start_line: 515
+    end_line: 515
+  summary: Exercise authoring, review, repair, disagreement, and outage cases through local service composition.
+  rationale: Prove behavior is preserved across the serialized operation boundary.
+- path: tests/test_execute_pr_test_authoring.py
+  type: modified
+  span:
+    start_line: 525
+    end_line: 532
+  summary: Exercise authoring, review, repair, disagreement, and outage cases through local service composition.
+  rationale: Prove behavior is preserved across the serialized operation boundary.
+- path: tests/test_execute_pr_test_authoring.py
+  type: modified
+  span:
+    start_line: 534
+    end_line: 536
+  summary: Exercise authoring, review, repair, disagreement, and outage cases through local service composition.
+  rationale: Prove behavior is preserved across the serialized operation boundary.
+- path: tests/test_execute_pr_test_authoring.py
+  type: modified
+  span:
+    start_line: 546
+    end_line: 546
+  summary: Exercise authoring, review, repair, disagreement, and outage cases through local service composition.
+  rationale: Prove behavior is preserved across the serialized operation boundary.
+- path: tests/test_execute_pr_test_authoring.py
+  type: modified
+  span:
+    start_line: 550
+    end_line: 550
+  summary: Exercise authoring, review, repair, disagreement, and outage cases through local service composition.
+  rationale: Prove behavior is preserved across the serialized operation boundary.
+- path: tests/test_execute_pr_test_authoring.py
+  type: modified
+  span:
+    start_line: 575
+    end_line: 579
+  summary: Exercise authoring, review, repair, disagreement, and outage cases through local service composition.
+  rationale: Prove behavior is preserved across the serialized operation boundary.
+- path: tests/test_execute_pr_test_authoring.py
+  type: modified
+  span:
+    start_line: 588
+    end_line: 588
+  summary: Exercise authoring, review, repair, disagreement, and outage cases through local service composition.
+  rationale: Prove behavior is preserved across the serialized operation boundary.
+- path: tests/test_execute_pr_test_authoring.py
+  type: modified
+  span:
+    start_line: 594
+    end_line: 594
+  summary: Exercise authoring, review, repair, disagreement, and outage cases through local service composition.
+  rationale: Prove behavior is preserved across the serialized operation boundary.
+- path: tests/test_execute_pr_test_authoring.py
+  type: modified
+  span:
+    start_line: 645
+    end_line: 645
+  summary: Exercise authoring, review, repair, disagreement, and outage cases through local service composition.
+  rationale: Prove behavior is preserved across the serialized operation boundary.
+- path: tests/test_execute_pr_test_authoring.py
+  type: modified
+  span:
+    start_line: 655
+    end_line: 655
+  summary: Exercise authoring, review, repair, disagreement, and outage cases through local service composition.
+  rationale: Prove behavior is preserved across the serialized operation boundary.
+- path: tests/test_execute_pr_test_authoring.py
+  type: modified
+  span:
+    start_line: 682
+    end_line: 695
+  summary: Exercise authoring, review, repair, disagreement, and outage cases through local service composition.
+  rationale: Prove behavior is preserved across the serialized operation boundary.
+- path: tests/test_execute_pr_test_authoring.py
+  type: modified
+  span:
+    start_line: 697
+    end_line: 699
+  summary: Exercise authoring, review, repair, disagreement, and outage cases through local service composition.
+  rationale: Prove behavior is preserved across the serialized operation boundary.
+- path: tests/test_execute_pr_test_authoring.py
+  type: modified
+  span:
+    start_line: 708
+    end_line: 712
+  summary: Exercise authoring, review, repair, disagreement, and outage cases through local service composition.
+  rationale: Prove behavior is preserved across the serialized operation boundary.
+- path: tests/test_execute_pr_test_authoring.py
+  type: modified
+  span:
+    start_line: 703
+    end_line: 705
+  summary: Exercise authoring, review, repair, disagreement, and outage cases through local service composition.
+  rationale: Prove behavior is preserved across the serialized operation boundary.
+- path: tests/test_execute_pr_test_authoring.py
+  type: modified
+  span:
+    start_line: 751
+    end_line: 751
+  summary: Exercise authoring, review, repair, disagreement, and outage cases through local service composition.
+  rationale: Prove behavior is preserved across the serialized operation boundary.
+- path: tests/test_execute_pr_test_quality_service.py
+  type: modified
+  span:
+    start_line: 3
+    end_line: 8
+  summary: Verify provider selection, service-side credentials, and service review results.
+  rationale: Prove provider setup occurs in the service handler.
+- path: tests/test_execute_pr_test_quality_service.py
+  type: modified
+  span:
+    start_line: 107
+    end_line: 177
+  summary: Verify provider selection, service-side credentials, and service review results.
+  rationale: Prove provider setup occurs in the service handler.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 15
+    end_line: 15
+  summary: Verify retryable review-provider failures use service-side backoff.
+  rationale: Protect the moved retry policy across the agent-to-service route.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 224
+    end_line: 224
+  summary: Verify retryable review-provider failures use service-side backoff.
+  rationale: Protect the moved retry policy across the agent-to-service route.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 229
+    end_line: 235
+  summary: Verify retryable review-provider failures use service-side backoff.
+  rationale: Protect the moved retry policy across the agent-to-service route.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 257
+    end_line: 259
+  summary: Verify retryable review-provider failures use service-side backoff.
+  rationale: Protect the moved retry policy across the agent-to-service route.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 262
+    end_line: 264
+  summary: Verify retryable review-provider failures use service-side backoff.
+  rationale: Protect the moved retry policy across the agent-to-service route.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 280
+    end_line: 280
+  summary: Verify retryable review-provider failures use service-side backoff.
+  rationale: Protect the moved retry policy across the agent-to-service route.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 277
+    end_line: 277
+  summary: Verify retryable review-provider failures use service-side backoff.
+  rationale: Protect the moved retry policy across the agent-to-service route.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 297
+    end_line: 297
+  summary: Verify retryable review-provider failures use service-side backoff.
+  rationale: Protect the moved retry policy across the agent-to-service route.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 298
+    end_line: 298
+  summary: Verify retryable review-provider failures use service-side backoff.
+  rationale: Protect the moved retry policy across the agent-to-service route.
+entities:
+- id: execute-pr-test-quality-review
+  type: Function
+  action: modified
+- id: verification-health-handler
+  type: Function
+  action: added
+entity_relationships:
+- id: quality-review-runs-in-verification-health
+  type: part_of
+  source: execute-pr-test-quality-review
+  target: verification-health-handler
+  action: added
+  description: The service handler runs the execute-PR quality review and returns its advisory report
+    as an operation artifact.
+invariants:
+- id: execute-pr-test-quality-review-remains-advisory
+  description: Quality-review findings and provider outages do not change required execute-PR validation
+    status.
+  action: added
+- id: execute-pr-quality-provider-credentials-stay-service-side
+  description: Jev and LLM credentials are resolved by the service and are not included in agent operation
+    inputs.
+  action: added
+guidance: []
+features: []
+proposed_prs: []

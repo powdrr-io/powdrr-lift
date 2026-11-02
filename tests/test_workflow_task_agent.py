@@ -12,6 +12,7 @@ from typing import Any, cast
 
 import pytest
 import yaml
+from powdrr_local import LocalPowdrrService
 from powdrr_service.planning.multipr_structrr import (
     compile_multi_pr_proposal,
     write_multi_pr_proposal,
@@ -221,12 +222,17 @@ def _commit_test_structrr_baseline(
 def test_execute_pr_test_findings_retry_provider_429_with_backoff(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
 ) -> None:
     class RateLimitedThenOpinionAndSuggestion:
         calls = 0
 
-        def complete_json(self, _messages: list[dict[str, str]]) -> dict[str, Any]:
+        def complete_json(
+            self,
+            _messages: list[dict[str, str]],
+            *,
+            response_schema: dict[str, Any] | None = None,
+        ) -> dict[str, Any]:
+            del response_schema
             self.calls += 1
             if self.calls == 1:
                 raise WorkflowLLMHTTPError(
@@ -248,7 +254,9 @@ def test_execute_pr_test_findings_retry_provider_429_with_backoff(
     for name in ("TYPESAFEAI_API_KEY", "TYPESAFE_API_KEY", "SYSTEM_ONE_API_KEY"):
         monkeypatch.delenv(name, raising=False)
     delays: list[float] = []
-    monkeypatch.setattr("powdrr_lift.workrr.llm.time.sleep", delays.append)
+    monkeypatch.setattr(
+        "powdrr_service.verification.execute_pr_test_quality.time.sleep", delays.append
+    )
     client = RateLimitedThenOpinionAndSuggestion()
     config = WorkflowTaskAgentConfig(
         workflow_dir=tmp_path,
@@ -258,9 +266,6 @@ def test_execute_pr_test_findings_retry_provider_429_with_backoff(
 
     class FakeJevClient:
         calls = 0
-
-        def __init__(self, _fallback: Any, *, fail_closed: bool) -> None:
-            assert fail_closed
 
         def complete_json(
             self,
@@ -272,9 +277,8 @@ def test_execute_pr_test_findings_retry_provider_429_with_backoff(
             assert response_schema["required"] == ["shortcoming_present"]
             return {"shortcoming_present": self.calls == 1}
 
-    monkeypatch.setattr(task_agent, "JevSemanticClassifierClient", FakeJevClient)
+    service = LocalPowdrrService(quality_review_clients=(FakeJevClient(), client))
     review = _review_execute_pr_test_quality(
-        client,
         {
             "test_obligations": [
                 {
@@ -290,12 +294,12 @@ def test_execute_pr_test_findings_retry_provider_429_with_backoff(
             },
         },
         config=config,
+        service=service,
     )
 
     assert review["outcome"] == "advisory"
     assert client.calls == 3
     assert delays == [1.5]
-    assert "retrying in 1.5 seconds (retry 1/2)" in capsys.readouterr().err
 
 
 def test_execute_pr_test_author_prompt_leaves_workspace_path_for_agent(

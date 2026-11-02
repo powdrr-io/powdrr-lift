@@ -206,7 +206,7 @@ live coding score.
 
 ## Synthetic classifier cases
 
-`semantic-prompt-cases-v1.jsonl` contains independently written source cases
+`packages/service/src/powdrr_service/resources/evaluations/semantic-prompt-cases-v1.jsonl` contains independently written source cases
 for the six planned confusion families. Each row records the source text,
 target proposition, allowed context, gold decisions, explicitly unspecified
 details, and required or forbidden prompt claims. Cases from the
@@ -231,8 +231,8 @@ truth; disagreement or suspicious variants still need targeted human review.
 Validate the case corpus with:
 
 ```bash
-PYTHONPATH=src /Users/gregory/code/powdrr-lift/.venv/bin/python \
-  -m powdrr_lift.workrr.semantic_prompt_cases
+PYTHONPATH=packages/service/src /Users/gregory/code/powdrr-lift/.venv/bin/python \
+  -m powdrr_service.evaluations.semantic_prompt_cases
 ```
 
 The synthetic cases complement the three real task prompt evaluations. They do

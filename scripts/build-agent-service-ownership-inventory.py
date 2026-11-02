@@ -70,6 +70,14 @@ def _owner(path: str) -> tuple[str, str, str]:
         )
     if path.startswith("packages/service/src/powdrr_service/evaluations/"):
         return "service", "service-owned prompt and benchmark evaluation policy", "8"
+    if path.startswith("packages/service/src/powdrr_service/planning/"):
+        if path.endswith(("/classifier_input.py", "/semantic_contract_compiler.py")):
+            return (
+                "service",
+                "service-owned semantic instruction classification and compilation",
+                "8",
+            )
+        return "service", "service-owned planning policy", "8"
     if path.startswith("packages/service/src/powdrr_service/resources/evaluations/"):
         return "service", "bundled private evaluation rubric", "8"
     if path.startswith(
@@ -250,6 +258,7 @@ def main() -> int:
                 "--",
                 "src/powdrr_lift",
                 "packages/service/src/powdrr_service/evaluations",
+                "packages/service/src/powdrr_service/planning",
                 "packages/service/src/powdrr_service/procedrr",
                 "packages/service/src/powdrr_service/procedrr_evaluator",
                 "packages/service/src/powdrr_service/structrr",

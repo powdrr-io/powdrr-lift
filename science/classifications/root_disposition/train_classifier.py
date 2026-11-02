@@ -14,6 +14,7 @@ from typing import Any
 
 import numpy as np
 import torch
+from powdrr_service.planning.classifier_input import format_classifier_input
 from torch.utils.data import Dataset
 from transformers import (
     AutoModelForSequenceClassification,
@@ -21,8 +22,6 @@ from transformers import (
     Trainer,
     TrainingArguments,
 )
-
-from powdrr_lift.core.classifier_input import format_classifier_input
 
 DEFAULT_MODEL = "microsoft/MiniLM-L12-H384-uncased"
 DEFAULT_MODEL_REVISION = "44acabbec0ef496f6dbc93adadea57f376b7c0ec"

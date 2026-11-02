@@ -12,6 +12,21 @@ from powdrr_service.planning.semantic_contract import (
     PartialSemanticContract,
     SemanticContractError,
 )
+from powdrr_service.planning.semantic_contract_compiler import (
+    CLASSIFIER_DEFINITIONS,
+    SEMANTIC_DIMENSION_DEFINITIONS,
+    applicable_source_semantic_dimensions,
+    bind_behavior_family_decision,
+    bind_source_extractions,
+    bind_source_semantic_decisions,
+    compile_deterministic_source_extractions,
+    compile_source_contract,
+    prepare_behavior_family_decision,
+    prepare_dependent_source_semantic_decisions,
+    prepare_source_extractions,
+    prepare_source_semantic_decisions,
+    project_partial_contract_to_legacy_design,
+)
 from powdrr_service.planning.semantic_decision import (
     DECISION_VALUES,
     SEMANTIC_DIMENSION_DECISION_KINDS,
@@ -29,21 +44,6 @@ from powdrr_service.semantic_faithfulness import (
 from powdrr_lift.workrr.command_catalog import (
     FeatureCommandRuntime,
     feature_command_catalog,
-)
-from powdrr_lift.workrr.semantic_contract_compiler import (
-    CLASSIFIER_DEFINITIONS,
-    SEMANTIC_DIMENSION_DEFINITIONS,
-    applicable_source_semantic_dimensions,
-    bind_behavior_family_decision,
-    bind_source_extractions,
-    bind_source_semantic_decisions,
-    compile_deterministic_source_extractions,
-    compile_source_contract,
-    prepare_behavior_family_decision,
-    prepare_dependent_source_semantic_decisions,
-    prepare_source_extractions,
-    prepare_source_semantic_decisions,
-    project_partial_contract_to_legacy_design,
 )
 
 NOW = "2026-09-25T00:00:00Z"

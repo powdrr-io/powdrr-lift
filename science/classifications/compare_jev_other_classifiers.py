@@ -22,6 +22,7 @@ from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+from powdrr_service.planning.semantic_contract_compiler import CLASSIFIER_DEFINITIONS
 from powdrr_service.planning.semantic_decision import DECISION_VALUES
 from powdrr_service.providers.config import default_llm_mappings
 from powdrr_service.providers.credentials import resolve_provider_credentials
@@ -29,7 +30,6 @@ from powdrr_service.resources import bundled_process_directory
 
 from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
 from powdrr_lift.workrr.provider_runtime import build_workflow_client
-from powdrr_lift.workrr.semantic_contract_compiler import CLASSIFIER_DEFINITIONS
 
 ROOT = Path(__file__).resolve().parents[2]
 DATASET = ROOT / "science/classifications/root_disposition/data/root_disposition.jsonl"

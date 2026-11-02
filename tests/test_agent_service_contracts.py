@@ -177,6 +177,36 @@ def test_package_import_graph_respects_agent_and_service_ownership() -> None:
             assert not imports & forbidden, (side, source, imports & forbidden)
 
 
+def test_semantic_instruction_policy_is_owned_by_service() -> None:
+    repository = Path(__file__).parents[1]
+    service = repository / "packages/service/src/powdrr_service"
+    moved_modules = (
+        service / "planning/semantic_contract_compiler.py",
+        service / "planning/classifier_input.py",
+        service / "evaluations/semantic_prompt_cases.py",
+        service / "evaluations/semantic_prompt_variants.py",
+    )
+    for source in moved_modules:
+        tree = ast.parse(source.read_text(encoding="utf-8"))
+        imports: set[str] = set()
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                imports.update(alias.name.split(".")[0] for alias in node.names)
+            elif isinstance(node, ast.ImportFrom) and node.module:
+                imports.add(node.module.split(".")[0])
+        assert "powdrr_lift" not in imports, source
+
+    assert (service / "resources/evaluations/semantic-prompt-cases-v1.jsonl").is_file()
+    assert not (
+        repository / "src/powdrr_lift/workrr/semantic_contract_compiler.py"
+    ).exists()
+    assert not (repository / "src/powdrr_lift/workrr/semantic_prompt_cases.py").exists()
+    assert not (
+        repository / "src/powdrr_lift/workrr/semantic_prompt_variants.py"
+    ).exists()
+    assert not (repository / "src/powdrr_lift/core/classifier_input.py").exists()
+
+
 def test_legacy_service_imports_are_explicitly_owned() -> None:
     repository = Path(__file__).parents[1]
     allowlist = json.loads(

@@ -491,7 +491,11 @@ required validation cannot be reported as success. Worker commits remain visible
    Keep verification-contract compilation, proposal review, intent lineage, and
    invariant review in the service with those Structrr policy modules.
    Move DeepSWE prompt/probe evaluation and prompt-to-benchmark comparison
-   policy into the service with its bundled default rubric.
+   policy into the service with its bundled default rubric. Move semantic
+   instruction classification and contract compilation, classifier-input
+   formatting, prompt-case validation/variant generation, and the semantic
+   prompt-case corpus into service-owned planning/evaluation modules and
+   resources.
 2. Remove the legacy-import allowlist and private compatibility shims. An old
    executable entry point may remain as a thin local-composition delegator;
    the public agent package must not depend on it.

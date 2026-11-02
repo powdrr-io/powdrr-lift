@@ -207,6 +207,24 @@ def test_semantic_instruction_policy_is_owned_by_service() -> None:
     assert not (repository / "src/powdrr_lift/core/classifier_input.py").exists()
 
 
+def test_changelog_parser_is_service_owned_without_legacy_exports() -> None:
+    import powdrr_lift
+
+    repository = Path(__file__).parents[1]
+    parser = repository / "packages/service/src/powdrr_service/changelog/parser.py"
+    tree = ast.parse(parser.read_text(encoding="utf-8"))
+    imports: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            imports.update(alias.name.split(".")[0] for alias in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            imports.add(node.module.split(".")[0])
+    assert "powdrr_lift" not in imports
+    assert not tuple((repository / "src/powdrr_lift/change_log_parser").glob("*.py"))
+    assert not (repository / "src/powdrr_lift/core/schemas.py").exists()
+    assert not hasattr(powdrr_lift, "parse_change_log")
+
+
 def test_legacy_service_imports_are_explicitly_owned() -> None:
     repository = Path(__file__).parents[1]
     allowlist = json.loads(

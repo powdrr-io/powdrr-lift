@@ -10,8 +10,9 @@ from types import SimpleNamespace
 
 import pytest
 import yaml
+from powdrr_service.changelog import parse_change_log
 
-from powdrr_lift import parse_change_log, parse_validation_report
+from powdrr_lift import parse_validation_report
 from powdrr_lift.cli import (
     _run_harbor_feature,
     _stage_generated_file,

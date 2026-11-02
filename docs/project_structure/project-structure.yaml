@@ -24,8 +24,8 @@ modules:
     purpose: MCP server exposing powdrr-lift tools to external clients.
   - id: powdrr-lift-change-log-parser
     action: added
-    relative_location: src/powdrr_lift/change_log_parser/
-    purpose: Parse and validate change log entries.
+    relative_location: packages/service/src/powdrr_service/changelog/
+    purpose: Service-owned change log schema parser and result models.
   - id: powdrr-lift-tests
     action: added
     relative_location: tests/

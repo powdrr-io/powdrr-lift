@@ -267,7 +267,7 @@ Expected touchpoints:
 
 - a new `src/powdrr_lift/core/verification_contract.py` for provider-neutral models;
 - `src/powdrr_lift/core/pr_specification.py` and `src/powdrr_lift/core/feature_planning_specification.py` for specification parsing;
-- `src/powdrr_lift/change_log_parser/parse_change_log.py`, `src/powdrr_lift/change_log_template.py`, and `src/powdrr_lift/change_log_validation.py` for changelog support;
+- `packages/service/src/powdrr_service/changelog/parser.py` for changelog schema parsing; `src/powdrr_lift/change_log_template.py` and `src/powdrr_lift/change_log_validation.py` still own generation and validation pending their service boundary work;
 - `src/powdrr_lift/core/code_index.py` for relationship indexing;
 - the corresponding specification, parser, changelog, and index tests under `tests/`.
 

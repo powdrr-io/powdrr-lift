@@ -5,11 +5,11 @@ import subprocess
 from pathlib import Path
 
 import pytest
+from powdrr_service.changelog import Span
 
 import powdrr_lift.core.code_index as code_index_store
 import powdrr_lift.core.index as core_index
 from powdrr_lift import (
-    Span,
     code_index_db_path,
     lookup_code_provenance,
     lookup_entity_decisions,

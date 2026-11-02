@@ -25,6 +25,7 @@ from powdrr_service.behavior_contract import (
     behavior_scenario_probe_findings,
     compile_behavior_scenarios,
 )
+from powdrr_service.changelog import parse_change_log
 from powdrr_service.decision_classifier import (
     preferred_semantic_classifier_client,
 )
@@ -84,7 +85,6 @@ from powdrr_service.structrr.verification_obligations import (
     compile_verification_obligations,
 )
 
-from powdrr_lift.change_log_parser import parse_change_log
 from powdrr_lift.core.contract_closure import (
     ContractClosureError,
     RepositoryEvidence,

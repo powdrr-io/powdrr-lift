@@ -1,0 +1,629 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1305
+title: Move Structrr proposal policy into service
+intent:
+  problem: Structrr proposal, source-manifest, actual-diff, and candidate-comparison policy still lived in the agent
+    package, leaving service planning dependent on agent-owned modules.
+  goal: Move these policy modules into powdrr_service, update all production and test imports directly, and remove
+    the legacy imports without compatibility shims.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/architecture/agent-service-legacy-import-allowlist.json
+  type: modified
+  span:
+    start_line: 14
+    end_line: 23
+  summary: Remove Structrr proposal and candidate-policy imports from the temporary service-to-agent allowlist.
+  rationale: These modules now live in the service package, so service code no longer depends on their agent-package
+    paths.
+- path: docs/architecture/agent-service-legacy-import-allowlist.json
+  type: modified
+  span:
+    start_line: 29
+    end_line: 48
+  summary: Remove Structrr proposal and candidate-policy imports from the temporary service-to-agent allowlist.
+  rationale: These modules now live in the service package, so service code no longer depends on their agent-package
+    paths.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2188
+    end_line: 2188
+  summary: Record the four Structrr policy modules as service-owned at their new package paths.
+  rationale: Keep the extraction inventory aligned with the code move and preserve the existing inventory ordering.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2191
+    end_line: 2191
+  summary: Record the four Structrr policy modules as service-owned at their new package paths.
+  rationale: Keep the extraction inventory aligned with the code move and preserve the existing inventory ordering.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2192
+    end_line: 2193
+  summary: Record the four Structrr policy modules as service-owned at their new package paths.
+  rationale: Keep the extraction inventory aligned with the code move and preserve the existing inventory ordering.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2196
+    end_line: 2198
+  summary: Record the four Structrr policy modules as service-owned at their new package paths.
+  rationale: Keep the extraction inventory aligned with the code move and preserve the existing inventory ordering.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2221
+    end_line: 2221
+  summary: Record the four Structrr policy modules as service-owned at their new package paths.
+  rationale: Keep the extraction inventory aligned with the code move and preserve the existing inventory ordering.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2224
+    end_line: 2225
+  summary: Record the four Structrr policy modules as service-owned at their new package paths.
+  rationale: Keep the extraction inventory aligned with the code move and preserve the existing inventory ordering.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2230
+    end_line: 2232
+  summary: Record the four Structrr policy modules as service-owned at their new package paths.
+  rationale: Keep the extraction inventory aligned with the code move and preserve the existing inventory ordering.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2297
+    end_line: 2297
+  summary: Record the four Structrr policy modules as service-owned at their new package paths.
+  rationale: Keep the extraction inventory aligned with the code move and preserve the existing inventory ordering.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2302
+    end_line: 2304
+  summary: Record the four Structrr policy modules as service-owned at their new package paths.
+  rationale: Keep the extraction inventory aligned with the code move and preserve the existing inventory ordering.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2341
+    end_line: 2341
+  summary: Record the four Structrr policy modules as service-owned at their new package paths.
+  rationale: Keep the extraction inventory aligned with the code move and preserve the existing inventory ordering.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2343
+    end_line: 2343
+  summary: Record the four Structrr policy modules as service-owned at their new package paths.
+  rationale: Keep the extraction inventory aligned with the code move and preserve the existing inventory ordering.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2346
+    end_line: 2348
+  summary: Record the four Structrr policy modules as service-owned at their new package paths.
+  rationale: Keep the extraction inventory aligned with the code move and preserve the existing inventory ordering.
+- path: docs/plans/agent-service-code-split.md
+  type: modified
+  span:
+    start_line: 488
+    end_line: 490
+  summary: Update the plan to include the remaining Structrr proposal and comparison policy in this service-boundary
+    slice.
+  rationale: Document the extraction boundary while leaving bootstrap evidence collection on the agent side.
+- path: packages/service/src/powdrr_service/local_service.py
+  type: modified
+  span:
+    start_line: 704
+    end_line: 705
+  summary: Update service planning callers to import Structrr policy from the service package.
+  rationale: Remove dependencies on the legacy agent package paths.
+- path: packages/service/src/powdrr_service/planning/multipr_structrr.py
+  type: modified
+  span:
+    start_line: 12
+    end_line: 12
+  summary: Update service planning callers to import Structrr policy from the service package.
+  rationale: Remove dependencies on the legacy agent package paths.
+- path: packages/service/src/powdrr_service/planning/multipr_structrr.py
+  type: modified
+  span:
+    start_line: 16
+    end_line: 17
+  summary: Update service planning callers to import Structrr policy from the service package.
+  rationale: Remove dependencies on the legacy agent package paths.
+- path: packages/service/src/powdrr_service/planning/multipr_structrr.py
+  type: modified
+  span:
+    start_line: 20
+    end_line: 20
+  summary: Update service planning callers to import Structrr policy from the service package.
+  rationale: Remove dependencies on the legacy agent package paths.
+- path: packages/service/src/powdrr_service/structrr/actual_diff.py
+  type: renamed
+  span:
+    start_line: 1
+    end_line: 177
+  summary: Move actual Structrr diff policy into the service package.
+  rationale: Keep comparison policy service-owned while callers supply repository evidence.
+- path: packages/service/src/powdrr_service/structrr/candidate_comparison.py
+  type: renamed
+  span:
+    start_line: 1
+    end_line: 681
+  summary: Move candidate snapshot comparison policy into the service package.
+  rationale: Keep candidate evaluation with service planning and validation.
+- path: packages/service/src/powdrr_service/structrr/source_manifest.py
+  type: renamed
+  span:
+    start_line: 1
+    end_line: 322
+  summary: Move source-manifest policy and specification-path classification into the service package.
+  rationale: Centralize source classification with the service-owned proposal and diff logic.
+- path: scripts/build-agent-service-ownership-inventory.py
+  type: modified
+  span:
+    start_line: 16
+    end_line: 47
+  summary: Teach the ownership inventory builder to discover the moved service Structrr modules.
+  rationale: Keep future generated ownership inventories aware of the service-owned modules.
+- path: scripts/build-agent-service-ownership-inventory.py
+  type: modified
+  span:
+    start_line: 235
+    end_line: 235
+  summary: Teach the ownership inventory builder to discover the moved service Structrr modules.
+  rationale: Keep future generated ownership inventories aware of the service-owned modules.
+- path: src/powdrr_lift/agent_bootstrap.py
+  type: modified
+  span:
+    start_line: 17
+    end_line: 17
+  summary: Update agent production callers to import moved Structrr policy directly from powdrr_service.
+  rationale: Complete the package boundary without leaving legacy import shims.
+- path: src/powdrr_lift/agent_bootstrap.py
+  type: modified
+  span:
+    start_line: 31
+    end_line: 31
+  summary: Update agent production callers to import moved Structrr policy directly from powdrr_service.
+  rationale: Complete the package boundary without leaving legacy import shims.
+- path: src/powdrr_lift/core/index.py
+  type: modified
+  span:
+    start_line: 11
+    end_line: 11
+  summary: Update agent-side Structrr bootstrap and indexing to use the service-owned specification-path helper.
+  rationale: Keep repository scanning in the agent while using service-owned classification policy.
+- path: src/powdrr_lift/core/index.py
+  type: modified
+  span:
+    start_line: 24
+    end_line: 24
+  summary: Update agent-side Structrr bootstrap and indexing to use the service-owned specification-path helper.
+  rationale: Keep repository scanning in the agent while using service-owned classification policy.
+- path: src/powdrr_lift/core/spec_paths.py
+  type: modified
+  span:
+    start_line: 138
+    end_line: 145
+  summary: Update agent-side Structrr bootstrap and indexing to use the service-owned specification-path helper.
+  rationale: Keep repository scanning in the agent while using service-owned classification policy.
+- path: src/powdrr_lift/structrr/__init__.py
+  type: modified
+  span:
+    start_line: 13
+    end_line: 17
+  summary: Remove exports for modules moved to the service package.
+  rationale: Callers now import service-owned modules directly, with no compatibility re-exports.
+- path: src/powdrr_lift/structrr/__init__.py
+  type: modified
+  span:
+    start_line: 27
+    end_line: 31
+  summary: Remove exports for modules moved to the service package.
+  rationale: Callers now import service-owned modules directly, with no compatibility re-exports.
+- path: src/powdrr_lift/structrr/__init__.py
+  type: modified
+  span:
+    start_line: 56
+    end_line: 63
+  summary: Remove exports for modules moved to the service package.
+  rationale: Callers now import service-owned modules directly, with no compatibility re-exports.
+- path: src/powdrr_lift/structrr/__init__.py
+  type: modified
+  span:
+    start_line: 72
+    end_line: 79
+  summary: Remove exports for modules moved to the service package.
+  rationale: Callers now import service-owned modules directly, with no compatibility re-exports.
+- path: src/powdrr_lift/structrr/__init__.py
+  type: modified
+  span:
+    start_line: 89
+    end_line: 91
+  summary: Remove exports for modules moved to the service package.
+  rationale: Callers now import service-owned modules directly, with no compatibility re-exports.
+- path: src/powdrr_lift/structrr/__init__.py
+  type: modified
+  span:
+    start_line: 99
+    end_line: 101
+  summary: Remove exports for modules moved to the service package.
+  rationale: Callers now import service-owned modules directly, with no compatibility re-exports.
+- path: src/powdrr_lift/structrr/__init__.py
+  type: modified
+  span:
+    start_line: 122
+    end_line: 127
+  summary: Remove exports for modules moved to the service package.
+  rationale: Callers now import service-owned modules directly, with no compatibility re-exports.
+- path: src/powdrr_lift/structrr/__init__.py
+  type: modified
+  span:
+    start_line: 134
+    end_line: 139
+  summary: Remove exports for modules moved to the service package.
+  rationale: Callers now import service-owned modules directly, with no compatibility re-exports.
+- path: src/powdrr_lift/structrr/bootstrap.py
+  type: modified
+  span:
+    start_line: 17
+    end_line: 21
+  summary: Update agent production callers to import moved Structrr policy directly from powdrr_service.
+  rationale: Complete the package boundary without leaving legacy import shims.
+- path: src/powdrr_lift/structrr/bootstrap.py
+  type: modified
+  span:
+    start_line: 23
+    end_line: 27
+  summary: Update agent production callers to import moved Structrr policy directly from powdrr_service.
+  rationale: Complete the package boundary without leaving legacy import shims.
+- path: src/powdrr_lift/structrr/gate_compiler.py
+  type: modified
+  span:
+    start_line: 14
+    end_line: 14
+  summary: Update agent production callers to import moved Structrr policy directly from powdrr_service.
+  rationale: Complete the package boundary without leaving legacy import shims.
+- path: src/powdrr_lift/structrr/gate_compiler.py
+  type: modified
+  span:
+    start_line: 15
+    end_line: 15
+  summary: Update agent production callers to import moved Structrr policy directly from powdrr_service.
+  rationale: Complete the package boundary without leaving legacy import shims.
+- path: src/powdrr_lift/structrr/intent_lineage.py
+  type: modified
+  span:
+    start_line: 11
+    end_line: 11
+  summary: Update agent production callers to import moved Structrr policy directly from powdrr_service.
+  rationale: Complete the package boundary without leaving legacy import shims.
+- path: src/powdrr_lift/structrr/intent_lineage.py
+  type: modified
+  span:
+    start_line: 13
+    end_line: 14
+  summary: Update agent production callers to import moved Structrr policy directly from powdrr_service.
+  rationale: Complete the package boundary without leaving legacy import shims.
+- path: src/powdrr_lift/structrr/invariant_review.py
+  type: modified
+  span:
+    start_line: 20
+    end_line: 21
+  summary: Update agent production callers to import moved Structrr policy directly from powdrr_service.
+  rationale: Complete the package boundary without leaving legacy import shims.
+- path: src/powdrr_lift/structrr/invariant_review.py
+  type: modified
+  span:
+    start_line: 24
+    end_line: 25
+  summary: Update agent production callers to import moved Structrr policy directly from powdrr_service.
+  rationale: Complete the package boundary without leaving legacy import shims.
+- path: src/powdrr_lift/structrr/proposal_review.py
+  type: modified
+  span:
+    start_line: 17
+    end_line: 17
+  summary: Update agent production callers to import moved Structrr policy directly from powdrr_service.
+  rationale: Complete the package boundary without leaving legacy import shims.
+- path: src/powdrr_lift/structrr/proposal_review.py
+  type: modified
+  span:
+    start_line: 22
+    end_line: 22
+  summary: Update agent production callers to import moved Structrr policy directly from powdrr_service.
+  rationale: Complete the package boundary without leaving legacy import shims.
+- path: src/powdrr_lift/structrr/verification_obligations.py
+  type: modified
+  span:
+    start_line: 12
+    end_line: 13
+  summary: Update agent production callers to import moved Structrr policy directly from powdrr_service.
+  rationale: Complete the package boundary without leaving legacy import shims.
+- path: src/powdrr_lift/structrr/verification_obligations.py
+  type: modified
+  span:
+    start_line: 13
+    end_line: 13
+  summary: Update agent production callers to import moved Structrr policy directly from powdrr_service.
+  rationale: Complete the package boundary without leaving legacy import shims.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 59
+    end_line: 63
+  summary: Update agent production callers to import moved Structrr policy directly from powdrr_service.
+  rationale: Complete the package boundary without leaving legacy import shims.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 65
+    end_line: 70
+  summary: Update agent production callers to import moved Structrr policy directly from powdrr_service.
+  rationale: Complete the package boundary without leaving legacy import shims.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 72
+    end_line: 72
+  summary: Update agent production callers to import moved Structrr policy directly from powdrr_service.
+  rationale: Complete the package boundary without leaving legacy import shims.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 77
+    end_line: 80
+  summary: Update agent production callers to import moved Structrr policy directly from powdrr_service.
+  rationale: Complete the package boundary without leaving legacy import shims.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 85
+    end_line: 85
+  summary: Update agent production callers to import moved Structrr policy directly from powdrr_service.
+  rationale: Complete the package boundary without leaving legacy import shims.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 90
+    end_line: 95
+  summary: Update agent production callers to import moved Structrr policy directly from powdrr_service.
+  rationale: Complete the package boundary without leaving legacy import shims.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 101
+    end_line: 101
+  summary: Update agent production callers to import moved Structrr policy directly from powdrr_service.
+  rationale: Complete the package boundary without leaving legacy import shims.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 54
+    end_line: 54
+  summary: Update agent production callers to import moved Structrr policy directly from powdrr_service.
+  rationale: Complete the package boundary without leaving legacy import shims.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 56
+    end_line: 56
+  summary: Update agent production callers to import moved Structrr policy directly from powdrr_service.
+  rationale: Complete the package boundary without leaving legacy import shims.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 120
+    end_line: 121
+  summary: Update agent production callers to import moved Structrr policy directly from powdrr_service.
+  rationale: Complete the package boundary without leaving legacy import shims.
+- path: tests/test_actual_diff.py
+  type: modified
+  span:
+    start_line: 6
+    end_line: 9
+  summary: Update coverage to exercise the service-owned Structrr modules and direct imports.
+  rationale: Keep tests aligned with the package boundary and prevent regression to legacy paths.
+- path: tests/test_agent_service_contracts.py
+  type: modified
+  span:
+    start_line: 201
+    end_line: 235
+  summary: Update coverage to exercise the service-owned Structrr modules and direct imports.
+  rationale: Keep tests aligned with the package boundary and prevent regression to legacy paths.
+- path: tests/test_agent_service_repository_capabilities.py
+  type: modified
+  span:
+    start_line: 20
+    end_line: 21
+  summary: Update coverage to exercise the service-owned Structrr modules and direct imports.
+  rationale: Keep tests aligned with the package boundary and prevent regression to legacy paths.
+- path: tests/test_agent_service_repository_capabilities.py
+  type: modified
+  span:
+    start_line: 22
+    end_line: 22
+  summary: Update coverage to exercise the service-owned Structrr modules and direct imports.
+  rationale: Keep tests aligned with the package boundary and prevent regression to legacy paths.
+- path: tests/test_agent_service_repository_capabilities.py
+  type: modified
+  span:
+    start_line: 24
+    end_line: 24
+  summary: Update coverage to exercise the service-owned Structrr modules and direct imports.
+  rationale: Keep tests aligned with the package boundary and prevent regression to legacy paths.
+- path: tests/test_candidate_comparison.py
+  type: modified
+  span:
+    start_line: 8
+    end_line: 8
+  summary: Update coverage to exercise the service-owned Structrr modules and direct imports.
+  rationale: Keep tests aligned with the package boundary and prevent regression to legacy paths.
+- path: tests/test_candidate_comparison.py
+  type: modified
+  span:
+    start_line: 12
+    end_line: 12
+  summary: Update coverage to exercise the service-owned Structrr modules and direct imports.
+  rationale: Keep tests aligned with the package boundary and prevent regression to legacy paths.
+- path: tests/test_candidate_comparison.py
+  type: modified
+  span:
+    start_line: 281
+    end_line: 282
+  summary: Update coverage to exercise the service-owned Structrr modules and direct imports.
+  rationale: Keep tests aligned with the package boundary and prevent regression to legacy paths.
+- path: tests/test_candidate_comparison.py
+  type: modified
+  span:
+    start_line: 383
+    end_line: 384
+  summary: Update coverage to exercise the service-owned Structrr modules and direct imports.
+  rationale: Keep tests aligned with the package boundary and prevent regression to legacy paths.
+- path: tests/test_candidate_comparison.py
+  type: modified
+  span:
+    start_line: 461
+    end_line: 462
+  summary: Update coverage to exercise the service-owned Structrr modules and direct imports.
+  rationale: Keep tests aligned with the package boundary and prevent regression to legacy paths.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 23
+    end_line: 23
+  summary: Update coverage to exercise the service-owned Structrr modules and direct imports.
+  rationale: Keep tests aligned with the package boundary and prevent regression to legacy paths.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 28
+    end_line: 28
+  summary: Update coverage to exercise the service-owned Structrr modules and direct imports.
+  rationale: Keep tests aligned with the package boundary and prevent regression to legacy paths.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 31
+    end_line: 31
+  summary: Update coverage to exercise the service-owned Structrr modules and direct imports.
+  rationale: Keep tests aligned with the package boundary and prevent regression to legacy paths.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 34
+    end_line: 34
+  summary: Update coverage to exercise the service-owned Structrr modules and direct imports.
+  rationale: Keep tests aligned with the package boundary and prevent regression to legacy paths.
+- path: tests/test_intent_lineage.py
+  type: modified
+  span:
+    start_line: 9
+    end_line: 9
+  summary: Update coverage to exercise the service-owned Structrr modules and direct imports.
+  rationale: Keep tests aligned with the package boundary and prevent regression to legacy paths.
+- path: tests/test_intent_lineage.py
+  type: modified
+  span:
+    start_line: 16
+    end_line: 16
+  summary: Update coverage to exercise the service-owned Structrr modules and direct imports.
+  rationale: Keep tests aligned with the package boundary and prevent regression to legacy paths.
+- path: tests/test_invariant_review.py
+  type: modified
+  span:
+    start_line: 11
+    end_line: 11
+  summary: Update coverage to exercise the service-owned Structrr modules and direct imports.
+  rationale: Keep tests aligned with the package boundary and prevent regression to legacy paths.
+- path: tests/test_invariant_review.py
+  type: modified
+  span:
+    start_line: 15
+    end_line: 19
+  summary: Update coverage to exercise the service-owned Structrr modules and direct imports.
+  rationale: Keep tests aligned with the package boundary and prevent regression to legacy paths.
+- path: tests/test_invariant_review.py
+  type: modified
+  span:
+    start_line: 33
+    end_line: 34
+  summary: Update coverage to exercise the service-owned Structrr modules and direct imports.
+  rationale: Keep tests aligned with the package boundary and prevent regression to legacy paths.
+- path: tests/test_structrr_gate_compiler.py
+  type: modified
+  span:
+    start_line: 7
+    end_line: 7
+  summary: Update coverage to exercise the service-owned Structrr modules and direct imports.
+  rationale: Keep tests aligned with the package boundary and prevent regression to legacy paths.
+- path: tests/test_structrr_gate_compiler.py
+  type: modified
+  span:
+    start_line: 12
+    end_line: 12
+  summary: Update coverage to exercise the service-owned Structrr modules and direct imports.
+  rationale: Keep tests aligned with the package boundary and prevent regression to legacy paths.
+- path: tests/test_structrr_proposal.py
+  type: modified
+  span:
+    start_line: 7
+    end_line: 7
+  summary: Update coverage to exercise the service-owned Structrr modules and direct imports.
+  rationale: Keep tests aligned with the package boundary and prevent regression to legacy paths.
+- path: tests/test_structrr_source_manifest.py
+  type: modified
+  span:
+    start_line: 5
+    end_line: 5
+  summary: Update coverage to exercise the service-owned Structrr modules and direct imports.
+  rationale: Keep tests aligned with the package boundary and prevent regression to legacy paths.
+- path: tests/test_verification_obligations.py
+  type: modified
+  span:
+    start_line: 3
+    end_line: 4
+  summary: Update coverage to exercise the service-owned Structrr modules and direct imports.
+  rationale: Keep tests aligned with the package boundary and prevent regression to legacy paths.
+- path: tests/test_verification_obligations.py
+  type: modified
+  span:
+    start_line: 4
+    end_line: 4
+  summary: Update coverage to exercise the service-owned Structrr modules and direct imports.
+  rationale: Keep tests aligned with the package boundary and prevent regression to legacy paths.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 21
+    end_line: 22
+  summary: Update coverage to exercise the service-owned Structrr modules and direct imports.
+  rationale: Keep tests aligned with the package boundary and prevent regression to legacy paths.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 43
+    end_line: 44
+  summary: Update coverage to exercise the service-owned Structrr modules and direct imports.
+  rationale: Keep tests aligned with the package boundary and prevent regression to legacy paths.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 170
+    end_line: 170
+  summary: Update coverage to exercise the service-owned Structrr modules and direct imports.
+  rationale: Keep tests aligned with the package boundary and prevent regression to legacy paths.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []
+features: []
+proposed_prs: []

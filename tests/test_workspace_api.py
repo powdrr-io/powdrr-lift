@@ -26,6 +26,7 @@ def _client(
     tmp_path: Path,
     *,
     checkpoint_inspector: WorkspaceCheckpointInspector | None = None,
+    static_directory: Path | None = None,
 ) -> tuple[TestClient, WorkspaceStore, str, str]:
     store = WorkspaceStore(tmp_path / "workspace.db")
     repository_path = tmp_path / "repository"
@@ -41,8 +42,25 @@ def _client(
         bootstrap_secret=secret,
         expected_origin=origin,
         checkpoint_inspector=checkpoint_inspector,
+        static_directory=static_directory,
     )
     return TestClient(app, base_url=origin), store, repository.repository_id, secret
+
+
+def test_app_serves_bundled_ui_and_keeps_api_routes_available(tmp_path: Path) -> None:
+    assets = tmp_path / "web-assets"
+    (assets / "assets").mkdir(parents=True)
+    (assets / "index.html").write_text(
+        "<!doctype html><title>workspace</title>", encoding="utf-8"
+    )
+    (assets / "assets" / "app.js").write_text(
+        "console.log('workspace')", encoding="utf-8"
+    )
+    client, _, _, _ = _client(tmp_path, static_directory=assets)
+
+    assert "<title>workspace</title>" in client.get("/").text
+    assert client.get("/assets/app.js").text == "console.log('workspace')"
+    assert client.get("/api/v1/health").status_code == 200
 
 
 def _sign_in(client: TestClient, secret: str) -> str:
@@ -253,13 +271,26 @@ def test_app_lifespan_dispatches_workspace_turns_under_supervisor_lease(
 
 
 def test_workspace_app_factory_composes_procedrr_turn_dispatch(tmp_path: Path) -> None:
+    repository_root = tmp_path / "checkout"
+    repository_root.mkdir()
+    subprocess.run(
+        ["git", "init", str(repository_root)], check=True, capture_output=True
+    )
     app = build_workspace_app(
         data_dir=tmp_path / "workspace-data",
         bootstrap_secret="bootstrap-secret-value-that-is-at-least-32-characters",
         expected_origin="http://127.0.0.1:8765",
+        repository_root=repository_root,
     )
 
     with TestClient(app, base_url="http://127.0.0.1:8765") as client:
+        page = client.get("/")
+        assert page.status_code == 200
+        assert '<div id="root"></div>' in page.text
+        script_path = page.text.split('src="', maxsplit=1)[1].split('"', maxsplit=1)[0]
+        assert script_path.startswith("/assets/")
+        assert client.get(script_path).status_code == 200
+
         deadline = time.monotonic() + 5
         while True:
             health = client.get("/api/v1/health").json()
@@ -270,6 +301,9 @@ def test_workspace_app_factory_composes_procedrr_turn_dispatch(tmp_path: Path) -
             time.sleep(0.01)
 
     assert app.state.store.path == tmp_path / "workspace-data" / "workspace.sqlite3"
+    assert app.state.store.list_repositories()[0].canonical_root == str(
+        repository_root.resolve()
+    )
     assert app.state.turn_dispatch_runtime.health()["status"] == "stopped"
 
 

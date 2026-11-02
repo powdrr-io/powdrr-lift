@@ -104,3 +104,19 @@ then remove retained task branches and worktrees when they are no longer needed.
 For provider or model overrides, allowed-path limits, validation commands,
 timeouts, and repair limits, see the `bootstrap` and `implement` command help or
 the [README](README.md).
+
+## Launch the browser workspace
+
+From a Git checkout, start the local workspace with:
+
+```bash
+powdrr-lift ui --repo-root "$PWD"
+```
+
+The command opens the bundled UI in your browser and prints a one-use launch
+token in the terminal. Enter the token in the browser to connect. Workspace
+data is stored in your OS application data directory, outside the repository.
+Use `--port PORT` to select a port, `--no-open` to skip automatic browser launch,
+or `--data-dir PATH` to choose a different local data directory. Keep the
+terminal open while you use the workspace; closing the browser tab does not
+stop the local service.

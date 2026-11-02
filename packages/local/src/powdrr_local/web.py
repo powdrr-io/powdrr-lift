@@ -9,6 +9,7 @@ import secrets
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -22,6 +23,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from starlette.concurrency import run_in_threadpool
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.responses import JSONResponse
+from starlette.staticfiles import StaticFiles
 
 from powdrr_local.turn_dispatch_runtime import (
     WorkspaceTurnDispatchRuntime,
@@ -65,6 +67,7 @@ def create_app(
     event_source: WorkspaceEventSource | None = None,
     turn_dispatcher: WorkspaceTurnDispatcher | None = None,
     checkpoint_inspector: WorkspaceCheckpointInspector | None = None,
+    static_directory: Path | None = None,
     session_max_age: int = _SESSION_MAX_AGE_SECONDS,
 ) -> FastAPI:
     """Build an app without starting global services or touching credentials."""
@@ -287,6 +290,14 @@ def create_app(
         event_source=event_source,
         checkpoint_inspector=checkpoint_inspector,
     )
+    if static_directory is not None:
+        if not static_directory.is_dir():
+            raise ValueError("static_directory must be an existing directory")
+        app.mount(
+            "/",
+            StaticFiles(directory=static_directory, html=True),
+            name="workspace-ui",
+        )
     return app
 
 

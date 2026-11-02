@@ -5,6 +5,10 @@ const apiTarget = process.env.POWDRR_WORKSPACE_API ?? 'http://127.0.0.1:8765'
 
 export default defineConfig({
   plugins: [react()],
+  build: {
+    outDir: '../packages/local/src/powdrr_local/web_assets',
+    emptyOutDir: true,
+  },
   server: {
     proxy: {
       '/api': {

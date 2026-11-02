@@ -919,11 +919,9 @@
         "powdrr_lift.core.index",
         "powdrr_lift.core.pr_specification",
         "powdrr_lift.core.spec_paths",
-        "powdrr_lift.core.system_specification",
         "powdrr_lift.core.validation_messages",
         "powdrr_service.changelog",
         "powdrr_service.changelog.template",
-        "powdrr_service.changelog.structured_document",
         "powdrr_service.changelog.validation_policy",
         "powdrr_service.specifications.system"
       ],
@@ -997,6 +995,7 @@
         "powdrr_lift.workrr.scenario",
         "powdrr_lift.workrr.task_agent",
         "powdrr_lift.workrr.workflow_provider_selection",
+        "powdrr_lift.workrr.workspace_launch",
         "powdrr_service.evaluations.deepswe_design_evaluation",
         "powdrr_service.evaluations.deepswe_probe_evaluation",
         "powdrr_service.evaluations.prompt_benchmark_comparison",
@@ -1062,8 +1061,8 @@
         "powdrr_lift.core.template",
         "powdrr_lift.core.tool_manifest",
         "powdrr_lift.core.validate",
-        "powdrr_service.specifications.system",
-        "powdrr_lift.structrr.intent"
+        "powdrr_lift.structrr.intent",
+        "powdrr_service.specifications.system"
       ],
       "kind": "python_module",
       "owner": "split",
@@ -1628,7 +1627,6 @@
         "powdrr_lift.core.execution_state",
         "powdrr_lift.core.implementation_specification",
         "powdrr_lift.core.pr_specification",
-        "powdrr_lift.core.system_specification",
         "powdrr_lift.core.tool_manifest",
         "powdrr_lift.errors",
         "powdrr_lift.execution",
@@ -1646,6 +1644,7 @@
         "powdrr_lift.workrr.procedrr_chat",
         "powdrr_lift.workrr.scenario",
         "powdrr_service.procedrr",
+        "powdrr_service.resources",
         "powdrr_service.specifications.system"
       ],
       "kind": "python_module",

@@ -32,6 +32,7 @@ from powdrr_lift.workrr.planning.evidence import (
     lookup_symbols_in_pinned_file,
     read_pinned_code_file,
     record_file_evidence,
+    search_dependency_reference_paths,
     search_requirement_evidence,
 )
 
@@ -99,6 +100,37 @@ def _symbol(name: str, path: str, start: int, end: int) -> dict[str, Any]:
         "name": name,
         "path": path,
         "range": {"start_line": start, "end_line": end},
+    }
+
+
+def test_dependency_reference_evidence_maps_planned_paths_to_units(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repository, base_commit = _repository(tmp_path)
+    monkeypatch.setattr(
+        "powdrr_lift.workrr.planning.evidence._require_clean_pinned_checkout",
+        lambda root, commit: None,
+    )
+    monkeypatch.setattr(
+        "powdrr_lift.workrr.planning.evidence.find_workspace_reference_paths",
+        lambda paths, *, worktree_root: {
+            "src/schema.py": ("tests/test_schema.py",),
+        },
+    )
+
+    result = search_dependency_reference_paths(
+        repository,
+        base_commit,
+        {
+            "unit-implementation": ("src/schema.py",),
+            "unit-test": ("tests/test_schema.py",),
+        },
+    )
+
+    assert result == {
+        ("unit-implementation", "unit-test"): (
+            "src/schema.py -> tests/test_schema.py",
+        ),
     }
 
 

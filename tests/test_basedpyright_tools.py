@@ -9,6 +9,7 @@ from powdrr_lift.basedpyright_tools import (
     BASEDPYRIGHT_STRUCTURE_TOOL,
     BASEDPYRIGHT_SYMBOL_TOOL,
     execute_basedpyright_tool,
+    find_workspace_reference_paths,
 )
 from powdrr_lift.errors import PowdrrExecutionError
 
@@ -124,3 +125,54 @@ def test_basedpyright_structure_tool_rejects_non_python_paths(tmp_path: Path) ->
             {"path": "example.txt"},
             worktree_root=tmp_path,
         )
+
+
+def test_basedpyright_reference_search_maps_only_planned_consumer_files(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    producer = tmp_path / "src" / "catalog.py"
+    consumer = tmp_path / "src" / "dashboard.py"
+    unrelated = tmp_path / "src" / "unrelated.py"
+    producer.parent.mkdir()
+    producer.write_text("def lookup(): ...\n")
+    consumer.write_text("from catalog import lookup\n")
+    unrelated.write_text("def other(): ...\n")
+
+    class ReferenceServer(_FakeServer):
+        def request(self, method: str, params: Any) -> Any:
+            if method == "textDocument/documentSymbol":
+                uri = params["textDocument"]["uri"]
+                if uri == producer.as_uri():
+                    return [
+                        {
+                            "name": "lookup",
+                            "kind": 12,
+                            "range": {
+                                "start": {"line": 0, "character": 4},
+                                "end": {"line": 0, "character": 10},
+                            },
+                            "selectionRange": {
+                                "start": {"line": 0, "character": 4},
+                                "end": {"line": 0, "character": 10},
+                            },
+                        }
+                    ]
+                return []
+            if method == "textDocument/references":
+                return [
+                    {"uri": consumer.as_uri(), "range": {}},
+                    {"uri": unrelated.as_uri(), "range": {}},
+                ]
+            raise AssertionError(f"unexpected BasedPyright request: {method}")
+
+    monkeypatch.setattr(
+        "powdrr_lift.basedpyright_tools._BasedPyrightLanguageServer",
+        ReferenceServer,
+    )
+
+    result = find_workspace_reference_paths(
+        ["src/catalog.py", "src/dashboard.py"], worktree_root=tmp_path
+    )
+
+    assert result == {"src/catalog.py": ("src/dashboard.py",)}

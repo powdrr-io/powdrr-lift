@@ -331,6 +331,7 @@ class DependencyCandidateDiscovery:
 
     write_order_edges: tuple[UnitDependencyEdge, ...]
     confirmation_pairs: tuple[tuple[PendingUnitOutput, WorkUnit], ...]
+    code_reference_paths: Mapping[tuple[str, str], tuple[str, ...]]
 
 
 def discover_dependency_candidates(
@@ -338,6 +339,7 @@ def discover_dependency_candidates(
     pending_outputs: Sequence[PendingUnitOutput],
     *,
     related_requirement_ids: Mapping[str, Sequence[str]] | None = None,
+    code_reference_paths: Mapping[tuple[str, str], Sequence[str]] | None = None,
 ) -> DependencyCandidateDiscovery:
     """Avoid all-pairs dependency questions by pruning to concrete evidence."""
     by_id = {unit.id: unit for unit in units}
@@ -375,6 +377,7 @@ def discover_dependency_candidates(
     rare_token_limit = max(3, len(units) // 200)
     pairs: list[tuple[PendingUnitOutput, WorkUnit]] = []
     seen_pairs: set[tuple[str, str, tuple[str, ...], str]] = set()
+    accepted_reference_paths: dict[tuple[str, str], tuple[str, ...]] = {}
     for pending in pending_outputs:
         producer = by_id.get(pending.unit_id)
         if producer is None:
@@ -413,11 +416,15 @@ def discover_dependency_candidates(
                 for consumer_requirement in consumer.requirement_ids
             )
             shared_rare_tokens = candidate_tokens & unit_tokens[consumer.id]
+            reference_paths = tuple(
+                sorted((code_reference_paths or {}).get((producer.id, consumer.id), ()))
+            )
             if (
                 explicit_path_reference
                 or explicit_output_reference
                 or shared_requirement_relation
                 or len(shared_rare_tokens) >= 3
+                or reference_paths
             ):
                 pair_key = (
                     pending.unit_id,
@@ -428,7 +435,13 @@ def discover_dependency_candidates(
                 if pair_key not in seen_pairs:
                     seen_pairs.add(pair_key)
                     pairs.append((pending, consumer))
-    return DependencyCandidateDiscovery(write_order_edges, tuple(pairs))
+                if reference_paths:
+                    accepted_reference_paths[(producer.id, consumer.id)] = (
+                        reference_paths
+                    )
+    return DependencyCandidateDiscovery(
+        write_order_edges, tuple(pairs), accepted_reference_paths
+    )
 
 
 def _dependency_unit_text(unit: WorkUnit) -> str:
@@ -1384,6 +1397,7 @@ def build_dependency_confirmation_request(
     output: str,
     *,
     allowed_requirement_ids: set[str],
+    code_reference_paths: Sequence[str] = (),
 ) -> QuestionRequest[DependencyConfirmation]:
     if producer.id == consumer.id:
         raise DependencyError("producer and consumer must be different units")
@@ -1399,6 +1413,16 @@ def build_dependency_confirmation_request(
         ContextRecord(
             "candidate-requirements",
             {"requirement_ids": sorted(allowed_requirement_ids)},
+        ),
+        *(
+            (
+                ContextRecord(
+                    "basedpyright-reference-paths",
+                    {"producer_to_consumer": list(code_reference_paths)},
+                ),
+            )
+            if code_reference_paths
+            else ()
         ),
     )
     context_refs = tuple(item.ref_id for item in facts)
@@ -1417,6 +1441,7 @@ def build_dependency_confirmation_request(
                     "producer": producer.to_data(),
                     "consumer": consumer.to_data(),
                     "output": output,
+                    "code_reference_paths": list(code_reference_paths),
                 }
             ),
             context_refs,
@@ -1427,6 +1452,14 @@ def build_dependency_confirmation_request(
             f"Does consumer {consumer.id} need the producer's named output before "
             "it can be implemented or validated? Answer required only when there "
             "is a real information or artifact dependency."
+            + (
+                " BasedPyright found references from the producer's planned files "
+                f"to the consumer's planned files: {', '.join(code_reference_paths)}. "
+                "Use these as candidate evidence; a reference alone does not prove "
+                "that this named output is required."
+                if code_reference_paths
+                else ""
+            )
         ),
         answer_field_definitions={
             "result": "required or independent.",

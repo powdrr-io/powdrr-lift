@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -15,6 +16,9 @@ BASEDPYRIGHT_SYMBOL_TOOL = "basedpyright-symbol"
 BASEDPYRIGHT_STRUCTURE_TOOL = "basedpyright-structure"
 BASEDPYRIGHT_TOOLS = frozenset({BASEDPYRIGHT_SYMBOL_TOOL, BASEDPYRIGHT_STRUCTURE_TOOL})
 _MAX_RESULTS = 200
+_MAX_REFERENCE_FILES = 512
+_MAX_REFERENCE_SYMBOLS_PER_FILE = 512
+_MAX_REFERENCE_REQUESTS = 1_024
 
 
 def is_basedpyright_tool(tool: str) -> bool:
@@ -59,6 +63,155 @@ def find_workspace_symbols(
                 _symbol_to_data(symbol, worktree_root) for symbol in symbols[:limit]
             ]
     return results
+
+
+def find_workspace_reference_paths(
+    paths: list[str], *, worktree_root: Path
+) -> dict[str, tuple[str, ...]]:
+    """Find planned Python files that reference symbols in other planned files."""
+    root = worktree_root.resolve()
+    normalized_paths = tuple(
+        sorted(
+            {
+                str(path.resolve().relative_to(root))
+                for value in paths
+                if (path := _resolve_worktree_path(value, root)).is_file()
+                and path.suffix.casefold() in {".py", ".pyi"}
+            }
+        )
+    )
+    if len(normalized_paths) > _MAX_REFERENCE_FILES:
+        raise PowdrrExecutionError(
+            f"BasedPyright reference search accepts at most {_MAX_REFERENCE_FILES} "
+            "planned Python files at once."
+        )
+    if not normalized_paths:
+        return {}
+
+    allowed_paths = set(normalized_paths)
+    reference_paths: dict[str, set[str]] = {
+        relative_path: set() for relative_path in normalized_paths
+    }
+    source_by_path = {
+        relative_path: _resolve_worktree_path(relative_path, root).read_text(
+            encoding="utf-8"
+        )
+        for relative_path in normalized_paths
+    }
+    with _BasedPyrightLanguageServer(root) as server:
+        for relative_path in normalized_paths:
+            path = _resolve_worktree_path(relative_path, root)
+            server.notify(
+                "textDocument/didOpen",
+                {
+                    "textDocument": {
+                        "uri": path.as_uri(),
+                        "languageId": "python",
+                        "version": 1,
+                        "text": source_by_path[relative_path],
+                    }
+                },
+            )
+        reference_request_count = 0
+        for relative_path in normalized_paths:
+            path = _resolve_worktree_path(relative_path, root)
+            symbols = server.request(
+                "textDocument/documentSymbol",
+                {"textDocument": {"uri": path.as_uri()}},
+            )
+            if not isinstance(symbols, list):
+                raise PowdrrExecutionError(
+                    "basedpyright returned an invalid document symbol result."
+                )
+            candidates = tuple(
+                (name, line, character)
+                for name, line, character in _symbol_reference_positions(symbols)
+                if _symbol_appears_in_other_planned_file(
+                    name, relative_path, source_by_path
+                )
+            )
+            if len(candidates) > _MAX_REFERENCE_SYMBOLS_PER_FILE:
+                raise PowdrrExecutionError(
+                    f"BasedPyright reference search found more than "
+                    f"{_MAX_REFERENCE_SYMBOLS_PER_FILE} symbols in {relative_path}."
+                )
+            for _, line, character in candidates:
+                reference_request_count += 1
+                if reference_request_count > _MAX_REFERENCE_REQUESTS:
+                    raise PowdrrExecutionError(
+                        "BasedPyright reference search exceeded its limit of "
+                        f"{_MAX_REFERENCE_REQUESTS} symbol queries."
+                    )
+                references = server.request(
+                    "textDocument/references",
+                    {
+                        "textDocument": {"uri": path.as_uri()},
+                        "position": {"line": line, "character": character},
+                        "context": {"includeDeclaration": False},
+                    },
+                )
+                if references is None:
+                    continue
+                if not isinstance(references, list):
+                    raise PowdrrExecutionError(
+                        "basedpyright returned an invalid references result."
+                    )
+                for reference in references:
+                    if not isinstance(reference, dict):
+                        continue
+                    referenced_path = _uri_to_relative_path(reference.get("uri"), root)
+                    if (
+                        referenced_path in allowed_paths
+                        and referenced_path != relative_path
+                    ):
+                        reference_paths[relative_path].add(referenced_path)
+    return {
+        path: tuple(sorted(references))
+        for path, references in sorted(reference_paths.items())
+        if references
+    }
+
+
+def _symbol_reference_positions(
+    symbols: list[Any],
+) -> list[tuple[str, int, int]]:
+    positions: list[tuple[str, int, int]] = []
+    for symbol in symbols:
+        if not isinstance(symbol, dict):
+            continue
+        selection_range = symbol.get("selectionRange")
+        if not isinstance(selection_range, dict):
+            selection_range = symbol.get("range")
+        start = (
+            selection_range.get("start") if isinstance(selection_range, dict) else None
+        )
+        name = symbol.get("name")
+        if isinstance(start, dict):
+            line = start.get("line")
+            character = start.get("character")
+            if (
+                isinstance(name, str)
+                and name
+                and isinstance(line, int)
+                and not isinstance(line, bool)
+                and isinstance(character, int)
+                and not isinstance(character, bool)
+            ):
+                positions.append((name, line, character))
+        children = symbol.get("children")
+        if isinstance(children, list):
+            positions.extend(_symbol_reference_positions(children))
+    return positions
+
+
+def _symbol_appears_in_other_planned_file(
+    name: str, source_path: str, source_by_path: dict[str, str]
+) -> bool:
+    identifier = re.compile(rf"\b{re.escape(name)}\b")
+    return any(
+        path != source_path and identifier.search(source)
+        for path, source in source_by_path.items()
+    )
 
 
 def _find_symbols(

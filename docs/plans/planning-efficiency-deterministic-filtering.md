@@ -218,7 +218,12 @@ synthetic timings below do not establish the two-hour target.
 
 **Purpose:** Make dependency detection more evidence-based and control confirmation count as plans grow.
 
-**Current behavior:** Same-file write ordering is deterministic. Semantic candidates are pruned using explicit path mentions and rare-token overlap, then each remaining pair is asked separately.
+**Current behavior:** Same-file write ordering is deterministic. Semantic candidates are pruned using explicit path mentions and rare-token overlap; remaining confirmation questions use the shared bounded question batcher.
+
+**Progress:** Planned Python files now contribute BasedPyright reference candidates,
+bounded to symbols also named in another planned file. The references only add
+pairs for targeted confirmation; they do not determine dependency edges. Labeled
+candidate-recall coverage remains open.
 
 **Implementation:**
 

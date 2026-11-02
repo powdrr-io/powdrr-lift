@@ -347,6 +347,10 @@ class SourceLedgerQuestionMachine:
         ]
         | None = None,
         evidence_excerpt_reader: Callable[[Evidence], str] | None = None,
+        dependency_reference_search: Callable[
+            [Sequence[WorkUnit]], Mapping[tuple[str, str], Sequence[str]]
+        ]
+        | None = None,
         verification_command: str = "make test",
         repository_paths: Mapping[str, PathFact] | None = None,
         plan_id: str = "planning-session",
@@ -359,6 +363,9 @@ class SourceLedgerQuestionMachine:
         self.evidence_by_requirement = dict(evidence_by_requirement or {})
         self.evidence_search = evidence_search
         self.evidence_excerpt_reader = evidence_excerpt_reader
+        self.dependency_reference_search = dependency_reference_search
+        self._dependency_reference_cache_key: tuple[Any, ...] | None = None
+        self._dependency_reference_cache: Mapping[tuple[str, str], Sequence[str]] = {}
         self._evidence_search_cache: dict[str, RequirementEvidenceSearch] = {}
         self.verification_command = verification_command
         self.repository_paths = dict(repository_paths or {})
@@ -1195,6 +1202,9 @@ class SourceLedgerQuestionMachine:
                     pending_output.description,
                     allowed_requirement_ids=set(producer.requirement_ids)
                     | set(consumer.requirement_ids),
+                    code_reference_paths=discovery.code_reference_paths.get(
+                        (producer.id, consumer.id), ()
+                    ),
                 )
             )
         return tuple(requests)
@@ -1213,6 +1223,9 @@ class SourceLedgerQuestionMachine:
                 pending_output.description,
                 allowed_requirement_ids=set(producer.requirement_ids)
                 | set(consumer.requirement_ids),
+                code_reference_paths=discovery.code_reference_paths.get(
+                    (producer.id, consumer.id), ()
+                ),
             )
             answer = request.parse_answer(
                 accepted_answers[request.question.question_id]
@@ -1239,10 +1252,23 @@ class SourceLedgerQuestionMachine:
             requirement_id: requirement.related_requirement_ids
             for requirement_id, requirement in context.requirements.items()
         }
+        paths_key = tuple(
+            (unit.id, tuple(write.path for write in unit.planned_writes))
+            for unit in allocation.units
+        )
+        if (
+            paths_key != self._dependency_reference_cache_key
+            and self.dependency_reference_search is not None
+        ):
+            self._dependency_reference_cache = self.dependency_reference_search(
+                allocation.units
+            )
+            self._dependency_reference_cache_key = paths_key
         discovery = discover_dependency_candidates(
             allocation.units,
             allocation.pending_outputs,
             related_requirement_ids=related_requirement_ids,
+            code_reference_paths=self._dependency_reference_cache,
         )
         return allocation, discovery
 

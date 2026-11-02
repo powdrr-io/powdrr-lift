@@ -14,6 +14,7 @@ from typing import Any, Literal, Protocol
 from powdrr_agent.repository import (
     LocalActionError,
     execute_command,
+    find_workspace_reference_paths,
     find_workspace_symbols,
     inspect_pinned_checkout,
     read_pinned_file,
@@ -380,6 +381,36 @@ def search_requirements_evidence(
             basedpyright_available,
         )
     return output
+
+
+def search_dependency_reference_paths(
+    repository_root: str | Path,
+    base_commit: str,
+    paths_by_unit: Mapping[str, Sequence[str]],
+) -> dict[tuple[str, str], tuple[str, ...]]:
+    """Map planned unit pairs connected by BasedPyright symbol references."""
+    root = Path(repository_root).resolve()
+    _require_clean_pinned_checkout(root, base_commit)
+    owners_by_path: dict[str, set[str]] = {}
+    for unit_id, paths in paths_by_unit.items():
+        for path in paths:
+            if Path(path).suffix.casefold() in {".py", ".pyi"}:
+                owners_by_path.setdefault(path, set()).add(unit_id)
+    reference_paths = find_workspace_reference_paths(
+        sorted(owners_by_path), worktree_root=root
+    )
+    candidate_paths: dict[tuple[str, str], set[str]] = {}
+    for producer_path, consumer_paths in reference_paths.items():
+        for consumer_path in consumer_paths:
+            for producer_id in owners_by_path.get(producer_path, ()):
+                for consumer_id in owners_by_path.get(consumer_path, ()):
+                    if producer_id != consumer_id:
+                        candidate_paths.setdefault(
+                            (producer_id, consumer_id), set()
+                        ).add(f"{producer_path} -> {consumer_path}")
+    return {
+        pair: tuple(sorted(paths)) for pair, paths in sorted(candidate_paths.items())
+    }
 
 
 def read_pinned_code_file(

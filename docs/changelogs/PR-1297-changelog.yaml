@@ -1,0 +1,149 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1297
+title: Add history and context to workspace jobs
+intent:
+  problem: Workspace jobs lose visibility after completion, and job details do not expose useful timing or related work context.
+  goal: Add filterable job history and connect job status to its dependencies and originating design chat.
+human-decisions: []
+structured_files: []
+files:
+  - path: ui/src/App.css
+    type: modified
+    span: {start_line: 177, end_line: 177}
+    summary: Give the job tabs space for the history tab.
+    rationale: Keep the three job views usable in the sidebar.
+  - path: ui/src/App.css
+    type: modified
+    span: {start_line: 181, end_line: 182}
+    summary: Style the history filter control.
+    rationale: Make history filtering readable within the job sidebar.
+  - path: ui/src/App.css
+    type: modified
+    span: {start_line: 195, end_line: 201}
+    summary: Style job activity details and history status indicators.
+    rationale: Distinguish recent activity and terminal job states in the list.
+  - path: ui/src/App.css
+    type: modified
+    span: {start_line: 269, end_line: 272}
+    summary: Style links to originating chats and dependency jobs.
+    rationale: Make related workspace context actionable in job status.
+  - path: ui/src/App.test.tsx
+    type: modified
+    span: {start_line: 214, end_line: 215}
+    summary: Associate the ready-job fixture with a design chat and dependency.
+    rationale: Exercise related context in the workspace job view.
+  - path: ui/src/App.test.tsx
+    type: modified
+    span: {start_line: 230, end_line: 245}
+    summary: Add completed and failed job fixtures.
+    rationale: Verify terminal jobs appear in history and respond to filters.
+  - path: ui/src/App.test.tsx
+    type: modified
+    span: {start_line: 272, end_line: 272}
+    summary: Include terminal jobs in the workspace snapshot fixture.
+    rationale: Provide history entries to the workspace view test.
+  - path: ui/src/App.test.tsx
+    type: modified
+    span: {start_line: 301, end_line: 301}
+    summary: Assert dependency navigation is available from the job view.
+    rationale: Protect the new path to related jobs.
+  - path: ui/src/App.test.tsx
+    type: modified
+    span: {start_line: 319, end_line: 326}
+    summary: Verify history tab selection and failed-job filtering.
+    rationale: Keep terminal job discovery and filtering functional.
+  - path: ui/src/App.tsx
+    type: modified
+    span: {start_line: 115, end_line: 119}
+    summary: Show latest activity and detail text on job rows.
+    rationale: Surface useful status without opening each job.
+  - path: ui/src/App.tsx
+    type: modified
+    span: {start_line: 132, end_line: 133}
+    summary: Track the selected job tab and history filter.
+    rationale: Support separate running, ready, and historical job views.
+  - path: ui/src/App.tsx
+    type: modified
+    span: {start_line: 162, end_line: 167}
+    summary: Resolve selected job dependencies and originating chat.
+    rationale: Provide related workspace context to job status details.
+  - path: ui/src/App.tsx
+    type: modified
+    span: {start_line: 588, end_line: 588}
+    summary: Limit the running view to active and waiting jobs.
+    rationale: Make interrupted work discoverable in job history.
+  - path: ui/src/App.tsx
+    type: modified
+    span: {start_line: 591, end_line: 596}
+    summary: Build a sorted, filterable view of terminal jobs.
+    rationale: Keep completed and unsuccessful work accessible after execution ends.
+  - path: ui/src/App.tsx
+    type: modified
+    span: {start_line: 637, end_line: 637}
+    summary: Include historical jobs in the sidebar total.
+    rationale: Reflect all discoverable jobs in the section count.
+  - path: ui/src/App.tsx
+    type: modified
+    span: {start_line: 641, end_line: 641}
+    summary: Add the history tab and its job count.
+    rationale: Provide a dedicated view for terminal jobs.
+  - path: ui/src/App.tsx
+    type: modified
+    span: {start_line: 643, end_line: 655}
+    summary: Add state filtering and history-specific navigation labels.
+    rationale: Let users narrow history to relevant terminal outcomes.
+  - path: ui/src/App.tsx
+    type: modified
+    span: {start_line: 660, end_line: 660}
+    summary: Describe the empty state for the selected job view.
+    rationale: Give useful feedback when a filter has no matching jobs.
+  - path: ui/src/App.tsx
+    type: modified
+    span: {start_line: 707, end_line: 707}
+    summary: Pass dependency and originating-chat context into job status.
+    rationale: Keep related jobs and the design source reachable from job details.
+  - path: ui/src/components/JobStatus.tsx
+    type: modified
+    span: {start_line: 1, end_line: 1}
+    summary: Import workspace job and conversation types.
+    rationale: Type the new contextual job links.
+  - path: ui/src/components/JobStatus.tsx
+    type: modified
+    span: {start_line: 19, end_line: 37}
+    summary: Format elapsed and active job time.
+    rationale: Make execution duration and active time understandable at a glance.
+  - path: ui/src/components/JobStatus.tsx
+    type: modified
+    span: {start_line: 43, end_line: 46}
+    summary: Accept related jobs, chat, and navigation callbacks.
+    rationale: Allow job status to link to relevant workspace context.
+  - path: ui/src/components/JobStatus.tsx
+    type: modified
+    span: {start_line: 52, end_line: 55}
+    summary: Type the related job and conversation props.
+    rationale: Keep navigation inputs aligned with workspace API types.
+  - path: ui/src/components/JobStatus.tsx
+    type: modified
+    span: {start_line: 58, end_line: 58}
+    summary: Identify active and waiting job states.
+    rationale: Show live elapsed time for work that has not reached a terminal state.
+  - path: ui/src/components/JobStatus.tsx
+    type: modified
+    span: {start_line: 113, end_line: 128}
+    summary: Show elapsed time, last activity, and originating design chat.
+    rationale: Give users timing and source context for the selected job.
+  - path: ui/src/components/JobStatus.tsx
+    type: modified
+    span: {start_line: 162, end_line: 175}
+    summary: Link dependency jobs from the selected job status.
+    rationale: Make prerequisite execution status directly inspectable.
+entities: []
+entity_relationships: []
+invariants:
+  - id: workspace-job-history-includes-terminal-states
+    description: Succeeded, failed, cancelled, and interrupted jobs remain discoverable in the history view.
+    action: added
+  - id: workspace-job-status-links-related-context
+    description: Job status exposes its originating design chat and known dependency jobs as navigable context.
+    action: added
+guidance: []

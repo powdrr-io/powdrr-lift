@@ -1,5 +1,5 @@
 schema: https://powdrr.io/schema/changelog-v2
-change_id: 1308
+change_id: 1309
 title: Report checkpoint availability in job recovery details
 intent:
   problem: The recovery review shows checkpoint status as unreported because the workspace job detail API has no recovery assessment.

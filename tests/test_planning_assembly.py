@@ -616,7 +616,7 @@ def test_work_unit_continuation_only_includes_uncovered_requirements(
         )
         for requirement_id in requirement_ids
     )
-    monkeypatch.setattr(machine, "_parse_source_ledger", lambda _answers: ledger)
+    monkeypatch.setattr(machine, "accepted_ledger", lambda _answers: ledger)
     monkeypatch.setattr(machine, "accepted_coverage", lambda _answers: coverage)
     monkeypatch.setattr(
         machine, "_work_unit_context", lambda _ledger, _unresolved: context

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from pathlib import Path
@@ -71,6 +72,7 @@ from powdrr_service.planning.source import (
 )
 from powdrr_service.planning.structrr import (
     BoundStructuralSubject,
+    StructuralBaselineIndex,
     StructuralChange,
     StructuralSubjectPage,
     bind_structural_operation,
@@ -79,6 +81,7 @@ from powdrr_service.planning.structrr import (
     coalesce_structural_subjects,
     compile_structrr_plan,
     complete_subject_enumeration,
+    index_structural_baseline,
     reject_unordered_subject_conflicts,
 )
 from powdrr_service.planning.workflow_ids import slugify_workflow_id
@@ -351,6 +354,7 @@ class SourceLedgerQuestionMachine:
     ) -> None:
         source.validate()
         self.source = source
+        self._source_blocks_by_id = {item.id: item for item in source.blocks}
         self.evidence_by_requirement = dict(evidence_by_requirement or {})
         self.evidence_search = evidence_search
         self.evidence_excerpt_reader = evidence_excerpt_reader
@@ -365,9 +369,26 @@ class SourceLedgerQuestionMachine:
         self._invalid_accepted_question_ids: set[str] = set()
         self._accepted_question_input_digests: dict[str, str] | None = None
         self._oversized_work_unit_groups: set[tuple[str, ...]] = set()
+        self._max_question_frontier: int | None = None
         self._single_proposal_requirements: set[str] = set()
         self._supplemental_work_unit_requirements: set[str] = set()
         self._pending_deterministic_answers: dict[str, Mapping[str, Any]] = {}
+        self._accepted_ledger_cache_key: str | None = None
+        self._accepted_ledger_cache_value: SourceLedger | None = None
+        self._fidelity_request_cache: dict[str, QuestionRequest[Any]] = {}
+        self._validated_fidelity_answers: dict[str, str] = {}
+        self._coverage_request_cache: dict[str, QuestionRequest[Any]] = {}
+        self._accepted_coverage_cache: dict[str, tuple[str, RequirementCoverage]] = {}
+        self._accepted_work_unit_cache_key: str | None = None
+        self._accepted_work_unit_cache_value: (
+            tuple[WorkUnitContext, tuple[WorkUnitProposal, ...]] | None
+        ) = None
+        self._structrr_baseline_index_cache: dict[
+            tuple[str, ...], StructuralBaselineIndex
+        ] = {}
+        self._structural_change_request_cache: dict[
+            tuple[tuple[str, ...], str], QuestionRequest[Any]
+        ] = {}
         self._accepted_assembly_cache_key: tuple[Any, ...] | None = None
         self._accepted_assembly_cache_value: PlanningAssembly | None = None
 
@@ -390,6 +411,19 @@ class SourceLedgerQuestionMachine:
     ) -> None:
         """Set digests recorded with answers so changed question inputs are reasked."""
         self._accepted_question_input_digests = dict(input_digests)
+
+    def set_question_frontier_limit(self, limit: int) -> None:
+        """Bound frontier construction to one concurrent execution window."""
+        if isinstance(limit, bool) or not isinstance(limit, int) or limit < 1:
+            raise ValueError("question frontier limit must be a positive integer")
+        self._max_question_frontier = limit
+
+    def _batch_requests(
+        self, requests: Sequence[QuestionRequest[Any]]
+    ) -> tuple[QuestionRequest[Any], ...]:
+        if self._max_question_frontier is not None:
+            requests = requests[: self._max_question_frontier]
+        return batch_question_requests(requests)
 
     def repository_search_metrics(self) -> tuple[tuple[str, Mapping[str, Any]], ...]:
         """Return counts from completed searches without exposing evidence text."""
@@ -466,8 +500,14 @@ class SourceLedgerQuestionMachine:
         raw_records: list[dict[str, Any]] = []
         anchor_by_id = {anchor.id: anchor for anchor in self.source.anchors}
         pending_extractions: list[QuestionRequest[Any]] = []
+        frontier_limit = self._max_question_frontier
 
         for block in self.source.blocks:
+            if (
+                frontier_limit is not None
+                and len(pending_extractions) >= frontier_limit
+            ):
+                break
             after_anchor: str | None = None
             page_records: list[dict[str, Any]] = []
             block_incomplete = False
@@ -493,7 +533,7 @@ class SourceLedgerQuestionMachine:
                 raw_records.extend(page_records)
 
         if pending_extractions:
-            return batch_question_requests(pending_extractions)
+            return self._batch_requests(pending_extractions)
 
         requirements, drafts = allocate_requirements(
             raw_records,
@@ -570,16 +610,47 @@ class SourceLedgerQuestionMachine:
                     accepted_answers[disposition_request.question.question_id]
                 )
             prior_direct_by_fingerprint.setdefault(fingerprint, []).append(direct_ids)
+            if (
+                frontier_limit is not None
+                and len(pending_source_questions) >= frontier_limit
+            ):
+                break
 
-        for requirement in requirements:
-            fidelity_request = build_fidelity_request(
-                requirement, segmented=self.source
-            )
-            answer = accepted_answers.get(fidelity_request.question.question_id)
-            if answer is None:
-                pending_source_questions.append(fidelity_request)
-            else:
-                fidelity_request.parse_answer(answer)
+        if frontier_limit is None or len(pending_source_questions) < frontier_limit:
+            for requirement in requirements:
+                fidelity_request = self._fidelity_request_cache.get(requirement.id)
+                if fidelity_request is None:
+                    fidelity_request = build_fidelity_request(
+                        requirement, segmented=self.source
+                    )
+                    self._fidelity_request_cache[requirement.id] = fidelity_request
+                answer = accepted_answers.get(fidelity_request.question.question_id)
+                if answer is None:
+                    pending_source_questions.append(fidelity_request)
+                    if (
+                        frontier_limit is not None
+                        and len(pending_source_questions) >= frontier_limit
+                    ):
+                        break
+                else:
+                    answer_digest = hashlib.sha256(
+                        json.dumps(
+                            answer,
+                            sort_keys=True,
+                            separators=(",", ":"),
+                            ensure_ascii=False,
+                        ).encode("utf-8")
+                    ).hexdigest()
+                    if (
+                        self._validated_fidelity_answers.get(
+                            fidelity_request.question.question_id
+                        )
+                        != answer_digest
+                    ):
+                        fidelity_request.parse_answer(answer)
+                        self._validated_fidelity_answers[
+                            fidelity_request.question.question_id
+                        ] = answer_digest
 
         disposition_requests = tuple(
             request
@@ -592,8 +663,8 @@ class SourceLedgerQuestionMachine:
             if request.question.kind != "classify_source_block"
         )
         return (
-            *batch_question_requests(disposition_requests),
-            *batch_question_requests(fidelity_requests),
+            *self._batch_requests(disposition_requests),
+            *self._batch_requests(fidelity_requests),
         )
 
     def next_question(
@@ -613,10 +684,10 @@ class SourceLedgerQuestionMachine:
         source_requests = self._next_source_questions(accepted_answers)
         if source_requests:
             return source_requests
-        ledger = self._parse_source_ledger(accepted_answers)
+        ledger = self.accepted_ledger(accepted_answers)
         setup_requests = self._explicit_human_setup_requests(ledger, accepted_answers)
         if setup_requests:
-            return batch_question_requests(setup_requests)
+            return self._batch_requests(setup_requests)
         self._search_requirements_evidence(ledger.requirements)
         coverage_requests: list[QuestionRequest[Any]] = []
         for requirement in ledger.requirements:
@@ -624,13 +695,16 @@ class SourceLedgerQuestionMachine:
             evidence = self.evidence_by_requirement.get(
                 requirement.id, () if search is None else search.evidence
             )
-            coverage_request = self._build_coverage_request(
-                requirement, evidence, search
-            )
+            coverage_request = self._coverage_request_cache.get(requirement.id)
+            if coverage_request is None:
+                coverage_request = self._build_coverage_request(
+                    requirement, evidence, search
+                )
+                self._coverage_request_cache[requirement.id] = coverage_request
             if coverage_request.question.question_id not in accepted_answers:
                 coverage_requests.append(coverage_request)
         if coverage_requests:
-            return batch_question_requests(coverage_requests)
+            return self._batch_requests(coverage_requests)
 
         work_unit_requests = tuple(
             request
@@ -638,7 +712,7 @@ class SourceLedgerQuestionMachine:
             if request is not None
         )
         if work_unit_requests:
-            return batch_question_requests(work_unit_requests)
+            return self._batch_requests(work_unit_requests)
 
         downstream_requests: list[QuestionRequest[Any]] = []
         for request in self._item_description_requests(accepted_answers):
@@ -649,9 +723,9 @@ class SourceLedgerQuestionMachine:
             if request.question.question_id not in accepted_answers:
                 downstream_requests.append(request)
         if downstream_requests:
-            return batch_question_requests(downstream_requests)
+            return self._batch_requests(downstream_requests)
 
-        return batch_question_requests(
+        return self._batch_requests(
             tuple(
                 request
                 for request in self._structrr_requests(accepted_answers)
@@ -746,7 +820,7 @@ class SourceLedgerQuestionMachine:
         self, accepted_answers: Mapping[str, Mapping[str, Any]]
     ) -> tuple[QuestionRequest[Any] | None, ...]:
         self._supplemental_work_unit_requirements.clear()
-        ledger = self._parse_source_ledger(accepted_answers)
+        ledger = self.accepted_ledger(accepted_answers)
         coverage = self.accepted_coverage(accepted_answers)
         unresolved = tuple(
             item.requirement_id for item in coverage if item.answer.status != "complete"
@@ -934,6 +1008,40 @@ class SourceLedgerQuestionMachine:
         return allocate_work_units(proposals, context=context).units
 
     def _accepted_work_unit_proposals(
+        self, accepted_answers: Mapping[str, Mapping[str, Any]]
+    ) -> tuple[WorkUnitContext, tuple[WorkUnitProposal, ...]]:
+        proposal_answers = {
+            question_id: answer
+            for question_id, answer in accepted_answers.items()
+            if question_id.startswith("propose-units-v2-")
+        }
+        cache_key = hashlib.sha256(
+            json.dumps(
+                {
+                    "answers": proposal_answers,
+                    "single_proposal_requirements": sorted(
+                        self._single_proposal_requirements
+                    ),
+                    "supplemental_requirements": sorted(
+                        self._supplemental_work_unit_requirements
+                    ),
+                },
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=False,
+            ).encode("utf-8")
+        ).hexdigest()
+        if (
+            cache_key == self._accepted_work_unit_cache_key
+            and self._accepted_work_unit_cache_value is not None
+        ):
+            return self._accepted_work_unit_cache_value
+        result = self._compute_accepted_work_unit_proposals(accepted_answers)
+        self._accepted_work_unit_cache_key = cache_key
+        self._accepted_work_unit_cache_value = result
+        return result
+
+    def _compute_accepted_work_unit_proposals(
         self, accepted_answers: Mapping[str, Mapping[str, Any]]
     ) -> tuple[WorkUnitContext, tuple[WorkUnitProposal, ...]]:
         requests = self._work_unit_requests(accepted_answers)
@@ -1337,6 +1445,12 @@ class SourceLedgerQuestionMachine:
         prior_operations: list[Mapping[str, Any]] = []
         projected: Mapping[str, Any] = self.structrr_baseline
         while len(completed) < len(order):
+            progress_key = tuple(sorted(completed))
+            baseline_index = self._structrr_baseline_index_cache.get(progress_key)
+            if baseline_index is None:
+                baseline_index = index_structural_baseline(projected)
+                self._structrr_baseline_index_cache[progress_key] = baseline_index
+            baseline_digest = baseline_index.fingerprint
             ready_item_ids = tuple(
                 item_id
                 for item_id in order
@@ -1392,6 +1506,7 @@ class SourceLedgerQuestionMachine:
                         projected_baseline=projected,
                         prior_subjects=item_subjects,
                         page_ordinal=page_ordinal,
+                        baseline_digest=baseline_digest,
                     )
                     answer = accepted_answers.get(
                         enumeration_request.question.question_id
@@ -1429,7 +1544,7 @@ class SourceLedgerQuestionMachine:
                         break
                     page_ordinal += 1
             if pending_enumerations:
-                return batch_question_requests(pending_enumerations)
+                return self._batch_requests(pending_enumerations)
 
             known_entity_ids = {
                 str(entity.get("id"))
@@ -1474,21 +1589,32 @@ class SourceLedgerQuestionMachine:
                         if operation is not None:
                             batch_operations.append(operation)
                         continue
-                    change_request = build_structural_change_request(
-                        subject,
-                        projected_baseline=projected,
-                        taxonomy_entity_types=self.taxonomy_entity_types,
-                        planned_paths=planned_paths,
-                        known_entity_ids=known_entity_ids,
-                        source=self.source,
-                        units=units,
-                        valid_example={
-                            "result": "unchanged",
-                            "reason": (
-                                "The projected state already satisfies this subject."
-                            ),
-                        },
+                    request_key = (progress_key, subject.subject_id)
+                    change_request = self._structural_change_request_cache.get(
+                        request_key
                     )
+                    if change_request is None:
+                        change_request = build_structural_change_request(
+                            subject,
+                            projected_baseline=projected,
+                            taxonomy_entity_types=self.taxonomy_entity_types,
+                            planned_paths=planned_paths,
+                            known_entity_ids=known_entity_ids,
+                            source=self.source,
+                            units=units,
+                            baseline_digest=baseline_digest,
+                            baseline_index=baseline_index,
+                            valid_example={
+                                "result": "unchanged",
+                                "reason": (
+                                    "The projected state already satisfies this "
+                                    "subject."
+                                ),
+                            },
+                        )
+                        self._structural_change_request_cache[request_key] = (
+                            change_request
+                        )
                     answer = accepted_answers.get(change_request.question.question_id)
                     if answer is None:
                         pending_changes.append(change_request)
@@ -1498,7 +1624,7 @@ class SourceLedgerQuestionMachine:
                     if operation is not None:
                         batch_operations.append(operation)
             if pending_changes:
-                return batch_question_requests(pending_changes)
+                return self._batch_requests(pending_changes)
             all_operations = (*prior_operations, *batch_operations)
             reject_unordered_subject_conflicts(all_operations, prerequisites)
             projected = project_structural_operations(projected, batch_operations)
@@ -1899,12 +2025,47 @@ class SourceLedgerQuestionMachine:
         self, accepted_answers: Mapping[str, Mapping[str, Any]]
     ) -> SourceLedger:
         """Parse completed source-stage answers into canonical typed records."""
+        source_answers = {
+            question_id: answer
+            for question_id, answer in accepted_answers.items()
+            if question_id.startswith(
+                (
+                    "q-extract-requirements-",
+                    "q-classify-source-block-",
+                    "q-check-requirement-fidelity-",
+                    "q-compare-requirement-equivalence-",
+                )
+            )
+        }
+        cache_key = hashlib.sha256(
+            json.dumps(
+                source_answers,
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=False,
+            ).encode("utf-8")
+        ).hexdigest()
+        if (
+            cache_key == self._accepted_ledger_cache_key
+            and self._accepted_ledger_cache_value is not None
+        ):
+            return self._accepted_ledger_cache_value
         pending = self._next_source_question(accepted_answers)
         if pending is not None:
             raise ValueError(
                 f"source ledger is incomplete at {pending.question.question_id}"
             )
-        return self._parse_source_ledger(accepted_answers)
+        ledger = self._parse_source_ledger(accepted_answers)
+        if cache_key != self._accepted_ledger_cache_key:
+            self._fidelity_request_cache.clear()
+            self._validated_fidelity_answers.clear()
+            self._coverage_request_cache.clear()
+            self._accepted_coverage_cache.clear()
+            self._accepted_work_unit_cache_key = None
+            self._accepted_work_unit_cache_value = None
+        self._accepted_ledger_cache_key = cache_key
+        self._accepted_ledger_cache_value = ledger
+        return ledger
 
     def _parse_source_ledger(
         self, accepted_answers: Mapping[str, Mapping[str, Any]]
@@ -2016,19 +2177,36 @@ class SourceLedgerQuestionMachine:
             evidence = self.evidence_by_requirement.get(
                 requirement.id, () if search is None else search.evidence
             )
-            request = self._build_coverage_request(requirement, evidence, search)
-            answer = request.parse_answer(
-                accepted_answers[request.question.question_id]
+            request = self._coverage_request_cache.get(requirement.id)
+            if request is None:
+                request = self._build_coverage_request(requirement, evidence, search)
+                self._coverage_request_cache[requirement.id] = request
+            raw_answer = accepted_answers[request.question.question_id]
+            answer_digest = hashlib.sha256(
+                json.dumps(
+                    raw_answer,
+                    sort_keys=True,
+                    separators=(",", ":"),
+                    ensure_ascii=False,
+                ).encode("utf-8")
+            ).hexdigest()
+            cached = self._accepted_coverage_cache.get(requirement.id)
+            if cached is not None and cached[0] == answer_digest:
+                coverage.append(cached[1])
+                continue
+            answer = request.parse_answer(raw_answer)
+            parsed = create_requirement_coverage(
+                requirement,
+                answer,
+                evidence_by_id={item.id: item for item in evidence},
+                supplied_evidence_ids=tuple(item.id for item in evidence),
+                revision=1,
             )
-            coverage.append(
-                create_requirement_coverage(
-                    requirement,
-                    answer,
-                    evidence_by_id={item.id: item for item in evidence},
-                    supplied_evidence_ids=tuple(item.id for item in evidence),
-                    revision=1,
-                )
+            self._accepted_coverage_cache[requirement.id] = (
+                answer_digest,
+                parsed,
             )
+            coverage.append(parsed)
         return tuple(coverage)
 
     def _build_coverage_request(
@@ -2056,10 +2234,13 @@ class SourceLedgerQuestionMachine:
         )
 
     def _adjacent_blocks(self, block: Any) -> tuple[Any, ...]:
-        by_id = {item.id: item for item in self.source.blocks}
         result = []
         for block_id in (block.previous_block_id, block.next_block_id):
-            adjacent = by_id.get(block_id) if block_id is not None else None
+            adjacent = (
+                self._source_blocks_by_id.get(block_id)
+                if block_id is not None
+                else None
+            )
             if adjacent is not None:
                 result.append(adjacent)
         return tuple(result)

@@ -270,9 +270,9 @@ These tasks should receive deterministic candidates, narrow evidence, bounded sc
 
 Run three profiles with fixed source documents, pinned repository commits, and deterministic mock answers:
 
-1. **Typical:** 20 source blocks, 40 requirements, 16 work units, and 8 PR items.
-2. **Large:** 200 source blocks, 500 requirements, 150 work units, and 50 PR items.
-3. **Regression stress:** a bounded fixture representing the previous 2,051-page structural-enumeration failure, with repeated/path-bound candidates and a smaller set of genuinely new semantic subjects.
+1. **Typical:** 40 source blocks, 40 requirements, 16 work units, and 5 PR items.
+2. **Large:** 500 source blocks, 500 requirements, 150 work units, and 50 PR items.
+3. **Regression stress:** 40 source blocks and 16 work units with 2,051 repeated/path-bound Structrr subjects.
 
 For each profile, report:
 
@@ -283,6 +283,25 @@ For each profile, report:
 - Semantic comparison of final requirements, work units, dependencies, and Structrr operations against the accepted baseline fixture.
 
 Use the two-hour target only for a reference large-plan run with recorded provider settings and hardware. CI should enforce deterministic interaction-count and progress bounds, not a wall-clock threshold that varies with external provider or runner load.
+
+### Initial deterministic profile results (2026-11-01)
+
+Run with `python scripts/benchmark_planning_scale.py --profile all` using the
+shared repository environment. All provider answers are deterministic fixtures;
+the run makes no network calls. On the current development machine:
+
+| Profile | Local elapsed | Requirements | Work units | Plan items | Question answers | Provider calls |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Typical | 0.42s | 40 | 16 | 5 | 112 | 50 |
+| Large | 10.27s | 500 | 150 | 50 | 1,437 | 625 |
+| Structrr stress | 16.17s | 40 | 16 | 5 | 2,263 | 781 |
+
+Every run succeeded, used no more than four questions per provider call, and
+had zero validation retries. The stress profile includes 2,156 individual
+structural-review decisions and completes without oversized prompts. These
+figures measure deterministic local overhead only; they do not establish the
+two-hour target with live provider latency. The live-provider run still needs to
+record provider/model settings, concurrency, token usage, and hardware.
 
 ## Cross-cutting test requirements
 

@@ -474,6 +474,12 @@ def advance_planning_session(
     if callable(set_accepted_input_digests):
         set_accepted_input_digests(accepted_input_digests)
 
+    set_question_frontier_limit = getattr(
+        state_machine, "set_question_frontier_limit", None
+    )
+    if callable(set_question_frontier_limit):
+        set_question_frontier_limit(options.max_concurrent_questions * 4)
+
     parent = journal.head.digest if journal.head is not None else None
     sequence = 1 if journal.head is None else journal.head.sequence + 1
 

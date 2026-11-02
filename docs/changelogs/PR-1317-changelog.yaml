@@ -1,0 +1,257 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1317
+title: Move changelog template policy into service
+intent:
+  problem: Changelog template formatting and plan-diff enrichment still lived in the agent package, mixing
+    Powdrr policy with local Git and repository evidence collection.
+  goal: Move template formatting and plan-diff enrichment into the service package, keep local evidence
+    collection in the agent, remove the old renderer exports, and record the ownership boundary.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 902
+    end_line: 903
+  summary: Record the service-owned changelog template policy and update agent import edges.
+  rationale: Keep the module ownership inventory aligned with the implementation boundary.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 923
+    end_line: 924
+  summary: Record the service-owned changelog template policy and update agent import edges.
+  rationale: Keep the module ownership inventory aligned with the implementation boundary.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3728
+    end_line: 3736
+  summary: Record the service-owned changelog template policy and update agent import edges.
+  rationale: Keep the module ownership inventory aligned with the implementation boundary.
+- path: docs/plans/agent-service-code-split.md
+  type: modified
+  span:
+    start_line: 487
+    end_line: 490
+  summary: Update the staged split plan with the completed template policy move and remaining local collection
+    work.
+  rationale: Keep the migration sequence and remaining boundary work accurate.
+- path: docs/project_structure/project-structure.yaml
+  type: modified
+  span:
+    start_line: 25
+    end_line: 25
+  summary: Describe the service changelog package as owning parsing and template rendering policy.
+  rationale: Keep the declared project structure aligned with service ownership.
+- path: docs/project_structure/project-structure.yaml
+  type: modified
+  span:
+    start_line: 28
+    end_line: 28
+  summary: Describe the service changelog package as owning parsing and template rendering policy.
+  rationale: Keep the declared project structure aligned with service ownership.
+- path: packages/service/src/powdrr_service/changelog/template.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 717
+  summary: Implement service-owned changelog template formatting, related-section merging, and plan-diff
+    enrichment.
+  rationale: Centralize Powdrr changelog rendering policy in the service package without importing the
+    agent.
+- path: scripts/build-agent-service-ownership-inventory.py
+  type: modified
+  span:
+    start_line: 82
+    end_line: 82
+  summary: Classify changelog template modules as service-owned policy.
+  rationale: Keep regenerated ownership reports consistent with the extraction.
+- path: src/powdrr_lift/change_log_template.py
+  type: modified
+  span:
+    start_line: 6
+    end_line: 6
+  summary: Keep local Git diff and repository evidence collection in the agent while delegating rendering
+    and plan-diff enrichment to the service.
+  rationale: Separate repository access from changelog formatting policy and remove the former local renderer
+    implementation.
+- path: src/powdrr_lift/change_log_template.py
+  type: modified
+  span:
+    start_line: 12
+    end_line: 20
+  summary: Keep local Git diff and repository evidence collection in the agent while delegating rendering
+    and plan-diff enrichment to the service.
+  rationale: Separate repository access from changelog formatting policy and remove the former local renderer
+    implementation.
+- path: src/powdrr_lift/change_log_template.py
+  type: modified
+  span:
+    start_line: 22
+    end_line: 55
+  summary: Keep local Git diff and repository evidence collection in the agent while delegating rendering
+    and plan-diff enrichment to the service.
+  rationale: Separate repository access from changelog formatting policy and remove the former local renderer
+    implementation.
+- path: src/powdrr_lift/change_log_template.py
+  type: modified
+  span:
+    start_line: 57
+    end_line: 57
+  summary: Keep local Git diff and repository evidence collection in the agent while delegating rendering
+    and plan-diff enrichment to the service.
+  rationale: Separate repository access from changelog formatting policy and remove the former local renderer
+    implementation.
+- path: src/powdrr_lift/change_log_template.py
+  type: modified
+  span:
+    start_line: 99
+    end_line: 99
+  summary: Keep local Git diff and repository evidence collection in the agent while delegating rendering
+    and plan-diff enrichment to the service.
+  rationale: Separate repository access from changelog formatting policy and remove the former local renderer
+    implementation.
+- path: src/powdrr_lift/change_log_template.py
+  type: modified
+  span:
+    start_line: 104
+    end_line: 104
+  summary: Keep local Git diff and repository evidence collection in the agent while delegating rendering
+    and plan-diff enrichment to the service.
+  rationale: Separate repository access from changelog formatting policy and remove the former local renderer
+    implementation.
+- path: src/powdrr_lift/change_log_template.py
+  type: modified
+  span:
+    start_line: 146
+    end_line: 309
+  summary: Keep local Git diff and repository evidence collection in the agent while delegating rendering
+    and plan-diff enrichment to the service.
+  rationale: Separate repository access from changelog formatting policy and remove the former local renderer
+    implementation.
+- path: src/powdrr_lift/change_log_template.py
+  type: modified
+  span:
+    start_line: 134
+    end_line: 134
+  summary: Keep local Git diff and repository evidence collection in the agent while delegating rendering
+    and plan-diff enrichment to the service.
+  rationale: Separate repository access from changelog formatting policy and remove the former local renderer
+    implementation.
+- path: src/powdrr_lift/change_log_template.py
+  type: modified
+  span:
+    start_line: 381
+    end_line: 754
+  summary: Keep local Git diff and repository evidence collection in the agent while delegating rendering
+    and plan-diff enrichment to the service.
+  rationale: Separate repository access from changelog formatting policy and remove the former local renderer
+    implementation.
+- path: src/powdrr_lift/change_log_template.py
+  type: modified
+  span:
+    start_line: 293
+    end_line: 293
+  summary: Keep local Git diff and repository evidence collection in the agent while delegating rendering
+    and plan-diff enrichment to the service.
+  rationale: Separate repository access from changelog formatting policy and remove the former local renderer
+    implementation.
+- path: src/powdrr_lift/change_log_template.py
+  type: modified
+  span:
+    start_line: 907
+    end_line: 1002
+  summary: Keep local Git diff and repository evidence collection in the agent while delegating rendering
+    and plan-diff enrichment to the service.
+  rationale: Separate repository access from changelog formatting policy and remove the former local renderer
+    implementation.
+- path: src/powdrr_lift/change_log_template.py
+  type: modified
+  span:
+    start_line: 1241
+    end_line: 1259
+  summary: Keep local Git diff and repository evidence collection in the agent while delegating rendering
+    and plan-diff enrichment to the service.
+  rationale: Separate repository access from changelog formatting policy and remove the former local renderer
+    implementation.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 19
+    end_line: 21
+  summary: Use the service-owned structured-document path predicate during changelog validation.
+  rationale: Remove the remaining validation dependency on the former agent template module.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 24
+    end_line: 24
+  summary: Use the service-owned structured-document path predicate during changelog validation.
+  rationale: Remove the remaining validation dependency on the former agent template module.
+- path: src/powdrr_lift/core/__init__.py
+  type: modified
+  span:
+    start_line: 229
+    end_line: 229
+  summary: Remove the renderer from the legacy core package exports.
+  rationale: Avoid preserving a public agent-side rendering path after the service extraction.
+- path: src/powdrr_lift/core/__init__.py
+  type: modified
+  span:
+    start_line: 377
+    end_line: 377
+  summary: Remove the renderer from the legacy core package exports.
+  rationale: Avoid preserving a public agent-side rendering path after the service extraction.
+- path: src/powdrr_lift/core/template.py
+  type: modified
+  span:
+    start_line: 5
+    end_line: 5
+  summary: Remove the renderer from the legacy template facade.
+  rationale: Keep the facade limited to local template creation operations.
+- path: src/powdrr_lift/core/template.py
+  type: modified
+  span:
+    start_line: 12
+    end_line: 12
+  summary: Remove the renderer from the legacy template facade.
+  rationale: Keep the facade limited to local template creation operations.
+- path: tests/test_agent_service_contracts.py
+  type: modified
+  span:
+    start_line: 228
+    end_line: 247
+  summary: Assert the rendering policy has no agent imports and is absent from legacy public exports.
+  rationale: Protect service ownership and prevent the old renderer API from returning.
+- path: tests/test_change_log_template.py
+  type: modified
+  span:
+    start_line: 5
+    end_line: 5
+  summary: Cover service rendering of related evidence and JSON-shaped diff entries.
+  rationale: Verify the moved renderer handles the service contract and preserves generated spans and
+    change types.
+- path: tests/test_change_log_template.py
+  type: modified
+  span:
+    start_line: 8
+    end_line: 11
+  summary: Cover service rendering of related evidence and JSON-shaped diff entries.
+  rationale: Verify the moved renderer handles the service contract and preserves generated spans and
+    change types.
+- path: tests/test_change_log_template.py
+  type: modified
+  span:
+    start_line: 19
+    end_line: 60
+  summary: Cover service rendering of related evidence and JSON-shaped diff entries.
+  rationale: Verify the moved renderer handles the service contract and preserves generated spans and
+    change types.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []
+features: []
+proposed_prs: []

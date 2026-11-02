@@ -124,7 +124,7 @@ files:
     rationale: Preserve an honest fallback for older API responses.
   - path: tests/test_workspace_api.py
     type: modified
-    span: {start_line: 536, end_line: 583}
+    span: {start_line: 539, end_line: 586}
     summary: Verify checkpoint inspection is attached to recovery details without revealing internal references.
     rationale: Protect the API's privacy boundary and checkpoint status mapping.
   - path: tests/test_ui_workspace.py
@@ -169,18 +169,23 @@ files:
     rationale: Verify contract serialization behavior.
   - path: tests/test_workspace_api.py
     type: modified
-    span: {start_line: 9, end_line: 10}
-    summary: Import the checkpoint enum and job state used by API tests.
-    rationale: Set up and assert recovery inspection scenarios.
+    span: {start_line: 9, end_line: 11}
+    summary: Import checkpoint and operation types used by API tests.
+    rationale: Set up and assert typed recovery inspection scenarios.
   - path: tests/test_workspace_api.py
     type: modified
-    span: {start_line: 24, end_line: 26}
-    summary: Allow API test setup to inject a checkpoint inspector.
-    rationale: Exercise configured and unconfigured inspection boundaries.
+    span: {start_line: 19, end_line: 19}
+    summary: Import the checkpoint inspector protocol for test setup.
+    rationale: Type the optional inspector injected into the API.
   - path: tests/test_workspace_api.py
     type: modified
-    span: {start_line: 36, end_line: 41}
-    summary: Forward the test checkpoint inspector to the app factory.
+    span: {start_line: 25, end_line: 29}
+    summary: Type the optional checkpoint inspector accepted by the test client helper.
+    rationale: Keep test app construction aligned with the production interface.
+  - path: tests/test_workspace_api.py
+    type: modified
+    span: {start_line: 39, end_line: 44}
+    summary: Forward the typed test inspector to the app factory.
     rationale: Wire the test integration as production code does.
 entities: []
 entity_relationships: []

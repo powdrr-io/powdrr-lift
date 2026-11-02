@@ -25,7 +25,7 @@ modules:
   - id: powdrr-lift-change-log-policy
     action: added
     relative_location: packages/service/src/powdrr_service/changelog/
-    purpose: Service-owned changelog parsing, schema models, and template rendering policy.
+    purpose: Service-owned changelog parsing, schema models, rendering, and validation policy.
   - id: powdrr-lift-tests
     action: added
     relative_location: tests/

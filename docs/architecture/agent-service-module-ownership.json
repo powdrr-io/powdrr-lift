@@ -921,12 +921,13 @@
         "powdrr_lift.core.system_specification",
         "powdrr_lift.core.validation_messages",
         "powdrr_service.changelog",
-        "powdrr_service.changelog.template"
+        "powdrr_service.changelog.template",
+        "powdrr_service.changelog.validation_policy"
       ],
       "kind": "python_module",
       "owner": "split",
       "path": "src/powdrr_lift/change_log_validation.py",
-      "rationale": "classify public transport types versus private policy",
+      "rationale": "agent collects branch/specification evidence and composes service-owned changelog validation policy",
       "reviewed": false
     },
     {
@@ -3732,7 +3733,19 @@
       "kind": "python_module",
       "owner": "service",
       "path": "packages/service/src/powdrr_service/changelog/template.py",
-      "rationale": "service-owned changelog parsing and template policy",
+      "rationale": "service-owned changelog parsing, rendering, and validation policy",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [
+        "powdrr_service.changelog",
+        "powdrr_service.changelog.template"
+      ],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/changelog/validation_policy.py",
+      "rationale": "service-owned changelog validation policy",
       "reviewed": false
     }
   ],

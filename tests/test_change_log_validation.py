@@ -4,6 +4,10 @@ import subprocess
 from pathlib import Path
 
 import pytest
+from powdrr_service.changelog.validation_policy import (
+    ChangelogValidationIssue,
+    validate_v2_state_change,
+)
 
 from powdrr_lift import (
     change_log_validation,
@@ -11,6 +15,26 @@ from powdrr_lift import (
     validate_change_log_yaml,
 )
 from powdrr_lift.core import index as core_index
+
+
+def test_service_owns_changelog_state_validation_policy() -> None:
+    issues: list[ChangelogValidationIssue] = []
+    validate_v2_state_change(
+        issues=issues,
+        section_name="features",
+        item_index=1,
+        item_id="feature-1",
+        state="planned",
+        available_ids={"feature-1"},
+        unavailable_id_code="unknown_feature_id",
+        unavailable_id_message="Feature id {item_id!r} is unavailable.",
+        invalid_state_code="invalid_feature_state",
+        invalid_state_message="Feature state must be in_progress or completed.",
+    )
+
+    assert [(issue.code, issue.path) for issue in issues] == [
+        ("invalid_feature_state", "features[0].state")
+    ]
 
 
 def test_rationale_and_parent_entity_loading_do_not_walk_commit_history(

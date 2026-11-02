@@ -748,9 +748,24 @@ def test_structural_page_correction_fits_with_many_prior_subjects() -> None:
             PlannedWrite("src/new.py", "implementation", "python", source_refs, ()),
         ),
     )
+    entity_count = 2_051
+    relationship_count = 100
+    entities = [
+        {"id": f"python::symbol-{index:04d}", "path": "src/new.py"}
+        for index in range(entity_count)
+    ]
+    relationships = [
+        {
+            "id": f"relationship::{index:04d}",
+            "source": entities[index]["id"],
+            "relationship": "calls",
+            "target": entities[index + 1]["id"],
+        }
+        for index in range(relationship_count)
+    ]
     prior_subjects = tuple(
         BoundStructuralSubject(
-            f"python::symbol-{index:03d}",
+            entity["id"],
             "entities",
             "item-0282",
             "changed",
@@ -760,7 +775,20 @@ def test_structural_page_correction_fits_with_many_prior_subjects() -> None:
             False,
             None,
         )
-        for index in range(24)
+        for entity in entities
+    ) + tuple(
+        BoundStructuralSubject(
+            relationship["id"],
+            "entity_relationships",
+            "item-0282",
+            "changed",
+            ("req-01", "req-02", "req-03", "req-04"),
+            (unit.id,),
+            source_refs,
+            False,
+            None,
+        )
+        for relationship in relationships
     )
     request = build_subject_enumeration_request(
         plan_id="plan-01",
@@ -768,17 +796,35 @@ def test_structural_page_correction_fits_with_many_prior_subjects() -> None:
         units=(unit,),
         source=source,
         source_refs=source_refs,
-        projected_baseline={"entities": [], "files": [], "source_subjects": []},
+        projected_baseline={
+            "entities": entities,
+            "entity_relationships": relationships,
+            "files": [],
+            "source_subjects": [],
+        },
         prior_subjects=prior_subjects,
         page_ordinal=4,
     )
     prior_facts = [
         record.value
         for record in request.accepted_facts
-        if record.ref_id.startswith("prior-subject:")
+        if record.ref_id.startswith("prior-subject-summary:")
     ]
-    assert len(prior_facts) == 24
-    assert {"section": "entities", "subject_id": "python::symbol-000"} in prior_facts
+    assert prior_facts == [
+        {
+            "accepted_subject_counts_by_section": {
+                "entities": entity_count,
+                "entity_relationships": relationship_count,
+            }
+        }
+    ]
+    baseline_fact = next(
+        record
+        for record in request.accepted_facts
+        if record.ref_id.startswith("projected-structrr:")
+    )
+    assert baseline_fact.value["entities"] == []
+    assert baseline_fact.value["entity_relationships"] == []
     previous_answer = {
         "records": [
             {

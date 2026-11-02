@@ -73,6 +73,19 @@ class BoundStructuralSubject:
 
 
 @dataclass(frozen=True, slots=True)
+class StructuralBaselineIndex:
+    fingerprint: str
+    entities_by_id: Mapping[str, Mapping[str, Any]]
+    entities_by_path: Mapping[str, tuple[Mapping[str, Any], ...]]
+    relationships_by_id: Mapping[str, Mapping[str, Any]]
+    relationships_by_entity: Mapping[str, tuple[Mapping[str, Any], ...]]
+    source_subjects_by_key: Mapping[str, tuple[Mapping[str, Any], ...]]
+    source_subjects_by_path: Mapping[str, tuple[Mapping[str, Any], ...]]
+    source_subjects_by_file_entity: Mapping[str, tuple[Mapping[str, Any], ...]]
+    files_by_path: Mapping[str, tuple[Mapping[str, Any], ...]]
+
+
+@dataclass(frozen=True, slots=True)
 class StructuralSubjectPage:
     records: tuple[BoundStructuralSubject, ...]
     has_more: bool
@@ -546,6 +559,7 @@ def build_subject_enumeration_request(
     projected_baseline: Mapping[str, Any],
     prior_subjects: Sequence[BoundStructuralSubject] = (),
     page_ordinal: int = 1,
+    baseline_digest: str | None = None,
 ) -> QuestionRequest[StructuralSubjectPage]:
     unit_ids = {unit.id for unit in units}
     requirement_ids = {req for unit in units for req in unit.requirement_ids}
@@ -569,17 +583,43 @@ def build_subject_enumeration_request(
     unit_facts = tuple(
         ContextRecord(f"unit:{unit.id}", unit.to_data()) for unit in units
     )
-    subject_index = _structural_subject_index(projected_baseline, units)
+    baseline_digest = baseline_digest or snapshot_digest(projected_baseline)
+    subject_index = _structural_subject_index(
+        projected_baseline, units, fingerprint=baseline_digest
+    )
+    prior_subject_ids = {
+        (subject.section, subject.subject_id) for subject in prior_subjects
+    }
+    subject_index["entities"] = [
+        record
+        for record in subject_index["entities"]
+        if ("entities", str(record.get("id"))) not in prior_subject_ids
+    ]
+    subject_index["entity_relationships"] = [
+        record
+        for record in subject_index["entity_relationships"]
+        if (
+            "entity_relationships",
+            str(record.get("id")),
+        )
+        not in prior_subject_ids
+    ]
     baseline_fact = ContextRecord(
-        f"projected-structrr:{item_id}:{snapshot_digest(projected_baseline)[:20]}",
+        f"projected-structrr:{item_id}:{baseline_digest[:20]}",
         subject_index,
     )
-    prior_facts = tuple(
-        ContextRecord(
-            f"prior-subject:{subject.section}:{subject.subject_id}",
-            {"section": subject.section, "subject_id": subject.subject_id},
+    prior_counts: dict[str, int] = {}
+    for subject in prior_subjects:
+        prior_counts[subject.section] = prior_counts.get(subject.section, 0) + 1
+    prior_facts = (
+        (
+            ContextRecord(
+                f"prior-subject-summary:{item_id}:{page_ordinal:04d}",
+                {"accepted_subject_counts_by_section": prior_counts},
+            ),
         )
-        for subject in prior_subjects
+        if prior_counts
+        else ()
     )
     pagination_fact = ContextRecord(
         f"structural-pagination:{item_id}:{page_ordinal:04d}",
@@ -597,7 +637,7 @@ def build_subject_enumeration_request(
         item_id=item_id,
         units=units,
         source_refs=source_refs,
-        projected_baseline=projected_baseline,
+        subject_index=subject_index,
         prior_subjects=prior_subjects,
         page_ordinal=page_ordinal,
     )
@@ -707,15 +747,30 @@ def build_structural_change_request(
     valid_example: Mapping[str, Any],
     source: SegmentedSource | None = None,
     units: Sequence[WorkUnit] = (),
+    baseline_digest: str | None = None,
+    baseline_index: StructuralBaselineIndex | None = None,
 ) -> QuestionRequest[StructuralChange]:
+    baseline_index = baseline_index or index_structural_baseline(projected_baseline)
+    baseline_digest = baseline_digest or baseline_index.fingerprint
+    relevant_entity_ids = known_entity_ids
+    if subject.section == "entity_relationships" and not subject.is_new:
+        relationship = baseline_index.relationships_by_id.get(subject.subject_id)
+        if relationship is not None:
+            relevant_entity_ids = {
+                value
+                for value in (relationship.get("source"), relationship.get("target"))
+                if isinstance(value, str)
+            }
     excerpts = _source_excerpts(source, subject.source_refs) if source else ()
     facts = [
         ContextRecord(
             f"subject:{subject.section}:{subject.subject_id}", subject.to_data()
         ),
         ContextRecord(
-            f"projected-baseline:{subject.item_id}:{snapshot_digest(projected_baseline)[:20]}",
-            _structural_change_baseline_context(projected_baseline, subject),
+            f"projected-baseline:{subject.item_id}:{baseline_digest[:20]}",
+            _structural_change_baseline_context(
+                projected_baseline, subject, index=baseline_index
+            ),
         ),
         *(
             ContextRecord(f"unit:{unit.id}", unit.to_data())
@@ -733,7 +788,7 @@ def build_structural_change_request(
         facts.append(ContextRecord("planned-paths", {"paths": sorted(planned_paths)}))
     if subject.section == "entity_relationships":
         facts.append(
-            ContextRecord("entity-identities", {"ids": sorted(known_entity_ids)})
+            ContextRecord("entity-identities", {"ids": sorted(relevant_entity_ids)})
         )
     accepted_facts = tuple(facts)
     context_ids = (
@@ -761,7 +816,7 @@ def build_structural_change_request(
             _digest(
                 {
                     "subject": subject.to_data(),
-                    "baseline": snapshot_digest(projected_baseline),
+                    "baseline": baseline_digest,
                     "source": [(item.ref_id, item.text) for item in excerpts],
                     "units": [
                         unit.to_data() for unit in units if unit.id in subject.unit_ids
@@ -853,7 +908,7 @@ def build_structural_change_request(
             subject=subject,
             taxonomy_entity_types=set(taxonomy_entity_types),
             planned_paths=planned_paths,
-            known_entity_ids=known_entity_ids,
+            known_entity_ids=relevant_entity_ids,
         ),
     )
 
@@ -863,7 +918,7 @@ def _example_subject_page(
     item_id: str,
     units: Sequence[WorkUnit],
     source_refs: Sequence[str],
-    projected_baseline: Mapping[str, Any],
+    subject_index: Mapping[str, Any],
     prior_subjects: Sequence[BoundStructuralSubject],
     page_ordinal: int,
 ) -> Mapping[str, Any]:
@@ -871,7 +926,6 @@ def _example_subject_page(
     prior_subject_ids = {
         (subject.section, subject.subject_id) for subject in prior_subjects
     }
-    subject_index = _structural_subject_index(projected_baseline, units)
     existing_entities = {
         subject_id
         for subject_id in _record_ids(subject_index, "entities", "id")
@@ -893,7 +947,10 @@ def _example_subject_page(
 
 
 def _structural_subject_index(
-    snapshot: Mapping[str, Any], units: Sequence[WorkUnit]
+    snapshot: Mapping[str, Any],
+    units: Sequence[WorkUnit],
+    *,
+    fingerprint: str | None = None,
 ) -> dict[str, Any]:
     """Give subject enumeration a compact baseline index for this item's paths."""
     paths = {
@@ -941,7 +998,7 @@ def _structural_subject_index(
         or record.get("target") in relevant_entity_ids
     ]
     return {
-        "fingerprint": snapshot_digest(snapshot),
+        "fingerprint": fingerprint or snapshot_digest(snapshot),
         "planned_paths": sorted(paths),
         "entities": [
             _pick_fields(record, ("id", "type", "name", "path"))
@@ -995,19 +1052,16 @@ def _subject_page_schema(
 
 
 def _structural_change_baseline_context(
-    snapshot: Mapping[str, Any], subject: BoundStructuralSubject
+    snapshot: Mapping[str, Any],
+    subject: BoundStructuralSubject,
+    *,
+    index: StructuralBaselineIndex | None = None,
 ) -> dict[str, Any]:
     """Provide the one existing subject and its direct references to change review."""
+    index = index or index_structural_baseline(snapshot)
     subject_id = subject.subject_id
     paths = {subject.planned_path} if subject.planned_path else set()
-    entities = _mapping_records(snapshot.get("entities"))
-    relationships = _mapping_records(snapshot.get("entity_relationships"))
-    source_subjects = _mapping_records(snapshot.get("source_subjects"))
-    files = _mapping_records(snapshot.get("files"))
-    target_relationship = next(
-        (record for record in relationships if record.get("id") == subject_id),
-        None,
-    )
+    target_relationship = index.relationships_by_id.get(subject_id)
     related_entity_ids = {subject_id}
     if target_relationship is not None:
         related_entity_ids.update(
@@ -1018,43 +1072,69 @@ def _structural_change_baseline_context(
             )
             if isinstance(value, str)
         )
+    relevant_entity_ids_from_index = {
+        entity_id
+        for entity_id in related_entity_ids
+        if entity_id in index.entities_by_id
+    }
     relevant_entities = [
-        record
-        for record in entities
-        if record.get("id") in related_entity_ids
-        or (subject.section == "files" and record.get("path") in paths)
+        index.entities_by_id[item] for item in sorted(relevant_entity_ids_from_index)
     ]
+    if subject.section == "files":
+        relevant_entities.extend(
+            record
+            for path in sorted(paths)
+            for record in index.entities_by_path.get(path, ())
+            if record not in relevant_entities
+        )
     related_entity_ids.update(
         str(record["id"])
         for record in relevant_entities
         if isinstance(record.get("id"), str)
     )
+    relevant_relationships_by_id = (
+        {subject_id: index.relationships_by_id[subject_id]}
+        if subject_id in index.relationships_by_id
+        else {}
+    )
+    if subject.section != "entity_relationships":
+        for entity_id in related_entity_ids:
+            relevant_relationships_by_id.update(
+                (str(record["id"]), record)
+                for record in index.relationships_by_entity.get(entity_id, ())
+                if isinstance(record.get("id"), str)
+            )
     relevant_relationships = [
-        record
-        for record in relationships
-        if record.get("id") == subject_id
-        or record.get("source") in related_entity_ids
-        or record.get("target") in related_entity_ids
+        relevant_relationships_by_id[key]
+        for key in sorted(relevant_relationships_by_id)
     ]
     if subject.section == "files":
-        relevant_source_subjects = [
-            record
-            for record in source_subjects
-            if record.get("stable_key") == subject_id
-            or record.get("path") in paths
-            or record.get("file_entity_id") in related_entity_ids
-        ]
+        relevant_source_subjects_by_id = {
+            str(record.get("stable_key")): record
+            for record in index.source_subjects_by_key.get(subject_id, ())
+        }
+        for path in paths:
+            relevant_source_subjects_by_id.update(
+                (str(record.get("stable_key")), record)
+                for record in index.source_subjects_by_path.get(path, ())
+            )
+        for entity_id in related_entity_ids:
+            relevant_source_subjects_by_id.update(
+                (str(record.get("stable_key")), record)
+                for record in index.source_subjects_by_file_entity.get(entity_id, ())
+            )
+        relevant_source_subjects = list(relevant_source_subjects_by_id.values())
     elif subject.section == "entities":
-        relevant_source_subjects = [
-            record
-            for record in source_subjects
-            if record.get("stable_key") == subject_id
-        ]
+        relevant_source_subjects = list(
+            index.source_subjects_by_key.get(subject_id, ())
+        )
     else:
         relevant_source_subjects = []
-    relevant_files = [record for record in files if record.get("path") in paths]
+    relevant_files = [
+        record for path in sorted(paths) for record in index.files_by_path.get(path, ())
+    ]
     return {
-        "fingerprint": snapshot_digest(snapshot),
+        "fingerprint": index.fingerprint,
         "entities": [
             _pick_fields(record, ("id", "type", "name", "path"))
             for record in relevant_entities
@@ -1086,6 +1166,54 @@ def _mapping_records(value: Any) -> list[Mapping[str, Any]]:
     if not isinstance(value, list):
         return []
     return [record for record in value if isinstance(record, Mapping)]
+
+
+def index_structural_baseline(
+    snapshot: Mapping[str, Any],
+) -> StructuralBaselineIndex:
+    """Index a projected Structrr snapshot once for repeated candidate reviews."""
+    entities = _mapping_records(snapshot.get("entities"))
+    relationships = _mapping_records(snapshot.get("entity_relationships"))
+    source_subjects = _mapping_records(snapshot.get("source_subjects"))
+    files = _mapping_records(snapshot.get("files"))
+
+    def grouped(
+        records: Sequence[Mapping[str, Any]], key: str
+    ) -> dict[str, tuple[Mapping[str, Any], ...]]:
+        values: dict[str, list[Mapping[str, Any]]] = {}
+        for record in records:
+            value = record.get(key)
+            if isinstance(value, str):
+                values.setdefault(value, []).append(record)
+        return {value: tuple(items) for value, items in values.items()}
+
+    relationships_by_entity: dict[str, list[Mapping[str, Any]]] = {}
+    for relationship in relationships:
+        for endpoint in (relationship.get("source"), relationship.get("target")):
+            if isinstance(endpoint, str):
+                relationships_by_entity.setdefault(endpoint, []).append(relationship)
+    return StructuralBaselineIndex(
+        snapshot_digest(snapshot),
+        {
+            str(record["id"]): record
+            for record in entities
+            if isinstance(record.get("id"), str)
+        },
+        grouped(entities, "path"),
+        {
+            str(record["id"]): record
+            for record in relationships
+            if isinstance(record.get("id"), str)
+        },
+        {
+            entity_id: tuple(records)
+            for entity_id, records in relationships_by_entity.items()
+        },
+        grouped(source_subjects, "stable_key"),
+        grouped(source_subjects, "path"),
+        grouped(source_subjects, "file_entity_id"),
+        grouped(files, "path"),
+    )
 
 
 def _pick_fields(record: Mapping[str, Any], fields: Sequence[str]) -> dict[str, Any]:

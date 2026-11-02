@@ -1,4 +1,4 @@
-from powdrr_lift.change_log_parser import parse_change_log
+from powdrr_service.changelog import parse_change_log
 
 
 def test_parse_change_log_maps_yaml_into_dataclasses() -> None:

@@ -11,8 +11,8 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from powdrr_service.changelog import parse_change_log
 
-from powdrr_lift.change_log_parser import parse_change_log
 from powdrr_lift.core.index import ChangelogDocument
 from powdrr_lift.workrr.github_issue_queue import parse_reviewed_plan_yaml
 

@@ -9,14 +9,14 @@ from pathlib import Path
 from typing import Any, cast
 
 import yaml
-
-from powdrr_lift.change_log_parser import (
+from powdrr_service.changelog import (
     ChangeEntity,
     ChangeFile,
     ChangeLog,
     RelatedSection,
     parse_change_log,
 )
+
 from powdrr_lift.change_log_template import (
     BranchDiffEntry,
     _collect_branch_diff_entries,

@@ -8,9 +8,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import yaml
-from powdrr_service.structrr.source_manifest import is_specification_path
-
-from powdrr_lift.change_log_parser import (
+from powdrr_service.changelog import (
     ChangeEntity,
     ChangeFile,
     ChangeLog,
@@ -18,6 +16,8 @@ from powdrr_lift.change_log_parser import (
     Span,
     parse_change_log,
 )
+from powdrr_service.structrr.source_manifest import is_specification_path
+
 from powdrr_lift.change_log_template import (
     _resolve_default_branch,
     _resolve_repo_root,

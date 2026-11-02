@@ -3,11 +3,11 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
+from powdrr_service.changelog import Decision, parse_change_log
+
 from powdrr_lift import (
-    Decision,
     create_change_log_template,
     create_change_log_template_from_plan_diff,
-    parse_change_log,
 )
 
 

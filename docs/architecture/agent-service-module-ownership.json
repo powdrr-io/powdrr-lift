@@ -784,7 +784,6 @@
     {
       "extraction_pr": "3/8",
       "internal_imports": [
-        "powdrr_lift.change_log_parser",
         "powdrr_lift.change_log_template",
         "powdrr_lift.change_log_validation",
         "powdrr_lift.core.architecture_specification",
@@ -852,9 +851,9 @@
     {
       "extraction_pr": "3/8",
       "internal_imports": [
-        "powdrr_lift.change_log_parser",
         "powdrr_lift.core.index",
-        "powdrr_lift.workrr.github_issue_queue"
+        "powdrr_lift.workrr.github_issue_queue",
+        "powdrr_service.changelog"
       ],
       "kind": "python_module",
       "owner": "split",
@@ -899,26 +898,6 @@
     {
       "extraction_pr": "3/8",
       "internal_imports": [
-        "powdrr_lift.change_log_parser.parse_change_log"
-      ],
-      "kind": "python_module",
-      "owner": "split",
-      "path": "src/powdrr_lift/change_log_parser/__init__.py",
-      "rationale": "classify public transport types versus private policy",
-      "reviewed": false
-    },
-    {
-      "extraction_pr": "3/8",
-      "internal_imports": [],
-      "kind": "python_module",
-      "owner": "split",
-      "path": "src/powdrr_lift/change_log_parser/parse_change_log.py",
-      "rationale": "classify public transport types versus private policy",
-      "reviewed": false
-    },
-    {
-      "extraction_pr": "3/8",
-      "internal_imports": [
         "powdrr_lift.core.code_index",
         "powdrr_lift.core.template_generation"
       ],
@@ -931,7 +910,6 @@
     {
       "extraction_pr": "3/8",
       "internal_imports": [
-        "powdrr_lift.change_log_parser",
         "powdrr_lift.change_log_template",
         "powdrr_lift.core.architecture_specification",
         "powdrr_lift.core.entity_taxonomy",
@@ -940,7 +918,8 @@
         "powdrr_lift.core.pr_specification",
         "powdrr_lift.core.spec_paths",
         "powdrr_lift.core.system_specification",
-        "powdrr_lift.core.validation_messages"
+        "powdrr_lift.core.validation_messages",
+        "powdrr_service.changelog"
       ],
       "kind": "python_module",
       "owner": "split",
@@ -1072,7 +1051,6 @@
         "powdrr_lift.core.plan_diff_specification",
         "powdrr_lift.core.pr_analysis",
         "powdrr_lift.core.pr_specification",
-        "powdrr_lift.core.schemas",
         "powdrr_lift.core.system_specification",
         "powdrr_lift.core.template",
         "powdrr_lift.core.tool_manifest",
@@ -1168,10 +1146,10 @@
     {
       "extraction_pr": "3/8",
       "internal_imports": [
-        "powdrr_lift.change_log_parser",
         "powdrr_lift.change_log_template",
         "powdrr_lift.core.index",
-        "powdrr_lift.errors"
+        "powdrr_lift.errors",
+        "powdrr_service.changelog"
       ],
       "kind": "python_module",
       "owner": "split",
@@ -1337,9 +1315,9 @@
     {
       "extraction_pr": "3/8",
       "internal_imports": [
-        "powdrr_lift.change_log_parser",
         "powdrr_lift.change_log_template",
-        "powdrr_lift.core.spec_paths"
+        "powdrr_service.changelog",
+        "powdrr_service.structrr.source_manifest"
       ],
       "kind": "python_module",
       "owner": "split",
@@ -1368,10 +1346,10 @@
     {
       "extraction_pr": "3/8",
       "internal_imports": [
-        "powdrr_lift.change_log_parser",
         "powdrr_lift.core.repo",
         "powdrr_lift.core.spec_paths",
-        "powdrr_lift.core.template_generation"
+        "powdrr_lift.core.template_generation",
+        "powdrr_service.changelog"
       ],
       "kind": "python_module",
       "owner": "split",
@@ -1444,17 +1422,6 @@
       "kind": "python_module",
       "owner": "split",
       "path": "src/powdrr_lift/core/repository_inventory.py",
-      "rationale": "classify each symbol as service policy or public exchanged data",
-      "reviewed": false
-    },
-    {
-      "extraction_pr": "3/8",
-      "internal_imports": [
-        "powdrr_lift.change_log_parser"
-      ],
-      "kind": "python_module",
-      "owner": "split",
-      "path": "src/powdrr_lift/core/schemas.py",
       "rationale": "classify each symbol as service policy or public exchanged data",
       "reviewed": false
     },
@@ -2186,15 +2153,14 @@
     {
       "extraction_pr": "3",
       "internal_imports": [
-        "powdrr_lift.change_log_parser",
-        "powdrr_service.decision_obligation",
         "powdrr_lift.core.entity_taxonomy",
-        "powdrr_lift.core.spec_paths",
         "powdrr_lift.structrr.python_topology",
-        "powdrr_lift.structrr.source_manifest",
         "powdrr_lift.structrr.validation",
-        "powdrr_service.structrr.validation_models",
-        "powdrr_service.structrr.active_intent"
+        "powdrr_service.changelog",
+        "powdrr_service.decision_obligation",
+        "powdrr_service.structrr.active_intent",
+        "powdrr_service.structrr.source_manifest",
+        "powdrr_service.structrr.validation_models"
       ],
       "kind": "python_module",
       "owner": "split",
@@ -2815,7 +2781,6 @@
     {
       "extraction_pr": "5/7",
       "internal_imports": [
-        "powdrr_lift.change_log_parser",
         "powdrr_lift.core.contract_closure",
         "powdrr_lift.core.execution_plan",
         "powdrr_lift.core.implementation_packet",
@@ -2839,6 +2804,7 @@
         "powdrr_lift.workrr.verification_evidence",
         "powdrr_lift.workrr.verification_provider",
         "powdrr_service.behavior_contract",
+        "powdrr_service.changelog",
         "powdrr_service.decision_classifier",
         "powdrr_service.decision_obligation",
         "powdrr_service.external_contract_research",
@@ -3736,6 +3702,26 @@
       "owner": "service",
       "path": "packages/service/src/powdrr_service/resources/evaluations/semantic-prompt-cases-v1.jsonl",
       "rationale": "bundled private evaluation rubric",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [
+        "powdrr_service.changelog.parser"
+      ],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/changelog/__init__.py",
+      "rationale": "service-owned changelog schema and parsing policy",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/changelog/parser.py",
+      "rationale": "service-owned changelog schema and parsing policy",
       "reviewed": false
     }
   ],

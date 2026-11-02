@@ -214,21 +214,6 @@ from powdrr_lift.core.pr_specification import (
     show_proposed_pr_specification,
     validate_pr_specification_yaml,
 )
-from powdrr_lift.core.schemas import (
-    ChangeEntity,
-    ChangeEntityRelationship,
-    ChangeFeatureState,
-    ChangeFile,
-    ChangeGuidance,
-    ChangeInvariant,
-    ChangeLog,
-    ChangeProposedPRState,
-    Decision,
-    Intent,
-    RelatedSection,
-    Span,
-    parse_change_log,
-)
 from powdrr_lift.core.system_specification import (
     SystemSpecificationValidationIssue,
     SystemSpecificationValidationReport,
@@ -257,7 +242,6 @@ _IMPLEMENTATION = "powdrr_lift.core.implementation_specification"
 _INDEX = "powdrr_lift.core.index"
 _PR_ANALYSIS = "powdrr_lift.core.pr_analysis"
 _PR_SPECIFICATION = "powdrr_lift.core.pr_specification"
-_SCHEMAS = "powdrr_lift.core.schemas"
 _SYSTEM = "powdrr_lift.core.system_specification"
 _TEMPLATE = "powdrr_lift.core.template"
 _VALIDATE = "powdrr_lift.core.validate"
@@ -322,20 +306,8 @@ _EXPORTS: dict[str, str] = {
     "EntityReferenceReport": _ENTITY_CONTEXT,
     "EntityRelationshipReport": _ENTITY_CONTEXT,
     "ChangelogDocument": _INDEX,
-    "ChangeEntity": _SCHEMAS,
-    "ChangeEntityRelationship": _SCHEMAS,
-    "ChangeFeatureState": _SCHEMAS,
-    "ChangeFile": _SCHEMAS,
-    "ChangeGuidance": _SCHEMAS,
-    "ChangeInvariant": _SCHEMAS,
-    "ChangeLog": _SCHEMAS,
-    "ChangeProposedPRState": _SCHEMAS,
-    "Decision": _SCHEMAS,
     "EntityGraph": _INDEX,
     "EntityOccurrence": _INDEX,
-    "Intent": _SCHEMAS,
-    "RelatedSection": _SCHEMAS,
-    "Span": _SCHEMAS,
     "SourceIndex": _INDEX,
     "ProvenanceRecord": _INDEX,
     "RelationshipOccurrence": _INDEX,
@@ -382,7 +354,6 @@ _EXPORTS: dict[str, str] = {
     "lookup_entity_references": _ENTITY_CONTEXT,
     "lookup_entity_relationships": _ENTITY_CONTEXT,
     "load_delivery_profile": _DELIVERY_PROFILE,
-    "parse_change_log": _SCHEMAS,
     "parse_line_range": _EDIT_CONTEXT,
     "parse_line_ranges": _EDIT_CONTEXT,
     "parse_validation_report": _VALIDATE,

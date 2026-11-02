@@ -6,7 +6,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from pathlib import Path
 
-from powdrr_lift.change_log_parser import (
+from powdrr_service.changelog import (
     ChangeEntity,
     ChangeEntityRelationship,
     ChangeFeatureState,
@@ -21,6 +21,7 @@ from powdrr_lift.change_log_parser import (
     Span,
     parse_change_log,
 )
+
 from powdrr_lift.change_log_template import _resolve_default_branch, _resolve_repo_root
 from powdrr_lift.core.index import (
     ChangelogDocument,

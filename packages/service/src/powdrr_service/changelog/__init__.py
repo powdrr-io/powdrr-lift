@@ -1,4 +1,4 @@
-from powdrr_lift.change_log_parser.parse_change_log import (
+from powdrr_service.changelog.parser import (
     ChangeEntity,
     ChangeEntityRelationship,
     ChangeFeatureState,

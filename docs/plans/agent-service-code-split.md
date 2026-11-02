@@ -483,7 +483,9 @@ required validation cannot be reported as success. Worker commits remain visible
 ### PR 8 — Finish ownership, remove migration shims, and prove isolation
 
 1. Migrate every remaining command/module/resource in the inventory: evaluation,
-   template operations, changelogs, standalone validation, inspectors, and helpers.
+   template operations, changelog generation/validation, standalone inspectors,
+   and helpers. Changelog schema parsing and result models are service-owned;
+   generation and validation still need separate local Git/evidence boundaries.
    Update imports and monkeypatch targets explicitly; do not retain monkeypatch
    compatibility through global `sys.modules` aliases. Move Structrr proposal,
    source-manifest, actual-diff, and candidate-comparison policy into the service;

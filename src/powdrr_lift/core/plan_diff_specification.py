@@ -6,8 +6,8 @@ from pathlib import Path
 from typing import Any, cast
 
 import yaml
+from powdrr_service.changelog import parse_change_log
 
-from powdrr_lift.change_log_parser import parse_change_log
 from powdrr_lift.core.repo import resolve_repo_root as _resolve_repo_root
 from powdrr_lift.core.spec_paths import (
     PLAN_DIFF_SCHEMA_URL,

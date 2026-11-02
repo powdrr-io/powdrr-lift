@@ -135,14 +135,6 @@ def plan_diff_specification_path(
     )
 
 
-def is_specification_path(path: str) -> bool:
-    normalized_path = path.replace("\\", "/")
-    return (
-        normalized_path.startswith("docs/proposals/")
-        or normalized_path.startswith("docs/current/")
-    ) and normalized_path.endswith(".yaml")
-
-
 def is_current_specification_path(path: str | Path) -> bool:
     parts = Path(path).parts
     return Path(path).suffix == ".yaml" and any(

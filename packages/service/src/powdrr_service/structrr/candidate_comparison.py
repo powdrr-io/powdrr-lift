@@ -8,11 +8,10 @@ from dataclasses import dataclass
 from typing import Any
 
 from powdrr_service.decision_obligation import content_fingerprint
+from powdrr_service.structrr.actual_diff import StructrrActualDiff
+from powdrr_service.structrr.proposal import ProposalRevision
 from powdrr_service.structrr.rebase import rebase_structrr_snapshot
 from powdrr_service.structrr.snapshot import snapshot_digest
-
-from powdrr_lift.structrr.actual_diff import StructrrActualDiff
-from powdrr_lift.structrr.proposal import ProposalRevision
 
 CANDIDATE_COMPARISON_SCHEMA_VERSION = "candidate-comparison-v3"
 

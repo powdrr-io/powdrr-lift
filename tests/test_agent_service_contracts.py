@@ -198,6 +198,41 @@ def test_legacy_service_imports_are_explicitly_owned() -> None:
     assert all(entry["owner_pr"] > 0 for entry in allowlist["entries"])
 
 
+def test_structrr_proposal_and_comparison_policy_is_service_owned() -> None:
+    repository = Path(__file__).parents[1]
+    modules = (
+        "proposal.py",
+        "actual_diff.py",
+        "candidate_comparison.py",
+        "source_manifest.py",
+    )
+    service_root = repository / "packages/service/src/powdrr_service/structrr"
+    agent_root = repository / "src/powdrr_lift/structrr"
+    for module in modules:
+        source = service_root / module
+        assert source.is_file()
+        assert not (agent_root / module).exists()
+        tree = ast.parse(source.read_text(encoding="utf-8"))
+        imports = {
+            node.module
+            for node in ast.walk(tree)
+            if isinstance(node, ast.ImportFrom) and node.module is not None
+        }
+        imports.update(
+            alias.name
+            for node in ast.walk(tree)
+            if isinstance(node, ast.Import)
+            for alias in node.names
+        )
+        assert not any(name.startswith("powdrr_lift") for name in imports), source
+
+    from powdrr_service.structrr.proposal import ProposalRevision
+    from powdrr_service.structrr.source_manifest import SourceManifest
+
+    assert ProposalRevision.__module__ == "powdrr_service.structrr.proposal"
+    assert SourceManifest.__module__ == "powdrr_service.structrr.source_manifest"
+
+
 def test_service_owned_planning_has_no_agent_reexport_modules() -> None:
     repository = Path(__file__).parents[1]
     legacy_reexports = (

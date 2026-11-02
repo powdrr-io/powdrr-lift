@@ -18,6 +18,8 @@ from powdrr_service.planning.multipr_structrr import (
     write_multi_pr_proposal,
 )
 from powdrr_service.resources import bundled_process_directory
+from powdrr_service.structrr.proposal import ProposalOperation, ProposalRevision
+from powdrr_service.structrr.source_manifest import SourceManifest
 from powdrr_service.verification.execute_pr_test_authoring import (
     WORKSPACE_ROOT_PLACEHOLDER,
     build_execute_pr_test_author_prompt,
@@ -40,8 +42,6 @@ from powdrr_lift.process.tasks import (
     WorkflowInstance,
     WorkflowTask,
 )
-from powdrr_lift.structrr.proposal import ProposalOperation, ProposalRevision
-from powdrr_lift.structrr.source_manifest import SourceManifest
 from powdrr_lift.workrr import task_agent
 from powdrr_lift.workrr.actions import WorkflowEdit
 from powdrr_lift.workrr.git import (
@@ -167,7 +167,7 @@ def _commit_test_structrr_baseline(
     repo_root: Path,
     snapshot: Mapping[str, Any],
 ) -> tuple[Mapping[str, Any], SourceManifest]:
-    from powdrr_lift.structrr.source_manifest import compile_source_manifest
+    from powdrr_service.structrr.source_manifest import compile_source_manifest
 
     source_revision = subprocess.run(
         ["git", "rev-parse", "HEAD"],

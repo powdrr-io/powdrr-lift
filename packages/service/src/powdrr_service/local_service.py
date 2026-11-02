@@ -701,8 +701,8 @@ class LocalPowdrrService:
                 candidate_manifest, dict
             ):
                 raise ValueError("both snapshots must include a source manifest")
-            from powdrr_lift.structrr.actual_diff import compile_actual_structrr_diff
-            from powdrr_lift.structrr.source_manifest import SourceManifest
+            from powdrr_service.structrr.actual_diff import compile_actual_structrr_diff
+            from powdrr_service.structrr.source_manifest import SourceManifest
 
             actual = compile_actual_structrr_diff(
                 baseline,

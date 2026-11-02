@@ -4,8 +4,7 @@ import json
 from pathlib import Path
 
 import pytest
-
-from powdrr_lift.structrr.proposal import (
+from powdrr_service.structrr.proposal import (
     compile_proposal_revision,
     load_proposal_revision,
     validate_proposal_revision,

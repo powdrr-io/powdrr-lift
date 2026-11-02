@@ -10,11 +10,18 @@ from typing import Any, Literal
 
 from powdrr_service.decision_obligation import content_fingerprint
 
-from powdrr_lift.core.spec_paths import is_specification_path
-
 SOURCE_MANIFEST_SCHEMA_VERSION = "structrr-source-manifest-v1"
 SOURCE_EXTRACTOR_VERSION = "structrr-source-observations-v1"
 SourceEvidenceKind = Literal["source_observation", "declaration"]
+
+
+def is_specification_path(path: str) -> bool:
+    """Whether a repository path names a current or proposed spec document."""
+    normalized_path = path.replace("\\", "/")
+    return (
+        normalized_path.startswith("docs/proposals/")
+        or normalized_path.startswith("docs/current/")
+    ) and normalized_path.endswith(".yaml")
 
 
 @dataclass(frozen=True, slots=True)

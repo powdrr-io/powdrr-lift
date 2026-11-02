@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 import yaml
+from powdrr_service.structrr.source_manifest import is_specification_path
 
 from powdrr_lift.change_log_parser import (
     ChangeEntity,
@@ -21,7 +22,6 @@ from powdrr_lift.change_log_template import (
     _resolve_default_branch,
     _resolve_repo_root,
 )
-from powdrr_lift.core.spec_paths import is_specification_path
 
 _PR_FILE_NAME_RE = re.compile(r"^PR-(\d+)-changelog\.yaml$")
 _PR_SUBJECT_RE = re.compile(r"\(#(?P<pr_number>\d+)\)")

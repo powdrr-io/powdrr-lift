@@ -8,13 +8,15 @@ from typing import Any, TypedDict
 
 import pytest
 from powdrr_service.decision_obligation import DecisionOutcome, DecisionResult
-from powdrr_service.structrr.obligation_evidence import NormativeStrength
-
-from powdrr_lift.structrr.actual_diff import (
+from powdrr_service.structrr.actual_diff import (
     StructrrActualDiff,
     compile_actual_structrr_diff,
 )
-from powdrr_lift.structrr.candidate_comparison import compare_candidate_snapshot
+from powdrr_service.structrr.candidate_comparison import compare_candidate_snapshot
+from powdrr_service.structrr.obligation_evidence import NormativeStrength
+from powdrr_service.structrr.proposal import ProposalRevision, compile_proposal_revision
+from powdrr_service.structrr.source_manifest import compile_source_manifest
+
 from powdrr_lift.structrr.invariant_review import (
     InvariantApplicability,
     InvariantOrigin,
@@ -30,8 +32,6 @@ from powdrr_lift.structrr.invariant_review import (
     write_invariant_review_receipt,
     write_invariant_review_run,
 )
-from powdrr_lift.structrr.proposal import ProposalRevision, compile_proposal_revision
-from powdrr_lift.structrr.source_manifest import compile_source_manifest
 
 
 class _ReviewContext(TypedDict):

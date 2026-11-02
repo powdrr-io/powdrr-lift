@@ -12,39 +12,9 @@
       "rationale": "Planning maps the existing provider execution error into its stable planning outcome; replace it with a service-owned error type during provider extraction."
     },
     {
-      "import": "powdrr_lift.structrr.actual_diff.compile_actual_structrr_diff",
-      "owner_pr": 8,
-      "rationale": "The service still reuses the existing actual Structrr diff implementation; relocate it with the remaining Structrr product semantics."
-    },
-    {
-      "import": "powdrr_lift.structrr.actual_diff.StructrrActualDiff",
-      "owner_pr": 8,
-      "rationale": "The service-owned multi-PR proposal still consumes the existing Structrr diff record; relocate it with Structrr policy."
-    },
-    {
       "import": "powdrr_lift.structrr.bootstrap.bootstrap_structrr",
       "owner_pr": 8,
       "rationale": "Bootstrap still reuses the existing Structrr implementation over a service-owned snapshot; relocate it with the remaining Structrr product semantics."
-    },
-    {
-      "import": "powdrr_lift.structrr.candidate_comparison.compare_candidate_snapshot",
-      "owner_pr": 8,
-      "rationale": "The service-owned proposal reconciliation still uses the existing Structrr candidate comparison; relocate it with Structrr policy."
-    },
-    {
-      "import": "powdrr_lift.structrr.proposal.ProposalRevision",
-      "owner_pr": 8,
-      "rationale": "The service-owned multi-PR proposal still uses the established Structrr proposal record; relocate it with Structrr policy."
-    },
-    {
-      "import": "powdrr_lift.structrr.proposal.compile_proposal_revision",
-      "owner_pr": 8,
-      "rationale": "The service-owned multi-PR proposal still uses the established Structrr compiler; relocate it with Structrr policy."
-    },
-    {
-      "import": "powdrr_lift.structrr.source_manifest.SourceManifest",
-      "owner_pr": 8,
-      "rationale": "Actual Structrr diff compilation still uses the existing source-manifest type; move the type with the service-owned Structrr implementation."
     },
     {
       "import": "powdrr_lift.workrr.llm.complete_json_with_timeout_retry",

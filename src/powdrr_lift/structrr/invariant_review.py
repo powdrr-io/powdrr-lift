@@ -17,13 +17,12 @@ from powdrr_service.decision_obligation import (
     content_fingerprint,
     evidence_fingerprint,
 )
-from powdrr_service.structrr.obligation_evidence import NormativeStrength
-
-from powdrr_lift.structrr.actual_diff import StructrrActualDiff
-from powdrr_lift.structrr.candidate_comparison import (
+from powdrr_service.structrr.actual_diff import StructrrActualDiff
+from powdrr_service.structrr.candidate_comparison import (
     CANDIDATE_COMPARISON_SCHEMA_VERSION,
 )
-from powdrr_lift.structrr.proposal import ProposalRevision
+from powdrr_service.structrr.obligation_evidence import NormativeStrength
+from powdrr_service.structrr.proposal import ProposalRevision
 
 INVARIANT_REVIEW_RECEIPT_SCHEMA_VERSION = "invariant-review-receipt-v2"
 INVARIANT_REVIEW_PREDICATE_VERSION = "invariant-review-v1"

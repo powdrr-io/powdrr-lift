@@ -51,7 +51,9 @@ from powdrr_service.providers.selection import (
     resolve_llm_mapping,
 )
 from powdrr_service.resources import bundled_process_directory
+from powdrr_service.structrr.proposal import ProposalRevision
 from powdrr_service.structrr.snapshot import snapshot_digest
+from powdrr_service.structrr.source_manifest import SourceManifest
 from powdrr_service.verification.execute_pr_acceptance import (
     build_execute_pr_test_report,
     execute_pr_attempt_passed,
@@ -117,8 +119,6 @@ from powdrr_lift.process.tasks import (
     WorkflowTask,
 )
 from powdrr_lift.structrr.bootstrap import bootstrap_structrr
-from powdrr_lift.structrr.proposal import ProposalRevision
-from powdrr_lift.structrr.source_manifest import SourceManifest
 from powdrr_lift.workrr.action_operations import (
     _apply_file_edits,
     _apply_yaml_operations,

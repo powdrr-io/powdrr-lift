@@ -3,9 +3,10 @@ import type { FormEvent, KeyboardEvent } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { workspaceClient } from './api/client'
-import type { Conversation, Message, WorkspaceJobAction, WorkspaceJobDetail, WorkspaceRepository, WorkspaceSnapshot } from './api/types'
+import type { Conversation, Message, WorkspaceJobAction, WorkspaceJobCreateInput, WorkspaceJobDetail, WorkspaceRepository, WorkspaceSnapshot } from './api/types'
 import { WorkspaceApiError } from './api/types'
 import { JobStatus } from './components/JobStatus'
+import { JobCreateDialog } from './components/JobCreateDialog'
 import { QuestionCard } from './components/QuestionCard'
 import './App.css'
 
@@ -129,6 +130,7 @@ function App() {
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [conversationId, setConversationId] = useState<string | null>(readSelection().conversationId)
   const [selectedJobId, setSelectedJobId] = useState<string | null>(readSelection().jobId)
+  const [showJobCreateDialog, setShowJobCreateDialog] = useState(false)
   const [jobTab, setJobTab] = useState<'running' | 'ready' | 'history'>('running')
   const [historyFilter, setHistoryFilter] = useState<'all' | 'succeeded' | 'failed' | 'cancelled' | 'interrupted'>('all')
   const [jobDetail, setJobDetail] = useState<WorkspaceJobDetail | null>(null)
@@ -445,6 +447,14 @@ function App() {
     if (repositoryId) updateUrl(repositoryId, null, id)
   }
 
+  const createJob = async (input: WorkspaceJobCreateInput) => {
+    if (!repositoryId) throw new Error('Choose a workspace before creating a job.')
+    const job = await workspaceClient.createJob(repositoryId, input)
+    await refreshWorkspace(repositoryId)
+    setJobTab('ready')
+    selectJob(job.job_id)
+  }
+
   const sendMessage = async () => {
     const content = draft.trim()
     if (!repositoryId || !conversationId || !content || busy || activeTurn) return
@@ -596,6 +606,7 @@ function App() {
     .sort((left, right) => right.updated_at.localeCompare(left.updated_at))
 
   return (
+    <>
     <div className={`workspace${mobileSidebarOpen ? ' sidebar-open' : ''}`}>
       {mobileSidebarOpen && <button className="mobile-backdrop" aria-label="Close navigation" onClick={() => setMobileSidebarOpen(false)} />}
       <aside className="sidebar" aria-label="Workspace navigation">
@@ -634,7 +645,7 @@ function App() {
               {filteredConversations.length === 0 && <p className="sidebar-empty">{search ? 'No chats match your search.' : 'Your design chats will appear here.'}</p>}
             </nav>
             <section className="job-section" aria-label="Autonomous jobs">
-              <div className="job-section__heading"><span>JOBS</span><span>{runningJobs.length + readyJobs.length + historyJobs.length}</span></div>
+              <div className="job-section__heading"><span>JOBS</span><span className="job-section__heading-actions"><span>{runningJobs.length + readyJobs.length + historyJobs.length}</span><button type="button" onClick={() => setShowJobCreateDialog(true)} aria-label="Create autonomous job" title="Create autonomous job">＋</button></span></div>
               <div className="job-tabs" role="tablist" aria-label="Job status">
                 <button type="button" role="tab" aria-selected={jobTab === 'running'} onClick={() => setJobTab('running')}>Running <span>{runningJobs.length}</span></button>
                 <button type="button" role="tab" aria-selected={jobTab === 'ready'} onClick={() => setJobTab('ready')}>Ready / pending <span>{readyJobs.length}</span></button>
@@ -772,6 +783,16 @@ function App() {
         <footer className="app-footer"><span>BUILT FOR THOUGHTFUL SOFTWARE</span><span>Local by design <i>✳</i></span></footer>
       </main>
     </div>
+    {showJobCreateDialog && repositoryId && (
+      <JobCreateDialog
+        conversations={conversations}
+        jobs={snapshot?.jobs ?? []}
+        repositoryName={currentRepository?.display_name ?? 'Workspace'}
+        onClose={() => setShowJobCreateDialog(false)}
+        onCreate={createJob}
+      />
+    )}
+    </>
   )
 }
 

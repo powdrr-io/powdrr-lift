@@ -4,8 +4,10 @@ import type {
   ConversationMessages,
   Message,
   WorkspaceEvent,
+  WorkspaceJob,
   WorkspaceJobAction,
   WorkspaceJobActionResult,
+  WorkspaceJobCreateInput,
   WorkspaceJobDetail,
   WorkspaceQuestion,
   WorkspaceRepository,
@@ -94,6 +96,14 @@ export class WorkspaceClient {
       `${apiRoot}/repositories/${encodeURIComponent(repositoryId)}/jobs/${encodeURIComponent(jobId)}`,
     )
     return (await response.json()) as WorkspaceJobDetail
+  }
+
+  async createJob(repositoryId: string, input: WorkspaceJobCreateInput): Promise<WorkspaceJob> {
+    const response = await this.mutate(
+      `${apiRoot}/repositories/${encodeURIComponent(repositoryId)}/jobs`,
+      { method: 'POST', body: JSON.stringify(input) },
+    )
+    return (await response.json()) as WorkspaceJob
   }
 
   async requestJobAction(

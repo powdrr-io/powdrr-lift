@@ -22,10 +22,10 @@ modules:
     action: added
     relative_location: src/powdrr_lift/mcp_server.py
     purpose: MCP server exposing powdrr-lift tools to external clients.
-  - id: powdrr-lift-change-log-parser
+  - id: powdrr-lift-change-log-policy
     action: added
     relative_location: packages/service/src/powdrr_service/changelog/
-    purpose: Service-owned change log schema parser and result models.
+    purpose: Service-owned changelog parsing, schema models, and template rendering policy.
   - id: powdrr-lift-tests
     action: added
     relative_location: tests/

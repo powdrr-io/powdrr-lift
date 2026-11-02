@@ -19,50 +19,71 @@ files:
 - path: docs/architecture/agent-service-module-ownership.json
   type: modified
   span:
-    start_line: 927
-    end_line: 928
+    start_line: 921
+    end_line: 921
   summary: Update ownership records and import edges for service-owned system specification validation.
   rationale: Keep the architecture inventory aligned with the extraction.
 - path: docs/architecture/agent-service-module-ownership.json
   type: modified
   span:
-    start_line: 1009
-    end_line: 1009
+    start_line: 925
+    end_line: 926
   summary: Update ownership records and import edges for service-owned system specification validation.
   rationale: Keep the architecture inventory aligned with the extraction.
 - path: docs/architecture/agent-service-module-ownership.json
   type: modified
   span:
-    start_line: 1065
+    start_line: 998
+    end_line: 998
+  summary: Update ownership records and import edges for service-owned system specification validation.
+  rationale: Keep the architecture inventory aligned with the extraction.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 1008
+    end_line: 1008
+  summary: Update ownership records and import edges for service-owned system specification validation.
+  rationale: Keep the architecture inventory aligned with the extraction.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 1064
     end_line: 1065
   summary: Update ownership records and import edges for service-owned system specification validation.
   rationale: Keep the architecture inventory aligned with the extraction.
 - path: docs/architecture/agent-service-module-ownership.json
   type: modified
   span:
-    start_line: 1505
-    end_line: 1506
+    start_line: 1504
+    end_line: 1505
   summary: Update ownership records and import edges for service-owned system specification validation.
   rationale: Keep the architecture inventory aligned with the extraction.
 - path: docs/architecture/agent-service-module-ownership.json
   type: modified
   span:
-    start_line: 1511
-    end_line: 1511
+    start_line: 1510
+    end_line: 1510
   summary: Update ownership records and import edges for service-owned system specification validation.
   rationale: Keep the architecture inventory aligned with the extraction.
 - path: docs/architecture/agent-service-module-ownership.json
   type: modified
   span:
-    start_line: 1648
-    end_line: 1649
+    start_line: 1626
+    end_line: 1626
   summary: Update ownership records and import edges for service-owned system specification validation.
   rationale: Keep the architecture inventory aligned with the extraction.
 - path: docs/architecture/agent-service-module-ownership.json
   type: modified
   span:
-    start_line: 3758
-    end_line: 3777
+    start_line: 1646
+    end_line: 1648
+  summary: Update ownership records and import edges for service-owned system specification validation.
+  rationale: Keep the architecture inventory aligned with the extraction.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3757
+    end_line: 3776
   summary: Update ownership records and import edges for service-owned system specification validation.
   rationale: Keep the architecture inventory aligned with the extraction.
 - path: docs/plans/agent-service-code-split.md

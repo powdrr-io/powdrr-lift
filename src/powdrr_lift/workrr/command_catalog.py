@@ -45,6 +45,21 @@ from powdrr_service.planning.semantic_contract import (
     PartialSemanticContract,
     SemanticContractError,
 )
+from powdrr_service.planning.semantic_contract_compiler import (
+    bind_behavior_family_decision,
+    bind_field_entailment_reviews,
+    bind_source_extractions,
+    bind_source_semantic_decisions,
+    compile_deterministic_source_extractions,
+    compile_source_contract,
+    finalize_source_faithfulness,
+    prepare_behavior_family_decision,
+    prepare_dependent_source_semantic_decisions,
+    prepare_field_entailment_reviews,
+    prepare_source_extractions,
+    prepare_source_semantic_decisions,
+    project_partial_contract_to_legacy_design,
+)
 from powdrr_service.planning.semantic_decision import (
     SEMANTIC_DIMENSION_DECISION_KINDS,
     SemanticDecision,
@@ -88,21 +103,6 @@ from powdrr_lift.workrr.repository_subject_binding import (
     prepare_candidate_relation_decisions,
     prepare_subject_lookup_query,
     retrieve_subject_candidates,
-)
-from powdrr_lift.workrr.semantic_contract_compiler import (
-    bind_behavior_family_decision,
-    bind_field_entailment_reviews,
-    bind_source_extractions,
-    bind_source_semantic_decisions,
-    compile_deterministic_source_extractions,
-    compile_source_contract,
-    finalize_source_faithfulness,
-    prepare_behavior_family_decision,
-    prepare_dependent_source_semantic_decisions,
-    prepare_field_entailment_reviews,
-    prepare_source_extractions,
-    prepare_source_semantic_decisions,
-    project_partial_contract_to_legacy_design,
 )
 from powdrr_lift.workrr.uncertainty_decisions import (
     records_for_scenario,

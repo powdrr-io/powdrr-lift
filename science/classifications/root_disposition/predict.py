@@ -9,9 +9,8 @@ from pathlib import Path
 from typing import Any
 
 import torch
+from powdrr_service.planning.classifier_input import format_classifier_input
 from transformers import AutoModelForSequenceClassification, AutoTokenizer
-
-from powdrr_lift.core.classifier_input import format_classifier_input
 
 
 def classify(

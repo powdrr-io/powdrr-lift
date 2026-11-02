@@ -5,22 +5,17 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-
-from powdrr_lift.workrr.semantic_prompt_cases import (
+from powdrr_service.evaluations.semantic_prompt_cases import (
+    DEFAULT_SEMANTIC_PROMPT_CASES,
     SemanticPromptCaseError,
     load_semantic_prompt_cases,
     validate_semantic_prompt_cases,
 )
-from powdrr_lift.workrr.semantic_prompt_variants import (
+from powdrr_service.evaluations.semantic_prompt_variants import (
     generate_semantic_prompt_variants,
 )
 
-CASE_PATH = (
-    Path(__file__).resolve().parents[1]
-    / "docs"
-    / "evaluations"
-    / "semantic-prompt-cases-v1.jsonl"
-)
+CASE_PATH = DEFAULT_SEMANTIC_PROMPT_CASES
 
 
 def _case(case_id: str, **overrides: Any) -> dict[str, Any]:

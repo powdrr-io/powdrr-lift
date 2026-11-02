@@ -17,13 +17,12 @@ ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "src"))
 
 from powdrr_service import decision_classifier as jev_classifier  # noqa: E402
-from powdrr_service.planning.semantic_decision import SemanticDecisionSpec  # noqa: E402
-
-from powdrr_lift.workrr.semantic_contract_compiler import (  # noqa: E402
+from powdrr_service.planning.semantic_contract_compiler import (  # noqa: E402
     CLASSIFIER_DEFINITIONS,
     SOURCE_CLASSIFIER_REVISION,
     _classifier_request,
 )
+from powdrr_service.planning.semantic_decision import SemanticDecisionSpec  # noqa: E402
 
 LABELS = ("context", "include", "include_prohibition", "exclude", "unclear")
 DEFAULT_CASES = Path(__file__).with_name("jev_smoke_cases.jsonl")
@@ -233,7 +232,11 @@ def main() -> int:
                 ROOT / "packages/service/src/powdrr_service/decision_classifier.py"
             ).read_bytes()
             + (
-                ROOT / "src/powdrr_lift/workrr/semantic_contract_compiler.py"
+                ROOT
+                / (
+                    "packages/service/src/powdrr_service/planning/"
+                    "semantic_contract_compiler.py"
+                )
             ).read_bytes()
         ).hexdigest(),
         "cases": len(cases),

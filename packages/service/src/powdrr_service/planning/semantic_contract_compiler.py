@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
+from powdrr_service.planning.classifier_input import format_classifier_input
 from powdrr_service.planning.semantic_contract import (
     BoundSourceExtraction,
     PartialSemanticContract,
@@ -38,8 +39,6 @@ from powdrr_service.semantic_faithfulness import (
 from powdrr_service.semantic_faithfulness import (
     prepare_field_entailment_reviews as prepare_field_reviews,
 )
-
-from powdrr_lift.core.classifier_input import format_classifier_input
 
 SOURCE_CLASSIFIER_REVISION = (
     "source-classifier-v3-bounded-context-no-obligation-fallback"

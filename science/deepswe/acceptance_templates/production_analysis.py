@@ -19,12 +19,12 @@ from powdrr_service.planning.instruction_ledger import (
     apply_atomicity_decisions,
     compile_instruction_ledger,
 )
-
-from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
-from powdrr_lift.workrr.semantic_contract_compiler import (
+from powdrr_service.planning.semantic_contract_compiler import (
     bind_source_semantic_decisions,
     prepare_source_semantic_decisions,
 )
+
+from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
 
 from . import PROMPT_VERSION
 from .cli import DEFAULT_MODEL, _client

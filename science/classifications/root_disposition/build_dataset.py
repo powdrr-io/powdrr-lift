@@ -28,6 +28,10 @@ from powdrr_service.planning.instruction_ledger import (
     apply_atomicity_decisions,
     compile_instruction_ledger,
 )
+from powdrr_service.planning.semantic_contract_compiler import (
+    bind_source_semantic_decisions,
+    prepare_source_semantic_decisions,
+)
 from powdrr_service.planning.semantic_decision import DECISION_VALUES
 from powdrr_service.providers.config import default_llm_mappings
 from powdrr_service.providers.credentials import resolve_provider_credentials
@@ -35,10 +39,6 @@ from powdrr_service.resources import bundled_process_directory
 
 from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
 from powdrr_lift.workrr.provider_runtime import build_workflow_client
-from powdrr_lift.workrr.semantic_contract_compiler import (
-    bind_source_semantic_decisions,
-    prepare_source_semantic_decisions,
-)
 
 ROOT_DIR = Path(__file__).resolve().parents[3]
 DATASET_SCHEMA = "semantic-classifier-example-v1"

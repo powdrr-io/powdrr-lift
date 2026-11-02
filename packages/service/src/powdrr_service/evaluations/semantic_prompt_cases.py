@@ -9,8 +9,8 @@ from pathlib import Path
 from typing import Any
 
 DEFAULT_SEMANTIC_PROMPT_CASES = (
-    Path(__file__).resolve().parents[3]
-    / "docs"
+    Path(__file__).resolve().parents[1]
+    / "resources"
     / "evaluations"
     / "semantic-prompt-cases-v1.jsonl"
 )

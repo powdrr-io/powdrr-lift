@@ -7,7 +7,7 @@ import re
 from collections.abc import Mapping, Sequence
 from typing import Any, Protocol
 
-from powdrr_lift.workrr.semantic_prompt_cases import (
+from powdrr_service.evaluations.semantic_prompt_cases import (
     SemanticPromptCaseError,
     validate_semantic_prompt_cases,
 )

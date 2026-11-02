@@ -1,5 +1,6 @@
 # ruff: noqa: I001
 
+from powdrr_service.resources import bundled_process_directory
 import os
 import json
 import subprocess
@@ -13,10 +14,13 @@ from typing import Any, cast
 import pytest
 
 from powdrr_service.providers.config import DEEPINFRA_CHEAP_MODEL
-from powdrr_lift.workrr.procedrr import StructuredToolExecutor
+from powdrr_lift.workrr.procedrr import StructuredToolExecutor, WorkrrProcedrrClient
 from powdrr_lift.workrr.task_agent import _normalize_execute_pr_coding_attempt
-from procedrr_evaluator import EvaluationError, Evaluator
-from procedrr_evaluator.evaluator import EvaluationEvent, ValidationGateError
+from powdrr_service.procedrr_evaluator import EvaluationError, Evaluator
+from powdrr_service.procedrr_evaluator.evaluator import (
+    EvaluationEvent,
+    ValidationGateError,
+)
 
 
 def test_benchmark_gate_records_issue_and_continues() -> None:
@@ -56,7 +60,7 @@ class FakeLLM:
 
 
 def test_for_each_runs_judge_only_items_concurrently_and_collects_in_order() -> None:
-    from procedrr import parse_and_validate
+    from powdrr_service.procedrr import parse_and_validate
 
     barrier = threading.Barrier(2)
 
@@ -110,7 +114,7 @@ steps:
 
 
 def test_for_each_batches_judgments_without_parallel_execution() -> None:
-    from procedrr import parse_and_validate
+    from powdrr_service.procedrr import parse_and_validate
 
     class BatchLLM:
         def __init__(self) -> None:
@@ -223,7 +227,7 @@ def test_parallel_judge_failures_preserve_each_failed_item_event() -> None:
 
 
 def test_evaluator_enforces_declared_operation_return_schema() -> None:
-    from procedrr import parse_and_validate
+    from powdrr_service.procedrr import parse_and_validate
 
     document = parse_and_validate(
         """
@@ -249,7 +253,7 @@ steps:
 
 
 def test_evaluator_operation_event_contains_step_inputs_and_output() -> None:
-    from procedrr import parse_and_validate
+    from powdrr_service.procedrr import parse_and_validate
 
     document = parse_and_validate(
         """
@@ -312,7 +316,7 @@ def test_evaluator_records_failed_judge_path_and_request_trace() -> None:
 
 
 def test_evaluator_calls_a_named_procedrr_process(tmp_path: Path) -> None:
-    from procedrr import parse_and_validate
+    from powdrr_service.procedrr import parse_and_validate
 
     (tmp_path / "design-interview.yaml").write_text(
         """
@@ -381,7 +385,7 @@ def test_execute_proposed_pr_workflow_enforces_implementation_and_pr_calls(
     plan_defect_detected: bool,
     unshaped_execution_error: bool,
 ) -> None:
-    from procedrr import parse_and_validate
+    from powdrr_service.procedrr import parse_and_validate
 
     plan_defect_evidence = (
         [
@@ -461,9 +465,7 @@ steps:
     }
     for name, source in processes.items():
         (tmp_path / f"{name}.yaml").write_text(source, encoding="utf-8")
-    repository_processes = (
-        Path(__file__).resolve().parents[1] / "docs/procedrr/processes"
-    )
+    repository_processes = bundled_process_directory()
     for name in ("finish-implementation-pr", "amend-plan-and-open-pr"):
         (tmp_path / f"{name}.yaml").write_text(
             (repository_processes / f"{name}.yaml").read_text(encoding="utf-8"),
@@ -708,7 +710,7 @@ steps:
 
 
 def test_called_process_uses_its_own_recovery_declarations(tmp_path: Path) -> None:
-    from procedrr import parse_and_validate
+    from powdrr_service.procedrr import parse_and_validate
 
     (tmp_path / "recoverable-child.yaml").write_text(
         """\
@@ -823,7 +825,7 @@ def test_evaluator_resolves_tool_output_into_declared_judge_context() -> None:
 
 def test_evaluator_applies_prompt_rules_deterministically() -> None:
     llm = FakeLLM()
-    from procedrr import parse_and_validate
+    from powdrr_service.procedrr import parse_and_validate
 
     document = parse_and_validate(
         """
@@ -1502,8 +1504,8 @@ def test_evaluator_runs_checked_in_design_interview_definition() -> None:
                 }
             return {"ok": True}
 
-    source = Path("docs/procedrr/processes/design-interview.yaml").read_text()
-    from procedrr import parse_and_validate
+    source = (bundled_process_directory() / "design-interview.yaml").read_text()
+    from powdrr_service.procedrr import parse_and_validate
 
     document = parse_and_validate(source)
     result = Evaluator(llm, execute).evaluate(
@@ -1541,7 +1543,7 @@ def test_live_parallel_atomicity_matches_serial_judgments(tmp_path: Path) -> Non
     from importlib import import_module
 
     import yaml
-    from procedrr import parse_and_validate
+    from powdrr_service.procedrr import parse_and_validate
 
     build_probe_client = import_module(
         "powdrr_lift.workrr.prompt_probe"
@@ -1566,7 +1568,7 @@ def test_live_parallel_atomicity_matches_serial_judgments(tmp_path: Path) -> Non
         },
     ]
     production = parse_and_validate(
-        Path("docs/procedrr/processes/design-interview.yaml").read_text()
+        (bundled_process_directory() / "design-interview.yaml").read_text()
     )
     loop = copy.deepcopy(production["steps"][1]["for_each"])
     loop["snapshot"]["name"] = "atomicity_clauses"
@@ -1621,7 +1623,7 @@ def test_live_design_interview_decomposes_compound_state_data_lifecycle(
         FeatureCommandRuntime,
         feature_command_catalog,
     )
-    from procedrr import parse_and_validate
+    from powdrr_service.procedrr import parse_and_validate
 
     build_probe_client = import_module(
         "powdrr_lift.workrr.prompt_probe"
@@ -1652,7 +1654,7 @@ def test_live_design_interview_decomposes_compound_state_data_lifecycle(
         return runtime.dispatch(command[0], list(command), parameters)
 
     document = parse_and_validate(
-        Path("docs/procedrr/processes/design-interview.yaml").read_text()
+        (bundled_process_directory() / "design-interview.yaml").read_text()
     )
     result = Evaluator(llm, execute).evaluate(
         document,
@@ -1684,7 +1686,7 @@ def test_live_design_interview_decomposes_compound_state_data_lifecycle(
 
 
 def test_evaluator_tracks_operation_output_schema_on_binding() -> None:
-    from procedrr import parse_and_validate
+    from powdrr_service.procedrr import parse_and_validate
 
     source = """
 name: schema-tracking
@@ -1837,8 +1839,8 @@ class HelloWorldLLM:
 
 def test_execute_proposed_pr_hello_world_end_to_end(tmp_path: Path) -> None:
     (tmp_path / "hello.py").write_text('print("Hello, World")\n', encoding="utf-8")
-    source = Path("docs/procedrr/processes/execute-proposed-pr.yaml").read_text()
-    from procedrr import parse_and_validate
+    source = (bundled_process_directory() / "execute-proposed-pr.yaml").read_text()
+    from powdrr_service.procedrr import parse_and_validate
 
     document = parse_and_validate(source)
 
@@ -1886,7 +1888,7 @@ def test_execute_proposed_pr_hello_world_end_to_end(tmp_path: Path) -> None:
 
 
 def test_operation_resolves_explicit_literal_and_reference_values() -> None:
-    from procedrr import parse_and_validate
+    from powdrr_service.procedrr import parse_and_validate
 
     document = parse_and_validate(
         """
@@ -1943,7 +1945,7 @@ def test_execute_proposed_pr_hello_world_with_live_llm(tmp_path: Path) -> None:
         "id: hello-world-live\nmodules: [{id: hello, action: added}]\n",
         encoding="utf-8",
     )
-    from procedrr import parse_and_validate
+    from powdrr_service.procedrr import parse_and_validate
 
     from importlib import import_module
 
@@ -1951,7 +1953,7 @@ def test_execute_proposed_pr_hello_world_with_live_llm(tmp_path: Path) -> None:
         "powdrr_lift.workrr.prompt_probe"
     ).build_probe_client
     document = parse_and_validate(
-        Path("docs/procedrr/processes/execute-proposed-pr.yaml").read_text()
+        (bundled_process_directory() / "execute-proposed-pr.yaml").read_text()
     )
     llm = build_probe_client(
         provider="deepinfra-cheap",
@@ -1999,8 +2001,8 @@ def test_execute_proposed_pr_hello_world_with_live_llm(tmp_path: Path) -> None:
             return {"changed": True, "path": parameters["file_path"]}
         raise AssertionError(f"unexpected operation: {tool}")
 
-    Evaluator.with_workrr(
-        llm,
+    Evaluator(
+        WorkrrProcedrrClient(llm, process_directory=tmp_path),
         StructuredToolExecutor(
             execute,
             available_paths=lambda: ["hello.py", "test_hello.py"],

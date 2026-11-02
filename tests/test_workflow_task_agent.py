@@ -17,6 +17,7 @@ from powdrr_service.planning.multipr_structrr import (
     compile_multi_pr_proposal,
     write_multi_pr_proposal,
 )
+from powdrr_service.resources import bundled_process_directory
 from powdrr_service.verification.execute_pr_test_authoring import (
     WORKSPACE_ROOT_PLACEHOLDER,
     build_execute_pr_test_author_prompt,
@@ -2583,8 +2584,8 @@ def test_coding_agent_exception_binds_and_reaches_parent_workflow_review(
     tmp_path: Path,
 ) -> None:
     """Carry the adapter's raised-error path through the real parent process."""
-    from procedrr import parse_and_validate
-    from procedrr_evaluator import Evaluator
+    from powdrr_service.procedrr import parse_and_validate
+    from powdrr_service.procedrr_evaluator import Evaluator
 
     (tmp_path / "execute-proposed-pr.yaml").write_text(
         """\
@@ -2609,9 +2610,7 @@ steps:
 """,
         encoding="utf-8",
     )
-    repository_processes = (
-        Path(__file__).resolve().parents[1] / "docs/procedrr/processes"
-    )
+    repository_processes = bundled_process_directory()
     for name in ("finish-implementation-pr", "amend-plan-and-open-pr"):
         (tmp_path / f"{name}.yaml").write_text(
             (repository_processes / f"{name}.yaml").read_text(encoding="utf-8"),

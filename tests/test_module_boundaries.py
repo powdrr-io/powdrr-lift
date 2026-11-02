@@ -6,6 +6,9 @@ import ast
 from pathlib import Path
 
 SOURCE_ROOT = Path(__file__).parents[1] / "src" / "powdrr_lift"
+SERVICE_ROOT = (
+    Path(__file__).parents[1] / "packages" / "service" / "src" / "powdrr_service"
+)
 
 
 def test_language_and_agent_package_surfaces_exist() -> None:
@@ -149,6 +152,13 @@ def test_service_provider_modules_do_not_import_legacy_agent_modules() -> None:
     for path in paths:
         imports = _imported_modules(path)
         assert not any(module.startswith("powdrr_lift") for module in imports), path
+
+
+def test_service_procedrr_runtime_does_not_import_legacy_agent_modules() -> None:
+    for package in ("procedrr", "procedrr_evaluator"):
+        for path in (SERVICE_ROOT / package).rglob("*.py"):
+            imports = _imported_modules(path)
+            assert not any(module.startswith("powdrr_lift") for module in imports), path
 
 
 def test_workflow_implementations_are_not_stranded_at_package_root() -> None:

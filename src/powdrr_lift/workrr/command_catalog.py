@@ -50,6 +50,11 @@ from powdrr_service.planning.semantic_decision import (
     SemanticDecision,
     SemanticDecisionError,
 )
+from powdrr_service.procedrr.command_catalog import (
+    CommandCatalog,
+    CommandSpec,
+    object_schema,
+)
 from powdrr_service.semantic_faithfulness import (
     FaithfulnessError,
     FieldEntailmentReview,
@@ -104,7 +109,6 @@ from powdrr_lift.workrr.uncertainty_decisions import (
     records_for_worker_events,
     update_decision_artifact,
 )
-from procedrr.command_catalog import CommandCatalog, CommandSpec, object_schema
 
 
 def _split_source_context(

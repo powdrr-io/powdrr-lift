@@ -261,7 +261,7 @@ steps:
           each module. Never apply a decision to a module absent from its related_modules list. Record every action-bearing
           id from the feature-wide specification-v1 sections after the proposed_prs section, preserving source
           order and action. Label every change item with the proposed_pr_id that will deliver it. Use the read_document
-          action to inspect docs/procedrr/processes/execute-proposed-pr-workflow.yaml; do not use shell commands
+          action to use the bundled execute-proposed-pr-workflow process; do not use shell commands
           to read the template. A proposed PR dependency means the predecessor workflow is complete only after
           its integration pull request is merged; completion of the predecessor''s final task or creation of
           its pull request is not sufficient. Preserve these workflow-level dependencies in the instantiation
@@ -984,7 +984,7 @@ steps:
           source: previous_step
         details: 'Use the `proposed_pr_names`, `feature_name`, and `proposed_pr_specification_template` inputs
           from the preceding steps. For each validated proposed PR, inspect whether its matching workflow already
-          exists and reuse it when present. For each missing workflow, inspect docs/procedrr/processes/execute-proposed-pr-workflow.yaml
+          exists and reuse it when present. For each missing workflow, use the bundled execute-proposed-pr-workflow process
           with read_document, resolve every process input placeholder from the matching validated proposed PR,
           and prepare the complete instantiation values. Use the fixed Procedrr process, canonical feature name,
           distinct workflow instance names, proposed-PR order, and dependency relationships. Before finalizing
@@ -1038,7 +1038,7 @@ steps:
           required: true
           source: previous_step
         details: 'Invoke instantiate-workflow once for each missing workflow listed in the `invocation-plan`
-          input. Use docs/procedrr/processes/execute-proposed-pr-workflow.yaml, pass every process inputs as
+          input. Use the bundled execute-proposed-pr-workflow process, pass every process inputs as
           JSON with repeated --process-input NAME=JSON options, Do not pass workflow dependencies manually:
           instantiate-workflow derives them from the unified proposed-PR specification. The dependency graph
           is the source of truth; do not claim dependencies were applied unless they are present in the persisted

@@ -32,6 +32,13 @@ from powdrr_service.planning.multipr_structrr import (
 )
 from powdrr_service.planning.reviewed_plan import reviewed_file_creation_conflicts
 from powdrr_service.planning.workflow_ids import slugify_workflow_id
+from powdrr_service.procedrr import ProcessCatalog
+from powdrr_service.procedrr_evaluator import (
+    ProcedrrExecutionService,
+    ProcessExecutionCheckpoint,
+    ProcessTerminalStatus,
+    SuspendEvaluation,
+)
 from powdrr_service.providers.config import (
     DEFAULT_LLM_TYPE,
     DEFAULT_MODEL,
@@ -43,6 +50,7 @@ from powdrr_service.providers.selection import (
     long_context_backup_for,
     resolve_llm_mapping,
 )
+from powdrr_service.resources import bundled_process_directory
 from powdrr_service.structrr.snapshot import snapshot_digest
 from powdrr_service.verification.execute_pr_acceptance import (
     build_execute_pr_test_report,
@@ -208,13 +216,6 @@ from powdrr_lift.workrr.provider_runtime import (
     resolve_workflow_provider,
 )
 from powdrr_lift.workrr.test_obligations import acceptance_criteria_contract
-from procedrr import ProcessCatalog
-from procedrr_evaluator import (
-    ProcedrrExecutionService,
-    ProcessExecutionCheckpoint,
-    ProcessTerminalStatus,
-    SuspendEvaluation,
-)
 
 _TASK_PROMPT_PLACEHOLDER_RE = re.compile(r"<([A-Za-z0-9_-]+)>")
 _TASK_PROMPT_INPUT_REFERENCE_RE = re.compile(r"\binput_state\.([A-Za-z0-9_-]+)\b")
@@ -3824,7 +3825,7 @@ class _TaskProcedrrOperations:
 
     def execute(self, operation: str, parameters: Mapping[str, Any]) -> Any:
         if operation == "procedrr_fragment_start":
-            from procedrr.fragments import start_fragment
+            from powdrr_service.procedrr.fragments import start_fragment
 
             available = parameters.get("available_bindings", [])
             allowed = parameters.get("allowed_tools", [])
@@ -3847,7 +3848,7 @@ class _TaskProcedrrOperations:
                 max_steps=int(parameters.get("max_steps", 64)),
             )
         if operation == "procedrr_fragment_apply_edit":
-            from procedrr.fragments import apply_fragment_step_json
+            from powdrr_service.procedrr.fragments import apply_fragment_step_json
 
             state = parameters.get("state")
             step_json = parameters.get("step_json")
@@ -4779,9 +4780,7 @@ def _select_task(
 
 def _load_task_process_catalog(repo_root: Path) -> ProcessCatalog:
     """Combine bundled task-runtime processes with the target repository catalog."""
-    bundled_directory = (
-        Path(__file__).resolve().parents[3] / "docs" / "procedrr" / "processes"
-    )
+    bundled_directory = bundled_process_directory()
     bundled = ProcessCatalog.load(bundled_directory)
     processes = {process.name: process for process in bundled.list()}
     repository_directory = repo_root / "docs" / "procedrr" / "processes"

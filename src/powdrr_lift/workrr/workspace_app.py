@@ -7,6 +7,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from powdrr_local.web import create_app
 from powdrr_local.workspace import WorkspaceStore
+from powdrr_service.resources import bundled_process_directory
 
 from powdrr_lift.workrr.chat_config import WorkflowChatConfig
 from powdrr_lift.workrr.workspace_chat_turn import WorkspaceChatTurnDispatcher
@@ -32,9 +33,7 @@ def build_workspace_app(
     """
     resolved_data_dir = data_dir.expanduser().resolve()
     store = WorkspaceStore(resolved_data_dir / "workspace.sqlite3")
-    process_directory = (
-        Path(__file__).resolve().parents[3] / "docs" / "procedrr" / "processes"
-    )
+    process_directory = bundled_process_directory()
     workflow_config = WorkflowChatConfig(
         processes_dir=process_directory,
         provider=provider,

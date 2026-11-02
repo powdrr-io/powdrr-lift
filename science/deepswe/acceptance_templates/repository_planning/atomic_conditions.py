@@ -9,9 +9,9 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from powdrr_service.procedrr import parse_and_validate
 
 from powdrr_lift.workrr import WorkflowLLMClient
-from procedrr import parse_and_validate
 from science.deepswe.acceptance_templates.common import (
     load_json,
     object_schema,

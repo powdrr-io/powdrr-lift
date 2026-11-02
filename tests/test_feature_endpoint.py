@@ -17,6 +17,9 @@ from powdrr_service.decision_obligation import (
     DecisionResult,
     evidence_fingerprint,
 )
+from powdrr_service.procedrr import parse_and_validate
+from powdrr_service.procedrr_evaluator import Evaluator
+from powdrr_service.resources import bundled_process_directory
 from powdrr_service.structrr.obligation_evidence import (
     NormativeStrength,
     compile_obligation_evidence_contract,
@@ -104,8 +107,6 @@ from powdrr_lift.workrr.feature_endpoint import (
     run_feature_in_place,
 )
 from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
-from procedrr import parse_and_validate
-from procedrr_evaluator import Evaluator
 
 
 def test_miniswe_probe_authoring_uses_compact_context_and_clean_baseline(
@@ -1029,13 +1030,7 @@ def test_design_stage_compiles_same_prompt_and_structrr_diff_for_both_modes(
 
 
 def test_product_flow_starts_with_shared_design_interview() -> None:
-    flow_path = (
-        Path(__file__).parents[1]
-        / "docs"
-        / "procedrr"
-        / "processes"
-        / "implement-feature.yaml"
-    )
+    flow_path = bundled_process_directory() / "implement-feature.yaml"
     flow = yaml.safe_load(flow_path.read_text(encoding="utf-8"))
 
     assert flow["steps"][0]["call"]["process"] == "design-interview"
@@ -1111,13 +1106,13 @@ def test_procedrr_replay_loader_preserves_completed_judge_results(
             json.dumps(record)
             for record in (
                 {
-                    "record_type": "procedrr.step",
+                    "record_type": "powdrr_service.procedrr.step",
                     "kind": "judge",
                     "messages": messages,
                     "value": {"multiple": True},
                 },
                 {
-                    "record_type": "procedrr.step",
+                    "record_type": "powdrr_service.procedrr.step",
                     "kind": "judge",
                     "replay_key": WorkrrProcedrrClient.replay_key(redacted_messages),
                     "value": {"multiple": False},
@@ -1139,7 +1134,7 @@ def test_procedrr_replay_loader_preserves_completed_judge_results(
 def test_worker_prompt_capture_trims_real_implement_feature_at_worker_boundary() -> (
     None
 ):
-    source = Path("docs/procedrr/processes/implement-feature.yaml").read_text(
+    source = (bundled_process_directory() / "implement-feature.yaml").read_text(
         encoding="utf-8"
     )
 
@@ -3112,7 +3107,7 @@ def test_endpoint_refreshes_stale_baseline_from_validated_bootstrap(
 
 
 def test_feature_flow_is_shared_and_validated() -> None:
-    path = Path("docs/procedrr/processes/implement-feature.yaml")
+    path = bundled_process_directory() / "implement-feature.yaml"
 
     validated = _validate_procedrr_flow(Path.cwd())
 
@@ -3846,13 +3841,7 @@ def test_feature_flow_falls_back_to_source_tree_for_external_target(
 ) -> None:
     validated = _validate_procedrr_flow(tmp_path)
 
-    assert validated == (
-        Path(__file__).resolve().parents[1]
-        / "docs"
-        / "procedrr"
-        / "processes"
-        / "implement-feature.yaml"
-    )
+    assert validated == (bundled_process_directory() / "implement-feature.yaml")
 
 
 def test_feature_taxonomy_falls_back_to_packaged_resource_for_external_target(
@@ -4008,7 +3997,7 @@ def test_design_flow_compiles_real_collected_test_into_proposal(
 ) -> None:
     """Exercise the clause-to-obligation design pipeline."""
     flow = parse_and_validate(
-        Path("docs/procedrr/processes/design-interview.yaml").read_text()
+        (bundled_process_directory() / "design-interview.yaml").read_text()
     )
 
     class PlanningLLM:

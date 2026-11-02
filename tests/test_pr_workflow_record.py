@@ -134,7 +134,7 @@ def test_pull_request_record_preserves_root_and_nested_processes(
         base_branch="main",
         title="Example PR",
         workflow_name="specify-a-feature",
-        workflow_path="docs/procedrr/processes/specify-a-feature.yaml",
+        workflow_path="powdrr_service.resources/processes/specify-a-feature.yaml",
         steps=[{"id": "capture-goal", "description": "Capture the goal"}],
         events=[
             {"kind": "task_run_process", "process_id": "review-system"},

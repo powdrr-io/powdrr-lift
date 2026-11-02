@@ -6,7 +6,7 @@
       "internal_imports": [],
       "kind": "resource",
       "owner": "service",
-      "path": "docs/procedrr/processes/address-review-comments.yaml",
+      "path": "packages/service/src/powdrr_service/resources/processes/address-review-comments.yaml",
       "rationale": "private process-language implementation and resources",
       "reviewed": false
     },
@@ -15,7 +15,7 @@
       "internal_imports": [],
       "kind": "resource",
       "owner": "service",
-      "path": "docs/procedrr/processes/adversarial-pr-review.yaml",
+      "path": "packages/service/src/powdrr_service/resources/processes/adversarial-pr-review.yaml",
       "rationale": "private process-language implementation and resources",
       "reviewed": false
     },
@@ -24,7 +24,7 @@
       "internal_imports": [],
       "kind": "resource",
       "owner": "service",
-      "path": "docs/procedrr/processes/amend-plan-and-open-pr.yaml",
+      "path": "packages/service/src/powdrr_service/resources/processes/amend-plan-and-open-pr.yaml",
       "rationale": "private process-language implementation and resources",
       "reviewed": false
     },
@@ -33,7 +33,7 @@
       "internal_imports": [],
       "kind": "resource",
       "owner": "service",
-      "path": "docs/procedrr/processes/bootstrap-code-structure.yaml",
+      "path": "packages/service/src/powdrr_service/resources/processes/bootstrap-code-structure.yaml",
       "rationale": "private process-language implementation and resources",
       "reviewed": false
     },
@@ -42,7 +42,7 @@
       "internal_imports": [],
       "kind": "resource",
       "owner": "service",
-      "path": "docs/procedrr/processes/create-pull-request.yaml",
+      "path": "packages/service/src/powdrr_service/resources/processes/create-pull-request.yaml",
       "rationale": "private process-language implementation and resources",
       "reviewed": false
     },
@@ -51,7 +51,7 @@
       "internal_imports": [],
       "kind": "resource",
       "owner": "service",
-      "path": "docs/procedrr/processes/dead-code-review.yaml",
+      "path": "packages/service/src/powdrr_service/resources/processes/dead-code-review.yaml",
       "rationale": "private process-language implementation and resources",
       "reviewed": false
     },
@@ -60,7 +60,7 @@
       "internal_imports": [],
       "kind": "resource",
       "owner": "service",
-      "path": "docs/procedrr/processes/design-interview.yaml",
+      "path": "packages/service/src/powdrr_service/resources/processes/design-interview.yaml",
       "rationale": "private process-language implementation and resources",
       "reviewed": false
     },
@@ -69,7 +69,7 @@
       "internal_imports": [],
       "kind": "resource",
       "owner": "service",
-      "path": "docs/procedrr/processes/durable-task.yaml",
+      "path": "packages/service/src/powdrr_service/resources/processes/durable-task.yaml",
       "rationale": "private process-language implementation and resources",
       "reviewed": false
     },
@@ -78,7 +78,7 @@
       "internal_imports": [],
       "kind": "resource",
       "owner": "service",
-      "path": "docs/procedrr/processes/execute-proposed-pr-workflow.yaml",
+      "path": "packages/service/src/powdrr_service/resources/processes/execute-proposed-pr-workflow.yaml",
       "rationale": "private process-language implementation and resources",
       "reviewed": false
     },
@@ -87,7 +87,7 @@
       "internal_imports": [],
       "kind": "resource",
       "owner": "service",
-      "path": "docs/procedrr/processes/execute-proposed-pr.yaml",
+      "path": "packages/service/src/powdrr_service/resources/processes/execute-proposed-pr.yaml",
       "rationale": "private process-language implementation and resources",
       "reviewed": false
     },
@@ -96,7 +96,7 @@
       "internal_imports": [],
       "kind": "resource",
       "owner": "service",
-      "path": "docs/procedrr/processes/feature-functionality-review.yaml",
+      "path": "packages/service/src/powdrr_service/resources/processes/feature-functionality-review.yaml",
       "rationale": "private process-language implementation and resources",
       "reviewed": false
     },
@@ -105,7 +105,7 @@
       "internal_imports": [],
       "kind": "resource",
       "owner": "service",
-      "path": "docs/procedrr/processes/feature-test-coverage-review.yaml",
+      "path": "packages/service/src/powdrr_service/resources/processes/feature-test-coverage-review.yaml",
       "rationale": "private process-language implementation and resources",
       "reviewed": false
     },
@@ -114,7 +114,7 @@
       "internal_imports": [],
       "kind": "resource",
       "owner": "service",
-      "path": "docs/procedrr/processes/finish-implementation-pr.yaml",
+      "path": "packages/service/src/powdrr_service/resources/processes/finish-implementation-pr.yaml",
       "rationale": "private process-language implementation and resources",
       "reviewed": false
     },
@@ -123,7 +123,7 @@
       "internal_imports": [],
       "kind": "resource",
       "owner": "service",
-      "path": "docs/procedrr/processes/finish-pr-prep.yaml",
+      "path": "packages/service/src/powdrr_service/resources/processes/finish-pr-prep.yaml",
       "rationale": "private process-language implementation and resources",
       "reviewed": false
     },
@@ -132,7 +132,7 @@
       "internal_imports": [],
       "kind": "resource",
       "owner": "service",
-      "path": "docs/procedrr/processes/fix-ci-failures.yaml",
+      "path": "packages/service/src/powdrr_service/resources/processes/fix-ci-failures.yaml",
       "rationale": "private process-language implementation and resources",
       "reviewed": false
     },
@@ -141,7 +141,7 @@
       "internal_imports": [],
       "kind": "resource",
       "owner": "service",
-      "path": "docs/procedrr/processes/fix-merge-conflicts.yaml",
+      "path": "packages/service/src/powdrr_service/resources/processes/fix-merge-conflicts.yaml",
       "rationale": "private process-language implementation and resources",
       "reviewed": false
     },
@@ -150,7 +150,7 @@
       "internal_imports": [],
       "kind": "resource",
       "owner": "service",
-      "path": "docs/procedrr/processes/fully-review-pr.yaml",
+      "path": "packages/service/src/powdrr_service/resources/processes/fully-review-pr.yaml",
       "rationale": "private process-language implementation and resources",
       "reviewed": false
     },
@@ -159,7 +159,7 @@
       "internal_imports": [],
       "kind": "resource",
       "owner": "service",
-      "path": "docs/procedrr/processes/generate-fragment.yaml",
+      "path": "packages/service/src/powdrr_service/resources/processes/generate-fragment.yaml",
       "rationale": "private process-language implementation and resources",
       "reviewed": false
     },
@@ -168,7 +168,7 @@
       "internal_imports": [],
       "kind": "resource",
       "owner": "service",
-      "path": "docs/procedrr/processes/handle-ad-hoc.yaml",
+      "path": "packages/service/src/powdrr_service/resources/processes/handle-ad-hoc.yaml",
       "rationale": "private process-language implementation and resources",
       "reviewed": false
     },
@@ -177,7 +177,7 @@
       "internal_imports": [],
       "kind": "resource",
       "owner": "service",
-      "path": "docs/procedrr/processes/implement-feature.yaml",
+      "path": "packages/service/src/powdrr_service/resources/processes/implement-feature.yaml",
       "rationale": "private process-language implementation and resources",
       "reviewed": false
     },
@@ -186,7 +186,7 @@
       "internal_imports": [],
       "kind": "resource",
       "owner": "service",
-      "path": "docs/procedrr/processes/independent-skill-workflow-review.yaml",
+      "path": "packages/service/src/powdrr_service/resources/processes/independent-skill-workflow-review.yaml",
       "rationale": "private process-language implementation and resources",
       "reviewed": false
     },
@@ -195,7 +195,7 @@
       "internal_imports": [],
       "kind": "resource",
       "owner": "service",
-      "path": "docs/procedrr/processes/plan-execution.yaml",
+      "path": "packages/service/src/powdrr_service/resources/processes/plan-execution.yaml",
       "rationale": "private process-language implementation and resources",
       "reviewed": false
     },
@@ -204,7 +204,7 @@
       "internal_imports": [],
       "kind": "resource",
       "owner": "service",
-      "path": "docs/procedrr/processes/plan-repair-execution.yaml",
+      "path": "packages/service/src/powdrr_service/resources/processes/plan-repair-execution.yaml",
       "rationale": "private process-language implementation and resources",
       "reviewed": false
     },
@@ -213,7 +213,7 @@
       "internal_imports": [],
       "kind": "resource",
       "owner": "service",
-      "path": "docs/procedrr/processes/resolve-external-contracts.yaml",
+      "path": "packages/service/src/powdrr_service/resources/processes/resolve-external-contracts.yaml",
       "rationale": "private process-language implementation and resources",
       "reviewed": false
     },
@@ -222,7 +222,7 @@
       "internal_imports": [],
       "kind": "resource",
       "owner": "service",
-      "path": "docs/procedrr/processes/review-architecture.yaml",
+      "path": "packages/service/src/powdrr_service/resources/processes/review-architecture.yaml",
       "rationale": "private process-language implementation and resources",
       "reviewed": false
     },
@@ -231,7 +231,7 @@
       "internal_imports": [],
       "kind": "resource",
       "owner": "service",
-      "path": "docs/procedrr/processes/review-skill-workflow.yaml",
+      "path": "packages/service/src/powdrr_service/resources/processes/review-skill-workflow.yaml",
       "rationale": "private process-language implementation and resources",
       "reviewed": false
     },
@@ -240,7 +240,7 @@
       "internal_imports": [],
       "kind": "resource",
       "owner": "service",
-      "path": "docs/procedrr/processes/review-system.yaml",
+      "path": "packages/service/src/powdrr_service/resources/processes/review-system.yaml",
       "rationale": "private process-language implementation and resources",
       "reviewed": false
     },
@@ -249,7 +249,7 @@
       "internal_imports": [],
       "kind": "resource",
       "owner": "service",
-      "path": "docs/procedrr/processes/run-tests-and-fix.yaml",
+      "path": "packages/service/src/powdrr_service/resources/processes/run-tests-and-fix.yaml",
       "rationale": "private process-language implementation and resources",
       "reviewed": false
     },
@@ -258,7 +258,7 @@
       "internal_imports": [],
       "kind": "resource",
       "owner": "service",
-      "path": "docs/procedrr/processes/security-review.yaml",
+      "path": "packages/service/src/powdrr_service/resources/processes/security-review.yaml",
       "rationale": "private process-language implementation and resources",
       "reviewed": false
     },
@@ -267,7 +267,7 @@
       "internal_imports": [],
       "kind": "resource",
       "owner": "service",
-      "path": "docs/procedrr/processes/select-process.yaml",
+      "path": "packages/service/src/powdrr_service/resources/processes/select-process.yaml",
       "rationale": "private process-language implementation and resources",
       "reviewed": false
     },
@@ -276,7 +276,7 @@
       "internal_imports": [],
       "kind": "resource",
       "owner": "service",
-      "path": "docs/procedrr/processes/software_development_entity_taxonomy.md",
+      "path": "packages/service/src/powdrr_service/resources/processes/software_development_entity_taxonomy.md",
       "rationale": "private process-language implementation and resources",
       "reviewed": false
     },
@@ -285,7 +285,7 @@
       "internal_imports": [],
       "kind": "resource",
       "owner": "service",
-      "path": "docs/procedrr/processes/spec-v1-design-review.yaml",
+      "path": "packages/service/src/powdrr_service/resources/processes/spec-v1-design-review.yaml",
       "rationale": "private process-language implementation and resources",
       "reviewed": false
     },
@@ -294,7 +294,7 @@
       "internal_imports": [],
       "kind": "resource",
       "owner": "service",
-      "path": "docs/procedrr/processes/specify-a-feature.yaml",
+      "path": "packages/service/src/powdrr_service/resources/processes/specify-a-feature.yaml",
       "rationale": "private process-language implementation and resources",
       "reviewed": false
     },
@@ -303,7 +303,7 @@
       "internal_imports": [],
       "kind": "resource",
       "owner": "service",
-      "path": "docs/procedrr/processes/specify-architecture.yaml",
+      "path": "packages/service/src/powdrr_service/resources/processes/specify-architecture.yaml",
       "rationale": "private process-language implementation and resources",
       "reviewed": false
     },
@@ -312,7 +312,7 @@
       "internal_imports": [],
       "kind": "resource",
       "owner": "service",
-      "path": "docs/procedrr/processes/specify-implementation.yaml",
+      "path": "packages/service/src/powdrr_service/resources/processes/specify-implementation.yaml",
       "rationale": "private process-language implementation and resources",
       "reviewed": false
     },
@@ -321,7 +321,7 @@
       "internal_imports": [],
       "kind": "resource",
       "owner": "service",
-      "path": "docs/procedrr/processes/specify-system.yaml",
+      "path": "packages/service/src/powdrr_service/resources/processes/specify-system.yaml",
       "rationale": "private process-language implementation and resources",
       "reviewed": false
     },
@@ -330,7 +330,7 @@
       "internal_imports": [],
       "kind": "resource",
       "owner": "service",
-      "path": "docs/procedrr/processes/start-implementing-feature.yaml",
+      "path": "packages/service/src/powdrr_service/resources/processes/start-implementing-feature.yaml",
       "rationale": "private process-language implementation and resources",
       "reviewed": false
     },
@@ -1028,8 +1028,8 @@
         "powdrr_service.planning.workflow_ids",
         "powdrr_service.structrr.rebase",
         "powdrr_service.structrr.verification_health",
-        "procedrr",
-        "procedrr.catalog"
+        "powdrr_service.procedrr",
+        "powdrr_service.procedrr.catalog"
       ],
       "kind": "python_module",
       "owner": "split",
@@ -1676,7 +1676,7 @@
         "powdrr_lift.workrr.observer",
         "powdrr_lift.workrr.procedrr_chat",
         "powdrr_lift.workrr.scenario",
-        "procedrr"
+        "powdrr_service.procedrr"
       ],
       "kind": "python_module",
       "owner": "split",
@@ -2110,7 +2110,7 @@
         "powdrr_lift.core.validation_messages",
         "powdrr_lift.process.task_step",
         "powdrr_lift.process.tasks",
-        "procedrr"
+        "powdrr_service.procedrr"
       ],
       "kind": "python_module",
       "owner": "service",
@@ -2629,7 +2629,7 @@
         "powdrr_lift.workrr.repository_subject_binding",
         "powdrr_lift.workrr.semantic_contract_compiler",
         "powdrr_lift.workrr.uncertainty_decisions",
-        "procedrr.command_catalog"
+        "powdrr_service.procedrr.command_catalog"
       ],
       "kind": "python_module",
       "owner": "agent",
@@ -2872,9 +2872,9 @@
         "powdrr_service.planning.workflow_ids",
         "powdrr_service.structrr.active_intent",
         "powdrr_service.structrr.snapshot",
-        "procedrr",
-        "procedrr_evaluator.evaluator",
-        "procedrr_evaluator.runtime",
+        "powdrr_service.procedrr",
+        "powdrr_service.procedrr_evaluator.evaluator",
+        "powdrr_service.procedrr_evaluator.runtime",
         "powdrr_contracts.models",
         "powdrr_contracts.service"
       ],
@@ -3108,7 +3108,7 @@
       "internal_imports": [
         "powdrr_lift.errors",
         "powdrr_lift.workrr.protocol",
-        "procedrr.fragments"
+        "powdrr_service.procedrr.fragments"
       ],
       "kind": "python_module",
       "owner": "split",
@@ -3134,8 +3134,8 @@
         "powdrr_lift.workrr.review_feedback",
         "powdrr_lift.workrr.provider_runtime",
         "powdrr_service.providers.selection",
-        "procedrr",
-        "procedrr_evaluator.runtime"
+        "powdrr_service.procedrr",
+        "powdrr_service.procedrr_evaluator.runtime"
       ],
       "kind": "python_module",
       "owner": "split",
@@ -3163,7 +3163,7 @@
       "extraction_pr": "5/7",
       "internal_imports": [
         "powdrr_lift.errors",
-        "procedrr.command_catalog"
+        "powdrr_service.procedrr.command_catalog"
       ],
       "kind": "python_module",
       "owner": "split",
@@ -3480,9 +3480,9 @@
         "powdrr_service.planning.repair_service",
         "powdrr_service.planning.workflow_ids",
         "powdrr_service.structrr.snapshot",
-        "procedrr",
-        "procedrr.fragments",
-        "procedrr_evaluator",
+        "powdrr_service.procedrr",
+        "powdrr_service.procedrr.fragments",
+        "powdrr_service.procedrr_evaluator",
         "powdrr_service.verification.execute_pr_test_quality",
         "powdrr_service.verification.execute_pr_test_corrections",
         "powdrr_service.verification.execute_pr_test_validation",
@@ -3565,28 +3565,28 @@
     {
       "extraction_pr": "8",
       "internal_imports": [
-        "procedrr.catalog",
-        "procedrr.command_catalog",
-        "procedrr.compiler",
-        "procedrr.editor",
-        "procedrr.fragments",
-        "procedrr.model",
-        "procedrr.parser"
+        "powdrr_service.procedrr.catalog",
+        "powdrr_service.procedrr.command_catalog",
+        "powdrr_service.procedrr.compiler",
+        "powdrr_service.procedrr.editor",
+        "powdrr_service.procedrr.fragments",
+        "powdrr_service.procedrr.model",
+        "powdrr_service.procedrr.parser"
       ],
       "kind": "python_module",
       "owner": "service",
-      "path": "src/procedrr/__init__.py",
+      "path": "packages/service/src/powdrr_service/procedrr/__init__.py",
       "rationale": "private process-language runtime",
       "reviewed": false
     },
     {
       "extraction_pr": "8",
       "internal_imports": [
-        "procedrr.parser"
+        "powdrr_service.procedrr.parser"
       ],
       "kind": "python_module",
       "owner": "service",
-      "path": "src/procedrr/catalog.py",
+      "path": "packages/service/src/powdrr_service/procedrr/catalog.py",
       "rationale": "private process-language runtime",
       "reviewed": false
     },
@@ -3595,18 +3595,18 @@
       "internal_imports": [],
       "kind": "python_module",
       "owner": "service",
-      "path": "src/procedrr/command_catalog.py",
+      "path": "packages/service/src/powdrr_service/procedrr/command_catalog.py",
       "rationale": "private process-language runtime",
       "reviewed": false
     },
     {
       "extraction_pr": "8",
       "internal_imports": [
-        "procedrr.model"
+        "powdrr_service.procedrr.model"
       ],
       "kind": "python_module",
       "owner": "service",
-      "path": "src/procedrr/compiler.py",
+      "path": "packages/service/src/powdrr_service/procedrr/compiler.py",
       "rationale": "private process-language runtime",
       "reviewed": false
     },
@@ -3615,19 +3615,19 @@
       "internal_imports": [],
       "kind": "python_module",
       "owner": "service",
-      "path": "src/procedrr/editor.py",
+      "path": "packages/service/src/powdrr_service/procedrr/editor.py",
       "rationale": "private process-language runtime",
       "reviewed": false
     },
     {
       "extraction_pr": "8",
       "internal_imports": [
-        "procedrr.editor",
-        "procedrr.parser"
+        "powdrr_service.procedrr.editor",
+        "powdrr_service.procedrr.parser"
       ],
       "kind": "python_module",
       "owner": "service",
-      "path": "src/procedrr/fragments.py",
+      "path": "packages/service/src/powdrr_service/procedrr/fragments.py",
       "rationale": "private process-language runtime",
       "reviewed": false
     },
@@ -3636,7 +3636,7 @@
       "internal_imports": [],
       "kind": "python_module",
       "owner": "service",
-      "path": "src/procedrr/model.py",
+      "path": "packages/service/src/powdrr_service/procedrr/model.py",
       "rationale": "private process-language runtime",
       "reviewed": false
     },
@@ -3645,19 +3645,19 @@
       "internal_imports": [],
       "kind": "python_module",
       "owner": "service",
-      "path": "src/procedrr/parser.py",
+      "path": "packages/service/src/powdrr_service/procedrr/parser.py",
       "rationale": "private process-language runtime",
       "reviewed": false
     },
     {
       "extraction_pr": "8",
       "internal_imports": [
-        "procedrr_evaluator.evaluator",
-        "procedrr_evaluator.runtime"
+        "powdrr_service.procedrr_evaluator.evaluator",
+        "powdrr_service.procedrr_evaluator.runtime"
       ],
       "kind": "python_module",
       "owner": "service",
-      "path": "src/procedrr_evaluator/__init__.py",
+      "path": "packages/service/src/powdrr_service/procedrr_evaluator/__init__.py",
       "rationale": "private process-language runtime",
       "reviewed": false
     },
@@ -3666,11 +3666,11 @@
       "internal_imports": [
         "powdrr_lift.workrr.procedrr",
         "powdrr_lift.workrr.protocol",
-        "procedrr"
+        "powdrr_service.procedrr"
       ],
       "kind": "python_module",
       "owner": "service",
-      "path": "src/procedrr_evaluator/evaluator.py",
+      "path": "packages/service/src/powdrr_service/procedrr_evaluator/evaluator.py",
       "rationale": "private process-language runtime",
       "reviewed": false
     },
@@ -3678,12 +3678,12 @@
       "extraction_pr": "8",
       "internal_imports": [
         "powdrr_lift.workrr.protocol",
-        "procedrr.catalog",
-        "procedrr_evaluator.evaluator"
+        "powdrr_service.procedrr.catalog",
+        "powdrr_service.procedrr_evaluator.evaluator"
       ],
       "kind": "python_module",
       "owner": "service",
-      "path": "src/procedrr_evaluator/runtime.py",
+      "path": "packages/service/src/powdrr_service/procedrr_evaluator/runtime.py",
       "rationale": "private process-language runtime",
       "reviewed": false
     },
@@ -3732,7 +3732,7 @@
   ],
   "inventory_scope": [
     "tracked first-party Python source",
-    "tracked Powdrr process resources",
+    "tracked private service process resources",
     "tracked scripts"
   ],
   "review_rule": "Every entry is a first-pass classification. Review owner, rationale, and extraction PR before marking reviewed true.",

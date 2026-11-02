@@ -11,6 +11,7 @@ import pytest
 from powdrr_service import decision_classifier as jev_classifier
 from powdrr_service.planning.multipr_structrr import compile_multi_pr_proposal
 from powdrr_service.planning.plan_sizing import PlanSizingError, size_plan_items
+from powdrr_service.resources import bundled_process_directory
 
 from powdrr_lift import cli
 from powdrr_lift.workrr import (
@@ -1406,13 +1407,7 @@ def test_generated_plan_resolves_procedrr_process_workflow(tmp_path: Path) -> No
 def test_execute_proposed_pr_process_runs_coding_agent_before_completion() -> None:
     import yaml
 
-    process_path = (
-        Path(__file__).parents[1]
-        / "docs"
-        / "procedrr"
-        / "processes"
-        / "execute-proposed-pr.yaml"
-    )
+    process_path = bundled_process_directory() / "execute-proposed-pr.yaml"
     process = yaml.safe_load(process_path.read_text(encoding="utf-8"))
     coding_step = process["steps"][0]["operation"]["parameters"]
 
@@ -1553,7 +1548,7 @@ def test_plan_workflow_instance_id_tracks_input_changes() -> None:
 def test_plan_worker_process_catalog_does_not_depend_on_target_repo(
     tmp_path: Path,
 ) -> None:
-    from procedrr import ProcessCatalog
+    from powdrr_service.procedrr import ProcessCatalog
 
     process_directory = planned_workflow_task._bundled_procedrr_process_directory()
     target_process_directory = tmp_path / "docs" / "procedrr" / "processes"
@@ -1568,9 +1563,7 @@ def test_generated_plan_rejects_unknown_procedrr_process(tmp_path: Path) -> None
     with pytest.raises(ValueError, match="unknown Procedrr process"):
         instantiate_procedrr_process_workflow(
             process_id="missing-process",
-            process_directory=(
-                Path(__file__).resolve().parents[1] / "docs/procedrr/processes"
-            ),
+            process_directory=(bundled_process_directory()),
             input_state={},
             work_item_name="proposal-v1-foundation",
             output_root=tmp_path / "workflows",

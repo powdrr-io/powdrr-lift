@@ -10,6 +10,7 @@ from typing import Any
 
 from powdrr_contracts.workspace import EventType, QuestionState, TurnState
 from powdrr_local.workspace import WorkspaceStore
+from powdrr_service.resources import bundled_process_directory
 
 from powdrr_lift.workrr import procedrr_chat
 from powdrr_lift.workrr.chat_config import WorkflowChatConfig
@@ -39,7 +40,7 @@ def test_workspace_turn_runs_and_resumes_procedrr_chat(
 ) -> None:
     process_dir = tmp_path / "processes"
     process_dir.mkdir()
-    shutil.copy(Path("docs/procedrr/processes/select-process.yaml"), process_dir)
+    shutil.copy(bundled_process_directory() / "select-process.yaml", process_dir)
     process_source = "\n".join(
         [
             "version: 1",

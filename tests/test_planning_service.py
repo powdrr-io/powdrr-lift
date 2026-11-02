@@ -41,10 +41,11 @@ from powdrr_service.planning.source import (
     Requirement,
     segment_markdown_source,
 )
+from powdrr_service.procedrr.catalog import ProcessCatalog
+from powdrr_service.resources import bundled_process_directory
 
 from powdrr_lift.workrr.github_issue_queue import QueueIssue
 from powdrr_lift.workrr.planning.evidence import RequirementEvidenceSearch
-from procedrr.catalog import ProcessCatalog
 
 
 class _Client:
@@ -586,9 +587,7 @@ def test_procedrr_initialize_reopens_answer_invalidated_by_later_checkpoint() ->
 
     client = _Client()
     run_planning_procedrr(
-        process_directory=(
-            Path(__file__).resolve().parents[1] / "docs" / "procedrr" / "processes"
-        ),
+        process_directory=(bundled_process_directory()),
         session=session,
         state_machine=machine,
         checkpoint_store=store,
@@ -869,8 +868,8 @@ def test_session_issue_is_created_as_a_non_queue_tracker_and_resumes_by_number()
 
 
 def test_bundled_plan_process_is_validated_procedrr() -> None:
-    repository_root = Path(__file__).parents[1]
-    process_path = repository_root / "docs/procedrr/processes/plan-execution.yaml"
+    Path(__file__).parents[1]
+    process_path = bundled_process_directory() / "plan-execution.yaml"
 
     process = ProcessCatalog.load(process_path.parent).get("plan-execution")
 
@@ -883,7 +882,7 @@ def test_bundled_plan_process_is_validated_procedrr() -> None:
 
 
 def test_procedrr_process_runs_and_checkpoints_bounded_questions() -> None:
-    repository_root = Path(__file__).parents[1]
+    Path(__file__).parents[1]
     session_id = "session-123"
     session = PlanningSession(
         session_id=session_id,
@@ -900,7 +899,7 @@ def test_procedrr_process_runs_and_checkpoints_bounded_questions() -> None:
     client = _Client()
     store = InMemoryCheckpointStore(session_id=session_id)
     result = run_planning_procedrr(
-        process_directory=str(repository_root / "docs/procedrr/processes"),
+        process_directory=str(bundled_process_directory()),
         session=session,
         state_machine=_Machine(),
         checkpoint_store=store,
@@ -1271,10 +1270,10 @@ def test_procedrr_runs_real_planning_machine_through_compiled_artifacts() -> Non
     )
     provider = _PlanningScriptClient()
     store = InMemoryCheckpointStore(session_id=session_id)
-    repository_root = Path(__file__).parents[1]
+    Path(__file__).parents[1]
 
     result = run_planning_procedrr(
-        process_directory=repository_root / "docs/procedrr/processes",
+        process_directory=bundled_process_directory(),
         session=session,
         state_machine=machine,
         checkpoint_store=store,

@@ -5,9 +5,9 @@ import json
 from pathlib import Path
 
 import yaml
+from powdrr_service.procedrr import parse_and_validate
+from powdrr_service.procedrr_evaluator import Evaluator
 
-from procedrr import parse_and_validate
-from procedrr_evaluator import Evaluator
 from science.deepswe.acceptance_templates.common import load_json, write_json
 from science.deepswe.acceptance_templates.repository_planning.contracts import (
     ContractClient,

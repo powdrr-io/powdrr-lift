@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from powdrr_service.resources import bundled_process_directory
 
 DEFAULT_FEATURE_REQUEST = (
     "I want to specify a feature where all human and LLM interactions are written "
@@ -89,6 +90,8 @@ def _command(*args: str) -> list[str]:
 def _process_subset(repo_root: Path, root_process: str, destination: Path) -> Path:
     """Copy the selected process and its statically declared dependencies."""
     source_dir = repo_root / "docs" / "procedrr" / "processes"
+    if not source_dir.is_dir():
+        source_dir = bundled_process_directory()
     destination.mkdir(parents=True, exist_ok=True)
     pending = [root_process]
     copied: set[str] = set()

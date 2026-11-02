@@ -16,6 +16,7 @@ import yaml
 from powdrr_local import LocalPowdrrService
 from powdrr_service.decision_obligation import evidence_fingerprint
 from powdrr_service.planning.semantic_decision import SEMANTIC_DIMENSION_DECISION_KINDS
+from powdrr_service.resources import bundled_process_directory
 from powdrr_service.verification import probe_repair
 
 from powdrr_lift.workrr.coding_agent import MiniSWEAgentProvider
@@ -1223,7 +1224,7 @@ def _fixture_repo(tmp_path: Path) -> Path:
         encoding="utf-8",
     )
     shutil.copytree(
-        REPOSITORY_ROOT / "docs" / "procedrr" / "processes",
+        bundled_process_directory(),
         repo / "docs" / "procedrr" / "processes",
     )
     shutil.copy2(

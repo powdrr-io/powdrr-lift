@@ -3,9 +3,10 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from procedrr import ProcessCatalog
-from procedrr.fragments import apply_fragment_step_json, start_fragment
-from procedrr_evaluator.runtime import ProcedrrExecutionService
+from powdrr_service.procedrr import ProcessCatalog
+from powdrr_service.procedrr.fragments import apply_fragment_step_json, start_fragment
+from powdrr_service.procedrr_evaluator.runtime import ProcedrrExecutionService
+from powdrr_service.resources import bundled_process_directory
 
 
 class SequenceLLM:
@@ -38,6 +39,16 @@ def _tool_catalog() -> dict[str, Any]:
 
 def _scope_and_label_responses() -> list[dict[str, Any]]:
     return [{"labels": ["pr-prep", "python"]}]
+
+
+def test_bundled_process_catalog_is_owned_by_the_service_package() -> None:
+    process_directory = bundled_process_directory().resolve()
+
+    assert process_directory.is_dir()
+    assert process_directory.name == "processes"
+    assert (process_directory / "implement-feature.yaml").is_file()
+    assert (process_directory / "plan-execution.yaml").is_file()
+    assert "docs" not in process_directory.parts
 
 
 def _handle_ad_hoc_executor(
@@ -87,8 +98,8 @@ def _handle_ad_hoc_executor(
 
 
 def test_handle_ad_hoc_skips_pr_prep_when_the_request_changes_no_files() -> None:
-    repository_root = Path(__file__).resolve().parents[1]
-    catalog = ProcessCatalog.load(repository_root / "docs/procedrr/processes")
+    Path(__file__).resolve().parents[1]
+    catalog = ProcessCatalog.load(bundled_process_directory())
     executor, calls = _handle_ad_hoc_executor(has_changes=False)
     llm = SequenceLLM([{"step_json": '{"terminal":"succeeded"}'}])
 
@@ -106,8 +117,8 @@ def test_handle_ad_hoc_skips_pr_prep_when_the_request_changes_no_files() -> None
 
 
 def test_handle_ad_hoc_runs_finish_pr_prep_for_changed_files() -> None:
-    repository_root = Path(__file__).resolve().parents[1]
-    catalog = ProcessCatalog.load(repository_root / "docs/procedrr/processes")
+    Path(__file__).resolve().parents[1]
+    catalog = ProcessCatalog.load(bundled_process_directory())
     executor, calls = _handle_ad_hoc_executor(has_changes=True)
     llm = SequenceLLM(
         [
@@ -133,8 +144,8 @@ def test_handle_ad_hoc_runs_finish_pr_prep_for_changed_files() -> None:
 
 
 def test_finish_pr_prep_runs_every_discovered_validation_tool() -> None:
-    repository_root = Path(__file__).resolve().parents[1]
-    catalog = ProcessCatalog.load(repository_root / "docs/procedrr/processes")
+    Path(__file__).resolve().parents[1]
+    catalog = ProcessCatalog.load(bundled_process_directory())
     calls: list[tuple[str, dict[str, Any]]] = []
 
     def invoke_tool(parameters: Any) -> dict[str, Any]:
@@ -174,8 +185,8 @@ def test_finish_pr_prep_runs_every_discovered_validation_tool() -> None:
 
 
 def test_finish_pr_prep_accepts_files_already_committed_on_feature_branch() -> None:
-    repository_root = Path(__file__).resolve().parents[1]
-    catalog = ProcessCatalog.load(repository_root / "docs/procedrr/processes")
+    Path(__file__).resolve().parents[1]
+    catalog = ProcessCatalog.load(bundled_process_directory())
     calls: list[tuple[str, dict[str, Any]]] = []
 
     def invoke_tool(parameters: Any) -> dict[str, Any]:
@@ -210,8 +221,8 @@ def test_finish_pr_prep_accepts_files_already_committed_on_feature_branch() -> N
 
 
 def test_finish_pr_prep_reviews_large_scope_without_runtime_paths() -> None:
-    repository_root = Path(__file__).resolve().parents[1]
-    catalog = ProcessCatalog.load(repository_root / "docs/procedrr/processes")
+    Path(__file__).resolve().parents[1]
+    catalog = ProcessCatalog.load(bundled_process_directory())
     intended = [f"attestation/component-{index:02d}.py" for index in range(65)]
     runtime = [f".powdrr/procedrr-runs/old-{index:03d}.json" for index in range(104)]
     calls: list[tuple[str, dict[str, Any]]] = []
@@ -264,8 +275,8 @@ def test_finish_pr_prep_reviews_large_scope_without_runtime_paths() -> None:
 
 
 def test_finish_pr_prep_repairs_then_reruns_all_validations() -> None:
-    repository_root = Path(__file__).resolve().parents[1]
-    catalog = ProcessCatalog.load(repository_root / "docs/procedrr/processes")
+    Path(__file__).resolve().parents[1]
+    catalog = ProcessCatalog.load(bundled_process_directory())
     responses = [
         *_scope_and_label_responses(),
         {

@@ -36,6 +36,7 @@ from powdrr_service.planning.service import (
 from powdrr_service.planning.source import segment_markdown_source
 from powdrr_service.planning.workflow_ids import slugify_workflow_id
 from powdrr_service.providers.credentials import resolve_provider_credentials
+from powdrr_service.resources import bundled_process_directory
 
 from powdrr_lift.core import resolve_repo_root
 from powdrr_lift.core.entity_taxonomy import load_entity_taxonomy
@@ -292,9 +293,7 @@ def run_planning_session(
         journal = checkpoint_store.load()
         if journal.events:
             issue_checkpoint_store.publish_archive(journal.events)
-        process_directory = (
-            Path(__file__).resolve().parents[2] / "docs" / "procedrr" / "processes"
-        )
+        process_directory = bundled_process_directory()
         result = run_planning_procedrr(
             process_directory=process_directory,
             session=session,

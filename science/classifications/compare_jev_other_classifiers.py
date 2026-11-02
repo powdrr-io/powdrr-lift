@@ -25,6 +25,7 @@ from urllib.request import Request, urlopen
 from powdrr_service.planning.semantic_decision import DECISION_VALUES
 from powdrr_service.providers.config import default_llm_mappings
 from powdrr_service.providers.credentials import resolve_provider_credentials
+from powdrr_service.resources import bundled_process_directory
 
 from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
 from powdrr_lift.workrr.provider_runtime import build_workflow_client
@@ -299,7 +300,7 @@ def main() -> int:
             model_cache_dir=ROOT / ".powdrr" / "models",
             progress_stream=None,
         ),
-        process_directory=ROOT / "docs/procedrr/processes",
+        process_directory=bundled_process_directory(),
     )
     heldout_families = set(
         json.loads(HOLDOUT_FAMILIES.read_text(encoding="utf-8"))["source_family_ids"]

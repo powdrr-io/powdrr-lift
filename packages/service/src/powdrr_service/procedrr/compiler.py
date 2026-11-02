@@ -6,7 +6,7 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from typing import Any
 
-from procedrr.model import (
+from powdrr_service.procedrr.model import (
     CallNode,
     ControlNode,
     ForEachNode,

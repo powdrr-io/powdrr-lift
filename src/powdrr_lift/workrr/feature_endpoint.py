@@ -47,6 +47,10 @@ from powdrr_service.obligation_review import (
     compile_obligation_evidence_packets,
 )
 from powdrr_service.planning.workflow_ids import slugify_workflow_id
+from powdrr_service.procedrr import ProcessCatalog, parse_and_validate
+from powdrr_service.procedrr_evaluator.evaluator import EvaluationError
+from powdrr_service.procedrr_evaluator.runtime import ProcedrrExecutionService
+from powdrr_service.resources import bundled_process_directory
 from powdrr_service.structrr.active_intent import (
     ActiveIntentReference,
     ActiveIntentResolutionError,
@@ -162,9 +166,6 @@ from powdrr_lift.workrr.verification_evidence import VerificationEvidenceRunner
 from powdrr_lift.workrr.verification_provider import (
     default_verification_provider_registry,
 )
-from procedrr import ProcessCatalog, parse_and_validate
-from procedrr_evaluator.evaluator import EvaluationError
-from procedrr_evaluator.runtime import ProcedrrExecutionService
 
 Runner = Callable[..., subprocess.CompletedProcess[str]]
 
@@ -588,7 +589,7 @@ def _execute_procedrr_flow(
         if event.kind == "benchmark_gate_warning":
             benchmark_gate_warnings.append(dict(event_data))
         record = {
-            "record_type": "procedrr.step",
+            "record_type": "powdrr_service.procedrr.step",
             "sequence": event.sequence,
             "process_id": event.identity.process_id,
             "process_fingerprint": event.identity.fingerprint,
@@ -5838,24 +5839,7 @@ def _validate_procedrr_flow(worktree: Path) -> Path:
     )
     path = repository_path
     if not path.is_file():
-        package_data_path = (
-            Path(__file__).resolve().parents[2] / "implement-feature.yaml"
-        )
-        source_tree_path = (
-            Path(__file__).resolve().parents[3]
-            / "docs"
-            / "procedrr"
-            / "processes"
-            / "implement-feature.yaml"
-        )
-        path = next(
-            (
-                candidate
-                for candidate in (package_data_path, source_tree_path)
-                if candidate.is_file()
-            ),
-            package_data_path,
-        )
+        path = bundled_process_directory() / "implement-feature.yaml"
     try:
         parse_and_validate(
             path.read_text(encoding="utf-8"),
@@ -5925,24 +5909,7 @@ def _validate_design_interview_flow(worktree: Path) -> Path:
     )
     path = repository_path
     if not path.is_file():
-        package_data_path = (
-            Path(__file__).resolve().parents[2] / "design-interview.yaml"
-        )
-        source_tree_path = (
-            Path(__file__).resolve().parents[3]
-            / "docs"
-            / "procedrr"
-            / "processes"
-            / "design-interview.yaml"
-        )
-        path = next(
-            (
-                candidate
-                for candidate in (package_data_path, source_tree_path)
-                if candidate.is_file()
-            ),
-            package_data_path,
-        )
+        path = bundled_process_directory() / "design-interview.yaml"
     try:
         parse_and_validate(
             path.read_text(encoding="utf-8"),

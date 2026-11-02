@@ -10,10 +10,10 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from powdrr_service.procedrr import parse_and_validate
+from powdrr_service.procedrr_evaluator import Evaluator
 
 from powdrr_lift.workrr import WorkflowLLMClient
-from procedrr import parse_and_validate
-from procedrr_evaluator import Evaluator
 from science.deepswe.acceptance_templates.common import digest, load_json, write_json
 from science.deepswe.acceptance_templates.repository_planning.prepare import inspect
 from science.deepswe.acceptance_templates.repository_planning.run import (

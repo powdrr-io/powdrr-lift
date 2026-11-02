@@ -5,20 +5,18 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from enum import StrEnum
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
-from procedrr.catalog import ProcessCatalog, ProcessIdentity
-from procedrr_evaluator.evaluator import (
+from powdrr_service.procedrr.catalog import ProcessCatalog, ProcessIdentity
+from powdrr_service.procedrr_evaluator.evaluator import (
     EvaluationCheckpoint,
     EvaluationError,
     EvaluationEvent,
     EvaluationResult,
     Evaluator,
     OperationExecutor,
+    WorkflowLLMClient,
 )
-
-if TYPE_CHECKING:
-    from powdrr_lift.workrr.protocol import WorkflowLLMClient
 
 
 class ProcessTerminalStatus(StrEnum):

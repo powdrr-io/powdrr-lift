@@ -13,10 +13,10 @@ from typing import Any, cast
 
 from jsonschema import ValidationError as JsonSchemaError
 from jsonschema import validate as validate_json
+from powdrr_service.procedrr.fragments import apply_fragment_step_json, start_fragment
 
 from powdrr_lift.errors import ProviderExecutionError
 from powdrr_lift.workrr.protocol import WorkflowLLMClient
-from procedrr.fragments import apply_fragment_step_json, start_fragment
 
 _PROVIDER_CREDENTIAL_RE = re.compile(
     r"(?i)((?:api[_-]?key|access[_-]?key|secret|password|token|authorization)"
@@ -255,7 +255,7 @@ class WorkrrProcedrrClient:
         delegate = getattr(client, "_fallback", None)
         self._telemetry_sink(
             {
-                "record_type": "procedrr.provider_attempt",
+                "record_type": "powdrr_service.procedrr.provider_attempt",
                 "trace_id": trace_id,
                 "attempt": attempt + 1,
                 "provider_client": type(client).__name__,

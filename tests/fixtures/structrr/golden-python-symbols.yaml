@@ -48,17 +48,17 @@ symbols:
     span:
       start_line: 378
       end_line: 426
-  - path: src/procedrr/model.py
+  - path: packages/service/src/powdrr_service/procedrr/model.py
     kind: class
-    qualified_name: src.procedrr.model.WorkflowDefinition
-    stable_key: python::src.procedrr.model.WorkflowDefinition
+    qualified_name: packages.service.src.powdrr_service.procedrr.model.WorkflowDefinition
+    stable_key: python::packages.service.src.powdrr_service.procedrr.model.WorkflowDefinition
     span:
       start_line: 454
       end_line: 473
-  - path: src/procedrr/model.py
+  - path: packages/service/src/powdrr_service/procedrr/model.py
     kind: method
-    qualified_name: src.procedrr.model.WorkflowDefinition.fingerprint
-    stable_key: python::src.procedrr.model.WorkflowDefinition.fingerprint
+    qualified_name: packages.service.src.powdrr_service.procedrr.model.WorkflowDefinition.fingerprint
+    stable_key: python::packages.service.src.powdrr_service.procedrr.model.WorkflowDefinition.fingerprint
     span:
       start_line: 471
       end_line: 473

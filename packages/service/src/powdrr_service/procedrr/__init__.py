@@ -1,24 +1,28 @@
 """A small, total control plane for bounded LLM-assisted procedures."""
 
-from procedrr.catalog import (
+from powdrr_service.procedrr.catalog import (
     ProcessCatalog,
     ProcessCatalogError,
     ProcessDefinition,
     ProcessIdentity,
 )
-from procedrr.command_catalog import (
+from powdrr_service.procedrr.command_catalog import (
     CommandCatalog,
     CommandCatalogError,
     CommandSpec,
 )
-from procedrr.compiler import CompilationError, CompilationReport, compile_workflow
-from procedrr.editor import append_step, apply_json_edits, set_value
-from procedrr.fragments import (
+from powdrr_service.procedrr.compiler import (
+    CompilationError,
+    CompilationReport,
+    compile_workflow,
+)
+from powdrr_service.procedrr.editor import append_step, apply_json_edits, set_value
+from powdrr_service.procedrr.fragments import (
     apply_fragment_edit,
     apply_fragment_step_json,
     start_fragment,
 )
-from procedrr.model import (
+from powdrr_service.procedrr.model import (
     ActivationLimits,
     CallNode,
     DecisionContract,
@@ -43,7 +47,7 @@ from procedrr.model import (
     WorkflowDefinition,
     WorklistNode,
 )
-from procedrr.parser import (
+from powdrr_service.procedrr.parser import (
     DocumentDiagnostic,
     ParseError,
     parse_and_validate,

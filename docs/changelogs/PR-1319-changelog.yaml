@@ -1,0 +1,85 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1319
+title: Record dependency reviews in planning scale reports
+intent:
+  problem: Large planning reports omit dependency candidate outcomes, and incomplete work-unit proposals can make report generation fail before preserving the run result.
+  goal: Report dependency candidates and confirmations when available, preserve blocked run reports, and document the latest large live-profile outcome.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/plans/planning-efficiency-deterministic-filtering.md
+    type: modified
+    span: {start_line: 3, end_line: 3}
+    summary: Update the plan status with the remaining live-run blocker.
+    rationale: Reflect the measured work-unit failure without treating elapsed time as a successful completion.
+  - path: docs/plans/planning-efficiency-deterministic-filtering.md
+    type: modified
+    span: {start_line: 50, end_line: 57}
+    summary: Record merged dependency-recall coverage and the latest work-unit blocker.
+    rationale: Keep the work sequence and outstanding acceptance evidence current.
+  - path: docs/plans/planning-efficiency-deterministic-filtering.md
+    type: modified
+    span: {start_line: 226, end_line: 231}
+    summary: Document dependency review telemetry and incomplete-checkpoint behavior.
+    rationale: State how candidate outcomes are measured and why blocked runs may lack them.
+  - path: docs/plans/planning-efficiency-deterministic-filtering.md
+    type: modified
+    span: {start_line: 406, end_line: 420}
+    summary: Add the latest large live-provider run metrics and failure status.
+    rationale: Preserve provider settings, elapsed time, question counts, pending repairs, and the fact that dependency analysis was not reached.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 21, end_line: 21}
+    summary: Import sequence typing for dependency metric inputs.
+    rationale: Type candidate and confirmation collections used by the report helper.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 27, end_line: 31}
+    summary: Import work-unit output and consumer types for dependency metrics.
+    rationale: Associate each candidate with its producer output and consumer unit.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 113, end_line: 198}
+    summary: Count output-to-consumer candidates and their confirmation outcomes.
+    rationale: Measure required, independent, and pending dependency decisions per output.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 620, end_line: 622}
+    summary: Collect dependency metrics without discarding incomplete-run checkpoints.
+    rationale: Retain a blocked planning report when work-unit proposals are incomplete.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 669, end_line: 670}
+    summary: Include dependency metrics or their unavailable reason in the report.
+    rationale: Make downstream analysis distinguish zero candidates from an uncompleted dependency stage.
+  - path: tests/test_benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 8, end_line: 9}
+    summary: Import planning output and work-unit types for telemetry fixtures.
+    rationale: Build nontrivial candidate-to-consumer data in unit tests.
+  - path: tests/test_benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 21, end_line: 23}
+    summary: Expose benchmark report helpers to the test module.
+    rationale: Test candidate counting and blocked-checkpoint handling directly.
+  - path: tests/test_benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 65, end_line: 199}
+    summary: Test per-output review counts, incomplete checkpoint reporting, and a confirmed dependency.
+    rationale: Exercise candidate counts with both accepted and pending decisions and verify that a required edge is reported correctly.
+entities:
+  - id: planning-scale-benchmark
+    type: Script
+    action: modified
+  - id: dependency-review-telemetry-tests
+    type: Regression test
+    action: added
+entity_relationships:
+  - source: dependency-review-telemetry-tests
+    relationship: validates
+    target: planning-scale-benchmark
+invariants:
+  - id: incomplete-work-units-preserve-scale-report
+    description: An incomplete work-unit checkpoint is reported with an unavailable dependency-metrics reason instead of aborting benchmark report generation.
+    action: added
+guidance: []

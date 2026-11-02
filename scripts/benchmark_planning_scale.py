@@ -18,13 +18,17 @@ import json
 import sys
 import time
 from collections import Counter, defaultdict
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from threading import Lock
 from typing import Any
 
-from powdrr_service.planning.assembly import MAX_WORK_UNIT_REQUIREMENTS_PER_QUESTION
+from powdrr_service.planning.assembly import (
+    MAX_WORK_UNIT_REQUIREMENTS_PER_QUESTION,
+    PendingUnitOutput,
+    WorkUnit,
+)
 from powdrr_service.planning.checkpoints import (
     JournalState,
     PlanningCheckpoint,
@@ -104,6 +108,92 @@ def fixture_shape_mismatches(
             [profile.min_work_units, profile.work_units],
         )
     return mismatches
+
+
+def dependency_candidate_summary(
+    pending_outputs: Sequence[PendingUnitOutput],
+    confirmation_pairs: Sequence[tuple[PendingUnitOutput, WorkUnit]],
+    confirmation_results: Sequence[bool | None],
+) -> dict[str, Any]:
+    """Report output-to-consumer candidates and their review outcomes."""
+    if len(confirmation_pairs) != len(confirmation_results):
+        raise ValueError("each dependency candidate must have one review result")
+
+    output_ordinals: dict[tuple[str, str, tuple[str, ...]], int] = {}
+    by_output: dict[int, dict[str, int | str]] = {}
+    for ordinal, pending in enumerate(pending_outputs, start=1):
+        key = (pending.unit_id, pending.description, pending.requirement_ids)
+        output_ordinals.setdefault(key, ordinal)
+        by_output[ordinal] = {
+            "producer_unit_id": pending.unit_id,
+            "output_ordinal": ordinal,
+            "candidate_consumers": 0,
+            "answered": 0,
+            "required": 0,
+            "independent": 0,
+            "pending": 0,
+        }
+
+    answered = required = independent = pending_count = 0
+    for (pending_output, _consumer), result in zip(
+        confirmation_pairs, confirmation_results, strict=True
+    ):
+        key = (
+            pending_output.unit_id,
+            pending_output.description,
+            pending_output.requirement_ids,
+        )
+        ordinal = output_ordinals.get(key)
+        if ordinal is None:
+            raise ValueError("dependency candidate references an unknown output")
+        output = by_output[ordinal]
+        output["candidate_consumers"] = int(output["candidate_consumers"]) + 1
+        if result is None:
+            output["pending"] = int(output["pending"]) + 1
+            pending_count += 1
+        else:
+            output["answered"] = int(output["answered"]) + 1
+            answered += 1
+            if result:
+                output["required"] = int(output["required"]) + 1
+                required += 1
+            else:
+                output["independent"] = int(output["independent"]) + 1
+                independent += 1
+
+    return {
+        "pending_output_count": len(pending_outputs),
+        "output_consumer_candidate_count": len(confirmation_pairs),
+        "confirmation_question_count": len(confirmation_pairs),
+        "confirmation_answer_count": answered,
+        "required_dependency_count": required,
+        "independent_candidate_count": independent,
+        "pending_confirmation_count": pending_count,
+        "by_output": list(by_output.values()),
+    }
+
+
+def dependency_metrics_for(
+    machine: Any, accepted_answers: Mapping[str, Mapping[str, Any]]
+) -> tuple[dict[str, Any] | None, str | None]:
+    """Summarize dependency review, preserving incomplete planning checkpoints."""
+    try:
+        allocation, discovery = machine._dependency_discovery(accepted_answers)
+        requests = machine._dependency_requests(accepted_answers)
+        results = []
+        for request in requests:
+            answer = accepted_answers.get(request.question.question_id)
+            results.append(
+                None if answer is None else request.parse_answer(answer).required
+            )
+        return (
+            dependency_candidate_summary(
+                allocation.pending_outputs, discovery.confirmation_pairs, results
+            ),
+            None,
+        )
+    except (ValueError, RuntimeError) as error:
+        return None, str(error)
 
 
 class _ProgressClient:
@@ -527,6 +617,9 @@ def run_profile(
         and isinstance(event.payload.get("accepted_answer"), Mapping)
         and "has_more" in event.payload["accepted_answer"]
     )
+    dependency_metrics, dependency_metrics_error = dependency_metrics_for(
+        machine, accepted
+    )
     report = {
         "profile": profile.name,
         "provider": provider,
@@ -573,6 +666,8 @@ def run_profile(
         ),
         "by_question_kind": dict(by_question_kind),
         "phases": dict(by_phase),
+        "dependency_candidates": dependency_metrics,
+        "dependency_candidates_unavailable_reason": dependency_metrics_error,
     }
     mismatches = fixture_shape_mismatches(profile, report)
     report["fixture_shape_mismatches"] = mismatches

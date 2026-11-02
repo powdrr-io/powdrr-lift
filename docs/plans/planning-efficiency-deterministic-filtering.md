@@ -1,6 +1,6 @@
 # Planning Efficiency Through Deterministic Filtering
 
-**Status:** Core reductions landed; static dependency-candidate recall and large-profile live validation remain open  
+**Status:** Core reductions landed; labeled dependency recall and live candidate telemetry are covered; large live planning remains blocked by incomplete work-unit proposals  
 **Date:** 2026-11-01  
 **Owner:** Powdrr-Lift planning service  
 **Related change:** [PR #1283](https://github.com/powdrr-io/powdrr-lift/pull/1283) starts deterministic Structrr candidate selection for path-bound existing subjects.
@@ -47,13 +47,14 @@ deterministic-answer provenance.
 The tasks below are ordered by dependency and implementation risk. Each numbered milestone should be a separate reviewable PR unless implementation evidence shows two adjacent tasks are inseparable. PR #1283 is the first path-bound Structrr candidate slice; merge it before the later symbol-index expansion.
 
 The main code reductions have since landed across PRs #1291, #1293, and #1300.
-PR #1300 added scale profiles and reduced large-run prompt/frontier costs. Two
-acceptance items remain: complete the hand-labeled dependency-candidate recall
-coverage for static code references, and record a large-profile run against the
-configured live provider. The current BasedPyright adapter exposes workspace
-symbols and per-file structure; dependency discovery currently uses planned
-paths, named outputs, related requirements, and lexical candidates. The
-synthetic timings below do not establish the two-hour target.
+PR #1300 added scale profiles and reduced large-run prompt/frontier costs. PR
+#1315 added a hand-labeled multi-edge dependency-recall fixture and expanded
+large-profile live reporting. The current BasedPyright adapter exposes
+workspace symbols and per-file structure; dependency discovery currently uses
+planned paths, named outputs, related requirements, and lexical candidates.
+The latest large live run reached work-unit planning but blocked on 16
+unanswered supplemental proposals, so it did not reach dependency analysis or
+establish the two-hour completion target.
 
 ### Milestone 0: Record a baseline and expose planning cost
 
@@ -222,8 +223,12 @@ synthetic timings below do not establish the two-hour target.
 
 **Progress:** Planned Python files now contribute BasedPyright reference candidates,
 bounded to symbols also named in another planned file. The references only add
-pairs for targeted confirmation; they do not determine dependency edges. Labeled
-candidate-recall coverage remains open.
+pairs for targeted confirmation; they do not determine dependency edges. PR
+#1315 added a labeled two-edge chain with no prose overlap and a lexical false
+positive that must be rejected. Live report telemetry now records output to
+consumer candidates and required, independent, and pending confirmations. A
+blocked or incomplete work-unit checkpoint records why those counts are
+unavailable instead of failing while assembling the report.
 
 **Implementation:**
 
@@ -397,6 +402,21 @@ question members. It produced 40 requirements, 11 work units (nine covering
 four requirements and two covering two requirements), and 5 plan items. There
 were zero validation retries and no fixture-shape mismatch; provider token
 usage remained unavailable.
+
+### Latest large live-provider run (2026-11-02)
+
+The `large` profile was rerun after the work-unit grouping changes with
+`deepinfra-cheap` / `deepseek-ai/DeepSeek-V4-Flash-0731`, concurrency 4, and a
+30-second per-call timeout. It took 993.2 seconds (16.6 minutes) and made 570
+provider calls for 1,594 question members. The planner extracted all 500
+requirements, then blocked during work-unit proposal repair with 16 supplemental
+`propose_work_units` questions still pending. It recorded 10 validation retries;
+work units and PR items were not compiled. Dependency candidate metrics are
+therefore unavailable for this run. Token usage was not returned. This is a
+failure datapoint, not a completed large-plan performance result. The earlier
+large run's 972-second duration is also not a success because it produced 60
+items against the 50-item target. Hardware: Apple Silicon MacBook Air, arm64,
+Darwin 25.5.0.
 
 ## Cross-cutting test requirements
 

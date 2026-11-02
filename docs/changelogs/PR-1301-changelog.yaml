@@ -1,0 +1,59 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1301
+title: Show job activity and attempt history in the workspace
+intent:
+  problem: Job details show only the latest attempt metadata and do not preserve a readable view of earlier attempts.
+  goal: Present the latest recorded activity with its timestamp and keep prior attempts available in a collapsed chronological history.
+human-decisions: []
+structured_files: []
+files:
+  - path: ui/src/App.css
+    type: modified
+    span: {start_line: 277, end_line: 291}
+    summary: Style the activity timeline and expandable previous-attempt history.
+    rationale: Make execution history easy to scan without taking over the job detail view.
+  - path: ui/src/App.test.tsx
+    type: modified
+    span: {start_line: 355, end_line: 360}
+    summary: Add an earlier attempt to the job detail fixture.
+    rationale: Verify more than one recorded attempt is rendered in chronological history.
+  - path: ui/src/App.test.tsx
+    type: modified
+    span: {start_line: 405, end_line: 408}
+    summary: Expand prior attempts and assert their run and attempt identifiers.
+    rationale: Protect recovery context visibility after a retry.
+  - path: ui/src/components/JobStatus.tsx
+    type: modified
+    span: {start_line: 2, end_line: 2}
+    summary: Import the job timeline component.
+    rationale: Compose recorded activity into the job status details.
+  - path: ui/src/components/JobStatus.tsx
+    type: modified
+    span: {start_line: 106, end_line: 112}
+    summary: Remove the standalone latest-update block.
+    rationale: Present the current activity with its timestamp in the unified timeline.
+  - path: ui/src/components/JobStatus.tsx
+    type: modified
+    span: {start_line: 129, end_line: 135}
+    summary: Remove the separate current-stage block.
+    rationale: Avoid duplicating the activity already shown in the timeline.
+  - path: ui/src/components/JobStatus.tsx
+    type: modified
+    span: {start_line: 163, end_line: 163}
+    summary: Render the timeline when job activity or attempts are available.
+    rationale: Keep status details grounded in recorded job data.
+  - path: ui/src/components/JobTimeline.tsx
+    type: added
+    span: {start_line: 1, end_line: 83}
+    summary: Show the latest activity and attempt metadata with timestamps, with earlier attempts collapsed.
+    rationale: Preserve retry context without inventing historical outcomes or progress percentages absent from the API.
+entities: []
+entity_relationships: []
+invariants:
+  - id: job-timeline-uses-recorded-activity
+    description: The timeline displays only job activity and attempt metadata provided by the workspace API.
+    action: added
+  - id: prior-job-attempts-remain-inspectable
+    description: Earlier attempts remain available in chronological order after retries while staying collapsed by default.
+    action: added
+guidance: []

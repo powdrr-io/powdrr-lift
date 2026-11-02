@@ -149,9 +149,9 @@ files:
     rationale: Prevent incomplete live runs from appearing successful.
   - path: tests/test_benchmark_planning_scale.py
     type: added
-    span: {start_line: 1, end_line: 44}
-    summary: Test work-unit bounds and exact requirement and PR-item expectations.
-    rationale: Verify valid cohesion is accepted and malformed plan sizes are rejected.
+    span: {start_line: 1, end_line: 59}
+    summary: Load the standalone benchmark by path and test work-unit bounds plus exact requirement and PR-item expectations.
+    rationale: Keep CI collection independent of the checkout root being importable as a Python package, while verifying valid cohesion and rejecting malformed plan sizes.
   - path: tests/test_planning_assembly.py
     type: modified
     span: {start_line: 446, end_line: 450}

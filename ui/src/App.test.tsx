@@ -1,6 +1,6 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import App from './App'
 import type { Conversation, Message, WorkspaceJob, WorkspaceJobDetail, WorkspaceQuestion, WorkspaceRepository, WorkspaceSnapshot, WorkspaceTurn } from './api/types'
 import { WorkspaceApiError } from './api/types'
@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   snapshot: vi.fn(),
   listConversations: vi.fn(),
   createConversation: vi.fn(),
+  createJob: vi.fn(),
   messages: vi.fn(),
   sendMessage: vi.fn(),
   answerQuestion: vi.fn(),
@@ -65,6 +66,8 @@ function emptySnapshot(): WorkspaceSnapshot {
 }
 
 describe('workspace shell', () => {
+  afterEach(() => cleanup())
+
   beforeEach(() => {
     window.history.replaceState({}, '', '/')
     localStorage.clear()
@@ -75,6 +78,21 @@ describe('workspace shell', () => {
     mocks.snapshot.mockResolvedValue(emptySnapshot())
     mocks.listConversations.mockResolvedValue([])
     mocks.createConversation.mockResolvedValue(conversation)
+    mocks.createJob.mockResolvedValue({
+      schema_version: 1,
+      job_id: 'job-created',
+      repository_id: 'repo-1',
+      kind: 'planning',
+      title: 'Plan search',
+      state: 'ready',
+      conversation_id: 'conversation-1',
+      dependency_ids: [],
+      artifact_refs: [],
+      detail: '',
+      revision: 1,
+      created_at: '2026-11-01T00:00:00Z',
+      updated_at: '2026-11-01T00:00:00Z',
+    })
     mocks.messages.mockResolvedValue([])
     mocks.sendMessage.mockResolvedValue(undefined)
     mocks.answerQuestion.mockResolvedValue(undefined)
@@ -136,6 +154,86 @@ describe('workspace shell', () => {
     expect(await screen.findByText('Design a deployment dashboard.')).toBeTruthy()
     const transcript = screen.getByLabelText('Design conversation')
     expect(within(transcript).getByText('You')).toBeTruthy()
+  })
+
+  it('creates a planning job from a linked specification and selects the created job', async () => {
+    const user = userEvent.setup()
+    mocks.resumeSession.mockResolvedValue(undefined)
+    mocks.listRepositories.mockResolvedValue([repository])
+    mocks.listConversations.mockResolvedValue([{
+      ...conversation,
+      specification_refs: ['spec:search-v2'],
+      revision: 7,
+    }])
+
+    render(<App />)
+    await user.click(await screen.findByRole('button', { name: 'Create autonomous job' }))
+    await user.type(screen.getByLabelText('Job title'), 'Plan search')
+    await user.selectOptions(screen.getByLabelText('Design chat with a linked specification'), 'conversation-1')
+    await user.selectOptions(screen.getByLabelText('Specification reference'), 'spec:search-v2')
+    await user.click(screen.getByRole('button', { name: 'Create job' }))
+
+    await waitFor(() => expect(mocks.createJob).toHaveBeenCalledOnce())
+    const [createdRepositoryId, input] = mocks.createJob.mock.calls[0]
+    expect(createdRepositoryId).toBe('repo-1')
+    expect(input).toMatchObject({
+      kind: 'planning',
+      title: 'Plan search',
+      conversation_id: 'conversation-1',
+      dependency_ids: [],
+      job_inputs: { pinned_spec_ref: 'spec:search-v2' },
+      source_refs: ['spec:search-v2'],
+      source_spec_revision: 'conversation-revision:conversation-1:7',
+      provider_config_refs: ['provider:deepinfra-flash'],
+    })
+    expect(input.request_id).toMatch(/^[0-9a-f-]{36}$/)
+    expect(new URL(window.location.href).searchParams.get('job')).toBe('job-created')
+    expect(screen.queryByRole('dialog', { name: 'Create a job' })).toBeNull()
+  })
+
+  it('requires explicit approval before creating PR execution from a completed plan', async () => {
+    const user = userEvent.setup()
+    mocks.resumeSession.mockResolvedValue(undefined)
+    mocks.listRepositories.mockResolvedValue([repository])
+    mocks.listConversations.mockResolvedValue([conversation])
+    const completedPlan: WorkspaceJob = {
+      schema_version: 1,
+      job_id: 'plan-1',
+      repository_id: 'repo-1',
+      kind: 'planning',
+      title: 'Plan search',
+      state: 'succeeded',
+      conversation_id: 'conversation-1',
+      dependency_ids: [],
+      artifact_refs: ['proposal:search-part-1'],
+      detail: 'Plan completed.',
+      revision: 3,
+      created_at: '2026-11-01T00:00:00Z',
+      updated_at: '2026-11-01T00:03:00Z',
+    }
+    mocks.snapshot.mockResolvedValue({ ...emptySnapshot(), jobs: [completedPlan] })
+
+    render(<App />)
+    await user.click(await screen.findByRole('button', { name: 'Create autonomous job' }))
+    await user.selectOptions(screen.getByLabelText('Job type'), 'pr_execution')
+    await user.type(screen.getByLabelText('Job title'), 'Implement search')
+    await user.selectOptions(screen.getByLabelText('Completed planning job'), 'plan-1')
+    await user.selectOptions(screen.getByLabelText('Proposed change from this plan'), 'proposal:search-part-1')
+    const createButton = screen.getByRole('button', { name: 'Create job' })
+    expect(createButton.hasAttribute('disabled')).toBe(true)
+    await user.click(screen.getByLabelText('I confirm this proposed change has been approved for execution.'))
+    await user.click(createButton)
+
+    await waitFor(() => expect(mocks.createJob).toHaveBeenCalledOnce())
+    const input = mocks.createJob.mock.calls[0][1]
+    expect(input).toMatchObject({
+      kind: 'pr_execution',
+      conversation_id: 'conversation-1',
+      dependency_ids: ['plan-1'],
+      job_inputs: { approved_change_ref: 'proposal:search-part-1' },
+      source_refs: ['proposal:search-part-1'],
+      source_spec_revision: null,
+    })
   })
 
   it('renders a persisted interview question and submits its schema-valid answer', async () => {

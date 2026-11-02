@@ -279,6 +279,7 @@ from powdrr_lift.workrr.task_agent import (
     run_workflow_task,
 )
 from powdrr_lift.workrr.workflow_provider_selection import choose_workflow_provider
+from powdrr_lift.workrr.workspace_launch import add_workspace_ui_parser
 
 run_workflow_chat = run_procedrr_workflow_chat
 
@@ -298,6 +299,7 @@ def _positive_finite_seconds(value: str) -> float:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="powdrr-lift")
     subparsers = parser.add_subparsers(dest="command", required=True)
+    add_workspace_ui_parser(subparsers)
 
     credentials_parser = subparsers.add_parser(
         "check-credentials",

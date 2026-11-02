@@ -1,0 +1,152 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1313
+title: Add a packaged local workspace launcher
+intent:
+  problem: The browser workspace API and frontend exist, but developers have no supported command to start the bundled UI with persistent local data.
+  goal: Add a loopback-only CLI launcher, OS-specific user data paths, static asset serving from the Python package, and a documented local startup flow.
+human-decisions: []
+structured_files: []
+files:
+  - path: GETTING_STARTED.md
+    type: modified
+    span: {start_line: 107, end_line: 122}
+    summary: Document how to launch the browser workspace and use its one-time token.
+    rationale: Make the new local UI available from the existing developer setup guide.
+  - path: docs/design/browser-workspace-api.md
+    type: modified
+    span: {start_line: 7, end_line: 18}
+    summary: Describe launch options, OS data locations, token bootstrap, and port conflict behavior.
+    rationale: Keep the local API and launcher contract discoverable.
+  - path: packages/local/src/powdrr_local/web.py
+    type: modified
+    span: {start_line: 12, end_line: 12}
+    summary: Import filesystem path typing for optional static hosting.
+    rationale: Accept a bundled frontend directory in the API app factory.
+  - path: packages/local/src/powdrr_local/web.py
+    type: modified
+    span: {start_line: 26, end_line: 26}
+    summary: Import Starlette static asset serving.
+    rationale: Serve the frontend from the local application origin.
+  - path: packages/local/src/powdrr_local/web.py
+    type: modified
+    span: {start_line: 70, end_line: 70}
+    summary: Add an optional static asset directory to app construction.
+    rationale: Keep API-only test and embedding configurations supported.
+  - path: packages/local/src/powdrr_local/web.py
+    type: modified
+    span: {start_line: 293, end_line: 300}
+    summary: Mount validated static assets after API routes.
+    rationale: Serve the browser application while retaining existing API endpoints.
+  - path: packages/local/src/powdrr_local/web_assets/assets/index-B5dRLaAj.css
+    type: added
+    span: {start_line: 1, end_line: 1}
+    summary: Bundle the workspace styles for offline local serving.
+    rationale: Let installed Python packages serve the production frontend without Node.
+  - path: packages/local/src/powdrr_local/web_assets/assets/index-Das2veAR.js
+    type: added
+    span: {start_line: 1, end_line: 43}
+    summary: Bundle the React workspace application and its runtime dependencies.
+    rationale: Make the complete browser UI available from the installed local package.
+  - path: packages/local/src/powdrr_local/web_assets/index.html
+    type: added
+    span: {start_line: 1, end_line: 16}
+    summary: Add the production frontend entry point.
+    rationale: Provide the document loaded by the local static file mount.
+  - path: packages/local/src/powdrr_local/web_assets/powdrr-mark.svg
+    type: added
+    span: {start_line: 1, end_line: 10}
+    summary: Bundle the workspace mark used by the frontend.
+    rationale: Keep the icon available in installed builds.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 282, end_line: 282}
+    summary: Import the UI command parser.
+    rationale: Register the launcher with the existing CLI.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 302, end_line: 302}
+    summary: Add the `ui` subcommand to the CLI.
+    rationale: Provide one supported entry point for starting the browser workspace.
+  - path: src/powdrr_lift/workrr/workspace_app.py
+    type: modified
+    span: {start_line: 7, end_line: 7}
+    summary: Locate the installed local package for bundled assets.
+    rationale: Resolve frontend files from the package that owns them.
+  - path: src/powdrr_lift/workrr/workspace_app.py
+    type: modified
+    span: {start_line: 28, end_line: 29}
+    summary: Accept an optional repository root and static asset directory.
+    rationale: Let the launcher register a checkout and supply package assets.
+  - path: src/powdrr_lift/workrr/workspace_app.py
+    type: modified
+    span: {start_line: 55, end_line: 61}
+    summary: Register the requested repository and locate bundled frontend files.
+    rationale: Prepare persistent workspace data and static content before app startup.
+  - path: src/powdrr_lift/workrr/workspace_app.py
+    type: modified
+    span: {start_line: 68, end_line: 68}
+    summary: Pass the static directory to the API application factory.
+    rationale: Serve the bundled UI from the same loopback origin as the API.
+  - path: src/powdrr_lift/workrr/workspace_launch.py
+    type: added
+    span: {start_line: 1, end_line: 165}
+    summary: Implement the local UI command, OS data paths, token display, port validation, and server startup.
+    rationale: Launch the bundled workspace without requiring a separate frontend server.
+  - path: tests/test_workspace_api.py
+    type: modified
+    span: {start_line: 29, end_line: 29}
+    summary: Allow API test setup to specify static assets.
+    rationale: Exercise the app's optional frontend hosting path.
+  - path: tests/test_workspace_api.py
+    type: modified
+    span: {start_line: 45, end_line: 45}
+    summary: Pass the static asset directory to app construction in tests.
+    rationale: Match the production static hosting integration.
+  - path: tests/test_workspace_api.py
+    type: modified
+    span: {start_line: 50, end_line: 65}
+    summary: Verify static frontend files and API routes are both served.
+    rationale: Protect same-origin asset hosting without breaking workspace endpoints.
+  - path: tests/test_workspace_api.py
+    type: modified
+    span: {start_line: 274, end_line: 278}
+    summary: Set up a Git checkout for the workspace launch integration test.
+    rationale: Verify optional startup repository registration against a real repository.
+  - path: tests/test_workspace_api.py
+    type: modified
+    span: {start_line: 283, end_line: 283}
+    summary: Pass the Git checkout to the workspace app factory.
+    rationale: Exercise the launch-time repository setup option.
+  - path: tests/test_workspace_api.py
+    type: modified
+    span: {start_line: 287, end_line: 293}
+    summary: Verify the packaged UI entry point and JavaScript asset are served.
+    rationale: Ensure the app factory exposes its bundled frontend.
+  - path: tests/test_workspace_api.py
+    type: modified
+    span: {start_line: 304, end_line: 306}
+    summary: Verify launch-time repository registration persists its canonical root.
+    rationale: Protect correct repository setup for the browser workspace.
+  - path: tests/test_workspace_launch.py
+    type: added
+    span: {start_line: 1, end_line: 84}
+    summary: Test OS-specific data paths, CLI options, and valid port bounds.
+    rationale: Verify launcher configuration across macOS, Linux, and Windows conventions.
+  - path: ui/vite.config.ts
+    type: modified
+    span: {start_line: 8, end_line: 11}
+    summary: Build production UI assets into the local Python package.
+    rationale: Include the frontend in Python wheels so users do not need Node to run it.
+entities: []
+entity_relationships: []
+invariants:
+  - id: workspace-launch-is-loopback-only
+    description: The UI launcher binds only to 127.0.0.1 and rejects an occupied port without connecting to an unverified service.
+    action: added
+  - id: workspace-data-is-outside-the-repository
+    description: Workspace data defaults to the operating system's per-user application data location and supports an explicit override.
+    action: added
+  - id: browser-assets-are-packaged
+    description: The Python local package includes the built frontend assets used by the UI launcher.
+    action: added
+guidance: []

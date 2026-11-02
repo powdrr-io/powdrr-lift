@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import powdrr_local
 from fastapi import FastAPI
 from powdrr_local.web import create_app
 from powdrr_local.workspace import WorkspaceStore
@@ -24,6 +25,8 @@ def build_workspace_app(
     model: str = "glm-5.2",
     api_key: str | None = None,
     base_url: str | None = None,
+    repository_root: Path | None = None,
+    static_directory: Path | None = None,
 ) -> FastAPI:
     """Build a runnable workspace API with repository-aware chat dispatch.
 
@@ -49,10 +52,18 @@ def build_workspace_app(
         store,
         workflow_config,
     )
+    if repository_root is not None:
+        store.register_repository(repository_root)
+    resolved_static_directory = static_directory
+    if resolved_static_directory is None:
+        bundled_assets = Path(powdrr_local.__file__).parent / "web_assets"
+        if bundled_assets.is_dir():
+            resolved_static_directory = bundled_assets
     return create_app(
         store=store,
         bootstrap_secret=bootstrap_secret,
         expected_origin=expected_origin,
         repository_registry=store,
         turn_dispatcher=turn_dispatcher,
+        static_directory=resolved_static_directory,
     )

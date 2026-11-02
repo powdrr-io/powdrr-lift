@@ -4,6 +4,18 @@ The local HTTP API is created with `powdrr_local.web.create_app`. It is bound
 to a loopback origin and uses the same SQLite workspace database as the local
 service. The API does not start workflow execution from a request handler.
 
+Launch the bundled browser workspace with `powdrr-lift ui`. Optionally pass
+`--repo-root PATH` to register a Git checkout at startup, `--port PORT` to
+select a loopback port (default `8765`), `--no-open` to keep the browser closed,
+or `--data-dir PATH` to override the OS-specific user data directory. The
+launcher prints a one-use token in the terminal; enter it in the browser to
+bootstrap the session. Workspace databases stay outside the repository by
+default. macOS uses `~/Library/Application Support/powdrr-lift`, Windows uses
+`%LOCALAPPDATA%/powdrr-lift`, and Linux uses `$XDG_DATA_HOME/powdrr-lift` or
+`~/.local/share/powdrr-lift` when that variable is unset. Port conflicts fail
+with an instruction to choose another port; the launcher does not connect to an
+unverified service on the requested port.
+
 ## Session bootstrap
 
 The application supplies its short-lived bootstrap credential to the browser

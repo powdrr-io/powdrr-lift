@@ -1,0 +1,57 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1305
+title: Add an explicit recovery review before retry or resume
+intent:
+  problem: Failed and interrupted jobs expose retry actions without a recovery review, while the job detail API does not report checkpoint validation.
+  goal: Show the available attempt and output context, state checkpoint uncertainty clearly, and require confirmation before sending backend-permitted retry or resume actions.
+human-decisions: []
+structured_files: []
+files:
+  - path: ui/src/App.css
+    type: modified
+    span: {start_line: 281, end_line: 285}
+    summary: Style the recovery context and action confirmation sections.
+    rationale: Separate recovery information from ordinary progress while retaining the active workspace theme.
+  - path: ui/src/components/JobStatus.tsx
+    type: modified
+    span: {start_line: 1, end_line: 1}
+    summary: Import state for the recovery confirmation flow.
+    rationale: Keep confirmation scoped to the selected job revision.
+  - path: ui/src/components/JobStatus.tsx
+    type: modified
+    span: {start_line: 62, end_line: 65}
+    summary: Track recovery review state by job ID, revision, and status.
+    rationale: Discard stale confirmation when the backend job state changes.
+  - path: ui/src/components/JobStatus.tsx
+    type: modified
+    span: {start_line: 103, end_line: 109}
+    summary: Require users to review retry and resume actions before submitting.
+    rationale: Put an explicit review step between recovery intent and backend action.
+  - path: ui/src/components/JobStatus.tsx
+    type: modified
+    span: {start_line: 111, end_line: 111}
+    summary: Label retry and resume buttons as review actions for recovery states.
+    rationale: Make the confirmation step discoverable.
+  - path: ui/src/components/JobStatus.tsx
+    type: modified
+    span: {start_line: 119, end_line: 146}
+    summary: Show checkpoint availability as unreported and summarize available attempt/output context before confirmation.
+    rationale: Avoid claiming checkpoint validity while preserving the actions and alternatives returned by the backend.
+  - path: ui/src/components/JobStatus.test.tsx
+    type: added
+    span: {start_line: 1, end_line: 77}
+    summary: Verify recovery context is visible and retry is not sent until explicitly confirmed.
+    rationale: Protect the review-before-retry behavior for interrupted jobs.
+entities: []
+entity_relationships: []
+invariants:
+  - id: recovery-action-requires-current-review
+    description: Retry and resume actions for failed or interrupted jobs require explicit confirmation tied to the currently displayed job revision.
+    action: added
+  - id: checkpoint-status-is-not-inferred
+    description: The UI reports checkpoint availability as unreported when the job detail API provides no checkpoint validation field.
+    action: added
+  - id: recovery-options-follow-backend-permission
+    description: Only retry or resume actions listed by the backend can be requested from the recovery panel.
+    action: added
+guidance: []

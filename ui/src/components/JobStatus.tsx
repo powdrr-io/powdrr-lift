@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { Conversation, WorkspaceJob, WorkspaceJobAction, WorkspaceJobDetail } from '../api/types'
 import { ArtifactLinks } from './ArtifactLinks'
 import { JobTimeline } from './JobTimeline'
@@ -58,6 +59,10 @@ export function JobStatus({
 }) {
   const { job } = detail
   const isActive = ['running', 'waiting_for_input', 'waiting_for_external'].includes(job.state)
+  const isRecoveryState = ['failed', 'interrupted'].includes(job.state)
+  const recoveryReviewKey = `${job.job_id}:${job.revision}:${job.state}`
+  const [recoveryReview, setRecoveryReview] = useState<{ key: string; action: WorkspaceJobAction } | null>(null)
+  const pendingRecoveryAction = recoveryReview?.key === recoveryReviewKey ? recoveryReview.action : null
 
   return (
     <section className="job-status" aria-label="Autonomous job status">
@@ -95,12 +100,46 @@ export function JobStatus({
                     type="button"
                     className={action === 'cancel' ? 'job-action job-action--secondary' : 'job-action'}
                     disabled={pendingActions.includes(action)}
-                    onClick={() => onAction(action)}
+                    onClick={() => {
+                      if (isRecoveryState && (action === 'retry' || action === 'resume')) {
+                        setRecoveryReview({ key: recoveryReviewKey, action })
+                        return
+                      }
+                      onAction(action)
+                    }}
                   >
-                    {pendingActions.includes(action) ? 'Sending…' : labels[action]}
+                    {pendingActions.includes(action) ? 'Sending…' : isRecoveryState && (action === 'retry' || action === 'resume') ? `Review ${action}` : labels[action]}
                   </button>
                 )
               })}
+            </div>
+          </section>
+        )}
+
+        {isRecoveryState && (
+          <section className="job-status__section job-recovery" aria-labelledby="job-recovery-title">
+            <h2 id="job-recovery-title">Recovery review</h2>
+            <dl className="job-status__metadata">
+              <div><dt>Checkpoint availability</dt><dd>Not reported by the workspace API</dd></div>
+              <div><dt>Latest attempt</dt><dd>{detail.latest_attempt?.attempt_id ?? 'No attempt recorded'}</dd></div>
+              <div><dt>Saved outputs</dt><dd>{detail.outputs.length}</dd></div>
+            </dl>
+            <p>The latest attempt, source revision, design chat, and saved outputs are shown below. Only actions listed by the backend are available here.</p>
+            {detail.allowed_actions.some((action) => action === 'retry' || action === 'resume')
+              ? <p>Review the available context before requesting a retry or resume. The workspace does not expose checkpoint validation details in this response.</p>
+              : <p>The backend has not permitted retry or resume. Use the latest activity and saved outputs to decide what to do next.</p>}
+          </section>
+        )}
+
+        {pendingRecoveryAction && (
+          <section className="job-status__section job-recovery-confirm" aria-labelledby="job-recovery-confirm-title" aria-describedby="job-recovery-confirm-description">
+            <h2 id="job-recovery-confirm-title">Confirm {pendingRecoveryAction}</h2>
+            <p id="job-recovery-confirm-description">Checkpoint availability is not reported here. Confirm only after reviewing the attempt and outputs above. This request will be sent with the current job revision.</p>
+            <div className="job-status__actions">
+              <button type="button" className="job-action job-action--secondary" onClick={() => setRecoveryReview(null)}>Keep reviewing</button>
+              <button type="button" className="job-action" disabled={pendingActions.includes(pendingRecoveryAction)} onClick={() => onAction(pendingRecoveryAction)}>
+                {pendingActions.includes(pendingRecoveryAction) ? 'Sending…' : `Confirm ${pendingRecoveryAction}`}
+              </button>
             </div>
           </section>
         )}

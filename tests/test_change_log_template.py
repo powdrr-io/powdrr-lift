@@ -2,13 +2,60 @@ from __future__ import annotations
 
 import subprocess
 from pathlib import Path
+from types import SimpleNamespace
 
 from powdrr_service.changelog import Decision, parse_change_log
+from powdrr_service.changelog.template import (
+    RelatedSectionPreview,
+    render_change_log_template,
+)
 
 from powdrr_lift import (
     create_change_log_template,
     create_change_log_template_from_plan_diff,
 )
+
+
+def test_service_renderer_renders_diff_and_related_evidence() -> None:
+    rendered = render_change_log_template(
+        branch_name="feature/example",
+        default_branch_name="main",
+        diff_entries=[
+            SimpleNamespace(
+                status="A",
+                path="src/new_module.py",
+                start_line=1,
+                end_line=8,
+            )
+        ],
+        related_sections_by_entry=[RelatedSectionPreview(entities=("new-module",))],
+    )
+
+    assert "path: src/new_module.py" in rendered
+    assert "type: added" in rendered
+    assert "entities:" in rendered
+    assert "- new-module" in rendered
+
+
+def test_service_renderer_accepts_json_shaped_diff_entries() -> None:
+    rendered = render_change_log_template(
+        branch_name="feature/example",
+        default_branch_name="main",
+        diff_entries=[
+            {
+                "status": "R",
+                "path": "src/renamed_module.py",
+                "start_line": 3,
+                "end_line": 6,
+            }
+        ],
+    )
+
+    assert "#   R src/renamed_module.py" in rendered
+    assert "path: src/renamed_module.py" in rendered
+    assert "type: renamed" in rendered
+    assert "start_line: 3" in rendered
+    assert "end_line: 6" in rendered
 
 
 def test_create_change_log_template_uses_branch_diff(tmp_path: Path) -> None:

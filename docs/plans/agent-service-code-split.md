@@ -484,8 +484,10 @@ required validation cannot be reported as success. Worker commits remain visible
 
 1. Migrate every remaining command/module/resource in the inventory: evaluation,
    template operations, changelog generation/validation, standalone inspectors,
-   and helpers. Changelog schema parsing and result models are service-owned;
-   generation and validation still need separate local Git/evidence boundaries.
+   and helpers. Changelog schema parsing, result models, template formatting,
+   and plan-diff enrichment are service-owned. Branch diff collection,
+   repository evidence collection, output-file handling, and validation still
+   need separate local Git/evidence boundaries.
    Update imports and monkeypatch targets explicitly; do not retain monkeypatch
    compatibility through global `sys.modules` aliases. Move Structrr proposal,
    source-manifest, actual-diff, and candidate-comparison policy into the service;

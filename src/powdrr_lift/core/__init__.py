@@ -226,7 +226,6 @@ from powdrr_lift.core.system_specification import (
 from powdrr_lift.core.template import (
     create_change_log_template,
     create_change_log_template_from_plan_diff,
-    render_change_log_template,
 )
 
 _ARCHITECTURE = "powdrr_lift.core.architecture_specification"
@@ -374,7 +373,6 @@ _EXPORTS: dict[str, str] = {
     "render_proposed_pr_search_report": _PR_SPECIFICATION,
     "render_system_map_specification_template": _FEATURE_PLANNING,
     "render_system_specification_template": _SYSTEM,
-    "render_change_log_template": _TEMPLATE,
     "resolve_default_branch": _PR_ANALYSIS,
     "resolve_repo_root": _PR_ANALYSIS,
     "search_proposed_pr_specifications": _PR_SPECIFICATION,

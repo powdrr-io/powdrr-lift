@@ -225,6 +225,26 @@ def test_changelog_parser_is_service_owned_without_legacy_exports() -> None:
     assert not hasattr(powdrr_lift, "parse_change_log")
 
 
+def test_changelog_rendering_policy_is_service_owned_without_legacy_export() -> None:
+    import powdrr_lift
+    import powdrr_lift.change_log_template as agent_template
+    import powdrr_lift.core as core
+
+    repository = Path(__file__).parents[1]
+    renderer = repository / "packages/service/src/powdrr_service/changelog/template.py"
+    tree = ast.parse(renderer.read_text(encoding="utf-8"))
+    imports: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            imports.update(alias.name.split(".")[0] for alias in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            imports.add(node.module.split(".")[0])
+    assert "powdrr_lift" not in imports
+    assert not hasattr(agent_template, "render_change_log_template")
+    assert not hasattr(core, "render_change_log_template")
+    assert not hasattr(powdrr_lift, "render_change_log_template")
+
+
 def test_legacy_service_imports_are_explicitly_owned() -> None:
     repository = Path(__file__).parents[1]
     allowlist = json.loads(

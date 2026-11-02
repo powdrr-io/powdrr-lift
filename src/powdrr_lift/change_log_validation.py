@@ -16,12 +16,14 @@ from powdrr_service.changelog import (
     RelatedSection,
     parse_change_log,
 )
+from powdrr_service.changelog.template import (
+    is_structured_document_path as _is_structured_document_path,
+)
 
 from powdrr_lift.change_log_template import (
     BranchDiffEntry,
     _collect_branch_diff_entries,
     _current_branch,
-    _is_structured_document_path,
     _resolve_default_branch,
     _resolve_repo_root,
 )

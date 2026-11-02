@@ -5,6 +5,8 @@ from __future__ import annotations
 import hashlib
 import hmac
 import ipaddress
+import os
+import re
 import secrets
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -24,6 +26,7 @@ from starlette.concurrency import run_in_threadpool
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from starlette.responses import JSONResponse
 from starlette.staticfiles import StaticFiles
+from starlette.types import Scope
 
 from powdrr_local.turn_dispatch_runtime import (
     WorkspaceTurnDispatchRuntime,
@@ -41,6 +44,29 @@ from powdrr_local.workspace_api import (
 
 _SESSION_COOKIE = "powdrr_session"
 _SESSION_MAX_AGE_SECONDS = 8 * 60 * 60
+_HASHED_ASSET_PATTERN = re.compile(r"-[A-Za-z0-9_-]{8,}\.[^./]+$")
+
+
+class _WorkspaceStaticFiles(StaticFiles):
+    """Serve revalidated app shell files and immutable fingerprinted assets."""
+
+    def file_response(
+        self,
+        full_path: os.PathLike[str] | str,
+        stat_result: os.stat_result,
+        scope: Scope,
+        status_code: int = 200,
+    ) -> Response:
+        response = super().file_response(full_path, stat_result, scope, status_code)
+        file_path = Path(full_path)
+        if (
+            file_path.parent.name == "assets"
+            and _HASHED_ASSET_PATTERN.search(file_path.name) is not None
+        ):
+            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        else:
+            response.headers["Cache-Control"] = "no-cache"
+        return response
 
 
 class BootstrapRequest(BaseModel):
@@ -126,6 +152,14 @@ def create_app(
         openapi_url=None,
         lifespan=lifespan,
     )
+
+    @app.middleware("http")
+    async def prevent_api_caching(request: Request, call_next: Any) -> Response:
+        response = await call_next(request)
+        if request.url.path.startswith("/api/"):
+            response.headers["Cache-Control"] = "no-store"
+        return response
+
     app.state.workspace_instance_id = workspace_instance_id
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=[parsed.hostname])
     app.state.store = store
@@ -297,7 +331,7 @@ def create_app(
             raise ValueError("static_directory must be an existing directory")
         app.mount(
             "/",
-            StaticFiles(directory=static_directory, html=True),
+            _WorkspaceStaticFiles(directory=static_directory, html=True),
             name="workspace-ui",
         )
     return app

@@ -19,6 +19,9 @@ or unverified service on the port is rejected with an instruction to choose
 another port. Reuse does not issue a new one-use token; use the existing browser
 session or stop the original process before restarting it.
 
+The app shell is revalidated on each browser use, fingerprinted Vite assets are
+cached as immutable for one year, and all `/api/` responses use `no-store`.
+
 ## Session bootstrap
 
 The application supplies its short-lived bootstrap credential to the browser

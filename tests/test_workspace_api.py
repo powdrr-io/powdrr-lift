@@ -55,14 +55,22 @@ def test_app_serves_bundled_ui_and_keeps_api_routes_available(tmp_path: Path) ->
     (assets / "index.html").write_text(
         "<!doctype html><title>workspace</title>", encoding="utf-8"
     )
-    (assets / "assets" / "app.js").write_text(
+    (assets / "assets" / "app-12345678.js").write_text(
         "console.log('workspace')", encoding="utf-8"
     )
     client, _, _, _ = _client(tmp_path, static_directory=assets)
 
-    assert "<title>workspace</title>" in client.get("/").text
-    assert client.get("/assets/app.js").text == "console.log('workspace')"
-    assert client.get("/api/v1/health").status_code == 200
+    app_shell = client.get("/")
+    assert "<title>workspace</title>" in app_shell.text
+    assert app_shell.headers["Cache-Control"] == "no-cache"
+    hashed_asset = client.get("/assets/app-12345678.js")
+    assert hashed_asset.text == "console.log('workspace')"
+    assert (
+        hashed_asset.headers["Cache-Control"] == "public, max-age=31536000, immutable"
+    )
+    health = client.get("/api/v1/health")
+    assert health.status_code == 200
+    assert health.headers["Cache-Control"] == "no-store"
 
 
 def _sign_in(client: TestClient, secret: str) -> str:
@@ -72,6 +80,7 @@ def _sign_in(client: TestClient, secret: str) -> str:
         json={"token": secret},
     )
     assert response.status_code == 201
+    assert response.headers["Cache-Control"] == "no-store"
     return response.json()["csrf_token"]
 
 

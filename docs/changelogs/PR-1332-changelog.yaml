@@ -1,0 +1,110 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1332
+title: Measure live planning PR sizes
+intent:
+  problem: Live planning benchmarks treat any difference from the deterministic fixture's item count as a structural failure, even when each generated PR stays within the planner's allocation bounds.
+  goal: Report actual PR sizing and gate live structural acceptance on completeness and allocation limits while retaining exact fixture counts for deterministic runs.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/plans/planning-efficiency-deterministic-filtering.md
+    type: modified
+    span: {start_line: 3, end_line: 3}
+    summary: Record the latest live benchmark and explain sizing-based structural acceptance.
+    rationale: Keep the planning performance record aligned with the benchmark's new live-run criteria and observed PR sizes.
+  - path: docs/plans/planning-efficiency-deterministic-filtering.md
+    type: modified
+    span: {start_line: 359, end_line: 365}
+    summary: Distinguish deterministic fixture shape from live structural acceptance.
+    rationale: A different live item count should be evaluated by measured allocation bounds while fixture diagnostics remain visible.
+  - path: docs/plans/planning-efficiency-deterministic-filtering.md
+    type: modified
+    span: {start_line: 493, end_line: 512}
+    summary: Add concurrency-four run metrics and per-item size measurements.
+    rationale: Show the observed runtime, dependency confirmation reductions, and size bounds from the live benchmark.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 29, end_line: 31}
+    summary: Import allocation limit constants.
+    rationale: Measure accepted PR allocations against the planner's configured maximum sizes.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 33, end_line: 34}
+    summary: Import allocation and item-description types.
+    rationale: Build sizing measurements from the planner's accepted allocation groups.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 139, end_line: 158}
+    summary: Add compact item-sizing data to profile summaries.
+    rationale: Report item sizes without including per-item details in compact output.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 183, end_line: 185}
+    summary: Retain live structural and sizing status in compact output.
+    rationale: Expose the structural result and summarized item sizes to benchmark consumers.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 193, end_line: 193}
+    summary: Include the compact sizing summary in profile output.
+    rationale: Keep allocation measurements available to callers of the summary function.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 251, end_line: 334}
+    summary: Compute item-size distributions and live structural issues.
+    rationale: Assess live output against planner allocation limits while preserving deterministic shape comparisons.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 887, end_line: 891}
+    summary: Compute sizing metrics from accepted item descriptions.
+    rationale: Capture real allocation dimensions after planning compilation.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 940, end_line: 940}
+    summary: Store sizing metrics in profile reports.
+    rationale: Make measured PR sizes available in saved benchmark artifacts.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 948, end_line: 950}
+    summary: Store live structural status and issue details.
+    rationale: Explain whether the live run passed completeness and allocation-size checks.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 1117, end_line: 1117}
+    summary: Gate live benchmark exit status on structural issues.
+    rationale: Permit valid item-count variation while still failing incomplete or oversized plans.
+  - path: tests/test_benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 10, end_line: 15}
+    summary: Import allocation fixtures for item-sizing tests.
+    rationale: Exercise the sizing logic using real planner allocation objects.
+  - path: tests/test_benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 30, end_line: 31}
+    summary: Expose sizing helpers to benchmark tests.
+    rationale: Test the structural gate and measured item-size summary directly.
+  - path: tests/test_benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 83, end_line: 143}
+    summary: Test size-bound acceptance and oversized allocation diagnostics.
+    rationale: Ensure live item count may vary while configured PR-size bounds remain enforced.
+  - path: tests/test_benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 324, end_line: 341}
+    summary: Verify compact output retains sizing fields and omits item-level details.
+    rationale: Keep summaries useful without inflating them with every allocation record.
+  - path: tests/test_benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 351, end_line: 352}
+    summary: Assert compact output includes the structural status and item count.
+    rationale: Protect the summary fields consumed by benchmark reporting.
+  - path: tests/test_benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 364, end_line: 364}
+    summary: Assert compact output omits per-item diagnostic details.
+    rationale: Prevent compact benchmark output from growing with the number of planned PRs.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []
+features: []
+proposed_prs: []

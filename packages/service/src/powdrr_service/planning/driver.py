@@ -190,6 +190,8 @@ def _planned_existing_structural_subjects(
     requirement_by_id: Mapping[str, Requirement],
     projected_baseline: Mapping[str, Any],
     fallback_source_refs: Sequence[str],
+    basedpyright_symbols_by_path: Mapping[str, Sequence[Mapping[str, Any]]]
+    | None = None,
 ) -> tuple[BoundStructuralSubject, ...]:
     """Bind path-related baseline entities and relationships as candidates."""
     owners_by_path: dict[str, dict[str, set[str]]] = {}
@@ -242,6 +244,18 @@ def _planned_existing_structural_subjects(
             ):
                 entity_paths_by_id.setdefault(entity_id, set()).add(path)
     candidates: dict[str, dict[str, set[str]]] = {}
+    symbol_entity_ids_by_path = (
+        {}
+        if basedpyright_symbols_by_path is None
+        else {
+            path: _bound_entities_for_basedpyright_symbols(
+                path,
+                symbols,
+                projected_baseline=projected_baseline,
+            )
+            for path, symbols in basedpyright_symbols_by_path.items()
+        }
+    )
     for entity in entities:
         entity_id = entity.get("id")
         if not isinstance(entity_id, str):
@@ -258,6 +272,11 @@ def _planned_existing_structural_subjects(
             path_owner[candidate_path]
             for candidate_path in sorted(entity_paths)
             if candidate_path in path_owner
+            and (
+                isinstance(path, str)
+                or candidate_path not in symbol_entity_ids_by_path
+                or entity_id in symbol_entity_ids_by_path[candidate_path]
+            )
         ]
         if not related_owners:
             continue
@@ -314,6 +333,64 @@ def _planned_existing_structural_subjects(
                 )
             )
     return tuple(result)
+
+
+def _bound_entities_for_basedpyright_symbols(
+    path: str,
+    symbols: Sequence[Mapping[str, Any]],
+    *,
+    projected_baseline: Mapping[str, Any],
+) -> set[str]:
+    """Bind file-local BasedPyright declarations to indexed Structrr entities."""
+    source_subjects = projected_baseline.get("source_subjects", [])
+    if not isinstance(source_subjects, list):
+        return set()
+    module_names = {
+        str(subject["qualified_name"])
+        for subject in source_subjects
+        if isinstance(subject, Mapping)
+        and subject.get("path") == path
+        and subject.get("kind") == "module"
+        and isinstance(subject.get("qualified_name"), str)
+    }
+    matched_keys: set[tuple[str, str]] = {("module", name) for name in module_names}
+
+    def visit(items: Sequence[Mapping[str, Any]], prefix: str) -> None:
+        for symbol in items:
+            name = symbol.get("name")
+            kind = symbol.get("kind")
+            if not isinstance(name, str) or not name or not isinstance(kind, str):
+                continue
+            qualified_name = f"{prefix}.{name}" if prefix else name
+            matched_keys.add((kind, qualified_name))
+            children = symbol.get("children")
+            if isinstance(children, list):
+                visit(
+                    [child for child in children if isinstance(child, Mapping)],
+                    qualified_name,
+                )
+
+    for module_name in sorted(module_names):
+        visit(symbols, module_name)
+    matched_subject_ids = {
+        str(subject["id"])
+        for subject in source_subjects
+        if isinstance(subject, Mapping)
+        and subject.get("path") == path
+        and isinstance(subject.get("id"), str)
+        and (subject.get("kind"), subject.get("qualified_name")) in matched_keys
+    }
+    bindings = projected_baseline.get("source_bindings", [])
+    if not isinstance(bindings, list):
+        return set()
+    return {
+        str(binding["entity_id"])
+        for binding in bindings
+        if isinstance(binding, Mapping)
+        and binding.get("path") == path
+        and binding.get("subject_id") in matched_subject_ids
+        and isinstance(binding.get("entity_id"), str)
+    }
 
 
 @dataclass(frozen=True, slots=True)
@@ -1536,6 +1613,17 @@ class SourceLedgerQuestionMachine:
                         for source_ref in requirement_by_id[requirement_id].source_refs
                     )
                 )
+                item_python_paths = {
+                    write.path
+                    for unit in units
+                    for write in unit.planned_writes
+                    if write.path.casefold().endswith((".py", ".pyi"))
+                }
+                item_symbols_by_path = {
+                    path: self._structural_symbol_cache[path]
+                    for path in sorted(item_python_paths)
+                    if path in self._structural_symbol_cache
+                }
                 planned_file_subjects = _planned_file_subjects(
                     item_id,
                     units,
@@ -1549,6 +1637,7 @@ class SourceLedgerQuestionMachine:
                     requirement_by_id=requirement_by_id,
                     projected_baseline=projected,
                     fallback_source_refs=source_refs,
+                    basedpyright_symbols_by_path=item_symbols_by_path,
                 )
                 item_subjects = [*planned_file_subjects, *deterministic_subjects]
                 page_ordinal = 1
@@ -1564,16 +1653,6 @@ class SourceLedgerQuestionMachine:
                         prior_subjects=item_subjects,
                         page_ordinal=page_ordinal,
                         baseline_digest=baseline_digest,
-                        basedpyright_symbols_by_path={
-                            path: self._structural_symbol_cache[path]
-                            for path in planned_python_paths
-                            if path in self._structural_symbol_cache
-                            and any(
-                                write.path == path
-                                for unit in units
-                                for write in unit.planned_writes
-                            )
-                        },
                     )
                     answer = accepted_answers.get(
                         enumeration_request.question.question_id

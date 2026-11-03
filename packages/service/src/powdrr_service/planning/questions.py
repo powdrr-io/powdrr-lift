@@ -485,6 +485,17 @@ def run_question[AnswerT](
         except QuestionInputTooLarge:
             if last_error is None:
                 raise
+            if len(request.batch_members) > 1:
+                return _retry_split_batch_after_oversized_correction(
+                    client,
+                    request,
+                    model=model,
+                    stderr=stderr,
+                    max_transport_retries=max_transport_retries,
+                    transport_backoff_seconds=transport_backoff_seconds,
+                    use_provider_schema=use_provider_schema,
+                    prior_attempts=attempt - 1,
+                )
             assert last_error is not None
             return NeedsQuestionAnswer(
                 question=replace(request.question, attempt=attempt - 1),
@@ -576,6 +587,81 @@ def run_question[AnswerT](
         attempts=MAX_SEMANTIC_CORRECTIONS + 1,
         error=last_error,
         previous_answer=previous_answer,
+    )
+
+
+def _retry_split_batch_after_oversized_correction(
+    client: WorkflowLLMClient,
+    request: QuestionRequest[Any],
+    *,
+    model: str,
+    stderr: Any,
+    max_transport_retries: int,
+    transport_backoff_seconds: float,
+    use_provider_schema: bool,
+    prior_attempts: int,
+) -> QuestionResult[Any]:
+    """Retry a failed batch in smaller groups when its correction would overflow."""
+    members = request.batch_members
+    midpoint = len(members) // 2
+    answer_map: dict[str, Mapping[str, Any]] = {}
+    attempts = prior_attempts
+    for subset in (members[:midpoint], members[midpoint:]):
+        child_request = subset[0] if len(subset) == 1 else _build_question_batch(subset)
+        child_result = run_question(
+            client,
+            child_request,
+            model=model,
+            stderr=stderr,
+            max_transport_retries=max_transport_retries,
+            transport_backoff_seconds=transport_backoff_seconds,
+            use_provider_schema=use_provider_schema,
+        )
+        attempts += child_result.attempts
+        if isinstance(child_result, NeedsQuestionAnswer):
+            return NeedsQuestionAnswer(
+                question=replace(request.question, attempt=attempts),
+                attempts=attempts,
+                error=child_result.error,
+                previous_answer=child_result.previous_answer,
+            )
+        child_answers = (
+            child_result.raw_answer.get("answers")
+            if child_request.batch_members
+            else {child_request.question.question_id: child_result.raw_answer}
+        )
+        if not isinstance(child_answers, Mapping):
+            return NeedsQuestionAnswer(
+                question=replace(request.question, attempt=attempts),
+                attempts=attempts,
+                error=PlanningContractError(
+                    "/answers", "subdivided batch returned no answer map"
+                ),
+                previous_answer=dict(child_result.raw_answer),
+            )
+        answer_map.update(
+            {
+                question_id: dict(answer)
+                for question_id, answer in child_answers.items()
+                if isinstance(question_id, str) and isinstance(answer, Mapping)
+            }
+        )
+
+    raw_answer = {"answers": answer_map}
+    try:
+        parsed_answer = request.parse_answer(raw_answer)
+    except PlanningContractError as error:
+        return NeedsQuestionAnswer(
+            question=replace(request.question, attempt=attempts),
+            attempts=attempts,
+            error=error,
+            previous_answer=raw_answer,
+        )
+    return AcceptedQuestionAnswer(
+        question=replace(request.question, attempt=attempts),
+        attempts=attempts,
+        answer=parsed_answer,
+        raw_answer=raw_answer,
     )
 
 

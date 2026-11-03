@@ -255,6 +255,73 @@ def test_batch_question_request_preserves_each_question_schema_and_identity() ->
         batch.parse_answer({"answers": {"q-000001": _VALID_PAGE}})
 
 
+def test_oversized_batch_correction_subdivides_and_revalidates_each_member() -> None:
+    requests = tuple(
+        _request(
+            _question(
+                f"q-{index:06d}",
+                f"block-{index:02d}",
+                (f"evidence-{index:02d}",),
+            ),
+            accepted_facts=(
+                ContextRecord(f"evidence-{index:02d}", {"body": "c" * 1800}),
+            ),
+        )
+        for index in range(1, 5)
+    )
+    (batch,) = batch_question_requests(requests)
+    first_invalid_batch_answer = {
+        "answers": {
+            request.question.question_id: {
+                **_VALID_PAGE,
+                "unexpected": "x" * 3600,
+            }
+            for request in requests
+        }
+    }
+    valid_first_half = {
+        "answers": {
+            request.question.question_id: _VALID_PAGE for request in requests[:2]
+        }
+    }
+    valid_second_half = {
+        "answers": {
+            request.question.question_id: _VALID_PAGE for request in requests[2:]
+        }
+    }
+    client = _ScriptedClient(
+        {
+            ("planning_question_batch", "block-01"): [
+                first_invalid_batch_answer,
+                valid_first_half,
+            ],
+            ("planning_question_batch", "block-03"): [valid_second_half],
+        }
+    )
+
+    result = run_question(
+        client,
+        batch,
+        model="deepinfra-cheap",
+        stderr=None,
+        max_transport_retries=0,
+        transport_backoff_seconds=0,
+    )
+
+    assert not isinstance(result, NeedsQuestionAnswer)
+    assert result.question.question_id == batch.question.question_id
+    assert set(result.raw_answer["answers"]) == {
+        request.question.question_id for request in requests
+    }
+    assert result.answer == {
+        request.question.question_id: _VALID_PAGE for request in requests
+    }
+    assert client.calls == {
+        ("planning_question_batch", "block-01"): 2,
+        ("planning_question_batch", "block-03"): 1,
+    }
+
+
 def test_question_request_accepts_tagged_object_schema_and_validates_its_examples() -> (
     None
 ):

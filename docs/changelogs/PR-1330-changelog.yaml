@@ -1,0 +1,46 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1330
+title: Split oversized planning correction batches
+intent:
+  problem: A malformed answer to a batched planning question can make its correction prompt exceed the input bound, leaving the planning session blocked even when each member question fits independently.
+  goal: Subdivide the batch, retry its member questions in bounded groups, and reassemble the original validated answer without losing question identity.
+human-decisions: []
+structured_files: []
+files:
+  - path: packages/service/src/powdrr_service/planning/questions.py
+    type: modified
+    span: {start_line: 488, end_line: 498}
+    summary: Detect oversized correction prompts for multi-member planning batches and trigger subdivision.
+    rationale: Recover from correction context overflow while retaining the existing bounded behavior for individual questions.
+  - path: packages/service/src/powdrr_service/planning/questions.py
+    type: modified
+    span: {start_line: 593, end_line: 667}
+    summary: Retry smaller batch groups, collect answers by original question ID, and validate the reassembled answer.
+    rationale: Preserve member schemas and IDs while allowing oversized batch corrections to complete.
+  - path: tests/test_planning_questions.py
+    type: modified
+    span: {start_line: 258, end_line: 324}
+    summary: Exercise an oversized invalid batch response and verify successful split retries for all members.
+    rationale: Ensure subdivision resolves correction overflow without omitting or altering member answers.
+  - path: docs/plans/planning-efficiency-deterministic-filtering.md
+    type: modified
+    span: {start_line: 3, end_line: 3}
+    summary: Update the plan status with the completed live validation and remaining item-count mismatch.
+    rationale: Keep progress status aligned with measured implementation results.
+  - path: docs/plans/planning-efficiency-deterministic-filtering.md
+    type: modified
+    span: {start_line: 464, end_line: 465}
+    summary: Clarify the distinctive-token rule used by output-phrase candidate filtering.
+    rationale: Keep the documented candidate filter behavior precise.
+  - path: docs/plans/planning-efficiency-deterministic-filtering.md
+    type: modified
+    span: {start_line: 468, end_line: 490}
+    summary: Record batch subdivision, live dependency candidate counts, runtime, and the remaining plan-shape mismatch.
+    rationale: Preserve measured outcomes and distinguish candidate reduction from end-to-end latency improvement.
+entities: []
+entity_relationships: []
+invariants:
+  - id: subdivided-planning-batches-preserve-question-identity
+    description: Subdivided batch answers are reassembled and validated against the original question IDs and member parsers.
+    action: added
+guidance: []

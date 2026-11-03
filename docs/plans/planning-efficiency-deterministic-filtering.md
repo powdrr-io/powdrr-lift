@@ -1,6 +1,6 @@
 # Planning Efficiency Through Deterministic Filtering
 
-**Status:** Core reductions landed; dependency candidate precision now rejects generic repeated output labels while preserving explicit references with distinctive terms; a live validation rerun is still needed
+**Status:** Core reductions landed; dependency candidate filtering and oversized batch correction subdivision have live-run coverage; the latest large run completed in 22.2 minutes with a remaining plan-item shape mismatch
 **Date:** 2026-11-01  
 **Owner:** Powdrr-Lift planning service  
 **Related change:** [PR #1283](https://github.com/powdrr-io/powdrr-lift/pull/1283) starts deterministic Structrr candidate selection for path-bound existing subjects.
@@ -461,18 +461,33 @@ the largest call groups. The 190 dependency-confirmation calls reviewed 570
 candidates and classified all 570 as independent, making candidate precision
 the clearest next optimization target.
 
-The dependency candidate filter now requires an exact output-phrase reference
-to contain at least one token that is uncommon across planned work units. This
+The dependency candidate filter requires an exact output-phrase reference to
+contain at least one token that is uncommon across planned work units. It
 removes generic repeated labels while retaining named references, including
 phrases with only one distinctive token. Focused tests cover both behaviors and
-the existing labeled dependency-recall fixtures. The deterministic large
-profile does not emit pending outputs, so it cannot measure this filter. A live
-large rerun stopped during source-ledger extraction, before dependency
-discovery: correction context for three source blocks exceeded its input bound
-and left the ledger incomplete after 56 provider calls. Its report is saved at
-`.powdrr/benchmark-reports/planning-scale-20261103T032053788963Z.json`. This is
-not evidence about candidate reduction; rerun the live profile after the
-source-ledger input-bound issue is addressed.
+the existing labeled dependency-recall fixtures. The first live rerun stopped
+during source-ledger extraction because correction context exceeded its input
+bound. PR #1330 subdivides that batch and combines the validated member answers.
+
+The next live run completed the large profile with `deepinfra-cheap` /
+`deepseek-ai/DeepSeek-V4-Flash-0731`, concurrency 2, and a 30-second timeout. It
+took 1,329.332 seconds (22.2 minutes), made 702 provider calls, and produced 500
+requirements, 125 work units, and 55 plan items. The 55 items exceed the
+fixture target of 50, so the run is complete but does not pass the plan-shape
+check. Dependency discovery found 94 candidates across 163 pending outputs;
+all 94 were confirmed independent using 32 confirmation calls. Against the
+prior large run (570 candidates across 161 outputs and 190 confirmation
+calls), this reduced candidate pairs by 83.5% and dependency confirmation calls
+by 83.2%. The complete report is saved at
+`.powdrr/benchmark-reports/planning-scale-20261103T035520329320Z.json`.
+Provider token usage was unavailable. Hardware: Apple Silicon MacBook Air,
+arm64, Darwin 25.5.0.
+
+The lower concurrency run took 67 seconds longer end to end than the earlier
+concurrency-4 run, despite fewer total provider calls. This is not an overall
+latency improvement measurement; it demonstrates that the candidate reduction
+works on a completed live plan and that the oversized correction can recover
+without blocking source-ledger completion.
 
 ## Cross-cutting test requirements
 

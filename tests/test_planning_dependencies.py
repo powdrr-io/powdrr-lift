@@ -4,6 +4,7 @@ import hashlib
 from dataclasses import replace
 
 import pytest
+from powdrr_service.decision_classifier import _classifier_request
 from powdrr_service.planning.assembly import (
     PendingUnitOutput,
     PlannedWrite,
@@ -22,6 +23,8 @@ from powdrr_service.planning.dependencies import (
     bind_manual_setup,
     bind_unit_prerequisites,
     bind_validation,
+    build_confirmed_dependency_details_request,
+    build_dependency_candidate_review_request,
     build_dependency_confirmation_request,
     build_dependency_graph_review_requests,
     build_human_setup_description_request,
@@ -42,6 +45,7 @@ from powdrr_service.planning.dependencies import (
     parse_validation_proposal,
     parse_validation_record,
 )
+from powdrr_service.planning.questions import build_question_messages
 from powdrr_service.planning.source import (
     PinnedSourceDocument,
     Requirement,
@@ -401,6 +405,56 @@ def test_dependency_discovery_uses_reference_evidence_without_lexical_overlap() 
     )
     assert "BasedPyright found references" in question.exact_question
     assert "src/catalog.py -> src/dashboard.py" in question.exact_question
+
+
+def test_dependency_candidate_uses_jev_boolean_then_bounded_details() -> None:
+    producer = _unit("unit-producer", "req-0001")
+    consumer = _unit("unit-consumer", "req-0002")
+    output = "The generated API schema."
+    allowed = {"req-0001", "req-0002"}
+    references = ("src/api.py -> src/client.py",)
+    review = build_dependency_candidate_review_request(
+        producer,
+        consumer,
+        output,
+        allowed_requirement_ids=allowed,
+        code_reference_paths=references,
+    )
+
+    review.validate()
+    assert review.question.kind == "review_dependency_candidate"
+    assert review.answer_schema["properties"]["required"]["type"] == "boolean"
+    assert review.parse_answer({"required": True}) is True
+    assert review.parse_answer({"required": False}) is False
+    jev_request = _classifier_request(
+        build_question_messages(review), review.answer_schema
+    )
+    assert jev_request is not None
+    assert jev_request["output_property"]["type"] == "boolean"
+    assert any("reference alone" in item for item in jev_request["instructions"])
+    classifier = next(
+        fact.value
+        for fact in review.accepted_facts
+        if fact.ref_id == "dependency-candidate-classifier"
+    )
+    assert "reference alone does not prove" in classifier["instructions"][0]
+
+    details = build_confirmed_dependency_details_request(
+        producer,
+        consumer,
+        output,
+        allowed_requirement_ids=allowed,
+        candidate_review=review,
+        code_reference_paths=references,
+    )
+    details.validate()
+    confirmation = details.parse_answer(
+        {"requirement_ids": ["req-0001"], "reason": "The client consumes the schema."}
+    )
+    assert confirmation.required
+    assert confirmation.output == output
+    assert confirmation.requirement_ids == ("req-0001",)
+    assert details.question.kind == "describe_confirmed_dependency"
 
 
 def test_candidate_recall_fixture_keeps_chain_and_reviews_false_positive() -> None:

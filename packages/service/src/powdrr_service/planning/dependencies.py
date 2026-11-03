@@ -1484,6 +1484,236 @@ def build_dependency_confirmation_request(
     )
 
 
+def build_dependency_candidate_review_request(
+    producer: WorkUnit,
+    consumer: WorkUnit,
+    output: str,
+    *,
+    allowed_requirement_ids: set[str],
+    code_reference_paths: Sequence[str] = (),
+) -> QuestionRequest[bool]:
+    """Ask Jev whether one discovered producer/consumer pair is a real edge."""
+    facts = _dependency_candidate_facts(
+        producer,
+        consumer,
+        output,
+        allowed_requirement_ids=allowed_requirement_ids,
+        code_reference_paths=code_reference_paths,
+    )
+    digest = _digest(
+        {
+            "producer": producer.to_data(),
+            "consumer": consumer.to_data(),
+            "output": output,
+            "code_reference_paths": list(code_reference_paths),
+        }
+    )
+    candidate_id = digest[-12:]
+    classifier = ContextRecord(
+        "dependency-candidate-classifier",
+        {
+            "question": (
+                f"Does consumer {consumer.id} need producer {producer.id}'s named "
+                "output before it can be implemented or validated?"
+            ),
+            "instructions": [
+                "Answer true only when the consumer needs this specific producer "
+                "output as an information or artifact prerequisite. Treat paths "
+                "and references as candidate evidence; a reference alone does not "
+                "prove a dependency. Otherwise answer false."
+            ],
+            "allowed_values": ["true", "false"],
+            "criteria": {
+                "true": "The named output is required by the consumer.",
+                "false": "The named output is not required by the consumer.",
+            },
+            "subject_text": (
+                f"Producer: {producer.id}. Consumer: {consumer.id}. "
+                f"Candidate output: {output}."
+            ),
+        },
+    )
+    all_facts = (*facts, classifier)
+
+    def parse(value: Mapping[str, Any]) -> bool:
+        _exact(value, {"required"})
+        required = value["required"]
+        if not isinstance(required, bool):
+            raise PlanningContractError("/required", "must be a boolean")
+        return required
+
+    return QuestionRequest(
+        question=Question(
+            f"review-dependency-{producer.id}-{consumer.id}-{candidate_id}",
+            "review_dependency_candidate",
+            1,
+            (producer.id, consumer.id),
+            _digest({"candidate": digest, "classifier": classifier.value}),
+            tuple(item.ref_id for item in all_facts),
+            "dependency-candidate-review-v1",
+            1,
+        ),
+        exact_question=(
+            "Review this one dependency candidate. Decide only whether the consumer "
+            "requires the named producer output to make progress."
+        ),
+        answer_field_definitions={
+            "required": "Whether this specific candidate is a dependency."
+        },
+        source_excerpts=(),
+        repository_evidence=(),
+        accepted_facts=all_facts,
+        valid_example={"required": True},
+        empty_example={"required": False},
+        answer_schema={
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["required"],
+            "properties": {"required": {"type": "boolean"}},
+        },
+        parse_answer=parse,
+    )
+
+
+def build_confirmed_dependency_details_request(
+    producer: WorkUnit,
+    consumer: WorkUnit,
+    output: str,
+    *,
+    allowed_requirement_ids: set[str],
+    candidate_review: QuestionRequest[bool],
+    code_reference_paths: Sequence[str] = (),
+) -> QuestionRequest[DependencyConfirmation]:
+    """Ask the generative planner for edge explanation after Jev confirms it."""
+    facts = _dependency_candidate_facts(
+        producer,
+        consumer,
+        output,
+        allowed_requirement_ids=allowed_requirement_ids,
+        code_reference_paths=code_reference_paths,
+    )
+    review_fact = ContextRecord(
+        "jev-dependency-candidate-review",
+        {
+            "question_id": candidate_review.question.question_id,
+            "input_digest": candidate_review.question.input_digest,
+            "required": True,
+        },
+    )
+    all_facts = (*facts, review_fact)
+    digest = _digest(
+        {
+            "candidate_review_digest": candidate_review.question.input_digest,
+            "producer": producer.to_data(),
+            "consumer": consumer.to_data(),
+            "output": output,
+            "allowed_requirement_ids": sorted(allowed_requirement_ids),
+            "code_reference_paths": list(code_reference_paths),
+        }
+    )
+
+    def parse(value: Mapping[str, Any]) -> DependencyConfirmation:
+        _exact(value, {"requirement_ids", "reason"})
+        return DependencyConfirmation(
+            True,
+            output,
+            _refs(
+                value["requirement_ids"],
+                "/requirement_ids",
+                allowed_requirement_ids,
+                minimum=1,
+            ),
+            _text(value["reason"], "/reason", max_length=1_000),
+        )
+
+    return QuestionRequest(
+        question=Question(
+            f"describe-confirmed-dependency-{producer.id}-{consumer.id}-{digest[-12:]}",
+            "describe_confirmed_dependency",
+            1,
+            (producer.id, consumer.id),
+            digest,
+            tuple(item.ref_id for item in all_facts),
+            "confirmed-dependency-details-v1",
+            1,
+        ),
+        exact_question=(
+            "Jev confirmed this dependency candidate. Identify which supplied "
+            "requirements connect the producer and consumer, and briefly explain "
+            "how the consumer uses the named output. The output itself is fixed."
+        ),
+        answer_field_definitions={
+            "requirement_ids": "Supplied requirement IDs affected by this edge.",
+            "reason": "Why the consumer requires the producer output.",
+        },
+        source_excerpts=(),
+        repository_evidence=(),
+        accepted_facts=all_facts,
+        valid_example={
+            "requirement_ids": sorted(allowed_requirement_ids),
+            "reason": "The consumer uses the producer's named output.",
+        },
+        empty_example={
+            "requirement_ids": sorted(allowed_requirement_ids),
+            "reason": "The consumer uses the producer's named output.",
+        },
+        answer_schema={
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["requirement_ids", "reason"],
+            "properties": {
+                "requirement_ids": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {"type": "string"},
+                },
+                "reason": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 1_000,
+                },
+            },
+        },
+        parse_answer=parse,
+    )
+
+
+def _dependency_candidate_facts(
+    producer: WorkUnit,
+    consumer: WorkUnit,
+    output: str,
+    *,
+    allowed_requirement_ids: set[str],
+    code_reference_paths: Sequence[str],
+) -> tuple[ContextRecord, ...]:
+    if producer.id == consumer.id:
+        raise DependencyError("producer and consumer must be different units")
+    endpoint_requirement_ids = set(producer.requirement_ids) | set(
+        consumer.requirement_ids
+    )
+    if not allowed_requirement_ids <= endpoint_requirement_ids:
+        raise DependencyError("dependency question includes unrelated requirement IDs")
+    return (
+        ContextRecord(f"producer:{producer.id}", producer.to_data()),
+        ContextRecord(f"consumer:{consumer.id}", consumer.to_data()),
+        ContextRecord("candidate-output", {"description": output}),
+        ContextRecord(
+            "candidate-requirements",
+            {"requirement_ids": sorted(allowed_requirement_ids)},
+        ),
+        *(
+            (
+                ContextRecord(
+                    "basedpyright-reference-paths",
+                    {"producer_to_consumer": list(code_reference_paths)},
+                ),
+            )
+            if code_reference_paths
+            else ()
+        ),
+    )
+
+
 def build_dependency_graph_review_requests(
     units: Sequence[WorkUnit],
     pending_outputs: Sequence[PendingUnitOutput],

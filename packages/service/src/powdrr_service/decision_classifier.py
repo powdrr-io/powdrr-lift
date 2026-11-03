@@ -360,6 +360,7 @@ class JevSemanticClassifierClient(_DecisionApiSemanticClassifierClient):
     default_model = JEV_MODEL
     default_endpoint = JEV_DEFAULT_BASE_URL
     fallback_on_error = False
+    max_batch_size = 8
 
     def __init__(
         self,
@@ -411,8 +412,8 @@ class JevSemanticClassifierClient(_DecisionApiSemanticClassifierClient):
                 )
             )
 
-        for offset in range(0, len(pending), 8):
-            batch = pending[offset : offset + 8]
+        for offset in range(0, len(pending), self.max_batch_size):
+            batch = pending[offset : offset + self.max_batch_size]
             self._execute_batch(batch)
             for item in batch:
                 results[item.result_index] = item.future.result()

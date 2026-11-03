@@ -303,13 +303,16 @@ def test_compact_summary_omits_large_shape_diagnostics_but_keeps_run_metrics() -
         "provider_requests": 1200,
         "validation_retries": 4,
         "phases": {
-            "confirm_dependency": {
+            "dependency-and-pr-slicing": {
                 "questions": 600,
                 "api_calls": 150,
                 "elapsed_ms": 4_200,
             }
         },
-        "by_question_kind": {"confirm_dependency": {"questions": 600}},
+        "by_question_kind": {
+            "review_dependency_candidate": {"questions": 600},
+            "describe_confirmed_dependency": {"questions": 400},
+        },
         "dependency_candidates": {
             "output_consumer_candidate_count": 600,
             "confirmation_answer_count": 590,
@@ -350,7 +353,7 @@ def test_compact_summary_omits_large_shape_diagnostics_but_keeps_run_metrics() -
     assert summary["plan_items"] == 57
     assert summary["live_structural_status"] == "passed"
     assert summary["item_sizing"]["item_count"] == 57
-    assert summary["phases"]["confirm_dependency"] == {
+    assert summary["phases"]["dependency-and-pr-slicing"] == {
         "questions": 600,
         "api_calls": 150,
         "provider_call_elapsed_ms": 4_200,
@@ -455,10 +458,11 @@ def test_live_report_includes_dependency_candidate_and_confirmation_counts() -> 
 
     class DependencyAnswerClient(example_answer_client):
         def _answer(self, packet: Any) -> dict[str, Any]:
-            if packet["exact_question"]["kind"] == "confirm_dependency":
+            kind = packet["exact_question"]["kind"]
+            if kind == "review_dependency_candidate":
+                return {"required": True}
+            if kind == "describe_confirmed_dependency":
                 return {
-                    "result": "required",
-                    "output": "The operation response contract.",
                     "requirement_ids": ["req-0001"],
                     "reason": "The consumer uses the producer response contract.",
                 }

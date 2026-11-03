@@ -1180,7 +1180,7 @@ def build_item_description_request(
     selected = [units[unit_id] for unit_id in group.unit_ids]
     accepted = tuple(ContextRecord(unit.id, unit.to_data()) for unit in selected)
     context_ids = tuple(record.ref_id for record in accepted)
-    title_review_facts = (
+    title_review_facts: tuple[ContextRecord, ...] = (
         ContextRecord(
             "prior-item-titles",
             {"titles": [title for _item_id, title in already_used_titles]},

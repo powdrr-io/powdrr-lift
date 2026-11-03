@@ -16,6 +16,7 @@ from powdrr_service.planning.assembly import (
     AllocationGroup,
     ItemDescription,
     PathFact,
+    PendingUnitOutput,
     WorkUnit,
     WorkUnitContext,
     WorkUnitProposal,
@@ -46,7 +47,8 @@ from powdrr_service.planning.dependencies import (
     UnitDependencyEdge,
     Validation,
     bind_manual_setup,
-    build_dependency_confirmation_request,
+    build_confirmed_dependency_details_request,
+    build_dependency_candidate_review_request,
     build_human_setup_description_request,
     compile_dependency_graph,
     discover_dependency_candidates,
@@ -542,7 +544,8 @@ class SourceLedgerQuestionMachine:
         if self._max_question_frontier is not None:
             requests = requests[: self._max_question_frontier]
         if requests and all(
-            request.question.kind == "review_structural_candidate"
+            request.question.kind
+            in {"review_structural_candidate", "review_dependency_candidate"}
             for request in requests
         ):
             return tuple(requests)
@@ -587,6 +590,7 @@ class SourceLedgerQuestionMachine:
                     search, pinned_commit=self.source.document.commit_sha
                 ):
                     continue
+                assert search is not None
                 answer = {
                     "status": "missing",
                     "evidence_ids": [],
@@ -843,7 +847,7 @@ class SourceLedgerQuestionMachine:
                 downstream_requests.append(request)
 
         for request in self._dependency_requests(accepted_answers):
-            if request.question.question_id not in accepted_answers:
+            if self._request_is_pending(request, accepted_answers):
                 downstream_requests.append(request)
         if downstream_requests:
             return self._batch_requests(downstream_requests)
@@ -1308,21 +1312,102 @@ class SourceLedgerQuestionMachine:
     ) -> tuple[QuestionRequest[Any], ...]:
         allocation, discovery = self._dependency_discovery(accepted_answers)
         units = {unit.id: unit for unit in allocation.units}
-        requests: list[QuestionRequest[Any]] = []
+        pairs: list[
+            tuple[
+                PendingUnitOutput,
+                WorkUnit,
+                WorkUnit,
+                QuestionRequest[bool],
+                set[str],
+                tuple[str, ...],
+            ]
+        ] = []
+        pending_reviews: list[QuestionRequest[Any]] = []
         for pending_output, consumer in discovery.confirmation_pairs:
             producer = units[pending_output.unit_id]
-            requests.append(
-                build_dependency_confirmation_request(
-                    producer,
+            allowed_requirement_ids = set(producer.requirement_ids) | set(
+                consumer.requirement_ids
+            )
+            code_reference_paths = tuple(
+                discovery.code_reference_paths.get((producer.id, consumer.id), ())
+            )
+            review = build_dependency_candidate_review_request(
+                producer,
+                consumer,
+                pending_output.description,
+                allowed_requirement_ids=allowed_requirement_ids,
+                code_reference_paths=code_reference_paths,
+            )
+            pairs.append(
+                (
+                    pending_output,
                     consumer,
-                    pending_output.description,
-                    allowed_requirement_ids=set(producer.requirement_ids)
-                    | set(consumer.requirement_ids),
-                    code_reference_paths=discovery.code_reference_paths.get(
-                        (producer.id, consumer.id), ()
-                    ),
+                    producer,
+                    review,
+                    allowed_requirement_ids,
+                    code_reference_paths,
                 )
             )
+            answer = accepted_answers.get(review.question.question_id)
+            if answer is not None and (
+                self._accepted_question_input_digests is not None
+                and self._accepted_question_input_digests.get(
+                    review.question.question_id
+                )
+                != review.question.input_digest
+            ):
+                self._invalid_accepted_question_ids.add(review.question.question_id)
+                answer = None
+            if answer is None:
+                pending_reviews.append(review)
+                continue
+            try:
+                review.parse_answer(answer)
+            except PlanningContractError:
+                self._invalid_accepted_question_ids.add(review.question.question_id)
+                pending_reviews.append(review)
+        if pending_reviews:
+            return self._batch_requests(pending_reviews)
+
+        requests: list[QuestionRequest[Any]] = []
+        for (
+            pending_output,
+            consumer,
+            producer,
+            review,
+            allowed_ids,
+            reference_paths,
+        ) in pairs:
+            if not review.parse_answer(accepted_answers[review.question.question_id]):
+                continue
+            details = build_confirmed_dependency_details_request(
+                producer,
+                consumer,
+                pending_output.description,
+                allowed_requirement_ids=allowed_ids,
+                candidate_review=review,
+                code_reference_paths=reference_paths,
+            )
+            answer = accepted_answers.get(details.question.question_id)
+            if answer is not None and (
+                self._accepted_question_input_digests is not None
+                and self._accepted_question_input_digests.get(
+                    details.question.question_id
+                )
+                != details.question.input_digest
+            ):
+                self._invalid_accepted_question_ids.add(details.question.question_id)
+                answer = None
+            if answer is not None:
+                try:
+                    details.parse_answer(answer)
+                except PlanningContractError:
+                    self._invalid_accepted_question_ids.add(
+                        details.question.question_id
+                    )
+                    answer = None
+            if answer is None:
+                requests.append(details)
         return tuple(requests)
 
     def accepted_dependency_edges(
@@ -1333,30 +1418,41 @@ class SourceLedgerQuestionMachine:
         edges = list(discovery.write_order_edges)
         for pending_output, consumer in discovery.confirmation_pairs:
             producer = units[pending_output.unit_id]
-            request = build_dependency_confirmation_request(
+            allowed_requirement_ids = set(producer.requirement_ids) | set(
+                consumer.requirement_ids
+            )
+            code_reference_paths = tuple(
+                discovery.code_reference_paths.get((producer.id, consumer.id), ())
+            )
+            review = build_dependency_candidate_review_request(
                 producer,
                 consumer,
                 pending_output.description,
-                allowed_requirement_ids=set(producer.requirement_ids)
-                | set(consumer.requirement_ids),
-                code_reference_paths=discovery.code_reference_paths.get(
-                    (producer.id, consumer.id), ()
-                ),
+                allowed_requirement_ids=allowed_requirement_ids,
+                code_reference_paths=code_reference_paths,
+            )
+            if not review.parse_answer(accepted_answers[review.question.question_id]):
+                continue
+            request = build_confirmed_dependency_details_request(
+                producer,
+                consumer,
+                pending_output.description,
+                allowed_requirement_ids=allowed_requirement_ids,
+                candidate_review=review,
+                code_reference_paths=code_reference_paths,
             )
             answer = request.parse_answer(
                 accepted_answers[request.question.question_id]
             )
-            if answer.required:
-                assert answer.output is not None
-                edges.append(
-                    UnitDependencyEdge(
-                        producer.id,
-                        consumer.id,
-                        answer.output,
-                        answer.reason,
-                        answer.requirement_ids,
-                    )
+            edges.append(
+                UnitDependencyEdge(
+                    producer.id,
+                    consumer.id,
+                    answer.output or pending_output.description,
+                    answer.reason,
+                    answer.requirement_ids,
                 )
+            )
         return tuple(edges)
 
     def _dependency_discovery(
@@ -1804,7 +1900,7 @@ class SourceLedgerQuestionMachine:
                         pending_enumerations.append(enumeration_request)
                         break
                     item_pages.append(page)
-                    item_subjects = list(
+                    item_subjects = tuple(
                         coalesce_structural_subjects((*item_subjects, *page.records))
                     )
                     if not page.has_more:

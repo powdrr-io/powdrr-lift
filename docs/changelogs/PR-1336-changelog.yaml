@@ -1,0 +1,145 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1336
+title: Bind Structrr candidates from BasedPyright symbols
+intent:
+  problem: Path-based Structrr planning seeds every baseline entity associated with a planned file and still frames model review as broad enumeration, despite a pinned BasedPyright symbol inventory being available.
+  goal: Match current declarations to baseline source subjects and entity bindings, deterministically seed only supported symbol candidates and their existing relationships, then ask the model only for additional subjects.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/plans/planning-efficiency-deterministic-filtering.md
+    type: modified
+    span: {start_line: 63, end_line: 73}
+    summary: Record deterministic symbol-to-baseline candidate binding and compact resume inputs.
+    rationale: Keep the planning-efficiency sequence aligned with the implementation.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 193, end_line: 194}
+    summary: Accept BasedPyright symbol results in path-bound candidate construction.
+    rationale: Use the already queried pinned symbols when binding planned-path candidates.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 247, end_line: 258}
+    summary: Derive matched entity IDs from path-scoped symbols.
+    rationale: Restrict source-binding candidates to declarations present in the analyzed file.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 275, end_line: 279}
+    summary: Filter path-bound entities through matched symbol bindings.
+    rationale: Avoid seeding unrelated entities linked to the same file.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 338, end_line: 395}
+    summary: Match nested BasedPyright declarations to baseline source subjects by qualified name and kind, then resolve their bound entity IDs.
+    rationale: Make static symbol evidence produce deterministic Structrr candidates without asking the model to rediscover known identities.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 1616, end_line: 1626}
+    summary: Scope symbol results to each item's planned Python write paths before candidate binding.
+    rationale: Keep candidate selection local to the allocated work item.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 1640, end_line: 1640}
+    summary: Pass item-scoped symbols into deterministic candidate construction.
+    rationale: Keep unplanned files and unrelated symbols out of the candidate set.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 1567, end_line: 1576}
+    summary: Remove raw symbol payloads from the additional-subject request.
+    rationale: Digest the actual deterministic candidate records rather than sending redundant symbol trees to the model.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 563, end_line: 564}
+    summary: Remove raw symbol trees from the enumeration context.
+    rationale: Candidate records are already bound in code; copying the full inventory would inflate prompts.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 631, end_line: 631}
+    summary: Keep the additional-subject facts compact after removing raw symbol context.
+    rationale: Retain bounded enumeration inputs while deterministic candidates stay digest-bound.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 704, end_line: 706}
+    summary: Include selected candidate records in the question input digest through prior subjects.
+    rationale: Ensure resume detects candidate changes without hashing irrelevant raw symbols into the prompt context.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 685, end_line: 691}
+    summary: Ask for additional structural subjects beyond path-bound candidates already selected.
+    rationale: Reserve semantic discovery for identities not already deterministically bound.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 693, end_line: 694}
+    summary: Keep the additional-subject prompt from inferring relationships from shared paths or names.
+    rationale: Preserve explicit evidence requirements after narrowing the model's role.
+  - path: src/powdrr_lift/basedpyright_tools.py
+    type: modified
+    span: {start_line: 22, end_line: 22}
+    summary: Raise the bounded per-file symbol limit to 4,096.
+    rationale: A real query against the planning driver exceeded the prior 512-symbol limit; the larger cap remains explicit and bounded.
+  - path: tests/test_planning_service.py
+    type: modified
+    span: {start_line: 1191, end_line: 1191}
+    summary: Add a module candidate to the symbol-binding fixture.
+    rationale: Cover deterministic binding for the module declaration.
+  - path: tests/test_planning_service.py
+    type: modified
+    span: {start_line: 1193, end_line: 1193}
+    summary: Add an unrelated same-file function candidate to the fixture.
+    rationale: Prove the symbol inventory excludes unselected declarations in the same path.
+  - path: tests/test_planning_service.py
+    type: modified
+    span: {start_line: 1197, end_line: 1204}
+    summary: Add source-subject metadata for module, function, and unrelated helper declarations.
+    rationale: Exercise qualified-name and kind matching against the Structrr index.
+  - path: tests/test_planning_service.py
+    type: modified
+    span: {start_line: 1208, end_line: 1209}
+    summary: Add source binding records for the known declarations.
+    rationale: Verify candidate entity IDs resolve through explicit baseline bindings.
+  - path: tests/test_planning_service.py
+    type: modified
+    span: {start_line: 1212, end_line: 1220}
+    summary: Add a relationship owned by the unrelated helper candidate.
+    rationale: Ensure relationships touching filtered symbols are also excluded.
+  - path: tests/test_planning_service.py
+    type: modified
+    span: {start_line: 1224, end_line: 1238}
+    summary: Add source-subject entity bindings for parse, module, and helper symbols.
+    rationale: Exercise the deterministic mapping from BasedPyright declarations to Structrr entities.
+  - path: tests/test_planning_service.py
+    type: modified
+    span: {start_line: 1252, end_line: 1256}
+    summary: Supply a BasedPyright function symbol to the path-bound candidate test.
+    rationale: Test the actual static-symbol matching path.
+  - path: tests/test_planning_service.py
+    type: modified
+    span: {start_line: 1266, end_line: 1268}
+    summary: Assert only the matched module, function, and related relationship are candidates.
+    rationale: Protect deterministic relevance filtering and relationship ownership.
+  - path: tests/test_planning_service.py
+    type: modified
+    span: {start_line: 1272, end_line: 1272}
+    summary: Assert each selected subject remains assigned to its owning work unit.
+    rationale: Preserve candidate provenance after static filtering.
+  - path: tests/test_planning_structrr.py
+    type: modified
+    span: {start_line: 723, end_line: 723}
+    summary: Assert previously selected deterministic candidates are absent from the additional-subject baseline.
+    rationale: Ensure the model does not re-enumerate identities already bound to planned paths.
+  - path: tests/test_planning_structrr.py
+    type: modified
+    span: {start_line: 726, end_line: 726}
+    summary: Remove the raw symbol-inventory prompt test after moving evidence binding into deterministic candidate construction.
+    rationale: Keep the test focused on the compact additional-subject contract.
+  - path: tests/test_planning_structrr.py
+    type: modified
+    span: {start_line: 728, end_line: 729}
+    summary: Keep the compact additional-subject test adjacent to its pagination coverage.
+    rationale: Preserve focused coverage for the remaining semantic discovery path.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []
+features: []
+proposed_prs: []

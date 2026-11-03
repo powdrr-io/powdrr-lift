@@ -4,6 +4,28 @@
     {
       "extraction_pr": "8",
       "internal_imports": [],
+      "kind": "python_module",
+      "owner": "agent",
+      "path": "packages/agent/src/powdrr_agent/artifact_state.py",
+      "rationale": "commit-pinned Git source and provenance collection for artifact inspection",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [
+        "powdrr_service.changelog",
+        "powdrr_service.planning.plan_document",
+        "powdrr_service.planning.plan_models"
+      ],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/artifact_state.py",
+      "rationale": "artifact-state reconstruction and projection policy over supplied snapshot evidence",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [],
       "kind": "resource",
       "owner": "service",
       "path": "packages/service/src/powdrr_service/resources/processes/address-review-comments.yaml",
@@ -850,19 +872,6 @@
       "reviewed": false
     },
     {
-      "extraction_pr": "3/8",
-      "internal_imports": [
-        "powdrr_lift.core.index",
-        "powdrr_lift.workrr.github_issue_queue",
-        "powdrr_service.changelog"
-      ],
-      "kind": "python_module",
-      "owner": "split",
-      "path": "src/powdrr_lift/artifact_state.py",
-      "rationale": "classify public transport types versus private policy",
-      "reviewed": false
-    },
-    {
       "extraction_pr": "3/6",
       "internal_imports": [
         "powdrr_lift.builtin_tool_help",
@@ -947,7 +956,6 @@
       "internal_imports": [
         "powdrr_lift.agent_bootstrap",
         "powdrr_lift.agent_feature",
-        "powdrr_lift.artifact_state",
         "powdrr_lift.blame_ui",
         "powdrr_lift.core",
         "powdrr_lift.core.capability_exception",

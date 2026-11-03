@@ -1,0 +1,433 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1331
+title: Move artifact state inspection into the service
+intent:
+  problem: Artifact state outside workflow inspection still bypassed the agent/service
+    boundary, and the service imported the legacy projection from the agent application
+    package.
+  goal: Collect pinned source files and Git provenance in the agent, then reconstruct
+    every selected artifact-state area through the serialized service operation.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/architecture/agent-service-legacy-import-allowlist.json
+  type: modified
+  span:
+    start_line: 4
+    end_line: 8
+  summary: Remove the artifact-state service-to-agent migration import.
+  rationale: The service now owns artifact-state reconstruction.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 4
+    end_line: 25
+  summary: Assign artifact source collection to the agent and projection policy to
+    the service.
+  rationale: Keep the ownership inventory aligned with the extracted boundary.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 852
+    end_line: 864
+  summary: Assign artifact source collection to the agent and projection policy to
+    the service.
+  rationale: Keep the ownership inventory aligned with the extracted boundary.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 950
+    end_line: 950
+  summary: Assign artifact source collection to the agent and projection policy to
+    the service.
+  rationale: Keep the ownership inventory aligned with the extracted boundary.
+- path: docs/plans/agent-service-code-split.md
+  type: modified
+  span:
+    start_line: 518
+    end_line: 522
+  summary: Record service ownership of all artifact-state areas.
+  rationale: Keep the staged split plan aligned with completed work.
+- path: packages/agent/src/powdrr_agent/artifact_state.py
+  type: modified
+  span:
+    start_line: 1
+    end_line: 1
+  summary: Collect selected commit-pinned source files and per-file Git provenance.
+  rationale: Keep repository access in the agent while supplying service reconstruction
+    evidence.
+- path: packages/agent/src/powdrr_agent/artifact_state.py
+  type: modified
+  span:
+    start_line: 7
+    end_line: 7
+  summary: Collect selected commit-pinned source files and per-file Git provenance.
+  rationale: Keep repository access in the agent while supplying service reconstruction
+    evidence.
+- path: packages/agent/src/powdrr_agent/artifact_state.py
+  type: modified
+  span:
+    start_line: 22
+    end_line: 22
+  summary: Collect selected commit-pinned source files and per-file Git provenance.
+  rationale: Keep repository access in the agent while supplying service reconstruction
+    evidence.
+- path: packages/agent/src/powdrr_agent/artifact_state.py
+  type: modified
+  span:
+    start_line: 29
+    end_line: 30
+  summary: Collect selected commit-pinned source files and per-file Git provenance.
+  rationale: Keep repository access in the agent while supplying service reconstruction
+    evidence.
+- path: packages/agent/src/powdrr_agent/artifact_state.py
+  type: modified
+  span:
+    start_line: 32
+    end_line: 32
+  summary: Collect selected commit-pinned source files and per-file Git provenance.
+  rationale: Keep repository access in the agent while supplying service reconstruction
+    evidence.
+- path: packages/agent/src/powdrr_agent/artifact_state.py
+  type: modified
+  span:
+    start_line: 47
+    end_line: 62
+  summary: Collect selected commit-pinned source files and per-file Git provenance.
+  rationale: Keep repository access in the agent while supplying service reconstruction
+    evidence.
+- path: packages/agent/src/powdrr_agent/artifact_state.py
+  type: modified
+  span:
+    start_line: 64
+    end_line: 64
+  summary: Collect selected commit-pinned source files and per-file Git provenance.
+  rationale: Keep repository access in the agent while supplying service reconstruction
+    evidence.
+- path: packages/agent/src/powdrr_agent/artifact_state.py
+  type: modified
+  span:
+    start_line: 72
+    end_line: 75
+  summary: Collect selected commit-pinned source files and per-file Git provenance.
+  rationale: Keep repository access in the agent while supplying service reconstruction
+    evidence.
+- path: packages/agent/src/powdrr_agent/artifact_state.py
+  type: modified
+  span:
+    start_line: 60
+    end_line: 60
+  summary: Collect selected commit-pinned source files and per-file Git provenance.
+  rationale: Keep repository access in the agent while supplying service reconstruction
+    evidence.
+- path: packages/agent/src/powdrr_agent/artifact_state.py
+  type: modified
+  span:
+    start_line: 87
+    end_line: 87
+  summary: Collect selected commit-pinned source files and per-file Git provenance.
+  rationale: Keep repository access in the agent while supplying service reconstruction
+    evidence.
+- path: packages/agent/src/powdrr_agent/artifact_state.py
+  type: modified
+  span:
+    start_line: 94
+    end_line: 97
+  summary: Collect selected commit-pinned source files and per-file Git provenance.
+  rationale: Keep repository access in the agent while supplying service reconstruction
+    evidence.
+- path: packages/agent/src/powdrr_agent/artifact_state.py
+  type: modified
+  span:
+    start_line: 104
+    end_line: 144
+  summary: Collect selected commit-pinned source files and per-file Git provenance.
+  rationale: Keep repository access in the agent while supplying service reconstruction
+    evidence.
+- path: packages/service/src/powdrr_service/artifact_state.py
+  type: modified
+  span:
+    start_line: 1
+    end_line: 784
+  summary: Own reconstruction for bootstrap, entities, relationships, workflows, plans,
+    changelogs, and pull requests.
+  rationale: Keep artifact projection and attachment policy in the service.
+- path: packages/service/src/powdrr_service/local_service.py
+  type: modified
+  span:
+    start_line: 71
+    end_line: 75
+  summary: Reconstruct selected artifact-state areas from supplied snapshots.
+  rationale: Route inspection through the service without access to the agent repository.
+- path: packages/service/src/powdrr_service/local_service.py
+  type: modified
+  span:
+    start_line: 78
+    end_line: 79
+  summary: Reconstruct selected artifact-state areas from supplied snapshots.
+  rationale: Route inspection through the service without access to the agent repository.
+- path: packages/service/src/powdrr_service/local_service.py
+  type: modified
+  span:
+    start_line: 82
+    end_line: 82
+  summary: Reconstruct selected artifact-state areas from supplied snapshots.
+  rationale: Route inspection through the service without access to the agent repository.
+- path: packages/service/src/powdrr_service/local_service.py
+  type: modified
+  span:
+    start_line: 86
+    end_line: 86
+  summary: Reconstruct selected artifact-state areas from supplied snapshots.
+  rationale: Route inspection through the service without access to the agent repository.
+- path: packages/service/src/powdrr_service/local_service.py
+  type: modified
+  span:
+    start_line: 91
+    end_line: 93
+  summary: Reconstruct selected artifact-state areas from supplied snapshots.
+  rationale: Route inspection through the service without access to the agent repository.
+- path: packages/service/src/powdrr_service/local_service.py
+  type: modified
+  span:
+    start_line: 96
+    end_line: 100
+  summary: Reconstruct selected artifact-state areas from supplied snapshots.
+  rationale: Route inspection through the service without access to the agent repository.
+- path: packages/service/src/powdrr_service/local_service.py
+  type: modified
+  span:
+    start_line: 582
+    end_line: 582
+  summary: Reconstruct selected artifact-state areas from supplied snapshots.
+  rationale: Route inspection through the service without access to the agent repository.
+- path: packages/service/src/powdrr_service/local_service.py
+  type: modified
+  span:
+    start_line: 587
+    end_line: 587
+  summary: Reconstruct selected artifact-state areas from supplied snapshots.
+  rationale: Route inspection through the service without access to the agent repository.
+- path: packages/service/src/powdrr_service/local_service.py
+  type: modified
+  span:
+    start_line: 590
+    end_line: 601
+  summary: Reconstruct selected artifact-state areas from supplied snapshots.
+  rationale: Route inspection through the service without access to the agent repository.
+- path: packages/service/src/powdrr_service/local_service.py
+  type: modified
+  span:
+    start_line: 608
+    end_line: 610
+  summary: Reconstruct selected artifact-state areas from supplied snapshots.
+  rationale: Route inspection through the service without access to the agent repository.
+- path: scripts/build-agent-service-ownership-inventory.py
+  type: modified
+  span:
+    start_line: 16
+    end_line: 29
+  summary: Classify the service projection module and agent evidence collector.
+  rationale: Keep future ownership inventory generation consistent with the split.
+- path: scripts/build-agent-service-ownership-inventory.py
+  type: modified
+  span:
+    start_line: 355
+    end_line: 356
+  summary: Classify the service projection module and agent evidence collector.
+  rationale: Keep future ownership inventory generation consistent with the split.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 21
+    end_line: 24
+  summary: Route artifact-state CLI options through agent collection and the serialized
+    service bridge.
+  rationale: Preserve the CLI while removing direct calls into legacy reconstruction
+    policy.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 75
+    end_line: 75
+  summary: Route artifact-state CLI options through agent collection and the serialized
+    service bridge.
+  rationale: Preserve the CLI while removing direct calls into legacy reconstruction
+    policy.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 5052
+    end_line: 5077
+  summary: Route artifact-state CLI options through agent collection and the serialized
+    service bridge.
+  rationale: Preserve the CLI while removing direct calls into legacy reconstruction
+    policy.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 5056
+    end_line: 5056
+  summary: Route artifact-state CLI options through agent collection and the serialized
+    service bridge.
+  rationale: Preserve the CLI while removing direct calls into legacy reconstruction
+    policy.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 5060
+    end_line: 5061
+  summary: Route artifact-state CLI options through agent collection and the serialized
+    service bridge.
+  rationale: Preserve the CLI while removing direct calls into legacy reconstruction
+    policy.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 5063
+    end_line: 5063
+  summary: Route artifact-state CLI options through agent collection and the serialized
+    service bridge.
+  rationale: Preserve the CLI while removing direct calls into legacy reconstruction
+    policy.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 5065
+    end_line: 5066
+  summary: Route artifact-state CLI options through agent collection and the serialized
+    service bridge.
+  rationale: Preserve the CLI while removing direct calls into legacy reconstruction
+    policy.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 5069
+    end_line: 5077
+  summary: Route artifact-state CLI options through agent collection and the serialized
+    service bridge.
+  rationale: Preserve the CLI while removing direct calls into legacy reconstruction
+    policy.
+- path: tests/test_agent_service_artifact_state_e2e.py
+  type: modified
+  span:
+    start_line: 10
+    end_line: 10
+  summary: Cover plan attachment and changelog entity projections through the service
+    path.
+  rationale: Verify selected-area reconstruction and pinned changelog provenance end
+    to end.
+- path: tests/test_agent_service_artifact_state_e2e.py
+  type: modified
+  span:
+    start_line: 27
+    end_line: 29
+  summary: Cover plan attachment and changelog entity projections through the service
+    path.
+  rationale: Verify selected-area reconstruction and pinned changelog provenance end
+    to end.
+- path: tests/test_agent_service_artifact_state_e2e.py
+  type: modified
+  span:
+    start_line: 47
+    end_line: 50
+  summary: Cover plan attachment and changelog entity projections through the service
+    path.
+  rationale: Verify selected-area reconstruction and pinned changelog provenance end
+    to end.
+- path: tests/test_agent_service_artifact_state_e2e.py
+  type: modified
+  span:
+    start_line: 58
+    end_line: 58
+  summary: Cover plan attachment and changelog entity projections through the service
+    path.
+  rationale: Verify selected-area reconstruction and pinned changelog provenance end
+    to end.
+- path: tests/test_agent_service_artifact_state_e2e.py
+  type: modified
+  span:
+    start_line: 64
+    end_line: 64
+  summary: Cover plan attachment and changelog entity projections through the service
+    path.
+  rationale: Verify selected-area reconstruction and pinned changelog provenance end
+    to end.
+- path: tests/test_agent_service_artifact_state_e2e.py
+  type: modified
+  span:
+    start_line: 115
+    end_line: 201
+  summary: Cover plan attachment and changelog entity projections through the service
+    path.
+  rationale: Verify selected-area reconstruction and pinned changelog provenance end
+    to end.
+- path: tests/test_agent_service_artifact_state_e2e.py
+  type: modified
+  span:
+    start_line: 204
+    end_line: 210
+  summary: Cover plan attachment and changelog entity projections through the service
+    path.
+  rationale: Verify selected-area reconstruction and pinned changelog provenance end
+    to end.
+- path: tests/test_agent_service_artifact_state_e2e.py
+  type: modified
+  span:
+    start_line: 223
+    end_line: 223
+  summary: Cover plan attachment and changelog entity projections through the service
+    path.
+  rationale: Verify selected-area reconstruction and pinned changelog provenance end
+    to end.
+- path: tests/test_agent_service_artifact_state_e2e.py
+  type: modified
+  span:
+    start_line: 229
+    end_line: 229
+  summary: Cover plan attachment and changelog entity projections through the service
+    path.
+  rationale: Verify selected-area reconstruction and pinned changelog provenance end
+    to end.
+- path: tests/test_agent_service_artifact_state_e2e.py
+  type: modified
+  span:
+    start_line: 253
+    end_line: 253
+  summary: Cover plan attachment and changelog entity projections through the service
+    path.
+  rationale: Verify selected-area reconstruction and pinned changelog provenance end
+    to end.
+- path: tests/test_agent_service_artifact_state_e2e.py
+  type: modified
+  span:
+    start_line: 259
+    end_line: 259
+  summary: Cover plan attachment and changelog entity projections through the service
+    path.
+  rationale: Verify selected-area reconstruction and pinned changelog provenance end
+    to end.
+- path: tests/test_agent_service_artifact_state_e2e.py
+  type: modified
+  span:
+    start_line: 265
+    end_line: 271
+  summary: Cover plan attachment and changelog entity projections through the service
+    path.
+  rationale: Verify selected-area reconstruction and pinned changelog provenance end
+    to end.
+- path: tests/test_agent_service_artifact_state_e2e.py
+  type: modified
+  span:
+    start_line: 287
+    end_line: 293
+  summary: Cover plan attachment and changelog entity projections through the service
+    path.
+  rationale: Verify selected-area reconstruction and pinned changelog provenance end
+    to end.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []
+features: []
+proposed_prs: []

@@ -24,14 +24,9 @@ files:
     rationale: Explain where the full report is stored and what the terminal output contains.
   - path: docs/plans/planning-efficiency-deterministic-filtering.md
     type: modified
-    span: {start_line: 442, end_line: 453}
+    span: {start_line: 442, end_line: 462}
     summary: Record large-run timing, call counts, completion status, and 58-versus-50 item shape mismatch.
-    rationale: Separate measured execution from a planning-quality pass.
-  - path: docs/plans/planning-efficiency-deterministic-filtering.md
-    type: modified
-    span: {start_line: 454, end_line: 459}
-    summary: Record phase call totals and the low precision of dependency candidates.
-    rationale: Identify dependency confirmation as a concrete optimization target.
+    rationale: Separate measured execution from a planning-quality pass and identify dependency confirmation as a cost target.
   - path: scripts/benchmark_planning_scale.py
     type: modified
     span: {start_line: 23, end_line: 23}
@@ -59,12 +54,12 @@ files:
     rationale: Avoid emitting one progress line per request on large runs.
   - path: scripts/benchmark_planning_scale.py
     type: modified
-    span: {start_line: 384, end_line: 384}
+    span: {start_line: 276, end_line: 280}
     summary: Remove per-request start messages from live benchmark output.
     rationale: Keep console output bounded while preserving periodic progress.
   - path: scripts/benchmark_planning_scale.py
     type: modified
-    span: {start_line: 399, end_line: 402}
+    span: {start_line: 399, end_line: 408}
     summary: Emit one progress message every 25 completed calls.
     rationale: Provide progress without flooding terminal output.
   - path: scripts/benchmark_planning_scale.py
@@ -79,7 +74,7 @@ files:
     rationale: Make artifact path behavior predictable from any working directory.
   - path: scripts/benchmark_planning_scale.py
     type: modified
-    span: {start_line: 987, end_line: 991}
+    span: {start_line: 987, end_line: 994}
     summary: Write the full report and print only its compact summary.
     rationale: Ensure completed and shape-mismatched runs both retain complete diagnostics without dumping them to stdout.
   - path: tests/test_benchmark_planning_scale.py

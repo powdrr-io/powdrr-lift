@@ -8,6 +8,7 @@ import subprocess
 import sys
 import tempfile
 import uuid
+from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from importlib.resources import files
@@ -267,6 +268,7 @@ def run_planning_session(
             repository_paths=_planning_repository_paths(
                 repo_root, base_commit, pinned_source.text
             ),
+            preferred_runtimes=_planning_preferred_runtimes(repo_root, base_commit),
             plan_id=plan_id,
             structrr_baseline=structrr_baseline,
             taxonomy_entity_types=taxonomy.entity_types,
@@ -661,6 +663,32 @@ def _planning_repository_paths(
         path: PathFact(path, PATH_RUNTIME_SUFFIXES.get(Path(path).suffix.lower()))
         for path in sorted(tracked & cited_paths)
     }
+
+
+def _planning_preferred_runtimes(repo_root: Path, base_commit: str) -> tuple[str, ...]:
+    listing = subprocess.run(
+        ["git", "ls-tree", "-r", "--name-only", base_commit],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.splitlines()
+    return _preferred_runtimes_from_paths(listing)
+
+
+def _preferred_runtimes_from_paths(paths: Sequence[str]) -> tuple[str, ...]:
+    counts = Counter(
+        runtime
+        for path in paths
+        if (runtime := PATH_RUNTIME_SUFFIXES.get(Path(path).suffix.lower()))
+        and runtime != "shell"
+    )
+    return tuple(
+        runtime
+        for runtime, _count in sorted(
+            counts.items(), key=lambda item: (-item[1], item[0])
+        )[:3]
+    )
 
 
 def _write_compiled_plan_files(

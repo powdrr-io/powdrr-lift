@@ -1,6 +1,6 @@
 # Planning Efficiency Through Deterministic Filtering
 
-**Status:** Core reductions landed; labeled dependency recall and live candidate telemetry are covered; large live planning remains blocked by incomplete work-unit proposals  
+**Status:** Core reductions landed; labeled dependency recall and candidate telemetry are covered; work-unit planning now receives implementation-language preferences derived from the pinned repository
 **Date:** 2026-11-01  
 **Owner:** Powdrr-Lift planning service  
 **Related change:** [PR #1283](https://github.com/powdrr-io/powdrr-lift/pull/1283) starts deterministic Structrr candidate selection for path-bound existing subjects.
@@ -412,11 +412,37 @@ provider calls for 1,594 question members. The planner extracted all 500
 requirements, then blocked during work-unit proposal repair with 16 supplemental
 `propose_work_units` questions still pending. It recorded 10 validation retries;
 work units and PR items were not compiled. Dependency candidate metrics are
-therefore unavailable for this run. Token usage was not returned. This is a
-failure datapoint, not a completed large-plan performance result. The earlier
+therefore unavailable for this run. The benchmark now reports pending question
+IDs and the unavailable reason, and PR #1320 adds each unresolved question's
+validation pointer and message without storing its model response. A diagnostic
+rerun identified the first blocker: the model proposed
+`src/behavior_outcomes.c`, but the synthetic repository supplied no language or
+path evidence, so runtime classification correctly requested repository
+evidence. The generic synthetic requirements had let the model choose an
+arbitrary language. PR #1320 derives the most common implementation languages
+from code file types tracked at the pinned base and includes them in each
+work-unit question as preferences. Its benchmark fixture also names Python as
+the design runtime and supplies a pinned Python path. Rerun the large live
+profile before treating the workflow as validated. Token usage was not
+returned. These are failure datapoints, not completed large-plan performance
+results. The earlier
 large run's 972-second duration is also not a success because it produced 60
 items against the 50-item target. Hardware: Apple Silicon MacBook Air, arm64,
 Darwin 25.5.0.
+
+After adding pinned repository runtime preferences, the `typical` live profile
+completed in 106.7 seconds with `deepinfra-cheap` /
+`deepseek-ai/DeepSeek-V4-Flash-0731`, concurrency 4, and a 30-second timeout.
+It produced 40 requirements, 10 work units, and 5 items with no validation
+retries or fixture mismatch. The subsequent large live profile completed with
+all 500 requirements and 57 plan items. It passed work-unit proposal validation
+instead of blocking on an unsupported `.c` path; the generated item titles
+specified Python modules. The expected item count is 50, so this is a successful
+execution but still a plan-shape mismatch, not a quality pass. The large-run
+terminal JSON was too large for the command capture and its elapsed time and
+provider-call totals were not retained; do not use this run as a timing result.
+This verifies the language preference on both profile sizes, while the large
+profile's plan shape and the missing concise live report remain follow-up work.
 
 ## Cross-cutting test requirements
 

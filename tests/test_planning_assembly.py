@@ -471,7 +471,6 @@ def test_work_unit_question_has_a_parser_valid_example_and_exact_context() -> No
                 "next_anchor": None,
             }
         )
-
     with pytest.raises(ValueError, match="one to four requirements"):
         build_work_unit_proposal_request(
             context,
@@ -522,6 +521,32 @@ def test_work_unit_question_has_a_parser_valid_example_and_exact_context() -> No
                 "next_anchor": None,
             }
         )
+
+
+def test_work_unit_question_carries_pinned_repository_runtime_preferences() -> None:
+    context, anchor = _context()
+    preferred_context = replace(context, preferred_runtimes=("python", "swift"))
+
+    request = build_work_unit_proposal_request(
+        context, ["req-0001"], valid_example={"records": [_proposal(context, anchor)]}
+    )
+    preferred_request = build_work_unit_proposal_request(
+        preferred_context,
+        ["req-0001"],
+        valid_example={"records": [_proposal(preferred_context, anchor)]},
+    )
+
+    assert preferred_request.question.input_digest != request.question.input_digest
+    assert "When the preferred_implementation_runtimes" in (
+        preferred_request.exact_question
+    )
+    preference_facts = [
+        record
+        for record in preferred_request.accepted_facts
+        if record.ref_id == "preferred_implementation_runtimes"
+    ]
+    assert len(preference_facts) == 1
+    assert preference_facts[0].value["runtimes"] == ["python", "swift"]
 
 
 def test_work_unit_page_cursor_is_derived_and_cannot_skip_uncovered_requirements() -> (

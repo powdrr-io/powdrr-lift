@@ -26,6 +26,7 @@ from typing import Any
 
 from powdrr_service.planning.assembly import (
     MAX_WORK_UNIT_REQUIREMENTS_PER_QUESTION,
+    PathFact,
     PendingUnitOutput,
     WorkUnit,
 )
@@ -194,6 +195,42 @@ def dependency_metrics_for(
         )
     except (ValueError, RuntimeError) as error:
         return None, str(error)
+
+
+def unresolved_question_diagnostics(events: Sequence[Any]) -> list[dict[str, Any]]:
+    """Summarize unresolved answer failures without retaining model responses."""
+    unresolved: dict[str, dict[str, Any]] = {}
+    for event in events:
+        if event.event_type not in {"needs_answer", "answer_accepted"}:
+            continue
+        payload = event.payload
+        question = payload.get("question")
+        if not isinstance(question, Mapping):
+            continue
+        question_id = question.get("question_id")
+        if not isinstance(question_id, str):
+            continue
+        if event.event_type == "answer_accepted":
+            unresolved.pop(question_id, None)
+            continue
+        validation_result = payload.get("validation_result")
+        if not isinstance(validation_result, Mapping):
+            validation_result = {}
+        subject_ids = question.get("subject_ids")
+        unresolved[question_id] = {
+            "question_id": question_id,
+            "kind": question.get("kind"),
+            "subject_ids": (
+                [item for item in subject_ids if isinstance(item, str)]
+                if isinstance(subject_ids, list)
+                else []
+            ),
+            "attempt": question.get("attempt"),
+            "input_digest": payload.get("input_digest"),
+            "error_pointer": validation_result.get("json_pointer"),
+            "error_message": validation_result.get("message"),
+        }
+    return list(unresolved.values())
 
 
 class _ProgressClient:
@@ -427,7 +464,7 @@ class _ExampleAnswerClient:
 def _source_document(profile: Profile) -> PinnedSourceDocument:
     paragraphs = []
     for ordinal in range(1, profile.requirements + 1):
-        paragraphs.append(f"Implement behavior outcome {ordinal}.")
+        paragraphs.append(f"Implement behavior outcome {ordinal} as a Python module.")
     text = "\n\n".join(paragraphs)
     return PinnedSourceDocument(
         repository="powdrr-io/planning-benchmark",
@@ -507,6 +544,12 @@ def run_profile(
         source,
         evidence_search=search,
         verification_command="make test",
+        repository_paths={
+            "src/generated/existing_behavior.py": PathFact(
+                "src/generated/existing_behavior.py", "python"
+            )
+        },
+        preferred_runtimes=("python",),
         plan_id=f"benchmark-{profile.name}",
         structrr_baseline=_structrr_baseline(profile, _planned_paths(profile)),
     )
@@ -668,6 +711,9 @@ def run_profile(
         "phases": dict(by_phase),
         "dependency_candidates": dependency_metrics,
         "dependency_candidates_unavailable_reason": dependency_metrics_error,
+        "unresolved_question_diagnostics": unresolved_question_diagnostics(
+            journal.events
+        ),
     }
     mismatches = fixture_shape_mismatches(profile, report)
     report["fixture_shape_mismatches"] = mismatches

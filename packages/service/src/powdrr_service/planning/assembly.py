@@ -286,6 +286,7 @@ class WorkUnitContext:
     component_ids: frozenset[str]
     repository_paths: Mapping[str, PathFact]
     ambiguous_runtime_resolutions: Mapping[str, str]
+    preferred_runtimes: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -748,7 +749,20 @@ def build_work_unit_proposal_request(
     components = (
         ContextRecord("components", {"component_ids": sorted(context.component_ids)}),
     )
-    accepted = (*requirement_facts, *validations, *components)
+    preferred_runtimes = (
+        (
+            ContextRecord(
+                "preferred_implementation_runtimes",
+                {
+                    "runtimes": list(context.preferred_runtimes),
+                    "basis": "file types in the pinned repository",
+                },
+            ),
+        )
+        if context.preferred_runtimes
+        else ()
+    )
+    accepted = (*requirement_facts, *validations, *components, *preferred_runtimes)
     all_refs = tuple(
         [
             *(item.ref_id for item in excerpts),
@@ -773,6 +787,7 @@ def build_work_unit_proposal_request(
         "evidence": [item.value for item in evidence],
         "validations": [item.value for item in validations],
         "components": sorted(context.component_ids),
+        "preferred_runtimes": list(context.preferred_runtimes),
         "page_after": page_after,
     }
     question_identity: dict[str, Any] = {
@@ -837,6 +852,10 @@ def build_work_unit_proposal_request(
             "requirement, evidence, or source IDs. Component, validation, and "
             "runtime are derived from supplied catalogs and planned paths. Split "
             "different implementation runtimes into separate units. "
+            "When the preferred_implementation_runtimes fact is supplied, prefer "
+            "those pinned repository languages if they can satisfy the source. "
+            "Use another runtime only when the requirements or repository evidence "
+            "require it. "
             "For each requirement ID in a unit, at least one planned write must "
             "cite one of that requirement's own source_refs from its requirement "
             "fact; do not cite only a neighboring requirement's anchors. "

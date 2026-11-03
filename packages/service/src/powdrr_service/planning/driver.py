@@ -353,6 +353,7 @@ class SourceLedgerQuestionMachine:
         | None = None,
         verification_command: str = "make test",
         repository_paths: Mapping[str, PathFact] | None = None,
+        preferred_runtimes: Sequence[str] = (),
         plan_id: str = "planning-session",
         structrr_baseline: Mapping[str, Any] | None = None,
         taxonomy_entity_types: tuple[str, ...] = (),
@@ -369,6 +370,7 @@ class SourceLedgerQuestionMachine:
         self._evidence_search_cache: dict[str, RequirementEvidenceSearch] = {}
         self.verification_command = verification_command
         self.repository_paths = dict(repository_paths or {})
+        self.preferred_runtimes = tuple(dict.fromkeys(preferred_runtimes))
         self.plan_id = plan_id
         self.structrr_baseline = (
             None if structrr_baseline is None else dict(structrr_baseline)
@@ -980,6 +982,7 @@ class SourceLedgerQuestionMachine:
             component_ids=frozenset({"repository"}),
             repository_paths=self.repository_paths,
             ambiguous_runtime_resolutions={},
+            preferred_runtimes=self.preferred_runtimes,
         )
 
     def _work_unit_example(

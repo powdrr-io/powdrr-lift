@@ -1,0 +1,236 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1354
+title: Increase source extraction batch throughput safely
+intent:
+  problem: Source extraction consumed most planning calls while shared batch and input limits prevented small independent questions from fitting together.
+  goal: Raise only the source extraction batch and aggregate input bounds, preserve individual question validation, and report per-kind batch maxima.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/plans/planning-efficiency-deterministic-filtering.md
+  type: modified
+  span:
+    start_line: 663
+    end_line: 687
+  summary: Record deterministic and live results for six-member source extraction batches.
+  rationale: Preserve measured call reduction and live sizing and fixture-count caveats.
+- path: packages/service/src/powdrr_service/planning/questions.py
+  type: modified
+  span:
+    start_line: 22
+    end_line: 22
+  summary: Define the source extraction batch input bound.
+  rationale: Keep the larger prompt ceiling specific to this question kind.
+- path: packages/service/src/powdrr_service/planning/questions.py
+  type: modified
+  span:
+    start_line: 29
+    end_line: 29
+  summary: Export the source extraction batch input bound.
+  rationale: Let batching code and tests use the named bound.
+- path: packages/service/src/powdrr_service/planning/questions.py
+  type: modified
+  span:
+    start_line: 63
+    end_line: 63
+  summary: Add the effective input limit to oversized-input errors.
+  rationale: Report which bound a request exceeded.
+- path: packages/service/src/powdrr_service/planning/questions.py
+  type: modified
+  span:
+    start_line: 66
+    end_line: 66
+  summary: Store the effective input limit on the error.
+  rationale: Make the active bound available to callers and tests.
+- path: packages/service/src/powdrr_service/planning/questions.py
+  type: modified
+  span:
+    start_line: 78
+    end_line: 78
+  summary: Format oversized-input errors with the effective limit.
+  rationale: Keep diagnostics aligned with per-request bounds.
+- path: packages/service/src/powdrr_service/planning/questions.py
+  type: modified
+  span:
+    start_line: 116
+    end_line: 116
+  summary: Add a request-level aggregate input limit.
+  rationale: Keep individual questions at the existing bound and batches configurable.
+- path: packages/service/src/powdrr_service/planning/questions.py
+  type: modified
+  span:
+    start_line: 121
+    end_line: 122
+  summary: Validate the configured request input bound.
+  rationale: Reject invalid limits before constructing provider requests.
+- path: packages/service/src/powdrr_service/planning/questions.py
+  type: modified
+  span:
+    start_line: 160
+    end_line: 160
+  summary: Allow per-kind defaults while preserving explicit batch-size overrides.
+  rationale: Limit the six-member exception to source extraction.
+- path: packages/service/src/powdrr_service/planning/questions.py
+  type: modified
+  span:
+    start_line: 163
+    end_line: 163
+  summary: Validate an explicitly configured batch size.
+  rationale: Preserve the positive-size contract when no default is used.
+- path: packages/service/src/powdrr_service/planning/questions.py
+  type: modified
+  span:
+    start_line: 178
+    end_line: 180
+  summary: Select six members for extraction and four for other question kinds.
+  rationale: Apply the bounded per-kind batching policy.
+- path: packages/service/src/powdrr_service/planning/questions.py
+  type: modified
+  span:
+    start_line: 182
+    end_line: 182
+  summary: Flush a batch when its kind-specific member limit is reached.
+  rationale: Prevent larger source batches from affecting other question kinds.
+- path: packages/service/src/powdrr_service/planning/questions.py
+  type: modified
+  span:
+    start_line: 354
+    end_line: 358
+  summary: Set aggregate batch input limits by member question kind.
+  rationale: Bound extraction batches at 32,000 characters and other batches at 24,000.
+- path: packages/service/src/powdrr_service/planning/questions.py
+  type: modified
+  span:
+    start_line: 513
+    end_line: 513
+  summary: Check serialized requests against their configured input limit.
+  rationale: Enforce the source-specific batch bound without changing the individual limit.
+- path: packages/service/src/powdrr_service/planning/questions.py
+  type: modified
+  span:
+    start_line: 519
+    end_line: 519
+  summary: Include the effective request limit in oversized-input errors.
+  rationale: Keep diagnostics aligned with the active bound.
+- path: scripts/benchmark_planning_scale.py
+  type: modified
+  span:
+    start_line: 180
+    end_line: 180
+  summary: Include per-kind batch maxima in compact benchmark summaries.
+  rationale: Keep the new diagnostic visible in concise reports.
+- path: scripts/benchmark_planning_scale.py
+  type: modified
+  span:
+    start_line: 927
+    end_line: 937
+  summary: Compute maximum observed batch size per question kind.
+  rationale: Let scale checks verify the source-only increase.
+- path: scripts/benchmark_planning_scale.py
+  type: modified
+  span:
+    start_line: 994
+    end_line: 994
+  summary: Persist per-kind batch maxima in scale reports.
+  rationale: Keep batch limits reviewable from benchmark artifacts.
+- path: scripts/benchmark_planning_scale.py
+  type: modified
+  span:
+    start_line: 1061
+    end_line: 1070
+  summary: Enforce six extraction members and four members for other question kinds.
+  rationale: Turn batch growth outside the source exception into a deterministic failure.
+- path: tests/test_benchmark_planning_scale.py
+  type: modified
+  span:
+    start_line: 304
+    end_line: 307
+  summary: Add per-kind maxima to compact report fixtures.
+  rationale: Preserve the new diagnostic in benchmark summaries.
+- path: tests/test_benchmark_planning_scale.py
+  type: modified
+  span:
+    start_line: 357
+    end_line: 360
+  summary: Assert compact reports include per-kind batch maxima.
+  rationale: Prevent benchmark summaries from dropping batch-limit evidence.
+- path: tests/test_planning_questions.py
+  type: modified
+  span:
+    start_line: 275
+    end_line: 275
+  summary: Clarify the four-member default applies to non-extraction kinds.
+  rationale: Distinguish general batching from the extraction exception.
+- path: tests/test_planning_questions.py
+  type: modified
+  span:
+    start_line: 277
+    end_line: 279
+  summary: Exercise the general cap with item-description questions.
+  rationale: Verify other question kinds remain limited to four members.
+- path: tests/test_planning_questions.py
+  type: modified
+  span:
+    start_line: 296
+    end_line: 309
+  summary: Verify six extraction members retain independent answer parsing.
+  rationale: Test the larger bounded batch without weakening member validation.
+- path: tests/test_planning_questions.py
+  type: modified
+  span:
+    start_line: 317
+    end_line: 317
+  summary: Keep correction-splitting coverage on a non-extraction batch.
+  rationale: Preserve the four-member correction scenario.
+- path: tests/test_planning_source.py
+  type: modified
+  span:
+    start_line: 6
+    end_line: 6
+  summary: Import dataclass replacement for source-batch bound coverage.
+  rationale: Reuse a batch while testing its smaller-bound failure.
+- path: tests/test_planning_source.py
+  type: modified
+  span:
+    start_line: 13
+    end_line: 15
+  summary: Import input limits and the oversized-input exception.
+  rationale: Assert the extraction-specific bound and existing individual bound.
+- path: tests/test_planning_source.py
+  type: modified
+  span:
+    start_line: 519
+    end_line: 522
+  summary: Create six distinct extraction questions in the batch fixture.
+  rationale: Exercise the new source-only batch path.
+- path: tests/test_planning_source.py
+  type: modified
+  span:
+    start_line: 526
+    end_line: 526
+  summary: Assert the extraction fixture has six source blocks.
+  rationale: Keep the test input aligned with the batch size.
+- path: tests/test_planning_source.py
+  type: modified
+  span:
+    start_line: 533
+    end_line: 539
+  summary: Verify six members use the source batch bound and fail under the individual bound.
+  rationale: Prove the larger aggregate limit remains explicit and source-specific.
+- path: tests/test_planning_source.py
+  type: modified
+  span:
+    start_line: 528
+    end_line: 531
+  summary: Remove assertions tied to the previous two-member fixture.
+  rationale: Replace the old assumption with six-member coverage.
+entities: []
+entity_relationships: []
+invariants:
+- id: extraction-batches-have-a-separate-bounded-input-limit
+  description: Source extraction batches allow at most six members and 32,000 serialized input characters; each member remains independently validated, and other question kinds retain four members and 24,000 characters.
+  action: added
+guidance: []
+features: []
+proposed_prs: []
+

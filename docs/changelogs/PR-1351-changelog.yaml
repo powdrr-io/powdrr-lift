@@ -1,0 +1,236 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1351
+title: Split verification evidence execution and acceptance
+intent:
+  problem: Verification execution and evidence artifact writes were mixed with service acceptance policy
+    in legacy application modules, and the runner depended directly on service obligation types.
+  goal: Keep provider execution and evidence materialization in the local agent, represent evidence through
+    public contracts, and perform freshness and acceptance decisions in service policy without changing
+    serialized evidence behavior.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2711
+    end_line: 2712
+  summary: Move verification evidence execution to the agent and acceptance reconciliation to the service.
+  rationale: Keep the ownership inventory and import edges aligned with the new package boundaries.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2714
+    end_line: 2716
+  summary: Move verification evidence execution to the agent and acceptance reconciliation to the service.
+  rationale: Keep the ownership inventory and import edges aligned with the new package boundaries.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2828
+    end_line: 2828
+  summary: Move verification evidence execution to the agent and acceptance reconciliation to the service.
+  rationale: Keep the ownership inventory and import edges aligned with the new package boundaries.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2834
+    end_line: 2834
+  summary: Move verification evidence execution to the agent and acceptance reconciliation to the service.
+  rationale: Keep the ownership inventory and import edges aligned with the new package boundaries.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2857
+    end_line: 2859
+  summary: Move verification evidence execution to the agent and acceptance reconciliation to the service.
+  rationale: Keep the ownership inventory and import edges aligned with the new package boundaries.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3498
+    end_line: 3498
+  summary: Move verification evidence execution to the agent and acceptance reconciliation to the service.
+  rationale: Keep the ownership inventory and import edges aligned with the new package boundaries.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3501
+    end_line: 3503
+  summary: Move verification evidence execution to the agent and acceptance reconciliation to the service.
+  rationale: Keep the ownership inventory and import edges aligned with the new package boundaries.
+- path: packages/agent/src/powdrr_agent/execution/verification_evidence.py
+  type: renamed
+  span:
+    start_line: 1
+    end_line: 246
+  summary: Run exact verification obligations locally and materialize evidence artifacts in the agent
+    package.
+  rationale: Keep repository provider execution and local artifact writes on the user machine.
+- path: packages/contracts/src/powdrr_contracts/__init__.py
+  type: modified
+  span:
+    start_line: 22
+    end_line: 23
+  summary: Export the public evidence status and verification evidence model.
+  rationale: Give the local runner and service acceptance policy a shared transport-independent contract.
+- path: packages/contracts/src/powdrr_contracts/__init__.py
+  type: modified
+  span:
+    start_line: 26
+    end_line: 26
+  summary: Export the public evidence status and verification evidence model.
+  rationale: Give the local runner and service acceptance policy a shared transport-independent contract.
+- path: packages/contracts/src/powdrr_contracts/__init__.py
+  type: modified
+  span:
+    start_line: 35
+    end_line: 35
+  summary: Export the public evidence status and verification evidence model.
+  rationale: Give the local runner and service acceptance policy a shared transport-independent contract.
+- path: packages/contracts/src/powdrr_contracts/__init__.py
+  type: modified
+  span:
+    start_line: 48
+    end_line: 48
+  summary: Export the public evidence status and verification evidence model.
+  rationale: Give the local runner and service acceptance policy a shared transport-independent contract.
+- path: packages/contracts/src/powdrr_contracts/__init__.py
+  type: modified
+  span:
+    start_line: 50
+    end_line: 50
+  summary: Export the public evidence status and verification evidence model.
+  rationale: Give the local runner and service acceptance policy a shared transport-independent contract.
+- path: packages/contracts/src/powdrr_contracts/verification.py
+  type: modified
+  span:
+    start_line: 6
+    end_line: 6
+  summary: Define evidence statuses and the serialized verification evidence record in contracts.
+  rationale: Preserve the existing evidence schema while removing implementation-package coupling.
+- path: packages/contracts/src/powdrr_contracts/verification.py
+  type: modified
+  span:
+    start_line: 10
+    end_line: 22
+  summary: Define evidence statuses and the serialized verification evidence record in contracts.
+  rationale: Preserve the existing evidence schema while removing implementation-package coupling.
+- path: packages/contracts/src/powdrr_contracts/verification.py
+  type: modified
+  span:
+    start_line: 77
+    end_line: 119
+  summary: Define evidence statuses and the serialized verification evidence record in contracts.
+  rationale: Preserve the existing evidence schema while removing implementation-package coupling.
+- path: packages/service/src/powdrr_service/verification/evidence_reconciliation.py
+  type: renamed
+  span:
+    start_line: 1
+    end_line: 113
+  summary: Move evidence freshness and final acceptance decisions into the service.
+  rationale: Keep verification policy with the service while consuming evidence supplied by contracts.
+- path: scripts/build-agent-service-ownership-inventory.py
+  type: modified
+  span:
+    start_line: 22
+    end_line: 22
+  summary: Classify the evidence runner as agent-owned and reconciliation as service-owned.
+  rationale: Keep future ownership inventory generation consistent with the extracted modules.
+- path: scripts/build-agent-service-ownership-inventory.py
+  type: modified
+  span:
+    start_line: 49
+    end_line: 51
+  summary: Classify the evidence runner as agent-owned and reconciliation as service-owned.
+  rationale: Keep future ownership inventory generation consistent with the extracted modules.
+- path: scripts/build-agent-service-ownership-inventory.py
+  type: modified
+  span:
+    start_line: 414
+    end_line: 414
+  summary: Classify the evidence runner as agent-owned and reconciliation as service-owned.
+  rationale: Keep future ownership inventory generation consistent with the extracted modules.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 18
+    end_line: 18
+  summary: Connect feature orchestration to the agent runner and service reconciliation policy.
+  rationale: Preserve workflow behavior while assigning execution and acceptance to their owners.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 102
+    end_line: 104
+  summary: Connect feature orchestration to the agent runner and service reconciliation policy.
+  rationale: Preserve workflow behavior while assigning execution and acceptance to their owners.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 160
+    end_line: 160
+  summary: Connect feature orchestration to the agent runner and service reconciliation policy.
+  rationale: Preserve workflow behavior while assigning execution and acceptance to their owners.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 170
+    end_line: 170
+  summary: Connect feature orchestration to the agent runner and service reconciliation policy.
+  rationale: Preserve workflow behavior while assigning execution and acceptance to their owners.
+- path: tests/test_evidence_reconciliation.py
+  type: modified
+  span:
+    start_line: 1
+    end_line: 3
+  summary: Test evidence acceptance through the service-owned reconciler.
+  rationale: Keep reconciliation coverage attached to the service implementation.
+- path: tests/test_intent_verification_acceptance.py
+  type: modified
+  span:
+    start_line: 6
+    end_line: 6
+  summary: Exercise local evidence execution followed by service acceptance and repair.
+  rationale: Retain end-to-end coverage across the relocated agent and service components.
+- path: tests/test_intent_verification_acceptance.py
+  type: modified
+  span:
+    start_line: 12
+    end_line: 12
+  summary: Exercise local evidence execution followed by service acceptance and repair.
+  rationale: Retain end-to-end coverage across the relocated agent and service components.
+- path: tests/test_intent_verification_acceptance.py
+  type: modified
+  span:
+    start_line: 15
+    end_line: 15
+  summary: Exercise local evidence execution followed by service acceptance and repair.
+  rationale: Retain end-to-end coverage across the relocated agent and service components.
+- path: tests/test_verification_evidence.py
+  type: modified
+  span:
+    start_line: 7
+    end_line: 7
+  summary: Test evidence execution and persisted artifacts through the agent package.
+  rationale: Protect local provider execution and evidence serialization behavior.
+- path: tests/test_verification_evidence.py
+  type: modified
+  span:
+    start_line: 14
+    end_line: 14
+  summary: Test evidence execution and persisted artifacts through the agent package.
+  rationale: Protect local provider execution and evidence serialization behavior.
+- path: tests/test_verification_evidence.py
+  type: modified
+  span:
+    start_line: 15
+    end_line: 19
+  summary: Test evidence execution and persisted artifacts through the agent package.
+  rationale: Protect local provider execution and evidence serialization behavior.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []
+features: []
+proposed_prs: []

@@ -1,0 +1,28 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1339
+title: Test Structrr reference candidate recall
+intent:
+  problem: Structrr's new BasedPyright reference evidence lacks a hand-labeled multi-edge fixture proving the planned-path candidate filter retains known relationships and excludes unplanned files.
+  goal: Add a nontrivial reference chain with explicit expected edges and record it against the Structrr candidate-recall acceptance criterion.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/plans/planning-efficiency-deterministic-filtering.md
+    type: modified
+    span: {start_line: 81, end_line: 83}
+    summary: Record the labeled recall fixture alongside the merged BasedPyright path-pair evidence.
+    rationale: Track progress against milestone 5's candidate-recall acceptance criterion.
+  - path: tests/test_basedpyright_tools.py
+    type: modified
+    span: {start_line: 7, end_line: 7}
+    summary: Import the service path-pair filter for the cross-component recall fixture.
+    rationale: Exercise BasedPyright output through the same item-scoping helper used by Structrr.
+  - path: tests/test_basedpyright_tools.py
+    type: modified
+    span: {start_line: 274, end_line: 386}
+    summary: Add a hand-labeled producer-to-consumer chain with an unplanned-file decoy.
+    rationale: Prove the candidate path set retains all three expected edges while excluding references outside the planned files.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []

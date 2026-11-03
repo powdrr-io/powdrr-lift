@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import subprocess
 import sys
@@ -24,6 +25,7 @@ from powdrr_local.planning.checkpoints import (
 )
 from powdrr_local.planning.sessions import GitHubPlanningIssueStore
 from powdrr_local.planning.source import read_pinned_source
+from powdrr_service.decision_classifier import JEV_MODEL, JevSemanticClassifierClient
 from powdrr_service.planning.assembly import PathFact, WorkUnit
 from powdrr_service.planning.compiler import PlanningCompilationError
 from powdrr_service.planning.driver import SourceLedgerQuestionMachine
@@ -220,6 +222,7 @@ def run_planning_session(
         )
         if callable(set_output_limit):
             set_output_limit(8192)
+        jev_client = JevSemanticClassifierClient(planning_client, fail_closed=True)
 
         source = segment_markdown_source(pinned_source)
         taxonomy = load_entity_taxonomy(repo_root, _structrr_taxonomy_path(repo_root))
@@ -407,6 +410,9 @@ def run_planning_session(
                 ),
                 use_provider_schema=planning_mapping.provider != "deepinfra-cheap",
                 provider=planning_mapping.provider,
+                decision_client=jev_client,
+                decision_provider="JEV",
+                decision_model=os.environ.get("SYSTEM_ONE_MODEL") or JEV_MODEL,
                 telemetry_sink=record_telemetry,
                 deterministic_telemetry_sink=record_deterministic_telemetry,
             ),

@@ -558,6 +558,7 @@ def build_subject_enumeration_request(
     source_refs: Sequence[str],
     projected_baseline: Mapping[str, Any],
     prior_subjects: Sequence[BoundStructuralSubject] = (),
+    excluded_subject_ids: Sequence[tuple[str, str]] = (),
     basedpyright_reference_path_pairs: Sequence[tuple[str, str]] = (),
     page_ordinal: int = 1,
     baseline_digest: str | None = None,
@@ -591,10 +592,12 @@ def build_subject_enumeration_request(
     prior_subject_ids = {
         (subject.section, subject.subject_id) for subject in prior_subjects
     }
+    excluded_ids = set(excluded_subject_ids)
+    blocked_subject_ids = prior_subject_ids | excluded_ids
     subject_index["entities"] = [
         record
         for record in subject_index["entities"]
-        if ("entities", str(record.get("id"))) not in prior_subject_ids
+        if ("entities", str(record.get("id"))) not in blocked_subject_ids
     ]
     subject_index["entity_relationships"] = [
         record
@@ -603,7 +606,7 @@ def build_subject_enumeration_request(
             "entity_relationships",
             str(record.get("id")),
         )
-        not in prior_subject_ids
+        not in blocked_subject_ids
     ]
     baseline_fact = ContextRecord(
         f"projected-structrr:{item_id}:{baseline_digest[:20]}",
@@ -670,9 +673,7 @@ def build_subject_enumeration_request(
             units=units,
             source_ids=set(source_refs),
             projected_baseline=projected_baseline,
-            prior_subject_ids={
-                (item.section, item.subject_id) for item in prior_subjects
-            },
+            prior_subject_ids=blocked_subject_ids,
             page_ordinal=page_ordinal,
         )
         if any(subject.section == "files" for subject in page.records):
@@ -693,6 +694,7 @@ def build_subject_enumeration_request(
                     "units": [unit.to_data() for unit in units],
                     "source": [(item.ref_id, item.text) for item in excerpt_map],
                     "prior": [item.to_data() for item in prior_subjects],
+                    "excluded_subject_ids": sorted(excluded_ids),
                     "basedpyright_references": reference_fact.value,
                     "page": page_ordinal,
                 }
@@ -761,6 +763,109 @@ def build_subject_enumeration_request(
         answer_schema=_subject_page_schema(
             sections=("entities", "entity_relationships")
         ),
+        parse_answer=parse,
+    )
+
+
+def build_structural_candidate_review_request(
+    subject: BoundStructuralSubject,
+    *,
+    source: SegmentedSource,
+    units: Sequence[WorkUnit],
+    projected_baseline: Mapping[str, Any],
+    baseline_index: StructuralBaselineIndex | None = None,
+) -> QuestionRequest[bool]:
+    """Ask Jev whether one deterministic existing Structrr candidate changes."""
+    if subject.section not in {"entities", "entity_relationships"} or subject.is_new:
+        raise ValueError("candidate review requires an existing entity or relationship")
+    baseline_index = baseline_index or index_structural_baseline(projected_baseline)
+    context = _structural_change_baseline_context(
+        projected_baseline, subject, index=baseline_index
+    )
+    excerpts = _source_excerpts(source, subject.source_refs)
+    units_by_id = {unit.id: unit for unit in units}
+    candidate_units = tuple(
+        units_by_id[item] for item in subject.unit_ids if item in units_by_id
+    )
+    accepted_facts = (
+        ContextRecord(
+            f"structural-candidate-classifier:{subject.item_id}:{subject.subject_id}",
+            {
+                "question": (
+                    "Does this planned item require changing this existing Structrr "
+                    "entity or relationship?"
+                ),
+                "instructions": [
+                    "Answer true only when the cited requirements and implementation "
+                    "units change, add, delete, or remove this exact existing subject. "
+                    "Answer false when the subject is merely nearby, referenced, or "
+                    "unaffected. Do not infer a change from path or name similarity."
+                ],
+                "allowed_values": ["true", "false"],
+                "criteria": {
+                    "true": "The planned work changes this exact subject.",
+                    "false": "The planned work does not change this exact subject.",
+                },
+                "subject_text": (
+                    f"Candidate {subject.section}/{subject.subject_id}; action "
+                    f"proposed by deterministic evidence: {subject.action}."
+                ),
+            },
+        ),
+        ContextRecord(
+            f"structural-candidate-baseline:{subject.item_id}:{subject.subject_id}",
+            context,
+        ),
+        *(ContextRecord(f"unit:{unit.id}", unit.to_data()) for unit in candidate_units),
+    )
+    context_ids = tuple(record.ref_id for record in accepted_facts)
+    input_data = {
+        "baseline": context,
+        "subject": subject.to_data(),
+        "units": [unit.to_data() for unit in candidate_units],
+        "source": [(excerpt.ref_id, excerpt.text) for excerpt in excerpts],
+    }
+    digest = _digest(input_data)
+    subject_digest = hashlib.sha256(
+        f"{subject.section}:{subject.subject_id}".encode()
+    ).hexdigest()[:12]
+    question_id = f"review-candidate-{subject.item_id}-{subject_digest}"
+
+    def parse(value: Mapping[str, Any]) -> bool:
+        if set(value) != {"relevant"} or not isinstance(value.get("relevant"), bool):
+            raise PlanningContractError("/relevant", "must be a boolean")
+        return value["relevant"]
+
+    return QuestionRequest(
+        question=Question(
+            question_id,
+            "review_structural_candidate",
+            1,
+            (subject.item_id, subject.section, subject.subject_id),
+            digest,
+            (*context_ids, *(excerpt.ref_id for excerpt in excerpts)),
+            "structural-candidate-review-v1",
+            1,
+        ),
+        exact_question=(
+            "Review this one existing Structrr candidate against the planned item. "
+            "Return relevant=true only if the item changes this exact entity or "
+            "relationship; otherwise return false."
+        ),
+        answer_field_definitions={
+            "relevant": "Whether this exact existing subject is changed by the item."
+        },
+        source_excerpts=excerpts,
+        repository_evidence=(),
+        accepted_facts=accepted_facts,
+        valid_example={"relevant": True},
+        empty_example={"relevant": False},
+        answer_schema={
+            "type": "object",
+            "additionalProperties": False,
+            "required": ["relevant"],
+            "properties": {"relevant": {"type": "boolean"}},
+        },
         parse_answer=parse,
     )
 

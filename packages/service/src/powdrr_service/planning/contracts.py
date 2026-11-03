@@ -28,6 +28,7 @@ QUESTION_KINDS = frozenset(
         "describe_human_setup",
         "compare_setup_equivalence",
         "enumerate_structural_subjects",
+        "review_structural_candidate",
         "describe_structural_change",
         "locate_repair_impact",
         "planning_question_batch",

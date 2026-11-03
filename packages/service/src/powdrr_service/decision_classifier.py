@@ -504,15 +504,26 @@ def _classifier_request(
         return None
     content = messages[-1].get("content", "")
     marker = "Context:\n"
-    if marker not in content:
-        return None
+    if marker in content:
+        prompt_prefix, _, context_text = content.partition(marker)
+    else:
+        prompt_prefix = content
+        context_text = content
     try:
-        context = json.loads(content.split(marker, 1)[1])
+        context = json.loads(context_text)
     except (json.JSONDecodeError, TypeError):
         return None
     if not isinstance(context, Mapping):
         return None
-    prompt_prefix = content.split(marker, 1)[0]
+    if marker not in content:
+        exact_question = context.get("exact_question")
+        prompt = (
+            exact_question.get("prompt")
+            if isinstance(exact_question, Mapping)
+            else None
+        )
+        if isinstance(prompt, str):
+            prompt_prefix = prompt
     classifier = _find_classifier_request(context)
     output_property = _single_output_property(response_schema)
     if isinstance(classifier, Mapping):
@@ -601,7 +612,7 @@ def _classifier_request(
         )
         if clause is None:
             return None
-        prompt_prefix, _, context_suffix = content.partition(marker)
+        context_suffix = content.partition(marker)[2] if marker in content else content
         return {
             "kind": "boolean_classifier",
             "allowed_values": ["true", "false"],
@@ -633,21 +644,30 @@ def _classifier_request(
 
 
 def _find_classifier_request(context: Mapping[str, Any]) -> Mapping[str, Any] | None:
-    for value in context.values():
-        if not isinstance(value, Mapping):
-            continue
-        if not {"question", "instructions", "allowed_values"} <= value.keys():
-            continue
-        spec = value.get("spec")
-        has_proposition = isinstance(spec, Mapping) and isinstance(
-            spec.get("proposition_text"), str
-        )
-        has_legacy_source = isinstance(value.get("subject_text"), str) or isinstance(
-            value.get("source_text"), str
-        )
-        if has_proposition or has_legacy_source:
-            return value
-    return None
+    def find(value: Any) -> Mapping[str, Any] | None:
+        if isinstance(value, Mapping):
+            if {"question", "instructions", "allowed_values"} <= value.keys():
+                spec = value.get("spec")
+                has_proposition = isinstance(spec, Mapping) and isinstance(
+                    spec.get("proposition_text"), str
+                )
+                has_legacy_source = isinstance(
+                    value.get("subject_text"), str
+                ) or isinstance(value.get("source_text"), str)
+                if has_proposition or has_legacy_source:
+                    return value
+            for nested in value.values():
+                match = find(nested)
+                if match is not None:
+                    return match
+        elif isinstance(value, list):
+            for nested in value:
+                match = find(nested)
+                if match is not None:
+                    return match
+        return None
+
+    return find(context)
 
 
 def _classifier_source_text(request: Mapping[str, Any], spec: Any) -> str | None:

@@ -270,6 +270,9 @@ class PlanningOptions:
     max_concurrent_questions: int = 4
     use_provider_schema: bool = True
     provider: str = "unknown"
+    decision_client: PlanningModelClient | None = None
+    decision_provider: str = "JEV"
+    decision_model: str = "jev-latest"
     telemetry_sink: Callable[[Mapping[str, Any]], None] | None = None
     deterministic_telemetry_sink: Callable[[Mapping[str, Any]], None] | None = None
 
@@ -646,6 +649,7 @@ def advance_planning_session(
     # Results are committed in frontier order through one writer. The providers
     # run concurrently, but checkpoint heads never race.
     for result in accepted_results:
+        uses_decision_client = result.question.kind == "review_structural_candidate"
         append_checkpoint(
             PlanningCheckpoint.answer_accepted(
                 session_id=session.session_id,
@@ -654,7 +658,20 @@ def advance_planning_session(
                 parent_digest=parent,
                 question=result.question,
                 accepted_answer=result.raw_answer,
-                validation_result={"accepted": True, "attempts": result.attempts},
+                validation_result={
+                    "accepted": True,
+                    "attempts": result.attempts,
+                    "provider": (
+                        options.decision_provider
+                        if uses_decision_client
+                        else options.provider
+                    ),
+                    "model": (
+                        options.decision_model
+                        if uses_decision_client
+                        else options.model
+                    ),
+                },
                 id_counters=journal.id_counters,
             )
         )
@@ -709,7 +726,21 @@ def _run_question_batch(
     ) -> tuple[QuestionRequest[Any], Any, Exception | None, str, dict[str, Any]]:
         output = StringIO()
         started = time.monotonic()
-        telemetry_client = _QuestionTelemetryClient(client)
+        uses_decision_client = request.question.kind == "review_structural_candidate"
+        request_client = (
+            options.decision_client
+            if uses_decision_client and options.decision_client is not None
+            else client
+        )
+        if uses_decision_client and options.decision_client is None:
+            raise PlanningServiceError(
+                "structural candidate reviews require the configured Jev "
+                "decision client"
+            )
+        request_model = (
+            options.decision_model if uses_decision_client else options.model
+        )
+        telemetry_client = _QuestionTelemetryClient(request_client)
         error: Exception | None = None
         request_chars = None
         try:
@@ -727,7 +758,7 @@ def _run_question_batch(
             result = run_question(
                 telemetry_client,
                 request,
-                model=options.model,
+                model=request_model,
                 stderr=output,
                 max_transport_retries=options.max_transport_retries,
                 transport_backoff_seconds=options.transport_backoff_seconds,
@@ -783,8 +814,10 @@ def _run_question_batch(
             "api_calls": telemetry_client.api_calls,
             "provider_failures": telemetry_client.provider_failures,
             "elapsed_ms": round((time.monotonic() - started) * 1000, 3),
-            "provider": options.provider,
-            "model": options.model,
+            "provider": (
+                options.decision_provider if uses_decision_client else options.provider
+            ),
+            "model": request_model,
             "outcome": (
                 "error"
                 if error is not None
@@ -861,6 +894,7 @@ def _question_phase(kind: str) -> str:
         return "dependency-and-pr-slicing"
     if kind in {
         "enumerate_structural_subjects",
+        "review_structural_candidate",
         "describe_structural_change",
         "check_validation_coverage",
     }:

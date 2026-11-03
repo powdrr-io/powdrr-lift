@@ -4,8 +4,10 @@ import hashlib
 from types import SimpleNamespace
 from typing import Any
 
+import powdrr_service.planning.driver as driver_module
 import powdrr_service.planning.structrr as structrr_module
 import pytest
+from powdrr_service.decision_classifier import _classifier_request
 from powdrr_service.planning.assembly import PlannedWrite, WorkUnit
 from powdrr_service.planning.contracts import PlanningContractError
 from powdrr_service.planning.dependencies import Validation
@@ -27,6 +29,7 @@ from powdrr_service.planning.structrr import (
     StructuralSubjectPage,
     UnorderedStructrrConflict,
     bind_structural_operation,
+    build_structural_candidate_review_request,
     build_structural_change_request,
     build_subject_enumeration_request,
     compile_structrr_plan,
@@ -317,6 +320,86 @@ def test_structural_subject_answer_is_reasked_when_projected_context_changes() -
     assert machine._request_is_pending(requests[0], {question_id: stale_answer})
 
 
+def test_structural_candidates_are_reviewed_before_enumeration(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    text = "# Plan\n\nChange the existing behavior.\n"
+    source = segment_markdown_source(
+        PinnedSourceDocument(
+            repository="owner/repo",
+            commit_sha="a" * 40,
+            path="docs/plan.md",
+            blob_sha="b" * 40,
+            content_sha256=hashlib.sha256(text.encode()).hexdigest(),
+            text=text,
+        )
+    )
+    source_ref = source.anchors[0].id
+    unit = _unit()
+    candidate = BoundStructuralSubject(
+        "entity-01",
+        "entities",
+        "item-0001",
+        "changed",
+        ("req-01",),
+        (unit.id,),
+        (source_ref,),
+        False,
+    )
+    monkeypatch.setattr(
+        driver_module,
+        "_planned_existing_structural_subjects",
+        lambda *args, **kwargs: (candidate,),
+    )
+    machine: Any = SourceLedgerQuestionMachine(
+        source,
+        plan_id="plan-01",
+        structrr_baseline={
+            "entities": [{"id": "entity-01", "type": "Module", "name": "behavior"}],
+            "entity_relationships": [],
+            "files": [],
+            "source_subjects": [],
+        },
+    )
+    item_record = {
+        "id": "item-0001",
+        "dependencies": [],
+        "allowed_paths": [],
+        "acceptance_criteria": [],
+        "unit_ids": [unit.id],
+        "units": [unit],
+    }
+    machine._structrr_item_records = lambda _answers: (item_record,)
+    machine.accepted_assembly = lambda _answers, *, plan_id: SimpleNamespace(
+        dependency_graph=SimpleNamespace(item_order=("item-0001",), item_edges=())
+    )
+    machine.accepted_ledger = lambda _answers: SimpleNamespace(
+        requirements=(SimpleNamespace(id="req-01", source_refs=(source_ref,)),)
+    )
+
+    review = machine._structrr_requests({})[0]
+    assert review.question.kind == "review_structural_candidate"
+    machine.set_accepted_question_input_digests(
+        {review.question.question_id: review.question.input_digest}
+    )
+
+    enumeration = machine._structrr_requests(
+        {review.question.question_id: {"relevant": False}}
+    )[0]
+
+    assert enumeration.question.kind == "enumerate_structural_subjects"
+    baseline_fact = next(
+        fact.value
+        for fact in enumeration.accepted_facts
+        if fact.ref_id.startswith("projected-structrr:")
+    )
+    assert baseline_fact["entities"] == []
+    assert not any(
+        fact.ref_id.startswith("prior-subject-summary:")
+        for fact in enumeration.accepted_facts
+    )
+
+
 def test_planned_file_subjects_do_not_need_structural_llm_calls() -> None:
     text = "# Plan\n\nImplement the requested behavior.\n"
     source = segment_markdown_source(
@@ -411,6 +494,107 @@ def test_subject_enumeration_uses_unique_refs_for_repeated_planned_write_paths()
     assert f"planned-write:{unit.id}:src/new.py:duplicate-2" in (
         request.question.context_ref_ids
     )
+
+
+def test_existing_structural_candidate_gets_a_narrow_boolean_review() -> None:
+    text = "# Plan\n\nChange the existing behavior.\n"
+    source = segment_markdown_source(
+        PinnedSourceDocument(
+            repository="owner/repo",
+            commit_sha="a" * 40,
+            path="docs/plan.md",
+            blob_sha="b" * 40,
+            content_sha256=hashlib.sha256(text.encode()).hexdigest(),
+            text=text,
+        )
+    )
+    source_ref = source.anchors[0].id
+    subject = BoundStructuralSubject(
+        "entity-01",
+        "entities",
+        "item-0001",
+        "changed",
+        ("req-01",),
+        ("unit-01",),
+        (source_ref,),
+        False,
+    )
+    baseline = {
+        "entities": [{"id": "entity-01", "type": "Module", "name": "behavior"}],
+        "entity_relationships": [],
+        "source_subjects": [],
+        "files": [],
+    }
+    request = build_structural_candidate_review_request(
+        subject,
+        source=source,
+        units=(_unit(),),
+        projected_baseline=baseline,
+    )
+
+    request.validate()
+    assert request.question.kind == "review_structural_candidate"
+    assert request.answer_schema["properties"]["relevant"]["type"] == "boolean"
+    assert request.parse_answer({"relevant": True}) is True
+    assert request.parse_answer({"relevant": False}) is False
+    assert request.question.input_digest.startswith("sha256:")
+    assert source_ref in request.question.context_ref_ids
+    classifier = next(
+        fact.value for fact in request.accepted_facts if "classifier" in fact.ref_id
+    )
+    assert classifier["allowed_values"] == ["true", "false"]
+    assert classifier["subject_text"].endswith("changed.")
+    jev_request = _classifier_request(
+        build_question_messages(request), request.answer_schema
+    )
+    assert jev_request is not None
+    assert jev_request["allowed_values"] == ["true", "false"]
+    assert jev_request["output_property"]["type"] == "boolean"
+    assert any("merely nearby" in item for item in jev_request["instructions"])
+
+
+def test_rejected_candidates_are_hidden_and_cannot_be_enumerated_again() -> None:
+    text = "# Plan\n\nChange the existing behavior.\n"
+    source = segment_markdown_source(
+        PinnedSourceDocument(
+            repository="owner/repo",
+            commit_sha="a" * 40,
+            path="docs/plan.md",
+            blob_sha="b" * 40,
+            content_sha256=hashlib.sha256(text.encode()).hexdigest(),
+            text=text,
+        )
+    )
+    source_ref = source.anchors[0].id
+    baseline = {
+        "entities": [{"id": "entity-01", "type": "Module", "name": "behavior"}],
+        "entity_relationships": [],
+        "files": [],
+    }
+    request = build_subject_enumeration_request(
+        plan_id="plan-01",
+        item_id="item-0001",
+        units=(_unit(),),
+        source=source,
+        source_refs=(source_ref,),
+        projected_baseline=baseline,
+        excluded_subject_ids=(("entities", "entity-01"),),
+    )
+
+    baseline_fact = next(
+        fact.value
+        for fact in request.accepted_facts
+        if fact.ref_id.startswith("projected-structrr:")
+    )
+    assert baseline_fact["entities"] == []
+    with pytest.raises(PlanningContractError):
+        request.parse_answer(
+            {
+                "records": [_record("entity-01")],
+                "has_more": False,
+                "next_anchor": None,
+            }
+        )
 
 
 def test_planned_file_mislabeled_as_entity_is_recovered_deterministically() -> None:

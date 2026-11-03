@@ -10,6 +10,10 @@ from typing import Any, cast
 
 import yaml
 from powdrr_service.specifications.common import validate_related_module_references
+from powdrr_service.specifications.proposed_pr_coverage import (
+    ProposedPRSourceDocument,
+    validate_proposed_pr_coverage_and_effects,
+)
 from powdrr_service.structrr.verification_contract import (
     VERIFICATION_CONTRACT_FIELDS,
     VerificationContract,
@@ -40,11 +44,6 @@ _EFFECT_SECTIONS = (
 _EFFECT_SOURCE_FILES = (
     "architecture-specification.yaml",
     "implementation-specification.yaml",
-)
-_FEATURE_COVERAGE_SECTIONS = (
-    "requirements",
-    "acceptance_criteria",
-    "expected_tests",
 )
 _CONTENT_SECTIONS = (
     "requirements",
@@ -1080,19 +1079,23 @@ def _build_multi_proposed_pr_validation_report(
         proposed_pr_ids=tuple(ids.values()),
         issues=issues,
     )
-    _validate_multi_pr_feature_coverage(
-        raw_spec,
-        repo_root=repo_root,
-        work_item_name=work_item_name,
-        proposed_pr_ids=tuple(ids.values()),
-        issues=issues,
-    )
-    _validate_v1_effect_equivalence(
-        raw_spec,
-        repo_root=repo_root,
-        work_item_name=work_item_name,
-        file_path=file_path,
-        issues=issues,
+    issues.extend(
+        PRSpecificationValidationIssue(
+            code=issue.code, message=issue.message, path=issue.path
+        )
+        for issue in validate_proposed_pr_coverage_and_effects(
+            proposed_pr_specification_yaml,
+            proposed_pr_ids=tuple(ids.values()),
+            feature_coverage_source=_load_feature_coverage_source(
+                repo_root=repo_root,
+                work_item_name=work_item_name,
+            ),
+            effect_sources=_load_effect_sources(
+                repo_root=repo_root,
+                work_item_name=work_item_name,
+                file_path=file_path,
+            ),
+        ).issues
     )
     return PRSpecificationValidationReport(
         validation_successful=not issues,
@@ -1168,142 +1171,51 @@ def _validate_feature_change_sections(
                 )
 
 
-def _validate_multi_pr_feature_coverage(
-    raw_spec: Mapping[str, Any],
-    *,
-    repo_root: Path,
-    work_item_name: str,
-    proposed_pr_ids: Sequence[str],
-    issues: list[PRSpecificationValidationIssue],
-) -> None:
-    """Require every authoritative feature item to have one proposed-PR owner."""
+def _load_feature_coverage_source(
+    *, repo_root: Path, work_item_name: str
+) -> ProposedPRSourceDocument | None:
     source_path = (
         repo_root / PROPOSALS_ROOT / work_item_name / "feature-pr-specification.yaml"
     )
     if not source_path.is_file():
-        return
+        return None
     try:
-        source = _load_yaml_mapping(source_path.read_text(encoding="utf-8"))
+        return ProposedPRSourceDocument(
+            path=str(source_path),
+            yaml_content=source_path.read_text(encoding="utf-8"),
+        )
     except Exception as exc:  # noqa: BLE001
-        issues.append(
-            PRSpecificationValidationIssue(
-                "invalid_feature_coverage_source",
-                f"Could not read feature coverage source: {exc}",
-                str(source_path),
-            )
-        )
-        return
+        return ProposedPRSourceDocument(path=str(source_path), read_error=str(exc))
 
-    authoritative: dict[str, set[str]] = {}
-    for section in _FEATURE_COVERAGE_SECTIONS:
-        ids: set[str] = set()
-        raw_items = source.get(section, [])
-        if not isinstance(raw_items, Sequence) or isinstance(raw_items, (str, bytes)):
-            continue
-        for index, raw_item in enumerate(raw_items):
-            if not isinstance(raw_item, Mapping):
-                continue
-            item_id = _optional_string(raw_item.get("id"))
-            if item_id is None:
-                issues.append(
-                    PRSpecificationValidationIssue(
-                        "feature_coverage_id_missing",
-                        "Authoritative feature coverage items require an id.",
-                        f"{source_path}:{section}[{index}].id",
-                    )
-                )
-                continue
-            if item_id in ids:
-                issues.append(
-                    PRSpecificationValidationIssue(
-                        "duplicate_feature_coverage_id",
-                        f"Authoritative feature item id {item_id!r} is duplicated.",
-                        f"{source_path}:{section}[{index}].id",
-                    )
-                )
-            ids.add(item_id)
-        if ids:
-            authoritative[section] = ids
 
-    owners: dict[str, dict[str, str]] = {section: {} for section in authoritative}
-    known_pr_ids = _normalize_identifier_set(proposed_pr_ids)
-    for index, raw_pr in enumerate(
-        _coerce_sequence(
-            raw_spec.get("proposed_prs"),
-            path="proposed_prs",
-            issues=issues,
-            issue_code="invalid_proposed_prs_section",
-            issue_message="proposed_prs must be a list of proposed PR mappings.",
-        )
-    ):
-        if not isinstance(raw_pr, Mapping):
+def _load_effect_sources(
+    *,
+    repo_root: Path,
+    work_item_name: str,
+    file_path: str | Path | None,
+) -> tuple[ProposedPRSourceDocument, ...]:
+    proposal_dir = (
+        Path(file_path).resolve().parent
+        if file_path is not None
+        else repo_root / PROPOSALS_ROOT / work_item_name
+    )
+    sources: list[ProposedPRSourceDocument] = []
+    for filename in _EFFECT_SOURCE_FILES:
+        source_path = proposal_dir / filename
+        if not source_path.is_file():
             continue
-        proposed_pr_id = _optional_string(raw_pr.get("id"))
-        if proposed_pr_id is None:
-            continue
-        for section, expected_ids in authoritative.items():
-            raw_values = raw_pr.get(section, [])
-            if not isinstance(raw_values, Sequence) or isinstance(
-                raw_values, (str, bytes)
-            ):
-                issues.append(
-                    PRSpecificationValidationIssue(
-                        "invalid_feature_coverage_section",
-                        f"{section} must be a list of ids in each proposed PR.",
-                        f"proposed_prs[{index}].{section}",
-                    )
-                )
-                continue
-            for value_index, raw_value in enumerate(raw_values):
-                coverage_id = _optional_string(raw_value)
-                path = f"proposed_prs[{index}].{section}[{value_index}]"
-                if coverage_id is None:
-                    issues.append(
-                        PRSpecificationValidationIssue(
-                            "feature_coverage_id_missing",
-                            f"{section} entries must be non-empty ids.",
-                            path,
-                        )
-                    )
-                    continue
-                if coverage_id not in expected_ids:
-                    issues.append(
-                        PRSpecificationValidationIssue(
-                            "unknown_feature_coverage_id",
-                            f"{coverage_id!r} is not an authoritative {section} id.",
-                            path,
-                        )
-                    )
-                    continue
-                if coverage_id in owners[section]:
-                    issues.append(
-                        PRSpecificationValidationIssue(
-                            "duplicate_feature_coverage_assignment",
-                            f"{section} id {coverage_id!r} is assigned to both "
-                            f"{owners[section][coverage_id]!r} and {proposed_pr_id!r}.",
-                            path,
-                        )
-                    )
-                owners[section][coverage_id] = proposed_pr_id
-                if _normalize_identifier(proposed_pr_id) not in known_pr_ids:
-                    issues.append(
-                        PRSpecificationValidationIssue(
-                            "unknown_proposed_pr_id",
-                            f"Proposed PR id {proposed_pr_id!r} is not declared.",
-                            f"proposed_prs[{index}].id",
-                        )
-                    )
-    for section, expected_ids in authoritative.items():
-        missing = sorted(expected_ids - set(owners[section]))
-        if missing:
-            issues.append(
-                PRSpecificationValidationIssue(
-                    "uncovered_feature_items",
-                    f"Every authoritative {section} item must be assigned to a "
-                    f"proposed PR; missing: {', '.join(missing)}.",
-                    f"proposed_prs.*.{section}",
+        try:
+            sources.append(
+                ProposedPRSourceDocument(
+                    path=str(source_path),
+                    yaml_content=source_path.read_text(encoding="utf-8"),
                 )
             )
+        except Exception as exc:  # noqa: BLE001
+            sources.append(
+                ProposedPRSourceDocument(path=str(source_path), read_error=str(exc))
+            )
+    return tuple(sources)
 
 
 def _validate_dependency_graph(
@@ -1336,112 +1248,6 @@ def _validate_dependency_graph(
 
     for node in graph:
         visit(node, ())
-
-
-def _validate_v1_effect_equivalence(
-    raw_spec: Mapping[str, Any],
-    *,
-    repo_root: Path,
-    work_item_name: str,
-    file_path: str | Path | None,
-    issues: list[PRSpecificationValidationIssue],
-) -> None:
-    proposal_dir = (
-        Path(file_path).resolve().parent
-        if file_path is not None
-        else repo_root / PROPOSALS_ROOT / work_item_name
-    )
-    source_effects: dict[str, list[tuple[str, str]]] = {
-        section: [] for section in _EFFECT_SECTIONS
-    }
-    seen_source_effects: dict[str, set[tuple[str, str]]] = {
-        section: set() for section in _EFFECT_SECTIONS
-    }
-    found_source = False
-    for filename in _EFFECT_SOURCE_FILES:
-        path = proposal_dir / filename
-        if not path.is_file():
-            continue
-        found_source = True
-        try:
-            data = _load_yaml_mapping(path.read_text(encoding="utf-8"))
-        except Exception as exc:  # noqa: BLE001
-            issues.append(
-                PRSpecificationValidationIssue(
-                    "invalid_effect_source",
-                    f"Could not read v1 effect source: {exc}",
-                    str(path),
-                )
-            )
-            continue
-        for section in _EFFECT_SECTIONS:
-            raw_items = data.get(section, [])
-            if not isinstance(raw_items, Sequence) or isinstance(
-                raw_items, (str, bytes)
-            ):
-                continue
-            for item in raw_items:
-                if isinstance(item, Mapping):
-                    item_id = _optional_string(item.get("id"))
-                    action = _optional_string(item.get("action"))
-                    if item_id is not None and action is not None:
-                        effect = (item_id, action)
-                        if effect not in seen_source_effects[section]:
-                            seen_source_effects[section].add(effect)
-                            source_effects[section].append(effect)
-    if not found_source:
-        return
-    proposed_effects: dict[str, list[tuple[str, str]]] = {
-        section: [] for section in _EFFECT_SECTIONS
-    }
-    seen_proposed_effects: dict[str, set[tuple[str, str]]] = {
-        section: set() for section in _EFFECT_SECTIONS
-    }
-    for section in _EFFECT_SECTIONS:
-        raw_items = raw_spec.get(section, [])
-        if not isinstance(raw_items, Sequence) or isinstance(raw_items, (str, bytes)):
-            continue
-        for item in raw_items:
-            if isinstance(item, Mapping):
-                item_id = _optional_string(item.get("id"))
-                action = _optional_string(item.get("action"))
-                if item_id is not None and action is not None:
-                    effect = (item_id, action)
-                    if effect not in seen_proposed_effects[section]:
-                        seen_proposed_effects[section].add(effect)
-                        proposed_effects[section].append(effect)
-    for section in _EFFECT_SECTIONS:
-        if proposed_effects[section] != source_effects[section]:
-            expected = source_effects[section]
-            actual = proposed_effects[section]
-            missing = [effect for effect in expected if effect not in actual]
-            unexpected = [effect for effect in actual if effect not in expected]
-            details = [
-                f"Expected ordered id/action pairs: {_format_effect_pairs(expected)}.",
-                f"Actual ordered id/action pairs: {_format_effect_pairs(actual)}.",
-            ]
-            if missing:
-                details.append(f"Missing: {_format_effect_pairs(missing)}.")
-            if unexpected:
-                details.append(f"Unexpected: {_format_effect_pairs(unexpected)}.")
-            issues.append(
-                PRSpecificationValidationIssue(
-                    "v1_effect_mismatch",
-                    f"Proposed PR {section} entries do not match the authoritative "
-                    "ordered id/action effects. " + " ".join(details),
-                    f"proposed_prs.{section}",
-                )
-            )
-
-
-def _format_effect_pairs(effects: Sequence[tuple[str, str]]) -> str:
-    if not effects:
-        return "[]"
-    return (
-        "["
-        + ", ".join(f"({item_id!r}, {action!r})" for item_id, action in effects)
-        + "]"
-    )
 
 
 def _collect_dependent_pr_ids(

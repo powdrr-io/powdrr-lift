@@ -360,6 +360,21 @@ def test_implementation_specification_policy_is_service_owned() -> None:
     )
 
 
+def test_proposed_pr_coverage_policy_is_service_owned() -> None:
+    from powdrr_service.specifications.proposed_pr_coverage import (
+        validate_proposed_pr_coverage_and_effects,
+    )
+
+    import powdrr_lift.core.pr_specification as agent_pr_specification
+
+    assert not hasattr(agent_pr_specification, "_validate_multi_pr_feature_coverage")
+    assert not hasattr(agent_pr_specification, "_validate_v1_effect_equivalence")
+    assert (
+        agent_pr_specification.validate_proposed_pr_coverage_and_effects
+        is validate_proposed_pr_coverage_and_effects
+    )
+
+
 def test_legacy_service_imports_are_explicitly_owned() -> None:
     repository = Path(__file__).parents[1]
     allowlist = json.loads(

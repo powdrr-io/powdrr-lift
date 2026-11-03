@@ -105,6 +105,13 @@ def _owner(path: str) -> tuple[str, str, str]:
                 "architecture evidence",
                 "8",
             )
+        if path.endswith("/proposed_pr_coverage.py"):
+            return (
+                "service",
+                "proposed-PR coverage and effect-equivalence policy over supplied "
+                "YAML evidence",
+                "8",
+            )
         return (
             "service",
             "service-owned structured specification validation policy",

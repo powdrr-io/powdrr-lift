@@ -1385,6 +1385,7 @@
         "powdrr_lift.core.template_generation",
         "powdrr_lift.core.validation_messages",
         "powdrr_service.specifications.common",
+        "powdrr_service.specifications.proposed_pr_coverage",
         "powdrr_service.structrr.verification_contract"
       ],
       "kind": "python_module",
@@ -3819,6 +3820,15 @@
       "owner": "service",
       "path": "packages/service/src/powdrr_service/specifications/implementation.py",
       "rationale": "implementation-specification validation over supplied architecture evidence",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/specifications/proposed_pr_coverage.py",
+      "rationale": "proposed-PR coverage and effect-equivalence policy over supplied YAML evidence",
       "reviewed": false
     }
   ],

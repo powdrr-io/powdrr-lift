@@ -24,6 +24,12 @@ from powdrr_service.specifications.implementation import (
     build_implementation_specification_validation_report,
     summarize_architecture_specification_yaml,
 )
+from powdrr_service.specifications.proposed_pr_coverage import (
+    ProposedPRCoverageIssue,
+    ProposedPRCoverageResult,
+    ProposedPRSourceDocument,
+    validate_proposed_pr_coverage_and_effects,
+)
 from powdrr_service.specifications.system import (
     SystemSpecificationValidationIssue,
     SystemSpecificationValidationReport,
@@ -52,4 +58,8 @@ __all__ = [
     "ImplementationSpecificationValidationReport",
     "build_implementation_specification_validation_report",
     "summarize_architecture_specification_yaml",
+    "ProposedPRCoverageIssue",
+    "ProposedPRCoverageResult",
+    "ProposedPRSourceDocument",
+    "validate_proposed_pr_coverage_and_effects",
 ]

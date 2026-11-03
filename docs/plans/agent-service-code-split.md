@@ -515,7 +515,11 @@ required validation cannot be reported as success. Worker commits remain visible
    instruction classification and contract compilation, classifier-input
    formatting, prompt-case validation/variant generation, and the semantic
    prompt-case corpus into service-owned planning/evaluation modules and
-   resources.
+   resources. Artifact-state reconstruction and projection for bootstrap,
+   entities, relationships, workflows, plans, changelogs, and pull requests
+   now run through the service operation. The agent gathers only the selected
+   commit-pinned documents plus per-file Git provenance; all CLI area options
+   use the serialized bridge.
 2. Remove the legacy-import allowlist and private compatibility shims. An old
    executable entry point may remain as a thin local-composition delegator;
    the public agent package must not depend on it.

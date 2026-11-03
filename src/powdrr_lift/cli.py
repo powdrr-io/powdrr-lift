@@ -18,6 +18,10 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from powdrr_agent.artifact_state import (
+    RepositorySnapshotError,
+    collect_artifact_state_snapshot,
+)
 from powdrr_contracts.models import (
     Artifact,
     OperationRequest,
@@ -72,7 +76,6 @@ from powdrr_lift.agent_feature import (
     DEFAULT_FEATURE_TIMEOUT_SECONDS,
     run_agent_feature_task,
 )
-from powdrr_lift.artifact_state import ArtifactStateError, build_artifact_state
 from powdrr_lift.blame_ui import serve as serve_blame_ui
 from powdrr_lift.core import (
     architecture_specification_default_output_path,
@@ -5049,45 +5052,29 @@ def _run_artifact_state(args: argparse.Namespace) -> int:
     ]
     if args.pull_requests:
         requested_areas.append("pull_requests")
-    if requested_areas == ["workflows"]:
-        from powdrr_agent.artifact_state import collect_workflow_snapshot
-        from powdrr_local import JsonServiceBridge, LocalPowdrrService
-
-        try:
-            request = collect_workflow_snapshot(
-                repo_root,
-                branch=args.branch,
-                sha=args.sha,
-                repository_id=args.repository or "",
-                request_id=str(uuid.uuid4()),
-            )
-            update = JsonServiceBridge(LocalPowdrrService()).start(request)
-        except (OSError, ValueError) as error:
-            print(f"Could not build artifact state: {error}", file=sys.stderr)
-            return 1
-        if update.status != "succeeded" or not update.output_artifacts:
-            message = (
-                update.failure.message
-                if update.failure
-                else "service returned no projection"
-            )
-            print(f"Could not build artifact state: {message}", file=sys.stderr)
-            return 1
-        print(update.output_artifacts[0].data.decode("utf-8"))
-        return 0
     try:
-        report = build_artifact_state(
+        request = collect_artifact_state_snapshot(
             repo_root,
             branch=args.branch,
             sha=args.sha,
-            repository=args.repository,
-            include_github=not args.no_github,
+            repository_id=args.repository or "",
+            request_id=str(uuid.uuid4()),
             areas=requested_areas or None,
+            include_github=not args.no_github,
         )
-    except ArtifactStateError as error:
+        update = JsonServiceBridge(LocalPowdrrService()).start(request)
+    except (OSError, RepositorySnapshotError, ValueError) as error:
         print(f"Could not build artifact state: {error}", file=sys.stderr)
         return 1
-    print(json.dumps(report, sort_keys=True))
+    if update.status != "succeeded" or not update.output_artifacts:
+        message = (
+            update.failure.message
+            if update.failure
+            else "service returned no projection"
+        )
+        print(f"Could not build artifact state: {message}", file=sys.stderr)
+        return 1
+    print(update.output_artifacts[0].data.decode("utf-8"))
     return 0
 
 

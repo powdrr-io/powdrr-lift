@@ -6,19 +6,29 @@ import json
 import re
 import subprocess
 from collections.abc import Mapping, Sequence
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 import yaml
-from powdrr_service.changelog import parse_change_log
 
-from powdrr_lift.core.index import ChangelogDocument
-from powdrr_lift.workrr.github_issue_queue import parse_reviewed_plan_yaml
+from powdrr_service.changelog import parse_change_log
+from powdrr_service.planning.plan_document import parse_reviewed_plan_yaml
 
 
 class ArtifactStateError(ValueError):
     """The requested repository revision cannot be inspected."""
+
+
+@dataclass(frozen=True)
+class ChangelogDocument:
+    pr_number: int
+    changelog_path: Path
+    changelog: Any
+    commit_sha: str | None
+    commit_timestamp: int | None
+    commit_subject: str | None
 
 
 def build_artifact_state(
@@ -29,6 +39,7 @@ def build_artifact_state(
     repository: str | None = None,
     include_github: bool = True,
     areas: Sequence[str] | None = None,
+    source_history: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Build a read-only artifact inventory for a commit reachable from a branch.
 
@@ -70,13 +81,17 @@ def build_artifact_state(
     paths = _git(root, "ls-tree", "-r", "--name-only", commit).splitlines()
     needs_bootstrap = bool(selected_areas & {"bootstrap", "entities", "relationships"})
     bootstrap_path, bootstrap, bootstrap_commit_time = (
-        _load_bootstrap(root, paths, commit) if needs_bootstrap else (None, None, None)
+        _load_bootstrap(root, paths, commit, source_history)
+        if needs_bootstrap
+        else (None, None, None)
     )
     needs_changelogs = bool(
         selected_areas & {"changelogs", "entities", "relationships"}
     )
     changelog_documents = (
-        _load_changelogs(root, paths, commit) if needs_changelogs else []
+        _load_changelogs(root, paths, commit, source_history)
+        if needs_changelogs
+        else []
     )
     entities = (
         _materialize_entities(
@@ -215,7 +230,10 @@ def _read_yaml_at(root: Path, commit: str, path: str) -> object:
 
 
 def _load_bootstrap(
-    root: Path, paths: list[str], commit: str
+    root: Path,
+    paths: list[str],
+    commit: str,
+    source_history: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> tuple[str | None, Mapping[str, Any] | None, int | None]:
     candidates = [
         path
@@ -229,17 +247,31 @@ def _load_bootstrap(
             "https://powdrr.io/schema/structrr-bootstrap-v1"
         ):
             continue
-        result = subprocess.run(
-            ["git", "-C", str(root), "log", "-1", "--format=%ct", commit, "--", path],
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        timestamp = (
-            int(result.stdout.strip())
-            if result.returncode == 0 and result.stdout.strip()
-            else 0
-        )
+        history = (source_history or {}).get(path, {})
+        if history.get("timestamp") is not None:
+            timestamp = int(history["timestamp"])
+        else:
+            result = subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(root),
+                    "log",
+                    "-1",
+                    "--format=%ct",
+                    commit,
+                    "--",
+                    path,
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            timestamp = (
+                int(result.stdout.strip())
+                if result.returncode == 0 and result.stdout.strip()
+                else 0
+            )
         ranked.append((timestamp, path, document))
     if not ranked:
         return None, None, None
@@ -248,7 +280,10 @@ def _load_bootstrap(
 
 
 def _load_changelogs(
-    root: Path, paths: list[str], commit: str
+    root: Path,
+    paths: list[str],
+    commit: str,
+    source_history: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> list[ChangelogDocument]:
     changelog_paths = [
         path
@@ -279,7 +314,17 @@ def _load_changelogs(
         if match is None:
             continue
         pr_number = int(match.group(1))
+        source_record = (source_history or {}).get(path, {})
         commit_record = history.get(pr_number)
+        if source_record:
+            try:
+                commit_record = (
+                    str(source_record["sha"]),
+                    int(source_record["timestamp"]),
+                    str(source_record["subject"]),
+                )
+            except (KeyError, TypeError, ValueError):
+                pass
         if commit_record is None:
             result = subprocess.run(
                 [

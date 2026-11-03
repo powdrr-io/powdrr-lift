@@ -68,26 +68,36 @@ class LocalPowdrrService:
                 "invalid_request",
                 "Repository snapshot is required.",
             )
-        areas = request.inputs.get("areas", ["workflows"])
-        if areas != ["workflows"]:
+        areas = request.inputs.get("areas")
+        if areas is not None and (
+            not isinstance(areas, list)
+            or not all(isinstance(area, str) for area in areas)
+        ):
             return _failed(
                 request.request_id,
-                "unsupported_projection",
-                "This boundary slice supports workflow inspection.",
+                "invalid_request",
+                "Artifact-state areas must be an array of strings.",
             )
         try:
-            projection = self._inspect_workflows(request)
+            projection = self._inspect_artifacts(request)
         except (ValueError, OSError, subprocess.SubprocessError) as exc:
             return _failed(request.request_id, "artifact_inspection_failed", str(exc))
         payload = json.dumps(projection, sort_keys=True, separators=(",", ":")).encode()
+        selected_areas = projection["selected_areas"]
         return OperationUpdate(
             operation_id=request.request_id,
             revision=1,
             status="succeeded",
-            progress=({"phase": "artifact_state_reconstructed", "area": "workflows"},),
+            progress=(
+                {"phase": "artifact_state_reconstructed", "areas": selected_areas},
+            ),
             output_artifacts=(
                 Artifact(
-                    artifact_id="artifact-state/workflows.json",
+                    artifact_id=(
+                        f"artifact-state/{selected_areas[0]}.json"
+                        if len(selected_areas) == 1
+                        else "artifact-state/state.json"
+                    ),
                     media_type="application/vnd.powdrr.artifact-state+json",
                     data=payload,
                 ),
@@ -569,26 +579,35 @@ class LocalPowdrrService:
             ),
         )
 
-    def _inspect_workflows(self, request: OperationRequest) -> dict[str, Any]:
+    def _inspect_artifacts(self, request: OperationRequest) -> dict[str, Any]:
         repository = request.repository
         assert repository is not None
         with tempfile.TemporaryDirectory(prefix="powdrr-service-snapshot-") as temp:
             root = Path(temp).resolve()
-            _write_snapshot(root, request, path_prefix="docs/workflows/")
+            _write_snapshot(root, request)
             _initialize_snapshot_git(root)
             commit = _git(root, "rev-parse", "HEAD").strip()
-            # Importing the legacy implementation is a temporary PR 2 migration
-            # edge; it receives a service-owned snapshot directory, never the
-            # agent's repository path or a callback into it.
-            from powdrr_lift.artifact_state import build_artifact_state
+            from powdrr_service.artifact_state import build_artifact_state
+
+            source_history = {
+                artifact.artifact_id: {
+                    "sha": artifact.attributes.get("source_commit_sha"),
+                    "timestamp": artifact.attributes.get("source_commit_timestamp"),
+                    "subject": artifact.attributes.get("source_commit_subject"),
+                }
+                for artifact in request.artifacts
+                if artifact.media_type == "application/vnd.powdrr.source-file"
+                and artifact.attributes.get("source_commit_sha")
+            }
 
             result = build_artifact_state(
                 root,
                 branch="snapshot",
                 sha=commit,
                 repository=repository.repository_id,
-                include_github=False,
-                areas=["workflows"],
+                include_github=bool(request.inputs.get("include_github", True)),
+                areas=request.inputs.get("areas"),
+                source_history=source_history,
             )
         result["branch"] = repository.branch
         result["sha"] = repository.head_sha

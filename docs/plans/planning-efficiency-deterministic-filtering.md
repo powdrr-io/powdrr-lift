@@ -660,6 +660,31 @@ the general batch limit at four; the existing input-size subdivision and
 per-member parsers still handle batching safely. No completed live report was
 written for this failed run.
 
+### Larger bounded batches for source extraction (2026-11-03)
+
+The large profile spends most of its provider calls extracting and paginating
+requirements. Source extraction now batches up to six independent questions,
+with a 32,000-character limit on the combined batch input. Each individual
+question remains limited to 24,000 characters, and the existing member parsers
+still validate each page and its source-specific cursor. Every other question
+kind retains a four-member maximum. The benchmark reports the maximum batch size
+by question kind and enforces those limits.
+
+The deterministic large profile still matched 500 requirements, 150 work units,
+and 50 plan items with no retries. Total calls fell from 236 to 205, with
+source-ledger calls falling from 125 to 94. In a live large run using
+`deepinfra-cheap` / `deepseek-ai/DeepSeek-V4-Flash-0731`, concurrency eight, and
+a 30-second per-call timeout, planning completed in 368.024 seconds with 303
+calls, 500 requirements, and 125 work units. Six was the observed maximum
+extraction batch size; work-unit batches remained at two or fewer. The run had
+zero validation retries and passed the live sizing gate with 61 items. The
+previous successful concurrency-eight run took 405.426 seconds and 335 calls;
+this is a 9.2% lower elapsed time and 9.6% fewer calls, but it is not a
+controlled comparison because provider-generated questions and outputs vary.
+Token telemetry is unavailable. The 50-item fixture target was not met, while
+all actual item-size bounds passed. The report is saved at
+`/tmp/planning-extraction-six-live.json`.
+
 ## Cross-cutting test requirements
 
 - Use mocked nontrivial provider responses. Do not use live-model calls as the only proof that a contract works.

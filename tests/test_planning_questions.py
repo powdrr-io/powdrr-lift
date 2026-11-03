@@ -272,9 +272,11 @@ def test_batch_question_request_preserves_each_question_schema_and_identity() ->
         batch.parse_answer({"answers": {"q-000001": _VALID_PAGE}})
 
 
-def test_batch_question_requests_keep_default_batch_size_at_four() -> None:
+def test_batch_question_requests_keep_non_extraction_default_at_four() -> None:
     requests = tuple(
-        _request(_question(f"q-{index:06d}", f"block-{index:02d}"))
+        _request(
+            _question(f"q-{index:06d}", f"block-{index:02d}", kind="describe_item")
+        )
         for index in range(1, 9)
     )
 
@@ -291,6 +293,20 @@ def test_batch_question_requests_keep_default_batch_size_at_four() -> None:
         ) == {request.question.question_id: _VALID_PAGE for request in members}
 
 
+def test_extraction_batch_uses_six_when_input_bound_allows() -> None:
+    requests = tuple(
+        _request(_question(f"q-{index:06d}", f"block-{index:02d}"))
+        for index in range(1, 7)
+    )
+
+    (batch,) = batch_question_requests(requests)
+
+    assert len(batch.batch_members) == 6
+    assert batch.parse_answer(
+        {"answers": {request.question.question_id: _VALID_PAGE for request in requests}}
+    ) == {request.question.question_id: _VALID_PAGE for request in requests}
+
+
 def test_oversized_batch_correction_subdivides_and_revalidates_each_member() -> None:
     requests = tuple(
         _request(
@@ -298,6 +314,7 @@ def test_oversized_batch_correction_subdivides_and_revalidates_each_member() -> 
                 f"q-{index:06d}",
                 f"block-{index:02d}",
                 (f"evidence-{index:02d}",),
+                kind="describe_item",
             ),
             accepted_facts=(
                 ContextRecord(f"evidence-{index:02d}", {"body": "c" * 1800}),

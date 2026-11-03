@@ -3,12 +3,16 @@ from __future__ import annotations
 import hashlib
 import json
 import subprocess
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
 from powdrr_local.planning.source import read_pinned_source
 from powdrr_service.planning.contracts import PlanningContractError
 from powdrr_service.planning.questions import (
+    MAX_QUESTION_INPUT_CHARS,
+    MAX_SOURCE_EXTRACTION_BATCH_INPUT_CHARS,
+    QuestionInputTooLarge,
     batch_question_requests,
     build_question_messages,
 )
@@ -512,23 +516,28 @@ def test_extraction_questions_batch_with_distinct_pagination_candidates() -> Non
     segmented = segment_markdown_source(
         _document(
             "# Plan\n\n"
-            "First requirement must work. Second requirement must persist.\n\n"
-            "Third requirement must be logged. Fourth requirement must be reported.\n"
+            + "\n\n".join(
+                f"Requirement {index} must be implemented." for index in range(1, 7)
+            )
+            + "\n"
         )
     )
     blocks = [block for block in segmented.blocks if block.kind == "paragraph"]
-    assert len(blocks) == 2
+    assert len(blocks) == 6
     anchors = {anchor.id: anchor for anchor in segmented.anchors}
     requests = tuple(
         build_extract_requirements_request(block, anchors=anchors) for block in blocks
     )
 
     (batch,) = batch_question_requests(requests)
+    assert len(batch.batch_members) == 6
+    assert batch.max_input_chars == MAX_SOURCE_EXTRACTION_BATCH_INPUT_CHARS
+    with pytest.raises(QuestionInputTooLarge) as error:
+        build_question_messages(
+            replace(batch, max_input_chars=MAX_QUESTION_INPUT_CHARS)
+        )
+    assert error.value.limit_chars == MAX_QUESTION_INPUT_CHARS
     packet = json.loads(build_question_messages(batch)[1]["content"])
-
-    assert len(batch.batch_members) == 2
-    assert requests[0].exact_question == requests[1].exact_question
-    assert requests[0].answer_field_definitions == requests[1].answer_field_definitions
     shared_contract = next(
         item["value"]
         for item in packet["accepted_facts"]

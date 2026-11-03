@@ -1,0 +1,36 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1342
+title: Verify isolated agent distributions in CI
+intent:
+  problem: The agent package metadata looked isolated, but CI did not verify the contents or runtime imports of built distributions.
+  goal: Build the agent and contracts wheel and source distributions, compare packaged agent files against ownership, and prove they import without service, local, or legacy packages.
+human-decisions: []
+structured_files: []
+files:
+  - path: .github/workflows/ci.yml
+    type: modified
+    span:
+      start_line: 117
+      end_line: 119
+    summary: Run the distribution isolation audit as a required CI step.
+    rationale: Keep package boundary checks from depending on a developer running a local packaging command.
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span:
+      start_line: 783
+      end_line: 791
+    summary: Assign the new distribution audit script to the agent verification tooling.
+    rationale: Keep the source ownership inventory complete.
+  - path: scripts/verify-agent-distribution.py
+    type: added
+    span:
+      start_line: 1
+      end_line: 176
+    summary: Build agent and contracts distributions, inspect their contents, and install them in an isolated environment.
+    rationale: Verify the open agent package contains only inventoried agent code and imports with private packages unavailable.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []
+features: []
+proposed_prs: []

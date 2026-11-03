@@ -114,6 +114,9 @@ jobs:
       - name: Validate Procedrr process catalog
         run: uv run powdrr-lift validate-procedrr-processes
 
+      - name: Verify isolated agent distributions
+        run: uv run python scripts/verify-agent-distribution.py
+
       - name: Run tests
         run: uv run pytest -n auto --cov=powdrr_lift --cov=powdrr_service --cov=powdrr_contracts --cov=powdrr_local --cov=powdrr_agent --cov-branch --cov-report=term-missing --cov-report=xml tests
 

@@ -1,6 +1,6 @@
 # Planning Efficiency Through Deterministic Filtering
 
-**Status:** Core reductions landed; labeled dependency recall and candidate telemetry are covered; work-unit planning receives pinned repository language preferences; the scale benchmark now saves full reports and prints compact summaries
+**Status:** Core reductions landed; dependency candidate precision now rejects generic repeated output labels while preserving explicit references with distinctive terms; a live validation rerun is still needed
 **Date:** 2026-11-01  
 **Owner:** Powdrr-Lift planning service  
 **Related change:** [PR #1283](https://github.com/powdrr-io/powdrr-lift/pull/1283) starts deterministic Structrr candidate selection for path-bound existing subjects.
@@ -460,6 +460,19 @@ calls. These counts point to source-ledger and dependency candidate review as
 the largest call groups. The 190 dependency-confirmation calls reviewed 570
 candidates and classified all 570 as independent, making candidate precision
 the clearest next optimization target.
+
+The dependency candidate filter now requires an exact output-phrase reference
+to contain at least one token that is uncommon across planned work units. This
+removes generic repeated labels while retaining named references, including
+phrases with only one distinctive token. Focused tests cover both behaviors and
+the existing labeled dependency-recall fixtures. The deterministic large
+profile does not emit pending outputs, so it cannot measure this filter. A live
+large rerun stopped during source-ledger extraction, before dependency
+discovery: correction context for three source blocks exceeded its input bound
+and left the ledger incomplete after 56 provider calls. Its report is saved at
+`.powdrr/benchmark-reports/planning-scale-20261103T032053788963Z.json`. This is
+not evidence about candidate reduction; rerun the live profile after the
+source-ledger input-bound issue is addressed.
 
 ## Cross-cutting test requirements
 

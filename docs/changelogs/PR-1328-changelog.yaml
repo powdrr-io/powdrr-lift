@@ -1,0 +1,41 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1328
+title: Prune generic planning dependency candidates
+intent:
+  problem: Repeated generic output phrases were creating dependency confirmation candidates even though the large live plan classified all 570 reviewed candidates as independent.
+  goal: Require explicit output-phrase candidates to contain at least one uncommon work-unit token while retaining other evidence paths and labeled dependency recall.
+human-decisions: []
+structured_files: []
+files:
+  - path: packages/service/src/powdrr_service/planning/dependencies.py
+    type: modified
+    span: {start_line: 387, end_line: 389}
+    summary: Count output-phrase tokens that are uncommon across planned work units.
+    rationale: Reduce generic dependency candidates while preserving named outputs, repository paths, requirement links, and code-reference evidence.
+  - path: packages/service/src/powdrr_service/planning/dependencies.py
+    type: modified
+    span: {start_line: 407, end_line: 412}
+    summary: Require an exact output-phrase candidate to contain at least one uncommon token.
+    rationale: Prevent repeated generic output labels from creating semantic dependency review candidates.
+  - path: tests/test_planning_dependencies.py
+    type: modified
+    span: {start_line: 281, end_line: 359}
+    summary: Cover pruning generic repeated labels and retaining references with one distinctive token.
+    rationale: Protect precision improvements without losing explicit dependency candidates.
+  - path: docs/plans/planning-efficiency-deterministic-filtering.md
+    type: modified
+    span: {start_line: 3, end_line: 3}
+    summary: Update the plan status with the dependency candidate precision change and pending live validation.
+    rationale: Keep the planning record aligned with implementation and measured validation status.
+  - path: docs/plans/planning-efficiency-deterministic-filtering.md
+    type: modified
+    span: {start_line: 464, end_line: 476}
+    summary: Record the candidate filter behavior and that the live rerun stopped before dependency discovery.
+    rationale: Distinguish unit-test coverage from live candidate-reduction evidence and preserve the source-ledger blocker.
+entities: []
+entity_relationships: []
+invariants:
+  - id: generic-output-phrases-do-not-create-dependency-candidates
+    description: An exact repeated output phrase creates a lexical dependency candidate only when it includes a token uncommon across planned work units.
+    action: altered
+guidance: []

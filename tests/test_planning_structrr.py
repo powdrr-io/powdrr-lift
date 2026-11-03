@@ -723,6 +723,60 @@ def test_structural_page_example_does_not_repeat_prior_subjects() -> None:
     request.parse_answer(request.valid_example)
 
 
+def test_structural_enumeration_includes_path_scoped_basedpyright_symbols() -> None:
+    text = "# Plan\n\nUpdate the parser.\n"
+    source = segment_markdown_source(
+        PinnedSourceDocument(
+            repository="owner/repo",
+            commit_sha="a" * 40,
+            path="docs/plan.md",
+            blob_sha="b" * 40,
+            content_sha256=hashlib.sha256(text.encode()).hexdigest(),
+            text=text,
+        )
+    )
+    source_ref = source.anchors[0].id
+    unit = _unit(
+        writes=(PlannedWrite("src/parser.py", "implementation", "python", (), ()),)
+    )
+    symbols: dict[str, list[dict[str, Any]]] = {
+        "src/parser.py": [
+            {
+                "name": "parse",
+                "kind": "function",
+                "range": {
+                    "start_line": 4,
+                    "start_character": 0,
+                    "end_line": 8,
+                    "end_character": 0,
+                },
+            }
+        ],
+        "src/unplanned.py": [{"name": "ignored", "kind": "function"}],
+    }
+
+    request = build_subject_enumeration_request(
+        plan_id="plan-01",
+        item_id="item-0001",
+        units=(unit,),
+        source=source,
+        source_refs=(source_ref,),
+        projected_baseline={"entities": [], "entity_relationships": []},
+        basedpyright_symbols_by_path=symbols,
+    )
+
+    fact = next(
+        item
+        for item in request.accepted_facts
+        if item.ref_id == "basedpyright-symbols:item-0001"
+    )
+    assert fact.value == {
+        "symbols_by_path": {"src/parser.py": symbols["src/parser.py"]}
+    }
+    assert "basedpyright-symbols:item-0001" in request.question.context_ref_ids
+    assert "BasedPyright symbol inventory" in request.exact_question
+
+
 def test_structural_page_correction_fits_with_many_prior_subjects() -> None:
     text = (
         "# Plan\n\n## First area\n"

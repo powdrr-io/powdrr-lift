@@ -351,6 +351,10 @@ class SourceLedgerQuestionMachine:
             [Sequence[WorkUnit]], Mapping[tuple[str, str], Sequence[str]]
         ]
         | None = None,
+        structural_symbol_search: Callable[
+            [Sequence[str]], Mapping[str, Sequence[Mapping[str, Any]]]
+        ]
+        | None = None,
         verification_command: str = "make test",
         repository_paths: Mapping[str, PathFact] | None = None,
         preferred_runtimes: Sequence[str] = (),
@@ -365,6 +369,9 @@ class SourceLedgerQuestionMachine:
         self.evidence_search = evidence_search
         self.evidence_excerpt_reader = evidence_excerpt_reader
         self.dependency_reference_search = dependency_reference_search
+        self.structural_symbol_search = structural_symbol_search
+        self._structural_symbol_cache_key: tuple[str, ...] | None = None
+        self._structural_symbol_cache: Mapping[str, Sequence[Mapping[str, Any]]] = {}
         self._dependency_reference_cache_key: tuple[Any, ...] | None = None
         self._dependency_reference_cache: Mapping[tuple[str, str], Sequence[str]] = {}
         self._evidence_search_cache: dict[str, RequirementEvidenceSearch] = {}
@@ -1467,6 +1474,26 @@ class SourceLedgerQuestionMachine:
         ledger = self.accepted_ledger(accepted_answers)
         requirement_by_id = {item.id: item for item in ledger.requirements}
         record_by_id = {str(record["id"]): record for record in item_records}
+        planned_python_paths = tuple(
+            sorted(
+                {
+                    write.path
+                    for record in item_records
+                    for unit in record["units"]
+                    for write in unit.planned_writes
+                    if write.path.casefold().endswith((".py", ".pyi"))
+                }
+            )
+        )
+        if (
+            self.structural_symbol_search is not None
+            and planned_python_paths
+            and planned_python_paths != self._structural_symbol_cache_key
+        ):
+            self._structural_symbol_cache = self.structural_symbol_search(
+                planned_python_paths
+            )
+            self._structural_symbol_cache_key = planned_python_paths
         order = assembly.dependency_graph.item_order
         prerequisites: dict[str, set[str]] = {item_id: set() for item_id in order}
         for edge in assembly.dependency_graph.item_edges:
@@ -1537,6 +1564,16 @@ class SourceLedgerQuestionMachine:
                         prior_subjects=item_subjects,
                         page_ordinal=page_ordinal,
                         baseline_digest=baseline_digest,
+                        basedpyright_symbols_by_path={
+                            path: self._structural_symbol_cache[path]
+                            for path in planned_python_paths
+                            if path in self._structural_symbol_cache
+                            and any(
+                                write.path == path
+                                for unit in units
+                                for write in unit.planned_writes
+                            )
+                        },
                     )
                     answer = accepted_answers.get(
                         enumeration_request.question.question_id

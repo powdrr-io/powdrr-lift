@@ -14,6 +14,7 @@ from typing import Any, Literal, Protocol
 from powdrr_agent.repository import (
     LocalActionError,
     execute_command,
+    find_workspace_document_symbols,
     find_workspace_reference_paths,
     find_workspace_symbols,
     inspect_pinned_checkout,
@@ -411,6 +412,23 @@ def search_dependency_reference_paths(
     return {
         pair: tuple(sorted(paths)) for pair, paths in sorted(candidate_paths.items())
     }
+
+
+def search_structural_document_symbols(
+    repository_root: str | Path,
+    base_commit: str,
+    paths: Sequence[str],
+) -> dict[str, list[dict[str, Any]]]:
+    """Read BasedPyright symbols from the clean checkout pinned by the plan."""
+    root = Path(repository_root).resolve()
+    _require_clean_pinned_checkout(root, base_commit)
+    normalized_paths = tuple(sorted(set(paths)))
+    try:
+        return find_workspace_document_symbols(
+            list(normalized_paths), worktree_root=root
+        )
+    except PowdrrExecutionError as error:
+        raise EvidenceError(f"structural symbol search failed: {error}") from error
 
 
 def read_pinned_code_file(

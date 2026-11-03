@@ -224,6 +224,17 @@ def find_workspace_reference_paths(
     return find(paths, worktree_root=worktree_root)
 
 
+def find_workspace_document_symbols(
+    paths: list[str], *, worktree_root: Path
+) -> dict[str, list[dict[str, Any]]]:
+    """Return BasedPyright document symbols for bounded planned Python paths."""
+    from powdrr_lift.basedpyright_tools import (
+        find_workspace_document_symbols as find,
+    )
+
+    return find(paths, worktree_root=worktree_root)
+
+
 def digest_at_path(repo_root: str | Path, relative_path: str) -> str | None:
     """Observe a safe in-repository file digest for an optimistic precondition."""
     root = Path(repo_root).resolve()

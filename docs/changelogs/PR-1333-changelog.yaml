@@ -1,0 +1,125 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1333
+title: Add BasedPyright symbols to Structrr planning
+intent:
+  problem: Structrr planning relies on baseline path bindings and semantic enumeration but does not expose current BasedPyright symbols from the planned Python files to the item-level reviewer.
+  goal: Query a bounded set of planned Python files once, add each item's own symbol inventory to its durable enumeration context, and preserve safe resume behavior through the question input digest.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/plans/planning-efficiency-deterministic-filtering.md
+    type: modified
+    span: {start_line: 62, end_line: 70}
+    summary: Record the BasedPyright symbol-context slice of the Structrr planning milestone.
+    rationale: Keep the optimization plan synchronized with the implementation and its resume behavior.
+  - path: packages/agent/src/powdrr_agent/repository.py
+    type: modified
+    span: {start_line: 227, end_line: 237}
+    summary: Expose bounded document-symbol lookup through the agent repository adapter.
+    rationale: Keep BasedPyright access behind the repository capability boundary.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 354, end_line: 357}
+    summary: Accept an optional structural symbol search callback.
+    rationale: Keep service planning independent of the local BasedPyright implementation.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 372, end_line: 374}
+    summary: Cache symbol search results by the complete planned path set.
+    rationale: Avoid repeating static analysis during Structrr question reconstruction and resume.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 1477, end_line: 1496}
+    summary: Query symbols once for all planned Python write paths.
+    rationale: Scope analysis to files the plan may change and share one result across items.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 1567, end_line: 1576}
+    summary: Pass only the current item's planned-path symbols to its enumeration request.
+    rationale: Keep candidate context relevant to the item's allocated changes.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 563, end_line: 564}
+    summary: Add an optional path-indexed symbol inventory to Structrr enumeration.
+    rationale: Make static code evidence an explicit input to structural subject review.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 633, end_line: 658}
+    summary: Add path-scoped symbol facts to context and the question digest.
+    rationale: Persist exact candidate evidence in the review context and invalidate stale answers when it changes.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 704, end_line: 706}
+    summary: Include BasedPyright facts in the enumeration input digest.
+    rationale: Bind accepted answers to the static symbol evidence used during review.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 720, end_line: 723}
+    summary: Guide the reviewer to treat symbols as candidates and avoid inferred relationships.
+    rationale: Use code-analysis evidence without treating symbol presence or proximity as proof of a structural change.
+  - path: src/powdrr_lift/basedpyright_tools.py
+    type: modified
+    span: {start_line: 22, end_line: 22}
+    summary: Set a per-file limit for document symbol results.
+    rationale: Bound structural analysis output rather than silently truncating candidates.
+  - path: src/powdrr_lift/basedpyright_tools.py
+    type: modified
+    span: {start_line: 176, end_line: 240}
+    summary: Query document symbols for a deduplicated bounded set of planned Python paths in one language-server session.
+    rationale: Reuse BasedPyright efficiently while excluding unplanned repository files from item context.
+  - path: src/powdrr_lift/basedpyright_tools.py
+    type: modified
+    span: {start_line: 565, end_line: 578}
+    summary: Count nested symbols before accepting the bounded result.
+    rationale: Reject oversized inventories instead of returning incomplete static evidence.
+  - path: src/powdrr_lift/workrr/planning/evidence.py
+    type: modified
+    span: {start_line: 17, end_line: 17}
+    summary: Import the BasedPyright document-symbol capability.
+    rationale: Keep local pinned-checkout analysis behind the planning evidence adapter.
+  - path: src/powdrr_lift/workrr/planning/evidence.py
+    type: modified
+    span: {start_line: 417, end_line: 433}
+    summary: Verify the pinned clean checkout before searching planned source symbols.
+    rationale: Ensure symbol results describe the base commit recorded by the plan.
+  - path: src/powdrr_lift/workrr/planning_session.py
+    type: modified
+    span: {start_line: 60, end_line: 60}
+    summary: Import the pinned structural symbol search adapter.
+    rationale: Connect the local planning session to repository analysis.
+  - path: src/powdrr_lift/workrr/planning_session.py
+    type: modified
+    span: {start_line: 229, end_line: 230}
+    summary: Initialize path-keyed structural symbol caching.
+    rationale: Reuse the one analysis result as planning reconstructs questions.
+  - path: src/powdrr_lift/workrr/planning_session.py
+    type: modified
+    span: {start_line: 259, end_line: 279}
+    summary: Run pinned symbol analysis and retain baseline review if it is unavailable.
+    rationale: Add static evidence without making a missing local analyzer prevent planning.
+  - path: src/powdrr_lift/workrr/planning_session.py
+    type: modified
+    span: {start_line: 291, end_line: 291}
+    summary: Inject the local symbol search into the planning machine.
+    rationale: Keep repository-specific analysis outside the service planning core.
+  - path: tests/test_basedpyright_tools.py
+    type: modified
+    span: {start_line: 12, end_line: 12}
+    summary: Import the document-symbol search adapter for testing.
+    rationale: Cover the new bounded code-analysis entry point.
+  - path: tests/test_basedpyright_tools.py
+    type: modified
+    span: {start_line: 119, end_line: 149}
+    summary: Test deduplication, ordering, and single-session querying across planned files.
+    rationale: Verify the adapter analyzes only supplied Python paths and reuses one language-server session.
+  - path: tests/test_planning_structrr.py
+    type: modified
+    span: {start_line: 726, end_line: 779}
+    summary: Test that Structrr questions carry only their planned-path symbol inventory.
+    rationale: Protect path scoping, durable context references, and question input binding.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []
+features: []
+proposed_prs: []

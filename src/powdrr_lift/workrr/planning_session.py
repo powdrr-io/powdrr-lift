@@ -57,6 +57,7 @@ from powdrr_lift.workrr.planning.evidence import (
     read_evidence_excerpt,
     search_dependency_reference_paths,
     search_requirements_evidence,
+    search_structural_document_symbols,
 )
 from powdrr_lift.workrr.provider_runtime import (
     build_workflow_client,
@@ -225,6 +226,8 @@ def run_planning_session(
         taxonomy = load_entity_taxonomy(repo_root, _structrr_taxonomy_path(repo_root))
         dependency_reference_cache_key: tuple[Any, ...] | None = None
         dependency_reference_cache: Mapping[tuple[str, str], tuple[str, ...]] = {}
+        structural_symbol_cache_key: tuple[str, ...] | None = None
+        structural_symbol_cache: Mapping[str, Sequence[Mapping[str, Any]]] = {}
 
         def search_dependency_references(
             units: Sequence[WorkUnit],
@@ -253,6 +256,27 @@ def run_planning_session(
             dependency_reference_cache_key = cache_key
             return dependency_reference_cache
 
+        def search_structural_symbols(
+            paths: Sequence[str],
+        ) -> Mapping[str, Sequence[Mapping[str, Any]]]:
+            nonlocal structural_symbol_cache_key, structural_symbol_cache
+            cache_key = tuple(sorted(set(paths)))
+            if cache_key == structural_symbol_cache_key:
+                return structural_symbol_cache
+            try:
+                structural_symbol_cache = search_structural_document_symbols(
+                    repo_root, base_commit, cache_key
+                )
+            except EvidenceError as error:
+                print(
+                    "BasedPyright Structrr symbol search unavailable; "
+                    f"continuing with baseline candidates and semantic review: {error}",
+                    file=stream,
+                )
+                structural_symbol_cache = {}
+            structural_symbol_cache_key = cache_key
+            return structural_symbol_cache
+
         machine = SourceLedgerQuestionMachine(
             source,
             evidence_search=lambda requirements: search_requirements_evidence(
@@ -264,6 +288,7 @@ def run_planning_session(
                 repo_root, evidence
             ),
             dependency_reference_search=search_dependency_references,
+            structural_symbol_search=search_structural_symbols,
             verification_command=verification_command,
             repository_paths=_planning_repository_paths(
                 repo_root, base_commit, pinned_source.text

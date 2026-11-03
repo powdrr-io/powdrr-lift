@@ -59,6 +59,15 @@ shape mismatch, not a quality pass. The run's first copy of the full JSON report
 was too large for terminal capture. This follow-up adds a local full-report
 artifact and compact console summary, then records a second large run below.
 
+PR #1332 records actual per-item sizes and judges live results against the
+allocator's work-unit, acceptance-criteria, and component bounds. This follow-up
+adds a single bounded BasedPyright document-symbol query across planned Python
+write paths and supplies each Structrr enumeration question with only the symbol
+inventory for that item's paths. The symbol result is included in the question's
+input digest so resumed answers are invalidated if the pinned analysis changes.
+If BasedPyright is unavailable, planning keeps the existing baseline candidates
+and semantic review path.
+
 ### Milestone 0: Record a baseline and expose planning cost
 
 **Purpose:** Establish which phases dominate elapsed time and provide a before/after comparison for every optimization.

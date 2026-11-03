@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 import sys
+from datetime import UTC, datetime
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 from typing import Any, cast
@@ -23,6 +25,10 @@ fixture_shape_mismatches = _BENCHMARK.fixture_shape_mismatches
 dependency_candidate_summary = _BENCHMARK.dependency_candidate_summary
 dependency_metrics_for = _BENCHMARK.dependency_metrics_for
 unresolved_question_diagnostics = _BENCHMARK.unresolved_question_diagnostics
+compact_profile_summary = _BENCHMARK.compact_profile_summary
+planning_report_artifact_path = _BENCHMARK.planning_report_artifact_path
+write_planning_report_artifact = _BENCHMARK.write_planning_report_artifact
+progress_client = _BENCHMARK._ProgressClient
 example_answer_client: Any = _BENCHMARK._ExampleAnswerClient
 
 
@@ -213,6 +219,105 @@ def test_resolved_question_is_removed_from_unresolved_diagnostics() -> None:
     )
 
     assert unresolved_question_diagnostics((needs_answer, accepted)) == []
+
+
+def test_compact_summary_omits_large_shape_diagnostics_but_keeps_run_metrics() -> None:
+    report = {
+        "profile": "large",
+        "provider": "deepinfra-cheap",
+        "model": "example-model",
+        "terminal_status": "succeeded",
+        "elapsed_seconds": 972.3,
+        "requirements": 500,
+        "work_units": 150,
+        "plan_items": 57,
+        "provider_api_calls": 900,
+        "provider_requests": 1200,
+        "validation_retries": 4,
+        "phases": {
+            "confirm_dependency": {
+                "questions": 600,
+                "api_calls": 150,
+                "elapsed_ms": 4_200,
+            }
+        },
+        "by_question_kind": {"confirm_dependency": {"questions": 600}},
+        "dependency_candidates": {
+            "output_consumer_candidate_count": 600,
+            "confirmation_answer_count": 590,
+            "by_output": [{"verbose": "per-output diagnostic"}] * 500,
+        },
+        "fixture_shape_diagnostics": {
+            "requirements": [
+                {"statement": "large raw requirement payload"} for _ in range(500)
+            ],
+            "items": [{"title": "large generated item payload"} for _ in range(57)],
+        },
+        "pending_questions": [],
+    }
+
+    summary = compact_profile_summary(report)
+    serialized = json.dumps(summary)
+
+    assert summary["elapsed_seconds"] == 972.3
+    assert summary["provider_api_calls"] == 900
+    assert summary["plan_items"] == 57
+    assert summary["phases"]["confirm_dependency"] == {
+        "questions": 600,
+        "api_calls": 150,
+        "provider_call_elapsed_ms": 4_200,
+    }
+    assert summary["dependency_candidates"] == {
+        "output_consumer_candidate_count": 600,
+        "confirmation_answer_count": 590,
+    }
+    assert "large raw requirement payload" not in serialized
+    assert "large generated item payload" not in serialized
+    assert "by_output" not in serialized
+    assert len(serialized) < 2_000
+
+
+def test_full_report_artifact_is_saved_separately_from_console_summary(
+    tmp_path: Path,
+) -> None:
+    report = {
+        "schema": "planning-scale-report-v1",
+        "profiles": [{"profile": "large", "fixture_shape_diagnostics": [1, 2, 3]}],
+    }
+    report_path = tmp_path / "reports" / "planning-scale.json"
+
+    write_planning_report_artifact(report, report_path)
+
+    assert json.loads(report_path.read_text(encoding="utf-8")) == report
+
+
+def test_default_report_artifact_path_is_timestamped_under_powdrr() -> None:
+    timestamp = datetime(2026, 11, 2, 23, 59, 58, tzinfo=UTC)
+
+    path = planning_report_artifact_path(Path("/repo"), timestamp=timestamp)
+
+    assert path == Path(
+        "/repo/.powdrr/benchmark-reports/planning-scale-20261102T235958000000Z.json"
+    )
+
+
+def test_live_progress_logs_periodically_instead_of_for_every_request(
+    capsys: Any,
+) -> None:
+    class Client:
+        def complete_json(self, *_args: Any, **_kwargs: Any) -> dict[str, Any]:
+            return {"ok": True}
+
+    client = progress_client(Client())
+
+    for _ in range(26):
+        assert client.complete_json([]) == {"ok": True}
+
+    progress = capsys.readouterr().err
+    assert progress.count("Live benchmark completed") == 1
+    assert "25 provider calls" in progress
+    assert "request 1 started" not in progress
+    assert "request 1 finished" not in progress
 
 
 def test_blocked_live_report_diagnoses_unanchored_c_runtime_path() -> None:

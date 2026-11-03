@@ -20,6 +20,7 @@ import time
 from collections import Counter, defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from threading import Lock
 from typing import Any
@@ -84,6 +85,113 @@ PROFILES = {
 }
 
 
+def compact_profile_summary(report: Mapping[str, Any]) -> dict[str, Any]:
+    """Return useful run metrics without large requirement and plan diagnostics."""
+    dependency_candidates = report.get("dependency_candidates")
+    dependency_count_fields = (
+        "pending_output_count",
+        "output_consumer_candidate_count",
+        "confirmation_question_count",
+        "confirmation_answer_count",
+        "required_dependency_count",
+        "independent_candidate_count",
+        "pending_confirmation_count",
+    )
+    dependency_summary = None
+    if isinstance(dependency_candidates, Mapping):
+        dependency_summary = {
+            key: dependency_candidates[key]
+            for key in dependency_count_fields
+            if key in dependency_candidates
+        }
+    phases = report.get("phases")
+    question_kinds = report.get("by_question_kind")
+    compact_phases = (
+        {
+            name: {
+                "questions": values.get("questions"),
+                "api_calls": values.get("api_calls"),
+                "provider_call_elapsed_ms": values.get("elapsed_ms"),
+            }
+            for name, values in phases.items()
+            if isinstance(phases, Mapping) and isinstance(values, Mapping)
+        }
+        if isinstance(phases, Mapping)
+        else {}
+    )
+    compact_question_kinds = (
+        {
+            name: {
+                "questions": values.get("questions"),
+                "api_calls": values.get("api_calls"),
+            }
+            for name, values in question_kinds.items()
+            if isinstance(question_kinds, Mapping) and isinstance(values, Mapping)
+        }
+        if isinstance(question_kinds, Mapping)
+        else {}
+    )
+    return {
+        key: report.get(key)
+        for key in (
+            "profile",
+            "provider",
+            "model",
+            "concurrency",
+            "provider_timeout_seconds",
+            "terminal_status",
+            "elapsed_seconds",
+            "source_blocks",
+            "requirements",
+            "work_units",
+            "plan_items",
+            "provider_api_calls",
+            "provider_requests",
+            "accepted_answer_pages",
+            "deterministic_answers",
+            "validation_retries",
+            "prompt_tokens",
+            "completion_tokens",
+            "token_usage_known",
+            "fixture_shape_status",
+            "fixture_shape_mismatches",
+            "expected_work_unit_range",
+            "work_unit_requirement_counts",
+        )
+    } | {
+        "phases": compact_phases,
+        "by_question_kind": compact_question_kinds,
+        "dependency_candidates": dependency_summary,
+        "dependency_candidates_unavailable_reason": report.get(
+            "dependency_candidates_unavailable_reason"
+        ),
+        "unresolved_question_count": len(report.get("pending_questions", ())),
+        "compile_error": report.get("compile_error"),
+    }
+
+
+def planning_report_artifact_path(
+    repository_root: Path, *, timestamp: datetime | None = None
+) -> Path:
+    """Choose a unique ignored artifact path for a full benchmark report."""
+    run_time = timestamp or datetime.now(UTC)
+    filename = f"planning-scale-{run_time.strftime('%Y%m%dT%H%M%S%fZ')}.json"
+    return repository_root / ".powdrr" / "benchmark-reports" / filename
+
+
+def write_planning_report_artifact(report: Mapping[str, Any], path: Path) -> None:
+    """Persist the full report independently of the compact console summary."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+
+
+def _display_report_path(path: Path, repository_root: Path) -> str:
+    try:
+        return path.relative_to(repository_root).as_posix()
+    except ValueError:
+        return str(path)
+
+
 def fixture_shape_mismatches(
     profile: Profile, report: Mapping[str, Any]
 ) -> dict[str, tuple[Any, Any]]:
@@ -144,10 +252,10 @@ def dependency_candidate_summary(
             pending_output.description,
             pending_output.requirement_ids,
         )
-        ordinal = output_ordinals.get(key)
-        if ordinal is None:
+        output_ordinal = output_ordinals.get(key)
+        if output_ordinal is None:
             raise ValueError("dependency candidate references an unknown output")
-        output = by_output[ordinal]
+        output = by_output[output_ordinal]
         output["candidate_consumers"] = int(output["candidate_consumers"]) + 1
         if result is None:
             output["pending"] = int(output["pending"]) + 1
@@ -239,6 +347,7 @@ class _ProgressClient:
     def __init__(self, client: Any) -> None:
         self._client = client
         self._call_number = 0
+        self._completed_count = 0
         self._call_number_lock = Lock()
 
     @property
@@ -273,11 +382,6 @@ class _ProgressClient:
             except (KeyError, TypeError, json.JSONDecodeError):
                 pass
         started = time.perf_counter()
-        print(
-            f"Live benchmark request {call_number} started ({kind}).",
-            file=sys.stderr,
-            flush=True,
-        )
         try:
             result = self._client.complete_json(
                 messages, response_schema=response_schema
@@ -292,12 +396,16 @@ class _ProgressClient:
             )
             raise
         elapsed = time.perf_counter() - started
-        print(
-            f"Live benchmark request {call_number} finished in "
-            f"{elapsed:.1f}s ({kind}).",
-            file=sys.stderr,
-            flush=True,
-        )
+        with self._call_number_lock:
+            self._completed_count += 1
+            completed_count = self._completed_count
+        if completed_count % 25 == 0:
+            print(
+                f"Live benchmark completed {completed_count} provider calls; "
+                f"most recent: {kind} in {elapsed:.1f}s.",
+                file=sys.stderr,
+                flush=True,
+            )
         return result
 
 
@@ -817,6 +925,14 @@ def main() -> int:
         default=120,
         help="Per-provider-call timeout in live mode (default: 120).",
     )
+    parser.add_argument(
+        "--report-file",
+        type=Path,
+        help=(
+            "Path for the full JSON report. Defaults to a timestamped artifact "
+            "under .powdrr/benchmark-reports."
+        ),
+    )
     args = parser.parse_args()
     if args.live and args.profile == "all":
         parser.error("--live requires one explicit --profile to control provider cost")
@@ -825,6 +941,9 @@ def main() -> int:
     if args.timeout_seconds <= 0:
         parser.error("--timeout-seconds must be positive")
     repository_root = Path(__file__).resolve().parents[1]
+    report_path = args.report_file or planning_report_artifact_path(repository_root)
+    if not report_path.is_absolute():
+        report_path = repository_root / report_path
     selected = (
         tuple(PROFILES.values()) if args.profile == "all" else (PROFILES[args.profile],)
     )
@@ -865,9 +984,14 @@ def main() -> int:
         )
         for profile in selected
     ]
-    print(
-        json.dumps({"schema": "planning-scale-report-v1", "profiles": report}, indent=2)
-    )
+    full_report = {"schema": "planning-scale-report-v1", "profiles": report}
+    write_planning_report_artifact(full_report, report_path)
+    summary = {
+        "schema": "planning-scale-summary-v1",
+        "report_file": _display_report_path(report_path, repository_root),
+        "profiles": [compact_profile_summary(item) for item in report],
+    }
+    print(json.dumps(summary, indent=2))
     if args.live and any(
         item["terminal_status"] != "succeeded" or item["fixture_shape_mismatches"]
         for item in report

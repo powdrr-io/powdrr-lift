@@ -1,0 +1,379 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1324
+title: Move architecture specification policy to service
+intent:
+  problem: Architecture specification rules and shared specification-v1 policies still
+    lived in agent core modules.
+  goal: Move semantic rules into the service and pass repository evidence from the
+    agent adapter as content.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/plans/agent-service-code-split.md
+  type: modified
+  span:
+    start_line: 495
+    end_line: 500
+  summary: Record completed architecture and shared specification-v1 policy extraction.
+  rationale: Keep the remaining validator work explicit in the split plan.
+- path: packages/service/src/powdrr_service/specifications/__init__.py
+  type: modified
+  span:
+    start_line: 3
+    end_line: 18
+  summary: Export architecture and shared specification-v1 validation policies.
+  rationale: Make the moved policies available through the service package.
+- path: packages/service/src/powdrr_service/specifications/__init__.py
+  type: modified
+  span:
+    start_line: 29
+    end_line: 40
+  summary: Add public exports for the new service-owned policy functions and results.
+  rationale: Define the service module's supported policy surface.
+- path: packages/service/src/powdrr_service/specifications/architecture.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 863
+  summary: Implement architecture specification validation over supplied YAML and
+    system specification evidence.
+  rationale: Keep semantic validation policy in the service without filesystem access.
+- path: packages/service/src/powdrr_service/specifications/common.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 460
+  summary: Move shared specification-v1 normalization, module/tool validation, and
+    reference rules into the service.
+  rationale: Keep shared specification semantics out of agent modules.
+- path: scripts/build-agent-service-ownership-inventory.py
+  type: modified
+  span:
+    start_line: 88
+    end_line: 100
+  summary: Classify the new service-owned specification policy modules.
+  rationale: Keep future ownership inventory generation aligned with this extraction.
+- path: scripts/build-agent-service-ownership-inventory.py
+  type: modified
+  span:
+    start_line: 121
+    end_line: 134
+  summary: Describe the agent-side architecture evidence adapter and file normalizer
+    ownership.
+  rationale: Keep future ownership inventory generation aligned with this extraction.
+- path: tests/test_agent_service_contracts.py
+  type: modified
+  span:
+    start_line: 304
+    end_line: 333
+  summary: Assert service isolation and that the agent architecture module delegates
+    to service policy.
+  rationale: Prevent semantic validation from drifting back into agent modules.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 1087
+    end_line: 1088
+  summary: Record that the agent adapter collects system specification evidence and
+    calls service policy.
+  rationale: Keep architecture ownership and import edges accurate.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 1088
+    end_line: 1090
+  summary: Record that the agent adapter collects system specification evidence and
+    calls service policy.
+  rationale: Keep architecture ownership and import edges accurate.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 1095
+    end_line: 1095
+  summary: Record that the agent adapter collects system specification evidence and
+    calls service policy.
+  rationale: Keep architecture ownership and import edges accurate.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 1311
+    end_line: 1312
+  summary: Record that the agent adapter collects system specification evidence and
+    calls service policy.
+  rationale: Keep architecture ownership and import edges accurate.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 1312
+    end_line: 1313
+  summary: Record the implementation validator's service-owned shared policy import.
+  rationale: Keep architecture ownership and import edges accurate.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 1386
+    end_line: 1386
+  summary: Record that the agent adapter collects system specification evidence and
+    calls service policy.
+  rationale: Keep architecture ownership and import edges accurate.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 1400
+    end_line: 1401
+  summary: Record that the agent adapter collects system specification evidence and
+    calls service policy.
+  rationale: Keep architecture ownership and import edges accurate.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 1490
+    end_line: 1490
+  summary: Record that the agent adapter collects system specification evidence and
+    calls service policy.
+  rationale: Keep architecture ownership and import edges accurate.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 1495
+    end_line: 1495
+  summary: Record that the agent adapter collects system specification evidence and
+    calls service policy.
+  rationale: Keep architecture ownership and import edges accurate.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3760
+    end_line: 3761
+  summary: Record that the agent adapter collects system specification evidence and
+    calls service policy.
+  rationale: Keep architecture ownership and import edges accurate.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3790
+    end_line: 3809
+  summary: Record that the agent adapter collects system specification evidence and
+    calls service policy.
+  rationale: Keep architecture ownership and import edges accurate.
+- path: src/powdrr_lift/core/architecture_specification.py
+  type: modified
+  span:
+    start_line: 4
+    end_line: 4
+  summary: Retain local template and file operations while collecting system YAML
+    evidence for the service validator.
+  rationale: Keep repository access on the agent side of the service boundary.
+- path: src/powdrr_lift/core/architecture_specification.py
+  type: modified
+  span:
+    start_line: 6
+    end_line: 6
+  summary: Retain local template and file operations while collecting system YAML
+    evidence for the service validator.
+  rationale: Keep repository access on the agent side of the service boundary.
+- path: src/powdrr_lift/core/architecture_specification.py
+  type: modified
+  span:
+    start_line: 9
+    end_line: 16
+  summary: Retain local template and file operations while collecting system YAML
+    evidence for the service validator.
+  rationale: Keep repository access on the agent side of the service boundary.
+- path: src/powdrr_lift/core/architecture_specification.py
+  type: modified
+  span:
+    start_line: 18
+    end_line: 22
+  summary: Retain local template and file operations while collecting system YAML
+    evidence for the service validator.
+  rationale: Keep repository access on the agent side of the service boundary.
+- path: src/powdrr_lift/core/architecture_specification.py
+  type: modified
+  span:
+    start_line: 30
+    end_line: 38
+  summary: Retain local template and file operations while collecting system YAML
+    evidence for the service validator.
+  rationale: Keep repository access on the agent side of the service boundary.
+- path: src/powdrr_lift/core/architecture_specification.py
+  type: modified
+  span:
+    start_line: 41
+    end_line: 62
+  summary: Retain local template and file operations while collecting system YAML
+    evidence for the service validator.
+  rationale: Keep repository access on the agent side of the service boundary.
+- path: src/powdrr_lift/core/architecture_specification.py
+  type: modified
+  span:
+    start_line: 64
+    end_line: 70
+  summary: Retain local template and file operations while collecting system YAML
+    evidence for the service validator.
+  rationale: Keep repository access on the agent side of the service boundary.
+- path: src/powdrr_lift/core/architecture_specification.py
+  type: modified
+  span:
+    start_line: 72
+    end_line: 108
+  summary: Retain local template and file operations while collecting system YAML
+    evidence for the service validator.
+  rationale: Keep repository access on the agent side of the service boundary.
+- path: src/powdrr_lift/core/architecture_specification.py
+  type: modified
+  span:
+    start_line: 125
+    end_line: 125
+  summary: Retain local template and file operations while collecting system YAML
+    evidence for the service validator.
+  rationale: Keep repository access on the agent side of the service boundary.
+- path: src/powdrr_lift/core/architecture_specification.py
+  type: modified
+  span:
+    start_line: 193
+    end_line: 1035
+  summary: Retain local template and file operations while collecting system YAML
+    evidence for the service validator.
+  rationale: Keep repository access on the agent side of the service boundary.
+- path: src/powdrr_lift/core/architecture_specification.py
+  type: modified
+  span:
+    start_line: 1050
+    end_line: 1065
+  summary: Retain local template and file operations while collecting system YAML
+    evidence for the service validator.
+  rationale: Keep repository access on the agent side of the service boundary.
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 17
+    end_line: 21
+  summary: Use service-owned shared specification action and reference rules.
+  rationale: Remove duplicate specification semantics from the agent module.
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 10
+    end_line: 14
+  summary: Use service-owned shared specification action and reference rules.
+  rationale: Remove duplicate specification semantics from the agent module.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 12
+    end_line: 12
+  summary: Use the service-owned related-module reference rule.
+  rationale: Keep shared specification semantics in the service.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 20
+    end_line: 20
+  summary: Use the service-owned related-module reference rule.
+  rationale: Keep shared specification semantics in the service.
+- path: src/powdrr_lift/core/project_structure.py
+  type: modified
+  span:
+    start_line: 8
+    end_line: 11
+  summary: Use service-owned shared module/tool and empty-value rules.
+  rationale: Keep shared specification semantics in the service.
+- path: src/powdrr_lift/core/project_structure.py
+  type: modified
+  span:
+    start_line: 12
+    end_line: 13
+  summary: Use service-owned shared module/tool and empty-value rules.
+  rationale: Keep shared specification semantics in the service.
+- path: src/powdrr_lift/core/specification_v1.py
+  type: modified
+  span:
+    start_line: 1
+    end_line: 1
+  summary: Reduce the agent module to local file reads and writes around service normalization
+    policy.
+  rationale: Keep filesystem effects on the agent side and normalization rules in
+    the service.
+- path: src/powdrr_lift/core/specification_v1.py
+  type: modified
+  span:
+    start_line: 5
+    end_line: 7
+  summary: Reduce the agent module to local file reads and writes around service normalization
+    policy.
+  rationale: Keep filesystem effects on the agent side and normalization rules in
+    the service.
+- path: src/powdrr_lift/core/specification_v1.py
+  type: modified
+  span:
+    start_line: 9
+    end_line: 9
+  summary: Reduce the agent module to local file reads and writes around service normalization
+    policy.
+  rationale: Keep filesystem effects on the agent side and normalization rules in
+    the service.
+- path: src/powdrr_lift/core/specification_v1.py
+  type: modified
+  span:
+    start_line: 7
+    end_line: 7
+  summary: Reduce the agent module to local file reads and writes around service normalization
+    policy.
+  rationale: Keep filesystem effects on the agent side and normalization rules in
+    the service.
+- path: src/powdrr_lift/core/specification_v1.py
+  type: modified
+  span:
+    start_line: 11
+    end_line: 11
+  summary: Reduce the agent module to local file reads and writes around service normalization
+    policy.
+  rationale: Keep filesystem effects on the agent side and normalization rules in
+    the service.
+- path: src/powdrr_lift/core/specification_v1.py
+  type: modified
+  span:
+    start_line: 76
+    end_line: 473
+  summary: Reduce the agent module to local file reads and writes around service normalization
+    policy.
+  rationale: Keep filesystem effects on the agent side and normalization rules in
+    the service.
+- path: tests/test_architecture_specification.py
+  type: modified
+  span:
+    start_line: 8
+    end_line: 10
+  summary: Exercise architecture validation through both the direct service API and
+    the agent evidence adapter.
+  rationale: Prove the service consumes explicit repository evidence and existing
+    validation behavior remains covered.
+- path: tests/test_architecture_specification.py
+  type: modified
+  span:
+    start_line: 91
+    end_line: 110
+  summary: Exercise architecture validation through both the direct service API and
+    the agent evidence adapter.
+  rationale: Prove the service consumes explicit repository evidence and existing
+    validation behavior remains covered.
+entities:
+- id: architecture-specification-validation-policy
+  type: Module
+  action: added
+- id: specification-v1-shared-validation-policy
+  type: Module
+  action: added
+- id: architecture-specification-service-boundary-tests
+  type: Regression test
+  action: added
+entity_relationships: []
+invariants:
+- id: architecture-validation-uses-supplied-evidence
+  description: The service architecture validator consumes YAML content and a relative
+    evidence path; local repository reads remain in the agent adapter.
+  action: added
+guidance: []
+features: []
+proposed_prs: []

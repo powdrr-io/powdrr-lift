@@ -5,12 +5,14 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from powdrr_service.specifications.common import (
+    validate_module_tool_sections,
+    validate_no_explicit_empty_values,
+)
 
 from powdrr_lift.core.repo import resolve_repo_root as _resolve_repo_root
 from powdrr_lift.core.specification_v1 import (
     normalize_specification_v1_file,
-    validate_module_tool_sections,
-    validate_no_explicit_empty_values,
 )
 from powdrr_lift.core.validation_messages import ValidationError
 

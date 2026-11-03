@@ -152,6 +152,19 @@ def _owner(path: str) -> tuple[str, str, str]:
             "service semantics; agent supplies pinned repository evidence",
             "3",
         )
+    if path == "src/powdrr_lift/change_log_template.py":
+        return (
+            "agent",
+            "collect branch diffs and source-index evidence locally, call the "
+            "service renderer, and write the template",
+            "8",
+        )
+    if path == "src/powdrr_lift/core/template_generation.py":
+        return (
+            "agent",
+            "serialize template-preservation requests to the service operation",
+            "8",
+        )
     if path.startswith("src/powdrr_lift/core/"):
         if path.endswith("/architecture_specification.py"):
             return (

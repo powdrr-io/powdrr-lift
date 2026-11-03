@@ -4,20 +4,91 @@ import argparse
 import re
 import subprocess
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 import yaml
-from powdrr_service.changelog.template import (
-    RelatedSectionPreview,
-    dedupe_string_values,
-    merge_related_sections_by_plan_diff,
-    related_section_matches,
-)
-from powdrr_service.changelog.template import (
-    render_change_log_template as _render_change_log_template,
-)
+from powdrr_contracts.models import OperationRequest
+from powdrr_local import JsonServiceBridge, LocalPowdrrService
+
+
+@dataclass(frozen=True, slots=True)
+class RelatedSectionPreview:
+    entities: tuple[str, ...] = ()
+    decisions: tuple[str, ...] = ()
+    invariants: tuple[str, ...] = ()
+    guidance: tuple[str, ...] = ()
+    proposed_prs: tuple[str, ...] = ()
+    acceptance_criteria: tuple[str, ...] = ()
+    expected_tests: tuple[str, ...] = ()
+    required_test_cases: tuple[str, ...] = ()
+    expected_outcomes: tuple[str, ...] = ()
+    non_goals: tuple[str, ...] = ()
+    risks: tuple[str, ...] = ()
+
+
+def _render_template_in_service(
+    *,
+    branch_name: str,
+    default_branch_name: str,
+    diff_entries: Sequence[BranchDiffEntry],
+    related_sections_by_entry: Sequence[RelatedSectionPreview],
+    plan_diff_report: Mapping[str, Any] | None = None,
+    existing_content: str | None = None,
+) -> str:
+    inputs: dict[str, Any] = {
+        "branch_name": branch_name,
+        "default_branch_name": default_branch_name,
+        "diff_entries": [asdict(item) for item in diff_entries],
+        "related_sections_by_entry": [
+            asdict(item) for item in related_sections_by_entry
+        ],
+        "existing_content": existing_content,
+    }
+    if plan_diff_report is not None:
+        inputs["plan_diff_report"] = dict(plan_diff_report)
+    update = JsonServiceBridge(LocalPowdrrService()).start(
+        OperationRequest(
+            request_id=str(uuid4()),
+            operation_kind="render_changelog_template",
+            inputs=inputs,
+        )
+    )
+    if update.status != "succeeded" or not update.output_artifacts:
+        message = (
+            update.failure.message
+            if update.failure
+            else "service returned no changelog template"
+        )
+        raise ValueError(f"Could not render changelog template: {message}")
+    return update.output_artifacts[0].data.decode("utf-8")
+
+
+def _dedupe_string_values(values: Sequence[str]) -> tuple[str, ...]:
+    seen_values: set[str] = set()
+    deduped: list[str] = []
+    for raw_value in values:
+        value = str(raw_value).strip()
+        if value and value not in seen_values:
+            seen_values.add(value)
+            deduped.append(value)
+    return tuple(deduped)
+
+
+def _related_section_matches(
+    related: object,
+    *,
+    related_file_set: set[str],
+    related_entity_set: set[str],
+) -> bool:
+    related_files = set(getattr(related, "files", ()))
+    related_entities = set(getattr(related, "entities", ()))
+    return bool(
+        related_files.intersection(related_file_set)
+        or related_entities.intersection(related_entity_set)
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -34,8 +105,6 @@ def create_change_log_template(
     repo_root: str | Path | None = None,
     default_branch: str | None = None,
 ) -> Path:
-    from powdrr_lift.core.template_generation import merge_existing_template_content
-
     repo_root_path = _resolve_repo_root(repo_root)
     resolved_branch_name = branch_name or _current_branch(repo_root_path)
     output_path = _resolve_output_path(repo_root_path, output_path)
@@ -54,20 +123,18 @@ def create_change_log_template(
         default_branch_name,
         diff_entries,
     )
-    template = _render_change_log_template(
+    existing_content = (
+        output_path.read_text(encoding="utf-8") if output_path.is_file() else None
+    )
+    template = _render_template_in_service(
         branch_name=resolved_branch_name,
         default_branch_name=default_branch_name,
         diff_entries=diff_entries,
         related_sections_by_entry=related_sections_by_entry,
+        existing_content=existing_content,
     )
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    existing_content = (
-        output_path.read_text(encoding="utf-8") if output_path.is_file() else None
-    )
-    output_path.write_text(
-        merge_existing_template_content(template, existing_content),
-        encoding="utf-8",
-    )
+    output_path.write_text(template, encoding="utf-8")
     return output_path
 
 
@@ -79,8 +146,6 @@ def create_change_log_template_from_plan_diff(
     repo_root: str | Path | None = None,
     default_branch: str | None = None,
 ) -> Path:
-    from powdrr_lift.core.template_generation import merge_existing_template_content
-
     repo_root_path = _resolve_repo_root(repo_root)
     output_path = _resolve_output_path(repo_root_path, output_path)
     default_branch_name = default_branch or _resolve_default_branch(repo_root_path)
@@ -96,25 +161,19 @@ def create_change_log_template_from_plan_diff(
         default_branch_name,
         diff_entries,
     )
-    related_sections_by_entry = merge_related_sections_by_plan_diff(
-        diff_entries,
-        related_sections_by_entry,
-        plan_diff_report,
+    existing_content = (
+        output_path.read_text(encoding="utf-8") if output_path.is_file() else None
     )
-    template = _render_change_log_template(
+    template = _render_template_in_service(
         branch_name=branch_name,
         default_branch_name=default_branch_name,
         diff_entries=diff_entries,
         related_sections_by_entry=related_sections_by_entry,
+        plan_diff_report=plan_diff_report,
+        existing_content=existing_content,
     )
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    existing_content = (
-        output_path.read_text(encoding="utf-8") if output_path.is_file() else None
-    )
-    output_path.write_text(
-        merge_existing_template_content(template, existing_content),
-        encoding="utf-8",
-    )
+    output_path.write_text(template, encoding="utf-8")
     return output_path
 
 
@@ -131,7 +190,7 @@ def _collect_related_sections_by_entry(
 
     related_sections_by_entry: list[RelatedSectionPreview] = []
     for diff_entry in diff_entries:
-        related_entities = dedupe_string_values(
+        related_entities = _dedupe_string_values(
             [
                 *_collect_related_entities_from_documents(
                     source_index.documents,
@@ -290,7 +349,7 @@ def _collect_related_lifecycle_ids(
             if item_id_value == "" or item_id_value in seen_ids or related is None:
                 continue
 
-            if related_section_matches(
+            if _related_section_matches(
                 related,
                 related_file_set=related_file_set,
                 related_entity_set=related_entity_set,

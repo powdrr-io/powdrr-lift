@@ -519,7 +519,10 @@ required validation cannot be reported as success. Worker commits remain visible
    entities, relationships, workflows, plans, changelogs, and pull requests
    now run through the service operation. The agent gathers only the selected
    commit-pinned documents plus per-file Git provenance; all CLI area options
-   use the serialized bridge.
+   use the serialized bridge. Changelog-template formatting, preservation of
+   existing template values, and plan-diff enrichment now run through service
+   operations; the agent collects branch-diff and source-index evidence and
+   writes the returned template locally.
 2. Remove the legacy-import allowlist and private compatibility shims. An old
    executable entry point may remain as a thin local-composition delegator;
    the public agent package must not depend on it.

@@ -6,6 +6,8 @@ from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
+import yaml
+
 
 @dataclass(frozen=True, slots=True)
 class RelatedSectionPreview:
@@ -47,6 +49,18 @@ def _value(source: object, key: str, default: object = None) -> object:
     return getattr(source, key, default)
 
 
+def _integer_value(source: object, key: str) -> int:
+    value = _value(source, key, 1)
+    if isinstance(value, int) and not isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        try:
+            return int(value)
+        except ValueError:
+            pass
+    return 1
+
+
 def render_change_log_template(
     branch_name: str,
     default_branch_name: str,
@@ -56,6 +70,133 @@ def render_change_log_template(
     header = _render_header(branch_name, default_branch_name, diff_entries)
     body = _render_template_body(diff_entries, related_sections_by_entry)
     return f"{header}\n{body}"
+
+
+def build_change_log_template(
+    *,
+    branch_name: str,
+    default_branch_name: str,
+    diff_entries: Sequence[Mapping[str, Any]],
+    related_sections_by_entry: Sequence[Mapping[str, Any]],
+    plan_diff_report: Mapping[str, Any] | None = None,
+    existing_content: str | None = None,
+) -> str:
+    """Render and enrich a changelog template from agent-collected evidence."""
+    related_sections = [
+        _related_section_from_mapping(section) for section in related_sections_by_entry
+    ]
+    if len(diff_entries) != len(related_sections):
+        raise ValueError("diff entries and related sections must have matching lengths")
+    rendered = render_change_log_template(
+        branch_name=branch_name,
+        default_branch_name=default_branch_name,
+        diff_entries=diff_entries,
+        related_sections_by_entry=related_sections,
+    )
+    if plan_diff_report is not None:
+        related_sections = merge_related_sections_by_plan_diff(
+            diff_entries, related_sections, plan_diff_report
+        )
+        rendered = render_change_log_template(
+            branch_name=branch_name,
+            default_branch_name=default_branch_name,
+            diff_entries=diff_entries,
+            related_sections_by_entry=related_sections,
+        )
+    return merge_existing_template_content(rendered, existing_content)
+
+
+def _related_section_from_mapping(value: Mapping[str, Any]) -> RelatedSectionPreview:
+    field_names = (
+        "entities",
+        "decisions",
+        "invariants",
+        "guidance",
+        "proposed_prs",
+        "acceptance_criteria",
+        "expected_tests",
+        "required_test_cases",
+        "expected_outcomes",
+        "non_goals",
+        "risks",
+    )
+    fields: dict[str, tuple[str, ...]] = {}
+    for field_name in field_names:
+        raw_values = value.get(field_name, [])
+        if not isinstance(raw_values, list) or not all(
+            isinstance(item, str) for item in raw_values
+        ):
+            raise ValueError(
+                f"related section {field_name} must be an array of strings"
+            )
+        fields[field_name] = tuple(raw_values)
+    return RelatedSectionPreview(**fields)
+
+
+def merge_existing_template_content(
+    generated_content: str,
+    existing_content: str | None,
+) -> str:
+    """Preserve valid user-entered values when regenerating a template."""
+    if existing_content is None:
+        return generated_content
+    try:
+        generated_data = yaml.safe_load(generated_content)
+        existing_data = yaml.safe_load(existing_content)
+    except yaml.YAMLError:
+        return generated_content
+    if not isinstance(generated_data, Mapping) or not isinstance(
+        existing_data, Mapping
+    ):
+        return generated_content
+    merged_data = _merge_template_value(generated_data, existing_data)
+    instruction_prefix = _instruction_prefix(generated_content)
+    rendered_data = yaml.safe_dump(merged_data, sort_keys=False)
+    if instruction_prefix:
+        return f"{instruction_prefix}\n{rendered_data}"
+    return rendered_data
+
+
+def _instruction_prefix(generated_content: str) -> str:
+    lines: list[str] = []
+    for line in generated_content.splitlines():
+        if line.strip() == "" or line.lstrip().startswith("#"):
+            lines.append(line)
+            continue
+        break
+    return "\n".join(lines).rstrip()
+
+
+def _merge_template_value(template: Any, existing: Any) -> Any:
+    if isinstance(template, Mapping) and isinstance(existing, Mapping):
+        merged: dict[Any, Any] = {}
+        for key, template_value in template.items():
+            merged[key] = (
+                _merge_template_value(template_value, existing[key])
+                if key in existing
+                else template_value
+            )
+        for key, existing_value in existing.items():
+            if key not in merged:
+                merged[key] = existing_value
+        return merged
+    if isinstance(template, list) and isinstance(existing, list):
+        if not template:
+            return existing
+        prototype = template[0]
+        if isinstance(prototype, Mapping):
+            return [
+                _merge_template_value(prototype, item)
+                if isinstance(item, Mapping)
+                else item
+                for item in existing
+            ]
+        return existing
+    if isinstance(template, Sequence) and not isinstance(
+        template, (str, bytes, bytearray)
+    ):
+        return existing
+    return existing
 
 
 def _render_template_body(
@@ -225,8 +366,8 @@ def merge_related_sections_by_plan_diff(
         related_by_key[
             (
                 str(_value(diff_entry, "path", "")),
-                int(_value(diff_entry, "start_line", 1)),
-                int(_value(diff_entry, "end_line", 1)),
+                _integer_value(diff_entry, "start_line"),
+                _integer_value(diff_entry, "end_line"),
             )
         ] = related_section
 
@@ -249,8 +390,8 @@ def merge_related_sections_by_plan_diff(
         for source_span in difference.source_spans:
             key = (
                 str(_value(source_span, "path", "")),
-                int(_value(source_span, "start_line", 1)),
-                int(_value(source_span, "end_line", 1)),
+                _integer_value(source_span, "start_line"),
+                _integer_value(source_span, "end_line"),
             )
             existing_section = related_by_key.get(key)
             if existing_section is None:
@@ -266,8 +407,8 @@ def merge_related_sections_by_plan_diff(
         related_by_key.get(
             (
                 str(_value(diff_entry, "path", "")),
-                int(_value(diff_entry, "start_line", 1)),
-                int(_value(diff_entry, "end_line", 1)),
+                _integer_value(diff_entry, "start_line"),
+                _integer_value(diff_entry, "end_line"),
             ),
             related_section,
         )
@@ -605,8 +746,20 @@ def related_section_matches(
     related_file_set: set[str],
     related_entity_set: set[str],
 ) -> bool:
-    related_files = set(_value(related, "files", ()))
-    related_entities = set(_value(related, "entities", ()))
+    raw_files = _value(related, "files", ())
+    raw_entities = _value(related, "entities", ())
+    related_files = (
+        set(raw_files)
+        if isinstance(raw_files, Sequence)
+        and all(isinstance(item, str) for item in raw_files)
+        else set()
+    )
+    related_entities = (
+        set(raw_entities)
+        if isinstance(raw_entities, Sequence)
+        and all(isinstance(item, str) for item in raw_entities)
+        else set()
+    )
     return bool(
         related_files.intersection(related_file_set)
         or related_entities.intersection(related_entity_set)

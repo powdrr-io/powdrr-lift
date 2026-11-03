@@ -364,14 +364,34 @@ def test_proposed_pr_coverage_policy_is_service_owned() -> None:
     from powdrr_service.specifications.proposed_pr_coverage import (
         validate_proposed_pr_coverage_and_effects,
     )
+    from powdrr_service.specifications.proposed_pr_validation import (
+        build_proposed_pr_specification_validation_report,
+    )
 
     import powdrr_lift.core.pr_specification as agent_pr_specification
 
     assert not hasattr(agent_pr_specification, "_validate_multi_pr_feature_coverage")
     assert not hasattr(agent_pr_specification, "_validate_v1_effect_equivalence")
     assert (
-        agent_pr_specification.validate_proposed_pr_coverage_and_effects
+        build_proposed_pr_specification_validation_report.__globals__[
+            "validate_proposed_pr_coverage_and_effects"
+        ]
         is validate_proposed_pr_coverage_and_effects
+    )
+
+
+def test_proposed_pr_specification_validation_policy_is_service_owned() -> None:
+    from powdrr_service.specifications.proposed_pr_validation import (
+        build_proposed_pr_specification_validation_report,
+    )
+
+    import powdrr_lift.core.pr_specification as agent_pr_specification
+
+    assert not hasattr(agent_pr_specification, "_collect_detail_items")
+    assert not hasattr(agent_pr_specification, "_collect_dependent_pr_ids")
+    assert (
+        agent_pr_specification._service_validate_pr_spec
+        is build_proposed_pr_specification_validation_report
     )
 
 

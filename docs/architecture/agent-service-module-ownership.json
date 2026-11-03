@@ -1386,12 +1386,13 @@
         "powdrr_lift.core.validation_messages",
         "powdrr_service.specifications.common",
         "powdrr_service.specifications.proposed_pr_coverage",
+        "powdrr_service.specifications.proposed_pr_validation",
         "powdrr_service.structrr.verification_contract"
       ],
       "kind": "python_module",
       "owner": "split",
       "path": "src/powdrr_lift/core/pr_specification.py",
-      "rationale": "classify each symbol as service policy or public exchanged data",
+      "rationale": "agent collects proposal files and feature IDs and handles templates/search; service owns proposed-PR validation policy",
       "reviewed": false
     },
     {
@@ -3829,6 +3830,19 @@
       "owner": "service",
       "path": "packages/service/src/powdrr_service/specifications/proposed_pr_coverage.py",
       "rationale": "proposed-PR coverage and effect-equivalence policy over supplied YAML evidence",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [
+        "powdrr_service.specifications.common",
+        "powdrr_service.specifications.proposed_pr_coverage",
+        "powdrr_service.structrr.verification_contract"
+      ],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/specifications/proposed_pr_validation.py",
+      "rationale": "proposed-PR specification validation policy over supplied repository evidence",
       "reviewed": false
     }
   ],

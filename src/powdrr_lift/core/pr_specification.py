@@ -9,14 +9,14 @@ from pathlib import Path
 from typing import Any, cast
 
 import yaml
-from powdrr_service.specifications.common import validate_related_module_references
 from powdrr_service.specifications.proposed_pr_coverage import (
     ProposedPRSourceDocument,
-    validate_proposed_pr_coverage_and_effects,
 )
-from powdrr_service.structrr.verification_contract import (
-    VERIFICATION_CONTRACT_FIELDS,
-    VerificationContract,
+from powdrr_service.specifications.proposed_pr_validation import (
+    build_proposed_pr_dependency_graph as _build_service_pr_dependency_graph,
+)
+from powdrr_service.specifications.proposed_pr_validation import (
+    build_proposed_pr_specification_validation_report as _service_validate_pr_spec,
 )
 
 from powdrr_lift.core.codebase_state import build_codebase_state_report
@@ -44,26 +44,6 @@ _EFFECT_SECTIONS = (
 _EFFECT_SOURCE_FILES = (
     "architecture-specification.yaml",
     "implementation-specification.yaml",
-)
-_CONTENT_SECTIONS = (
-    "requirements",
-    "approach",
-    "entities",
-    "entity_relationships",
-    "invariants",
-    "guidance",
-    "features",
-    "human-decisions",
-    "feature_ids",
-    "intent",
-    "acceptance_criteria",
-    "expected_tests",
-    "required_test_cases",
-    "expected_outcomes",
-    "non_goals",
-    "risks",
-    "modules",
-    "tools",
 )
 _PROPOSED_PR_SCHEMA = "https://powdrr.io/schemas/proposed-pr-specification-v1"
 
@@ -796,379 +776,44 @@ def build_pr_specification_validation_report(
     file_path: str | Path | None = None,
 ) -> PRSpecificationValidationReport:
     repo_root_path = _resolve_repo_root(repo_root)
-    issues: list[PRSpecificationValidationIssue] = []
     feature_catalog = _load_feature_catalog(repo_root_path)
     available_feature_ids = [entry.feature_id for entry in feature_catalog]
-    known_pr_ids = _load_existing_pr_ids(
-        repo_root_path,
-        excluded_file_path=file_path,
+    document_evidence = _load_proposed_pr_validation_documents(repo_root_path)
+    excluded_path = _resolved_local_file_path(repo_root_path, file_path)
+    existing_documents = tuple(
+        document
+        for document in document_evidence
+        if excluded_path is None or Path(document.path).resolve() != excluded_path
     )
-
-    try:
-        raw_spec = _load_yaml_mapping(proposed_pr_specification_yaml)
-    except Exception as exc:  # noqa: BLE001
-        issues.append(
-            PRSpecificationValidationIssue(
-                code="invalid_yaml",
-                message=f"Could not parse proposed PR specification YAML: {exc}",
-            )
-        )
-        return PRSpecificationValidationReport(
-            validation_successful=False,
-            proposed_pr_id=None,
-            available_feature_ids=available_feature_ids,
-            known_pr_ids=known_pr_ids,
-            issues=issues,
-        )
-
-    _validate_template_boilerplate_removed(
+    service_report = _service_validate_pr_spec(
         proposed_pr_specification_yaml,
-        issues=issues,
-    )
-    raw_modules = raw_spec.get("modules")
-    module_ids: set[str] = set()
-    if isinstance(raw_modules, list):
-        for item in raw_modules:
-            if not isinstance(item, Mapping):
-                continue
-            item_id = item.get("id")
-            if isinstance(item_id, str) and item_id.strip():
-                module_ids.add(item_id.strip())
-    scoped_sections = {
-        str(section): value
-        for section, value in raw_spec.items()
-        if isinstance(value, Sequence) and not isinstance(value, (str, bytes))
-    }
-    issues.extend(
-        PRSpecificationValidationIssue(
-            code=issue.code, message=issue.message, path=issue.path
-        )
-        for issue in validate_related_module_references(
-            scoped_sections, module_ids=module_ids
-        )
-    )
-    if not any(raw_spec.get(section) for section in _CONTENT_SECTIONS):
-        issues.append(
-            PRSpecificationValidationIssue(
-                code="empty_specification",
-                message=(
-                    "A specification must contain substantive design content; "
-                    "id and title alone are not sufficient."
-                ),
-            )
-        )
-
-    if "proposed_prs" in raw_spec:
-        return _build_multi_proposed_pr_validation_report(
-            raw_spec,
-            proposed_pr_specification_yaml=proposed_pr_specification_yaml,
-            work_item_name=work_item_name,
+        available_feature_ids=available_feature_ids,
+        existing_pr_specifications=existing_documents,
+        dependency_pr_specifications=document_evidence,
+        feature_coverage_source=_load_feature_coverage_source(
             repo_root=repo_root_path,
+            work_item_name=work_item_name,
+        ),
+        effect_sources=_load_effect_sources(
+            repo_root=repo_root_path,
+            work_item_name=work_item_name,
             file_path=file_path,
-            available_feature_ids=available_feature_ids,
-            known_pr_ids=known_pr_ids,
-            issues=issues,
-        )
-
-    seen_detail_ids: set[str] = set()
-
-    proposed_pr_id = _required_string(
-        raw_spec.get("id"),
-        path="id",
-        issues=issues,
-        issue_code="proposed_pr_id_missing",
-        issue_message="The id field is required.",
+        ),
     )
-    if proposed_pr_id is not None and _normalize_identifier(
-        proposed_pr_id
-    ) in _normalize_identifier_set(known_pr_ids):
-        issues.append(
+    return PRSpecificationValidationReport(
+        validation_successful=service_report.validation_successful,
+        proposed_pr_id=service_report.proposed_pr_id,
+        available_feature_ids=service_report.available_feature_ids,
+        known_pr_ids=service_report.known_pr_ids,
+        issues=[
             PRSpecificationValidationIssue(
-                code="duplicate_proposed_pr_id",
-                message=f"Proposed PR id {proposed_pr_id!r} already exists.",
-                path="id",
+                code=issue.code,
+                message=issue.message,
+                path=issue.path,
             )
-        )
-    if proposed_pr_id is not None:
-        seen_detail_ids.add(proposed_pr_id)
-
-    dependent_prs = _collect_dependent_pr_ids(
-        raw_spec.get("dependent_prs", []),
-        proposed_pr_id=proposed_pr_id,
-        known_pr_ids=known_pr_ids,
-        issues=issues,
+            for issue in service_report.issues
+        ],
     )
-    if proposed_pr_id is not None:
-        _validate_proposed_pr_dependency_cycle(
-            repo_root_path,
-            proposed_pr_id,
-            dependent_prs,
-            excluded_file_path=file_path,
-            issues=issues,
-        )
-
-    _collect_feature_ids(
-        _coerce_sequence(
-            raw_spec.get("feature_ids"),
-            path="feature_ids",
-            issues=issues,
-            issue_code="invalid_feature_ids_section",
-            issue_message="feature_ids must be a list of feature id strings.",
-        ),
-        available_feature_ids=set(available_feature_ids),
-        issues=issues,
-    )
-    raw_intent = raw_spec.get("intent")
-    intent = (
-        None
-        if raw_intent is None
-        else _coerce_mapping(
-            raw_intent,
-            path="intent",
-            issues=issues,
-            issue_code="invalid_intent_section",
-            issue_message=(
-                "intent must be a mapping with problem, goal, and reasoning."
-            ),
-        )
-    )
-    if intent is not None:
-        _required_string(
-            intent.get("problem"),
-            path="intent.problem",
-            issues=issues,
-            issue_code="intent_problem_missing",
-            issue_message="The intent.problem field is required.",
-        )
-        _required_string(
-            intent.get("goal"),
-            path="intent.goal",
-            issues=issues,
-            issue_code="intent_goal_missing",
-            issue_message="The intent.goal field is required.",
-        )
-        _required_string(
-            intent.get("reasoning"),
-            path="intent.reasoning",
-            issues=issues,
-            issue_code="intent_reasoning_missing",
-            issue_message="The intent.reasoning field is required.",
-        )
-
-    for section_name in (
-        "acceptance_criteria",
-        "expected_tests",
-        "required_test_cases",
-        "expected_outcomes",
-        "non_goals",
-        "risks",
-    ):
-        _collect_detail_items(
-            _coerce_sequence(
-                raw_spec.get(section_name),
-                path=section_name,
-                issues=issues,
-                issue_code=f"invalid_{section_name}_section",
-                issue_message=(f"{section_name} must be a list of detail items."),
-            ),
-            section_name=section_name,
-            seen_ids=seen_detail_ids,
-            issues=issues,
-        )
-
-    return PRSpecificationValidationReport(
-        validation_successful=not issues,
-        proposed_pr_id=proposed_pr_id,
-        available_feature_ids=available_feature_ids,
-        known_pr_ids=known_pr_ids,
-        issues=issues,
-    )
-
-
-def _build_multi_proposed_pr_validation_report(
-    raw_spec: Mapping[str, Any],
-    *,
-    proposed_pr_specification_yaml: str,
-    work_item_name: str,
-    repo_root: Path,
-    file_path: str | Path | None,
-    available_feature_ids: list[str],
-    known_pr_ids: list[str],
-    issues: list[PRSpecificationValidationIssue],
-) -> PRSpecificationValidationReport:
-    _required_string(
-        raw_spec.get("id"),
-        path="id",
-        issues=issues,
-        issue_code="feature_id_missing",
-        issue_message="The unified proposed PR file requires a top-level id.",
-    )
-    _collect_feature_ids(
-        _coerce_sequence(
-            raw_spec.get("feature_ids"),
-            path="feature_ids",
-            issues=issues,
-            issue_code="invalid_feature_ids_section",
-            issue_message="feature_ids must be a list of feature id strings.",
-        ),
-        available_feature_ids=set(available_feature_ids),
-        issues=issues,
-    )
-    raw_prs = _coerce_sequence(
-        raw_spec.get("proposed_prs"),
-        path="proposed_prs",
-        issues=issues,
-        issue_code="invalid_proposed_prs_section",
-        issue_message="proposed_prs must be a list of proposed PR mappings.",
-    )
-    ids: dict[str, str] = {}
-    for index, raw_pr in enumerate(raw_prs):
-        if not isinstance(raw_pr, Mapping):
-            issues.append(
-                PRSpecificationValidationIssue(
-                    "invalid_proposed_pr_entry",
-                    "Each proposed_prs entry must be a mapping.",
-                    f"proposed_prs[{index}]",
-                )
-            )
-            continue
-        pr_id = _required_string(
-            raw_pr.get("id"),
-            path=f"proposed_prs[{index}].id",
-            issues=issues,
-            issue_code="proposed_pr_id_missing",
-            issue_message="Each proposed PR requires an id.",
-        )
-        if pr_id is not None:
-            normalized = _normalize_identifier(pr_id)
-            if normalized in ids:
-                issues.append(
-                    PRSpecificationValidationIssue(
-                        "duplicate_proposed_pr_id",
-                        f"Proposed PR id {pr_id!r} is duplicated.",
-                        f"proposed_prs[{index}].id",
-                    )
-                )
-            ids[normalized] = pr_id
-    graph: dict[str, tuple[str, ...]] = {}
-    for index, raw_pr in enumerate(raw_prs):
-        if not isinstance(raw_pr, Mapping):
-            continue
-        entry = raw_pr
-        pr_id = _optional_string(entry.get("id"))
-        if pr_id is None:
-            continue
-        dependencies = _collect_dependent_pr_ids(
-            entry.get("dependent_prs", []),
-            proposed_pr_id=pr_id,
-            known_pr_ids=tuple(ids.values()),
-            issues=issues,
-        )
-        graph[pr_id] = dependencies
-        for detail_field in ("intent", "justification"):
-            _required_string(
-                entry.get(detail_field),
-                path=f"proposed_prs[{index}].{detail_field}",
-                issues=issues,
-                issue_code=f"proposed_pr_{detail_field}_missing",
-                issue_message=f"Each proposed PR requires {detail_field}.",
-            )
-    _validate_dependency_graph(graph, issues=issues)
-    _validate_feature_change_sections(
-        raw_spec,
-        proposed_pr_ids=tuple(ids.values()),
-        issues=issues,
-    )
-    issues.extend(
-        PRSpecificationValidationIssue(
-            code=issue.code, message=issue.message, path=issue.path
-        )
-        for issue in validate_proposed_pr_coverage_and_effects(
-            proposed_pr_specification_yaml,
-            proposed_pr_ids=tuple(ids.values()),
-            feature_coverage_source=_load_feature_coverage_source(
-                repo_root=repo_root,
-                work_item_name=work_item_name,
-            ),
-            effect_sources=_load_effect_sources(
-                repo_root=repo_root,
-                work_item_name=work_item_name,
-                file_path=file_path,
-            ),
-        ).issues
-    )
-    return PRSpecificationValidationReport(
-        validation_successful=not issues,
-        proposed_pr_id=None,
-        available_feature_ids=available_feature_ids,
-        known_pr_ids=known_pr_ids,
-        issues=issues,
-    )
-
-
-def _validate_feature_change_sections(
-    raw_spec: Mapping[str, Any],
-    *,
-    proposed_pr_ids: Sequence[str],
-    issues: list[PRSpecificationValidationIssue],
-) -> None:
-    known_ids = _normalize_identifier_set(proposed_pr_ids)
-    for section in _EFFECT_SECTIONS:
-        raw_items = raw_spec.get(section, [])
-        if not isinstance(raw_items, Sequence) or isinstance(raw_items, (str, bytes)):
-            issues.append(
-                PRSpecificationValidationIssue(
-                    "invalid_specification_v1_section",
-                    f"{section} must be a list.",
-                    section,
-                )
-            )
-            continue
-        for item_index, item in enumerate(raw_items):
-            path = f"{section}[{item_index}]"
-            if not isinstance(item, Mapping):
-                issues.append(
-                    PRSpecificationValidationIssue(
-                        "invalid_specification_v1_item",
-                        "Each specification-v1 item must be a mapping.",
-                        path,
-                    )
-                )
-                continue
-            _required_string(
-                item.get("id"),
-                path=f"{path}.id",
-                issues=issues,
-                issue_code="specification_v1_id_missing",
-                issue_message="Each specification-v1 item must include an id.",
-            )
-            action = _optional_string(item.get("action"))
-            if action not in {"added", "removed", "changed"}:
-                issues.append(
-                    PRSpecificationValidationIssue(
-                        "invalid_specification_v1_action",
-                        "Each specification-v1 action must be added, removed, or "
-                        "changed.",
-                        f"{path}.action",
-                    )
-                )
-            proposed_pr_id = _optional_string(item.get("proposed_pr_id"))
-            if proposed_pr_id is None:
-                issues.append(
-                    PRSpecificationValidationIssue(
-                        "proposed_pr_id_missing",
-                        "Each feature change must identify its proposed PR.",
-                        f"{path}.proposed_pr_id",
-                    )
-                )
-            elif _normalize_identifier(proposed_pr_id) not in known_ids:
-                issues.append(
-                    PRSpecificationValidationIssue(
-                        "unknown_proposed_pr_id",
-                        f"Proposed PR id {proposed_pr_id!r} is not declared above.",
-                        f"{path}.proposed_pr_id",
-                    )
-                )
 
 
 def _load_feature_coverage_source(
@@ -1218,185 +863,45 @@ def _load_effect_sources(
     return tuple(sources)
 
 
-def _validate_dependency_graph(
-    graph: Mapping[str, Sequence[str]],
-    *,
-    issues: list[PRSpecificationValidationIssue],
-) -> None:
-    visiting: set[str] = set()
-    visited: set[str] = set()
-
-    def visit(node: str, path: tuple[str, ...]) -> None:
-        normalized = _normalize_identifier(node)
-        if normalized in visiting:
-            issues.append(
-                PRSpecificationValidationIssue(
-                    "proposed_pr_dependency_cycle",
-                    "Proposed PR dependency cycle detected: "
-                    f"{' -> '.join((*path, node))}.",
-                    "proposed_prs",
+def _load_proposed_pr_validation_documents(
+    repo_root: Path,
+) -> tuple[ProposedPRSourceDocument, ...]:
+    documents: list[ProposedPRSourceDocument] = []
+    for specification_path in _iter_proposed_pr_specification_paths(repo_root):
+        try:
+            documents.append(
+                ProposedPRSourceDocument(
+                    path=str(specification_path),
+                    yaml_content=specification_path.read_text(encoding="utf-8"),
                 )
             )
-            return
-        if normalized in visited:
-            return
-        visiting.add(normalized)
-        for dependency in graph.get(node, ()):
-            visit(dependency, (*path, node))
-        visiting.remove(normalized)
-        visited.add(normalized)
-
-    for node in graph:
-        visit(node, ())
-
-
-def _collect_dependent_pr_ids(
-    raw_value: object,
-    *,
-    proposed_pr_id: str | None,
-    known_pr_ids: Sequence[str],
-    issues: list[PRSpecificationValidationIssue],
-) -> tuple[str, ...]:
-    if not isinstance(raw_value, Sequence) or isinstance(raw_value, (str, bytes)):
-        issues.append(
-            PRSpecificationValidationIssue(
-                code="invalid_dependent_prs_section",
-                message="dependent_prs must be a list of proposed PR ids.",
-                path="dependent_prs",
-            )
-        )
-        return ()
-
-    known_ids = _normalize_identifier_set(known_pr_ids)
-    if proposed_pr_id is not None:
-        known_ids.add(_normalize_identifier(proposed_pr_id))
-    seen_ids: set[str] = set()
-    dependent_prs: list[str] = []
-    for index, raw_id in enumerate(raw_value):
-        dependency_id = _required_string(
-            raw_id,
-            path=f"dependent_prs[{index}]",
-            issues=issues,
-            issue_code="dependent_pr_id_missing",
-            issue_message="Each dependent_prs entry must be a proposed PR id.",
-        )
-        if dependency_id is None:
-            continue
-        normalized_id = _normalize_identifier(dependency_id)
-        if normalized_id in seen_ids:
-            issues.append(
-                PRSpecificationValidationIssue(
-                    code="duplicate_dependent_pr_id",
-                    message=(
-                        f"Dependent proposed PR id {dependency_id!r} is duplicated."
-                    ),
-                    path=f"dependent_prs[{index}]",
+        except Exception as exc:  # noqa: BLE001
+            documents.append(
+                ProposedPRSourceDocument(
+                    path=str(specification_path), read_error=str(exc)
                 )
             )
-            continue
-        seen_ids.add(normalized_id)
-        dependent_prs.append(dependency_id)
-        if proposed_pr_id is not None and normalized_id == _normalize_identifier(
-            proposed_pr_id
-        ):
-            issues.append(
-                PRSpecificationValidationIssue(
-                    code="self_dependent_pr_id",
-                    message="A proposed PR cannot depend on itself.",
-                    path=f"dependent_prs[{index}]",
-                )
-            )
-        elif normalized_id not in known_ids:
-            issues.append(
-                PRSpecificationValidationIssue(
-                    code="unknown_dependent_pr_id",
-                    message=(
-                        f"Dependent proposed PR id {dependency_id!r} does not "
-                        "identify an existing proposed PR."
-                    ),
-                    path=f"dependent_prs[{index}]",
-                )
-            )
-    return tuple(dependent_prs)
+    return tuple(documents)
+
+
+def _resolved_local_file_path(
+    repo_root: Path, file_path: str | Path | None
+) -> Path | None:
+    if file_path is None:
+        return None
+    path = Path(file_path).expanduser()
+    if not path.is_absolute():
+        path = repo_root / path
+    return path.resolve()
 
 
 def load_proposed_pr_dependency_graph(
     repo_root: str | Path,
 ) -> dict[str, tuple[str, ...]]:
-    """Load the proposed-PR dependency graph from checked-in specifications."""
-    repo_root_path = _resolve_repo_root(repo_root)
-    graph: dict[str, tuple[str, ...]] = {}
-    for specification_path in _iter_proposed_pr_specification_paths(repo_root_path):
-        try:
-            raw_spec = _load_yaml_mapping(
-                specification_path.read_text(encoding="utf-8")
-            )
-        except Exception:  # noqa: BLE001
-            continue
-        nested_prs = raw_spec.get("proposed_prs")
-        records = (
-            [item for item in nested_prs if isinstance(item, Mapping)]
-            if isinstance(nested_prs, Sequence)
-            and not isinstance(nested_prs, (str, bytes))
-            else [raw_spec]
-        )
-        for record in records:
-            proposed_pr_id = _optional_string(record.get("id"))
-            if proposed_pr_id is None:
-                continue
-            raw_dependencies = record.get("dependent_prs", [])
-            if not isinstance(raw_dependencies, Sequence) or isinstance(
-                raw_dependencies, (str, bytes)
-            ):
-                continue
-            dependencies = tuple(
-                dependency.strip()
-                for dependency in raw_dependencies
-                if isinstance(dependency, str) and dependency.strip()
-            )
-            graph[proposed_pr_id] = dependencies
-    return graph
-
-
-def _validate_proposed_pr_dependency_cycle(
-    repo_root: Path,
-    proposed_pr_id: str,
-    dependent_prs: Sequence[str],
-    *,
-    excluded_file_path: str | Path | None,
-    issues: list[PRSpecificationValidationIssue],
-) -> None:
-    graph = load_proposed_pr_dependency_graph(repo_root)
-    if excluded_file_path is not None:
-        for existing_id, _dependencies in list(graph.items()):
-            if existing_id == proposed_pr_id:
-                del graph[existing_id]
-    graph[proposed_pr_id] = tuple(dependent_prs)
-
-    visiting: set[str] = set()
-    visited: set[str] = set()
-
-    def visit(node: str, path: tuple[str, ...]) -> None:
-        normalized_node = _normalize_identifier(node)
-        if normalized_node in visiting:
-            cycle = " -> ".join((*path, node))
-            issues.append(
-                PRSpecificationValidationIssue(
-                    code="proposed_pr_dependency_cycle",
-                    message=f"Proposed PR dependency cycle detected: {cycle}.",
-                    path="dependent_prs",
-                )
-            )
-            return
-        if normalized_node in visited:
-            return
-        visiting.add(normalized_node)
-        for dependency in graph.get(node, ()):
-            visit(dependency, (*path, node))
-        visiting.remove(normalized_node)
-        visited.add(normalized_node)
-
-    visit(proposed_pr_id, ())
+    """Load the dependency graph from repository documents through service policy."""
+    return _build_service_pr_dependency_graph(
+        _load_proposed_pr_validation_documents(_resolve_repo_root(repo_root))
+    )
 
 
 def _load_feature_catalog(repo_root: Path) -> list[_FeatureCatalogEntry]:
@@ -1730,177 +1235,8 @@ def _tokenize(text: str) -> list[str]:
     return tokens
 
 
-def _validate_template_boilerplate_removed(
-    proposed_pr_specification_yaml: str,
-    *,
-    issues: list[PRSpecificationValidationIssue],
-) -> None:
-    boilerplate_markers = (
-        "# PR specification template.",
-        "# Current feature ids:",
-        "# - Delete these instructions and replace them with this comment at the top:",
-    )
-    for marker in boilerplate_markers:
-        if marker in proposed_pr_specification_yaml:
-            issues.append(
-                PRSpecificationValidationIssue(
-                    code="template_boilerplate_not_removed",
-                    message=(
-                        "Remove the template instructions before validating the "
-                        "proposed PR specification."
-                    ),
-                    path=None,
-                )
-            )
-            return
-
-
 def _normalize_identifier(value: str) -> str:
     return value.strip().casefold()
-
-
-def _normalize_identifier_set(values: Sequence[str]) -> set[str]:
-    return {_normalize_identifier(value) for value in values}
-
-
-def _collect_detail_items(
-    raw_items: Sequence[object],
-    *,
-    section_name: str,
-    seen_ids: set[str],
-    issues: list[PRSpecificationValidationIssue],
-) -> set[str]:
-    item_ids: set[str] = set()
-    for index, raw_item in enumerate(raw_items):
-        item = _coerce_mapping(
-            raw_item,
-            path=f"{section_name}[{index}]",
-            issues=issues,
-            issue_code=f"invalid_{section_name}_item",
-            issue_message=(
-                f"Each {section_name.replace('_', ' ')} item must be a mapping."
-            ),
-        )
-        if item is None:
-            continue
-
-        item_id = _required_string(
-            item.get("id"),
-            path=f"{section_name}[{index}].id",
-            issues=issues,
-            issue_code=f"{section_name}_id_missing",
-            issue_message=(
-                f"Each {section_name.replace('_', ' ')} item must include an id."
-            ),
-        )
-        _required_string(
-            item.get("description"),
-            path=f"{section_name}[{index}].description",
-            issues=issues,
-            issue_code=f"{section_name}_description_missing",
-            issue_message=(
-                f"Each {section_name.replace('_', ' ')} item must include a "
-                "description."
-            ),
-        )
-        if item_id is None:
-            continue
-
-        if section_name == "required_test_cases":
-            contract = VerificationContract.from_mapping(item)
-            unknown_fields = (
-                set(item) - {"id", "description"} - set(VERIFICATION_CONTRACT_FIELDS)
-            )
-            for field_name in sorted(unknown_fields):
-                issues.append(
-                    PRSpecificationValidationIssue(
-                        code="verification_contract_field_unknown",
-                        message=(
-                            f"Unknown verification contract field {field_name!r}."
-                        ),
-                        path=f"{section_name}[{index}].{field_name}",
-                    )
-                )
-            for error in VerificationContract.mapping_validation_errors(item):
-                issues.append(
-                    PRSpecificationValidationIssue(
-                        code="verification_contract_invalid",
-                        message=error,
-                        path=f"{section_name}[{index}]",
-                    )
-                )
-            for error in contract.validation_errors():
-                issues.append(
-                    PRSpecificationValidationIssue(
-                        code="verification_contract_invalid",
-                        message=error,
-                        path=f"{section_name}[{index}]",
-                    )
-                )
-
-        if item_id in seen_ids:
-            issues.append(
-                PRSpecificationValidationIssue(
-                    code="duplicate_detail_id",
-                    message=(
-                        f"Detail id {item_id!r} appears more than once across "
-                        "the proposed PR specification."
-                    ),
-                    path=f"{section_name}[{index}].id",
-                )
-            )
-            continue
-
-        seen_ids.add(item_id)
-        item_ids.add(item_id)
-
-    return item_ids
-
-
-def _collect_feature_ids(
-    raw_feature_ids: Sequence[object],
-    *,
-    available_feature_ids: set[str],
-    issues: list[PRSpecificationValidationIssue],
-) -> set[str]:
-    feature_ids: set[str] = set()
-    for index, raw_feature_id in enumerate(raw_feature_ids):
-        feature_id = _required_string(
-            raw_feature_id,
-            path=f"feature_ids[{index}]",
-            issues=issues,
-            issue_code="feature_id_missing",
-            issue_message="Each feature id must be a string.",
-        )
-        if feature_id is None:
-            continue
-
-        if feature_id in feature_ids:
-            issues.append(
-                PRSpecificationValidationIssue(
-                    code="duplicate_feature_id",
-                    message=f"Feature id {feature_id!r} appears more than once.",
-                    path=f"feature_ids[{index}]",
-                )
-            )
-            continue
-
-        if feature_id not in available_feature_ids:
-            issues.append(
-                PRSpecificationValidationIssue(
-                    code="unknown_feature_id",
-                    message=(
-                        f"Feature id {feature_id!r} is not listed in the current "
-                        "source specifications."
-                    ),
-                    path=f"feature_ids[{index}]",
-                )
-            )
-            continue
-
-        feature_ids.add(feature_id)
-
-    return feature_ids
 
 
 def _load_yaml_mapping(raw_yaml: str) -> Mapping[str, Any]:
@@ -1953,38 +1289,6 @@ def _coerce_mapping(
         )
     )
     return None
-
-
-def _required_string(
-    raw_value: object,
-    *,
-    path: str,
-    issues: list[PRSpecificationValidationIssue],
-    issue_code: str,
-    issue_message: str,
-) -> str | None:
-    if raw_value is None:
-        issues.append(
-            PRSpecificationValidationIssue(
-                code=issue_code,
-                message=issue_message,
-                path=path,
-            )
-        )
-        return None
-
-    value = str(raw_value).strip()
-    if value == "":
-        issues.append(
-            PRSpecificationValidationIssue(
-                code=issue_code,
-                message=issue_message,
-                path=path,
-            )
-        )
-        return None
-
-    return value
 
 
 def _optional_string(raw_value: object) -> str | None:

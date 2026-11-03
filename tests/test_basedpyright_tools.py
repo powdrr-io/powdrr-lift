@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from powdrr_service.planning.driver import _planned_reference_path_pairs
 
 from powdrr_lift.basedpyright_tools import (
     BASEDPYRIGHT_STRUCTURE_TOOL,
@@ -270,3 +271,115 @@ def test_workspace_document_analysis_returns_symbols_and_references_in_one_sessi
     assert references == {"src/catalog.py": ("src/dashboard.py",)}
     assert len(servers) == 1
     assert servers[0].document_symbol_requests == 2
+
+
+def test_reference_candidates_recall_labeled_cross_file_edges_without_decoys(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sources = {
+        "src/identity.py": (
+            "def normalize_id(value): ...\ndef validate_id(value): ...\n"
+        ),
+        "src/storage.py": "def save_record(record): ...\ndef load_record(key): ...\n",
+        "src/api.py": (
+            "from identity import normalize_id\n"
+            "from storage import save_record\n\n"
+            "def handle_request(request): ...\n"
+        ),
+        "tests/test_api.py": "from api import handle_request\n",
+        "src/unplanned.py": (
+            "from identity import normalize_id\nfrom storage import load_record\n"
+        ),
+    }
+    for relative_path, source in sources.items():
+        path = tmp_path / relative_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(source)
+
+    planned_paths = (
+        "src/identity.py",
+        "src/storage.py",
+        "src/api.py",
+        "tests/test_api.py",
+    )
+    symbol_lines = {
+        "src/identity.py": (("normalize_id", 0), ("validate_id", 1)),
+        "src/storage.py": (("save_record", 0), ("load_record", 1)),
+        "src/api.py": (("handle_request", 3),),
+        "tests/test_api.py": (),
+    }
+    references_by_symbol = {
+        ("src/identity.py", "normalize_id"): (
+            "src/api.py",
+            "src/unplanned.py",
+        ),
+        ("src/storage.py", "save_record"): ("src/api.py",),
+        ("src/api.py", "handle_request"): ("tests/test_api.py",),
+        ("src/storage.py", "load_record"): ("src/unplanned.py",),
+    }
+
+    class LabeledReferenceServer(_FakeServer):
+        def request(self, method: str, params: Any) -> Any:
+            uri = params["textDocument"]["uri"]
+            relative_path = (
+                Path(uri.removeprefix("file://")).relative_to(tmp_path).as_posix()
+            )
+            if method == "textDocument/documentSymbol":
+                return [
+                    {
+                        "name": name,
+                        "kind": 12,
+                        "range": {
+                            "start": {"line": line, "character": 4},
+                            "end": {"line": line, "character": 20},
+                        },
+                        "selectionRange": {
+                            "start": {"line": line, "character": 4},
+                            "end": {"line": line, "character": 20},
+                        },
+                    }
+                    for name, line in symbol_lines[relative_path]
+                ]
+            if method == "textDocument/references":
+                position = params["position"]
+                symbol = next(
+                    (
+                        name
+                        for name, line in symbol_lines[relative_path]
+                        if line == position["line"]
+                    ),
+                    None,
+                )
+                targets = (
+                    ()
+                    if symbol is None
+                    else references_by_symbol.get((relative_path, symbol), ())
+                )
+                return [
+                    {
+                        "uri": (tmp_path / target).as_uri(),
+                        "range": {},
+                    }
+                    for target in targets
+                ]
+            raise AssertionError(f"unexpected BasedPyright request: {method}")
+
+    monkeypatch.setattr(
+        "powdrr_lift.basedpyright_tools._BasedPyrightLanguageServer",
+        LabeledReferenceServer,
+    )
+
+    symbols, references = find_workspace_document_analysis(
+        list(planned_paths), worktree_root=tmp_path
+    )
+    candidate_pairs = _planned_reference_path_pairs(planned_paths, references)
+
+    expected_labeled_edges = {
+        ("src/identity.py", "src/api.py"),
+        ("src/storage.py", "src/api.py"),
+        ("src/api.py", "tests/test_api.py"),
+    }
+    assert candidate_pairs == tuple(sorted(expected_labeled_edges))
+    assert "src/unplanned.py" not in symbols
+    assert all("unplanned" not in path for pair in candidate_pairs for path in pair)

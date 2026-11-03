@@ -1,5 +1,5 @@
 schema: https://powdrr.io/schema/changelog-v2
-change_id: 1333
+change_id: 1334
 title: Route changelog template generation through the service
 intent:
   problem: The agent directly imported service template formatting and plan-diff enrichment

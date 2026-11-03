@@ -5,7 +5,8 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
-from powdrr_lift.structrr.validation import DiscoveredValidationProfile
+from powdrr_service.structrr.validation import DiscoveredValidationProfile
+
 from powdrr_lift.workrr.verification_provider import (
     ProviderExecutionResult,
     ProviderInventory,

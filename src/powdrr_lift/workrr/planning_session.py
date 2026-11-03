@@ -39,11 +39,11 @@ from powdrr_service.planning.source import segment_markdown_source
 from powdrr_service.planning.workflow_ids import slugify_workflow_id
 from powdrr_service.providers.credentials import resolve_provider_credentials
 from powdrr_service.resources import bundled_process_directory
+from powdrr_service.structrr.bootstrap import bootstrap_structrr
+from powdrr_service.structrr.entity_taxonomy import load_entity_taxonomy
 
 from powdrr_lift.core import resolve_repo_root
-from powdrr_lift.core.entity_taxonomy import load_entity_taxonomy
 from powdrr_lift.errors import PowdrrExecutionError
-from powdrr_lift.structrr.bootstrap import bootstrap_structrr
 from powdrr_lift.workrr.credential_check import configured_model_mapping
 from powdrr_lift.workrr.github_issue_plan_generation import (
     PlanPullRequest,

@@ -4,9 +4,8 @@ import subprocess
 from pathlib import Path
 
 import yaml
+from powdrr_service.structrr.bootstrap import bootstrap_structrr
 from powdrr_service.structrr.rebase import rebase_structrr_snapshot
-
-from powdrr_lift.structrr.bootstrap import bootstrap_structrr
 
 PROJECT_ROOT = Path(__file__).parents[1]
 
@@ -40,7 +39,7 @@ def test_bootstrap_real_powdrr_checkout_matches_golden_symbols(
     assert len(subject_ids) == len(subjects)
     assert any(
         subject["qualified_name"]
-        == "src.powdrr_lift.structrr.bootstrap.bootstrap_structrr"
+        == "packages.service.src.powdrr_service.structrr.bootstrap.bootstrap_structrr"
         for subject in subjects
     )
     assert bindings

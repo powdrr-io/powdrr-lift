@@ -729,7 +729,7 @@ class LocalPowdrrService:
                 root = Path(temp).resolve()
                 _write_snapshot(root, request)
                 _initialize_snapshot_git(root)
-                from powdrr_lift.structrr.bootstrap import bootstrap_structrr
+                from powdrr_service.structrr.bootstrap import bootstrap_structrr
 
                 result = bootstrap_structrr(
                     root,

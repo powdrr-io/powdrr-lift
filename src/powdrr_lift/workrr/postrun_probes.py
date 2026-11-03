@@ -13,7 +13,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from powdrr_lift.structrr.validation import DiscoveredValidationProfile
+from powdrr_service.structrr.validation import DiscoveredValidationProfile
+
 from powdrr_lift.workrr.test_obligations import missing_obligation_ids
 
 POSTRUN_PROBE_SCHEMA_VERSION = "instruction-derived-probe-suite-v7"

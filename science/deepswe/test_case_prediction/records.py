@@ -11,7 +11,7 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
-from powdrr_lift.structrr.validation import discover_validation_profiles
+from powdrr_service.structrr.validation import discover_validation_profiles
 
 from . import SCHEMA_VERSION
 

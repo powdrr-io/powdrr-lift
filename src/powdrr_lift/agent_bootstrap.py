@@ -14,6 +14,12 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from powdrr_service.structrr.bootstrap import (
+    BootstrapResult,
+    bootstrap_structrr,
+    validate_bootstrap_document,
+)
+from powdrr_service.structrr.entity_taxonomy import load_entity_taxonomy
 from powdrr_service.structrr.source_manifest import SourceManifest
 
 from powdrr_lift.agent_runtime import (
@@ -22,13 +28,7 @@ from powdrr_lift.agent_runtime import (
     prepare_agent_worktree,
     publish_pull_request,
 )
-from powdrr_lift.core.entity_taxonomy import load_entity_taxonomy
 from powdrr_lift.errors import PowdrrExecutionError
-from powdrr_lift.structrr.bootstrap import (
-    BootstrapResult,
-    bootstrap_structrr,
-    validate_bootstrap_document,
-)
 from powdrr_lift.workrr.run_artifacts import (
     write_json_artifact,
     write_run_report,

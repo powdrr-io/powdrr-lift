@@ -14,7 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
 
-from powdrr_lift.structrr.validation import (
+from powdrr_service.structrr.validation import (
     VALIDATION_PROVIDER_INVENTORY_SCHEMA_VERSION,
     DiscoveredValidationProfile,
 )

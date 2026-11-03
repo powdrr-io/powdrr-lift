@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from powdrr_lift.core.entity_taxonomy import parse_entity_taxonomy_markdown
+from powdrr_service.structrr.entity_taxonomy import parse_entity_taxonomy_markdown
 
 
 def test_parse_entity_taxonomy_markdown_reads_repository_taxonomy() -> None:

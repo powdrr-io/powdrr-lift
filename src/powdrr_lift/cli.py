@@ -60,6 +60,8 @@ from powdrr_service.resources import bundled_process_directory
 from powdrr_service.specifications.system import (
     build_system_specification_validation_report,
 )
+from powdrr_service.structrr.bootstrap import bootstrap_structrr
+from powdrr_service.structrr.entity_taxonomy import load_entity_taxonomy
 from powdrr_service.structrr.intent_lineage import audit_intent_lineage
 from powdrr_service.structrr.rebase import rebase_structrr_snapshot
 from powdrr_service.structrr.verification_health import (
@@ -132,7 +134,6 @@ from powdrr_lift.core import (
 from powdrr_lift.core.capability_exception import CapabilityExceptionAuthority
 from powdrr_lift.core.delivery_profile import PhaseType
 from powdrr_lift.core.effective_contract import resolve_effective_contract
-from powdrr_lift.core.entity_taxonomy import load_entity_taxonomy
 from powdrr_lift.core.execution_plan import ExecutionPlan
 from powdrr_lift.core.pr_specification import load_proposed_pr_dependency_graph
 from powdrr_lift.core.project_structure import (
@@ -183,7 +184,6 @@ from powdrr_lift.pull_request_description import (
     render_pull_request_description_template,
 )
 from powdrr_lift.repository_state import render_repository_state
-from powdrr_lift.structrr.bootstrap import bootstrap_structrr
 from powdrr_lift.structrr.intent import (
     IntentClause,
     IntentContract,

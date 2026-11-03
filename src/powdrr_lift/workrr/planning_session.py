@@ -55,9 +55,8 @@ from powdrr_lift.workrr.github_issue_queue import (
 )
 from powdrr_lift.workrr.planning.evidence import (
     read_evidence_excerpt,
-    search_dependency_reference_paths,
     search_requirements_evidence,
-    search_structural_document_symbols,
+    search_structural_document_analysis,
 )
 from powdrr_lift.workrr.provider_runtime import (
     build_workflow_client,
@@ -226,13 +225,16 @@ def run_planning_session(
         taxonomy = load_entity_taxonomy(repo_root, _structrr_taxonomy_path(repo_root))
         dependency_reference_cache_key: tuple[Any, ...] | None = None
         dependency_reference_cache: Mapping[tuple[str, str], tuple[str, ...]] = {}
-        structural_symbol_cache_key: tuple[str, ...] | None = None
+        structural_analysis_cache_key: tuple[str, ...] | None = None
         structural_symbol_cache: Mapping[str, Sequence[Mapping[str, Any]]] = {}
+        structural_reference_cache: Mapping[str, Sequence[str]] = {}
 
         def search_dependency_references(
             units: Sequence[WorkUnit],
         ) -> Mapping[tuple[str, str], tuple[str, ...]]:
             nonlocal dependency_reference_cache_key, dependency_reference_cache
+            nonlocal structural_analysis_cache_key
+            nonlocal structural_symbol_cache, structural_reference_cache
             paths_by_unit = {
                 unit.id: tuple(
                     sorted({write.path for write in unit.planned_writes if write.path})
@@ -243,9 +245,32 @@ def run_planning_session(
             if cache_key == dependency_reference_cache_key:
                 return dependency_reference_cache
             try:
-                dependency_reference_cache = search_dependency_reference_paths(
-                    repo_root, base_commit, paths_by_unit
+                owners_by_path: dict[str, set[str]] = {}
+                for unit_id, paths in paths_by_unit.items():
+                    for path in paths:
+                        if path.casefold().endswith((".py", ".pyi")):
+                            owners_by_path.setdefault(path, set()).add(unit_id)
+                analysis_paths = tuple(sorted(owners_by_path))
+                (
+                    structural_symbol_cache,
+                    structural_reference_cache,
+                ) = search_structural_document_analysis(
+                    repo_root, base_commit, analysis_paths
                 )
+                structural_analysis_cache_key = analysis_paths
+                candidate_paths: dict[tuple[str, str], set[str]] = {}
+                for producer_path, consumer_paths in structural_reference_cache.items():
+                    for consumer_path in consumer_paths:
+                        for producer_id in owners_by_path.get(producer_path, ()):
+                            for consumer_id in owners_by_path.get(consumer_path, ()):
+                                if producer_id != consumer_id:
+                                    candidate_paths.setdefault(
+                                        (producer_id, consumer_id), set()
+                                    ).add(f"{producer_path} -> {consumer_path}")
+                dependency_reference_cache = {
+                    pair: tuple(sorted(paths))
+                    for pair, paths in sorted(candidate_paths.items())
+                }
             except (EvidenceError, PowdrrExecutionError) as error:
                 print(
                     "BasedPyright dependency reference search unavailable; "
@@ -253,29 +278,43 @@ def run_planning_session(
                     file=stream,
                 )
                 dependency_reference_cache = {}
+                structural_analysis_cache_key = None
+                structural_symbol_cache = {}
+                structural_reference_cache = {}
             dependency_reference_cache_key = cache_key
             return dependency_reference_cache
 
         def search_structural_symbols(
             paths: Sequence[str],
         ) -> Mapping[str, Sequence[Mapping[str, Any]]]:
-            nonlocal structural_symbol_cache_key, structural_symbol_cache
+            nonlocal structural_analysis_cache_key
+            nonlocal structural_symbol_cache, structural_reference_cache
             cache_key = tuple(sorted(set(paths)))
-            if cache_key == structural_symbol_cache_key:
+            if cache_key == structural_analysis_cache_key:
                 return structural_symbol_cache
             try:
-                structural_symbol_cache = search_structural_document_symbols(
+                (
+                    structural_symbol_cache,
+                    structural_reference_cache,
+                ) = search_structural_document_analysis(
                     repo_root, base_commit, cache_key
                 )
             except EvidenceError as error:
                 print(
-                    "BasedPyright Structrr symbol search unavailable; "
+                    "BasedPyright Structrr document analysis unavailable; "
                     f"continuing with baseline candidates and semantic review: {error}",
                     file=stream,
                 )
                 structural_symbol_cache = {}
-            structural_symbol_cache_key = cache_key
+                structural_reference_cache = {}
+            structural_analysis_cache_key = cache_key
             return structural_symbol_cache
+
+        def search_structural_references(
+            paths: Sequence[str],
+        ) -> Mapping[str, Sequence[str]]:
+            search_structural_symbols(paths)
+            return structural_reference_cache
 
         machine = SourceLedgerQuestionMachine(
             source,
@@ -289,6 +328,7 @@ def run_planning_session(
             ),
             dependency_reference_search=search_dependency_references,
             structural_symbol_search=search_structural_symbols,
+            structural_reference_search=search_structural_references,
             verification_command=verification_command,
             repository_paths=_planning_repository_paths(
                 repo_root, base_commit, pinned_source.text

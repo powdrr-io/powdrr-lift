@@ -14,6 +14,7 @@ from typing import Any, Literal, Protocol
 from powdrr_agent.repository import (
     LocalActionError,
     execute_command,
+    find_workspace_document_analysis,
     find_workspace_document_symbols,
     find_workspace_reference_paths,
     find_workspace_symbols,
@@ -429,6 +430,23 @@ def search_structural_document_symbols(
         )
     except PowdrrExecutionError as error:
         raise EvidenceError(f"structural symbol search failed: {error}") from error
+
+
+def search_structural_document_analysis(
+    repository_root: str | Path,
+    base_commit: str,
+    paths: Sequence[str],
+) -> tuple[dict[str, list[dict[str, Any]]], dict[str, tuple[str, ...]]]:
+    """Read symbols and cross-file references from one pinned BasedPyright session."""
+    root = Path(repository_root).resolve()
+    _require_clean_pinned_checkout(root, base_commit)
+    normalized_paths = tuple(sorted(set(paths)))
+    try:
+        return find_workspace_document_analysis(
+            list(normalized_paths), worktree_root=root
+        )
+    except PowdrrExecutionError as error:
+        raise EvidenceError(f"structural document analysis failed: {error}") from error
 
 
 def read_pinned_code_file(

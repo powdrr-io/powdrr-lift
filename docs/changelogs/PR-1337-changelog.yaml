@@ -1,0 +1,236 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1337
+title: Use BasedPyright references in Structrr candidate review
+intent:
+  problem: Structrr's additional-subject review cannot use the cross-file BasedPyright references already gathered for dependency planning, so code relationships may be missed or require another static-analysis session.
+  goal: Reuse pinned BasedPyright symbols and references, pass only item-scoped path-pair evidence into Structrr review, and bind that evidence to the durable question digest without treating references as proof of a structural change.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/plans/planning-efficiency-deterministic-filtering.md
+    type: modified
+    span: {start_line: 75, end_line: 81}
+    summary: Record the next Structrr candidate-evidence slice and its item-scoped resume behavior.
+    rationale: Keep the implementation sequence and expected evidence limits visible in the planning-efficiency plan.
+  - path: packages/agent/src/powdrr_agent/repository.py
+    type: modified
+    span: {start_line: 227, end_line: 237}
+    summary: Expose combined BasedPyright document and reference analysis through the repository adapter.
+    rationale: Reuse the repository capability boundary while retrieving both evidence types from one language-server session.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 186, end_line: 201}
+    summary: Filter BasedPyright reference pairs to paths owned by one plan item.
+    rationale: Prevent unrelated planned files from entering that item's Structrr review context.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 451, end_line: 454}
+    summary: Accept and cache item-scoped structural reference evidence.
+    rationale: Let the service consume evidence through callbacks without depending on the local BasedPyright implementation.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 470, end_line: 470}
+    summary: Store the reference search callback on the planning machine.
+    rationale: Keep the planning driver independent of the local static-analysis implementation.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 473, end_line: 474}
+    summary: Cache reference results by the complete planned path set.
+    rationale: Avoid repeating static analysis while rebuilding structural questions.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 1597, end_line: 1605}
+    summary: Load planned-path reference evidence with the structural symbol results.
+    rationale: Make reference evidence available while each item is reviewed.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 1659, end_line: 1661}
+    summary: Filter reference pairs to the current item's planned Python paths.
+    rationale: Keep unrelated file relationships out of this item’s candidate context.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 1689, end_line: 1689}
+    summary: Pass the filtered reference pairs into the Structrr enumeration request.
+    rationale: Bind additional-subject review to the evidence for its own item.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 561, end_line: 561}
+    summary: Accept optional BasedPyright reference path pairs in the enumeration builder.
+    rationale: Keep the request API explicit about static evidence supplied by planning.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 612, end_line: 622}
+    summary: Add compact BasedPyright path-pair facts to the additional-subject context.
+    rationale: Give the reviewer concrete cross-file evidence while keeping full symbol inventories out of the prompt.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 643, end_line: 650}
+    summary: Include reference facts in accepted context records.
+    rationale: Preserve the exact evidence alongside the rest of the question context.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 696, end_line: 696}
+    summary: Include reference evidence in the question input digest.
+    rationale: Ensure resume invalidates an accepted answer when its static evidence changes.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 711, end_line: 715}
+    summary: Explain how to interpret BasedPyright reference candidates.
+    rationale: Require semantic support before a reference becomes a Structrr relationship or change.
+  - path: src/powdrr_lift/basedpyright_tools.py
+    type: modified
+    span: {start_line: 73, end_line: 79}
+    summary: Delegate reference-path lookup to a combined document-analysis function.
+    rationale: Preserve the existing reference API while making one-session analysis reusable.
+  - path: src/powdrr_lift/basedpyright_tools.py
+    type: modified
+    span: {start_line: 93, end_line: 93}
+    summary: Report the combined document-analysis file limit.
+    rationale: Keep the bounded BasedPyright request limit clear for both evidence types.
+  - path: src/powdrr_lift/basedpyright_tools.py
+    type: modified
+    span: {start_line: 97, end_line: 97}
+    summary: Return empty symbol and reference maps when no planned Python paths remain.
+    rationale: Keep the combined analysis result shape stable for empty inputs.
+  - path: src/powdrr_lift/basedpyright_tools.py
+    type: modified
+    span: {start_line: 103, end_line: 103}
+    summary: Initialize the per-path symbol result map.
+    rationale: Collect declarations alongside references in the same session.
+  - path: src/powdrr_lift/basedpyright_tools.py
+    type: modified
+    span: {start_line: 135, end_line: 142}
+    summary: Convert and retain symbols returned for each analyzed file.
+    rationale: Return the declaration evidence already fetched for reference analysis.
+  - path: src/powdrr_lift/basedpyright_tools.py
+    type: modified
+    span: {start_line: 185, end_line: 185}
+    summary: Return both symbols and cross-file reference paths from the analysis.
+    rationale: Let planning share one complete result across its consumers.
+  - path: src/powdrr_lift/workrr/planning/evidence.py
+    type: modified
+    span: {start_line: 17, end_line: 17}
+    summary: Import the combined BasedPyright analysis adapter.
+    rationale: Keep pinned repository analysis behind the planning evidence layer.
+  - path: src/powdrr_lift/workrr/planning/evidence.py
+    type: modified
+    span: {start_line: 435, end_line: 451}
+    summary: Verify the pinned clean checkout and return symbols plus references together.
+    rationale: Ensure both evidence types describe the same planned base commit.
+  - path: src/powdrr_lift/workrr/planning_session.py
+    type: modified
+    span: {start_line: 58, end_line: 58}
+    summary: Import the combined pinned structural document-analysis adapter.
+    rationale: Reuse one symbol and reference result across planning phases.
+  - path: src/powdrr_lift/workrr/planning_session.py
+    type: modified
+    span: {start_line: 59, end_line: 59}
+    summary: Replace the symbol-only adapter import with combined document analysis.
+    rationale: Share static analysis rather than launching separate searches.
+  - path: src/powdrr_lift/workrr/planning_session.py
+    type: modified
+    span: {start_line: 228, end_line: 228}
+    summary: Key structural analysis cache entries by the complete planned path set.
+    rationale: Reuse matching analysis results during question reconstruction.
+  - path: src/powdrr_lift/workrr/planning_session.py
+    type: modified
+    span: {start_line: 230, end_line: 230}
+    summary: Add the cached reference path map beside the cached symbol map.
+    rationale: Keep both outputs from one BasedPyright run together.
+  - path: src/powdrr_lift/workrr/planning_session.py
+    type: modified
+    span: {start_line: 236, end_line: 237}
+    summary: Share the combined analysis caches with dependency reference discovery.
+    rationale: Allow dependency and Structrr stages to reuse the same result.
+  - path: src/powdrr_lift/workrr/planning_session.py
+    type: modified
+    span: {start_line: 248, end_line: 258}
+    summary: Build planned file ownership and run combined analysis for those Python paths.
+    rationale: Find structural and dependency evidence from the same pinned checkout and session.
+  - path: src/powdrr_lift/workrr/planning_session.py
+    type: modified
+    span: {start_line: 260, end_line: 273}
+    summary: Reuse references to assemble dependency candidates while caching document symbols.
+    rationale: Preserve dependency candidate direction and evidence without a second language-server startup.
+  - path: src/powdrr_lift/workrr/planning_session.py
+    type: modified
+    span: {start_line: 281, end_line: 283}
+    summary: Clear cached static evidence when dependency analysis fails.
+    rationale: Prevent stale symbols or references from leaking into a later question.
+  - path: src/powdrr_lift/workrr/planning_session.py
+    type: modified
+    span: {start_line: 290, end_line: 291}
+    summary: Share symbol and reference caches with Structrr analysis.
+    rationale: Reuse analysis results from the dependency phase when path sets match.
+  - path: src/powdrr_lift/workrr/planning_session.py
+    type: modified
+    span: {start_line: 293, end_line: 293}
+    summary: Return cached symbols when the planned Python paths match.
+    rationale: Avoid repeating BasedPyright work for the same path set.
+  - path: src/powdrr_lift/workrr/planning_session.py
+    type: modified
+    span: {start_line: 296, end_line: 299}
+    summary: Populate both caches from the combined pinned analysis adapter.
+    rationale: Give Structrr and dependency planning consistent static evidence.
+  - path: src/powdrr_lift/workrr/planning_session.py
+    type: modified
+    span: {start_line: 304, end_line: 304}
+    summary: Report combined analysis failures as Structrr document-analysis failures.
+    rationale: Make the degraded static-evidence path clear in planning logs.
+  - path: src/powdrr_lift/workrr/planning_session.py
+    type: modified
+    span: {start_line: 309, end_line: 310}
+    summary: Clear the reference cache on analysis failure and remember the attempted path set.
+    rationale: Keep fallback behavior deterministic across resumed question construction.
+  - path: src/powdrr_lift/workrr/planning_session.py
+    type: modified
+    span: {start_line: 313, end_line: 318}
+    summary: Add a reference callback that shares the symbol analysis cache.
+    rationale: Supply Structrr references without launching another BasedPyright session.
+  - path: src/powdrr_lift/workrr/planning_session.py
+    type: modified
+    span: {start_line: 331, end_line: 331}
+    summary: Wire the reference callback into the planning machine.
+    rationale: Deliver item-scoped BasedPyright reference candidates to Structrr planning.
+  - path: tests/test_basedpyright_tools.py
+    type: modified
+    span: {start_line: 12, end_line: 12}
+    summary: Import the combined BasedPyright document-analysis helper for direct testing.
+    rationale: Exercise the combined evidence API at its source.
+  - path: tests/test_basedpyright_tools.py
+    type: modified
+    span: {start_line: 212, end_line: 272}
+    summary: Verify combined analysis returns symbols and references from one server session.
+    rationale: Protect the single-session behavior and cross-file path filtering.
+  - path: tests/test_planning_service.py
+    type: modified
+    span: {start_line: 25, end_line: 25}
+    summary: Import the item path-pair filtering helper for its unit test.
+    rationale: Verify reference filtering independently of model interactions.
+  - path: tests/test_planning_service.py
+    type: modified
+    span: {start_line: 1162, end_line: 1171}
+    summary: Verify Structrr reference candidates are limited to the item's planned paths.
+    rationale: Exclude references to unrelated plan items.
+  - path: tests/test_planning_structrr.py
+    type: modified
+    span: {start_line: 166, end_line: 166}
+    summary: Supply a cross-file BasedPyright reference pair to the request fixture.
+    rationale: Exercise reference evidence as part of an item's accepted context.
+  - path: tests/test_planning_structrr.py
+    type: modified
+    span: {start_line: 189, end_line: 196}
+    summary: Build a comparison request without references.
+    rationale: Verify that changing the static reference evidence invalidates the prior answer.
+  - path: tests/test_planning_structrr.py
+    type: modified
+    span: {start_line: 227, end_line: 246}
+    summary: Assert the reference fact, digest binding, and semantic-candidate guidance.
+    rationale: Protect evidence durability and prevent references alone from proving structural changes.
+entities: []
+entity_relationships: []
+invariants:
+  - id: basedpyright-references-are-candidates
+    description: Cross-file code references may guide Structrr subject review but do not alone prove a structural relationship or change.
+    action: added
+guidance: []

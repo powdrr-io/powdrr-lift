@@ -558,6 +558,7 @@ def build_subject_enumeration_request(
     source_refs: Sequence[str],
     projected_baseline: Mapping[str, Any],
     prior_subjects: Sequence[BoundStructuralSubject] = (),
+    basedpyright_reference_path_pairs: Sequence[tuple[str, str]] = (),
     page_ordinal: int = 1,
     baseline_digest: str | None = None,
 ) -> QuestionRequest[StructuralSubjectPage]:
@@ -608,6 +609,17 @@ def build_subject_enumeration_request(
         f"projected-structrr:{item_id}:{baseline_digest[:20]}",
         subject_index,
     )
+    reference_fact = ContextRecord(
+        f"basedpyright-reference-paths:{item_id}",
+        {
+            "references": [
+                {"source_path": source_path, "target_path": target_path}
+                for source_path, target_path in sorted(
+                    set(basedpyright_reference_path_pairs)
+                )
+            ]
+        },
+    )
     prior_counts: dict[str, int] = {}
     for subject in prior_subjects:
         prior_counts[subject.section] = prior_counts.get(subject.section, 0) + 1
@@ -628,7 +640,14 @@ def build_subject_enumeration_request(
             "next_anchor_if_more": f"structural-page-{page_ordinal + 1:04d}",
         },
     )
-    facts = (*unit_facts, *path_refs, baseline_fact, *prior_facts, pagination_fact)
+    facts = (
+        *unit_facts,
+        *path_refs,
+        baseline_fact,
+        reference_fact,
+        *prior_facts,
+        pagination_fact,
+    )
     context_ids = (
         *(excerpt.ref_id for excerpt in excerpt_map),
         *(record.ref_id for record in facts),
@@ -674,6 +693,7 @@ def build_subject_enumeration_request(
                     "units": [unit.to_data() for unit in units],
                     "source": [(item.ref_id, item.text) for item in excerpt_map],
                     "prior": [item.to_data() for item in prior_subjects],
+                    "basedpyright_references": reference_fact.value,
                     "page": page_ordinal,
                 }
             ),
@@ -688,7 +708,11 @@ def build_subject_enumeration_request(
             "from the projected baseline fact and must not be rediscovered. Planned "
             "file paths have already been registered deterministically; do not "
             "return file subjects. Include only changes required by this item's "
-            "allocated units. Use a supplied existing "
+            "allocated units. BasedPyright references between planned paths are "
+            "candidate evidence for possible relationships; use them only when "
+            "the requirements and structural identities support the relationship. "
+            "A reference alone does not prove a Structrr relationship or change. "
+            "Use a supplied existing "
             "entity or relationship reference, or describe one new entity or "
             "relationship identity. Do not infer relationships from shared paths "
             "or names alone. "

@@ -224,6 +224,17 @@ def find_workspace_reference_paths(
     return find(paths, worktree_root=worktree_root)
 
 
+def find_workspace_document_analysis(
+    paths: list[str], *, worktree_root: Path
+) -> tuple[dict[str, list[dict[str, Any]]], dict[str, tuple[str, ...]]]:
+    """Return symbols and cross-file references from one BasedPyright session."""
+    from powdrr_lift.basedpyright_tools import (
+        find_workspace_document_analysis as analyze,
+    )
+
+    return analyze(paths, worktree_root=worktree_root)
+
+
 def find_workspace_document_symbols(
     paths: list[str], *, worktree_root: Path
 ) -> dict[str, list[dict[str, Any]]]:

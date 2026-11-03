@@ -72,6 +72,13 @@ candidate records, so resume detects changes without copying the full symbol
 inventory into the prompt. If BasedPyright is unavailable, planning keeps the
 existing baseline candidates and semantic review path.
 
+The next slice extends that candidate review with cross-file BasedPyright
+references among an item's own planned Python paths. Symbol declarations and
+reference paths are collected in the same language-server session; each
+additional-subject question receives only compact path-pair evidence scoped to
+its item. The evidence is digest-bound and is a candidate signal only: a
+reference does not itself establish a Structrr relationship or a change.
+
 ### Milestone 0: Record a baseline and expose planning cost
 
 **Purpose:** Establish which phases dominate elapsed time and provide a before/after comparison for every optimization.

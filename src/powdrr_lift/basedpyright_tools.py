@@ -70,6 +70,13 @@ def find_workspace_reference_paths(
     paths: list[str], *, worktree_root: Path
 ) -> dict[str, tuple[str, ...]]:
     """Find planned Python files that reference symbols in other planned files."""
+    return find_workspace_document_analysis(paths, worktree_root=worktree_root)[1]
+
+
+def find_workspace_document_analysis(
+    paths: list[str], *, worktree_root: Path
+) -> tuple[dict[str, list[dict[str, Any]]], dict[str, tuple[str, ...]]]:
+    """Return symbols and cross-file references from one BasedPyright session."""
     root = worktree_root.resolve()
     normalized_paths = tuple(
         sorted(
@@ -83,16 +90,17 @@ def find_workspace_reference_paths(
     )
     if len(normalized_paths) > _MAX_REFERENCE_FILES:
         raise PowdrrExecutionError(
-            f"BasedPyright reference search accepts at most {_MAX_REFERENCE_FILES} "
+            f"BasedPyright document analysis accepts at most {_MAX_REFERENCE_FILES} "
             "planned Python files at once."
         )
     if not normalized_paths:
-        return {}
+        return {}, {}
 
     allowed_paths = set(normalized_paths)
     reference_paths: dict[str, set[str]] = {
         relative_path: set() for relative_path in normalized_paths
     }
+    symbols_by_path: dict[str, list[dict[str, Any]]] = {}
     source_by_path = {
         relative_path: _resolve_worktree_path(relative_path, root).read_text(
             encoding="utf-8"
@@ -124,6 +132,14 @@ def find_workspace_reference_paths(
                 raise PowdrrExecutionError(
                     "basedpyright returned an invalid document symbol result."
                 )
+            if _document_symbol_count(symbols) > _MAX_DOCUMENT_SYMBOLS_PER_FILE:
+                raise PowdrrExecutionError(
+                    f"BasedPyright returned more than {_MAX_DOCUMENT_SYMBOLS_PER_FILE} "
+                    f"document symbols for {relative_path}."
+                )
+            symbols_by_path[relative_path] = [
+                _document_symbol_to_data(symbol, root) for symbol in symbols
+            ]
             candidates = tuple(
                 (name, line, character)
                 for name, line, character in _symbol_reference_positions(symbols)
@@ -166,7 +182,7 @@ def find_workspace_reference_paths(
                         and referenced_path != relative_path
                     ):
                         reference_paths[relative_path].add(referenced_path)
-    return {
+    return symbols_by_path, {
         path: tuple(sorted(references))
         for path, references in sorted(reference_paths.items())
         if references

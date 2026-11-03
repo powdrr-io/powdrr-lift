@@ -1162,7 +1162,7 @@ class SourceLedgerQuestionMachine:
         proposal_answers = {
             question_id: answer
             for question_id, answer in accepted_answers.items()
-            if question_id.startswith("propose-units-v3-")
+            if question_id.startswith("propose-units-v4-")
         }
         cache_key = hashlib.sha256(
             json.dumps(

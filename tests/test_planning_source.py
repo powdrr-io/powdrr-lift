@@ -1,12 +1,17 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import subprocess
 from pathlib import Path
 
 import pytest
 from powdrr_local.planning.source import read_pinned_source
 from powdrr_service.planning.contracts import PlanningContractError
+from powdrr_service.planning.questions import (
+    batch_question_requests,
+    build_question_messages,
+)
 from powdrr_service.planning.source import (
     EquivalenceDecision,
     PinnedSourceDocument,
@@ -479,8 +484,13 @@ def test_requirement_question_distinguishes_cursors_from_adjacent_citations() ->
         related_blocks=(adjacent,),
     )
 
-    candidates = ", ".join(obligation_anchors)
-    assert candidates in request.exact_question
+    pagination_fact = next(
+        item
+        for item in request.accepted_facts
+        if item.ref_id == f"pagination-candidates-{block.id}"
+    )
+    assert pagination_fact.value["allowed_next_anchor_ids"] == list(obligation_anchors)
+    assert ", ".join(obligation_anchors) not in request.exact_question
     assert "must never be used as pagination cursors" in request.exact_question
     assert "has_more=true requires a non-null next_anchor" in request.exact_question
     assert request.valid_example["has_more"] is True
@@ -496,6 +506,75 @@ def test_requirement_question_distinguishes_cursors_from_adjacent_citations() ->
                 "next_anchor": adjacent.anchor_ids[0],
             }
         )
+
+
+def test_extraction_questions_batch_with_distinct_pagination_candidates() -> None:
+    segmented = segment_markdown_source(
+        _document(
+            "# Plan\n\n"
+            "First requirement must work. Second requirement must persist.\n\n"
+            "Third requirement must be logged. Fourth requirement must be reported.\n"
+        )
+    )
+    blocks = [block for block in segmented.blocks if block.kind == "paragraph"]
+    assert len(blocks) == 2
+    anchors = {anchor.id: anchor for anchor in segmented.anchors}
+    requests = tuple(
+        build_extract_requirements_request(block, anchors=anchors) for block in blocks
+    )
+
+    (batch,) = batch_question_requests(requests)
+    packet = json.loads(build_question_messages(batch)[1]["content"])
+
+    assert len(batch.batch_members) == 2
+    assert requests[0].exact_question == requests[1].exact_question
+    assert requests[0].answer_field_definitions == requests[1].answer_field_definitions
+    shared_contract = next(
+        item["value"]
+        for item in packet["accepted_facts"]
+        if item["ref_id"] == "shared-member-question-contract"
+    )
+    assert shared_contract["prompt"] == requests[0].exact_question
+    child_packets = [
+        item["value"]
+        for item in packet["accepted_facts"]
+        if item["ref_id"].startswith("question:")
+    ]
+    assert all("prompt" not in item["exact_question"] for item in child_packets)
+    assert all("definitions" not in item["answer_fields"] for item in child_packets)
+    for member_request in requests:
+        pagination_fact = next(
+            fact
+            for fact in member_request.accepted_facts
+            if fact.ref_id
+            == f"pagination-candidates-{member_request.question.subject_ids[0]}"
+        )
+        candidate_ids = pagination_fact.value["allowed_next_anchor_ids"]
+        member_request.parse_answer(
+            {
+                "records": [],
+                "has_more": True,
+                "next_anchor": candidate_ids[0],
+            }
+        )
+        other_request = next(
+            candidate for candidate in requests if candidate is not member_request
+        )
+        other_pagination_fact = next(
+            fact
+            for fact in other_request.accepted_facts
+            if fact.ref_id.startswith("pagination-candidates-")
+        )
+        other_ids = set(other_pagination_fact.value["allowed_next_anchor_ids"])
+        if other_ids and not other_ids.issubset(set(candidate_ids)):
+            with pytest.raises(ValueError, match="current source block"):
+                member_request.parse_answer(
+                    {
+                        "records": [],
+                        "has_more": True,
+                        "next_anchor": next(iter(other_ids)),
+                    }
+                )
 
 
 def test_requirement_extraction_excludes_block_alias_when_clause_anchor_exists() -> (

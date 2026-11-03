@@ -28,7 +28,7 @@ The source-ledger question machine currently moves through these phases:
 1. Extract source obligations from each Markdown block, with pagination when a block has more than eight extracted records.
 2. Classify each source block as normative, context, or duplicate; check each extracted requirement for source fidelity.
 3. Search pinned repository evidence, then assess whether each requirement is already implemented.
-4. Propose implementation work units for groups of up to four unresolved requirements.
+4. Propose implementation work units for groups of up to four unresolved requirements, with each work unit covering at most four.
 5. Group work units into PR-sized items and ask for item title, objective, and scope.
 6. Discover dependency candidates from planned outputs, paths, and text, then confirm candidate edges.
 7. Derive planned file subjects, enumerate remaining Structrr subjects, and review structural changes.
@@ -201,7 +201,7 @@ file that also references one of the symbols.
 - Version the work-unit question contract and update its schema, parser, examples, prompt, and proposal data model together.
 - The parser must continue rejecting unknown requirement IDs, source refs, evidence IDs, paths, unsupported write roles, mixed runtimes, and uncovered unresolved requirements.
 - Do not loosen the exact coverage invariant to make the shorter schema easier to answer.
-- Retain a bounded maximum of four supplied requirements per question and the current page behavior. Batching from Milestone 1 handles independent groups.
+- Retain a bounded maximum of four supplied requirements per question and the current page behavior. Keep each proposed work unit bounded to four requirements. Batching from Milestone 1 handles independent groups.
 
 **Acceptance criteria:**
 
@@ -578,6 +578,30 @@ seconds, matched fixture shape, and had no validation retries. These mock-run
 results demonstrate interaction-count reduction, not live-provider latency.
 The report is saved at `/tmp/planning-exact-fidelity.json` for this development
 run.
+
+### Source extraction batch compaction (2026-11-03)
+
+Extraction questions previously embedded each block's allowed pagination IDs in
+the prompt and field definitions. That made otherwise equivalent questions
+appear to have different contracts, so a batch repeated the long instructions
+for every member. The planner now puts each block's cursor candidates and current
+cursor in its own digest-bound accepted fact. The shared instructions live once
+in the batch contract; every member keeps its own candidate fact and strict
+parser, which rejects cursors from another block.
+
+The large deterministic profile succeeded in 7.882 seconds with 500 source
+blocks, 500 requirements, 150 work units, and 50 items. It made 240 provider
+calls, matched the fixture shape, and had no validation retries. The live large
+run succeeded with 500 requirements and 125 work units in 641.034 seconds and
+355 calls. Its 860 extraction-question members used 215 calls (four members per
+call), compared with 752 members and 238 calls in the preceding live run. Across
+those different generated runs, total calls fell by 6.6%, while elapsed time
+rose from 624.952 to 641.034 seconds. Token usage was unavailable, so this
+demonstrates better request packing and fewer calls, not a latency improvement
+or a controlled token comparison. The live structural gate passed: 61 items
+contained two work units and one contained three, with 8–12 requirements per
+item and four acceptance criteria each. The fixture's exact 50-item target was
+not met. The report is saved at `/tmp/planning-post-extraction-batching-live.json`.
 
 ## Cross-cutting test requirements
 

@@ -7,6 +7,7 @@ from types import SimpleNamespace
 import pytest
 from powdrr_service.planning.assembly import (
     MAX_WORK_UNIT_PROPOSALS_PER_PAGE,
+    MAX_WORK_UNIT_REQUIREMENTS_PER_PROPOSAL,
     MAX_WORK_UNIT_REQUIREMENTS_PER_QUESTION,
     AllocationGroup,
     AssemblyError,
@@ -445,9 +446,9 @@ def test_work_unit_question_has_a_parser_valid_example_and_exact_context() -> No
 
     request.validate()
     assert request.question.kind == "propose_work_units"
-    assert request.question.contract_version == 3
-    assert request.question.expected_answer_schema == "work-unit-proposals-v3"
-    assert request.question.question_id.startswith("propose-units-v3-")
+    assert request.question.contract_version == 4
+    assert request.question.expected_answer_schema == "work-unit-proposals-v4"
+    assert request.question.question_id.startswith("propose-units-v4-")
     assert "several strongly related requirements together" in request.exact_question
     assert "Do not create one unit per requirement" in request.exact_question
     assert "requirement's own source_refs" in request.exact_question
@@ -588,6 +589,37 @@ def test_work_unit_proposals_scope_evidence_and_batch_independent_groups() -> No
         }
         assert request_evidence_ids == expected_evidence_ids
         requests.append(request)
+
+    four_requirement_request = build_work_unit_proposal_request(
+        context,
+        all_requirement_ids[:4],
+        valid_example={"records": [], "has_more": False, "next_anchor": None},
+    )
+    assert len(four_requirement_request.question.subject_ids) == 4
+    record_schema = four_requirement_request.answer_schema["properties"]["records"][
+        "items"
+    ]
+    assert (
+        record_schema["properties"]["requirement_ids"]["maxItems"]
+        == MAX_WORK_UNIT_REQUIREMENTS_PER_PROPOSAL
+    )
+    with pytest.raises(PlanningContractError, match="between 1 and 4 entries"):
+        four_requirement_request.parse_answer(
+            {
+                "records": [
+                    {
+                        "requirement_ids": list(all_requirement_ids[:5]),
+                        "deliverable": "Implement one bounded unit.",
+                        "planned_writes": [],
+                        "implementation_step": "Implement the bounded change.",
+                        "acceptance_criteria": ["The result is observable."],
+                        "required_outputs": [],
+                    }
+                ],
+                "has_more": False,
+                "next_anchor": None,
+            }
+        )
 
     unrelated_requirement_id = all_requirement_ids[-1]
     changed_unrelated_evidence = Evidence(

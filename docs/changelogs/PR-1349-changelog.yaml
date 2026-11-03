@@ -1,0 +1,235 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1349
+title: Move probe validation policy into service
+intent:
+  problem: Generated probe parsing, interaction validation, test-obligation IDs, and coverage rules were
+    still defined in legacy application modules, leaving proprietary verification policy in the application
+    package.
+  goal: Move probe validation and obligation policy into the service package, with executable probe data
+    represented by public contracts, while preserving current workflow behavior and payload fields.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2698
+    end_line: 2698
+  summary: Move probe validation and obligation-policy ownership records into the service package.
+  rationale: Keep ownership classification and dependency edges aligned with the relocated implementation.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2830
+    end_line: 2830
+  summary: Move probe validation and obligation-policy ownership records into the service package.
+  rationale: Keep ownership classification and dependency edges aligned with the relocated implementation.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2859
+    end_line: 2861
+  summary: Move probe validation and obligation-policy ownership records into the service package.
+  rationale: Keep ownership classification and dependency edges aligned with the relocated implementation.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3064
+    end_line: 3065
+  summary: Move probe validation and obligation-policy ownership records into the service package.
+  rationale: Keep ownership classification and dependency edges aligned with the relocated implementation.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3068
+    end_line: 3070
+  summary: Move probe validation and obligation-policy ownership records into the service package.
+  rationale: Keep ownership classification and dependency edges aligned with the relocated implementation.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3443
+    end_line: 3443
+  summary: Move probe validation and obligation-policy ownership records into the service package.
+  rationale: Keep ownership classification and dependency edges aligned with the relocated implementation.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3457
+    end_line: 3458
+  summary: Move probe validation and obligation-policy ownership records into the service package.
+  rationale: Keep ownership classification and dependency edges aligned with the relocated implementation.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3480
+    end_line: 3480
+  summary: Move probe validation and obligation-policy ownership records into the service package.
+  rationale: Keep ownership classification and dependency edges aligned with the relocated implementation.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3483
+    end_line: 3485
+  summary: Move probe validation and obligation-policy ownership records into the service package.
+  rationale: Keep ownership classification and dependency edges aligned with the relocated implementation.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3902
+    end_line: 3902
+  summary: Move probe validation and obligation-policy ownership records into the service package.
+  rationale: Keep ownership classification and dependency edges aligned with the relocated implementation.
+- path: packages/contracts/src/powdrr_contracts/__init__.py
+  type: modified
+  span:
+    start_line: 22
+    end_line: 22
+  summary: Export the public PostRunProbe model.
+  rationale: Share executable probe data between service policy and local agent execution through contracts.
+- path: packages/contracts/src/powdrr_contracts/__init__.py
+  type: modified
+  span:
+    start_line: 37
+    end_line: 37
+  summary: Export the public PostRunProbe model.
+  rationale: Share executable probe data between service policy and local agent execution through contracts.
+- path: packages/contracts/src/powdrr_contracts/verification.py
+  type: modified
+  span:
+    start_line: 11
+    end_line: 40
+  summary: Define PostRunProbe in the public contracts package with its established serialized shape.
+  rationale: Keep probe data independent of application and service implementation modules.
+- path: packages/service/src/powdrr_service/verification/postrun_probes.py
+  type: renamed
+  span:
+    start_line: 1
+    end_line: 1092
+  summary: Move generated-probe source parsing, interaction validation, and coverage checks into the service.
+  rationale: Keep probe validation policy with service-owned verification logic.
+- path: packages/service/src/powdrr_service/verification/test_obligations.py
+  type: renamed
+  span:
+    start_line: 1
+    end_line: 40
+  summary: Move deterministic acceptance-criterion IDs and obligation coverage helpers into the service.
+  rationale: Keep test-obligation policy out of the legacy application package.
+- path: scripts/build-agent-service-ownership-inventory.py
+  type: modified
+  span:
+    start_line: 34
+    end_line: 49
+  summary: Classify probe parsing and obligation helpers as service-owned verification modules.
+  rationale: Keep future inventory generation consistent with the extracted ownership boundary.
+- path: scripts/build-agent-service-ownership-inventory.py
+  type: modified
+  span:
+    start_line: 52
+    end_line: 52
+  summary: Classify probe parsing and obligation helpers as service-owned verification modules.
+  rationale: Keep future inventory generation consistent with the extracted ownership boundary.
+- path: scripts/build-agent-service-ownership-inventory.py
+  type: modified
+  span:
+    start_line: 407
+    end_line: 407
+  summary: Classify probe parsing and obligation helpers as service-owned verification modules.
+  rationale: Keep future inventory generation consistent with the extracted ownership boundary.
+- path: scripts/build-agent-service-ownership-inventory.py
+  type: modified
+  span:
+    start_line: 409
+    end_line: 409
+  summary: Classify probe parsing and obligation helpers as service-owned verification modules.
+  rationale: Keep future inventory generation consistent with the extracted ownership boundary.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 23
+    end_line: 23
+  summary: Use the service probe validator and contracts-owned probe model.
+  rationale: Keep generated source interpretation in service policy while preserving local workflow orchestration.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 101
+    end_line: 105
+  summary: Use the service probe validator and contracts-owned probe model.
+  rationale: Keep generated source interpretation in service policy while preserving local workflow orchestration.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 156
+    end_line: 161
+  summary: Use the service probe validator and contracts-owned probe model.
+  rationale: Keep generated source interpretation in service policy while preserving local workflow orchestration.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 92
+    end_line: 94
+  summary: Use service-owned acceptance-criterion obligation generation.
+  rationale: Keep test-obligation policy in the service package.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 218
+    end_line: 218
+  summary: Use service-owned acceptance-criterion obligation generation.
+  rationale: Keep test-obligation policy in the service package.
+- path: tests/test_execute_pr_tests.py
+  type: modified
+  span:
+    start_line: 29
+    end_line: 29
+  summary: Import obligation helpers from the service verification package.
+  rationale: Keep coverage tests attached to the policy implementation.
+- path: tests/test_execute_pr_tests.py
+  type: modified
+  span:
+    start_line: 34
+    end_line: 35
+  summary: Import obligation helpers from the service verification package.
+  rationale: Keep coverage tests attached to the policy implementation.
+- path: tests/test_postrun_probes.py
+  type: modified
+  span:
+    start_line: 10
+    end_line: 14
+  summary: Test the contracts-owned probe model and service-owned parsing and validation.
+  rationale: Protect the exchanged data shape and the moved validation behavior.
+- path: tests/test_postrun_probes.py
+  type: modified
+  span:
+    start_line: 16
+    end_line: 21
+  summary: Test the contracts-owned probe model and service-owned parsing and validation.
+  rationale: Protect the exchanged data shape and the moved validation behavior.
+- path: tests/test_postrun_probes.py
+  type: modified
+  span:
+    start_line: 88
+    end_line: 115
+  summary: Test the contracts-owned probe model and service-owned parsing and validation.
+  rationale: Protect the exchanged data shape and the moved validation behavior.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 27
+    end_line: 29
+  summary: Import acceptance-criterion obligations from the service package.
+  rationale: Keep task workflow tests aligned with service-owned obligation policy.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 83
+    end_line: 83
+  summary: Import acceptance-criterion obligations from the service package.
+  rationale: Keep task workflow tests aligned with service-owned obligation policy.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []
+features: []
+proposed_prs: []

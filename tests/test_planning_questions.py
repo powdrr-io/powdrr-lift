@@ -250,6 +250,20 @@ def test_batch_question_request_preserves_each_question_schema_and_identity() ->
 
     batch.validate()
     assert len(batch.batch_members) == 2
+    child_packets = [
+        fact["value"]
+        for fact in packet["accepted_facts"]
+        if fact["ref_id"].startswith("question:")
+    ]
+    assert all("prompt" not in child["exact_question"] for child in child_packets)
+    assert all("json_schema" not in child["answer_fields"] for child in child_packets)
+    assert all("examples" not in child for child in child_packets)
+    shared_contract = next(
+        fact["value"]
+        for fact in packet["accepted_facts"]
+        if fact["ref_id"] == "shared-member-question-contract"
+    )
+    assert shared_contract["prompt"] in packet["exact_question"]["prompt"]
     assert packet["answer_fields"]["json_schema"]["properties"]["answers"][
         "required"
     ] == ["q-000001", "q-000002"]

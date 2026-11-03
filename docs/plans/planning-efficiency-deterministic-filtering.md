@@ -533,6 +533,28 @@ were violated. This gives a direct PR-size measurement without tuning the plan
 to emit fewer items. The full report is saved at
 `.powdrr/benchmark-reports/planning-scale-20261103T055709887957Z.json`.
 
+### Work-unit proposal prompt reduction (2026-11-03)
+
+The latest recorded live report spent about 550.7 seconds on 125 work-unit
+proposal calls. Each call carried repository-wide evidence and path catalogs,
+and compatible proposal questions repeated their prompt, schema, and examples
+inside the combined request. This change scopes evidence to each question's
+requirements, includes only path facts needed to resolve ambiguous runtimes,
+and carries shared question instructions once per batch. The batch schema omits
+large per-question ID enums while each member's strict parser continues to
+validate IDs and references. When an answer cannot be accepted, the checkpoint
+retains the failing member's ID, validation pointer, previous answer, and actual
+attempt count; valid siblings can still be checkpointed independently.
+
+The deterministic `large` synthetic profile now completed in 8.651 seconds
+with 500 requirements, 150 work units, and 50 items. Its 125 work-unit proposal
+question members used 63 provider calls instead of 125, a 49.6% reduction for
+that phase. The full synthetic profile made 468 calls, had zero validation
+retries, and matched its fixture shape. This measures batching and correctness
+under deterministic responses; it does not establish live-provider latency.
+The report is saved at `/tmp/planning-large-scoped-workunits.json` for this
+development run.
+
 ## Cross-cutting test requirements
 
 - Use mocked nontrivial provider responses. Do not use live-model calls as the only proof that a contract works.

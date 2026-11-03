@@ -24,10 +24,12 @@ from powdrr_service.planning.assembly import (
 )
 from powdrr_service.planning.contracts import PlanningContractError
 from powdrr_service.planning.driver import SourceLedgerQuestionMachine
+from powdrr_service.planning.evidence import Evidence
 from powdrr_service.planning.plan_sizing import (
     ExplicitWorkUnit,
     allocate_explicit_work_units,
 )
+from powdrr_service.planning.questions import batch_question_requests
 from powdrr_service.planning.source import (
     PinnedSourceDocument,
     Requirement,
@@ -517,6 +519,197 @@ def test_work_unit_question_has_a_parser_valid_example_and_exact_context() -> No
         one_proposal.parse_answer(
             {
                 "records": [example_proposal, example_proposal],
+                "has_more": False,
+                "next_anchor": None,
+            }
+        )
+
+
+def test_work_unit_proposals_scope_evidence_and_batch_independent_groups() -> None:
+    context, anchor = _context(path="src/existing.py", runtime="python")
+    requirements = {}
+    evidence: dict[str, Evidence] = {}
+    evidence_by_requirement: dict[str, tuple[Evidence, ...]] = {}
+    repository_paths = dict(context.repository_paths)
+    all_requirement_ids = tuple(f"req-{index:04d}" for index in range(1, 17))
+    next_evidence = 1
+    for index, requirement_id in enumerate(all_requirement_ids):
+        requirements[requirement_id] = replace(
+            context.requirements["req-0001"], id=requirement_id
+        )
+        requirement_evidence = []
+        for _ in range(1):
+            path = f"src/module_{index:02d}_{next_evidence:03d}.py"
+            record = Evidence(
+                f"evidence-{next_evidence:04d}",
+                "a" * 40,
+                path,
+                1,
+                1,
+                "b" * 64,
+                "implementation",
+                f"module_{index}_{next_evidence}",
+            )
+            evidence[record.id] = record
+            requirement_evidence.append(record)
+            repository_paths[path] = PathFact(path, "python")
+            next_evidence += 1
+        evidence_by_requirement[requirement_id] = tuple(requirement_evidence)
+    context = replace(
+        context,
+        requirements=requirements,
+        unresolved_requirement_ids=all_requirement_ids,
+        evidence=evidence,
+        evidence_by_requirement=evidence_by_requirement,
+        repository_paths=repository_paths,
+    )
+
+    requests = []
+    for offset in range(0, len(all_requirement_ids), 4):
+        requirement_ids = all_requirement_ids[offset : offset + 4]
+        request = build_work_unit_proposal_request(
+            context,
+            requirement_ids,
+            valid_example={
+                "records": [],
+                "has_more": False,
+                "next_anchor": None,
+            },
+        )
+        request_evidence_ids = {
+            item.ref_id.removeprefix("evidence:")
+            for item in request.repository_evidence
+            if item.ref_id.startswith("evidence:")
+        }
+        expected_evidence_ids = {
+            record.id
+            for requirement_id in requirement_ids
+            for record in evidence_by_requirement[requirement_id]
+        }
+        assert request_evidence_ids == expected_evidence_ids
+        requests.append(request)
+
+    unrelated_requirement_id = all_requirement_ids[-1]
+    changed_unrelated_evidence = Evidence(
+        "evidence-9999",
+        "a" * 40,
+        "src/unrelated_module.py",
+        1,
+        1,
+        "c" * 64,
+        "implementation",
+        "unrelated_module",
+    )
+    changed_evidence = {
+        **evidence,
+        changed_unrelated_evidence.id: changed_unrelated_evidence,
+    }
+    changed_evidence_by_requirement = {
+        **evidence_by_requirement,
+        unrelated_requirement_id: (changed_unrelated_evidence,),
+    }
+    changed_paths = {
+        **repository_paths,
+        changed_unrelated_evidence.path: PathFact(
+            changed_unrelated_evidence.path, "python"
+        ),
+    }
+    changed_context = replace(
+        context,
+        evidence=changed_evidence,
+        evidence_by_requirement=changed_evidence_by_requirement,
+        repository_paths=changed_paths,
+    )
+    unchanged_request = build_work_unit_proposal_request(
+        changed_context,
+        all_requirement_ids[:4],
+        valid_example={"records": [], "has_more": False, "next_anchor": None},
+    )
+    assert unchanged_request.question.input_digest == requests[0].question.input_digest
+
+    unrelated_context = replace(
+        context,
+        evidence_by_requirement={
+            requirement_id: () for requirement_id in all_requirement_ids
+        },
+    )
+    small_context_requests = [
+        build_work_unit_proposal_request(
+            unrelated_context,
+            all_requirement_ids[offset : offset + 4],
+            valid_example={
+                "records": [],
+                "has_more": False,
+                "next_anchor": None,
+            },
+        )
+        for offset in range(0, len(all_requirement_ids), 4)
+    ]
+    assert all(
+        not any(
+            item.ref_id.startswith("evidence:") for item in request.repository_evidence
+        )
+        for request in small_context_requests
+    )
+    explicitly_unindexed_context = replace(context, evidence_by_requirement={})
+    explicitly_unindexed_request = build_work_unit_proposal_request(
+        explicitly_unindexed_context,
+        all_requirement_ids[:4],
+        valid_example={"records": [], "has_more": False, "next_anchor": None},
+    )
+    assert not any(
+        item.ref_id.startswith("evidence:")
+        for item in explicitly_unindexed_request.repository_evidence
+    )
+    batches = batch_question_requests(small_context_requests)
+    assert len(batches) == 2
+    assert sorted(len(batch.batch_members) for batch in batches) == [0, 3]
+    first_member_id = batches[0].batch_members[0].question.question_id
+    member_schema = batches[0].answer_schema["properties"]["answers"]["properties"][
+        first_member_id
+    ]
+    proposal_properties = member_schema["properties"]["records"]["items"]["properties"]
+    assert "enum" not in proposal_properties["requirement_ids"]["items"]
+    assert (
+        "enum"
+        not in proposal_properties["planned_writes"]["items"]["properties"][
+            "evidence_ids"
+        ]["items"]
+    )
+    assert proposal_properties["planned_writes"]["items"]["properties"]["role"][
+        "enum"
+    ] == ["configuration", "documentation", "implementation", "test"]
+
+    first_group_evidence_ids = {
+        record.id
+        for requirement_id in all_requirement_ids[:4]
+        for record in evidence_by_requirement[requirement_id]
+    }
+    foreign_evidence_id = next(
+        evidence_id
+        for evidence_id in evidence
+        if evidence_id not in first_group_evidence_ids
+    )
+    with pytest.raises(PlanningContractError, match="unknown reference"):
+        requests[0].parse_answer(
+            {
+                "records": [
+                    {
+                        "requirement_ids": [all_requirement_ids[0]],
+                        "deliverable": "Implement the scoped behavior.",
+                        "planned_writes": [
+                            {
+                                "path": "src/module_00_001.py",
+                                "role": "implementation",
+                                "source_refs": [anchor],
+                                "evidence_ids": [foreign_evidence_id],
+                            }
+                        ],
+                        "implementation_step": "Update the relevant module.",
+                        "acceptance_criteria": ["The behavior is observable."],
+                        "required_outputs": [],
+                    }
+                ],
                 "has_more": False,
                 "next_anchor": None,
             }

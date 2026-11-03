@@ -1100,6 +1100,7 @@ class SourceLedgerQuestionMachine:
             repository_paths=self.repository_paths,
             ambiguous_runtime_resolutions={},
             preferred_runtimes=self.preferred_runtimes,
+            evidence_by_requirement=self.evidence_by_requirement,
         )
 
     def _work_unit_example(

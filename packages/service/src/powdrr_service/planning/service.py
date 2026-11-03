@@ -17,7 +17,7 @@ import time
 import uuid
 from collections.abc import Callable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from io import StringIO
 from pathlib import Path
 from typing import Any, Protocol
@@ -624,7 +624,7 @@ def advance_planning_session(
                     except Exception as error:
                         needs_answers.append(
                             NeedsQuestionAnswer(
-                                member.question,
+                                replace(member.question, attempt=result.attempts),
                                 result.attempts,
                                 error
                                 if isinstance(error, PlanningContractError)
@@ -644,7 +644,51 @@ def advance_planning_session(
             else:
                 accepted_results.append(result)
         elif isinstance(result, NeedsQuestionAnswer):
-            needs_answers.append(result)
+            if not request.batch_members:
+                needs_answers.append(result)
+                continue
+            raw_answers = result.previous_answer.get("answers")
+            for member in request.batch_members:
+                raw_answer = (
+                    raw_answers.get(member.question.question_id)
+                    if isinstance(raw_answers, Mapping)
+                    else None
+                )
+                if not isinstance(raw_answer, Mapping):
+                    needs_answers.append(
+                        NeedsQuestionAnswer(
+                            replace(member.question, attempt=result.attempts),
+                            result.attempts,
+                            PlanningContractError(
+                                "/",
+                                "batch response omitted a valid answer for this member",
+                            ),
+                            {},
+                        )
+                    )
+                    continue
+                try:
+                    answer = member.parse_answer(raw_answer)
+                except Exception as error:
+                    needs_answers.append(
+                        NeedsQuestionAnswer(
+                            replace(member.question, attempt=result.attempts),
+                            result.attempts,
+                            error
+                            if isinstance(error, PlanningContractError)
+                            else PlanningContractError("/", str(error)),
+                            dict(raw_answer),
+                        )
+                    )
+                else:
+                    accepted_results.append(
+                        AcceptedQuestionAnswer(
+                            member.question,
+                            result.attempts,
+                            answer,
+                            dict(raw_answer),
+                        )
+                    )
 
     # Results are committed in frontier order through one writer. The providers
     # run concurrently, but checkpoint heads never race.

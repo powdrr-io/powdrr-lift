@@ -1,0 +1,221 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1346
+title: Scope and batch work-unit proposals
+intent:
+  problem: Work-unit planning made 125 provider calls in the latest large run, and each request repeated broad repository
+    evidence and batch instructions.
+  goal: Scope repository context to each proposal, compact compatible batch prompts, and preserve individual answer
+    validation and durable retries.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/plans/planning-efficiency-deterministic-filtering.md
+  type: modified
+  span:
+    start_line: 536
+    end_line: 557
+  summary: Record the proposal prompt and batching optimization with synthetic scale results.
+  rationale: Keep the measured call reduction and its synthetic-only limitation with the planning work.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 10
+    end_line: 10
+  summary: Scope proposal evidence and validate work units against the scoped context.
+  rationale: Reduce repeated repository context while preserving strict evidence and runtime checks.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 290
+    end_line: 290
+  summary: Scope proposal evidence and validate work units against the scoped context.
+  rationale: Reduce repeated repository context while preserving strict evidence and runtime checks.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 727
+    end_line: 743
+  summary: Scope proposal evidence and validate work units against the scoped context.
+  rationale: Reduce repeated repository context while preserving strict evidence and runtime checks.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 747
+    end_line: 750
+  summary: Scope proposal evidence and validate work units against the scoped context.
+  rationale: Reduce repeated repository context while preserving strict evidence and runtime checks.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 754
+    end_line: 754
+  summary: Scope proposal evidence and validate work units against the scoped context.
+  rationale: Reduce repeated repository context while preserving strict evidence and runtime checks.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 833
+    end_line: 837
+  summary: Scope proposal evidence and validate work units against the scoped context.
+  rationale: Reduce repeated repository context while preserving strict evidence and runtime checks.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 842
+    end_line: 842
+  summary: Scope proposal evidence and validate work units against the scoped context.
+  rationale: Reduce repeated repository context while preserving strict evidence and runtime checks.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 854
+    end_line: 854
+  summary: Scope proposal evidence and validate work units against the scoped context.
+  rationale: Reduce repeated repository context while preserving strict evidence and runtime checks.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 1103
+    end_line: 1103
+  summary: Pass requirement-indexed evidence into proposal construction.
+  rationale: Supply the deterministic evidence mapping already collected by the planner.
+- path: packages/service/src/powdrr_service/planning/questions.py
+  type: modified
+  span:
+    start_line: 8
+    end_line: 8
+  summary: Compact compatible proposal batches without weakening member validation.
+  rationale: Reduce repeated prompt and schema content while preserving each member question.
+- path: packages/service/src/powdrr_service/planning/questions.py
+  type: modified
+  span:
+    start_line: 204
+    end_line: 218
+  summary: Compact compatible proposal batches without weakening member validation.
+  rationale: Reduce repeated prompt and schema content while preserving each member question.
+- path: packages/service/src/powdrr_service/planning/questions.py
+  type: modified
+  span:
+    start_line: 222
+    end_line: 226
+  summary: Compact compatible proposal batches without weakening member validation.
+  rationale: Reduce repeated prompt and schema content while preserving each member question.
+- path: packages/service/src/powdrr_service/planning/questions.py
+  type: modified
+  span:
+    start_line: 230
+    end_line: 252
+  summary: Compact compatible proposal batches without weakening member validation.
+  rationale: Reduce repeated prompt and schema content while preserving each member question.
+- path: packages/service/src/powdrr_service/planning/questions.py
+  type: modified
+  span:
+    start_line: 323
+    end_line: 323
+  summary: Compact compatible proposal batches without weakening member validation.
+  rationale: Reduce repeated prompt and schema content while preserving each member question.
+- path: packages/service/src/powdrr_service/planning/questions.py
+  type: modified
+  span:
+    start_line: 326
+    end_line: 330
+  summary: Compact compatible proposal batches without weakening member validation.
+  rationale: Reduce repeated prompt and schema content while preserving each member question.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 20
+    end_line: 20
+  summary: Recover valid and invalid member answers independently from a failed batch.
+  rationale: Checkpoint valid siblings and attach unresolved diagnostics to the failing proposal.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 627
+    end_line: 627
+  summary: Recover valid and invalid member answers independently from a failed batch.
+  rationale: Checkpoint valid siblings and attach unresolved diagnostics to the failing proposal.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 647
+    end_line: 691
+  summary: Recover valid and invalid member answers independently from a failed batch.
+  rationale: Checkpoint valid siblings and attach unresolved diagnostics to the failing proposal.
+- path: scripts/benchmark_planning_scale.py
+  type: modified
+  span:
+    start_line: 602
+    end_line: 602
+  summary: Reconstruct valid examples for child questions in compact synthetic batches.
+  rationale: Keep deterministic benchmark responses aligned with compact packets.
+- path: scripts/benchmark_planning_scale.py
+  type: modified
+  span:
+    start_line: 604
+    end_line: 605
+  summary: Reconstruct valid examples for child questions in compact synthetic batches.
+  rationale: Keep deterministic benchmark responses aligned with compact packets.
+- path: scripts/benchmark_planning_scale.py
+  type: modified
+  span:
+    start_line: 607
+    end_line: 615
+  summary: Reconstruct valid examples for child questions in compact synthetic batches.
+  rationale: Keep deterministic benchmark responses aligned with compact packets.
+- path: tests/test_benchmark_planning_scale.py
+  type: modified
+  span:
+    start_line: 496
+    end_line: 496
+  summary: Assert work-unit proposal batching reduces provider calls.
+  rationale: Guard the interaction-count improvement in deterministic CI.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 27
+    end_line: 27
+  summary: Test requirement-scoped evidence, stable inputs, compact schemas, and foreign-reference rejection.
+  rationale: Protect proposal correctness while reducing repeated context and enabling batching.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 32
+    end_line: 32
+  summary: Test requirement-scoped evidence, stable inputs, compact schemas, and foreign-reference rejection.
+  rationale: Protect proposal correctness while reducing repeated context and enabling batching.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 526
+    end_line: 716
+  summary: Test requirement-scoped evidence, stable inputs, compact schemas, and foreign-reference rejection.
+  rationale: Protect proposal correctness while reducing repeated context and enabling batching.
+- path: tests/test_planning_questions.py
+  type: modified
+  span:
+    start_line: 253
+    end_line: 266
+  summary: Assert shared batch contracts omit duplicated child schemas and examples.
+  rationale: Verify compaction retains member identity and the outer response schema.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 103
+    end_line: 103
+  summary: Ignore shared batch-contract facts when answering synthetic members.
+  rationale: Keep test clients focused on independently answerable question packets.
+entities: []
+entity_relationships: []
+invariants:
+- id: work-unit-proposal-context-is-requirement-scoped
+  description: When requirement-indexed evidence is available, a proposal question and its parser use only evidence
+    associated with its requirements; an explicitly empty index supplies no evidence.
+  action: added
+- id: proposal-batches-preserve-member-validation-and-checkpoints
+  description: Batched proposal answers remain validated by each member's strict parser, and valid siblings may
+    be checkpointed independently from members requiring correction.
+  action: added
+guidance: []
+features: []
+proposed_prs: []

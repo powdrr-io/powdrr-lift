@@ -7,7 +7,7 @@ import json
 import re
 from collections.abc import Mapping, Sequence
 from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import PurePosixPath
 from typing import Any, Literal, cast
 
@@ -287,6 +287,7 @@ class WorkUnitContext:
     repository_paths: Mapping[str, PathFact]
     ambiguous_runtime_resolutions: Mapping[str, str]
     preferred_runtimes: tuple[str, ...] = ()
+    evidence_by_requirement: Mapping[str, tuple[Evidence, ...]] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -723,13 +724,34 @@ def build_work_unit_proposal_request(
         )
         for ref in source_refs
     )
+    if context.evidence_by_requirement is not None:
+        request_evidence = {
+            evidence.id: evidence
+            for requirement_id in requirement_ids
+            for evidence in context.evidence_by_requirement.get(requirement_id, ())
+        }
+    else:
+        request_evidence = dict(context.evidence)
+    excerpt_text = "\n".join(item.text for item in excerpts)
+    requirement_text = "\n".join(
+        context.requirements[requirement_id].statement
+        for requirement_id in requirement_ids
+    )
+    relevant_text = f"{requirement_text}\n{excerpt_text}"
+    referenced_paths = {item.path for item in request_evidence.values()} | {
+        path for path in context.repository_paths if path in relevant_text
+    }
     paths = tuple(
         ContextRecord(f"path:{path}", {"path": path, "runtime": fact.runtime})
         for path, fact in sorted(context.repository_paths.items())
+        if path in referenced_paths
+        and fact.runtime is not None
+        and PurePosixPath(path).suffix.lower() not in PATH_RUNTIME_SUFFIXES
+        and PurePosixPath(path).suffix.lower() not in _NEUTRAL_SUFFIXES
     )
     evidence = tuple(
         ContextRecord(f"evidence:{evidence_id}", item.to_data())
-        for evidence_id, item in sorted(context.evidence.items())
+        for evidence_id, item in sorted(request_evidence.items())
     )
     validations = tuple(
         ContextRecord(f"validation:{validation_id}", value)
@@ -808,11 +830,16 @@ def build_work_unit_proposal_request(
         expected_answer_schema="work-unit-proposals-v3",
         attempt=1,
     )
+    request_context = replace(
+        context,
+        unresolved_requirement_ids=tuple(requirement_ids),
+        evidence=request_evidence,
+    )
 
     def parse(value: Mapping[str, Any]) -> RequirementEnumerationPage:
         return parse_work_unit_proposal_page(
             value,
-            context=context,
+            context=request_context,
             requirement_order=requirement_ids,
             after_anchor=page_after,
             maximum_proposals=maximum_proposals,
@@ -824,7 +851,7 @@ def build_work_unit_proposal_request(
     record_properties["requirement_ids"]["items"]["enum"] = list(requirement_ids)
     write_properties = record_properties["planned_writes"]["items"]["properties"]
     write_properties["source_refs"]["items"]["enum"] = list(source_refs)
-    write_properties["evidence_ids"]["items"]["enum"] = sorted(context.evidence)
+    write_properties["evidence_ids"]["items"]["enum"] = sorted(request_evidence)
     output_properties = record_properties["required_outputs"]["items"]["properties"]
     output_properties["requirement_ids"]["items"]["enum"] = list(requirement_ids)
     next_anchors = list(requirement_ids[:-1])

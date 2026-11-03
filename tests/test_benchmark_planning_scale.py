@@ -493,6 +493,7 @@ def test_live_report_includes_dependency_candidate_and_confirmation_counts() -> 
         enforce_fixture_shape=True,
     )
 
+    assert report["by_question_kind"]["propose_work_units"]["api_calls"] == 1
     assert report["dependency_candidates"] == {
         "pending_output_count": 1,
         "output_consumer_candidate_count": 1,

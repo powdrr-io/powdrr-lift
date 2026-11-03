@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 from collections.abc import Callable, Mapping, Sequence
+from copy import deepcopy
 from dataclasses import dataclass, replace
 from typing import Any
 
@@ -200,16 +201,55 @@ def _build_question_batch(
         raise ValueError("question batch contains duplicate question IDs")
     members = {request.question.question_id: request for request in requests}
     batch_context: list[ContextRecord] = []
+    shared_contract = all(
+        request.exact_question == requests[0].exact_question
+        and request.answer_field_definitions == requests[0].answer_field_definitions
+        for request in requests[1:]
+    )
+    if shared_contract:
+        batch_context.append(
+            ContextRecord(
+                "shared-member-question-contract",
+                {
+                    "prompt": requests[0].exact_question,
+                    "answer_fields": dict(requests[0].answer_field_definitions),
+                },
+            )
+        )
     for request in requests:
         messages = build_question_messages(request)
         packet = json.loads(messages[1]["content"])
+        packet["answer_fields"].pop("json_schema", None)
+        packet.pop("examples", None)
+        if shared_contract:
+            packet["exact_question"].pop("prompt", None)
+            packet["answer_fields"].pop("definitions", None)
         batch_context.append(
             ContextRecord(f"question:{request.question.question_id}", packet)
         )
-    properties = {
-        request.question.question_id: dict(request.answer_schema)
-        for request in requests
-    }
+    properties = {}
+    for request in requests:
+        member_schema = deepcopy(dict(request.answer_schema))
+        if request.question.kind == "propose_work_units":
+            # Per-member parsers enforce these IDs after the batch response. The
+            # child question facts carry the allowed IDs, so repeating large enum
+            # lists in every provider schema needlessly prevents useful batching.
+            answer_properties = member_schema["properties"]
+            answer_properties["next_anchor"].pop("enum", None)
+            record_properties = answer_properties["records"]["items"]["properties"]
+            record_properties["requirement_ids"]["items"].pop("enum", None)
+            planned_write_properties = record_properties["planned_writes"]["items"]
+            planned_write_properties["properties"]["source_refs"]["items"].pop(
+                "enum", None
+            )
+            planned_write_properties["properties"]["evidence_ids"]["items"].pop(
+                "enum", None
+            )
+            output_properties = record_properties["required_outputs"]["items"][
+                "properties"
+            ]
+            output_properties["requirement_ids"]["items"].pop("enum", None)
+        properties[request.question.question_id] = member_schema
     schema = {
         "type": "object",
         "additionalProperties": False,
@@ -280,9 +320,14 @@ def _build_question_batch(
         ),
         exact_question=(
             "Answer every planning request in the accepted facts. Treat each "
-            "request as independent, follow its own question and schema, and put "
+            "request as independent, follow its question and schema, and put "
             "exactly one answer under its supplied question ID. Do not omit or "
             "combine answers."
+            + (
+                f" The shared member question is: {requests[0].exact_question}"
+                if shared_contract
+                else ""
+            )
         ),
         answer_field_definitions={
             "answers": "An answer object for every supplied question ID."

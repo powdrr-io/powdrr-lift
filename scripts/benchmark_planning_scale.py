@@ -599,8 +599,20 @@ class _ExampleAnswerClient:
         self.calls_by_kind[kind] += 1
         if kind == "planning_question_batch":
             answers = {}
+            example_answers = packet["examples"]["valid_positive"]["answers"]
             for fact in packet["accepted_facts"]:
+                if not fact["ref_id"].startswith("question:"):
+                    continue
                 child = fact["value"]
+                if "examples" not in child:
+                    child = {
+                        **child,
+                        "examples": {
+                            "valid_positive": example_answers[
+                                child["exact_question"]["question_id"]
+                            ]
+                        },
+                    }
                 answer = self._answer(child)
                 answers[child["exact_question"]["question_id"]] = answer
             return {"answers": answers}

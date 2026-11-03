@@ -100,6 +100,7 @@ class _PlanningScriptClient:
                     child["exact_question"]["question_id"]: self._answer(child)
                     for item in packet["accepted_facts"]
                     for child in (item["value"],)
+                    if item["ref_id"].startswith("question:")
                 }
             }
         return self._answer(packet)

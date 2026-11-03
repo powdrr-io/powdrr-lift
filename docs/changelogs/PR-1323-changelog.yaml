@@ -129,7 +129,7 @@ files:
     rationale: Keep the file consistent with the repository formatter.
   - path: tests/test_planning_assembly.py
     type: modified
-    span: {start_line: 527, end_line: 552}
+    span: {start_line: 526, end_line: 551}
     summary: Verify repository-language preferences are in the work-unit prompt and digest.
     rationale: Prevent loss of implementation guidance or reuse of stale answers.
 entities: []

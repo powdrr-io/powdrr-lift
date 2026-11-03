@@ -124,7 +124,12 @@ files:
     rationale: Keep the mocked planning session explicit about its repository language.
   - path: tests/test_planning_assembly.py
     type: modified
-    span: {start_line: 526, end_line: 551}
+    span: {start_line: 474, end_line: 474}
+    summary: Remove an extra blank line while formatting the changed test module.
+    rationale: Keep the file consistent with the repository formatter.
+  - path: tests/test_planning_assembly.py
+    type: modified
+    span: {start_line: 527, end_line: 552}
     summary: Verify repository-language preferences are in the work-unit prompt and digest.
     rationale: Prevent loss of implementation guidance or reuse of stale answers.
 entities: []

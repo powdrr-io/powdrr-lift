@@ -14,14 +14,24 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
 
-from powdrr_service.structrr.validation import (
-    VALIDATION_PROVIDER_INVENTORY_SCHEMA_VERSION,
-    DiscoveredValidationProfile,
-)
+from powdrr_contracts.verification import VALIDATION_PROVIDER_INVENTORY_SCHEMA_VERSION
 
 VERIFICATION_PROVIDER_INVENTORY_SCHEMA_VERSION = (
     VALIDATION_PROVIDER_INVENTORY_SCHEMA_VERSION
 )
+
+
+class DiscoveredValidationProfile(Protocol):
+    """Provider-neutral profile fields consumed by local verification adapters."""
+
+    @property
+    def name(self) -> str: ...
+
+    @property
+    def command(self) -> Sequence[str]: ...
+
+    @property
+    def provider(self) -> str: ...
 
 
 class VerificationProvider(Protocol):

@@ -8,9 +8,14 @@ import subprocess
 import sys
 from collections.abc import Mapping, Sequence
 from pathlib import Path, PurePosixPath
-from typing import Any
+from typing import Any, Protocol
 
-from powdrr_lift.workrr.coding_agent_validation import ValidationProfile
+
+class ValidationProfile(Protocol):
+    """Minimal validation profile data needed by local pytest execution."""
+
+    @property
+    def command(self) -> Sequence[str]: ...
 
 
 class ExecutePrTestError(ValueError):

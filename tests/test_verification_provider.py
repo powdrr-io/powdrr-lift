@@ -5,9 +5,10 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
-from powdrr_service.structrr.validation import DiscoveredValidationProfile
-
-from powdrr_lift.workrr.verification_provider import (
+from powdrr_agent.execution.verification_provider import (
+    DiscoveredValidationProfile as ProviderValidationProfile,
+)
+from powdrr_agent.execution.verification_provider import (
     ProviderExecutionResult,
     ProviderInventory,
     PytestVerificationProvider,
@@ -17,6 +18,7 @@ from powdrr_lift.workrr.verification_provider import (
     default_verification_provider_registry,
     match_selector,
 )
+from powdrr_service.structrr.validation import DiscoveredValidationProfile
 
 
 def test_pytest_inventory_contains_exact_node_ids(tmp_path: Path) -> None:
@@ -48,12 +50,12 @@ def test_registry_is_framework_neutral_and_dispatches_fake_provider(
         name = "fake"
 
         def detect(
-            self, root: Path, profiles: Sequence[DiscoveredValidationProfile]
+            self, root: Path, profiles: Sequence[ProviderValidationProfile]
         ) -> bool:
             return root == tmp_path
 
         def inventory(
-            self, root: Path, profile: DiscoveredValidationProfile
+            self, root: Path, profile: ProviderValidationProfile
         ) -> ProviderInventory:
             raise AssertionError("inventory is not part of this test")
 
@@ -116,7 +118,7 @@ def test_stestr_provider_collects_and_executes_exact_selector(
         return subprocess.CompletedProcess(command, 0, output, "")
 
     monkeypatch.setattr(
-        "powdrr_lift.workrr.verification_provider.subprocess.run", fake_run
+        "powdrr_agent.execution.verification_provider.subprocess.run", fake_run
     )
     provider = StestrVerificationProvider()
 

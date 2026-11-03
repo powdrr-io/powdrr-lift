@@ -11,13 +11,12 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
-from powdrr_service.structrr.verification_obligations import VerificationObligation
-
-from powdrr_lift.workrr.verification_provider import (
+from powdrr_agent.execution.verification_provider import (
     ProviderExecutionResult,
     VerificationProviderRegistry,
     VerificationProviderRequest,
 )
+from powdrr_service.structrr.verification_obligations import VerificationObligation
 
 VERIFICATION_EVIDENCE_SCHEMA_VERSION = "verification-evidence-v1"
 

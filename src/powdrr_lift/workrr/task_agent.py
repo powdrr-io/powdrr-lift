@@ -15,6 +15,13 @@ from typing import Any, TextIO
 from uuid import uuid4
 
 import yaml
+from powdrr_agent.execution.execute_pr_tests import (
+    ExecutePrTestError,
+    candidate_test_changes,
+    fingerprint_test_files,
+    install_frozen_test_files,
+    run_generated_pytest,
+)
 from powdrr_contracts.models import OperationRequest
 from powdrr_local import (
     JsonServiceBridge,
@@ -150,13 +157,6 @@ from powdrr_lift.workrr.decision_continuity import (
     review_inherited_decisions,
 )
 from powdrr_lift.workrr.error_logging import record_workflow_llm_error
-from powdrr_lift.workrr.execute_pr_tests import (
-    ExecutePrTestError,
-    candidate_test_changes,
-    fingerprint_test_files,
-    install_frozen_test_files,
-    run_generated_pytest,
-)
 from powdrr_lift.workrr.execution_loop import (
     _execute_shell_tool,
     _run_coding_loop_verification,

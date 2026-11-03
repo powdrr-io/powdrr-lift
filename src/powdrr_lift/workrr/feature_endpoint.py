@@ -14,6 +14,9 @@ from pathlib import Path
 from typing import Any, cast
 
 import yaml
+from powdrr_agent.execution.verification_provider import (
+    default_verification_provider_registry,
+)
 from powdrr_contracts.models import OperationRequest
 from powdrr_contracts.service import PowdrrService
 from powdrr_local import (
@@ -163,9 +166,6 @@ from powdrr_lift.workrr.run_artifacts import (
     write_run_report,
 )
 from powdrr_lift.workrr.verification_evidence import VerificationEvidenceRunner
-from powdrr_lift.workrr.verification_provider import (
-    default_verification_provider_registry,
-)
 
 Runner = Callable[..., subprocess.CompletedProcess[str]]
 

@@ -1,5 +1,17 @@
 """Agent proposal interfaces and provider adapters."""
 
+from powdrr_agent.execution.verification_provider import (
+    VERIFICATION_PROVIDER_INVENTORY_SCHEMA_VERSION,
+    ProviderExecutionResult,
+    ProviderInventory,
+    PytestVerificationProvider,
+    VerificationProvider,
+    VerificationProviderRegistry,
+    VerificationProviderRequest,
+    default_verification_provider_registry,
+    discover_verification_inventory,
+    match_selector,
+)
 from powdrr_service.providers.config import (
     LLMModelLimits,
     LLMModelMapping,
@@ -78,18 +90,6 @@ from powdrr_lift.workrr.repair import (
     classify_repair_failure,
 )
 from powdrr_lift.workrr.runner import ProposalKernel, run_proposal_round
-from powdrr_lift.workrr.verification_provider import (
-    VERIFICATION_PROVIDER_INVENTORY_SCHEMA_VERSION,
-    ProviderExecutionResult,
-    ProviderInventory,
-    PytestVerificationProvider,
-    VerificationProvider,
-    VerificationProviderRegistry,
-    VerificationProviderRequest,
-    default_verification_provider_registry,
-    discover_verification_inventory,
-    match_selector,
-)
 
 __all__ = [
     "AgentClient",

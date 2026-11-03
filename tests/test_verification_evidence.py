@@ -4,17 +4,17 @@ import json
 from pathlib import Path
 from typing import Any
 
+from powdrr_agent.execution.verification_provider import (
+    ProviderExecutionResult,
+    ProviderInventory,
+    VerificationProviderRegistry,
+    VerificationProviderRequest,
+)
 from powdrr_service.structrr.verification_obligations import VerificationObligation
 
 from powdrr_lift.workrr.verification_evidence import (
     EvidenceStatus,
     VerificationEvidenceRunner,
-)
-from powdrr_lift.workrr.verification_provider import (
-    ProviderExecutionResult,
-    ProviderInventory,
-    VerificationProviderRegistry,
-    VerificationProviderRequest,
 )
 
 

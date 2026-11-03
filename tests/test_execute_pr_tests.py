@@ -5,6 +5,14 @@ import sys
 from pathlib import Path
 
 import pytest
+from powdrr_agent.execution.execute_pr_tests import (
+    ExecutePrTestError,
+    candidate_test_changes,
+    fingerprint_test_files,
+    install_frozen_test_files,
+    pytest_command_for_files,
+    run_generated_pytest,
+)
 from powdrr_service.verification.execute_pr_test_corrections import (
     ExecutePrTestVerificationError,
     require_behavioral_red_result,
@@ -20,14 +28,6 @@ from powdrr_service.verification.execute_pr_test_validation import (
 )
 
 from powdrr_lift.workrr.coding_agent_validation import ValidationProfile
-from powdrr_lift.workrr.execute_pr_tests import (
-    ExecutePrTestError,
-    candidate_test_changes,
-    fingerprint_test_files,
-    install_frozen_test_files,
-    pytest_command_for_files,
-    run_generated_pytest,
-)
 from powdrr_lift.workrr.test_obligations import (
     ObligationError,
     acceptance_criteria_contract,

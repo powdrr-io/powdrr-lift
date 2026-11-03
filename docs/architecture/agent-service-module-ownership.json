@@ -2408,7 +2408,7 @@
         "powdrr_service.providers.config",
         "powdrr_lift.workrr.repair",
         "powdrr_lift.workrr.runner",
-        "powdrr_lift.workrr.verification_provider"
+        "powdrr_agent.execution.verification_provider"
       ],
       "kind": "python_module",
       "owner": "split",
@@ -2731,13 +2731,11 @@
     },
     {
       "extraction_pr": "7",
-      "internal_imports": [
-        "powdrr_lift.workrr.coding_agent_validation"
-      ],
+      "internal_imports": [],
       "kind": "python_module",
-      "owner": "split",
-      "path": "src/powdrr_lift/workrr/execute_pr_tests.py",
-      "rationale": "agent executes local pytest and Git/filesystem actions; service owns generated test validation policy",
+      "owner": "agent",
+      "path": "packages/agent/src/powdrr_agent/execution/execute_pr_tests.py",
+      "rationale": "local frozen generated-test installation and pytest execution",
       "reviewed": false
     },
     {
@@ -2835,7 +2833,7 @@
         "powdrr_lift.workrr.protocol",
         "powdrr_lift.workrr.run_artifacts",
         "powdrr_lift.workrr.verification_evidence",
-        "powdrr_lift.workrr.verification_provider",
+        "powdrr_agent.execution.verification_provider",
         "powdrr_service.behavior_contract",
         "powdrr_service.changelog",
         "powdrr_service.decision_classifier",
@@ -3425,7 +3423,7 @@
         "powdrr_lift.workrr.coding_agent_validation",
         "powdrr_lift.workrr.decision_continuity",
         "powdrr_lift.workrr.error_logging",
-        "powdrr_lift.workrr.execute_pr_tests",
+        "powdrr_agent.execution.execute_pr_tests",
         "powdrr_lift.workrr.execution_loop",
         "powdrr_lift.workrr.feature_endpoint",
         "powdrr_lift.workrr.git",
@@ -3496,7 +3494,7 @@
     {
       "extraction_pr": "7",
       "internal_imports": [
-        "powdrr_lift.workrr.verification_provider",
+        "powdrr_agent.execution.verification_provider",
         "powdrr_service.structrr.verification_obligations"
       ],
       "kind": "python_module",
@@ -3507,13 +3505,11 @@
     },
     {
       "extraction_pr": "7",
-      "internal_imports": [
-        "powdrr_service.structrr.validation"
-      ],
+      "internal_imports": [],
       "kind": "python_module",
-      "owner": "split",
-      "path": "src/powdrr_lift/workrr/verification_provider.py",
-      "rationale": "service probe/verification policy; agent runs local commands",
+      "owner": "agent",
+      "path": "packages/agent/src/powdrr_agent/execution/verification_provider.py",
+      "rationale": "local repository verification provider discovery and execution",
       "reviewed": false
     },
     {

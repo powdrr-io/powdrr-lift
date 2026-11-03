@@ -1,5 +1,5 @@
 schema: https://powdrr.io/schema/changelog-v2
-change_id: 1349
+change_id: 1350
 title: Compact source extraction batches
 intent:
   problem: Source extraction repeated block-specific cursor lists in each otherwise identical question

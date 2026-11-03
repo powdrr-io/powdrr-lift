@@ -385,8 +385,8 @@ def build_parser() -> argparse.ArgumentParser:
     plan_parser.add_argument(
         "--planning-concurrency",
         type=int,
-        default=4,
-        help="Maximum ready planning questions to ask concurrently (default: 4).",
+        default=8,
+        help="Maximum ready planning questions to ask concurrently (default: 8).",
     )
     plan_parser.add_argument("--planning-api-key")
     plan_parser.add_argument("--planning-base-url")
@@ -407,8 +407,8 @@ def build_parser() -> argparse.ArgumentParser:
     plan_resume_parser.add_argument(
         "--planning-concurrency",
         type=int,
-        default=4,
-        help="Maximum ready planning questions to ask concurrently (default: 4).",
+        default=8,
+        help="Maximum ready planning questions to ask concurrently (default: 8).",
     )
     plan_resume_parser.add_argument("--planning-api-key")
     plan_resume_parser.add_argument("--planning-base-url")

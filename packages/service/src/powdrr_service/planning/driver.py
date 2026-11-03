@@ -1126,18 +1126,22 @@ class SourceLedgerQuestionMachine:
     def _work_unit_example(
         self, context: WorkUnitContext, requirement_ids: tuple[str, ...]
     ) -> Mapping[str, Any]:
-        requirement_id = requirement_ids[0]
-        requirement = context.requirements[requirement_id]
+        source_refs = list(
+            dict.fromkeys(
+                context.requirements[requirement_id].source_refs[0]
+                for requirement_id in requirement_ids
+            )
+        )
         return {
             "records": [
                 {
-                    "requirement_ids": [requirement_id],
-                    "deliverable": "Concise example deliverable",
+                    "requirement_ids": list(requirement_ids),
+                    "deliverable": "One cohesive illustrative deliverable.",
                     "planned_writes": [
                         {
                             "path": "example-output.txt",
                             "role": "documentation",
-                            "source_refs": [requirement.source_refs[0]],
+                            "source_refs": source_refs,
                             "evidence_ids": [],
                         }
                     ],
@@ -1149,6 +1153,22 @@ class SourceLedgerQuestionMachine:
             "has_more": False,
             "next_anchor": None,
         }
+
+    @staticmethod
+    def _runtime_fact_records(
+        units: Sequence[WorkUnit],
+    ) -> list[dict[str, Any]]:
+        facts = {
+            (unit.id, write.path, write.runtime)
+            for unit in units
+            for write in unit.planned_writes
+        }
+        return [
+            {"unit_id": unit_id, "path": path, "runtime": runtime}
+            for unit_id, path, runtime in sorted(
+                facts, key=lambda fact: (fact[0], fact[1], fact[2] or "")
+            )
+        ]
 
     def accepted_work_units(
         self, accepted_answers: Mapping[str, Mapping[str, Any]]
@@ -2375,15 +2395,7 @@ class SourceLedgerQuestionMachine:
                     item_id: list(unit_ids)
                     for item_id, unit_ids in assembly.item_unit_ids.items()
                 },
-                "runtime_facts": [
-                    {
-                        "unit_id": unit.id,
-                        "path": write.path,
-                        "runtime": write.runtime,
-                    }
-                    for unit in assembly.units
-                    for write in unit.planned_writes
-                ],
+                "runtime_facts": self._runtime_fact_records(assembly.units),
                 "validations": [validation.to_data()],
                 "setups": setup_records,
                 "structrr": {

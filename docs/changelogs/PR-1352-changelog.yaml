@@ -1,0 +1,141 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1352
+title: Increase planning throughput safely
+intent:
+  problem: Large plans spend several minutes waiting for sequential provider requests, and high-concurrency
+    runs exposed weak source-citation examples and duplicate runtime records.
+  goal: Raise default planning concurrency based on a passing live run, clarify multi-requirement source
+    citations, and emit runtime facts in the unique form required by manifest validation.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/plans/planning-efficiency-deterministic-filtering.md
+  type: modified
+  span:
+    start_line: 3
+    end_line: 4
+  summary: Record the eight-concurrent run and its correctness caveats.
+  rationale: Keep the observed speed change, retries, compile outcome, and fixture mismatch attached to
+    the optimization.
+- path: docs/plans/planning-efficiency-deterministic-filtering.md
+  type: modified
+  span:
+    start_line: 606
+    end_line: 634
+  summary: Record the eight-concurrent run and its correctness caveats.
+  rationale: Keep the observed speed change, retries, compile outcome, and fixture mismatch attached to
+    the optimization.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 1129
+    end_line: 1134
+  summary: Give multi-requirement proposals a source-complete example and emit unique runtime facts.
+  rationale: Show the citation contract for every supplied requirement and avoid duplicate per-path runtime
+    records.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 1138
+    end_line: 1139
+  summary: Give multi-requirement proposals a source-complete example and emit unique runtime facts.
+  rationale: Show the citation contract for every supplied requirement and avoid duplicate per-path runtime
+    records.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 1144
+    end_line: 1144
+  summary: Give multi-requirement proposals a source-complete example and emit unique runtime facts.
+  rationale: Show the citation contract for every supplied requirement and avoid duplicate per-path runtime
+    records.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 1157
+    end_line: 1172
+  summary: Give multi-requirement proposals a source-complete example and emit unique runtime facts.
+  rationale: Show the citation contract for every supplied requirement and avoid duplicate per-path runtime
+    records.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 2398
+    end_line: 2398
+  summary: Give multi-requirement proposals a source-complete example and emit unique runtime facts.
+  rationale: Show the citation contract for every supplied requirement and avoid duplicate per-path runtime
+    records.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 270
+    end_line: 270
+  summary: Use eight as the service planning concurrency default.
+  rationale: Apply the measured higher-throughput setting to direct service callers.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 388
+    end_line: 389
+  summary: Default plan and resume commands to eight concurrent questions.
+  rationale: Make the measured planning throughput available to CLI users while retaining the override.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 410
+    end_line: 411
+  summary: Default plan and resume commands to eight concurrent questions.
+  rationale: Make the measured planning throughput available to CLI users while retaining the override.
+- path: src/powdrr_lift/workrr/planning_session.py
+  type: modified
+  span:
+    start_line: 85
+    end_line: 85
+  summary: Default planning sessions to eight concurrent questions.
+  rationale: Keep session callers aligned with the CLI and service defaults.
+- path: tests/test_cli.py
+  type: modified
+  span:
+    start_line: 24
+    end_line: 24
+  summary: Assert plan and resume concurrency defaults are eight.
+  rationale: Protect the user-facing command defaults and session configuration.
+- path: tests/test_cli.py
+  type: modified
+  span:
+    start_line: 106
+    end_line: 123
+  summary: Assert plan and resume concurrency defaults are eight.
+  rationale: Protect the user-facing command defaults and session configuration.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 529
+    end_line: 584
+  summary: Verify the multi-requirement example cites every supplied source anchor.
+  rationale: Keep the example parser-valid and representative of the multi-requirement citation invariant.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 63
+    end_line: 91
+  summary: Verify concurrency defaults and deduplicate runtime facts for repeated paths.
+  rationale: Protect the new throughput setting and the runtime-fact set invariant.
+entities: []
+entity_relationships: []
+invariants:
+- id: work-unit-examples-cite-each-supplied-requirement
+  description: A multi-requirement proposal example includes every supplied requirement and cites its
+    own source anchor in the example write.
+  action: added
+- id: runtime-facts-are-unique-per-unit-path-runtime
+  description: The planning manifest contains one runtime fact for each distinct unit, path, and runtime
+    tuple, even when multiple planned writes target the same typed path.
+  action: added
+- id: planning-default-concurrency-is-eight
+  description: Plan and resume default to eight concurrent ready questions, while local-provider sessions
+    remain serialized.
+  action: added
+guidance: []
+features: []
+proposed_prs: []

@@ -526,6 +526,62 @@ def test_work_unit_question_has_a_parser_valid_example_and_exact_context() -> No
         )
 
 
+def test_work_unit_example_maps_each_requirement_to_its_own_source_anchor() -> None:
+    text = (
+        "# Plan\n\n"
+        "First behavior must be implemented. Second behavior must be persisted. "
+        "Third behavior must be reported. Fourth behavior must be auditable.\n"
+    )
+    document = PinnedSourceDocument(
+        "repo",
+        "a" * 40,
+        "plan.md",
+        "b" * 40,
+        hashlib.sha256(text.encode()).hexdigest(),
+        text,
+    )
+    source = segment_markdown_source(document)
+    all_clause_anchors = tuple(
+        item.id for item in source.anchors if item.clause_id is not None
+    )
+    clause_anchors = all_clause_anchors[-4:]
+    assert len(clause_anchors) == 4
+    requirement_ids = tuple(f"req-{index:04d}" for index in range(1, 5))
+    requirements = {
+        requirement_id: Requirement(
+            requirement_id,
+            f"Implement behavior {index}.",
+            "behavior",
+            (clause_anchors[index - 1],),
+            (),
+            (),
+        )
+        for index, requirement_id in enumerate(requirement_ids, start=1)
+    }
+    base_context, _ = _context()
+    context = replace(
+        base_context,
+        source=source,
+        requirements=requirements,
+        unresolved_requirement_ids=requirement_ids,
+    )
+    machine = SourceLedgerQuestionMachine(source)
+
+    example = machine._work_unit_example(context, requirement_ids)
+    request = build_work_unit_proposal_request(
+        context,
+        requirement_ids,
+        valid_example=example,
+    )
+    parsed = request.parse_answer(example)
+
+    proposal = example["records"][0]
+    assert proposal["requirement_ids"] == list(requirement_ids)
+    assert len(proposal["planned_writes"]) == 1
+    assert set(proposal["planned_writes"][0]["source_refs"]) == set(clause_anchors)
+    assert parsed.records[0].requirement_ids == requirement_ids
+
+
 def test_work_unit_proposals_scope_evidence_and_batch_independent_groups() -> None:
     context, anchor = _context(path="src/existing.py", runtime="python")
     requirements = {}

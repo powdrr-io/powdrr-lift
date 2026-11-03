@@ -267,7 +267,7 @@ class PlanningOptions:
     model: str
     max_transport_retries: int = 5
     transport_backoff_seconds: float = 1.0
-    max_concurrent_questions: int = 4
+    max_concurrent_questions: int = 8
     use_provider_schema: bool = True
     provider: str = "unknown"
     decision_client: PlanningModelClient | None = None

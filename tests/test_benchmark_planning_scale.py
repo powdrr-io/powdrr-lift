@@ -494,6 +494,8 @@ def test_live_report_includes_dependency_candidate_and_confirmation_counts() -> 
     )
 
     assert report["by_question_kind"]["propose_work_units"]["api_calls"] == 1
+    assert "check_requirement_fidelity" not in report["by_question_kind"]
+    assert "assess_requirement_coverage" not in report["by_question_kind"]
     assert report["dependency_candidates"] == {
         "pending_output_count": 1,
         "output_consumer_candidate_count": 1,

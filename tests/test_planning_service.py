@@ -1547,10 +1547,7 @@ def test_structural_candidates_follow_baseline_symbol_bindings_on_planned_paths(
 
 
 def test_procedrr_runs_real_planning_machine_through_compiled_artifacts() -> None:
-    text = (
-        "# Plan\n\nImplement the requested behavior in src/behavior.txt.\n\n"
-        "Background only.\n"
-    )
+    text = "# Plan\n\nImplement the requested behavior.\n\nBackground only.\n"
     source_document = PinnedSourceDocument(
         repository="owner/repo",
         commit_sha="a" * 40,
@@ -1617,7 +1614,6 @@ def test_procedrr_runs_real_planning_machine_through_compiled_artifacts() -> Non
     )
     assert provider.calls == [
         "planning_question_batch",
-        "check_requirement_fidelity",
         "propose_work_units",
         "describe_item",
         "enumerate_structural_subjects",
@@ -1631,10 +1627,15 @@ def test_procedrr_runs_real_planning_machine_through_compiled_artifacts() -> Non
     ]
     assert {event.payload["question"]["kind"] for event in deterministic_events} == {
         "classify_source_block",
+        "check_requirement_fidelity",
         "assess_requirement_coverage",
     }
     assert any(
         event.payload["validation_result"]["rule_id"] == "completed-zero-hit-search-v1"
+        for event in deterministic_events
+    )
+    assert any(
+        event.payload["validation_result"]["rule_id"] == "exact-source-text-fidelity-v1"
         for event in deterministic_events
     )
     accepted = {
@@ -1672,4 +1673,73 @@ def test_procedrr_runs_real_planning_machine_through_compiled_artifacts() -> Non
             for question in accepted_questions
         )
         == 3
+    )
+
+
+def test_exact_source_fidelity_shortcut_leaves_paraphrases_for_review() -> None:
+    def machine_with_extraction(
+        source_text: str, statement: str
+    ) -> tuple[Any, dict[str, Any]]:
+        source_document = PinnedSourceDocument(
+            repository="owner/repo",
+            commit_sha="a" * 40,
+            path="docs/plan.md",
+            blob_sha="b" * 40,
+            content_sha256=hashlib.sha256(source_text.encode()).hexdigest(),
+            text=source_text,
+        )
+        source = segment_markdown_source(source_document)
+        machine = SourceLedgerQuestionMachine(source, plan_id="fidelity-shortcut")
+        initial = machine.ready_questions({})
+        assert len(initial) == 1
+        extraction = initial[0]
+        block_id = extraction.question.subject_ids[0]
+        anchor_id = next(
+            anchor.id
+            for anchor in source.anchors
+            if anchor.block_id == block_id and anchor.clause_id is not None
+        )
+        answers = {
+            extraction.question.question_id: {
+                "records": [
+                    {
+                        "statement": statement,
+                        "kind": "behavior",
+                        "source_refs": [anchor_id],
+                        "related_source_refs": [],
+                    }
+                ],
+                "has_more": False,
+                "next_anchor": None,
+            }
+        }
+        return machine, answers
+
+    exact_text = "Implement exact behavior.\n"
+    exact_machine, exact_answers = machine_with_extraction(
+        exact_text, exact_text.strip()
+    )
+    deterministic = exact_machine.deterministic_answers(exact_answers)
+    fidelity = next(
+        answer
+        for answer in deterministic
+        if answer["rule_id"] == "exact-source-text-fidelity-v1"
+    )
+    assert fidelity["answer"]["decision"] == "accept"
+
+    paraphrased_machine, paraphrased_answers = machine_with_extraction(
+        exact_text, "Implement the requested behavior."
+    )
+    paraphrased_deterministic = paraphrased_machine.deterministic_answers(
+        paraphrased_answers
+    )
+    assert not any(
+        answer["rule_id"] == "exact-source-text-fidelity-v1"
+        for answer in paraphrased_deterministic
+    )
+    next_requests = paraphrased_machine.ready_questions(paraphrased_answers)
+    assert any(
+        member.question.kind == "check_requirement_fidelity"
+        for request in next_requests
+        for member in request.batch_members or (request,)
     )

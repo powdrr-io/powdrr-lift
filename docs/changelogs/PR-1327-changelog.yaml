@@ -1,0 +1,156 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1327
+title: Move proposed PR coverage policy to service
+intent:
+  problem: Proposed PR validation still applied coverage and specification-v1 effect rules in the agent.
+  goal: Move those rules into the service while the agent supplies the required YAML evidence.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 1388
+    end_line: 1388
+  summary: Record the service policy import in the agent module ownership inventory.
+  rationale: Keep the dependency inventory aligned with the policy extraction.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3824
+    end_line: 3832
+  summary: Add the service proposed PR coverage policy module to the ownership inventory.
+  rationale: Track the extracted policy and its ownership.
+- path: docs/plans/agent-service-code-split.md
+  type: modified
+  span:
+    start_line: 501
+    end_line: 505
+  summary: Record proposed PR coverage and effect validation as service-owned policy.
+  rationale: Keep the extraction plan aligned with completed work.
+- path: packages/service/src/powdrr_service/specifications/__init__.py
+  type: modified
+  span:
+    start_line: 27
+    end_line: 32
+  summary: Export the proposed PR coverage policy and evidence types.
+  rationale: Make the service policy API explicit.
+- path: packages/service/src/powdrr_service/specifications/__init__.py
+  type: modified
+  span:
+    start_line: 61
+    end_line: 64
+  summary: Add proposed PR coverage API exports.
+  rationale: Keep the specifications package export list complete.
+- path: packages/service/src/powdrr_service/specifications/proposed_pr_coverage.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 390
+  summary: Validate proposed PR coverage and ordered effects using supplied YAML evidence.
+  rationale: Keep validation decisions in the service and repository reads in the agent.
+- path: scripts/build-agent-service-ownership-inventory.py
+  type: modified
+  span:
+    start_line: 108
+    end_line: 114
+  summary: Classify the new proposed PR coverage policy as service-owned.
+  rationale: Keep regenerated ownership inventories consistent.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 13
+    end_line: 16
+  summary: Import the service policy and evidence contract.
+  rationale: Route proposed PR policy checks through the service boundary.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 1082
+    end_line: 1098
+  summary: Call service validation with collected feature and effect evidence.
+  rationale: Keep policy evaluation in the service.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 44
+    end_line: 48
+  summary: Remove the agent-owned feature coverage policy sections.
+  rationale: Service now owns the applicable validation sections.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 1174
+    end_line: 1176
+  summary: Replace agent-side coverage evaluation with evidence collection.
+  rationale: Keep coverage decisions in the service.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 1181
+    end_line: 1181
+  summary: Stop parsing feature coverage source on the agent.
+  rationale: The service parses supplied source content.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 1183
+    end_line: 1185
+  summary: Pass feature coverage content and read errors through the evidence contract.
+  rationale: Keep file access local and preserve actionable source errors.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 1187
+    end_line: 1188
+  summary: Return feature source evidence from the agent collector.
+  rationale: The service evaluates supplied content.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 1197
+    end_line: 1226
+  summary: Remove feature coverage ownership and completeness decisions from the agent.
+  rationale: Keep semantic validation in the service.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 1191
+    end_line: 1205
+  summary: Collect effect-source YAML documents on the agent.
+  rationale: Supply evidence without moving repository access into the service.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 1207
+    end_line: 1211
+  summary: Preserve read failures as evidence for service reporting.
+  rationale: Keep source failures distinct from missing documents.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 1214
+    end_line: 1218
+  summary: Return all collected effect-source evidence to the caller.
+  rationale: Let the service compare authoritative effects.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 1341
+    end_line: 1446
+  summary: Remove agent-side ordered effect equivalence policy.
+  rationale: Service now evaluates the supplied effect evidence.
+- path: tests/test_agent_service_contracts.py
+  type: modified
+  span:
+    start_line: 363
+    end_line: 377
+  summary: Assert the agent routes proposed PR coverage checks through service policy.
+  rationale: Guard the service ownership boundary against regression.
+- path: tests/test_proposed_pr_coverage_service.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 114
+  summary: Exercise service coverage/effect validation, evidence failures, and import boundary.
+  rationale: Prove service behavior using supplied content without repository access.

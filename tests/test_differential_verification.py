@@ -1,4 +1,4 @@
-from powdrr_lift.workrr.differential_verification import (
+from powdrr_service.verification.differential import (
     DifferentialStatus,
     VerifierChangeKind,
     classify_differential_result,

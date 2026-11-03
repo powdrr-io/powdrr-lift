@@ -6,14 +6,16 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from powdrr_agent.execution.postrun_probe_runner import run_postrun_probes
+from powdrr_contracts.verification import PostRunProbeResult
+from powdrr_service.verification.probe_results import (
+    baseline_probe_failures,
+    probe_failures,
+)
 
 from powdrr_lift.workrr.postrun_probes import (
     PostRunProbe,
-    PostRunProbeResult,
-    baseline_probe_failures,
     parse_generated_postrun_probe_source,
-    probe_failures,
-    run_postrun_probes,
     validate_probe_interaction_plan,
 )
 
@@ -721,7 +723,7 @@ def test_run_postrun_probes_executes_each_function_from_same_module(
         instruction="explicit",
     )
 
-    results = run_postrun_probes(probes, root=tmp_path, profiles=())
+    results = run_postrun_probes(probes, root=tmp_path)
 
     assert [item.status for item in results] == ["passed", "failed"]
     assert all(item.command[0] == sys.executable for item in results)
@@ -801,6 +803,6 @@ def test_postrun_probe_execution_reports_runtime_failure(tmp_path: Path) -> None
         "other",
     )
     (tmp_path / "module.py").write_text("def public_api(value): return value\n")
-    result = run_postrun_probes((probe,), root=tmp_path, profiles=())[0]
+    result = run_postrun_probes((probe,), root=tmp_path)[0]
     assert result.status == "failed"
     assert "AssertionError" in result.output

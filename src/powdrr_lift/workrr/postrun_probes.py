@@ -3,17 +3,10 @@
 from __future__ import annotations
 
 import ast
-import os
 import re
-import subprocess
-import sys
-import tempfile
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any
-
-from powdrr_service.structrr.validation import DiscoveredValidationProfile
 
 from powdrr_lift.workrr.test_obligations import missing_obligation_ids
 
@@ -155,28 +148,6 @@ class PostRunProbe:
             "obligation_rule": self.obligation_rule,
             "interaction_ids": list(self.interaction_ids),
             "execution_path": self.execution_path,
-        }
-
-
-@dataclass(frozen=True, slots=True)
-class PostRunProbeResult:
-    probe_id: str
-    scenario_id: str
-    status: str
-    command: tuple[str, ...] = ()
-    returncode: int | None = None
-    output: str = ""
-    error: str | None = None
-
-    def to_data(self) -> dict[str, Any]:
-        return {
-            "probe_id": self.probe_id,
-            "scenario_id": self.scenario_id,
-            "status": self.status,
-            "command": list(self.command),
-            "returncode": self.returncode,
-            "output": self.output,
-            "error": self.error,
         }
 
 
@@ -1140,180 +1111,9 @@ def _string_leaves(value: Any) -> list[str]:
     return []
 
 
-def run_postrun_probes(
-    probes: Sequence[PostRunProbe],
-    *,
-    root: Path,
-    profiles: Sequence[DiscoveredValidationProfile],
-    timeout_seconds: float = 180.0,
-) -> tuple[PostRunProbeResult, ...]:
-    """Run frozen probes independently of the repository's test framework."""
-    del profiles
-    results: list[PostRunProbeResult] = []
-    with tempfile.TemporaryDirectory(prefix="powdrr-probes-") as temporary:
-        probe_root = Path(temporary)
-        runner_path = probe_root / "run_probe.py"
-        runner_path.write_text(_PROBE_RUNNER, encoding="utf-8")
-        suites: dict[str, Path] = {}
-        for probe in probes:
-            suite_path = suites.get(probe.test_source)
-            if suite_path is None:
-                suite_path = probe_root / f"suite_{len(suites):03d}.py"
-                suite_path.write_text(
-                    probe.test_source.rstrip() + "\n", encoding="utf-8"
-                )
-                suites[probe.test_source] = suite_path
-            command = (
-                sys.executable,
-                str(runner_path),
-                str(suite_path),
-                probe.function_name,
-            )
-            environment = os.environ.copy()
-            environment.pop("VIRTUAL_ENV", None)
-            environment["PYTHONDONTWRITEBYTECODE"] = "1"
-            existing_pythonpath = environment.get("PYTHONPATH", "")
-            import_paths = [str(root), str(root / "src")]
-            if existing_pythonpath:
-                import_paths.append(existing_pythonpath)
-            environment["PYTHONPATH"] = os.pathsep.join(import_paths)
-            try:
-                completed = subprocess.run(
-                    command,
-                    cwd=root,
-                    env=environment,
-                    capture_output=True,
-                    text=True,
-                    timeout=timeout_seconds,
-                    check=False,
-                )
-            except subprocess.TimeoutExpired as error:
-                results.append(
-                    PostRunProbeResult(
-                        probe.probe_id,
-                        probe.scenario_id,
-                        "timed_out",
-                        command,
-                        124,
-                        _output(error.stdout, error.stderr),
-                        "probe timed out",
-                    )
-                )
-                continue
-            except OSError as error:
-                results.append(
-                    PostRunProbeResult(
-                        probe.probe_id,
-                        probe.scenario_id,
-                        "unavailable",
-                        command,
-                        error=str(error),
-                    )
-                )
-                continue
-            results.append(
-                PostRunProbeResult(
-                    probe.probe_id,
-                    probe.scenario_id,
-                    "passed" if completed.returncode == 0 else "failed",
-                    command,
-                    completed.returncode,
-                    _output(completed.stdout, completed.stderr),
-                )
-            )
-    return tuple(results)
-
-
-def baseline_probe_failures(
-    results: Sequence[PostRunProbeResult],
-) -> list[str]:
-    """Return probes that passed or failed for an unexpected baseline reason."""
-    problems = []
-    for result in results:
-        if not baseline_probe_is_expected_failure(result):
-            problems.append(
-                f"{result.probe_id} ({result.scenario_id}) returned "
-                f"{result.status}; expected a baseline failure through "
-                "AssertionError, TypeError, or ImportError. "
-                f"{_truncate(result.output or result.error or '', 1600)}"
-            )
-    return problems
-
-
-def baseline_probe_is_expected_failure(result: PostRunProbeResult) -> bool:
-    """Recognize baseline exceptions that mean the requested API is absent."""
-    if result.status != "failed":
-        return False
-    terminal_line = next(
-        (line.strip() for line in reversed(result.output.splitlines()) if line.strip()),
-        "",
-    )
-    match = re.match(r"^([A-Za-z_][A-Za-z0-9_.]*)(?::|$)", terminal_line)
-    if match is None:
-        return False
-    exception_name = match.group(1).rsplit(".", 1)[-1]
-    return exception_name in {
-        "AssertionError",
-        "ImportError",
-        "ModuleNotFoundError",
-        "TypeError",
-    }
-
-
-def probe_failures(results: Sequence[Mapping[str, Any]]) -> list[dict[str, str]]:
-    """Convert failed probe results into focused coding-agent repair findings."""
-    return [
-        {
-            "scenario_id": str(item.get("scenario_id", "unknown")),
-            "reason": (
-                f"probe {item.get('probe_id', 'unknown')} {item.get('status')}: "
-                f"{_truncate(str(item.get('output') or item.get('error') or ''), 2400)}"
-            ),
-        }
-        for item in results
-        if item.get("status") in {"failed", "timed_out", "unavailable"}
-    ]
-
-
-_PROBE_RUNNER = """\
-import importlib.util
-import sys
-
-path, function_name = sys.argv[1:3]
-spec = importlib.util.spec_from_file_location("powdrr_generated_probe", path)
-if spec is None or spec.loader is None:
-    raise RuntimeError(f"cannot load generated probe: {path}")
-module = importlib.util.module_from_spec(spec)
-spec.loader.exec_module(module)
-function = getattr(module, function_name, None)
-if not callable(function):
-    raise RuntimeError(f"generated probe function not found: {function_name}")
-function()
-"""
-
-
-def _output(stdout: str | bytes | None, stderr: str | bytes | None) -> str:
-    chunks = [
-        part.decode(errors="replace") if isinstance(part, bytes) else part
-        for part in (stdout, stderr)
-        if part
-    ]
-    return _truncate("\n".join(chunks), 8000)
-
-
-def _truncate(value: str, limit: int) -> str:
-    normalized = re.sub(r"\n{3,}", "\n\n", value).strip()
-    return normalized if len(normalized) <= limit else normalized[:limit] + "…"
-
-
 __all__ = [
     "POSTRUN_PROBE_SCHEMA_VERSION",
     "PostRunProbe",
-    "PostRunProbeResult",
-    "baseline_probe_failures",
-    "baseline_probe_is_expected_failure",
     "parse_generated_postrun_probe_source",
-    "probe_failures",
-    "run_postrun_probes",
     "validate_probe_interaction_plan",
 ]

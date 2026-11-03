@@ -68,6 +68,10 @@ from powdrr_service.structrr.verification_health import (
     VerificationPolicyMode,
     audit_verification_health,
 )
+from powdrr_service.verification.differential import (
+    classify_differential_result,
+    detect_verifier_changes,
+)
 
 from powdrr_lift.agent_bootstrap import (
     BootstrapTaskConfig,
@@ -212,10 +216,6 @@ from powdrr_lift.workrr.credential_check import (
     check_jev_access,
     check_model_access,
     configured_model_mapping,
-)
-from powdrr_lift.workrr.differential_verification import (
-    classify_differential_result,
-    detect_verifier_changes,
 )
 from powdrr_lift.workrr.feature_endpoint import (
     FeatureEndpointConfig,

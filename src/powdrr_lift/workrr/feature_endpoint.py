@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any, cast
 
 import yaml
+from powdrr_agent.execution.postrun_probe_runner import run_postrun_probes
 from powdrr_agent.execution.verification_provider import (
     default_verification_provider_registry,
 )
@@ -96,6 +97,11 @@ from powdrr_service.structrr.verification_obligations import (
     VerificationObligationCompilation,
     compile_verification_obligations,
 )
+from powdrr_service.verification.probe_results import (
+    baseline_probe_failures,
+    baseline_probe_is_expected_failure,
+    probe_failures,
+)
 
 from powdrr_lift.core.contract_closure import (
     ContractClosureError,
@@ -150,12 +156,8 @@ from powdrr_lift.workrr.git import integration_branch_name
 from powdrr_lift.workrr.postrun_probes import (
     POSTRUN_PROBE_SCHEMA_VERSION,
     PostRunProbe,
-    baseline_probe_failures,
-    baseline_probe_is_expected_failure,
     parse_generated_postrun_probe_source,
-    probe_failures,
     required_probe_coverage_gaps,
-    run_postrun_probes,
 )
 from powdrr_lift.workrr.protocol import WorkflowLLMClient
 from powdrr_lift.workrr.run_artifacts import (
@@ -3741,7 +3743,6 @@ def _generate_miniswe_postrun_probes(
                 baseline_results = run_postrun_probes(
                     probes,
                     root=probe_worktree,
-                    profiles=(),
                 )
                 baseline_problems = baseline_probe_failures(baseline_results)
                 if baseline_problems:
@@ -7820,22 +7821,11 @@ def _prepare_final_implementation_review(
     generated_probe_results_path: str | None = None
     generated_probes = state.get("postrun_probes")
     if isinstance(generated_probes, tuple) and generated_probes:
-        raw_profiles = state.get("validation_profiles", ())
-        profiles = (
-            tuple(
-                item
-                for item in raw_profiles
-                if isinstance(item, DiscoveredValidationProfile)
-            )
-            if isinstance(raw_profiles, Sequence)
-            else ()
-        )
         generated_probe_results = tuple(
             item.to_data()
             for item in run_postrun_probes(
                 generated_probes,
                 root=worktree,
-                profiles=profiles,
             )
         )
         probe_root = state.get("postrun_probe_artifact_root")

@@ -3,6 +3,7 @@ from __future__ import annotations
 import ast
 import base64
 import hashlib
+import importlib.util
 import json
 from pathlib import Path
 
@@ -414,6 +415,24 @@ def test_legacy_service_imports_are_explicitly_owned() -> None:
                         actual.add(f"{node.module}.{alias.name}")
     assert actual == expected
     assert all(entry["owner_pr"] > 0 for entry in allowlist["entries"])
+
+
+def test_procedrr_runtime_and_operation_dispatch_are_service_owned() -> None:
+    from powdrr_service.procedrr_evaluator.model_client import ProcedrrModelClient
+    from powdrr_service.procedrr_evaluator.operations import (
+        ProcedrrOperationExecutor,
+    )
+
+    from powdrr_lift.workrr import procedrr as local_procedrr
+
+    assert ProcedrrModelClient.__module__ == (
+        "powdrr_service.procedrr_evaluator.model_client"
+    )
+    assert ProcedrrOperationExecutor.__module__ == (
+        "powdrr_service.procedrr_evaluator.operations"
+    )
+    assert not hasattr(local_procedrr, "WorkrrProcedrrClient")
+    assert importlib.util.find_spec("powdrr_lift.workrr.procedrr_operations") is None
 
 
 def test_structrr_review_and_verification_policy_is_service_owned() -> None:

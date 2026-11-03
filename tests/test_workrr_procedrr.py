@@ -3,16 +3,16 @@ from pathlib import Path
 from typing import Any, cast
 
 import pytest
+from powdrr_service.procedrr_evaluator.model_client import (
+    ProcedrrModelClient,
+    ProcedrrResponseError,
+    _is_retryable_provider_failure,
+)
 from powdrr_service.providers.clients import _parse_json_object
 from powdrr_service.providers.errors import ProviderResponseError
 
 from powdrr_lift.errors import PowdrrExecutionError, ProviderExecutionError
-from powdrr_lift.workrr.procedrr import (
-    ProcedrrResponseError,
-    StructuredToolExecutor,
-    WorkrrProcedrrClient,
-    _is_retryable_provider_failure,
-)
+from powdrr_lift.workrr.procedrr import StructuredToolExecutor
 
 
 class RepairingClient:
@@ -61,13 +61,15 @@ def test_procedrr_retries_empty_provider_content(
             return {"complete": True}
 
     provider = EmptyContentThenSuccess()
-    client = WorkrrProcedrrClient(
+    client = ProcedrrModelClient(
         cast(Any, provider),
         process_directory=tmp_path,
         provider_retry_delay_seconds=2.0,
     )
     delays: list[float] = []
-    monkeypatch.setattr("powdrr_lift.workrr.procedrr.time.sleep", delays.append)
+    monkeypatch.setattr(
+        "powdrr_service.procedrr_evaluator.model_client.time.sleep", delays.append
+    )
 
     assert client.complete_json(
         [{"role": "user", "content": "judge this"}],
@@ -94,13 +96,15 @@ def test_procedrr_retries_http_429(
             return {"complete": True}
 
     provider = RateLimitedThenSuccess()
-    client = WorkrrProcedrrClient(
+    client = ProcedrrModelClient(
         cast(Any, provider),
         process_directory=tmp_path,
         provider_retry_delay_seconds=2.0,
     )
     delays: list[float] = []
-    monkeypatch.setattr("powdrr_lift.workrr.procedrr.time.sleep", delays.append)
+    monkeypatch.setattr(
+        "powdrr_service.procedrr_evaluator.model_client.time.sleep", delays.append
+    )
 
     assert client.complete_json(
         [{"role": "user", "content": "judge this"}],
@@ -136,8 +140,10 @@ def test_procedrr_records_provider_retry_attempts_without_prompt_content(
             return self._fallback.complete_json(messages, **kwargs)
 
     events: list[dict[str, Any]] = []
-    monkeypatch.setattr("powdrr_lift.workrr.procedrr.time.sleep", lambda _: None)
-    client = WorkrrProcedrrClient(
+    monkeypatch.setattr(
+        "powdrr_service.procedrr_evaluator.model_client.time.sleep", lambda _: None
+    )
+    client = ProcedrrModelClient(
         cast(Any, FallbackWrapper()),
         process_directory=tmp_path,
         telemetry_sink=lambda record: events.append(dict(record)),
@@ -158,7 +164,7 @@ def test_procedrr_records_provider_retry_attempts_without_prompt_content(
 
 def test_procedrr_uses_workrr_schema_repair_transport(tmp_path: Path) -> None:
     provider = RepairingClient([{}, {"complete": True}])
-    client = WorkrrProcedrrClient(provider, process_directory=tmp_path)
+    client = ProcedrrModelClient(provider, process_directory=tmp_path)
 
     result = client.complete_json(
         [{"role": "user", "content": "judge this"}],
@@ -187,10 +193,10 @@ def test_procedrr_batch_preserves_order_and_replay_responses(tmp_path: Path) -> 
     first = [{"role": "user", "content": "first"}]
     second = [{"role": "user", "content": "second"}]
     provider = BatchClient()
-    client = WorkrrProcedrrClient(
+    client = ProcedrrModelClient(
         cast(Any, provider),
         process_directory=tmp_path,
-        replay_responses={WorkrrProcedrrClient.replay_key(first): {"complete": False}},
+        replay_responses={ProcedrrModelClient.replay_key(first): {"complete": False}},
     )
 
     result = client.complete_json_batch([(first, SCHEMA), (second, SCHEMA)])
@@ -217,7 +223,7 @@ def test_procedrr_repairs_non_object_json_provider_response(tmp_path: Path) -> N
             return {"complete": True}
 
     provider = NonObjectThenSuccess()
-    client = WorkrrProcedrrClient(
+    client = ProcedrrModelClient(
         cast(Any, provider), process_directory=tmp_path, max_retries=1
     )
 
@@ -269,7 +275,7 @@ def test_procedrr_falls_back_for_unsupported_schema_grammar_and_validates_locall
         },
     }
     provider = LimitedGrammarProvider()
-    client = WorkrrProcedrrClient(
+    client = ProcedrrModelClient(
         cast(Any, provider),
         process_directory=tmp_path,
         max_retries=1,
@@ -315,12 +321,14 @@ def test_procedrr_retries_transient_provider_failures_with_backoff(
             return {"complete": True}
 
     provider = FailingClient()
-    client = WorkrrProcedrrClient(
+    client = ProcedrrModelClient(
         cast(Any, provider),
         process_directory=tmp_path,
     )
     delays: list[float] = []
-    monkeypatch.setattr("powdrr_lift.workrr.procedrr.time.sleep", delays.append)
+    monkeypatch.setattr(
+        "powdrr_service.procedrr_evaluator.model_client.time.sleep", delays.append
+    )
 
     result = client.complete_json(
         [{"role": "user", "content": "judge this"}],
@@ -349,13 +357,15 @@ def test_procedrr_retries_empty_stream_provider_failures(
             return {"complete": True}
 
     provider = EmptyStreamThenSuccess()
-    client = WorkrrProcedrrClient(
+    client = ProcedrrModelClient(
         cast(Any, provider),
         process_directory=tmp_path,
         provider_retry_delay_seconds=2.0,
     )
     delays: list[float] = []
-    monkeypatch.setattr("powdrr_lift.workrr.procedrr.time.sleep", delays.append)
+    monkeypatch.setattr(
+        "powdrr_service.procedrr_evaluator.model_client.time.sleep", delays.append
+    )
 
     assert client.complete_json(
         [{"role": "user", "content": "judge this"}],
@@ -383,13 +393,15 @@ def test_procedrr_retries_truncated_stream_provider_failures(
             return {"complete": True}
 
     provider = TruncatedStreamThenSuccess()
-    client = WorkrrProcedrrClient(
+    client = ProcedrrModelClient(
         cast(Any, provider),
         process_directory=tmp_path,
         provider_retry_delay_seconds=2.0,
     )
     delays: list[float] = []
-    monkeypatch.setattr("powdrr_lift.workrr.procedrr.time.sleep", delays.append)
+    monkeypatch.setattr(
+        "powdrr_service.procedrr_evaluator.model_client.time.sleep", delays.append
+    )
 
     assert client.complete_json(
         [{"role": "user", "content": "judge this"}],
@@ -416,7 +428,7 @@ def test_procedrr_does_not_retry_explicit_provider_request_errors(
             )
 
     provider = UnsupportedSchemaClient()
-    client = WorkrrProcedrrClient(
+    client = ProcedrrModelClient(
         cast(Any, provider),
         process_directory=tmp_path,
         provider_retry_attempts=3,
@@ -436,12 +448,10 @@ def test_procedrr_replays_completed_judge_without_provider_call(
 ) -> None:
     provider = RepairingClient([{"complete": False}])
     messages = [{"role": "user", "content": "judge this"}]
-    client = WorkrrProcedrrClient(
+    client = ProcedrrModelClient(
         provider,
         process_directory=tmp_path,
-        replay_responses={
-            WorkrrProcedrrClient.replay_key(messages): {"complete": True}
-        },
+        replay_responses={ProcedrrModelClient.replay_key(messages): {"complete": True}},
     )
 
     assert client.complete_json(messages, response_schema=SCHEMA) == {"complete": True}
@@ -461,7 +471,7 @@ def test_procedrr_does_not_retry_non_transient_provider_failures(
             raise RuntimeError("invalid credentials")
 
     provider = FailingClient()
-    client = WorkrrProcedrrClient(cast(Any, provider), process_directory=tmp_path)
+    client = ProcedrrModelClient(cast(Any, provider), process_directory=tmp_path)
 
     with pytest.raises(RuntimeError, match="invalid credentials"):
         client.complete_json(
@@ -474,7 +484,7 @@ def test_procedrr_does_not_retry_non_transient_provider_failures(
 
 def test_procedrr_requires_a_schema() -> None:
     provider = RepairingClient([{"complete": True}])
-    client = WorkrrProcedrrClient(provider, process_directory=Path("."))
+    client = ProcedrrModelClient(provider, process_directory=Path("."))
 
     with pytest.raises(ProcedrrResponseError, match="output schema"):
         client.complete_json([{"role": "user", "content": "judge this"}])
@@ -484,14 +494,14 @@ def test_evaluator_can_be_constructed_with_workrr_transport(tmp_path: Path) -> N
     from powdrr_service.procedrr_evaluator import Evaluator
 
     evaluator = Evaluator(
-        WorkrrProcedrrClient(
+        ProcedrrModelClient(
             RepairingClient([{"complete": True}]), process_directory=tmp_path
         ),
         lambda _tool, _parameters: None,
         process_directory=tmp_path,
     )
 
-    assert evaluator.llm.__class__.__name__ == "WorkrrProcedrrClient"
+    assert evaluator.llm.__class__.__name__ == "ProcedrrModelClient"
 
 
 def test_tool_failures_are_structured_for_workrr(tmp_path: Path) -> None:

@@ -33,11 +33,11 @@ from powdrr_service.planning.semantic_contract_compiler import (
     prepare_source_semantic_decisions,
 )
 from powdrr_service.planning.semantic_decision import DECISION_VALUES
+from powdrr_service.procedrr_evaluator.model_client import ProcedrrModelClient
 from powdrr_service.providers.config import default_llm_mappings
 from powdrr_service.providers.credentials import resolve_provider_credentials
 from powdrr_service.resources import bundled_process_directory
 
-from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
 from powdrr_lift.workrr.provider_runtime import build_workflow_client
 
 ROOT_DIR = Path(__file__).resolve().parents[3]
@@ -108,7 +108,7 @@ def _json_schema_for_root() -> dict[str, Any]:
 
 
 def _call_judge(
-    client: WorkrrProcedrrClient,
+    client: ProcedrrModelClient,
     *,
     question: str,
     instructions: tuple[str, ...] | list[str],
@@ -213,7 +213,7 @@ def _repository_family(repository_url: Any, task_id: str) -> str:
 
 def _label_task(
     task: Mapping[str, Any],
-    client: WorkrrProcedrrClient,
+    client: ProcedrrModelClient,
     *,
     provider: str,
     model: str,
@@ -572,7 +572,7 @@ def main() -> int:
             model_cache_dir=ROOT_DIR / ".powdrr" / "models",
             progress_stream=None,
         )
-        task_client = WorkrrProcedrrClient(
+        task_client = ProcedrrModelClient(
             workflow_client,
             process_directory=bundled_process_directory(),
         )

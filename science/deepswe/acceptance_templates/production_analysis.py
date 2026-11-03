@@ -23,8 +23,7 @@ from powdrr_service.planning.semantic_contract_compiler import (
     bind_source_semantic_decisions,
     prepare_source_semantic_decisions,
 )
-
-from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
+from powdrr_service.procedrr_evaluator.model_client import ProcedrrModelClient
 
 from . import PROMPT_VERSION
 from .cli import DEFAULT_MODEL, _client
@@ -394,12 +393,12 @@ def main(argv: list[str] | None = None) -> int:
     planning_client = _client(args.planning_provider, args.planning_model, 120, 12288)
     process_directory = DESIGN_FLOW.parent
     jev_client = JevPromptAdapter(
-        WorkrrProcedrrClient(
+        ProcedrrModelClient(
             JevSemanticClassifierClient(planning_client, fail_closed=True),
             process_directory=process_directory,
         )
     )
-    split_client = WorkrrProcedrrClient(
+    split_client = ProcedrrModelClient(
         planning_client, process_directory=process_directory
     )
     matching_client = _client(args.planning_provider, args.matching_model, 120, 12288)

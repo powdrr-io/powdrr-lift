@@ -19,6 +19,7 @@ from powdrr_service.decision_obligation import (
 )
 from powdrr_service.procedrr import parse_and_validate
 from powdrr_service.procedrr_evaluator import Evaluator
+from powdrr_service.procedrr_evaluator.model_client import ProcedrrModelClient
 from powdrr_service.resources import bundled_process_directory
 from powdrr_service.structrr.actual_diff import StructrrActualDiff
 from powdrr_service.structrr.gate_compiler import compile_proposal_worklist
@@ -106,7 +107,6 @@ from powdrr_lift.workrr.feature_endpoint import (
     run_feature_endpoint,
     run_feature_in_place,
 )
-from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
 
 
 def test_miniswe_probe_authoring_uses_compact_context_and_clean_baseline(
@@ -1114,7 +1114,7 @@ def test_procedrr_replay_loader_preserves_completed_judge_results(
                 {
                     "record_type": "powdrr_service.procedrr.step",
                     "kind": "judge",
-                    "replay_key": WorkrrProcedrrClient.replay_key(redacted_messages),
+                    "replay_key": ProcedrrModelClient.replay_key(redacted_messages),
                     "value": {"multiple": False},
                 },
             )
@@ -1126,8 +1126,8 @@ def test_procedrr_replay_loader_preserves_completed_judge_results(
     replay = _load_procedrr_replay_responses(event_path)
 
     assert replay == {
-        WorkrrProcedrrClient.replay_key(messages): {"multiple": True},
-        WorkrrProcedrrClient.replay_key(redacted_messages): {"multiple": False},
+        ProcedrrModelClient.replay_key(messages): {"multiple": True},
+        ProcedrrModelClient.replay_key(redacted_messages): {"multiple": False},
     }
 
 

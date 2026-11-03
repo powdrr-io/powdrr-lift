@@ -1,0 +1,929 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1338
+title: Move Procedrr model and operation runtime into service
+intent:
+  problem: The service still imported Procedrr model repair and command dispatch from
+    the legacy application package.
+  goal: Own Procedrr model retries, structured response repair, and operation validation
+    in the service, then update all callers without compatibility shims.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/architecture/agent-service-legacy-import-allowlist.json
+  type: modified
+  span:
+    start_line: 8
+    end_line: 17
+  summary: Remove legacy Procedrr runtime imports from the service allowlist.
+  rationale: The service now owns the model adapter and operation dispatcher.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 566
+    end_line: 567
+  summary: Record the service-owned Procedrr adapter and dispatcher modules.
+  rationale: Keep the extraction inventory aligned with the relocated runtime code.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2823
+    end_line: 2824
+  summary: Record the service-owned Procedrr adapter and dispatcher modules.
+  rationale: Keep the extraction inventory aligned with the relocated runtime code.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3080
+    end_line: 3081
+  summary: Record the service-owned Procedrr adapter and dispatcher modules.
+  rationale: Keep the extraction inventory aligned with the relocated runtime code.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3085
+    end_line: 3085
+  summary: Record the service-owned Procedrr adapter and dispatcher modules.
+  rationale: Keep the extraction inventory aligned with the relocated runtime code.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3101
+    end_line: 3102
+  summary: Record the service-owned Procedrr adapter and dispatcher modules.
+  rationale: Keep the extraction inventory aligned with the relocated runtime code.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3133
+    end_line: 3144
+  summary: Record the service-owned Procedrr adapter and dispatcher modules.
+  rationale: Keep the extraction inventory aligned with the relocated runtime code.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3428
+    end_line: 3428
+  summary: Record the service-owned Procedrr adapter and dispatcher modules.
+  rationale: Keep the extraction inventory aligned with the relocated runtime code.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3430
+    end_line: 3430
+  summary: Record the service-owned Procedrr adapter and dispatcher modules.
+  rationale: Keep the extraction inventory aligned with the relocated runtime code.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3613
+    end_line: 3614
+  summary: Record the service-owned Procedrr adapter and dispatcher modules.
+  rationale: Keep the extraction inventory aligned with the relocated runtime code.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3625
+    end_line: 3625
+  summary: Record the service-owned Procedrr adapter and dispatcher modules.
+  rationale: Keep the extraction inventory aligned with the relocated runtime code.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3635
+    end_line: 3657
+  summary: Record the service-owned Procedrr adapter and dispatcher modules.
+  rationale: Keep the extraction inventory aligned with the relocated runtime code.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 25
+    end_line: 26
+  summary: Use the service-owned Procedrr model and operation adapters in planning.
+  rationale: Planning no longer imports these runtime components from the legacy application
+    package.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 39
+    end_line: 40
+  summary: Use the service-owned Procedrr model and operation adapters in planning.
+  rationale: Planning no longer imports these runtime components from the legacy application
+    package.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 944
+    end_line: 944
+  summary: Use the service-owned Procedrr model and operation adapters in planning.
+  rationale: Planning no longer imports these runtime components from the legacy application
+    package.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 998
+    end_line: 998
+  summary: Use the service-owned Procedrr model and operation adapters in planning.
+  rationale: Planning no longer imports these runtime components from the legacy application
+    package.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 1016
+    end_line: 1016
+  summary: Use the service-owned Procedrr model and operation adapters in planning.
+  rationale: Planning no longer imports these runtime components from the legacy application
+    package.
+- path: packages/service/src/powdrr_service/procedrr_evaluator/__init__.py
+  type: modified
+  span:
+    start_line: 1
+    end_line: 1
+  summary: Export the service-owned Procedrr model client and operation executor.
+  rationale: Make the moved runtime types available through the service evaluator
+    package.
+- path: packages/service/src/powdrr_service/procedrr_evaluator/__init__.py
+  type: modified
+  span:
+    start_line: 11
+    end_line: 15
+  summary: Export the service-owned Procedrr model client and operation executor.
+  rationale: Make the moved runtime types available through the service evaluator
+    package.
+- path: packages/service/src/powdrr_service/procedrr_evaluator/__init__.py
+  type: modified
+  span:
+    start_line: 36
+    end_line: 38
+  summary: Export the service-owned Procedrr model client and operation executor.
+  rationale: Make the moved runtime types available through the service evaluator
+    package.
+- path: packages/service/src/powdrr_service/procedrr_evaluator/model_client.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 430
+  summary: Own structured response validation, repair, provider retries, and telemetry
+    in the service.
+  rationale: Keep private Procedrr model behavior out of the legacy application package.
+- path: science/classifications/compare_jev_other_classifiers.py
+  type: modified
+  span:
+    start_line: 27
+    end_line: 27
+  summary: Use the service-owned Procedrr model adapter in classifier comparisons.
+  rationale: Keep evaluation tooling aligned with the relocated runtime.
+- path: science/classifications/compare_jev_other_classifiers.py
+  type: modified
+  span:
+    start_line: 31
+    end_line: 31
+  summary: Use the service-owned Procedrr model adapter in classifier comparisons.
+  rationale: Keep evaluation tooling aligned with the relocated runtime.
+- path: science/classifications/compare_jev_other_classifiers.py
+  type: modified
+  span:
+    start_line: 296
+    end_line: 296
+  summary: Use the service-owned Procedrr model adapter in classifier comparisons.
+  rationale: Keep evaluation tooling aligned with the relocated runtime.
+- path: science/classifications/root_disposition/build_dataset.py
+  type: modified
+  span:
+    start_line: 36
+    end_line: 36
+  summary: Use the service-owned Procedrr model adapter in dataset labeling.
+  rationale: Keep evaluation tooling aligned with the relocated runtime.
+- path: science/classifications/root_disposition/build_dataset.py
+  type: modified
+  span:
+    start_line: 40
+    end_line: 40
+  summary: Use the service-owned Procedrr model adapter in dataset labeling.
+  rationale: Keep evaluation tooling aligned with the relocated runtime.
+- path: science/classifications/root_disposition/build_dataset.py
+  type: modified
+  span:
+    start_line: 111
+    end_line: 111
+  summary: Use the service-owned Procedrr model adapter in dataset labeling.
+  rationale: Keep evaluation tooling aligned with the relocated runtime.
+- path: science/classifications/root_disposition/build_dataset.py
+  type: modified
+  span:
+    start_line: 216
+    end_line: 216
+  summary: Use the service-owned Procedrr model adapter in dataset labeling.
+  rationale: Keep evaluation tooling aligned with the relocated runtime.
+- path: science/classifications/root_disposition/build_dataset.py
+  type: modified
+  span:
+    start_line: 575
+    end_line: 575
+  summary: Use the service-owned Procedrr model adapter in dataset labeling.
+  rationale: Keep evaluation tooling aligned with the relocated runtime.
+- path: science/deepswe/acceptance_templates/production_analysis.py
+  type: modified
+  span:
+    start_line: 26
+    end_line: 26
+  summary: Use the service-owned Procedrr model adapter in production analysis.
+  rationale: Keep evaluation tooling aligned with the relocated runtime.
+- path: science/deepswe/acceptance_templates/production_analysis.py
+  type: modified
+  span:
+    start_line: 396
+    end_line: 396
+  summary: Use the service-owned Procedrr model adapter in production analysis.
+  rationale: Keep evaluation tooling aligned with the relocated runtime.
+- path: science/deepswe/acceptance_templates/production_analysis.py
+  type: modified
+  span:
+    start_line: 401
+    end_line: 401
+  summary: Use the service-owned Procedrr model adapter in production analysis.
+  rationale: Keep evaluation tooling aligned with the relocated runtime.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 53
+    end_line: 54
+  summary: Use the service-owned Procedrr model and operation adapters in feature
+    execution.
+  rationale: Update callers after moving the private runtime components.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 155
+    end_line: 156
+  summary: Use the service-owned Procedrr model and operation adapters in feature
+    execution.
+  rationale: Update callers after moving the private runtime components.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 339
+    end_line: 339
+  summary: Use the service-owned Procedrr model and operation adapters in feature
+    execution.
+  rationale: Update callers after moving the private runtime components.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 582
+    end_line: 582
+  summary: Use the service-owned Procedrr model and operation adapters in feature
+    execution.
+  rationale: Update callers after moving the private runtime components.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 722
+    end_line: 722
+  summary: Use the service-owned Procedrr model and operation adapters in feature
+    execution.
+  rationale: Update callers after moving the private runtime components.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 737
+    end_line: 737
+  summary: Use the service-owned Procedrr model and operation adapters in feature
+    execution.
+  rationale: Update callers after moving the private runtime components.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 747
+    end_line: 747
+  summary: Use the service-owned Procedrr model and operation adapters in feature
+    execution.
+  rationale: Update callers after moving the private runtime components.
+- path: src/powdrr_lift/workrr/procedrr.py
+  type: modified
+  span:
+    start_line: 1
+    end_line: 1
+  summary: Leave local structured tool dispatch in the combined application and remove
+    the Procedrr model adapter.
+  rationale: Model repair and provider retry behavior now live in service code.
+- path: src/powdrr_lift/workrr/procedrr.py
+  type: modified
+  span:
+    start_line: 5
+    end_line: 6
+  summary: Leave local structured tool dispatch in the combined application and remove
+    the Procedrr model adapter.
+  rationale: Model repair and provider retry behavior now live in service code.
+- path: src/powdrr_lift/workrr/procedrr.py
+  type: modified
+  span:
+    start_line: 14
+    end_line: 15
+  summary: Leave local structured tool dispatch in the combined application and remove
+    the Procedrr model adapter.
+  rationale: Model repair and provider retry behavior now live in service code.
+- path: src/powdrr_lift/workrr/procedrr.py
+  type: modified
+  span:
+    start_line: 18
+    end_line: 46
+  summary: Leave local structured tool dispatch in the combined application and remove
+    the Procedrr model adapter.
+  rationale: Model repair and provider retry behavior now live in service code.
+- path: src/powdrr_lift/workrr/procedrr.py
+  type: modified
+  span:
+    start_line: 157
+    end_line: 487
+  summary: Leave local structured tool dispatch in the combined application and remove
+    the Procedrr model adapter.
+  rationale: Model repair and provider retry behavior now live in service code.
+- path: src/powdrr_lift/workrr/procedrr.py
+  type: modified
+  span:
+    start_line: 529
+    end_line: 585
+  summary: Leave local structured tool dispatch in the combined application and remove
+    the Procedrr model adapter.
+  rationale: Model repair and provider retry behavior now live in service code.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 17
+    end_line: 18
+  summary: Use service-owned Procedrr model and operation adapters in interactive
+    workflows.
+  rationale: Update callers after moving the private runtime components.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 57
+    end_line: 58
+  summary: Use service-owned Procedrr model and operation adapters in interactive
+    workflows.
+  rationale: Update callers after moving the private runtime components.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 68
+    end_line: 68
+  summary: Use service-owned Procedrr model and operation adapters in interactive
+    workflows.
+  rationale: Update callers after moving the private runtime components.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 218
+    end_line: 218
+  summary: Use service-owned Procedrr model and operation adapters in interactive
+    workflows.
+  rationale: Update callers after moving the private runtime components.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 237
+    end_line: 237
+  summary: Use service-owned Procedrr model and operation adapters in interactive
+    workflows.
+  rationale: Update callers after moving the private runtime components.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 247
+    end_line: 247
+  summary: Use service-owned Procedrr model and operation adapters in interactive
+    workflows.
+  rationale: Update callers after moving the private runtime components.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 678
+    end_line: 678
+  summary: Use service-owned Procedrr model and operation adapters in interactive
+    workflows.
+  rationale: Update callers after moving the private runtime components.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 683
+    end_line: 683
+  summary: Use service-owned Procedrr model and operation adapters in interactive
+    workflows.
+  rationale: Update callers after moving the private runtime components.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 918
+    end_line: 918
+  summary: Use service-owned Procedrr model and operation adapters in interactive
+    workflows.
+  rationale: Update callers after moving the private runtime components.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 940
+    end_line: 940
+  summary: Use service-owned Procedrr model and operation adapters in interactive
+    workflows.
+  rationale: Update callers after moving the private runtime components.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 42
+    end_line: 43
+  summary: Use service-owned Procedrr model and operation adapters in task execution.
+  rationale: Update callers after moving the private runtime components.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 211
+    end_line: 212
+  summary: Use service-owned Procedrr model and operation adapters in task execution.
+  rationale: Update callers after moving the private runtime components.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 3808
+    end_line: 3808
+  summary: Use service-owned Procedrr model and operation adapters in task execution.
+  rationale: Update callers after moving the private runtime components.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 3816
+    end_line: 3816
+  summary: Use service-owned Procedrr model and operation adapters in task execution.
+  rationale: Update callers after moving the private runtime components.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 4548
+    end_line: 4548
+  summary: Use service-owned Procedrr model and operation adapters in task execution.
+  rationale: Update callers after moving the private runtime components.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 4587
+    end_line: 4587
+  summary: Use service-owned Procedrr model and operation adapters in task execution.
+  rationale: Update callers after moving the private runtime components.
+- path: tests/fixtures/structrr/golden-python-symbols.yaml
+  type: modified
+  span:
+    start_line: 37
+    end_line: 37
+  summary: Pin the Procedrr model client symbol at its new service-owned path.
+  rationale: Keep real-repository bootstrap verification aligned with the module move.
+- path: tests/fixtures/structrr/golden-python-symbols.yaml
+  type: modified
+  span:
+    start_line: 39
+    end_line: 40
+  summary: Pin the Procedrr model client symbol at its new service-owned path.
+  rationale: Keep real-repository bootstrap verification aligned with the module move.
+- path: tests/fixtures/structrr/golden-python-symbols.yaml
+  type: modified
+  span:
+    start_line: 42
+    end_line: 44
+  summary: Pin the Procedrr model client symbol at its new service-owned path.
+  rationale: Keep real-repository bootstrap verification aligned with the module move.
+- path: tests/fixtures/structrr/golden-python-symbols.yaml
+  type: modified
+  span:
+    start_line: 46
+    end_line: 47
+  summary: Pin the Procedrr model client symbol at its new service-owned path.
+  rationale: Keep real-repository bootstrap verification aligned with the module move.
+- path: tests/fixtures/structrr/golden-python-symbols.yaml
+  type: modified
+  span:
+    start_line: 49
+    end_line: 50
+  summary: Pin the Procedrr model client symbol at its new service-owned path.
+  rationale: Keep real-repository bootstrap verification aligned with the module move.
+- path: tests/test_agent_service_contracts.py
+  type: modified
+  span:
+    start_line: 6
+    end_line: 6
+  summary: Assert that Procedrr runtime classes are service-owned with no legacy aliases.
+  rationale: Prevent regressions in module ownership and compatibility-shim removal.
+- path: tests/test_agent_service_contracts.py
+  type: modified
+  span:
+    start_line: 420
+    end_line: 437
+  summary: Assert that Procedrr runtime classes are service-owned with no legacy aliases.
+  rationale: Prevent regressions in module ownership and compatibility-shim removal.
+- path: tests/test_external_contract_research.py
+  type: modified
+  span:
+    start_line: 26
+    end_line: 26
+  summary: Use the service-owned Procedrr model adapter in research tests.
+  rationale: Exercise the relocated runtime through its new import path.
+- path: tests/test_external_contract_research.py
+  type: modified
+  span:
+    start_line: 29
+    end_line: 29
+  summary: Use the service-owned Procedrr model adapter in research tests.
+  rationale: Exercise the relocated runtime through its new import path.
+- path: tests/test_external_contract_research.py
+  type: modified
+  span:
+    start_line: 789
+    end_line: 789
+  summary: Use the service-owned Procedrr model adapter in research tests.
+  rationale: Exercise the relocated runtime through its new import path.
+- path: tests/test_external_contract_research.py
+  type: modified
+  span:
+    start_line: 792
+    end_line: 792
+  summary: Use the service-owned Procedrr model adapter in research tests.
+  rationale: Exercise the relocated runtime through its new import path.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 22
+    end_line: 22
+  summary: Use the service-owned Procedrr model adapter in feature tests.
+  rationale: Exercise the relocated runtime through its new import path.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 109
+    end_line: 109
+  summary: Use the service-owned Procedrr model adapter in feature tests.
+  rationale: Exercise the relocated runtime through its new import path.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 1117
+    end_line: 1117
+  summary: Use the service-owned Procedrr model adapter in feature tests.
+  rationale: Exercise the relocated runtime through its new import path.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 1129
+    end_line: 1130
+  summary: Use the service-owned Procedrr model adapter in feature tests.
+  rationale: Exercise the relocated runtime through its new import path.
+- path: tests/test_procedrr_chat.py
+  type: modified
+  span:
+    start_line: 16
+    end_line: 16
+  summary: Use the service-owned Procedrr model adapter in chat tests.
+  rationale: Exercise the relocated runtime through its new import path.
+- path: tests/test_procedrr_chat.py
+  type: modified
+  span:
+    start_line: 24
+    end_line: 24
+  summary: Use the service-owned Procedrr model adapter in chat tests.
+  rationale: Exercise the relocated runtime through its new import path.
+- path: tests/test_procedrr_chat.py
+  type: modified
+  span:
+    start_line: 259
+    end_line: 259
+  summary: Use the service-owned Procedrr model adapter in chat tests.
+  rationale: Exercise the relocated runtime through its new import path.
+- path: tests/test_procedrr_chat.py
+  type: modified
+  span:
+    start_line: 335
+    end_line: 335
+  summary: Use the service-owned Procedrr model adapter in chat tests.
+  rationale: Exercise the relocated runtime through its new import path.
+- path: tests/test_procedrr_chat.py
+  type: modified
+  span:
+    start_line: 400
+    end_line: 400
+  summary: Use the service-owned Procedrr model adapter in chat tests.
+  rationale: Exercise the relocated runtime through its new import path.
+- path: tests/test_procedrr_chat.py
+  type: modified
+  span:
+    start_line: 529
+    end_line: 529
+  summary: Use the service-owned Procedrr model adapter in chat tests.
+  rationale: Exercise the relocated runtime through its new import path.
+- path: tests/test_procedrr_chat.py
+  type: modified
+  span:
+    start_line: 655
+    end_line: 655
+  summary: Use the service-owned Procedrr model adapter in chat tests.
+  rationale: Exercise the relocated runtime through its new import path.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span:
+    start_line: 17
+    end_line: 17
+  summary: Use the service-owned Procedrr model adapter in evaluator tests.
+  rationale: Exercise the relocated runtime through its new import path.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span:
+    start_line: 24
+    end_line: 24
+  summary: Use the service-owned Procedrr model adapter in evaluator tests.
+  rationale: Exercise the relocated runtime through its new import path.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span:
+    start_line: 2006
+    end_line: 2006
+  summary: Use the service-owned Procedrr model adapter in evaluator tests.
+  rationale: Exercise the relocated runtime through its new import path.
+- path: tests/test_workrr_procedrr.py
+  type: modified
+  span:
+    start_line: 6
+    end_line: 10
+  summary: Test provider repair and retry behavior through the service-owned model
+    adapter.
+  rationale: Protect structured response handling after moving the implementation.
+- path: tests/test_workrr_procedrr.py
+  type: modified
+  span:
+    start_line: 15
+    end_line: 15
+  summary: Test provider repair and retry behavior through the service-owned model
+    adapter.
+  rationale: Protect structured response handling after moving the implementation.
+- path: tests/test_workrr_procedrr.py
+  type: modified
+  span:
+    start_line: 64
+    end_line: 64
+  summary: Test provider repair and retry behavior through the service-owned model
+    adapter.
+  rationale: Protect structured response handling after moving the implementation.
+- path: tests/test_workrr_procedrr.py
+  type: modified
+  span:
+    start_line: 70
+    end_line: 72
+  summary: Test provider repair and retry behavior through the service-owned model
+    adapter.
+  rationale: Protect structured response handling after moving the implementation.
+- path: tests/test_workrr_procedrr.py
+  type: modified
+  span:
+    start_line: 99
+    end_line: 99
+  summary: Test provider repair and retry behavior through the service-owned model
+    adapter.
+  rationale: Protect structured response handling after moving the implementation.
+- path: tests/test_workrr_procedrr.py
+  type: modified
+  span:
+    start_line: 105
+    end_line: 107
+  summary: Test provider repair and retry behavior through the service-owned model
+    adapter.
+  rationale: Protect structured response handling after moving the implementation.
+- path: tests/test_workrr_procedrr.py
+  type: modified
+  span:
+    start_line: 143
+    end_line: 146
+  summary: Test provider repair and retry behavior through the service-owned model
+    adapter.
+  rationale: Protect structured response handling after moving the implementation.
+- path: tests/test_workrr_procedrr.py
+  type: modified
+  span:
+    start_line: 167
+    end_line: 167
+  summary: Test provider repair and retry behavior through the service-owned model
+    adapter.
+  rationale: Protect structured response handling after moving the implementation.
+- path: tests/test_workrr_procedrr.py
+  type: modified
+  span:
+    start_line: 196
+    end_line: 196
+  summary: Test provider repair and retry behavior through the service-owned model
+    adapter.
+  rationale: Protect structured response handling after moving the implementation.
+- path: tests/test_workrr_procedrr.py
+  type: modified
+  span:
+    start_line: 199
+    end_line: 199
+  summary: Test provider repair and retry behavior through the service-owned model
+    adapter.
+  rationale: Protect structured response handling after moving the implementation.
+- path: tests/test_workrr_procedrr.py
+  type: modified
+  span:
+    start_line: 226
+    end_line: 226
+  summary: Test provider repair and retry behavior through the service-owned model
+    adapter.
+  rationale: Protect structured response handling after moving the implementation.
+- path: tests/test_workrr_procedrr.py
+  type: modified
+  span:
+    start_line: 278
+    end_line: 278
+  summary: Test provider repair and retry behavior through the service-owned model
+    adapter.
+  rationale: Protect structured response handling after moving the implementation.
+- path: tests/test_workrr_procedrr.py
+  type: modified
+  span:
+    start_line: 324
+    end_line: 324
+  summary: Test provider repair and retry behavior through the service-owned model
+    adapter.
+  rationale: Protect structured response handling after moving the implementation.
+- path: tests/test_workrr_procedrr.py
+  type: modified
+  span:
+    start_line: 329
+    end_line: 331
+  summary: Test provider repair and retry behavior through the service-owned model
+    adapter.
+  rationale: Protect structured response handling after moving the implementation.
+- path: tests/test_workrr_procedrr.py
+  type: modified
+  span:
+    start_line: 360
+    end_line: 360
+  summary: Test provider repair and retry behavior through the service-owned model
+    adapter.
+  rationale: Protect structured response handling after moving the implementation.
+- path: tests/test_workrr_procedrr.py
+  type: modified
+  span:
+    start_line: 366
+    end_line: 368
+  summary: Test provider repair and retry behavior through the service-owned model
+    adapter.
+  rationale: Protect structured response handling after moving the implementation.
+- path: tests/test_workrr_procedrr.py
+  type: modified
+  span:
+    start_line: 396
+    end_line: 396
+  summary: Test provider repair and retry behavior through the service-owned model
+    adapter.
+  rationale: Protect structured response handling after moving the implementation.
+- path: tests/test_workrr_procedrr.py
+  type: modified
+  span:
+    start_line: 402
+    end_line: 404
+  summary: Test provider repair and retry behavior through the service-owned model
+    adapter.
+  rationale: Protect structured response handling after moving the implementation.
+- path: tests/test_workrr_procedrr.py
+  type: modified
+  span:
+    start_line: 431
+    end_line: 431
+  summary: Test provider repair and retry behavior through the service-owned model
+    adapter.
+  rationale: Protect structured response handling after moving the implementation.
+- path: tests/test_workrr_procedrr.py
+  type: modified
+  span:
+    start_line: 451
+    end_line: 451
+  summary: Test provider repair and retry behavior through the service-owned model
+    adapter.
+  rationale: Protect structured response handling after moving the implementation.
+- path: tests/test_workrr_procedrr.py
+  type: modified
+  span:
+    start_line: 454
+    end_line: 454
+  summary: Test provider repair and retry behavior through the service-owned model
+    adapter.
+  rationale: Protect structured response handling after moving the implementation.
+- path: tests/test_workrr_procedrr.py
+  type: modified
+  span:
+    start_line: 474
+    end_line: 474
+  summary: Test provider repair and retry behavior through the service-owned model
+    adapter.
+  rationale: Protect structured response handling after moving the implementation.
+- path: tests/test_workrr_procedrr.py
+  type: modified
+  span:
+    start_line: 487
+    end_line: 487
+  summary: Test provider repair and retry behavior through the service-owned model
+    adapter.
+  rationale: Protect structured response handling after moving the implementation.
+- path: tests/test_workrr_procedrr.py
+  type: modified
+  span:
+    start_line: 497
+    end_line: 497
+  summary: Test provider repair and retry behavior through the service-owned model
+    adapter.
+  rationale: Protect structured response handling after moving the implementation.
+- path: tests/test_workrr_procedrr.py
+  type: modified
+  span:
+    start_line: 504
+    end_line: 504
+  summary: Test provider repair and retry behavior through the service-owned model
+    adapter.
+  rationale: Protect structured response handling after moving the implementation.
+- path: tests/test_workrr_procedrr_operations.py
+  type: modified
+  span:
+    start_line: 12
+    end_line: 13
+  summary: Test operation validation through the service-owned dispatcher.
+  rationale: Protect authorized dispatch and command schema validation.
+- path: tests/test_workrr_procedrr_operations.py
+  type: modified
+  span:
+    start_line: 23
+    end_line: 23
+  summary: Test operation validation through the service-owned dispatcher.
+  rationale: Protect authorized dispatch and command schema validation.
+- path: tests/test_workrr_procedrr_operations.py
+  type: modified
+  span:
+    start_line: 27
+    end_line: 27
+  summary: Test operation validation through the service-owned dispatcher.
+  rationale: Protect authorized dispatch and command schema validation.
+- path: tests/test_workrr_procedrr_operations.py
+  type: modified
+  span:
+    start_line: 47
+    end_line: 47
+  summary: Test operation validation through the service-owned dispatcher.
+  rationale: Protect authorized dispatch and command schema validation.
+- path: tests/test_workrr_procedrr_operations.py
+  type: modified
+  span:
+    start_line: 52
+    end_line: 52
+  summary: Test operation validation through the service-owned dispatcher.
+  rationale: Protect authorized dispatch and command schema validation.
+- path: tests/test_workrr_procedrr_operations.py
+  type: modified
+  span:
+    start_line: 63
+    end_line: 63
+  summary: Test operation validation through the service-owned dispatcher.
+  rationale: Protect authorized dispatch and command schema validation.
+- path: tests/test_workrr_procedrr_operations.py
+  type: modified
+  span:
+    start_line: 65
+    end_line: 65
+  summary: Test operation validation through the service-owned dispatcher.
+  rationale: Protect authorized dispatch and command schema validation.
+- path: tests/test_workspace_chat_turn.py
+  type: modified
+  span:
+    start_line: 13
+    end_line: 13
+  summary: Use the service-owned Procedrr model adapter in workspace chat tests.
+  rationale: Exercise the relocated runtime through its new import path.
+- path: tests/test_workspace_chat_turn.py
+  type: modified
+  span:
+    start_line: 17
+    end_line: 17
+  summary: Use the service-owned Procedrr model adapter in workspace chat tests.
+  rationale: Exercise the relocated runtime through its new import path.
+- path: tests/test_workspace_chat_turn.py
+  type: modified
+  span:
+    start_line: 86
+    end_line: 86
+  summary: Use the service-owned Procedrr model adapter in workspace chat tests.
+  rationale: Exercise the relocated runtime through its new import path.
+- path: packages/service/src/powdrr_service/procedrr_evaluator/operations.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 58
+  summary: Move authorized operation validation and dispatch into the service evaluator
+    package.
+  rationale: Keep Procedrr command policy beside the private process runtime.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []
+features: []
+proposed_prs: []

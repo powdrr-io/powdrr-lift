@@ -39,6 +39,8 @@ from powdrr_service.procedrr_evaluator import (
     ProcessTerminalStatus,
     SuspendEvaluation,
 )
+from powdrr_service.procedrr_evaluator.model_client import ProcedrrModelClient
+from powdrr_service.procedrr_evaluator.operations import ProcedrrOperationExecutor
 from powdrr_service.providers.config import (
     DEFAULT_LLM_TYPE,
     DEFAULT_MODEL,
@@ -208,8 +210,6 @@ from powdrr_lift.workrr.paths import (
     resolve_project_root,
     resolve_worktree_file_path,
 )
-from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
-from powdrr_lift.workrr.procedrr_operations import WorkrrOperationExecutor
 from powdrr_lift.workrr.provider_runtime import (
     build_provider_client,
     maybe_record_llm_exchanges,
@@ -3805,7 +3805,7 @@ class _TaskProcedrrOperations:
         *,
         process_id: str,
         process_catalog: ProcessCatalog,
-        process_client: WorkrrProcedrrClient,
+        process_client: ProcedrrModelClient,
     ) -> None:
         self.strategy = strategy
         self.workflow = strategy.workflow
@@ -3813,7 +3813,7 @@ class _TaskProcedrrOperations:
         self.process_id = process_id
         self.process_catalog = process_catalog
         self.process_client = process_client
-        self.operation_executor: WorkrrOperationExecutor | None = None
+        self.operation_executor: ProcedrrOperationExecutor | None = None
         self.follow_up_task_id: str | None = None
         self.original_task_id = self.task.task_id
         checkpoint_data = self.task.process_checkpoint
@@ -4545,7 +4545,7 @@ def run_workflow_task(
             deterministic_output_state=deterministic_output_state,
             requires_deterministic_output_state=requires_deterministic_output_state,
         )
-        process_client = WorkrrProcedrrClient(
+        process_client = ProcedrrModelClient(
             task_client,
             process_directory=process_directory,
             max_retries=config.max_stalled_roundtrips,
@@ -4584,7 +4584,7 @@ def run_workflow_task(
 
             return execute
 
-        operation_executor = WorkrrOperationExecutor(
+        operation_executor = ProcedrrOperationExecutor(
             {name: operation_handler(name) for name in operation_names}
         )
         operations.operation_executor = operation_executor

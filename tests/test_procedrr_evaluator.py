@@ -14,13 +14,14 @@ from typing import Any, cast
 import pytest
 
 from powdrr_service.providers.config import DEEPINFRA_CHEAP_MODEL
-from powdrr_lift.workrr.procedrr import StructuredToolExecutor, WorkrrProcedrrClient
+from powdrr_lift.workrr.procedrr import StructuredToolExecutor
 from powdrr_lift.workrr.task_agent import _normalize_execute_pr_coding_attempt
 from powdrr_service.procedrr_evaluator import EvaluationError, Evaluator
 from powdrr_service.procedrr_evaluator.evaluator import (
     EvaluationEvent,
     ValidationGateError,
 )
+from powdrr_service.procedrr_evaluator.model_client import ProcedrrModelClient
 
 
 def test_benchmark_gate_records_issue_and_continues() -> None:
@@ -2002,7 +2003,7 @@ def test_execute_proposed_pr_hello_world_with_live_llm(tmp_path: Path) -> None:
         raise AssertionError(f"unexpected operation: {tool}")
 
     Evaluator(
-        WorkrrProcedrrClient(llm, process_directory=tmp_path),
+        ProcedrrModelClient(llm, process_directory=tmp_path),
         StructuredToolExecutor(
             execute,
             available_paths=lambda: ["hello.py", "test_hello.py"],

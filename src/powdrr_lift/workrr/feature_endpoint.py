@@ -50,6 +50,8 @@ from powdrr_service.obligation_review import (
 from powdrr_service.planning.workflow_ids import slugify_workflow_id
 from powdrr_service.procedrr import ProcessCatalog, parse_and_validate
 from powdrr_service.procedrr_evaluator.evaluator import EvaluationError
+from powdrr_service.procedrr_evaluator.model_client import ProcedrrModelClient
+from powdrr_service.procedrr_evaluator.operations import ProcedrrOperationExecutor
 from powdrr_service.procedrr_evaluator.runtime import ProcedrrExecutionService
 from powdrr_service.resources import bundled_process_directory
 from powdrr_service.structrr.active_intent import (
@@ -152,8 +154,6 @@ from powdrr_lift.workrr.postrun_probes import (
     required_probe_coverage_gaps,
     run_postrun_probes,
 )
-from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
-from powdrr_lift.workrr.procedrr_operations import WorkrrOperationExecutor
 from powdrr_lift.workrr.protocol import WorkflowLLMClient
 from powdrr_lift.workrr.run_artifacts import (
     RunFailure,
@@ -336,7 +336,7 @@ def _load_procedrr_replay_responses(
                 for message in messages
             ):
                 replay_responses[
-                    WorkrrProcedrrClient.replay_key(
+                    ProcedrrModelClient.replay_key(
                         [dict(message) for message in messages]
                     )
                 ] = dict(record["value"])
@@ -579,7 +579,7 @@ def _execute_procedrr_flow(
             and isinstance(event.data.get("messages"), list)
         )
         replay_key = (
-            WorkrrProcedrrClient.replay_key(event.data["messages"])
+            ProcedrrModelClient.replay_key(event.data["messages"])
             if is_redacted_search_judge
             else None
         )
@@ -719,7 +719,7 @@ def _execute_procedrr_flow(
 
         return dispatch
 
-    operation_executor = WorkrrOperationExecutor(
+    operation_executor = ProcedrrOperationExecutor(
         {
             name: operation_handler(name)
             for name in ("gather_context", "edit", "yaml_edit", "internal")
@@ -734,7 +734,7 @@ def _execute_procedrr_flow(
         )
     try:
         flow_directory = flow_path.parent
-        planning_client = WorkrrProcedrrClient(
+        planning_client = ProcedrrModelClient(
             config.planning_client,
             process_directory=flow_directory,
             replay_responses=replay_responses,
@@ -744,7 +744,7 @@ def _execute_procedrr_flow(
         if classifier_client is None:
             classifier_judge_client = planning_client
         else:
-            classifier_judge_client = WorkrrProcedrrClient(
+            classifier_judge_client = ProcedrrModelClient(
                 classifier_client,
                 process_directory=flow_directory,
                 replay_responses=replay_responses,

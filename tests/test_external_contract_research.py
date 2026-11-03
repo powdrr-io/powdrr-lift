@@ -23,10 +23,10 @@ from powdrr_service.external_contract_research import (
 )
 from powdrr_service.procedrr.parser import parse_and_validate
 from powdrr_service.procedrr_evaluator import Evaluator
+from powdrr_service.procedrr_evaluator.model_client import ProcedrrModelClient
 from powdrr_service.resources import bundled_process_directory
 
 from powdrr_lift.workrr.command_catalog import feature_command_catalog
-from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
 
 
 def test_external_research_has_no_legacy_agent_module() -> None:
@@ -786,10 +786,10 @@ def test_external_research_gate_and_evidence_control_model_calls(
 
     planning = Planning()
     evaluator = Evaluator(
-        WorkrrProcedrrClient(planning, process_directory=process_directory),
+        ProcedrrModelClient(planning, process_directory=process_directory),
         execute,
         judge_clients={
-            "jev": WorkrrProcedrrClient(
+            "jev": ProcedrrModelClient(
                 JevSemanticClassifierClient(planning, api_key="test-key"),
                 process_directory=process_directory,
             ),

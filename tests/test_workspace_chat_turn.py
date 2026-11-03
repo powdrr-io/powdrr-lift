@@ -10,11 +10,11 @@ from typing import Any
 
 from powdrr_contracts.workspace import EventType, QuestionState, TurnState
 from powdrr_local.workspace import WorkspaceStore
+from powdrr_service.procedrr_evaluator.model_client import ProcedrrModelClient
 from powdrr_service.resources import bundled_process_directory
 
 from powdrr_lift.workrr import procedrr_chat
 from powdrr_lift.workrr.chat_config import WorkflowChatConfig
-from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
 from powdrr_lift.workrr.workspace_chat_turn import (
     WorkspaceChatTurnDispatcher,
     WorkspaceChatTurnRunner,
@@ -83,7 +83,7 @@ def test_workspace_turn_runs_and_resumes_procedrr_chat(
         message_id="user-one",
         content="Configure the deployment.",
     )
-    client = WorkrrProcedrrClient(
+    client = ProcedrrModelClient(
         SelectingProvider(),  # type: ignore[arg-type]
         process_directory=process_dir,
         provider_retry_attempts=0,

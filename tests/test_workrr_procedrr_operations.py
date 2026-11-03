@@ -9,9 +9,8 @@ from powdrr_service.procedrr.command_catalog import (
     CommandSpec,
     object_schema,
 )
-
-from powdrr_lift.errors import PowdrrExecutionError
-from powdrr_lift.workrr.procedrr_operations import WorkrrOperationExecutor
+from powdrr_service.procedrr_evaluator import EvaluationError
+from powdrr_service.procedrr_evaluator.operations import ProcedrrOperationExecutor
 
 
 def test_executor_dispatches_only_to_caller_authorized_handler() -> None:
@@ -21,11 +20,11 @@ def test_executor_dispatches_only_to_caller_authorized_handler() -> None:
         calls.append(dict(parameters))
         return "ok"
 
-    executor = WorkrrOperationExecutor({"read_document": read_document})
+    executor = ProcedrrOperationExecutor({"read_document": read_document})
 
     assert executor("read_document", {"file_path": "README.md"}) == "ok"
     assert calls == [{"file_path": "README.md"}]
-    with pytest.raises(PowdrrExecutionError, match="unsupported operation"):
+    with pytest.raises(EvaluationError, match="unsupported operation"):
         executor("shell", {"command": ["echo", "unsafe"]})
 
 
@@ -45,12 +44,12 @@ def test_executor_validates_internal_command_before_dispatch() -> None:
         calls.append(dict(parameters))
         return {"ok": True}
 
-    executor = WorkrrOperationExecutor(
+    executor = ProcedrrOperationExecutor(
         {"internal": dispatch_internal},
         command_catalog=catalog,
     )
 
-    with pytest.raises(PowdrrExecutionError, match="parameters do not match"):
+    with pytest.raises(EvaluationError, match="parameters do not match"):
         executor("internal", {"command": ["approved-command"], "value": 7})
     assert calls == []
 
@@ -61,7 +60,7 @@ def test_executor_validates_internal_command_before_dispatch() -> None:
 
 
 def test_executor_rejects_malformed_internal_command() -> None:
-    executor = WorkrrOperationExecutor({"internal": lambda _parameters: None})
+    executor = ProcedrrOperationExecutor({"internal": lambda _parameters: None})
 
-    with pytest.raises(PowdrrExecutionError, match="non-empty list"):
+    with pytest.raises(EvaluationError, match="non-empty list"):
         executor("internal", {"command": []})

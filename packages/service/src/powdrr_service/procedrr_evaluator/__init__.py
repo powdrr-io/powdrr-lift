@@ -1,4 +1,4 @@
-"""Agent-side evaluator for testing procedrr declarations."""
+"""Service-side runtime for validated Procedrr processes."""
 
 from powdrr_service.procedrr_evaluator.evaluator import (
     EvaluationCheckpoint,
@@ -8,6 +8,11 @@ from powdrr_service.procedrr_evaluator.evaluator import (
     OperationExecutor,
     SuspendEvaluation,
 )
+from powdrr_service.procedrr_evaluator.model_client import (
+    ProcedrrModelClient,
+    ProcedrrResponseError,
+)
+from powdrr_service.procedrr_evaluator.operations import ProcedrrOperationExecutor
 from powdrr_service.procedrr_evaluator.runtime import (
     ProcedrrExecutionService,
     ProcessExecutionCheckpoint,
@@ -28,4 +33,7 @@ __all__ = [
     "ProcessExecutionResult",
     "ProcessTerminalStatus",
     "ProcedrrExecutionService",
+    "ProcedrrModelClient",
+    "ProcedrrOperationExecutor",
+    "ProcedrrResponseError",
 ]

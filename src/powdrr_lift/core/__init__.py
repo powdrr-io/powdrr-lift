@@ -215,13 +215,15 @@ from powdrr_lift.core.pr_specification import (
     validate_pr_specification_yaml,
 )
 from powdrr_lift.core.system_specification import (
-    SystemSpecificationValidationIssue,
-    SystemSpecificationValidationReport,
-    build_system_specification_validation_report,
     create_system_specification_template,
     render_system_specification_template,
     system_specification_default_output_path,
     validate_system_specification_yaml,
+)
+from powdrr_service.specifications.system import (
+    SystemSpecificationValidationIssue,
+    SystemSpecificationValidationReport,
+    build_system_specification_validation_report,
 )
 from powdrr_lift.core.template import (
     create_change_log_template,
@@ -242,6 +244,7 @@ _INDEX = "powdrr_lift.core.index"
 _PR_ANALYSIS = "powdrr_lift.core.pr_analysis"
 _PR_SPECIFICATION = "powdrr_lift.core.pr_specification"
 _SYSTEM = "powdrr_lift.core.system_specification"
+_SYSTEM_POLICY = "powdrr_service.specifications.system"
 _TEMPLATE = "powdrr_lift.core.template"
 _VALIDATE = "powdrr_lift.core.validate"
 
@@ -282,8 +285,8 @@ _EXPORTS: dict[str, str] = {
     "ArchitectureSpecificationValidationReport": _ARCHITECTURE,
     "ImplementationSpecificationValidationIssue": _IMPLEMENTATION,
     "ImplementationSpecificationValidationReport": _IMPLEMENTATION,
-    "SystemSpecificationValidationIssue": _SYSTEM,
-    "SystemSpecificationValidationReport": _SYSTEM,
+    "SystemSpecificationValidationIssue": _SYSTEM_POLICY,
+    "SystemSpecificationValidationReport": _SYSTEM_POLICY,
     "PRSpecificationValidationIssue": _PR_SPECIFICATION,
     "PRSpecificationValidationReport": _PR_SPECIFICATION,
     "ProposedPRSearchReport": _PR_SPECIFICATION,
@@ -326,7 +329,7 @@ _EXPORTS: dict[str, str] = {
     "build_invariants_report": _CODEBASE_STATE,
     "build_implementation_specification_validation_report": _IMPLEMENTATION,
     "build_pr_specification_validation_report": _PR_SPECIFICATION,
-    "build_system_specification_validation_report": _SYSTEM,
+    "build_system_specification_validation_report": _SYSTEM_POLICY,
     "build_changelog_index": _INDEX,
     "build_changelog_index_at_ref": _INDEX,
     "build_repo_tree": _BLAME_VIEW,

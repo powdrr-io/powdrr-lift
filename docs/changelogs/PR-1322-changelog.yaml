@@ -1,0 +1,407 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1322
+title: Move system specification validation policy to service
+intent:
+  problem: System-specification semantic validation still lived in an agent core module alongside local
+    template and repository code.
+  goal: Move system-specification content validation to the service while keeping template file operations
+    and CLI report formatting in the agent.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 801
+    end_line: 802
+  summary: Update ownership records and import edges for service-owned system specification validation.
+  rationale: Keep the architecture inventory aligned with the extraction.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 921
+    end_line: 921
+  summary: Update ownership records and import edges for service-owned system specification validation.
+  rationale: Keep the architecture inventory aligned with the extraction.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 925
+    end_line: 926
+  summary: Update ownership records and import edges for service-owned system specification validation.
+  rationale: Keep the architecture inventory aligned with the extraction.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 998
+    end_line: 998
+  summary: Update ownership records and import edges for service-owned system specification validation.
+  rationale: Keep the architecture inventory aligned with the extraction.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 1008
+    end_line: 1008
+  summary: Update ownership records and import edges for service-owned system specification validation.
+  rationale: Keep the architecture inventory aligned with the extraction.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 1064
+    end_line: 1065
+  summary: Update ownership records and import edges for service-owned system specification validation.
+  rationale: Keep the architecture inventory aligned with the extraction.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 1504
+    end_line: 1505
+  summary: Update ownership records and import edges for service-owned system specification validation.
+  rationale: Keep the architecture inventory aligned with the extraction.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 1510
+    end_line: 1510
+  summary: Update ownership records and import edges for service-owned system specification validation.
+  rationale: Keep the architecture inventory aligned with the extraction.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 1626
+    end_line: 1626
+  summary: Update ownership records and import edges for service-owned system specification validation.
+  rationale: Keep the architecture inventory aligned with the extraction.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 1646
+    end_line: 1648
+  summary: Update ownership records and import edges for service-owned system specification validation.
+  rationale: Keep the architecture inventory aligned with the extraction.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3757
+    end_line: 3776
+  summary: Update ownership records and import edges for service-owned system specification validation.
+  rationale: Keep the architecture inventory aligned with the extraction.
+- path: docs/plans/agent-service-code-split.md
+  type: modified
+  span:
+    start_line: 495
+    end_line: 498
+  summary: Record the completed system-specification policy extraction and remaining validators.
+  rationale: Keep the split plan aligned with implemented ownership.
+- path: docs/project_structure/project-structure.yaml
+  type: modified
+  span:
+    start_line: 29
+    end_line: 32
+  summary: Add the service system-specification policy module.
+  rationale: Document service ownership in the project structure.
+- path: packages/service/src/powdrr_service/specifications/__init__.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 13
+  summary: Expose system-specification validation policy from the service package.
+  rationale: Provide a stable service API.
+- path: packages/service/src/powdrr_service/specifications/system.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 634
+  summary: Implement system-specification YAML validation using content only.
+  rationale: Move proprietary semantic validation rules into the service.
+- path: scripts/build-agent-service-ownership-inventory.py
+  type: modified
+  span:
+    start_line: 87
+    end_line: 92
+  summary: Include service specification modules in ownership classification and discovery.
+  rationale: Keep generated inventories complete.
+- path: scripts/build-agent-service-ownership-inventory.py
+  type: modified
+  span:
+    start_line: 275
+    end_line: 275
+  summary: Include service specification modules in ownership classification and discovery.
+  rationale: Keep generated inventories complete.
+- path: src/powdrr_lift/__init__.py
+  type: modified
+  span:
+    start_line: 245
+    end_line: 250
+  summary: Route public system validation models and builder to service.
+  rationale: Keep public policy exports service-owned.
+- path: src/powdrr_lift/__init__.py
+  type: modified
+  span:
+    start_line: 294
+    end_line: 296
+  summary: Route public system validation models and builder to service.
+  rationale: Keep public policy exports service-owned.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 34
+    end_line: 36
+  summary: Invoke service system validation while keeping repository evidence collection local.
+  rationale: Keep filesystem evidence out of service policy.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 58
+    end_line: 60
+  summary: Invoke service system validation while keeping repository evidence collection local.
+  rationale: Keep filesystem evidence out of service policy.
+- path: src/powdrr_lift/change_log_validation.py
+  type: modified
+  span:
+    start_line: 1056
+    end_line: 1056
+  summary: Invoke service system validation while keeping repository evidence collection local.
+  rationale: Keep filesystem evidence out of service policy.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 56
+    end_line: 58
+  summary: Call service validation without passing local repository metadata.
+  rationale: Keep the service operation content-only.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 82
+    end_line: 82
+  summary: Call service validation without passing local repository metadata.
+  rationale: Keep the service operation content-only.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 4890
+    end_line: 4891
+  summary: Call service validation without passing local repository metadata.
+  rationale: Keep the service operation content-only.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 5436
+    end_line: 5437
+  summary: Call service validation without passing local repository metadata.
+  rationale: Keep the service operation content-only.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 5441
+    end_line: 5442
+  summary: Call service validation without passing local repository metadata.
+  rationale: Keep the service operation content-only.
+- path: src/powdrr_lift/core/__init__.py
+  type: modified
+  span:
+    start_line: 218
+    end_line: 220
+  summary: Route system validation exports to the service package.
+  rationale: Remove the agent core module as policy owner.
+- path: src/powdrr_lift/core/__init__.py
+  type: modified
+  span:
+    start_line: 223
+    end_line: 227
+  summary: Route system validation exports to the service package.
+  rationale: Remove the agent core module as policy owner.
+- path: src/powdrr_lift/core/__init__.py
+  type: modified
+  span:
+    start_line: 247
+    end_line: 247
+  summary: Route system validation exports to the service package.
+  rationale: Remove the agent core module as policy owner.
+- path: src/powdrr_lift/core/__init__.py
+  type: modified
+  span:
+    start_line: 288
+    end_line: 289
+  summary: Route system validation exports to the service package.
+  rationale: Remove the agent core module as policy owner.
+- path: src/powdrr_lift/core/__init__.py
+  type: modified
+  span:
+    start_line: 332
+    end_line: 332
+  summary: Route system validation exports to the service package.
+  rationale: Remove the agent core module as policy owner.
+- path: src/powdrr_lift/core/system_specification.py
+  type: modified
+  span:
+    start_line: 4
+    end_line: 5
+  summary: Retain local template and report formatting while removing semantic validation rules.
+  rationale: Keep filesystem behavior local and policy in service.
+- path: src/powdrr_lift/core/system_specification.py
+  type: modified
+  span:
+    start_line: 7
+    end_line: 7
+  summary: Retain local template and report formatting while removing semantic validation rules.
+  rationale: Keep filesystem behavior local and policy in service.
+- path: src/powdrr_lift/core/system_specification.py
+  type: modified
+  span:
+    start_line: 10
+    end_line: 10
+  summary: Retain local template and report formatting while removing semantic validation rules.
+  rationale: Keep filesystem behavior local and policy in service.
+- path: src/powdrr_lift/core/system_specification.py
+  type: modified
+  span:
+    start_line: 23
+    end_line: 37
+  summary: Retain local template and report formatting while removing semantic validation rules.
+  rationale: Keep filesystem behavior local and policy in service.
+- path: src/powdrr_lift/core/system_specification.py
+  type: modified
+  span:
+    start_line: 20
+    end_line: 28
+  summary: Retain local template and report formatting while removing semantic validation rules.
+  rationale: Keep filesystem behavior local and policy in service.
+- path: src/powdrr_lift/core/system_specification.py
+  type: modified
+  span:
+    start_line: 30
+    end_line: 48
+  summary: Retain local template and report formatting while removing semantic validation rules.
+  rationale: Keep filesystem behavior local and policy in service.
+- path: src/powdrr_lift/core/system_specification.py
+  type: modified
+  span:
+    start_line: 137
+    end_line: 768
+  summary: Retain local template and report formatting while removing semantic validation rules.
+  rationale: Keep filesystem behavior local and policy in service.
+- path: src/powdrr_lift/execution/acceptance.py
+  type: modified
+  span:
+    start_line: 19
+    end_line: 21
+  summary: Use service-owned validation in acceptance checks.
+  rationale: Keep acceptance aligned with service policy.
+- path: src/powdrr_lift/execution/acceptance.py
+  type: modified
+  span:
+    start_line: 31
+    end_line: 33
+  summary: Use service-owned validation in acceptance checks.
+  rationale: Keep acceptance aligned with service policy.
+- path: src/powdrr_lift/execution/acceptance.py
+  type: modified
+  span:
+    start_line: 999
+    end_line: 1000
+  summary: Use service-owned validation in acceptance checks.
+  rationale: Keep acceptance aligned with service policy.
+- path: src/powdrr_lift/mcp_server.py
+  type: modified
+  span:
+    start_line: 615
+    end_line: 616
+  summary: Make system validation a content-only MCP operation.
+  rationale: Avoid passing unused repository context.
+- path: src/powdrr_lift/mcp_server.py
+  type: modified
+  span:
+    start_line: 618
+    end_line: 618
+  summary: Make system validation a content-only MCP operation.
+  rationale: Avoid passing unused repository context.
+- path: src/powdrr_lift/mcp_server.py
+  type: modified
+  span:
+    start_line: 621
+    end_line: 622
+  summary: Make system validation a content-only MCP operation.
+  rationale: Avoid passing unused repository context.
+- path: tests/test_agent_service_contracts.py
+  type: modified
+  span:
+    start_line: 269
+    end_line: 303
+  summary: Assert service isolation and public builder routing.
+  rationale: Prevent validation policy from returning to agent modules.
+- path: tests/test_system_specification.py
+  type: modified
+  span:
+    start_line: 8
+    end_line: 10
+  summary: Exercise system-specification validation through the service API.
+  rationale: Verify behavior at its owning boundary.
+- path: tests/test_system_specification.py
+  type: modified
+  span:
+    start_line: 9
+    end_line: 9
+  summary: Exercise system-specification validation through the service API.
+  rationale: Verify behavior at its owning boundary.
+- path: tests/test_system_specification.py
+  type: modified
+  span:
+    start_line: 167
+    end_line: 167
+  summary: Exercise system-specification validation through the service API.
+  rationale: Verify behavior at its owning boundary.
+- path: tests/test_system_specification.py
+  type: modified
+  span:
+    start_line: 202
+    end_line: 202
+  summary: Exercise system-specification validation through the service API.
+  rationale: Verify behavior at its owning boundary.
+- path: tests/test_system_specification.py
+  type: modified
+  span:
+    start_line: 225
+    end_line: 225
+  summary: Exercise system-specification validation through the service API.
+  rationale: Verify behavior at its owning boundary.
+- path: tests/test_system_specification.py
+  type: modified
+  span:
+    start_line: 253
+    end_line: 253
+  summary: Exercise system-specification validation through the service API.
+  rationale: Verify behavior at its owning boundary.
+- path: tests/test_system_specification.py
+  type: modified
+  span:
+    start_line: 282
+    end_line: 282
+  summary: Exercise system-specification validation through the service API.
+  rationale: Verify behavior at its owning boundary.
+- path: tests/test_system_specification.py
+  type: modified
+  span:
+    start_line: 316
+    end_line: 316
+  summary: Exercise system-specification validation through the service API.
+  rationale: Verify behavior at its owning boundary.
+- path: tests/test_system_specification.py
+  type: modified
+  span:
+    start_line: 331
+    end_line: 331
+  summary: Exercise system-specification validation through the service API.
+  rationale: Verify behavior at its owning boundary.
+- path: tests/test_system_specification.py
+  type: modified
+  span:
+    start_line: 358
+    end_line: 358
+  summary: Exercise system-specification validation through the service API.
+  rationale: Verify behavior at its owning boundary.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []

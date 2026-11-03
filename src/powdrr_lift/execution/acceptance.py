@@ -16,6 +16,9 @@ from typing import Any
 
 from powdrr_service.procedrr import ProcessCatalog
 from powdrr_service.resources import bundled_process_directory
+from powdrr_service.specifications.system import (
+    build_system_specification_validation_report,
+)
 
 from powdrr_lift.core.architecture_specification import (
     build_architecture_specification_validation_report,
@@ -28,9 +31,6 @@ from powdrr_lift.core.implementation_specification import (
     build_implementation_specification_validation_report,
 )
 from powdrr_lift.core.pr_specification import build_pr_specification_validation_report
-from powdrr_lift.core.system_specification import (
-    build_system_specification_validation_report,
-)
 from powdrr_lift.core.tool_manifest import ToolEffect, ToolManifest
 from powdrr_lift.errors import (
     ExecutionCancelled,
@@ -996,8 +996,6 @@ risks:
     )
     system_report = build_system_specification_validation_report(
         system_path.read_text(encoding="utf-8"),
-        work_item_name="acceptance-feature",
-        repo_root=artifact_root,
     )
     architecture_report = build_architecture_specification_validation_report(
         architecture_path.read_text(encoding="utf-8"),

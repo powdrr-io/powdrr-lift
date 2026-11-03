@@ -26,6 +26,10 @@ modules:
     action: added
     relative_location: packages/service/src/powdrr_service/changelog/
     purpose: Service-owned changelog parsing, rendering, validation rules, and structured-document envelope checks.
+  - id: powdrr-lift-system-specification-policy
+    action: added
+    relative_location: packages/service/src/powdrr_service/specifications/
+    purpose: Service-owned semantic validation for system-specification content.
   - id: powdrr-lift-tests
     action: added
     relative_location: tests/

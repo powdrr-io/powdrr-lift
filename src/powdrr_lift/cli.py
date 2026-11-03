@@ -53,6 +53,9 @@ from powdrr_service.providers.config import (
 )
 from powdrr_service.providers.credentials import resolve_provider_credentials
 from powdrr_service.resources import bundled_process_directory
+from powdrr_service.specifications.system import (
+    build_system_specification_validation_report,
+)
 from powdrr_service.structrr.intent_lineage import audit_intent_lineage
 from powdrr_service.structrr.rebase import rebase_structrr_snapshot
 from powdrr_service.structrr.verification_health import (
@@ -79,7 +82,6 @@ from powdrr_lift.core import (
     build_implementation_specification_validation_report,
     build_invariants_report,
     build_pr_specification_validation_report,
-    build_system_specification_validation_report,
     codebase_state_default_output_path,
     create_architecture_specification_template,
     create_change_log_template,
@@ -4887,8 +4889,6 @@ def _validate_pr_file_specification(
     if kind == "system":
         report = validate_system_specification_yaml(
             proposed_yaml,
-            work_item_name=work_item_name,
-            repo_root=repo_root,
             file_path=path,
         )
     elif kind == "architecture":
@@ -5433,13 +5433,9 @@ def _run_evaluate_specification(args: argparse.Namespace) -> int:
             if kind == "system":
                 validation_successful = build_system_specification_validation_report(
                     proposed_yaml,
-                    work_item_name=work_item_name,
-                    repo_root=repo_root,
                 ).validation_successful
                 report_yaml = validate_system_specification_yaml(
                     proposed_yaml,
-                    work_item_name=work_item_name,
-                    repo_root=repo_root,
                     file_path=specification_path,
                 )
             elif kind == "architecture":

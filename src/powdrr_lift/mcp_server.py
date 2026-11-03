@@ -612,14 +612,9 @@ def build_server() -> Any:
     @server.tool()
     def validate_system_specification(
         system_specification_yaml: str,
-        work_item_name: str,
-        repo_root: str | None = None,
     ) -> str:
-        repo_root_path = resolve_repo_root(repo_root)
         return validate_system_specification_yaml(
             system_specification_yaml,
-            work_item_name=work_item_name,
-            repo_root=repo_root_path,
         )
 
     @server.tool()

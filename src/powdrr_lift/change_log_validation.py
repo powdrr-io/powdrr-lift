@@ -31,6 +31,9 @@ from powdrr_service.changelog.validation_policy import (
     validate_v2_lifecycle_item,
     validate_v2_state_change,
 )
+from powdrr_service.specifications.system import (
+    build_system_specification_validation_report,
+)
 
 from powdrr_lift.change_log_template import (
     BranchDiffEntry,
@@ -55,9 +58,6 @@ from powdrr_lift.core.pr_specification import (
     build_pr_specification_validation_report,
 )
 from powdrr_lift.core.spec_paths import SPECIFICATION_SCHEMA_URL
-from powdrr_lift.core.system_specification import (
-    build_system_specification_validation_report,
-)
 from powdrr_lift.core.validation_messages import (
     ValidationError,
     validation_error_to_data,
@@ -1053,7 +1053,6 @@ def _validate_v2_structured_file_specification(
     if structured_file_name == "system-specification.yaml":
         system_report = build_system_specification_validation_report(
             raw_yaml,
-            work_item_name=work_item_name,
         )
         issues.extend(
             ValidationIssue(code=issue.code, message=issue.message, path=issue.path)

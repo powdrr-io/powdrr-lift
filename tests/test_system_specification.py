@@ -5,8 +5,10 @@ from contextlib import redirect_stdout
 from pathlib import Path
 
 import yaml
+from powdrr_service.specifications.system import (
+    build_system_specification_validation_report,
+)
 
-from powdrr_lift import build_system_specification_validation_report
 from powdrr_lift.cli import main
 from powdrr_lift.core import system_specification_default_output_path
 from powdrr_lift.core.system_specification import create_system_specification_template
@@ -164,7 +166,6 @@ def test_validate_system_specification_reports_errors() -> None:
 
     report = build_system_specification_validation_report(
         proposed_spec,
-        work_item_name="powdrr-lift",
     )
 
     assert report.validation_successful is False
@@ -199,7 +200,6 @@ def test_validate_system_specification_flags_boilerplate() -> None:
 
     report = build_system_specification_validation_report(
         proposed_spec,
-        work_item_name="powdrr-lift",
     )
 
     assert report.validation_successful is False
@@ -222,7 +222,6 @@ def test_validate_system_specification_rejects_template_instructions() -> None:
 
     report = build_system_specification_validation_report(
         proposed_spec,
-        work_item_name="powdrr-lift",
     )
 
     assert report.validation_successful is False
@@ -250,7 +249,6 @@ def test_validate_system_specification_reports_duplicate_keys() -> None:
 
     report = build_system_specification_validation_report(
         proposed_spec,
-        work_item_name="powdrr-lift",
     )
 
     assert report.validation_successful is False
@@ -279,7 +277,6 @@ def test_validate_system_specification_flags_empty_optional_values() -> None:
 
     report = build_system_specification_validation_report(
         proposed_spec,
-        work_item_name="powdrr-lift",
     )
 
     assert report.validation_successful is False
@@ -313,7 +310,6 @@ def test_validate_system_specification_reports_success_for_valid_spec() -> None:
 
     report = build_system_specification_validation_report(
         proposed_spec,
-        work_item_name="powdrr-lift",
     )
 
     assert report.validation_successful is True
@@ -328,7 +324,6 @@ def test_validate_system_specification_allows_sparse_spec() -> None:
 
     report = build_system_specification_validation_report(
         proposed_spec,
-        work_item_name="powdrr-lift",
     )
 
     assert report.validation_successful is True
@@ -355,7 +350,6 @@ def test_validate_system_specification_reports_duplicate_ids_across_sections() -
 
     report = build_system_specification_validation_report(
         proposed_spec,
-        work_item_name="powdrr-lift",
     )
 
     assert report.validation_successful is False

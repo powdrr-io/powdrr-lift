@@ -798,7 +798,8 @@
         "powdrr_lift.core.index",
         "powdrr_lift.core.plan_diff_specification",
         "powdrr_lift.core.pr_specification",
-        "powdrr_lift.core.system_specification"
+        "powdrr_lift.core.system_specification",
+        "powdrr_service.specifications.system"
       ],
       "kind": "python_module",
       "owner": "split",
@@ -918,12 +919,11 @@
         "powdrr_lift.core.index",
         "powdrr_lift.core.pr_specification",
         "powdrr_lift.core.spec_paths",
-        "powdrr_lift.core.system_specification",
         "powdrr_lift.core.validation_messages",
         "powdrr_service.changelog",
         "powdrr_service.changelog.template",
-        "powdrr_service.changelog.structured_document",
-        "powdrr_service.changelog.validation_policy"
+        "powdrr_service.changelog.validation_policy",
+        "powdrr_service.specifications.system"
       ],
       "kind": "python_module",
       "owner": "split",
@@ -995,6 +995,7 @@
         "powdrr_lift.workrr.scenario",
         "powdrr_lift.workrr.task_agent",
         "powdrr_lift.workrr.workflow_provider_selection",
+        "powdrr_lift.workrr.workspace_launch",
         "powdrr_service.evaluations.deepswe_design_evaluation",
         "powdrr_service.evaluations.deepswe_probe_evaluation",
         "powdrr_service.evaluations.prompt_benchmark_comparison",
@@ -1004,6 +1005,7 @@
         "powdrr_service.providers.config",
         "powdrr_service.providers.credentials",
         "powdrr_service.resources",
+        "powdrr_service.specifications.system",
         "powdrr_service.structrr.intent_lineage",
         "powdrr_service.structrr.rebase",
         "powdrr_service.structrr.verification_health"
@@ -1059,7 +1061,8 @@
         "powdrr_lift.core.template",
         "powdrr_lift.core.tool_manifest",
         "powdrr_lift.core.validate",
-        "powdrr_lift.structrr.intent"
+        "powdrr_lift.structrr.intent",
+        "powdrr_service.specifications.system"
       ],
       "kind": "python_module",
       "owner": "split",
@@ -1498,12 +1501,13 @@
         "powdrr_lift.core.repo",
         "powdrr_lift.core.spec_paths",
         "powdrr_lift.core.template_generation",
-        "powdrr_lift.core.validation_messages"
+        "powdrr_lift.core.validation_messages",
+        "powdrr_service.specifications.system"
       ],
       "kind": "python_module",
       "owner": "split",
       "path": "src/powdrr_lift/core/system_specification.py",
-      "rationale": "classify each symbol as service policy or public exchanged data",
+      "rationale": "agent owns template file operations and CLI report formatting; service owns system-specification validation policy",
       "reviewed": false
     },
     {
@@ -1623,7 +1627,6 @@
         "powdrr_lift.core.execution_state",
         "powdrr_lift.core.implementation_specification",
         "powdrr_lift.core.pr_specification",
-        "powdrr_lift.core.system_specification",
         "powdrr_lift.core.tool_manifest",
         "powdrr_lift.errors",
         "powdrr_lift.execution",
@@ -1640,7 +1643,9 @@
         "powdrr_lift.workrr.observer",
         "powdrr_lift.workrr.procedrr_chat",
         "powdrr_lift.workrr.scenario",
-        "powdrr_service.procedrr"
+        "powdrr_service.procedrr",
+        "powdrr_service.resources",
+        "powdrr_service.specifications.system"
       ],
       "kind": "python_module",
       "owner": "split",
@@ -3747,6 +3752,26 @@
       "owner": "service",
       "path": "packages/service/src/powdrr_service/changelog/structured_document.py",
       "rationale": "service-owned YAML parsing, schema-envelope validation, and changelog issue normalization for structured-document content",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [
+        "powdrr_service.specifications.system"
+      ],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/specifications/__init__.py",
+      "rationale": "public service exports for structured-specification validation policy",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/specifications/system.py",
+      "rationale": "service-owned system-specification semantic validation over supplied YAML content",
       "reviewed": false
     },
     {

@@ -1,0 +1,323 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1349
+title: Compact source extraction batches
+intent:
+  problem: Source extraction repeated block-specific cursor lists in each otherwise identical question
+    contract, reducing the amount of useful work that fit into provider batches.
+  goal: Share stable extraction instructions once per batch while retaining digest-bound cursor candidates
+    and strict per-block answer validation.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/plans/planning-efficiency-deterministic-filtering.md
+  type: modified
+  span:
+    start_line: 31
+    end_line: 31
+  summary: Record extraction batch compaction and measured large-run results.
+  rationale: Keep the outcome and live-run limits alongside the planning optimization.
+- path: docs/plans/planning-efficiency-deterministic-filtering.md
+  type: modified
+  span:
+    start_line: 204
+    end_line: 204
+  summary: Record extraction batch compaction and measured large-run results.
+  rationale: Keep the outcome and live-run limits alongside the planning optimization.
+- path: docs/plans/planning-efficiency-deterministic-filtering.md
+  type: modified
+  span:
+    start_line: 582
+    end_line: 605
+  summary: Record extraction batch compaction and measured large-run results.
+  rationale: Keep the outcome and live-run limits alongside the planning optimization.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 37
+    end_line: 37
+  summary: Version work-unit proposals with an explicit per-unit requirement cap.
+  rationale: Keep proposal schemas, strict parsing, and durable question identity aligned.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 96
+    end_line: 96
+  summary: Version work-unit proposals with an explicit per-unit requirement cap.
+  rationale: Keep proposal schemas, strict parsing, and durable question identity aligned.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 371
+    end_line: 371
+  summary: Version work-unit proposals with an explicit per-unit requirement cap.
+  rationale: Keep proposal schemas, strict parsing, and durable question identity aligned.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 827
+    end_line: 827
+  summary: Version work-unit proposals with an explicit per-unit requirement cap.
+  rationale: Keep proposal schemas, strict parsing, and durable question identity aligned.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 829
+    end_line: 829
+  summary: Version work-unit proposals with an explicit per-unit requirement cap.
+  rationale: Keep proposal schemas, strict parsing, and durable question identity aligned.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 831
+    end_line: 831
+  summary: Version work-unit proposals with an explicit per-unit requirement cap.
+  rationale: Keep proposal schemas, strict parsing, and durable question identity aligned.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 833
+    end_line: 833
+  summary: Version work-unit proposals with an explicit per-unit requirement cap.
+  rationale: Keep proposal schemas, strict parsing, and durable question identity aligned.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 874
+    end_line: 874
+  summary: Version work-unit proposals with an explicit per-unit requirement cap.
+  rationale: Keep proposal schemas, strict parsing, and durable question identity aligned.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 1474
+    end_line: 1479
+  summary: Version work-unit proposals with an explicit per-unit requirement cap.
+  rationale: Keep proposal schemas, strict parsing, and durable question identity aligned.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 1481
+    end_line: 1481
+  summary: Version work-unit proposals with an explicit per-unit requirement cap.
+  rationale: Keep proposal schemas, strict parsing, and durable question identity aligned.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 1165
+    end_line: 1165
+  summary: Recognize the versioned work-unit proposal question identity.
+  rationale: Ensure proposal-answer reconstruction follows the updated contract.
+- path: packages/service/src/powdrr_service/planning/source.py
+  type: modified
+  span:
+    start_line: 779
+    end_line: 781
+  summary: Move pagination candidates into digest-bound per-block context.
+  rationale: Allow stable extraction instructions to be shared while each parser remains bound to its
+    own cursor candidates.
+- path: packages/service/src/powdrr_service/planning/source.py
+  type: modified
+  span:
+    start_line: 809
+    end_line: 817
+  summary: Move pagination candidates into digest-bound per-block context.
+  rationale: Allow stable extraction instructions to be shared while each parser remains bound to its
+    own cursor candidates.
+- path: packages/service/src/powdrr_service/planning/source.py
+  type: modified
+  span:
+    start_line: 852
+    end_line: 853
+  summary: Move pagination candidates into digest-bound per-block context.
+  rationale: Allow stable extraction instructions to be shared while each parser remains bound to its
+    own cursor candidates.
+- path: packages/service/src/powdrr_service/planning/source.py
+  type: modified
+  span:
+    start_line: 872
+    end_line: 874
+  summary: Move pagination candidates into digest-bound per-block context.
+  rationale: Allow stable extraction instructions to be shared while each parser remains bound to its
+    own cursor candidates.
+- path: scripts/benchmark_planning_scale.py
+  type: modified
+  span:
+    start_line: 34
+    end_line: 34
+  summary: Size benchmark work units using the explicit proposal cap.
+  rationale: Keep synthetic fixture expectations aligned with the production contract.
+- path: scripts/benchmark_planning_scale.py
+  type: modified
+  span:
+    start_line: 81
+    end_line: 82
+  summary: Size benchmark work units using the explicit proposal cap.
+  rationale: Keep synthetic fixture expectations aligned with the production contract.
+- path: tests/test_benchmark_planning_scale.py
+  type: modified
+  span:
+    start_line: 218
+    end_line: 218
+  summary: Update benchmark question fixtures for proposal contract version four.
+  rationale: Exercise diagnostics and response handling against the current durable question identity.
+- path: tests/test_benchmark_planning_scale.py
+  type: modified
+  span:
+    start_line: 220
+    end_line: 220
+  summary: Update benchmark question fixtures for proposal contract version four.
+  rationale: Exercise diagnostics and response handling against the current durable question identity.
+- path: tests/test_benchmark_planning_scale.py
+  type: modified
+  span:
+    start_line: 224
+    end_line: 224
+  summary: Update benchmark question fixtures for proposal contract version four.
+  rationale: Exercise diagnostics and response handling against the current durable question identity.
+- path: tests/test_benchmark_planning_scale.py
+  type: modified
+  span:
+    start_line: 243
+    end_line: 243
+  summary: Update benchmark question fixtures for proposal contract version four.
+  rationale: Exercise diagnostics and response handling against the current durable question identity.
+- path: tests/test_benchmark_planning_scale.py
+  type: modified
+  span:
+    start_line: 259
+    end_line: 259
+  summary: Update benchmark question fixtures for proposal contract version four.
+  rationale: Exercise diagnostics and response handling against the current durable question identity.
+- path: tests/test_benchmark_planning_scale.py
+  type: modified
+  span:
+    start_line: 261
+    end_line: 261
+  summary: Update benchmark question fixtures for proposal contract version four.
+  rationale: Exercise diagnostics and response handling against the current durable question identity.
+- path: tests/test_benchmark_planning_scale.py
+  type: modified
+  span:
+    start_line: 265
+    end_line: 265
+  summary: Update benchmark question fixtures for proposal contract version four.
+  rationale: Exercise diagnostics and response handling against the current durable question identity.
+- path: tests/test_benchmark_planning_scale.py
+  type: modified
+  span:
+    start_line: 473
+    end_line: 475
+  summary: Update benchmark question fixtures for proposal contract version four.
+  rationale: Exercise diagnostics and response handling against the current durable question identity.
+- path: tests/test_benchmark_planning_scale.py
+  type: modified
+  span:
+    start_line: 477
+    end_line: 487
+  summary: Update benchmark question fixtures for proposal contract version four.
+  rationale: Exercise diagnostics and response handling against the current durable question identity.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 10
+    end_line: 10
+  summary: Verify proposal contract versioning and per-unit requirement limits.
+  rationale: Prevent oversized or stale work-unit proposals from passing strict validation.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 449
+    end_line: 451
+  summary: Verify proposal contract versioning and per-unit requirement limits.
+  rationale: Prevent oversized or stale work-unit proposals from passing strict validation.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 593
+    end_line: 623
+  summary: Verify proposal contract versioning and per-unit requirement limits.
+  rationale: Prevent oversized or stale work-unit proposals from passing strict validation.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 880
+    end_line: 880
+  summary: Update replay fixtures for proposal contract version four.
+  rationale: Keep durable recovery tests aligned with current proposal question identities.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 882
+    end_line: 882
+  summary: Update replay fixtures for proposal contract version four.
+  rationale: Keep durable recovery tests aligned with current proposal question identities.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 886
+    end_line: 886
+  summary: Update replay fixtures for proposal contract version four.
+  rationale: Keep durable recovery tests aligned with current proposal question identities.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 903
+    end_line: 903
+  summary: Update replay fixtures for proposal contract version four.
+  rationale: Keep durable recovery tests aligned with current proposal question identities.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 905
+    end_line: 905
+  summary: Update replay fixtures for proposal contract version four.
+  rationale: Keep durable recovery tests aligned with current proposal question identities.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 909
+    end_line: 909
+  summary: Update replay fixtures for proposal contract version four.
+  rationale: Keep durable recovery tests aligned with current proposal question identities.
+- path: tests/test_planning_source.py
+  type: modified
+  span:
+    start_line: 4
+    end_line: 4
+  summary: Verify compact extraction batches preserve per-block cursor validation.
+  rationale: Prove shared instructions omit repeated candidates while each member rejects foreign cursors.
+- path: tests/test_planning_source.py
+  type: modified
+  span:
+    start_line: 11
+    end_line: 14
+  summary: Verify compact extraction batches preserve per-block cursor validation.
+  rationale: Prove shared instructions omit repeated candidates while each member rejects foreign cursors.
+- path: tests/test_planning_source.py
+  type: modified
+  span:
+    start_line: 487
+    end_line: 493
+  summary: Verify compact extraction batches preserve per-block cursor validation.
+  rationale: Prove shared instructions omit repeated candidates while each member rejects foreign cursors.
+- path: tests/test_planning_source.py
+  type: modified
+  span:
+    start_line: 511
+    end_line: 579
+  summary: Verify compact extraction batches preserve per-block cursor validation.
+  rationale: Prove shared instructions omit repeated candidates while each member rejects foreign cursors.
+entities: []
+entity_relationships: []
+invariants:
+- id: extraction-pagination-candidates-are-member-bound
+  description: Every extraction question carries its own digest-bound cursor candidates, and its parser
+    rejects pagination cursors outside that source block.
+  action: added
+- id: work-unit-proposals-have-an-explicit-four-requirement-limit
+  description: Each proposed work unit may cover at most four requirements, enforced by both the schema
+    and parser.
+  action: added
+guidance: []
+features: []
+proposed_prs: []

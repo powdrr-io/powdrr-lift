@@ -1,4 +1,4 @@
-"""Deterministic obligation IDs and coverage checks shared by test workflows."""
+"""Service-owned deterministic obligation IDs and test-coverage checks."""
 
 from __future__ import annotations
 

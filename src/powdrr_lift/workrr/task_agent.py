@@ -89,6 +89,9 @@ from powdrr_service.verification.execute_pr_test_validation import (
     validate_generated_test_files,
     validate_test_correction,
 )
+from powdrr_service.verification.test_obligations import (
+    acceptance_criteria_contract,
+)
 
 from powdrr_lift.basedpyright_tools import is_basedpyright_tool
 from powdrr_lift.core import resolve_repo_root
@@ -215,7 +218,6 @@ from powdrr_lift.workrr.provider_runtime import (
     maybe_record_llm_exchanges,
     resolve_workflow_provider,
 )
-from powdrr_lift.workrr.test_obligations import acceptance_criteria_contract
 
 _TASK_PROMPT_PLACEHOLDER_RE = re.compile(r"<([A-Za-z0-9_-]+)>")
 _TASK_PROMPT_INPUT_REFERENCE_RE = re.compile(r"\binput_state\.([A-Za-z0-9_-]+)\b")

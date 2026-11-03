@@ -1,14 +1,15 @@
-"""Generate and run instruction-derived post-run behavior probes."""
+"""Validate instruction-derived post-run behavior probes and coverage."""
 
 from __future__ import annotations
 
 import ast
 import re
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
 from typing import Any
 
-from powdrr_lift.workrr.test_obligations import missing_obligation_ids
+from powdrr_contracts.verification import PostRunProbe
+
+from powdrr_service.verification.test_obligations import missing_obligation_ids
 
 POSTRUN_PROBE_SCHEMA_VERSION = "instruction-derived-probe-suite-v7"
 
@@ -121,34 +122,6 @@ def _validate_probe_interaction(
         )
     item["evidence_quotes"] = evidence_quotes
     return item
-
-
-@dataclass(frozen=True, slots=True)
-class PostRunProbe:
-    probe_id: str
-    scenario_id: str
-    oracle_basis: str
-    test_source: str
-    function_name: str
-    obligation_id: str = ""
-    obligation_category: str = "other"
-    obligation_rule: str = "not_applicable"
-    interaction_ids: tuple[str, ...] = ()
-    execution_path: str = "sync"
-
-    def to_data(self) -> dict[str, Any]:
-        return {
-            "probe_id": self.probe_id,
-            "scenario_id": self.scenario_id,
-            "oracle_basis": self.oracle_basis,
-            "function_name": self.function_name,
-            "test_source": self.test_source,
-            "obligation_id": self.obligation_id,
-            "obligation_category": self.obligation_category,
-            "obligation_rule": self.obligation_rule,
-            "interaction_ids": list(self.interaction_ids),
-            "execution_path": self.execution_path,
-        }
 
 
 def parse_generated_postrun_probe_source(

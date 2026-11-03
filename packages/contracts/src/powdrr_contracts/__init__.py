@@ -19,6 +19,7 @@ from powdrr_contracts.models import (
 from powdrr_contracts.service import PowdrrService
 from powdrr_contracts.verification import (
     VALIDATION_PROVIDER_INVENTORY_SCHEMA_VERSION,
+    PostRunProbe,
     PostRunProbeResult,
 )
 
@@ -33,6 +34,7 @@ __all__ = [
     "OperationReference",
     "OperationRequest",
     "OperationUpdate",
+    "PostRunProbe",
     "PostRunProbeResult",
     "PowdrrService",
     "RepositorySnapshot",

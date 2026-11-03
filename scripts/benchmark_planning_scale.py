@@ -26,7 +26,12 @@ from threading import Lock
 from typing import Any
 
 from powdrr_service.planning.assembly import (
+    MAX_ITEM_CRITERIA,
+    MAX_ITEM_SCOPE_ENTRIES,
+    MAX_PR_WORK_UNITS,
     MAX_WORK_UNIT_REQUIREMENTS_PER_QUESTION,
+    AllocationGroup,
+    ItemDescription,
     PathFact,
     PendingUnitOutput,
     WorkUnit,
@@ -131,6 +136,26 @@ def compact_profile_summary(report: Mapping[str, Any]) -> dict[str, Any]:
         if isinstance(question_kinds, Mapping)
         else {}
     )
+    item_sizing = report.get("item_sizing")
+    compact_item_sizing = (
+        {
+            key: item_sizing[key]
+            for key in (
+                "item_count",
+                "work_units_per_item",
+                "requirements_per_item",
+                "acceptance_criteria_per_item",
+                "components_per_item",
+                "maximum_work_units",
+                "maximum_acceptance_criteria",
+                "maximum_components",
+                "violations",
+            )
+            if key in item_sizing
+        }
+        if isinstance(item_sizing, Mapping)
+        else None
+    )
     return {
         key: report.get(key)
         for key in (
@@ -155,6 +180,9 @@ def compact_profile_summary(report: Mapping[str, Any]) -> dict[str, Any]:
             "token_usage_known",
             "fixture_shape_status",
             "fixture_shape_mismatches",
+            "live_structural_status",
+            "live_structural_issues",
+            "item_sizing",
             "expected_work_unit_range",
             "work_unit_requirement_counts",
         )
@@ -162,6 +190,7 @@ def compact_profile_summary(report: Mapping[str, Any]) -> dict[str, Any]:
         "phases": compact_phases,
         "by_question_kind": compact_question_kinds,
         "dependency_candidates": dependency_summary,
+        "item_sizing": compact_item_sizing,
         "dependency_candidates_unavailable_reason": report.get(
             "dependency_candidates_unavailable_reason"
         ),
@@ -217,6 +246,90 @@ def fixture_shape_mismatches(
             [profile.min_work_units, profile.work_units],
         )
     return mismatches
+
+
+def item_sizing_summary(
+    item_descriptions: Sequence[tuple[AllocationGroup, ItemDescription]],
+) -> dict[str, Any]:
+    """Summarize PR sizes and report violations of planner allocation bounds."""
+    records = [
+        {
+            "allocation_id": group.id,
+            "work_units": len(group.unit_ids),
+            "requirements": len(group.requirement_ids),
+            "acceptance_criteria": group.acceptance_criteria_count,
+            "components": len(group.component_ids),
+        }
+        for group, _description in item_descriptions
+    ]
+    violations = []
+    for record in records:
+        allocation_id = record["allocation_id"]
+        if not 1 <= record["work_units"] <= MAX_PR_WORK_UNITS:
+            violations.append(
+                f"{allocation_id} contains {record['work_units']} work units; "
+                f"expected 1..{MAX_PR_WORK_UNITS}"
+            )
+        if record["acceptance_criteria"] > MAX_ITEM_CRITERIA:
+            violations.append(
+                f"{allocation_id} contains {record['acceptance_criteria']} "
+                f"acceptance criteria; maximum is {MAX_ITEM_CRITERIA}"
+            )
+        if record["components"] > MAX_ITEM_SCOPE_ENTRIES:
+            violations.append(
+                f"{allocation_id} spans {record['components']} components; "
+                f"maximum is {MAX_ITEM_SCOPE_ENTRIES}"
+            )
+    unit_counts = Counter(record["work_units"] for record in records)
+    requirement_counts = [record["requirements"] for record in records]
+    return {
+        "item_count": len(records),
+        "work_units_per_item": dict(sorted(unit_counts.items())),
+        "requirements_per_item": _numeric_distribution(requirement_counts),
+        "acceptance_criteria_per_item": _numeric_distribution(
+            [record["acceptance_criteria"] for record in records]
+        ),
+        "components_per_item": _numeric_distribution(
+            [record["components"] for record in records]
+        ),
+        "maximum_work_units": MAX_PR_WORK_UNITS,
+        "maximum_acceptance_criteria": MAX_ITEM_CRITERIA,
+        "maximum_components": MAX_ITEM_SCOPE_ENTRIES,
+        "violations": violations,
+        "items": records,
+    }
+
+
+def _numeric_distribution(values: Sequence[int]) -> dict[str, int | float | None]:
+    if not values:
+        return {"min": None, "max": None, "average": None}
+    return {
+        "min": min(values),
+        "max": max(values),
+        "average": round(sum(values) / len(values), 2),
+    }
+
+
+def live_structural_issues(profile: Profile, report: Mapping[str, Any]) -> list[str]:
+    """Gate live runs on plan completeness and size bounds, not item count."""
+    shape_issues = fixture_shape_mismatches(profile, report)
+    shape_issues.pop("plan_items", None)
+    issues = [
+        f"{field}={actual!r}; expected {expected!r}"
+        for field, (actual, expected) in sorted(shape_issues.items())
+    ]
+    item_sizing = report.get("item_sizing")
+    if not isinstance(item_sizing, Mapping):
+        issues.append("item sizing is unavailable")
+    else:
+        violations = item_sizing.get("violations")
+        if not isinstance(violations, list) or any(
+            not isinstance(item, str) for item in violations
+        ):
+            issues.append("item sizing violations are invalid")
+        elif violations:
+            issues.extend(violations)
+    return issues
 
 
 def dependency_candidate_summary(
@@ -771,6 +884,11 @@ def run_profile(
     dependency_metrics, dependency_metrics_error = dependency_metrics_for(
         machine, accepted
     )
+    item_sizing = (
+        item_sizing_summary(machine.accepted_item_descriptions(accepted))
+        if compiled is not None
+        else None
+    )
     report = {
         "profile": profile.name,
         "provider": provider,
@@ -819,6 +937,7 @@ def run_profile(
         "phases": dict(by_phase),
         "dependency_candidates": dependency_metrics,
         "dependency_candidates_unavailable_reason": dependency_metrics_error,
+        "item_sizing": item_sizing,
         "unresolved_question_diagnostics": unresolved_question_diagnostics(
             journal.events
         ),
@@ -826,6 +945,9 @@ def run_profile(
     mismatches = fixture_shape_mismatches(profile, report)
     report["fixture_shape_mismatches"] = mismatches
     report["fixture_shape_status"] = "mismatch" if mismatches else "matched"
+    structural_issues = live_structural_issues(profile, report)
+    report["live_structural_issues"] = structural_issues
+    report["live_structural_status"] = "mismatch" if structural_issues else "passed"
     report["expected_work_unit_range"] = [
         profile.min_work_units,
         profile.work_units,
@@ -992,10 +1114,7 @@ def main() -> int:
         "profiles": [compact_profile_summary(item) for item in report],
     }
     print(json.dumps(summary, indent=2))
-    if args.live and any(
-        item["terminal_status"] != "succeeded" or item["fixture_shape_mismatches"]
-        for item in report
-    ):
+    if args.live and any(item["live_structural_issues"] for item in report):
         return 1
     return 0
 

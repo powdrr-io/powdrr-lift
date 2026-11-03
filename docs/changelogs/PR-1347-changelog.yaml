@@ -1,0 +1,117 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1347
+title: Skip exact-source fidelity reviews
+intent:
+  problem: The large planning run spent 125 provider calls checking source fidelity, including requirements copied
+    exactly from one pinned source anchor; deterministic answers could also unlock additional deterministic work
+    that was not checked before the next provider request.
+  goal: Accept only exact single-anchor copies through a journaled deterministic rule and resolve newly enabled
+    deterministic answers before requesting more model work.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/plans/planning-efficiency-deterministic-filtering.md
+  type: modified
+  span:
+    start_line: 558
+    end_line: 581
+  summary: Record exact-source fidelity and deterministic frontier results.
+  rationale: Document measured interaction reductions and preserve the synthetic-run limitation.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 576
+    end_line: 576
+  summary: Derive fidelity acceptance only for exact single-anchor source copies.
+  rationale: Avoid semantic review only when the requirement text matches its pinned source exactly.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 582
+    end_line: 601
+  summary: Derive fidelity acceptance only for exact single-anchor source copies.
+  rationale: Avoid semantic review only when the requirement text matches its pinned source exactly.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 2705
+    end_line: 2728
+  summary: Derive fidelity acceptance only for exact single-anchor source copies.
+  rationale: Avoid semantic review only when the requirement text matches its pinned source exactly.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 30
+    end_line: 30
+  summary: Checkpoint deterministic answers until the planning frontier stabilizes.
+  rationale: Use newly accepted deterministic facts before dispatching another provider request.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 448
+    end_line: 474
+  summary: Checkpoint deterministic answers until the planning frontier stabilizes.
+  rationale: Use newly accepted deterministic facts before dispatching another provider request.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 524
+    end_line: 526
+  summary: Checkpoint deterministic answers until the planning frontier stabilizes.
+  rationale: Use newly accepted deterministic facts before dispatching another provider request.
+- path: tests/test_benchmark_planning_scale.py
+  type: modified
+  span:
+    start_line: 497
+    end_line: 498
+  summary: Assert exact-source fidelity and completed zero-hit coverage make no provider calls.
+  rationale: Protect deterministic interaction-count reductions in the large profile.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1550
+    end_line: 1550
+  summary: Verify exact source fidelity is durable and paraphrases remain under semantic review.
+  rationale: Exercise checkpoint provenance and conservative fallback to the existing model question.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1620
+    end_line: 1620
+  summary: Verify exact source fidelity is durable and paraphrases remain under semantic review.
+  rationale: Exercise checkpoint provenance and conservative fallback to the existing model question.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1630
+    end_line: 1630
+  summary: Verify exact source fidelity is durable and paraphrases remain under semantic review.
+  rationale: Exercise checkpoint provenance and conservative fallback to the existing model question.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1637
+    end_line: 1640
+  summary: Verify exact source fidelity is durable and paraphrases remain under semantic review.
+  rationale: Exercise checkpoint provenance and conservative fallback to the existing model question.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1677
+    end_line: 1745
+  summary: Verify exact source fidelity is durable and paraphrases remain under semantic review.
+  rationale: Exercise checkpoint provenance and conservative fallback to the existing model question.
+entities: []
+entity_relationships: []
+invariants:
+- id: exact-source-fidelity-requires-single-anchor-equality
+  description: The planner skips fidelity review only when the requirement text equals its sole pinned source anchor
+    after whitespace normalization; paraphrases and multi-anchor requirements remain semantic questions.
+  action: added
+- id: deterministic-planning-reaches-a-stable-frontier-before-provider-calls
+  description: Newly enabled deterministic answers are journaled and applied until no more deterministic answers
+    are available before a provider question is issued.
+  action: added
+guidance: []
+features: []
+proposed_prs: []

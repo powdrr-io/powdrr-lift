@@ -22,6 +22,8 @@ QUESTION_KINDS = frozenset(
         "describe_item",
         "resolve_prerequisite_output",
         "confirm_dependency",
+        "review_dependency_candidate",
+        "describe_confirmed_dependency",
         "review_dependency_graph",
         "check_validation_coverage",
         "requires_human_setup",

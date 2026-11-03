@@ -3,11 +3,18 @@ from __future__ import annotations
 import hashlib
 import json
 from collections.abc import Mapping
+from dataclasses import replace
 from pathlib import Path
 from threading import Barrier, Lock
+from types import SimpleNamespace
 from typing import Any
 
-from powdrr_service.planning.assembly import PlannedWrite, WorkUnit
+import pytest
+from powdrr_service.planning.assembly import (
+    PendingUnitOutput,
+    PlannedWrite,
+    WorkUnit,
+)
 from powdrr_service.planning.checkpoints import (
     InMemoryCheckpointStore,
     PlanningCheckpoint,
@@ -16,6 +23,10 @@ from powdrr_service.planning.contracts import (
     EnumerationAnswer,
     PlanningContractError,
     Question,
+)
+from powdrr_service.planning.dependencies import (
+    DependencyCandidateDiscovery,
+    UnitDependencyEdge,
 )
 from powdrr_service.planning.driver import (
     SourceLedgerQuestionMachine,
@@ -162,6 +173,13 @@ class _PlanningScriptClient:
                 "title": f"Implement behavior in {question['subject_ids'][0]}",
                 "objective": "Implement the behavior described by the plan.",
             }
+        if kind == "review_dependency_candidate":
+            return {"required": True}
+        if kind == "describe_confirmed_dependency":
+            return {
+                "requirement_ids": ["req-0001"],
+                "reason": "The consumer uses the producer output.",
+            }
         if kind == "enumerate_structural_subjects":
             return {"records": [], "has_more": False, "next_anchor": None}
         if kind == "review_dependency_graph":
@@ -293,7 +311,16 @@ def test_accepted_question_is_durable_and_not_called_again() -> None:
     }
 
 
-def test_structural_candidate_reviews_use_jev_and_checkpoint_provider() -> None:
+@pytest.mark.parametrize(
+    ("question_kind", "answer_key"),
+    (
+        ("review_structural_candidate", "relevant"),
+        ("review_dependency_candidate", "required"),
+    ),
+)
+def test_candidate_reviews_use_jev_and_checkpoint_provider(
+    question_kind: str, answer_key: str
+) -> None:
     session_id = "session-jev-candidate-review"
     store = InMemoryCheckpointStore(session_id=session_id)
     session = PlanningSession(
@@ -309,39 +336,60 @@ def test_structural_candidate_reviews_use_jev_and_checkpoint_provider() -> None:
         ),
     )
     question = Question(
-        "review-candidate-item-0001-0123456789ab",
-        "review_structural_candidate",
+        f"review-candidate-item-0001-{question_kind.replace('_', '-')}",
+        question_kind,
         1,
         ("item-0001", "entities", "entity-01"),
         "sha256:" + "d" * 64,
         (),
-        "structural-candidate-review-v1",
+        "candidate-review-v1",
         1,
     )
     request = QuestionRequest(
         question=question,
         exact_question="Does this item change the subject?",
-        answer_field_definitions={"relevant": "Whether this subject changes."},
+        answer_field_definitions={answer_key: "Whether this subject is relevant."},
         source_excerpts=(),
         repository_evidence=(),
         accepted_facts=(),
-        valid_example={"relevant": True},
-        empty_example={"relevant": False},
+        valid_example={answer_key: True},
+        empty_example={answer_key: False},
         answer_schema={
             "type": "object",
-            "required": ["relevant"],
-            "properties": {"relevant": {"type": "boolean"}},
+            "required": [answer_key],
+            "properties": {answer_key: {"type": "boolean"}},
         },
-        parse_answer=lambda value: value["relevant"],
+        parse_answer=lambda value: value[answer_key],
     )
 
     class CandidateMachine(_Machine):
         def __init__(self) -> None:
             super().__init__()
             self.request = request
+            self.requests = tuple(
+                replace(
+                    request,
+                    question=replace(
+                        request.question,
+                        question_id=f"{request.question.question_id}-{index}",
+                    ),
+                )
+                for index in range(1, 4)
+            )
+
+        def ready_questions(
+            self, accepted_answers: Mapping[str, Mapping[str, Any]]
+        ) -> tuple[QuestionRequest[Any], ...]:
+            return tuple(
+                item
+                for item in self.requests
+                if item.question.question_id not in accepted_answers
+            )
 
     class DecisionClient:
         calls = 0
+        batch_calls = 0
+        max_batch_size = 2
 
         def complete_json(
             self,
@@ -351,7 +399,19 @@ def test_structural_candidate_reviews_use_jev_and_checkpoint_provider() -> None:
         ) -> dict[str, Any]:
             del messages, response_schema
             self.calls += 1
-            return {"relevant": True}
+            return {answer_key: True}
+
+        def complete_json_batch(
+            self,
+            requests: list[tuple[list[dict[str, str]], Mapping[str, Any]]],
+        ) -> list[dict[str, Any]]:
+            self.calls += 1
+            self.batch_calls += 1
+            assert all(
+                schema["properties"][answer_key]["type"] == "boolean"
+                for _messages, schema in requests
+            )
+            return [{answer_key: True} for _request in requests]
 
     decision_client = DecisionClient()
     metrics: list[Mapping[str, Any]] = []
@@ -384,11 +444,104 @@ def test_structural_candidate_reviews_use_jev_and_checkpoint_provider() -> None:
 
     assert transition.status == "question_accepted"
     assert resumed.status == "complete"
-    assert decision_client.calls == 1
-    assert metrics[0]["provider"] == "JEV"
-    event = store.load().events[0]
-    assert event.payload["validation_result"]["provider"] == "JEV"
-    assert event.payload["validation_result"]["model"] == "jev-test"
+    assert decision_client.calls == 2
+    assert decision_client.batch_calls == 2
+    assert len(transition.question_ids) == 3
+    assert len(metrics) == 3
+    assert {metric["provider"] for metric in metrics} == {"JEV"}
+    assert sum(int(metric["api_calls"]) for metric in metrics) == 2
+    assert sorted(int(metric["batch_member_count"]) for metric in metrics) == [1, 2, 2]
+    events = store.load().events
+    assert len(events) == 3
+    assert {event.payload["validation_result"]["provider"] for event in events} == {
+        "JEV"
+    }
+    assert {event.payload["validation_result"]["model"] for event in events} == {
+        "jev-test"
+    }
+
+
+def test_dependency_candidates_gate_generative_details_on_jev() -> None:
+    text = "# Plan\n\nImplement the producer and consumer.\n"
+    source = segment_markdown_source(
+        PinnedSourceDocument(
+            repository="owner/repo",
+            commit_sha="a" * 40,
+            path="docs/plan.md",
+            blob_sha="b" * 40,
+            content_sha256=hashlib.sha256(text.encode()).hexdigest(),
+            text=text,
+        )
+    )
+    producer = WorkUnit(
+        "unit-producer",
+        ("req-0001",),
+        "Produce schema",
+        "core",
+        "python",
+        (),
+        "Produce the API schema.",
+        ("The schema is available.",),
+        ("validation-0001",),
+    )
+    consumer = WorkUnit(
+        "unit-consumer",
+        ("req-0002",),
+        "Consume schema",
+        "core",
+        "python",
+        (),
+        "Use the API schema.",
+        ("The client uses the schema.",),
+        ("validation-0001",),
+    )
+    output = PendingUnitOutput(
+        producer.id, "The generated API schema.", producer.requirement_ids
+    )
+    discovery = DependencyCandidateDiscovery((), ((output, consumer),), {})
+    machine: Any = SourceLedgerQuestionMachine(source, plan_id="dependency-review")
+    machine._dependency_discovery = lambda _answers: (
+        SimpleNamespace(units=(producer, consumer)),
+        discovery,
+    )
+
+    review = machine._dependency_requests({})[0]
+    assert review.question.kind == "review_dependency_candidate"
+    machine.set_accepted_question_input_digests(
+        {review.question.question_id: review.question.input_digest}
+    )
+    rejected_answers = {review.question.question_id: {"required": False}}
+
+    assert machine._dependency_requests(rejected_answers) == ()
+    assert machine.accepted_dependency_edges(rejected_answers) == ()
+
+    accepted_review_answers = {review.question.question_id: {"required": True}}
+    details = machine._dependency_requests(accepted_review_answers)[0]
+    assert details.question.kind == "describe_confirmed_dependency"
+    machine.set_accepted_question_input_digests(
+        {
+            review.question.question_id: review.question.input_digest,
+            details.question.question_id: details.question.input_digest,
+        }
+    )
+    answers = {
+        **accepted_review_answers,
+        details.question.question_id: {
+            "requirement_ids": ["req-0001"],
+            "reason": "The consumer uses the producer's schema.",
+        },
+    }
+
+    assert machine._dependency_requests(answers) == ()
+    assert machine.accepted_dependency_edges(answers) == (
+        UnitDependencyEdge(
+            producer.id,
+            consumer.id,
+            output.description,
+            "The consumer uses the producer's schema.",
+            ("req-0001",),
+        ),
+    )
 
 
 def test_invalid_answer_is_checkpointed_with_telemetry_after_bounded_corrections() -> (
@@ -1139,6 +1292,13 @@ def test_source_question_machine_accounts_for_normative_and_context_blocks() -> 
         elif question.kind == "describe_item":
             answer = dict(request.valid_example)
             answer["title"] = f"Implement behavior in {question.subject_ids[0]}"
+        elif question.kind == "review_dependency_candidate":
+            answer = {"required": True}
+        elif question.kind == "describe_confirmed_dependency":
+            answer = {
+                "requirement_ids": ["req-0001"],
+                "reason": "The focused test consumes the implementation contract.",
+            }
         elif question.kind == "confirm_dependency":
             answer = {
                 "result": "required",
@@ -1443,7 +1603,11 @@ def test_procedrr_runs_real_planning_machine_through_compiled_artifacts() -> Non
         state_machine=machine,
         checkpoint_store=store,
         client=provider,
-        options=PlanningOptions(model="scripted-model"),
+        options=PlanningOptions(
+            model="scripted-model",
+            decision_client=provider,
+            decision_model="scripted-model",
+        ),
         stderr=None,
     )
 

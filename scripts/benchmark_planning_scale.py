@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import sys
 import time
 from collections import Counter, defaultdict
@@ -25,6 +26,7 @@ from pathlib import Path
 from threading import Lock
 from typing import Any
 
+from powdrr_service.decision_classifier import JEV_MODEL, JevSemanticClassifierClient
 from powdrr_service.planning.assembly import (
     MAX_ITEM_CRITERIA,
     MAX_ITEM_SCOPE_ENTRIES,
@@ -41,6 +43,9 @@ from powdrr_service.planning.checkpoints import (
     PlanningCheckpoint,
     prepare_checkpoint_append,
     reduce_checkpoint_comments,
+)
+from powdrr_service.planning.dependencies import (
+    build_dependency_candidate_review_request,
 )
 from powdrr_service.planning.driver import SourceLedgerQuestionMachine
 from powdrr_service.planning.service import (
@@ -401,13 +406,22 @@ def dependency_metrics_for(
     """Summarize dependency review, preserving incomplete planning checkpoints."""
     try:
         allocation, discovery = machine._dependency_discovery(accepted_answers)
-        requests = machine._dependency_requests(accepted_answers)
         results = []
-        for request in requests:
-            answer = accepted_answers.get(request.question.question_id)
-            results.append(
-                None if answer is None else request.parse_answer(answer).required
+        units = {unit.id: unit for unit in allocation.units}
+        for pending_output, consumer in discovery.confirmation_pairs:
+            producer = units[pending_output.unit_id]
+            review = build_dependency_candidate_review_request(
+                producer,
+                consumer,
+                pending_output.description,
+                allowed_requirement_ids=set(producer.requirement_ids)
+                | set(consumer.requirement_ids),
+                code_reference_paths=discovery.code_reference_paths.get(
+                    (producer.id, consumer.id), ()
+                ),
             )
+            answer = accepted_answers.get(review.question.question_id)
+            results.append(None if answer is None else review.parse_answer(answer))
         return (
             dependency_candidate_summary(
                 allocation.pending_outputs, discovery.confirmation_pairs, results
@@ -592,6 +606,19 @@ class _ExampleAnswerClient:
             return {"answers": answers}
         return self._answer(packet)
 
+    def complete_json_batch(
+        self,
+        requests: list[tuple[list[dict[str, str]], Mapping[str, Any]]],
+    ) -> list[dict[str, Any]]:
+        """Model one bounded Jev batch while keeping member answers independent."""
+        answers = []
+        for messages, _schema in requests:
+            packet = json.loads(messages[-1]["content"])
+            kind = packet["exact_question"]["kind"]
+            self.calls_by_kind[kind] += 1
+            answers.append(self._answer(packet))
+        return answers
+
     def _answer(self, packet: Mapping[str, Any]) -> dict[str, Any]:
         kind = packet["exact_question"]["kind"]
         if kind == "extract_requirements":
@@ -745,6 +772,9 @@ def run_profile(
     *,
     repository_root: Path,
     client: Any | None = None,
+    decision_client: Any | None = None,
+    decision_provider: str = "JEV",
+    decision_model: str = JEV_MODEL,
     provider: str = "deterministic-profile",
     model: str = "deterministic-profile",
     concurrency: int = 4,
@@ -805,6 +835,13 @@ def run_profile(
         options=PlanningOptions(
             model=model,
             provider=provider,
+            decision_client=(
+                answer_client if decision_client is None else decision_client
+            ),
+            decision_provider=(
+                provider if decision_client is None else decision_provider
+            ),
+            decision_model=decision_model,
             max_concurrent_questions=concurrency,
             use_provider_schema=use_provider_schema,
             telemetry_sink=calls.append,
@@ -1070,8 +1107,10 @@ def main() -> int:
         tuple(PROFILES.values()) if args.profile == "all" else (PROFILES[args.profile],)
     )
     live_client = None
+    live_decision_client = None
     provider = "deterministic-profile"
     model = "deterministic-profile"
+    decision_model = JEV_MODEL
     if args.live:
         provider = resolve_workflow_provider(args.provider)
         mapping = configured_model_mapping(provider, args.model)
@@ -1091,12 +1130,19 @@ def main() -> int:
         if callable(set_output_limit):
             set_output_limit(8192)
         live_client = _ProgressClient(live_client)
+        live_decision_client = JevSemanticClassifierClient(
+            live_client, fail_closed=True
+        )
+        decision_model = os.environ.get("SYSTEM_ONE_MODEL") or JEV_MODEL
         model = mapping.model
     report = [
         run_profile(
             profile,
             repository_root=repository_root,
             client=live_client,
+            decision_client=live_decision_client,
+            decision_provider="JEV",
+            decision_model=decision_model,
             provider=provider,
             model=model,
             concurrency=args.concurrency,

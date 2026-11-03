@@ -649,7 +649,10 @@ def advance_planning_session(
     # Results are committed in frontier order through one writer. The providers
     # run concurrently, but checkpoint heads never race.
     for result in accepted_results:
-        uses_decision_client = result.question.kind == "review_structural_candidate"
+        uses_decision_client = result.question.kind in {
+            "review_structural_candidate",
+            "review_dependency_candidate",
+        }
         append_checkpoint(
             PlanningCheckpoint.answer_accepted(
                 session_id=session.session_id,
@@ -720,13 +723,37 @@ def _run_question_batch(
     prior_events: Sequence[Any] = (),
 ) -> tuple[tuple[QuestionRequest[Any], Any, Exception | None], ...]:
     """Execute ready questions concurrently while keeping progress output ordered."""
+    decision_question_kinds = {
+        "review_structural_candidate",
+        "review_dependency_candidate",
+    }
+    decision_client = options.decision_client
+    decision_batch = getattr(decision_client, "complete_json_batch", None)
+    if (
+        requests
+        and decision_client is not None
+        and callable(decision_batch)
+        and all(
+            request.question.kind in decision_question_kinds for request in requests
+        )
+    ):
+        return _run_decision_question_batch(
+            requests,
+            batch_client=decision_batch,
+            client=decision_client,
+            options=options,
+            stderr=stderr,
+        )
 
     def run_one(
         request: QuestionRequest[Any],
     ) -> tuple[QuestionRequest[Any], Any, Exception | None, str, dict[str, Any]]:
         output = StringIO()
         started = time.monotonic()
-        uses_decision_client = request.question.kind == "review_structural_candidate"
+        uses_decision_client = request.question.kind in {
+            "review_structural_candidate",
+            "review_dependency_candidate",
+        }
         request_client = (
             options.decision_client
             if uses_decision_client and options.decision_client is not None
@@ -762,7 +789,9 @@ def _run_question_batch(
                 stderr=output,
                 max_transport_retries=options.max_transport_retries,
                 transport_backoff_seconds=options.transport_backoff_seconds,
-                use_provider_schema=options.use_provider_schema,
+                use_provider_schema=(
+                    True if uses_decision_client else options.use_provider_schema
+                ),
             )
             error = None
         except Exception as caught:
@@ -867,6 +896,163 @@ def _run_question_batch(
     )
 
 
+class _SeededBatchAnswerClient:
+    """Expose one provider-batched answer, then delegate correction attempts."""
+
+    def __init__(self, client: PlanningModelClient, answer: Any) -> None:
+        self._client = client
+        self._answer = answer
+        self._used_answer = False
+
+    def complete_json(self, messages: list[dict[str, str]], **kwargs: Any) -> Any:
+        if not self._used_answer:
+            self._used_answer = True
+            return self._answer
+        return self._client.complete_json(messages, **kwargs)
+
+
+def _run_decision_question_batch(
+    requests: tuple[QuestionRequest[Any], ...],
+    *,
+    batch_client: Callable[
+        [list[tuple[list[dict[str, str]], Mapping[str, Any]]]], list[Any]
+    ],
+    client: PlanningModelClient,
+    options: PlanningOptions,
+    stderr: Any,
+) -> tuple[tuple[QuestionRequest[Any], Any, Exception | None], ...]:
+    """Run independent Jev booleans in one bounded provider batch."""
+    output_stream = stderr if stderr is not None else sys.stdout
+    outcomes: list[tuple[QuestionRequest[Any], Any, Exception | None]] = []
+    configured_batch_size = getattr(client, "max_batch_size", len(requests))
+    batch_size = (
+        configured_batch_size
+        if isinstance(configured_batch_size, int) and configured_batch_size > 0
+        else len(requests)
+    )
+    for offset in range(0, len(requests), batch_size):
+        batch_requests = requests[offset : offset + batch_size]
+        started = time.monotonic()
+        messages = tuple(
+            build_question_messages(request, schema_in_response=True)
+            for request in batch_requests
+        )
+        request_chars = tuple(
+            sum(len(message.get("content", "")) for message in item)
+            for item in messages
+        )
+        batch_error: Exception | None = None
+        answers: list[Any] = []
+        try:
+            answers = batch_client(
+                [
+                    (item_messages, request.answer_schema)
+                    for item_messages, request in zip(
+                        messages, batch_requests, strict=True
+                    )
+                ]
+            )
+            if len(answers) != len(batch_requests):
+                raise PlanningServiceError(
+                    "Jev decision batch returned a different number of answers "
+                    "than requests"
+                )
+        except Exception as caught_batch_error:
+            batch_error = caught_batch_error
+        batch_elapsed_ms = (time.monotonic() - started) * 1000
+        for index, request in enumerate(batch_requests):
+            telemetry_client = _QuestionTelemetryClient(
+                _SeededBatchAnswerClient(
+                    client,
+                    answers[index] if index < len(answers) else {},
+                )
+            )
+            output = StringIO()
+            error = batch_error
+            result = None
+            correction_started = time.monotonic()
+            if error is None:
+                try:
+                    result = run_question(
+                        telemetry_client,
+                        request,
+                        model=options.decision_model,
+                        stderr=output,
+                        max_transport_retries=options.max_transport_retries,
+                        transport_backoff_seconds=options.transport_backoff_seconds,
+                        use_provider_schema=True,
+                    )
+                except Exception as caught:
+                    error = caught
+            correction_elapsed_ms = (time.monotonic() - correction_started) * 1000
+            raw_answer = (
+                result.raw_answer
+                if isinstance(result, AcceptedQuestionAnswer)
+                else result.previous_answer
+                if isinstance(result, NeedsQuestionAnswer)
+                else answers[index]
+                if error is None and index < len(answers)
+                else None
+            )
+            metric = {
+                "question_ids": [request.question.question_id],
+                "question_kinds": [request.question.kind],
+                "phase": _question_phase(request.question.kind),
+                "input_digests": [request.question.input_digest],
+                "batch_member_count": len(batch_requests),
+                "request_chars": request_chars[index],
+                "request_chars_all_attempts": telemetry_client.prompt_chars,
+                "answer_chars": telemetry_client.response_chars
+                or (
+                    None
+                    if raw_answer is None
+                    else len(
+                        json.dumps(
+                            raw_answer, ensure_ascii=False, separators=(",", ":")
+                        )
+                    )
+                ),
+                "attempts": getattr(result, "attempts", None),
+                "validation_failures": max(0, getattr(result, "attempts", 1) - 1),
+                "api_calls": max(0, telemetry_client.api_calls - 1)
+                + (1 if index == 0 else 0),
+                "provider_failures": telemetry_client.provider_failures
+                + (1 if index == 0 and batch_error is not None else 0),
+                "elapsed_ms": round(
+                    batch_elapsed_ms / len(batch_requests) + correction_elapsed_ms,
+                    3,
+                ),
+                "provider": options.decision_provider,
+                "model": options.decision_model,
+                "outcome": (
+                    "error"
+                    if error is not None
+                    else "accepted"
+                    if isinstance(result, AcceptedQuestionAnswer)
+                    else "needs_answer"
+                ),
+                "deterministic": False,
+                "input_digest": request.question.input_digest,
+                "prompt_tokens": None,
+                "completion_tokens": None,
+                "pagination": [],
+            }
+            if output.getvalue():
+                output_stream.write(output.getvalue())
+            if options.telemetry_sink is not None:
+                try:
+                    options.telemetry_sink(metric)
+                except Exception as telemetry_error:
+                    output_stream.write(
+                        f"Planning telemetry could not be recorded: {telemetry_error}\n"
+                    )
+            outcomes.append((request, result, error))
+    flush = getattr(output_stream, "flush", None)
+    if callable(flush):
+        flush()
+    return tuple(outcomes)
+
+
 def _question_phase(kind: str) -> str:
     """Map typed planning questions to the planner phase they measure."""
     if kind in {
@@ -889,6 +1075,8 @@ def _question_phase(kind: str) -> str:
         "describe_item",
         "resolve_prerequisite_output",
         "confirm_dependency",
+        "review_dependency_candidate",
+        "describe_confirmed_dependency",
         "review_dependency_graph",
     }:
         return "dependency-and-pr-slicing"

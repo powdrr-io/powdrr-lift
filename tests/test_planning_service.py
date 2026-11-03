@@ -293,6 +293,104 @@ def test_accepted_question_is_durable_and_not_called_again() -> None:
     }
 
 
+def test_structural_candidate_reviews_use_jev_and_checkpoint_provider() -> None:
+    session_id = "session-jev-candidate-review"
+    store = InMemoryCheckpointStore(session_id=session_id)
+    session = PlanningSession(
+        session_id=session_id,
+        plan_id="bounded-plan",
+        repository="powdrr-io/example",
+        base_commit="a" * 40,
+        source_path="docs/plan.md",
+        source_blob_sha="b" * 40,
+        verification_command="make test",
+        issue=QueueIssue(
+            44, "Planning: bounded-plan", "", "open", ("powdrr:planning",), ""
+        ),
+    )
+    question = Question(
+        "review-candidate-item-0001-0123456789ab",
+        "review_structural_candidate",
+        1,
+        ("item-0001", "entities", "entity-01"),
+        "sha256:" + "d" * 64,
+        (),
+        "structural-candidate-review-v1",
+        1,
+    )
+    request = QuestionRequest(
+        question=question,
+        exact_question="Does this item change the subject?",
+        answer_field_definitions={"relevant": "Whether this subject changes."},
+        source_excerpts=(),
+        repository_evidence=(),
+        accepted_facts=(),
+        valid_example={"relevant": True},
+        empty_example={"relevant": False},
+        answer_schema={
+            "type": "object",
+            "required": ["relevant"],
+            "properties": {"relevant": {"type": "boolean"}},
+        },
+        parse_answer=lambda value: value["relevant"],
+    )
+
+    class CandidateMachine(_Machine):
+        def __init__(self) -> None:
+            super().__init__()
+            self.request = request
+
+    class DecisionClient:
+        calls = 0
+
+        def complete_json(
+            self,
+            messages: list[dict[str, str]],
+            *,
+            response_schema: dict[str, Any] | None = None,
+        ) -> dict[str, Any]:
+            del messages, response_schema
+            self.calls += 1
+            return {"relevant": True}
+
+    decision_client = DecisionClient()
+    metrics: list[Mapping[str, Any]] = []
+    options = PlanningOptions(
+        model="planner-model",
+        provider="deepinfra-cheap",
+        decision_client=decision_client,
+        decision_provider="JEV",
+        decision_model="jev-test",
+        telemetry_sink=metrics.append,
+    )
+    machine = CandidateMachine()
+
+    transition = advance_planning_session(
+        session=session,
+        state_machine=machine,
+        checkpoint_store=store,
+        client=_Client(),
+        options=options,
+        stderr=None,
+    )
+    resumed = advance_planning_session(
+        session=session,
+        state_machine=machine,
+        checkpoint_store=store,
+        client=_Client(),
+        options=options,
+        stderr=None,
+    )
+
+    assert transition.status == "question_accepted"
+    assert resumed.status == "complete"
+    assert decision_client.calls == 1
+    assert metrics[0]["provider"] == "JEV"
+    event = store.load().events[0]
+    assert event.payload["validation_result"]["provider"] == "JEV"
+    assert event.payload["validation_result"]["model"] == "jev-test"
+
+
 def test_invalid_answer_is_checkpointed_with_telemetry_after_bounded_corrections() -> (
     None
 ):

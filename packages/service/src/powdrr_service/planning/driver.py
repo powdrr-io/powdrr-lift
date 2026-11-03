@@ -77,6 +77,7 @@ from powdrr_service.planning.structrr import (
     StructuralChange,
     StructuralSubjectPage,
     bind_structural_operation,
+    build_structural_candidate_review_request,
     build_structural_change_request,
     build_subject_enumeration_request,
     coalesce_structural_subjects,
@@ -540,6 +541,11 @@ class SourceLedgerQuestionMachine:
     ) -> tuple[QuestionRequest[Any], ...]:
         if self._max_question_frontier is not None:
             requests = requests[: self._max_question_frontier]
+        if requests and all(
+            request.question.kind == "review_structural_candidate"
+            for request in requests
+        ):
+            return tuple(requests)
         return batch_question_requests(requests)
 
     def repository_search_metrics(self) -> tuple[tuple[str, Mapping[str, Any]], ...]:
@@ -1626,6 +1632,104 @@ class SourceLedgerQuestionMachine:
                 raise PlanningCompilationError(
                     "Structrr planning item graph has no ready item"
                 )
+            candidate_subjects_by_item: dict[
+                str,
+                tuple[
+                    tuple[BoundStructuralSubject, ...],
+                    tuple[tuple[str, str], ...],
+                ],
+            ] = {}
+            pending_candidate_reviews: list[QuestionRequest[Any]] = []
+            for item_id in ready_item_ids:
+                record = record_by_id[item_id]
+                units = tuple(record["units"])
+                requirement_ids = tuple(
+                    dict.fromkeys(
+                        requirement_id
+                        for unit in units
+                        for requirement_id in unit.requirement_ids
+                    )
+                )
+                source_refs = tuple(
+                    dict.fromkeys(
+                        source_ref
+                        for requirement_id in requirement_ids
+                        for source_ref in requirement_by_id[requirement_id].source_refs
+                    )
+                )
+                item_python_paths = {
+                    write.path
+                    for unit in units
+                    for write in unit.planned_writes
+                    if write.path.casefold().endswith((".py", ".pyi"))
+                }
+                item_symbols_by_path = {
+                    path: self._structural_symbol_cache[path]
+                    for path in sorted(item_python_paths)
+                    if path in self._structural_symbol_cache
+                }
+                planned_file_subjects = _planned_file_subjects(
+                    item_id,
+                    units,
+                    requirement_by_id=requirement_by_id,
+                    projected_baseline=projected,
+                    fallback_source_refs=source_refs,
+                )
+                deterministic_subjects = _planned_existing_structural_subjects(
+                    item_id,
+                    units,
+                    requirement_by_id=requirement_by_id,
+                    projected_baseline=projected,
+                    fallback_source_refs=source_refs,
+                    basedpyright_symbols_by_path=item_symbols_by_path,
+                )
+                relevant_candidates: list[BoundStructuralSubject] = []
+                excluded_candidates: list[tuple[str, str]] = []
+                for candidate in deterministic_subjects:
+                    review = build_structural_candidate_review_request(
+                        candidate,
+                        source=self.source,
+                        units=units,
+                        projected_baseline=projected,
+                        baseline_index=baseline_index,
+                    )
+                    answer = accepted_answers.get(review.question.question_id)
+                    if (
+                        answer is not None
+                        and self._accepted_question_input_digests is not None
+                        and self._accepted_question_input_digests.get(
+                            review.question.question_id
+                        )
+                        != review.question.input_digest
+                    ):
+                        self._invalid_accepted_question_ids.add(
+                            review.question.question_id
+                        )
+                        answer = None
+                    if answer is None:
+                        pending_candidate_reviews.append(review)
+                        continue
+                    try:
+                        relevant = review.parse_answer(answer)
+                    except PlanningContractError:
+                        self._invalid_accepted_question_ids.add(
+                            review.question.question_id
+                        )
+                        pending_candidate_reviews.append(review)
+                        continue
+                    if relevant:
+                        relevant_candidates.append(candidate)
+                    else:
+                        excluded_candidates.append(
+                            (candidate.section, candidate.subject_id)
+                        )
+                candidate_subjects_by_item[item_id] = (
+                    tuple((*planned_file_subjects, *relevant_candidates)),
+                    tuple(excluded_candidates),
+                )
+            if pending_candidate_reviews:
+                return self._batch_requests(pending_candidate_reviews)
+
             subjects_by_item: dict[str, tuple[BoundStructuralSubject, ...]] = {}
             pending_enumerations: list[QuestionRequest[Any]] = []
             for item_id in ready_item_ids:
@@ -1659,22 +1763,9 @@ class SourceLedgerQuestionMachine:
                 item_reference_path_pairs = _planned_reference_path_pairs(
                     tuple(item_python_paths), self._structural_reference_cache
                 )
-                planned_file_subjects = _planned_file_subjects(
-                    item_id,
-                    units,
-                    requirement_by_id=requirement_by_id,
-                    projected_baseline=projected,
-                    fallback_source_refs=source_refs,
-                )
-                deterministic_subjects = _planned_existing_structural_subjects(
-                    item_id,
-                    units,
-                    requirement_by_id=requirement_by_id,
-                    projected_baseline=projected,
-                    fallback_source_refs=source_refs,
-                    basedpyright_symbols_by_path=item_symbols_by_path,
-                )
-                item_subjects = [*planned_file_subjects, *deterministic_subjects]
+                item_subjects, excluded_subject_ids = candidate_subjects_by_item[
+                    item_id
+                ]
                 page_ordinal = 1
                 item_pages: list[StructuralSubjectPage] = []
                 while True:
@@ -1686,6 +1777,7 @@ class SourceLedgerQuestionMachine:
                         source_refs=source_refs,
                         projected_baseline=projected,
                         prior_subjects=item_subjects,
+                        excluded_subject_ids=excluded_subject_ids,
                         basedpyright_reference_path_pairs=item_reference_path_pairs,
                         page_ordinal=page_ordinal,
                         baseline_digest=baseline_digest,
@@ -1718,8 +1810,7 @@ class SourceLedgerQuestionMachine:
                     if not page.has_more:
                         subjects_by_item[item_id] = coalesce_structural_subjects(
                             (
-                                *planned_file_subjects,
-                                *deterministic_subjects,
+                                *item_subjects,
                                 *complete_subject_enumeration(item_pages),
                             )
                         )

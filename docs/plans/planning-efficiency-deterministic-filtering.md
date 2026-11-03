@@ -555,6 +555,30 @@ under deterministic responses; it does not establish live-provider latency.
 The report is saved at `/tmp/planning-large-scoped-workunits.json` for this
 development run.
 
+### Exact-source fidelity shortcut (2026-11-03)
+
+The latest large live report included 125 source-fidelity calls after
+requirement extraction. The planner can safely skip that semantic review when a
+requirement has exactly one source anchor and its statement matches that pinned
+anchor after whitespace normalization. Paraphrased statements and requirements
+with multiple anchors continue through the model review. The deterministic
+answer is recorded with its stable rule ID and question digest like other
+automatic answers.
+
+Deterministic answers can expose a new deterministic frontier. The coordinator
+now checkpoints them to a fixed point before asking a provider, so an exact
+fidelity answer can immediately unlock and resolve a completed zero-hit coverage
+search in the same transition.
+
+The deterministic large profile still produced 500 requirements, 150 work
+units, and 50 items. Exact-source fidelity removed 125 calls and completed
+zero-hit coverage removed 61 calls from the prior large synthetic profile,
+reducing total provider calls from 468 to 282 (39.7%). The run took 8.137
+seconds, matched fixture shape, and had no validation retries. These mock-run
+results demonstrate interaction-count reduction, not live-provider latency.
+The report is saved at `/tmp/planning-exact-fidelity.json` for this development
+run.
+
 ## Cross-cutting test requirements
 
 - Use mocked nontrivial provider responses. Do not use live-model calls as the only proof that a contract works.

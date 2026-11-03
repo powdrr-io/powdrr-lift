@@ -573,12 +573,32 @@ class SourceLedgerQuestionMachine:
     def deterministic_answers(
         self, accepted_answers: Mapping[str, Mapping[str, Any]]
     ) -> tuple[Mapping[str, Any], ...]:
-        """Derive only source and coverage answers proven by pinned facts."""
+        """Derive source and coverage answers proven by pinned facts."""
         self._pending_deterministic_answers.clear()
         requests = self.ready_questions(accepted_answers)
         derived = list(self._pending_deterministic_answers.values())
         for request in requests:
             for member in request.batch_members or (request,):
+                if member.question.kind == "check_requirement_fidelity":
+                    question_id = member.question.question_id
+                    if question_id in accepted_answers:
+                        continue
+                    answer = _exact_source_text_fidelity_answer(member)
+                    if answer is None:
+                        continue
+                    member.parse_answer(answer)
+                    derived.append(
+                        {
+                            "question": member.question,
+                            "answer": answer,
+                            "rule_id": "exact-source-text-fidelity-v1",
+                            "reason": (
+                                "The requirement statement matches its single pinned "
+                                "source anchor after whitespace normalization."
+                            ),
+                        }
+                    )
+                    continue
                 if member.question.kind != "assess_requirement_coverage":
                     continue
                 question_id = member.question.question_id
@@ -2680,6 +2700,30 @@ def _is_completed_zero_hit_search(search: Any, *, pinned_commit: str) -> bool:
         and search.matching_line_count == 0
         and search.matching_path_count == 0
     )
+
+
+def _exact_source_text_fidelity_answer(
+    request: QuestionRequest[Any],
+) -> Mapping[str, Any] | None:
+    """Accept only a requirement copied from exactly one pinned source anchor."""
+    if request.question.kind != "check_requirement_fidelity":
+        return None
+    if len(request.source_excerpts) != 1 or len(request.accepted_facts) != 1:
+        return None
+    requirement = request.accepted_facts[0].value
+    statement = requirement.get("statement")
+    source_text = request.source_excerpts[0].text
+    if not isinstance(statement, str) or not isinstance(source_text, str):
+        return None
+    if " ".join(statement.split()) != " ".join(source_text.split()):
+        return None
+    return {
+        "decision": "accept",
+        "reason": (
+            "The requirement statement matches its single pinned source anchor "
+            "after whitespace normalization."
+        ),
+    }
 
 
 __all__ = ["SourceLedger", "SourceLedgerQuestionMachine"]

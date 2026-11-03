@@ -27,7 +27,7 @@ from powdrr_service.planning.checkpoints import (
     PlanningCheckpoint,
     PlanningJournalError,
 )
-from powdrr_service.planning.contracts import PlanningContractError
+from powdrr_service.planning.contracts import PlanningContractError, Question
 from powdrr_service.planning.inference import PlanningModelClient
 from powdrr_service.planning.questions import (
     AcceptedQuestionAnswer,
@@ -445,6 +445,33 @@ def load_planning_session(
     )
 
 
+def _iter_deterministic_answer_closure(
+    derive: Callable[[Mapping[str, Mapping[str, Any]]], Sequence[Mapping[str, Any]]],
+    accepted: Mapping[str, Mapping[str, Any]],
+) -> Sequence[Mapping[str, Any]]:
+    """Apply newly enabled deterministic answers until the frontier is stable."""
+    applied: dict[str, Mapping[str, Any]] = dict(accepted)
+    results: list[Mapping[str, Any]] = []
+    while True:
+        frontier = tuple(derive(applied))
+        pending = tuple(
+            item
+            for item in frontier
+            if getattr(item.get("question"), "question_id", None) not in applied
+        )
+        if not pending:
+            return tuple(results)
+        for item in pending:
+            question = item["question"]
+            answer = item["answer"]
+            if not isinstance(question, Question) or not isinstance(answer, Mapping):
+                raise PlanningServiceError(
+                    "deterministic planning answer has invalid question or answer"
+                )
+            applied[question.question_id] = dict(answer)
+            results.append(item)
+
+
 def advance_planning_session(
     *,
     session: PlanningSession,
@@ -494,7 +521,9 @@ def advance_planning_session(
 
     derive_deterministic_answers = getattr(state_machine, "deterministic_answers", None)
     if callable(derive_deterministic_answers):
-        for deterministic in derive_deterministic_answers(accepted):
+        for deterministic in _iter_deterministic_answer_closure(
+            derive_deterministic_answers, accepted
+        ):
             question = deterministic["question"]
             answer = deterministic["answer"]
             if question.question_id in accepted:

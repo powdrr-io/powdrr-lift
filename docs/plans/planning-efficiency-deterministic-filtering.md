@@ -467,7 +467,7 @@ removes generic repeated labels while retaining named references, including
 phrases with only one distinctive token. Focused tests cover both behaviors and
 the existing labeled dependency-recall fixtures. The first live rerun stopped
 during source-ledger extraction because correction context exceeded its input
-bound. PR #1329 subdivides that batch and combines the validated member answers.
+bound. PR #1330 subdivides that batch and combines the validated member answers.
 
 The next live run completed the large profile with `deepinfra-cheap` /
 `deepseek-ai/DeepSeek-V4-Flash-0731`, concurrency 2, and a 30-second timeout. It

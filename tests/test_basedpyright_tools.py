@@ -9,6 +9,7 @@ from powdrr_lift.basedpyright_tools import (
     BASEDPYRIGHT_STRUCTURE_TOOL,
     BASEDPYRIGHT_SYMBOL_TOOL,
     execute_basedpyright_tool,
+    find_workspace_document_analysis,
     find_workspace_document_symbols,
     find_workspace_reference_paths,
 )
@@ -208,3 +209,64 @@ def test_basedpyright_reference_search_maps_only_planned_consumer_files(
     )
 
     assert result == {"src/catalog.py": ("src/dashboard.py",)}
+
+
+def test_workspace_document_analysis_returns_symbols_and_references_in_one_session(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    producer = tmp_path / "src" / "catalog.py"
+    consumer = tmp_path / "src" / "dashboard.py"
+    producer.parent.mkdir()
+    producer.write_text("def lookup(): ...\n")
+    consumer.write_text("from catalog import lookup\n")
+
+    class AnalysisServer(_FakeServer):
+        def __init__(self, root: Path) -> None:
+            super().__init__(root)
+            self.document_symbol_requests = 0
+
+        def request(self, method: str, params: Any) -> Any:
+            if method == "textDocument/documentSymbol":
+                self.document_symbol_requests += 1
+                uri = params["textDocument"]["uri"]
+                if uri == producer.as_uri():
+                    return [
+                        {
+                            "name": "lookup",
+                            "kind": 12,
+                            "range": {
+                                "start": {"line": 0, "character": 4},
+                                "end": {"line": 0, "character": 10},
+                            },
+                            "selectionRange": {
+                                "start": {"line": 0, "character": 4},
+                                "end": {"line": 0, "character": 10},
+                            },
+                        }
+                    ]
+                return []
+            if method == "textDocument/references":
+                return [{"uri": consumer.as_uri(), "range": {}}]
+            raise AssertionError(f"unexpected BasedPyright request: {method}")
+
+    servers: list[AnalysisServer] = []
+
+    def server_factory(root: Path) -> AnalysisServer:
+        server = AnalysisServer(root)
+        servers.append(server)
+        return server
+
+    monkeypatch.setattr(
+        "powdrr_lift.basedpyright_tools._BasedPyrightLanguageServer",
+        server_factory,
+    )
+
+    symbols, references = find_workspace_document_analysis(
+        ["src/catalog.py", "src/dashboard.py"], worktree_root=tmp_path
+    )
+
+    assert symbols["src/catalog.py"][0]["name"] == "lookup"
+    assert references == {"src/catalog.py": ("src/dashboard.py",)}
+    assert len(servers) == 1
+    assert servers[0].document_symbol_requests == 2

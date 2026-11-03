@@ -183,6 +183,22 @@ def _planned_file_subjects(
     return tuple(subjects)
 
 
+def _planned_reference_path_pairs(
+    planned_paths: Sequence[str],
+    references_by_path: Mapping[str, Sequence[str]],
+) -> tuple[tuple[str, str], ...]:
+    """Keep reference evidence local to the paths owned by one plan item."""
+    path_set = set(planned_paths)
+    return tuple(
+        sorted(
+            (source_path, target_path)
+            for source_path in path_set
+            for target_path in references_by_path.get(source_path, ())
+            if target_path in path_set
+        )
+    )
+
+
 def _planned_existing_structural_subjects(
     item_id: str,
     units: Sequence[WorkUnit],
@@ -432,6 +448,10 @@ class SourceLedgerQuestionMachine:
             [Sequence[str]], Mapping[str, Sequence[Mapping[str, Any]]]
         ]
         | None = None,
+        structural_reference_search: Callable[
+            [Sequence[str]], Mapping[str, Sequence[str]]
+        ]
+        | None = None,
         verification_command: str = "make test",
         repository_paths: Mapping[str, PathFact] | None = None,
         preferred_runtimes: Sequence[str] = (),
@@ -447,8 +467,11 @@ class SourceLedgerQuestionMachine:
         self.evidence_excerpt_reader = evidence_excerpt_reader
         self.dependency_reference_search = dependency_reference_search
         self.structural_symbol_search = structural_symbol_search
+        self.structural_reference_search = structural_reference_search
         self._structural_symbol_cache_key: tuple[str, ...] | None = None
         self._structural_symbol_cache: Mapping[str, Sequence[Mapping[str, Any]]] = {}
+        self._structural_reference_cache_key: tuple[str, ...] | None = None
+        self._structural_reference_cache: Mapping[str, Sequence[str]] = {}
         self._dependency_reference_cache_key: tuple[Any, ...] | None = None
         self._dependency_reference_cache: Mapping[tuple[str, str], Sequence[str]] = {}
         self._evidence_search_cache: dict[str, RequirementEvidenceSearch] = {}
@@ -1571,6 +1594,15 @@ class SourceLedgerQuestionMachine:
                 planned_python_paths
             )
             self._structural_symbol_cache_key = planned_python_paths
+        if (
+            self.structural_reference_search is not None
+            and planned_python_paths
+            and planned_python_paths != self._structural_reference_cache_key
+        ):
+            self._structural_reference_cache = self.structural_reference_search(
+                planned_python_paths
+            )
+            self._structural_reference_cache_key = planned_python_paths
         order = assembly.dependency_graph.item_order
         prerequisites: dict[str, set[str]] = {item_id: set() for item_id in order}
         for edge in assembly.dependency_graph.item_edges:
@@ -1624,6 +1656,9 @@ class SourceLedgerQuestionMachine:
                     for path in sorted(item_python_paths)
                     if path in self._structural_symbol_cache
                 }
+                item_reference_path_pairs = _planned_reference_path_pairs(
+                    tuple(item_python_paths), self._structural_reference_cache
+                )
                 planned_file_subjects = _planned_file_subjects(
                     item_id,
                     units,
@@ -1651,6 +1686,7 @@ class SourceLedgerQuestionMachine:
                         source_refs=source_refs,
                         projected_baseline=projected,
                         prior_subjects=item_subjects,
+                        basedpyright_reference_path_pairs=item_reference_path_pairs,
                         page_ordinal=page_ordinal,
                         baseline_digest=baseline_digest,
                     )

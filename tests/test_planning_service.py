@@ -22,6 +22,7 @@ from powdrr_service.planning.driver import (
     _deterministic_block_disposition,
     _is_completed_zero_hit_search,
     _planned_existing_structural_subjects,
+    _planned_reference_path_pairs,
 )
 from powdrr_service.planning.questions import (
     QuestionRequest,
@@ -1156,6 +1157,16 @@ def test_zero_hit_coverage_requires_complete_pinned_search_metadata() -> None:
     assert not _is_completed_zero_hit_search(incomplete, pinned_commit="a" * 40)
     assert not _is_completed_zero_hit_search(positive_count, pinned_commit="a" * 40)
     assert not _is_completed_zero_hit_search(complete, pinned_commit="b" * 40)
+
+
+def test_structural_reference_evidence_is_scoped_to_item_paths() -> None:
+    assert _planned_reference_path_pairs(
+        ("src/first.py", "src/second.py"),
+        {
+            "src/first.py": ("src/second.py", "src/unrelated.py"),
+            "src/unrelated.py": ("src/first.py",),
+        },
+    ) == (("src/first.py", "src/second.py"),)
 
 
 def test_structural_candidates_follow_baseline_symbol_bindings_on_planned_paths() -> (

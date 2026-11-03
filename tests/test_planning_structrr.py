@@ -163,6 +163,7 @@ def test_structural_questions_send_only_relevant_baseline_subjects(
         source=source,
         source_refs=(source_ref,),
         projected_baseline=baseline,
+        basedpyright_reference_path_pairs=(("src/relevant.py", "src/projected.py"),),
     )
     assert "Use action added only when subject_ref is null" in (
         enumeration.exact_question
@@ -184,6 +185,14 @@ def test_structural_questions_send_only_relevant_baseline_subjects(
                 if record["path"] != "src/projected.py"
             ],
         },
+    )
+    without_reference_evidence = build_subject_enumeration_request(
+        plan_id="plan",
+        item_id="item-0001",
+        units=(unit,),
+        source=source,
+        source_refs=(source_ref,),
+        projected_baseline=baseline,
     )
 
     subject = BoundStructuralSubject(
@@ -214,6 +223,26 @@ def test_structural_questions_send_only_relevant_baseline_subjects(
     assert (
         enumeration.question.input_digest
         != without_projected_file.question.input_digest
+    )
+    assert (
+        enumeration.question.input_digest
+        != without_reference_evidence.question.input_digest
+    )
+    reference_fact = next(
+        fact
+        for fact in enumeration.accepted_facts
+        if fact.ref_id == "basedpyright-reference-paths:item-0001"
+    )
+    assert reference_fact.value == {
+        "references": [
+            {
+                "source_path": "src/relevant.py",
+                "target_path": "src/projected.py",
+            }
+        ]
+    }
+    assert "candidate evidence for possible relationships" in (
+        enumeration.exact_question
     )
     assert "do not return file subjects" in (enumeration.exact_question)
     assert enumeration.answer_schema["properties"]["records"]["items"]["properties"][

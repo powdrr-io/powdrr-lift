@@ -301,6 +301,10 @@ def test_compact_summary_omits_large_shape_diagnostics_but_keeps_run_metrics() -
         "plan_items": 57,
         "provider_api_calls": 900,
         "provider_requests": 1200,
+        "max_batch_members_by_question_kind": {
+            "extract_requirements": 6,
+            "propose_work_units": 4,
+        },
         "validation_retries": 4,
         "phases": {
             "dependency-and-pr-slicing": {
@@ -350,6 +354,10 @@ def test_compact_summary_omits_large_shape_diagnostics_but_keeps_run_metrics() -
 
     assert summary["elapsed_seconds"] == 972.3
     assert summary["provider_api_calls"] == 900
+    assert summary["max_batch_members_by_question_kind"] == {
+        "extract_requirements": 6,
+        "propose_work_units": 4,
+    }
     assert summary["plan_items"] == 57
     assert summary["live_structural_status"] == "passed"
     assert summary["item_sizing"]["item_count"] == 57

@@ -177,6 +177,7 @@ def compact_profile_summary(report: Mapping[str, Any]) -> dict[str, Any]:
             "plan_items",
             "provider_api_calls",
             "provider_requests",
+            "max_batch_members_by_question_kind",
             "accepted_answer_pages",
             "deterministic_answers",
             "validation_retries",
@@ -923,6 +924,17 @@ def run_profile(
     max_questions_per_provider_call = max(
         (len(metric["question_ids"]) for metric in calls), default=0
     )
+    max_batch_members_by_question_kind: dict[str, int] = defaultdict(int)
+    for metric in calls:
+        question_ids = metric.get("question_ids", [])
+        kinds = metric.get("question_kinds", [])
+        if not isinstance(question_ids, list) or not isinstance(kinds, list):
+            continue
+        for kind in kinds:
+            if isinstance(kind, str):
+                max_batch_members_by_question_kind[kind] = max(
+                    max_batch_members_by_question_kind[kind], len(question_ids)
+                )
     pages = sum(
         1
         for event in journal.events
@@ -979,6 +991,7 @@ def run_profile(
         "completion_tokens": completion_tokens if token_usage_known else None,
         "token_usage_known": token_usage_known,
         "max_questions_per_provider_call": max_questions_per_provider_call,
+        "max_batch_members_by_question_kind": dict(max_batch_members_by_question_kind),
         "validation_retries": sum(
             int(metric["validation_failures"]) for metric in calls
         ),
@@ -1045,11 +1058,16 @@ def run_profile(
         }
     if mismatches and enforce_fixture_shape:
         raise RuntimeError(f"profile {profile.name} failed expectations: {mismatches}")
-    if max_questions_per_provider_call > 4:
-        raise RuntimeError(
-            f"profile {profile.name} exceeded the four-question batch limit: "
-            f"{max_questions_per_provider_call}"
-        )
+    batch_limits = {
+        kind: 6 if kind == "extract_requirements" else 4
+        for kind in max_batch_members_by_question_kind
+    }
+    for kind, batch_size in max_batch_members_by_question_kind.items():
+        if batch_size > batch_limits[kind]:
+            raise RuntimeError(
+                f"profile {profile.name} exceeded the {batch_limits[kind]}-question "
+                f"batch limit for {kind}: {batch_size}"
+            )
     return report
 
 

@@ -19,12 +19,14 @@ from powdrr_service.planning.inference import (
 )
 
 MAX_QUESTION_INPUT_CHARS = 24_000
+MAX_SOURCE_EXTRACTION_BATCH_INPUT_CHARS = 32_000
 MAX_SOURCE_BLOCK_CHARS = 8_000
 MAX_QUESTION_ANSWER_CHARS = 4_000
 MAX_WORK_UNIT_ANSWER_CHARS = MAX_QUESTION_ANSWER_CHARS + 128
 MAX_SEMANTIC_CORRECTIONS = 2
 __all__ = [
     "MAX_QUESTION_INPUT_CHARS",
+    "MAX_SOURCE_EXTRACTION_BATCH_INPUT_CHARS",
     "MAX_SOURCE_BLOCK_CHARS",
     "MAX_QUESTION_ANSWER_CHARS",
     "MAX_SEMANTIC_CORRECTIONS",
@@ -58,8 +60,10 @@ class QuestionInputTooLarge(ValueError):
         correction: bool = False,
         question_id: str | None = None,
         question_kind: str | None = None,
+        limit_chars: int = MAX_QUESTION_INPUT_CHARS,
     ) -> None:
         self.size_chars = size_chars
+        self.limit_chars = limit_chars
         self.correction = correction
         self.question_id = question_id
         self.question_kind = question_kind
@@ -71,7 +75,7 @@ class QuestionInputTooLarge(ValueError):
         )
         super().__init__(
             f"Serialized {stage} input{identity} is {size_chars} characters; "
-            f"the limit is {MAX_QUESTION_INPUT_CHARS}. Subdivide or narrow the "
+            f"the limit is {limit_chars}. Subdivide or narrow the "
             "question context; no content was truncated."
         )
 
@@ -109,10 +113,13 @@ class QuestionRequest[AnswerT]:
     parse_answer: Callable[[Mapping[str, Any]], AnswerT]
     batch_members: tuple[QuestionRequest[Any], ...] = ()
     max_answer_chars: int = MAX_QUESTION_ANSWER_CHARS
+    max_input_chars: int = MAX_QUESTION_INPUT_CHARS
 
     def validate(self) -> None:
         if self.max_answer_chars < 1:
             raise ValueError("max_answer_chars must be positive")
+        if self.max_input_chars < 1:
+            raise ValueError("max_input_chars must be positive")
         if not self.exact_question.strip():
             raise ValueError("exact_question must not be empty")
         if not self.answer_field_definitions:
@@ -150,10 +157,10 @@ class QuestionRequest[AnswerT]:
 
 
 def batch_question_requests(
-    requests: Sequence[QuestionRequest[Any]], *, max_batch_size: int = 4
+    requests: Sequence[QuestionRequest[Any]], *, max_batch_size: int | None = None
 ) -> tuple[QuestionRequest[Any], ...]:
     """Pack compatible questions into bounded model calls without losing identity."""
-    if max_batch_size < 1:
+    if max_batch_size is not None and max_batch_size < 1:
         raise ValueError("max_batch_size must be positive")
     batches: list[QuestionRequest[Any]] = []
     pending: list[QuestionRequest[Any]] = []
@@ -168,8 +175,11 @@ def batch_question_requests(
 
     for request in requests:
         request.validate()
+        batch_limit = max_batch_size or (
+            6 if request.question.kind == "extract_requirements" else 4
+        )
         if pending and (
-            len(pending) >= max_batch_size
+            len(pending) >= batch_limit
             or request.question.kind != pending[0].question.kind
         ):
             flush()
@@ -341,6 +351,11 @@ def _build_question_batch(
         parse_answer=parse,
         batch_members=tuple(members.values()),
         max_answer_chars=sum(request.max_answer_chars for request in requests),
+        max_input_chars=(
+            MAX_SOURCE_EXTRACTION_BATCH_INPUT_CHARS
+            if requests[0].question.kind == "extract_requirements"
+            else MAX_QUESTION_INPUT_CHARS
+        ),
     )
     build_question_messages(batch)
     return batch
@@ -495,12 +510,13 @@ def build_question_messages(
         ensure_ascii=False,
         separators=(",", ":"),
     )
-    if len(serialized_input) > MAX_QUESTION_INPUT_CHARS:
+    if len(serialized_input) > request.max_input_chars:
         raise QuestionInputTooLarge(
             len(serialized_input),
             correction=correction is not None,
             question_id=current_question.question_id,
             question_kind=current_question.kind,
+            limit_chars=request.max_input_chars,
         )
     return messages
 

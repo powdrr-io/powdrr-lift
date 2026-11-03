@@ -19,8 +19,11 @@ from powdrr_contracts.models import (
 from powdrr_contracts.service import PowdrrService
 from powdrr_contracts.verification import (
     VALIDATION_PROVIDER_INVENTORY_SCHEMA_VERSION,
+    VERIFICATION_EVIDENCE_SCHEMA_VERSION,
+    EvidenceStatus,
     PostRunProbe,
     PostRunProbeResult,
+    VerificationEvidence,
 )
 
 __all__ = [
@@ -29,6 +32,7 @@ __all__ = [
     "ChatCompletionRequest",
     "ChatCompletionResponse",
     "ContractError",
+    "EvidenceStatus",
     "LocalAction",
     "OperationInput",
     "OperationReference",
@@ -41,5 +45,7 @@ __all__ = [
     "ServiceError",
     "UserAnswer",
     "UserQuestion",
+    "VerificationEvidence",
     "VALIDATION_PROVIDER_INVENTORY_SCHEMA_VERSION",
+    "VERIFICATION_EVIDENCE_SCHEMA_VERSION",
 ]

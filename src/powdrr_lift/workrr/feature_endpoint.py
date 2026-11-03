@@ -15,6 +15,7 @@ from typing import Any, cast
 
 import yaml
 from powdrr_agent.execution.postrun_probe_runner import run_postrun_probes
+from powdrr_agent.execution.verification_evidence import VerificationEvidenceRunner
 from powdrr_agent.execution.verification_provider import (
     default_verification_provider_registry,
 )
@@ -98,6 +99,9 @@ from powdrr_service.structrr.verification_obligations import (
     VerificationObligationCompilation,
     compile_verification_obligations,
 )
+from powdrr_service.verification.evidence_reconciliation import (
+    reconcile_verification_evidence,
+)
 from powdrr_service.verification.postrun_probes import (
     POSTRUN_PROBE_SCHEMA_VERSION,
     parse_generated_postrun_probe_source,
@@ -157,7 +161,6 @@ from powdrr_lift.workrr.command_catalog import (
     FeatureCommandRuntime,
     feature_command_catalog,
 )
-from powdrr_lift.workrr.evidence_reconciliation import reconcile_verification_evidence
 from powdrr_lift.workrr.git import integration_branch_name
 from powdrr_lift.workrr.protocol import WorkflowLLMClient
 from powdrr_lift.workrr.run_artifacts import (
@@ -167,7 +170,6 @@ from powdrr_lift.workrr.run_artifacts import (
     write_json_artifact,
     write_run_report,
 )
-from powdrr_lift.workrr.verification_evidence import VerificationEvidenceRunner
 
 Runner = Callable[..., subprocess.CompletedProcess[str]]
 

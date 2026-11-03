@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from powdrr_lift.workrr.verification_evidence import EvidenceStatus
+from powdrr_contracts.verification import EvidenceStatus
 
 
 def reconcile_verification_evidence(

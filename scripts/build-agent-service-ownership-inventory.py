@@ -19,6 +19,7 @@ def _owner(path: str) -> tuple[str, str, str]:
                 "/execute_pr_tests.py",
                 "/verification_provider.py",
                 "/postrun_probe_runner.py",
+                "/verification_evidence.py",
             )
         ):
             return (
@@ -44,6 +45,9 @@ def _owner(path: str) -> tuple[str, str, str]:
         ),
         "packages/service/src/powdrr_service/verification/test_obligations.py": (
             "service-owned deterministic test-obligation and coverage policy"
+        ),
+        "packages/service/src/powdrr_service/verification/evidence_reconciliation.py": (
+            "service-owned acceptance and freshness policy for verification evidence"
         ),
     }
     if path in verification_modules:
@@ -407,6 +411,7 @@ def main() -> int:
                 "packages/service/src/powdrr_service/verification/postrun_probes.py",
                 "packages/service/src/powdrr_service/verification/probe_results.py",
                 "packages/service/src/powdrr_service/verification/test_obligations.py",
+                "packages/service/src/powdrr_service/verification/evidence_reconciliation.py",
                 "packages/agent/src/powdrr_agent/artifact_state.py",
                 "packages/agent/src/powdrr_agent",
                 "packages/service/src/powdrr_service/resources/evaluations",

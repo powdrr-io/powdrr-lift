@@ -8,12 +8,13 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from typing import Any
 
-from powdrr_lift.errors import PowdrrExecutionError
-from powdrr_lift.workrr.llm import complete_json_with_timeout_retry
-from powdrr_lift.workrr.protocol import WorkflowLLMClient
 from powdrr_service.planning.contracts import (
     PlanningContractError,
     Question,
+)
+from powdrr_service.planning.inference import (
+    PlanningModelClient,
+    complete_json_with_timeout_retry,
 )
 
 MAX_QUESTION_INPUT_CHARS = 24_000
@@ -460,7 +461,7 @@ def build_question_messages(
 
 
 def run_question[AnswerT](
-    client: WorkflowLLMClient,
+    client: PlanningModelClient,
     request: QuestionRequest[AnswerT],
     *,
     model: str,
@@ -520,8 +521,8 @@ def run_question[AnswerT](
                     request.answer_schema if use_provider_schema else None
                 ),
             )
-        except PowdrrExecutionError as error:
-            if error.error_code != "invalid_json_response":
+        except RuntimeError as error:
+            if getattr(error, "error_code", None) != "invalid_json_response":
                 raise
             raw_text = _malformed_response_text(str(error))
             previous_answer = {"unparsed_response": raw_text}
@@ -591,7 +592,7 @@ def run_question[AnswerT](
 
 
 def _retry_split_batch_after_oversized_correction(
-    client: WorkflowLLMClient,
+    client: PlanningModelClient,
     request: QuestionRequest[Any],
     *,
     model: str,
@@ -672,7 +673,7 @@ def _answer_size_limit(request: QuestionRequest[Any]) -> int:
 
 
 def run_questions[AnswerT](
-    client: WorkflowLLMClient,
+    client: PlanningModelClient,
     requests: Sequence[QuestionRequest[AnswerT]],
     *,
     model: str,

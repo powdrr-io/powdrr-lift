@@ -5,7 +5,7 @@ import sys
 import time
 from pathlib import Path
 
-from powdrr_lift.opencode_monitor import (
+from powdrr_agent.execution.opencode_monitor import (
     OpenCodeLiveness,
     append_event,
     classify_event,

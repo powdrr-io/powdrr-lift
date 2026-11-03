@@ -7,13 +7,13 @@ from dataclasses import replace
 from pathlib import Path
 
 import pytest
+from powdrr_agent.execution.minisweagent_monitor import MiniSWEAgentSnapshot
 from powdrr_contracts.models import ChatCompletionRequest, ChatCompletionResponse
 from powdrr_service.behavior_contract import BEHAVIOR_DIMENSIONS
 
 from powdrr_lift.cli import main
 from powdrr_lift.core.execution_plan import ExecutionPlan, ExecutionUnit
 from powdrr_lift.core.implementation_packet import compile_implementation_packet
-from powdrr_lift.minisweagent_monitor import MiniSWEAgentSnapshot
 from powdrr_lift.workrr.coding_agent import (
     CodingAgentAttempt,
     CodingAgentAttemptStore,
@@ -379,7 +379,11 @@ def test_minisweagent_provider_uses_targeted_prompt_and_diagnostics(
 
     command = captured["command"]
     assert isinstance(command, list)
-    assert command[:3] == [sys.executable, "-m", "powdrr_lift.minisweagent_session"]
+    assert command[:3] == [
+        sys.executable,
+        "-m",
+        "powdrr_agent.execution.minisweagent_session",
+    ]
     assert "--task" in command
     task = command[command.index("--task") + 1]
     assert "Use the repository's local conventions." in task
@@ -442,7 +446,11 @@ def test_minisweagent_provider_wraps_protected_runs_in_macos_sandbox(
     command = captured["command"]
     assert isinstance(command, list)
     assert command[:2] == ["/usr/bin/sandbox-exec", "-f"]
-    assert command[3:6] == [sys.executable, "-m", "powdrr_lift.minisweagent_session"]
+    assert command[3:6] == [
+        sys.executable,
+        "-m",
+        "powdrr_agent.execution.minisweagent_session",
+    ]
     profile = captured["profile"]
     assert isinstance(profile, str)
     assert f'(deny file-write* (subpath "{protected_checkout}"))' in profile
@@ -534,7 +542,7 @@ def test_minisweagent_provider_reads_large_task_prompt_from_file(
 
     command = captured["command"]
     assert isinstance(command, list)
-    assert command[1:3] == ["-m", "powdrr_lift.minisweagent_session"]
+    assert command[1:3] == ["-m", "powdrr_agent.execution.minisweagent_session"]
     assert "--task-file" in command
     assert result.returncode == 0
     task_path = captured["task_path"]
@@ -571,8 +579,16 @@ def test_minisweagent_provider_continues_saved_session_on_next_attempt(
     provider.run(_request(_head(worktree)), worktree_root=worktree, attempt_id="first")
     provider.run(_request(_head(worktree)), worktree_root=worktree, attempt_id="repair")
 
-    assert commands[0][:3] == [sys.executable, "-m", "powdrr_lift.minisweagent_session"]
-    assert commands[1][:3] == [sys.executable, "-m", "powdrr_lift.minisweagent_session"]
+    assert commands[0][:3] == [
+        sys.executable,
+        "-m",
+        "powdrr_agent.execution.minisweagent_session",
+    ]
+    assert commands[1][:3] == [
+        sys.executable,
+        "-m",
+        "powdrr_agent.execution.minisweagent_session",
+    ]
     assert "--previous" not in commands[0]
     assert commands[1][commands[1].index("--previous") + 1].endswith("first.traj.json")
     assert commands[1][commands[1].index("--output") + 1].endswith("repair.traj.json")

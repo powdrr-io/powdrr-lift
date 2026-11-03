@@ -8,10 +8,9 @@ import threading
 from pathlib import Path
 from typing import Any
 
+from powdrr_agent.execution.inference_ipc import receive_frame, send_frame
+from powdrr_agent.execution.minisweagent_monitor import run_minisweagent
 from powdrr_contracts.models import ChatCompletionRequest, ChatCompletionResponse
-
-from powdrr_lift.inference_ipc import receive_frame, send_frame
-from powdrr_lift.minisweagent_monitor import run_minisweagent
 
 
 def test_miniswe_model_subprocess_calls_service_while_parent_keeps_progressing(
@@ -69,7 +68,7 @@ def test_miniswe_model_subprocess_calls_service_while_parent_keeps_progressing(
     command = [
         sys.executable,
         "-m",
-        "powdrr_lift.minisweagent_session",
+        "powdrr_agent.execution.minisweagent_session",
         "--task",
         "Run the provided test commands and submit the task.",
         "--model",
@@ -166,7 +165,7 @@ def test_miniswe_timeout_kills_child_during_outstanding_inference(
 import socket
 import sys
 from powdrr_contracts.models import ChatCompletionRequest
-from powdrr_lift.inference_ipc import receive_frame, send_frame
+from powdrr_agent.execution.inference_ipc import receive_frame, send_frame
 
 connection = socket.socket(fileno=int(sys.argv[1]))
 request = ChatCompletionRequest(

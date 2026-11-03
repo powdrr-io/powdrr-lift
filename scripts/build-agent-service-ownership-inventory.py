@@ -13,6 +13,12 @@ from typing import Any
 
 def _owner(path: str) -> tuple[str, str, str]:
     """Assign a first-pass owner and extraction step for one tracked path."""
+    if path.startswith("packages/agent/src/powdrr_agent/execution/"):
+        return (
+            "agent",
+            "local agent process execution, monitoring, or repository capability",
+            "6",
+        )
     if path == "packages/service/src/powdrr_service/artifact_state.py":
         return (
             "service",
@@ -367,6 +373,7 @@ def main() -> int:
                 "packages/service/src/powdrr_service/structrr",
                 "packages/service/src/powdrr_service/artifact_state.py",
                 "packages/agent/src/powdrr_agent/artifact_state.py",
+                "packages/agent/src/powdrr_agent",
                 "packages/service/src/powdrr_service/resources/evaluations",
                 "packages/service/src/powdrr_service/resources/processes",
                 "docs/procedrr",

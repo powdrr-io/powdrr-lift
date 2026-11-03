@@ -1,0 +1,210 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1343
+title: Move local worker runtime into agent package
+intent:
+  problem: Local MiniSWE and OpenCode worker execution still lived in the legacy application package, so the agent distribution could not launch its own worker runtime.
+  goal: Package local worker monitoring, session execution, and the inference IPC adapter with the open-source agent, while keeping model inference routed through the existing service boundary.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 1999, end_line: 2000}
+    summary: Move the IPC framing module's ownership record into powdrr_agent.execution.
+    rationale: Keep the ownership inventory aligned with the extracted package path.
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 2006, end_line: 2006}
+    summary: Update the MiniSWE inference adapter dependency to the new IPC module.
+    rationale: Keep documented internal imports accurate after the package move.
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 2010, end_line: 2010}
+    summary: Record the MiniSWE monitor under the agent execution package.
+    rationale: Keep the inventory aligned with local process ownership.
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 2015, end_line: 2015}
+    summary: Record the MiniSWE session entry point under the agent execution package.
+    rationale: Keep ownership aligned with the installed agent entry point.
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 2017, end_line: 2018}
+    summary: Update the MiniSWE monitor's dependency edges to the moved IPC and diagnostic modules.
+    rationale: Keep the ownership graph aligned with actual imports.
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 2022, end_line: 2023}
+    summary: Record the OpenCode monitor under the agent execution package.
+    rationale: Keep ownership aligned with local process monitoring.
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 2027, end_line: 2027}
+    summary: Update the coding agent's MiniSWE monitor dependency edge.
+    rationale: Keep the inventory aligned with the orchestration import.
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 2031, end_line: 2032}
+    summary: Update the coding agent's OpenCode monitor dependency edge.
+    rationale: Keep the inventory aligned with the orchestration import.
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 2047, end_line: 2047}
+    summary: Add the agent execution package initializer to the ownership inventory.
+    rationale: Ensure the distribution audit accounts for the package marker.
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 2051, end_line: 2052}
+    summary: Record the execution package initializer as agent-owned code.
+    rationale: Keep packaged Python sources represented in the ownership inventory.
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 2576, end_line: 2577}
+    summary: Update the coding agent's ownership dependencies for the relocated monitors.
+    rationale: Keep the architecture inventory's dependency edges accurate.
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 3874, end_line: 3882}
+    summary: Classify modules under powdrr_agent.execution as agent-owned during inventory generation.
+    rationale: Preserve ownership classification for future runtime extraction work.
+  - path: packages/agent/pyproject.toml
+    type: modified
+    span: {start_line: 6, end_line: 6}
+    summary: Declare the pinned MiniSWE runtime dependency for the packaged session entry point.
+    rationale: Allow an isolated agent installation to run MiniSWE without installing the legacy application.
+  - path: packages/agent/src/powdrr_agent/execution/__init__.py
+    type: added
+    span: {start_line: 1, end_line: 1}
+    summary: Add the agent execution package for local worker and IPC adapters.
+    rationale: Group runtime code that executes locally and delegates inference to the service.
+  - path: packages/agent/src/powdrr_agent/execution/minisweagent_inference.py
+    type: renamed
+    span: {start_line: 1, end_line: 81}
+    summary: Move the MiniSWE model adapter that forwards requests over IPC into the agent package.
+    rationale: Preserve service-mediated model calls while making the worker adapter available in the isolated agent distribution.
+  - path: packages/agent/src/powdrr_agent/execution/minisweagent_monitor.py
+    type: renamed
+    span: {start_line: 1, end_line: 376}
+    summary: Move MiniSWE process monitoring and inference IPC coordination into the agent package.
+    rationale: Keep local subprocess lifecycle and telemetry code inside the open-source agent boundary.
+  - path: packages/agent/src/powdrr_agent/execution/minisweagent_session.py
+    type: renamed
+    span: {start_line: 1, end_line: 119}
+    summary: Move the MiniSWE session entry point into the agent package and configure its IPC model adapter there.
+    rationale: Let a separately installed agent launch sessions without importing the legacy application package.
+  - path: scripts/build-agent-service-ownership-inventory.py
+    type: modified
+    span: {start_line: 16, end_line: 21}
+    summary: Classify modules under the agent execution package as agent-owned.
+    rationale: Ensure future inventory generation recognizes the extracted worker runtime.
+  - path: scripts/build-agent-service-ownership-inventory.py
+    type: modified
+    span: {start_line: 376, end_line: 376}
+    summary: Include the agent package tree in generated ownership inventories.
+    rationale: Keep future ownership inventories complete as agent modules are added.
+  - path: scripts/verify-agent-distribution.py
+    type: modified
+    span: {start_line: 95, end_line: 95}
+    summary: Require the agent wheel to declare its MiniSWE runtime dependency.
+    rationale: Prevent publishing an agent package whose session cannot load its worker framework.
+  - path: scripts/verify-agent-distribution.py
+    type: modified
+    span: {start_line: 97, end_line: 98}
+    summary: Clarify the direct dependency boundary checked for the agent wheel.
+    rationale: Document the contracts and local MiniSWE dependencies accepted by the audit.
+  - path: scripts/verify-agent-distribution.py
+    type: modified
+    span: {start_line: 116, end_line: 116}
+    summary: Resolve public MiniSWE dependencies while installing the isolated agent wheel.
+    rationale: Exercise the same dependency installation expected for a standalone agent.
+  - path: scripts/verify-agent-distribution.py
+    type: modified
+    span: {start_line: 122, end_line: 123}
+    summary: Import nested agent modules during the isolated package smoke check.
+    rationale: Ensure the newly packaged execution subpackage is importable without private code.
+  - path: scripts/verify-agent-distribution.py
+    type: modified
+    span: {start_line: 130, end_line: 136}
+    summary: Run the packaged MiniSWE session module's help entry point in isolation.
+    rationale: Verify the installed agent can start its worker entry point independently of the source tree.
+  - path: src/powdrr_lift/workrr/coding_agent.py
+    type: modified
+    span: {start_line: 24, end_line: 28}
+    summary: Import local worker monitors from the agent package.
+    rationale: Route existing orchestration through the extracted agent runtime.
+  - path: src/powdrr_lift/workrr/coding_agent.py
+    type: modified
+    span: {start_line: 30, end_line: 31}
+    summary: Update the worker monitor imports to powdrr_agent.execution.
+    rationale: Remove orchestration's dependency on modules in the legacy package.
+  - path: src/powdrr_lift/workrr/coding_agent.py
+    type: modified
+    span: {start_line: 778, end_line: 782}
+    summary: Launch MiniSWE through the session module shipped in the agent distribution.
+    rationale: Allow worker execution when only the packaged agent runtime is available.
+  - path: tests/test_coding_agent.py
+    type: modified
+    span: {start_line: 10, end_line: 10}
+    summary: Import the MiniSWE snapshot type from the agent execution package.
+    rationale: Keep worker tests bound to the relocated implementation.
+  - path: tests/test_coding_agent.py
+    type: modified
+    span: {start_line: 16, end_line: 16}
+    summary: Import the MiniSWE snapshot type from powdrr_agent.execution.
+    rationale: Keep worker tests bound to the relocated implementation.
+  - path: tests/test_coding_agent.py
+    type: modified
+    span: {start_line: 382, end_line: 386}
+    summary: Assert that regular MiniSWE runs launch the packaged session module.
+    rationale: Catch regressions to the removed legacy entry point.
+  - path: tests/test_coding_agent.py
+    type: modified
+    span: {start_line: 449, end_line: 453}
+    summary: Assert that sandboxed MiniSWE runs launch the packaged session module.
+    rationale: Keep protected-run invocation aligned with the standalone agent distribution.
+  - path: tests/test_coding_agent.py
+    type: modified
+    span: {start_line: 545, end_line: 545}
+    summary: Assert that large task prompts use the packaged session entry point.
+    rationale: Preserve the large-prompt execution path after relocating the worker.
+  - path: tests/test_coding_agent.py
+    type: modified
+    span: {start_line: 582, end_line: 591}
+    summary: Assert that resumed MiniSWE sessions use the packaged module path.
+    rationale: Keep session continuation compatible with the extracted runtime.
+  - path: tests/test_minisweagent_inference.py
+    type: modified
+    span: {start_line: 11, end_line: 12}
+    summary: Import IPC framing and MiniSWE monitoring from the agent package.
+    rationale: Keep the end-to-end inference test on the packaged implementation.
+  - path: tests/test_minisweagent_inference.py
+    type: modified
+    span: {start_line: 13, end_line: 15}
+    summary: Import IPC framing and MiniSWE monitoring from powdrr_agent.execution.
+    rationale: Keep the end-to-end inference test on the packaged implementation.
+  - path: tests/test_minisweagent_inference.py
+    type: modified
+    span: {start_line: 71, end_line: 71}
+    summary: Run the inference test worker through the packaged session module.
+    rationale: Exercise the new module path in the IPC worker test.
+  - path: tests/test_minisweagent_inference.py
+    type: modified
+    span: {start_line: 168, end_line: 168}
+    summary: Import the relocated framing helper in the timeout test's child process.
+    rationale: Keep child-process test code compatible with the extraction.
+  - path: tests/test_minisweagent_monitor.py
+    type: modified
+    span: {start_line: 8, end_line: 8}
+    summary: Import MiniSWE monitor tests from the agent package.
+    rationale: Keep lifecycle and monitoring coverage attached to the packaged implementation.
+  - path: tests/test_opencode_monitor.py
+    type: modified
+    span: {start_line: 8, end_line: 8}
+    summary: Import OpenCode monitor tests from the agent package.
+    rationale: Keep process monitoring coverage attached to the packaged implementation.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []
+features: []
+proposed_prs: []

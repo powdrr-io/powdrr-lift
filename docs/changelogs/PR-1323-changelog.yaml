@@ -9,48 +9,125 @@ structured_files: []
 files:
   - path: docs/plans/planning-efficiency-deterministic-filtering.md
     type: modified
-    span: {start_line: 3, end_line: 446}
-    summary: Record the repository-language guidance and the large live run outcome, including its plan-shape mismatch.
-    rationale: Distinguish a completed execution from a plan-quality pass and preserve the evidence behind the language preference.
+    span: {start_line: 3, end_line: 3}
+    summary: Record repository-derived implementation language guidance in the plan status.
+    rationale: Make the current planner behavior visible in the ongoing planning-efficiency work.
+  - path: docs/plans/planning-efficiency-deterministic-filtering.md
+    type: modified
+    span: {start_line: 415, end_line: 428}
+    summary: Document the diagnostic that found an ungrounded C path and explain how pinned repository preferences address it.
+    rationale: Preserve the cause of the block and the evidence for the corrective change.
+  - path: docs/plans/planning-efficiency-deterministic-filtering.md
+    type: modified
+    span: {start_line: 433, end_line: 446}
+    summary: Record the typical and large live outcomes after adding repository-language guidance.
+    rationale: Distinguish successful execution from the large profile's plan-shape mismatch and missing timing data.
   - path: packages/service/src/powdrr_service/planning/assembly.py
     type: modified
-    span: {start_line: 289, end_line: 858}
-    summary: Include preferred implementation runtimes as accepted work-unit context and in the question digest.
-    rationale: Make the pinned repository language preference part of the model input and invalidate stale answers when it changes.
+    span: {start_line: 289, end_line: 289}
+    summary: Add preferred runtimes to the work-unit context.
+    rationale: Carry repository language guidance into proposal construction.
+  - path: packages/service/src/powdrr_service/planning/assembly.py
+    type: modified
+    span: {start_line: 752, end_line: 765}
+    summary: Include preferred runtimes as an accepted fact in the work-unit question.
+    rationale: Give the model explicit implementation guidance grounded in the pinned repository.
+  - path: packages/service/src/powdrr_service/planning/assembly.py
+    type: modified
+    span: {start_line: 790, end_line: 790}
+    summary: Include runtime preferences in the question digest inputs.
+    rationale: Prevent reuse of an answer after repository-language guidance changes.
+  - path: packages/service/src/powdrr_service/planning/assembly.py
+    type: modified
+    span: {start_line: 855, end_line: 858}
+    summary: Tell the model to prefer repository languages when they satisfy the source.
+    rationale: Keep generated implementation paths aligned with the design and existing code.
   - path: packages/service/src/powdrr_service/planning/driver.py
     type: modified
-    span: {start_line: 356, end_line: 985}
-    summary: Carry preferred runtimes through the planning question machine into work-unit questions.
-    rationale: Ensure runtime preferences reach the point where implementation paths and runtimes are proposed.
+    span: {start_line: 356, end_line: 356}
+    summary: Accept preferred runtimes in the source-ledger question machine.
+    rationale: Make repository preferences available to all question assembly steps.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 373, end_line: 373}
+    summary: Store a stable deduplicated runtime preference sequence.
+    rationale: Keep planning input deterministic.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 985, end_line: 985}
+    summary: Pass the runtime preferences into work-unit context.
+    rationale: Ensure proposals receive the pinned repository guidance.
   - path: scripts/benchmark_planning_scale.py
     type: modified
-    span: {start_line: 29, end_line: 717}
-    summary: Give synthetic planning requirements explicit Python design context and expose unresolved validation diagnostics without model responses.
-    rationale: Keep the synthetic fixture grounded in its intended language and make future blocked runs diagnosable.
+    span: {start_line: 29, end_line: 29}
+    summary: Import repository path facts for the synthetic benchmark context.
+    rationale: Model an existing Python source file in the synthetic repository.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 200, end_line: 235}
+    summary: Add concise diagnostics for unresolved questions without storing model responses.
+    rationale: Make blocked benchmark runs explainable while excluding potentially sensitive answer bodies.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 467, end_line: 467}
+    summary: State that synthetic behavior outcomes should be implemented as Python modules.
+    rationale: Ground the fixture's language choice in its design.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 547, end_line: 552}
+    summary: Supply an existing pinned Python path and Python runtime preference to synthetic planning.
+    rationale: Exercise the same repository-language input used by real planning sessions.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 714, end_line: 716}
+    summary: Include unresolved validation diagnostics in benchmark reports.
+    rationale: Preserve actionable blocker details in future live runs.
   - path: src/powdrr_lift/workrr/planning_session.py
     type: modified
-    span: {start_line: 11, end_line: 693}
-    summary: Derive up to three preferred runtimes from file suffix counts in the pinned Git tree.
-    rationale: Use deterministic evidence from the repository baseline rather than an unsupported model-selected language.
+    span: {start_line: 11, end_line: 11}
+    summary: Import a counter for deterministic language frequency ranking.
+    rationale: Rank preferred runtimes from tracked source file counts.
+  - path: src/powdrr_lift/workrr/planning_session.py
+    type: modified
+    span: {start_line: 271, end_line: 271}
+    summary: Derive preferences from the pinned planning base commit.
+    rationale: Use repository state consistent with the plan's evidence baseline.
+  - path: src/powdrr_lift/workrr/planning_session.py
+    type: modified
+    span: {start_line: 668, end_line: 693}
+    summary: Derive up to three preferred runtimes from tracked path suffix counts.
+    rationale: Favor the repository's existing implementation languages deterministically.
   - path: tests/test_benchmark_planning_scale.py
     type: modified
-    span: {start_line: 9, end_line: 257}
-    summary: Cover unresolved diagnostics and the ungrounded C-path failure case.
-    rationale: Preserve a regression for the failure that exposed missing language context without retaining model output.
+    span: {start_line: 9, end_line: 10}
+    summary: Import checkpoint and question types for diagnostic tests.
+    rationale: Construct realistic unresolved planning events.
+  - path: tests/test_benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 25, end_line: 25}
+    summary: Expose unresolved-question diagnostics to tests.
+    rationale: Test the report helper without invoking a live provider.
+  - path: tests/test_benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 142, end_line: 256}
+    summary: Test safe unresolved diagnostics and reproduce the ungrounded C-path block.
+    rationale: Keep a regression for the failure that exposed missing language context.
   - path: tests/test_github_issue_plan_generation.py
     type: modified
-    span: {start_line: 310, end_line: 1734}
-    summary: Verify stable language ranking and that preferences come from the pinned Git tree.
-    rationale: Keep the source of runtime preferences deterministic and tied to the planning base commit.
+    span: {start_line: 310, end_line: 349}
+    summary: Test stable ranking of preferred languages and selection from the pinned Git tree.
+    rationale: Ensure preferences come from deterministic repository evidence.
+  - path: tests/test_github_issue_plan_generation.py
+    type: modified
+    span: {start_line: 1729, end_line: 1733}
+    summary: Supply a runtime preference in the plan-generation integration fixture.
+    rationale: Keep the mocked planning session explicit about its repository language.
   - path: tests/test_planning_assembly.py
     type: modified
     span: {start_line: 526, end_line: 551}
-    summary: Verify preferred languages are included in the work-unit prompt, accepted facts, and digest.
-    rationale: Prevent losing the implementation guidance or reusing answers after that guidance changes.
-entities:
-  - id: pinned-repository-runtime-preferences
-    type: Planning behavior
-    action: added
+    summary: Verify repository-language preferences are in the work-unit prompt and digest.
+    rationale: Prevent loss of implementation guidance or reuse of stale answers.
+entities: []
 entity_relationships: []
 invariants:
   - id: work-unit-runtime-guidance-is-pinned

@@ -463,6 +463,7 @@ def test_work_unit_question_has_a_parser_valid_example_and_exact_context() -> No
     assert "implementation_runtime" not in record_schema["properties"]
     assert "validation_ids" not in record_schema["properties"]
     assert MAX_WORK_UNIT_REQUIREMENTS_PER_QUESTION == 4
+
     with pytest.raises(PlanningContractError, match="must contain"):
         request.parse_answer(
             {

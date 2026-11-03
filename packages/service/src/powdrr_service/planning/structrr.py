@@ -583,7 +583,15 @@ def build_subject_enumeration_request(
     path_refs = tuple(path_refs_list)
     excerpt_map = _source_excerpts(source, source_refs)
     unit_facts = tuple(
-        ContextRecord(f"unit:{unit.id}", unit.to_data()) for unit in units
+        ContextRecord(
+            f"unit:{unit.id}",
+            {
+                key: value
+                for key, value in unit.to_data().items()
+                if key != "planned_writes"
+            },
+        )
+        for unit in units
     )
     baseline_digest = baseline_digest or snapshot_digest(projected_baseline)
     subject_index = _structural_subject_index(

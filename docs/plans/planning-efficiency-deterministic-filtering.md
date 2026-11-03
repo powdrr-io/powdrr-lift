@@ -629,8 +629,36 @@ fixture target was missed. Compared with the preceding concurrency-four run
 (641.034 seconds, 355 calls, zero retries), the observed elapsed time was 39%
 lower. This is one successful higher-concurrency run without token telemetry,
 so it does not establish repeatability. The CLI, session configuration, and
-service defaults now use eight; local-provider execution remains forced to one.
+service concurrency defaults now use eight; local-provider execution remains
+forced to one.
 Continue tracking retry and compile outcomes in later large runs.
+
+### Structural review payload deduplication (2026-11-03)
+
+Structural enumeration carried each work unit's `planned_writes` both in the
+unit fact and in separate path facts. The unit fact now omits that repeated
+field; the full work-unit object remains part of the question input digest, and
+the path facts still provide every write to the reviewer. A focused test checks
+both the smaller payload and retained write evidence.
+
+The deterministic large profile's structural-review phase dropped from 39 to
+35 calls, while the complete profile remained valid at 500 requirements, 150
+work units, and 50 items. In a live large run, structural review dropped from
+47 to 43 calls; that run compiled in 405.426 seconds with 335 calls and passed
+the live sizing gate (61 items). The total elapsed time was slower than the
+previous 391.309-second live run, so this payload reduction has not yet shown a
+whole-run latency improvement. Reports: `/tmp/planning-compact-structural-requests.json`
+and `/tmp/planning-live-structural-compaction.json`.
+
+An experiment raising the general batch limit from four to eight saved only two
+calls in the deterministic large profile (236 to 234). The live large profile
+then failed during work-unit proposal: several concurrent calls failed, and a
+DeepSeek stream ended before its completion marker with a partial JSON answer.
+That failure does not prove batch size alone caused the transport error, but
+there is not enough measured benefit to justify the larger response risk. Keep
+the general batch limit at four; the existing input-size subdivision and
+per-member parsers still handle batching safely. No completed live report was
+written for this failed run.
 
 ## Cross-cutting test requirements
 

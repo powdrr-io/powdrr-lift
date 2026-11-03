@@ -272,6 +272,25 @@ def test_batch_question_request_preserves_each_question_schema_and_identity() ->
         batch.parse_answer({"answers": {"q-000001": _VALID_PAGE}})
 
 
+def test_batch_question_requests_keep_default_batch_size_at_four() -> None:
+    requests = tuple(
+        _request(_question(f"q-{index:06d}", f"block-{index:02d}"))
+        for index in range(1, 9)
+    )
+
+    batches = batch_question_requests(requests)
+
+    assert [len(batch.batch_members) for batch in batches] == [4, 4]
+    for batch, members in zip(batches, (requests[:4], requests[4:]), strict=True):
+        assert batch.parse_answer(
+            {
+                "answers": {
+                    request.question.question_id: _VALID_PAGE for request in members
+                }
+            }
+        ) == {request.question.question_id: _VALID_PAGE for request in members}
+
+
 def test_oversized_batch_correction_subdivides_and_revalidates_each_member() -> None:
     requests = tuple(
         _request(

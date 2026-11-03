@@ -223,6 +223,19 @@ def test_structural_questions_send_only_relevant_baseline_subjects(
 
     assert "python::relevant" in enumeration_input
     assert "path::src/projected.py" in enumeration_input
+    unit_fact = next(
+        fact for fact in enumeration.accepted_facts if fact.ref_id == f"unit:{unit.id}"
+    )
+    write_facts = [
+        fact
+        for fact in enumeration.accepted_facts
+        if fact.ref_id.startswith(f"planned-write:{unit.id}:")
+    ]
+    assert "planned_writes" not in unit_fact.value
+    assert len(write_facts) == len(unit.planned_writes)
+    assert [fact.value for fact in write_facts] == [
+        {"unit_id": unit.id, **write.to_data()} for write in unit.planned_writes
+    ]
     assert (
         enumeration.question.input_digest
         != without_projected_file.question.input_digest

@@ -98,6 +98,13 @@ def _owner(path: str) -> tuple[str, str, str]:
                 "shared specification-v1 normalization and validation rules",
                 "8",
             )
+        if path.endswith("/implementation.py"):
+            return (
+                "service",
+                "implementation-specification validation over supplied "
+                "architecture evidence",
+                "8",
+            )
         return (
             "service",
             "service-owned structured specification validation policy",
@@ -130,6 +137,13 @@ def _owner(path: str) -> tuple[str, str, str]:
                 "split",
                 "agent handles local file I/O; service owns specification-v1 "
                 "content normalization",
+                "8",
+            )
+        if path.endswith("/implementation_specification.py"):
+            return (
+                "split",
+                "agent collects architecture-specification evidence and handles "
+                "template/file I/O; service validates implementation content",
                 "8",
             )
         return (

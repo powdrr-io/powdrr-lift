@@ -496,8 +496,10 @@ required validation cannot be reported as success. Worker commits remain visible
    service-owned because it depends only on supplied content; the agent
    collects and passes referenced system-specification evidence. Shared
    specification-v1 normalization, module/tool rules, and cross-reference rules
-   are service-owned. Implementation and proposed-PR validators remain to be
-   extracted with referenced repository evidence passed explicitly.
+   are service-owned. Implementation-specification validation is now also
+   service-owned, with the agent supplying architecture-specification evidence.
+   Proposed-PR validation remains to be extracted with its referenced
+   repository evidence passed explicitly.
    Update imports and monkeypatch targets explicitly; do not retain monkeypatch
    compatibility through global `sys.modules` aliases. Move Structrr proposal,
    source-manifest, actual-diff, and candidate-comparison policy into the service;

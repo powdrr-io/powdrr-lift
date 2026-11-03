@@ -331,6 +331,35 @@ def test_architecture_specification_policy_is_service_owned() -> None:
     )
 
 
+def test_implementation_specification_policy_is_service_owned() -> None:
+    from powdrr_service.specifications.implementation import (
+        build_implementation_specification_validation_report,
+    )
+
+    import powdrr_lift.core.implementation_specification as agent_implementation
+
+    repository = Path(__file__).parents[1]
+    validator = (
+        repository
+        / "packages/service/src/powdrr_service/specifications/implementation.py"
+    )
+    tree = ast.parse(validator.read_text(encoding="utf-8"))
+    imports: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            imports.update(alias.name.split(".")[0] for alias in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            imports.add(node.module.split(".")[0])
+
+    assert "powdrr_lift" not in imports
+    assert not hasattr(agent_implementation, "_collect_section_items")
+    assert not hasattr(agent_implementation, "_collect_features")
+    assert (
+        agent_implementation._implementation_service.build_implementation_specification_validation_report
+        is build_implementation_specification_validation_report
+    )
+
+
 def test_legacy_service_imports_are_explicitly_owned() -> None:
     repository = Path(__file__).parents[1]
     allowlist = json.loads(

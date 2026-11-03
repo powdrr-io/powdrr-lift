@@ -6,6 +6,7 @@ from contextlib import redirect_stdout
 from pathlib import Path
 
 import yaml
+from powdrr_service.specifications import implementation as implementation_service
 
 from powdrr_lift import build_implementation_specification_validation_report
 from powdrr_lift.cli import main
@@ -56,6 +57,69 @@ def _write_architecture_specification(repo_root: Path) -> Path:
         encoding="utf-8",
     )
     return architecture_specification_path
+
+
+def test_service_implementation_validator_uses_supplied_architecture_evidence(
+    tmp_path: Path,
+) -> None:
+    architecture_path = _write_architecture_specification(tmp_path)
+    report = (
+        implementation_service.build_implementation_specification_validation_report(
+            """
+        version: 1
+        architecture_id: 2026-06-19
+        entities:
+          - id: Alpha
+            action: changed
+        entity_relationships: []
+        modules: []
+        tools: []
+        features: []
+        decisions: []
+            """,
+            architecture_specification_yaml=architecture_path.read_text(
+                encoding="utf-8"
+            ),
+            architecture_specification_path=(
+                "docs/current/powdrr-lift/architecture-specification.yaml"
+            ),
+        )
+    )
+
+    assert report.validation_successful is True
+    assert report.architecture_id == "2026-06-19"
+    assert report.available_entity_ids == ["Alpha", "Beta"]
+
+
+def test_service_implementation_validator_reports_missing_and_unreadable_evidence() -> (
+    None
+):
+    missing_report = (
+        implementation_service.build_implementation_specification_validation_report(
+            "architecture_id: 2026-06-19",
+            architecture_specification_yaml=None,
+            architecture_specification_path=(
+                "docs/current/powdrr-lift/architecture-specification.yaml"
+            ),
+        )
+    )
+    unreadable_report = (
+        implementation_service.build_implementation_specification_validation_report(
+            "architecture_id: 2026-06-19",
+            architecture_specification_yaml=None,
+            architecture_specification_path=(
+                "docs/current/powdrr-lift/architecture-specification.yaml"
+            ),
+            architecture_specification_read_error="permission denied",
+        )
+    )
+
+    assert [issue.code for issue in missing_report.issues] == [
+        "architecture_specification_missing"
+    ]
+    assert [issue.code for issue in unreadable_report.issues] == [
+        "invalid_architecture_specification"
+    ]
 
 
 def test_create_implementation_specification_template_writes_default_file(

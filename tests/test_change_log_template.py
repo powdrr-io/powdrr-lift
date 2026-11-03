@@ -4,6 +4,7 @@ import subprocess
 from pathlib import Path
 from types import SimpleNamespace
 
+import yaml
 from powdrr_service.changelog import Decision, parse_change_log
 from powdrr_service.changelog.template import (
     RelatedSectionPreview,
@@ -14,6 +15,41 @@ from powdrr_lift import (
     create_change_log_template,
     create_change_log_template_from_plan_diff,
 )
+from powdrr_lift.core.template_generation import merge_existing_template_content
+
+
+def test_template_value_preservation_uses_service_merge_policy() -> None:
+    generated = (
+        "schema: fixture-v1\n"
+        "title: null\n"
+        "items:\n"
+        "  - id: null\n"
+        "    objective: null\n"
+        "    acceptance: []\n"
+    )
+    existing = (
+        "schema: fixture-v1\n"
+        "title: Keep my title\n"
+        "items:\n"
+        "  - id: task-1\n"
+        "    objective: Keep the existing objective\n"
+        "    acceptance:\n"
+        "      - preserve this acceptance criterion\n"
+    )
+
+    merged = yaml.safe_load(merge_existing_template_content(generated, existing))
+
+    assert merged == {
+        "schema": "fixture-v1",
+        "title": "Keep my title",
+        "items": [
+            {
+                "id": "task-1",
+                "objective": "Keep the existing objective",
+                "acceptance": ["preserve this acceptance criterion"],
+            }
+        ],
+    }
 
 
 def test_service_renderer_renders_diff_and_related_evidence() -> None:

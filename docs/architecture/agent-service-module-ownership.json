@@ -908,14 +908,14 @@
     {
       "extraction_pr": "3/8",
       "internal_imports": [
+        "powdrr_contracts.models",
         "powdrr_lift.core.code_index",
-        "powdrr_lift.core.template_generation",
-        "powdrr_service.changelog.template"
+        "powdrr_local"
       ],
       "kind": "python_module",
-      "owner": "split",
+      "owner": "agent",
       "path": "src/powdrr_lift/change_log_template.py",
-      "rationale": "classify public transport types versus private policy",
+      "rationale": "collect branch diff and repository-index evidence locally, then call the service renderer and write the generated template",
       "reviewed": false
     },
     {
@@ -1533,12 +1533,15 @@
       "reviewed": false
     },
     {
-      "extraction_pr": "3/8",
-      "internal_imports": [],
+      "extraction_pr": "8",
+      "internal_imports": [
+        "powdrr_contracts.models",
+        "powdrr_local"
+      ],
       "kind": "python_module",
-      "owner": "split",
+      "owner": "agent",
       "path": "src/powdrr_lift/core/template_generation.py",
-      "rationale": "classify each symbol as service policy or public exchanged data",
+      "rationale": "serialize template-preservation requests to the service operation",
       "reviewed": false
     },
     {

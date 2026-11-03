@@ -1,0 +1,330 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1334
+title: Route changelog template generation through the service
+intent:
+  problem: The agent directly imported service template formatting and plan-diff enrichment
+    policy, while template-value preservation still ran in the legacy application
+    package.
+  goal: Keep Git diff and source-index collection local, and perform changelog rendering,
+    plan-diff enrichment, and template-value preservation through serialized service
+    operations.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 911
+    end_line: 911
+  summary: Assign changelog diff collection to the agent and template policy to the
+    service.
+  rationale: Keep the ownership inventory aligned with the serialized rendering boundary.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 913
+    end_line: 913
+  summary: Assign changelog diff collection to the agent and template policy to the
+    service.
+  rationale: Keep the ownership inventory aligned with the serialized rendering boundary.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 916
+    end_line: 916
+  summary: Assign changelog diff collection to the agent and template policy to the
+    service.
+  rationale: Keep the ownership inventory aligned with the serialized rendering boundary.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 918
+    end_line: 918
+  summary: Assign changelog diff collection to the agent and template policy to the
+    service.
+  rationale: Keep the ownership inventory aligned with the serialized rendering boundary.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 1536
+    end_line: 1540
+  summary: Assign changelog diff collection to the agent and template policy to the
+    service.
+  rationale: Keep the ownership inventory aligned with the serialized rendering boundary.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 1542
+    end_line: 1542
+  summary: Assign changelog diff collection to the agent and template policy to the
+    service.
+  rationale: Keep the ownership inventory aligned with the serialized rendering boundary.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 1544
+    end_line: 1544
+  summary: Assign changelog diff collection to the agent and template policy to the
+    service.
+  rationale: Keep the ownership inventory aligned with the serialized rendering boundary.
+- path: docs/plans/agent-service-code-split.md
+  type: modified
+  span:
+    start_line: 522
+    end_line: 525
+  summary: Record service ownership of changelog template rendering and enrichment.
+  rationale: Keep the staged split plan aligned with completed work.
+- path: packages/local/src/powdrr_local/registry.py
+  type: modified
+  span:
+    start_line: 20
+    end_line: 21
+  summary: Register serialized template rendering and preservation operations.
+  rationale: Allow the agent to reach service-owned template policy through the bridge.
+- path: packages/service/src/powdrr_service/changelog/template.py
+  type: modified
+  span:
+    start_line: 9
+    end_line: 10
+  summary: Render changelog templates, apply plan-diff enrichment, and preserve existing
+    values in the service.
+  rationale: Keep proprietary template formatting and merge policy behind the service
+    boundary.
+- path: packages/service/src/powdrr_service/changelog/template.py
+  type: modified
+  span:
+    start_line: 52
+    end_line: 63
+  summary: Render changelog templates, apply plan-diff enrichment, and preserve existing
+    values in the service.
+  rationale: Keep proprietary template formatting and merge policy behind the service
+    boundary.
+- path: packages/service/src/powdrr_service/changelog/template.py
+  type: modified
+  span:
+    start_line: 75
+    end_line: 201
+  summary: Render changelog templates, apply plan-diff enrichment, and preserve existing
+    values in the service.
+  rationale: Keep proprietary template formatting and merge policy behind the service
+    boundary.
+- path: packages/service/src/powdrr_service/changelog/template.py
+  type: modified
+  span:
+    start_line: 369
+    end_line: 370
+  summary: Render changelog templates, apply plan-diff enrichment, and preserve existing
+    values in the service.
+  rationale: Keep proprietary template formatting and merge policy behind the service
+    boundary.
+- path: packages/service/src/powdrr_service/changelog/template.py
+  type: modified
+  span:
+    start_line: 393
+    end_line: 394
+  summary: Render changelog templates, apply plan-diff enrichment, and preserve existing
+    values in the service.
+  rationale: Keep proprietary template formatting and merge policy behind the service
+    boundary.
+- path: packages/service/src/powdrr_service/changelog/template.py
+  type: modified
+  span:
+    start_line: 410
+    end_line: 411
+  summary: Render changelog templates, apply plan-diff enrichment, and preserve existing
+    values in the service.
+  rationale: Keep proprietary template formatting and merge policy behind the service
+    boundary.
+- path: packages/service/src/powdrr_service/changelog/template.py
+  type: modified
+  span:
+    start_line: 749
+    end_line: 762
+  summary: Render changelog templates, apply plan-diff enrichment, and preserve existing
+    values in the service.
+  rationale: Keep proprietary template formatting and merge policy behind the service
+    boundary.
+- path: packages/service/src/powdrr_service/local_service.py
+  type: modified
+  span:
+    start_line: 47
+    end_line: 50
+  summary: Validate template evidence and return rendered templates from service operations.
+  rationale: Expose a small serialized interface for template generation and preservation.
+- path: packages/service/src/powdrr_service/local_service.py
+  type: modified
+  span:
+    start_line: 107
+    end_line: 187
+  summary: Validate template evidence and return rendered templates from service operations.
+  rationale: Expose a small serialized interface for template generation and preservation.
+- path: scripts/build-agent-service-ownership-inventory.py
+  type: modified
+  span:
+    start_line: 155
+    end_line: 167
+  summary: Classify the local changelog evidence collector and template adapter as
+    agent-owned.
+  rationale: Keep future ownership inventory generation consistent with the split.
+- path: src/powdrr_lift/change_log_template.py
+  type: modified
+  span:
+    start_line: 7
+    end_line: 7
+  summary: Collect branch diff and source-index evidence locally, then send it to
+    the service renderer.
+  rationale: Keep repository access and output-file handling with the agent.
+- path: src/powdrr_lift/change_log_template.py
+  type: modified
+  span:
+    start_line: 10
+    end_line: 10
+  summary: Collect branch diff and source-index evidence locally, then send it to
+    the service renderer.
+  rationale: Keep repository access and output-file handling with the agent.
+- path: src/powdrr_lift/change_log_template.py
+  type: modified
+  span:
+    start_line: 13
+    end_line: 91
+  summary: Collect branch diff and source-index evidence locally, then send it to
+    the service renderer.
+  rationale: Keep repository access and output-file handling with the agent.
+- path: src/powdrr_lift/change_log_template.py
+  type: modified
+  span:
+    start_line: 37
+    end_line: 38
+  summary: Collect branch diff and source-index evidence locally, then send it to
+    the service renderer.
+  rationale: Keep repository access and output-file handling with the agent.
+- path: src/powdrr_lift/change_log_template.py
+  type: modified
+  span:
+    start_line: 126
+    end_line: 129
+  summary: Collect branch diff and source-index evidence locally, then send it to
+    the service renderer.
+  rationale: Keep repository access and output-file handling with the agent.
+- path: src/powdrr_lift/change_log_template.py
+  type: modified
+  span:
+    start_line: 134
+    end_line: 134
+  summary: Collect branch diff and source-index evidence locally, then send it to
+    the service renderer.
+  rationale: Keep repository access and output-file handling with the agent.
+- path: src/powdrr_lift/change_log_template.py
+  type: modified
+  span:
+    start_line: 137
+    end_line: 137
+  summary: Collect branch diff and source-index evidence locally, then send it to
+    the service renderer.
+  rationale: Keep repository access and output-file handling with the agent.
+- path: src/powdrr_lift/change_log_template.py
+  type: modified
+  span:
+    start_line: 82
+    end_line: 83
+  summary: Collect branch diff and source-index evidence locally, then send it to
+    the service renderer.
+  rationale: Keep repository access and output-file handling with the agent.
+- path: src/powdrr_lift/change_log_template.py
+  type: modified
+  span:
+    start_line: 164
+    end_line: 165
+  summary: Collect branch diff and source-index evidence locally, then send it to
+    the service renderer.
+  rationale: Keep repository access and output-file handling with the agent.
+- path: src/powdrr_lift/change_log_template.py
+  type: modified
+  span:
+    start_line: 167
+    end_line: 167
+  summary: Collect branch diff and source-index evidence locally, then send it to
+    the service renderer.
+  rationale: Keep repository access and output-file handling with the agent.
+- path: src/powdrr_lift/change_log_template.py
+  type: modified
+  span:
+    start_line: 172
+    end_line: 173
+  summary: Collect branch diff and source-index evidence locally, then send it to
+    the service renderer.
+  rationale: Keep repository access and output-file handling with the agent.
+- path: src/powdrr_lift/change_log_template.py
+  type: modified
+  span:
+    start_line: 176
+    end_line: 176
+  summary: Collect branch diff and source-index evidence locally, then send it to
+    the service renderer.
+  rationale: Keep repository access and output-file handling with the agent.
+- path: src/powdrr_lift/change_log_template.py
+  type: modified
+  span:
+    start_line: 193
+    end_line: 193
+  summary: Collect branch diff and source-index evidence locally, then send it to
+    the service renderer.
+  rationale: Keep repository access and output-file handling with the agent.
+- path: src/powdrr_lift/change_log_template.py
+  type: modified
+  span:
+    start_line: 352
+    end_line: 352
+  summary: Collect branch diff and source-index evidence locally, then send it to
+    the service renderer.
+  rationale: Keep repository access and output-file handling with the agent.
+- path: src/powdrr_lift/core/template_generation.py
+  type: modified
+  span:
+    start_line: 1
+    end_line: 2
+  summary: Serialize template-preservation requests to the service operation.
+  rationale: Keep template merge behavior service-owned across local generators.
+- path: src/powdrr_lift/core/template_generation.py
+  type: modified
+  span:
+    start_line: 5
+    end_line: 5
+  summary: Serialize template-preservation requests to the service operation.
+  rationale: Keep template merge behavior service-owned across local generators.
+- path: src/powdrr_lift/core/template_generation.py
+  type: modified
+  span:
+    start_line: 7
+    end_line: 8
+  summary: Serialize template-preservation requests to the service operation.
+  rationale: Keep template merge behavior service-owned across local generators.
+- path: src/powdrr_lift/core/template_generation.py
+  type: modified
+  span:
+    start_line: 15
+    end_line: 33
+  summary: Serialize template-preservation requests to the service operation.
+  rationale: Keep template merge behavior service-owned across local generators.
+- path: tests/test_change_log_template.py
+  type: modified
+  span:
+    start_line: 7
+    end_line: 7
+  summary: Verify existing template values survive through the service merge operation.
+  rationale: Cover the serialized service path and preserve user-entered template
+    content.
+- path: tests/test_change_log_template.py
+  type: modified
+  span:
+    start_line: 18
+    end_line: 52
+  summary: Verify existing template values survive through the service merge operation.
+  rationale: Cover the serialized service path and preserve user-entered template
+    content.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []
+features: []
+proposed_prs: []

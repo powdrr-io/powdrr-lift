@@ -17,6 +17,8 @@ OPERATION_KINDS = frozenset(
         "verification_health",
         "verification_diff",
         "evaluate_pr_against_changelog",
+        "render_changelog_template",
+        "merge_template_content",
         "evaluate_deepswe_design",
         "evaluate_deepswe_probes",
         "evaluate_deepswe_prompt",

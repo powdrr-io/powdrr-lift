@@ -44,6 +44,10 @@ class LocalPowdrrService:
         self._probe_repair_clients = probe_repair_clients
 
     def start(self, request: OperationRequest) -> OperationUpdate:
+        if request.operation_kind == "render_changelog_template":
+            return self._render_changelog_template(request)
+        if request.operation_kind == "merge_template_content":
+            return self._merge_template_content(request)
         if request.operation_kind == "review_feedback":
             return self._review_feedback(request)
         if request.operation_kind == "verification_health":
@@ -100,6 +104,87 @@ class LocalPowdrrService:
                     ),
                     media_type="application/vnd.powdrr.artifact-state+json",
                     data=payload,
+                ),
+            ),
+        )
+
+    def _render_changelog_template(self, request: OperationRequest) -> OperationUpdate:
+        try:
+            from powdrr_service.changelog.template import build_change_log_template
+
+            inputs = request.inputs
+            branch_name = inputs.get("branch_name")
+            default_branch_name = inputs.get("default_branch_name")
+            diff_entries = inputs.get("diff_entries")
+            related_sections = inputs.get("related_sections_by_entry")
+            plan_diff = inputs.get("plan_diff_report")
+            existing_content = inputs.get("existing_content")
+            if not isinstance(branch_name, str) or not isinstance(
+                default_branch_name, str
+            ):
+                raise ValueError("branch names must be strings")
+            if not isinstance(diff_entries, list) or not all(
+                isinstance(item, dict) for item in diff_entries
+            ):
+                raise ValueError("diff_entries must be an array of objects")
+            if not isinstance(related_sections, list) or not all(
+                isinstance(item, dict) for item in related_sections
+            ):
+                raise ValueError(
+                    "related_sections_by_entry must be an array of objects"
+                )
+            if plan_diff is not None and not isinstance(plan_diff, dict):
+                raise ValueError("plan_diff_report must be an object or null")
+            if existing_content is not None and not isinstance(existing_content, str):
+                raise ValueError("existing_content must be a string or null")
+            template = build_change_log_template(
+                branch_name=branch_name,
+                default_branch_name=default_branch_name,
+                diff_entries=diff_entries,
+                related_sections_by_entry=related_sections,
+                plan_diff_report=plan_diff,
+                existing_content=existing_content,
+            )
+        except (TypeError, ValueError) as exc:
+            return _failed(request.request_id, "invalid_template_evidence", str(exc))
+        return OperationUpdate(
+            operation_id=request.request_id,
+            revision=1,
+            status="succeeded",
+            progress=({"phase": "changelog_template_rendered"},),
+            output_artifacts=(
+                Artifact(
+                    artifact_id="changelog/template.yaml",
+                    media_type="application/yaml",
+                    data=template.encode("utf-8"),
+                ),
+            ),
+        )
+
+    def _merge_template_content(self, request: OperationRequest) -> OperationUpdate:
+        from powdrr_service.changelog.template import merge_existing_template_content
+
+        generated_content = request.inputs.get("generated_content")
+        existing_content = request.inputs.get("existing_content")
+        if not isinstance(generated_content, str) or (
+            existing_content is not None and not isinstance(existing_content, str)
+        ):
+            return _failed(
+                request.request_id,
+                "invalid_template_evidence",
+                "generated_content and existing_content must be strings or null.",
+            )
+        merged = merge_existing_template_content(generated_content, existing_content)
+        return OperationUpdate(
+            operation_id=request.request_id,
+            revision=1,
+            status="succeeded",
+            progress=({"phase": "template_content_merged"},),
+            output_artifacts=(
+                Artifact(
+                    artifact_id="template/merged.yaml",
+                    media_type="application/yaml",
+                    data=merged.encode("utf-8"),
                 ),
             ),
         )

@@ -785,6 +785,15 @@
       "internal_imports": [],
       "kind": "python_module",
       "owner": "agent",
+      "path": "scripts/verify-agent-distribution.py",
+      "rationale": "local development, repository, or verification harness",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "8",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "agent",
       "path": "scripts/workflow-chat-error-harness.py",
       "rationale": "local development, repository, or verification harness",
       "reviewed": false

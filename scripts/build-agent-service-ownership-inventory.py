@@ -85,6 +85,19 @@ def _owner(path: str) -> tuple[str, str, str]:
             "8",
         )
     if path.startswith("packages/service/src/powdrr_service/specifications/"):
+        if path.endswith("/architecture.py"):
+            return (
+                "service",
+                "architecture-specification validation policy over supplied "
+                "YAML evidence",
+                "8",
+            )
+        if path.endswith("/common.py"):
+            return (
+                "service",
+                "shared specification-v1 normalization and validation rules",
+                "8",
+            )
         return (
             "service",
             "service-owned structured specification validation policy",
@@ -105,6 +118,20 @@ def _owner(path: str) -> tuple[str, str, str]:
             "3",
         )
     if path.startswith("src/powdrr_lift/core/"):
+        if path.endswith("/architecture_specification.py"):
+            return (
+                "split",
+                "agent collects system-specification evidence and handles "
+                "template/file I/O; service validates architecture content",
+                "8",
+            )
+        if path.endswith("/specification_v1.py"):
+            return (
+                "split",
+                "agent handles local file I/O; service owns specification-v1 "
+                "content normalization",
+                "8",
+            )
         return (
             "split",
             "classify each symbol as service policy or public exchanged data",

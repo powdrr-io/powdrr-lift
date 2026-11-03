@@ -492,10 +492,12 @@ required validation cannot be reported as success. Worker commits remain visible
    document YAML parsing, schema-envelope checks, and normalization of
    spec-validation issues into changelog issues are service-owned; the agent
    supplies the file content and pinned taxonomy/specification evidence.
-   System-specification semantic validation is now service-owned because it
-   depends only on supplied content. Architecture, implementation, and proposed
-   PR validators remain to be extracted with referenced repository evidence
-   passed explicitly.
+   System- and architecture-specification semantic validation is now
+   service-owned because it depends only on supplied content; the agent
+   collects and passes referenced system-specification evidence. Shared
+   specification-v1 normalization, module/tool rules, and cross-reference rules
+   are service-owned. Implementation and proposed-PR validators remain to be
+   extracted with referenced repository evidence passed explicitly.
    Update imports and monkeypatch targets explicitly; do not retain monkeypatch
    compatibility through global `sys.modules` aliases. Move Structrr proposal,
    source-manifest, actual-diff, and candidate-comparison policy into the service;

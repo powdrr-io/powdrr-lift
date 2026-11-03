@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, cast
 
 import yaml
+from powdrr_service.specifications.common import validate_related_module_references
 from powdrr_service.structrr.verification_contract import (
     VERIFICATION_CONTRACT_FIELDS,
     VerificationContract,
@@ -17,7 +18,6 @@ from powdrr_service.structrr.verification_contract import (
 from powdrr_lift.core.codebase_state import build_codebase_state_report
 from powdrr_lift.core.repo import resolve_repo_root as _resolve_repo_root
 from powdrr_lift.core.spec_paths import CURRENT_ROOT, PROPOSALS_ROOT
-from powdrr_lift.core.specification_v1 import validate_related_module_references
 from powdrr_lift.core.template_generation import merge_existing_template_content
 from powdrr_lift.core.validation_messages import (
     ValidationError,

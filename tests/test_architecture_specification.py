@@ -5,6 +5,9 @@ from contextlib import redirect_stdout
 from pathlib import Path
 
 import yaml
+from powdrr_service.specifications.architecture import (
+    build_architecture_specification_validation_report as validate_architecture_policy,
+)
 
 from powdrr_lift import build_architecture_specification_validation_report
 from powdrr_lift.cli import main
@@ -83,6 +86,26 @@ def _write_system_specification(tmp_path: Path) -> None:
     )
     system_spec_path.parent.mkdir(parents=True, exist_ok=True)
     system_spec_path.write_text(_SYSTEM_SPECIFICATION_YAML, encoding="utf-8")
+
+
+def test_service_architecture_validator_uses_supplied_repository_evidence() -> None:
+    report = validate_architecture_policy(
+        """
+        id: 2026-06-19
+        entities: []
+        modules: []
+        tools: []
+        entity_relationships: []
+        invariants: []
+        guidance: []
+        """,
+        entity_types=["Service"],
+        system_specification_yaml=_SYSTEM_SPECIFICATION_YAML,
+        system_specification_path="docs/current/example/system-specification.yaml",
+    )
+
+    assert report.validation_successful is True
+    assert report.allowed_entity_types == ["Service"]
 
 
 def test_create_architecture_specification_template_writes_default_file(

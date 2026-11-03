@@ -1,0 +1,863 @@
+"""Service-owned architecture specification validation policy."""
+
+from __future__ import annotations
+
+import re
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, field
+from typing import Any, cast
+
+import yaml
+
+from powdrr_service.specifications.common import (
+    ENTITY_ACTIONS,
+    validate_module_tool_sections,
+    validate_related_module_references,
+)
+
+
+@dataclass(frozen=True, slots=True)
+class ArchitectureSpecificationValidationIssue:
+    code: str
+    message: str
+    path: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ArchitectureSpecificationValidationReport:
+    validation_successful: bool
+    title: str | None
+    allowed_entity_types: list[str] = field(default_factory=list)
+    module_ids: list[str] = field(default_factory=list)
+    tool_ids: list[str] = field(default_factory=list)
+    issues: list[ArchitectureSpecificationValidationIssue] = field(default_factory=list)
+
+
+_RATIONALE_REFERENCE_PATTERN = re.compile(r'"([^"]+)"')
+
+
+def build_architecture_specification_validation_report(
+    proposed_architecture_specification_yaml: str,
+    *,
+    entity_types: Sequence[str],
+    system_specification_yaml: str | None,
+    system_specification_path: str,
+    system_specification_read_error: str | None = None,
+) -> ArchitectureSpecificationValidationReport:
+    allowed_entity_types = _normalize_entity_types(entity_types)
+    issues: list[ArchitectureSpecificationValidationIssue] = []
+    if not allowed_entity_types:
+        issues.append(
+            ArchitectureSpecificationValidationIssue(
+                code="allowed_entity_types_missing",
+                message="Provide at least one allowed entity type.",
+            )
+        )
+        return ArchitectureSpecificationValidationReport(
+            validation_successful=False,
+            title=None,
+            allowed_entity_types=[],
+            issues=issues,
+        )
+
+    system_reference_ids = _load_system_reference_ids(
+        system_specification_yaml,
+        system_specification_path,
+        read_error=system_specification_read_error,
+        issues=issues,
+    )
+    if not system_reference_ids:
+        return ArchitectureSpecificationValidationReport(
+            validation_successful=False,
+            title=None,
+            allowed_entity_types=allowed_entity_types,
+            issues=issues,
+        )
+
+    try:
+        raw_spec = _load_yaml_mapping(proposed_architecture_specification_yaml)
+    except Exception as exc:  # noqa: BLE001
+        issues.append(
+            ArchitectureSpecificationValidationIssue(
+                code="invalid_yaml",
+                message=(
+                    f"Could not parse proposed architecture specification YAML: {exc}"
+                ),
+            )
+        )
+        return ArchitectureSpecificationValidationReport(
+            validation_successful=False,
+            title=None,
+            allowed_entity_types=allowed_entity_types,
+            issues=issues,
+        )
+
+    _validate_template_boilerplate_removed(
+        proposed_architecture_specification_yaml,
+        issues=issues,
+    )
+
+    title = _optional_string(raw_spec.get("title"))
+    _required_string(
+        raw_spec.get("id"),
+        path="id",
+        issues=issues,
+        issue_code="architecture_id_missing",
+        issue_message="The id field is required.",
+    )
+
+    entity_ids = _collect_entity_ids(
+        _coerce_sequence(
+            raw_spec.get("entities"),
+            path="entities",
+            issues=issues,
+            issue_code="invalid_entities_section",
+            issue_message="entities must be a list of entity mappings.",
+        ),
+        allowed_entity_types=allowed_entity_types,
+        system_reference_ids=system_reference_ids,
+        issues=issues,
+    )
+    module_ids = _collect_module_ids(
+        _coerce_sequence(
+            raw_spec.get("modules"),
+            path="modules",
+            issues=issues,
+            issue_code="invalid_modules_section",
+            issue_message="modules must be a list of module mappings.",
+        ),
+        issues=issues,
+    )
+    tool_ids = _collect_tool_ids(
+        _coerce_sequence(
+            raw_spec.get("tools"),
+            path="tools",
+            issues=issues,
+            issue_code="invalid_tools_section",
+            issue_message="tools must be a list of tool mappings.",
+        ),
+        module_ids=module_ids,
+        issues=issues,
+    )
+    scoped_sections: dict[str, Sequence[object]] = {}
+    for section in ("entities", "entity_relationships", "invariants", "guidance"):
+        value = raw_spec.get(section)
+        if isinstance(value, Sequence) and not isinstance(value, (str, bytes)):
+            scoped_sections[section] = value
+    issues.extend(
+        ArchitectureSpecificationValidationIssue(
+            code=issue.code, message=issue.message, path=issue.path
+        )
+        for issue in validate_related_module_references(
+            scoped_sections, module_ids=module_ids
+        )
+    )
+    relationship_ids = _collect_relationship_ids(
+        _coerce_sequence(
+            raw_spec.get("entity_relationships"),
+            path="entity_relationships",
+            issues=issues,
+            issue_code="invalid_entity_relationships_section",
+            issue_message=(
+                "entity_relationships must be a list of relationship mappings."
+            ),
+        ),
+        entity_ids=entity_ids,
+        system_reference_ids=system_reference_ids,
+        issues=issues,
+    )
+    _collect_related_references(
+        _coerce_sequence(
+            raw_spec.get("invariants"),
+            path="invariants",
+            issues=issues,
+            issue_code="invalid_invariants_section",
+            issue_message="invariants must be a list of invariant mappings.",
+        ),
+        section_name="invariants",
+        entity_ids=entity_ids,
+        relationship_ids=relationship_ids,
+        issues=issues,
+    )
+    _collect_related_references(
+        _coerce_sequence(
+            raw_spec.get("guidance"),
+            path="guidance",
+            issues=issues,
+            issue_code="invalid_guidance_section",
+            issue_message="guidance must be a list of guidance mappings.",
+        ),
+        section_name="guidance",
+        entity_ids=entity_ids,
+        relationship_ids=relationship_ids,
+        issues=issues,
+    )
+
+    return ArchitectureSpecificationValidationReport(
+        validation_successful=not issues,
+        title=title,
+        allowed_entity_types=allowed_entity_types,
+        module_ids=sorted(module_ids),
+        tool_ids=sorted(tool_ids),
+        issues=issues,
+    )
+
+
+def _validate_template_boilerplate_removed(
+    proposed_architecture_specification_yaml: str,
+    *,
+    issues: list[ArchitectureSpecificationValidationIssue],
+) -> None:
+    boilerplate_markers = (
+        "# Architecture specification template.",
+        "# - Delete these instructions and replace them with this comment at the top:",
+    )
+    if any(
+        marker in proposed_architecture_specification_yaml
+        for marker in boilerplate_markers
+    ):
+        issues.append(
+            ArchitectureSpecificationValidationIssue(
+                code="template_boilerplate_not_removed",
+                message=(
+                    "Remove the template instructions before validating the "
+                    "architecture specification."
+                ),
+                path=None,
+            )
+        )
+
+
+def _collect_entity_ids(
+    raw_entities: Sequence[object],
+    *,
+    allowed_entity_types: Sequence[str],
+    system_reference_ids: set[str],
+    issues: list[ArchitectureSpecificationValidationIssue],
+) -> set[str]:
+    entity_ids: set[str] = set()
+    for index, raw_entity in enumerate(raw_entities):
+        entity = _coerce_mapping(
+            raw_entity,
+            path=f"entities[{index}]",
+            issues=issues,
+            issue_code="invalid_entity_entry",
+            issue_message="Each entity entry must be a mapping.",
+        )
+        if entity is None:
+            continue
+
+        entity_id = _required_string(
+            entity.get("id"),
+            path=f"entities[{index}].id",
+            issues=issues,
+            issue_code="entity_id_missing",
+            issue_message="Each entity must include an id.",
+        )
+        entity_type = _required_string(
+            entity.get("type"),
+            path=f"entities[{index}].type",
+            issues=issues,
+            issue_code="entity_type_missing",
+            issue_message="Each entity must include a type.",
+        )
+        _validate_entity_action(
+            entity.get("action"),
+            path=f"entities[{index}].action",
+            issues=issues,
+        )
+        rationale = _optional_string(entity.get("rationale"))
+        if entity_id is None or entity_type is None:
+            continue
+
+        if entity_id in entity_ids:
+            issues.append(
+                ArchitectureSpecificationValidationIssue(
+                    code="duplicate_entity_id",
+                    message=f"Entity id {entity_id!r} appears more than once.",
+                    path=f"entities[{index}].id",
+                )
+            )
+            continue
+
+        canonical_entity_type = _canonical_allowed_entity_type(
+            entity_type, allowed_entity_types
+        )
+        if canonical_entity_type is None:
+            issues.append(
+                ArchitectureSpecificationValidationIssue(
+                    code="entity_type_not_allowed",
+                    message=(
+                        f"Entity type {entity_type!r} is not allowed. Use exactly "
+                        "one of: "
+                        f"{', '.join(repr(value) for value in allowed_entity_types)}. "
+                        "This applies to entities[].type only; relationship "
+                        "source and target fields must contain entity ids, not "
+                        "entity type names."
+                    ),
+                    path=f"entities[{index}].type",
+                )
+            )
+            continue
+
+        _validate_rationale_references(
+            rationale,
+            path=f"entities[{index}].rationale",
+            system_reference_ids=system_reference_ids,
+            issues=issues,
+            require_reference=True,
+            missing_reference_code="missing_entity_rationale_reference",
+            missing_reference_message=(
+                f"Entity {entity_id!r} is missing a rationale that cites at least "
+                "one current requirement or approach id in quotes."
+            ),
+            unknown_reference_code="unknown_entity_rationale_reference",
+        )
+        entity_ids.add(entity_id)
+
+    return entity_ids
+
+
+def _collect_module_ids(
+    raw_modules: Sequence[object],
+    *,
+    issues: list[ArchitectureSpecificationValidationIssue],
+) -> set[str]:
+    shared = validate_module_tool_sections(raw_modules, [])
+    issues.extend(
+        ArchitectureSpecificationValidationIssue(
+            code=issue.code, message=issue.message, path=issue.path
+        )
+        for issue in shared.issues
+    )
+    return shared.module_ids
+
+
+def _collect_tool_ids(
+    raw_tools: Sequence[object],
+    *,
+    module_ids: set[str],
+    issues: list[ArchitectureSpecificationValidationIssue],
+) -> set[str]:
+    shared = validate_module_tool_sections([], raw_tools, module_ids=module_ids)
+    issues.extend(
+        ArchitectureSpecificationValidationIssue(
+            code=issue.code, message=issue.message, path=issue.path
+        )
+        for issue in shared.issues
+    )
+    return shared.tool_ids
+
+
+def _validate_entity_action(
+    raw_action: object,
+    *,
+    path: str,
+    issues: list[ArchitectureSpecificationValidationIssue],
+    required: bool = False,
+) -> None:
+    action = (
+        _required_string(
+            raw_action,
+            path=path,
+            issues=issues,
+            issue_code="entity_action_missing",
+            issue_message="Each entity must include an action.",
+        )
+        if required
+        else _optional_string(raw_action)
+    )
+    if action is not None and action not in ENTITY_ACTIONS:
+        issues.append(
+            ArchitectureSpecificationValidationIssue(
+                code="invalid_entity_action",
+                message=(
+                    "Each entity action must be one of "
+                    "'added', 'removed', or 'changed'."
+                ),
+                path=path,
+            )
+        )
+
+
+def _collect_relationship_ids(
+    raw_relationships: Sequence[object],
+    *,
+    entity_ids: set[str],
+    system_reference_ids: set[str],
+    issues: list[ArchitectureSpecificationValidationIssue],
+) -> set[str]:
+    relationship_ids: set[str] = set()
+    for index, raw_relationship in enumerate(raw_relationships):
+        relationship = _coerce_mapping(
+            raw_relationship,
+            path=f"entity_relationships[{index}]",
+            issues=issues,
+            issue_code="invalid_relationship_entry",
+            issue_message="Each entity relationship entry must be a mapping.",
+        )
+        if relationship is None:
+            continue
+
+        relationship_id = _required_string(
+            relationship.get("id"),
+            path=f"entity_relationships[{index}].id",
+            issues=issues,
+            issue_code="relationship_id_missing",
+            issue_message="Each entity relationship must include an id.",
+        )
+        source = _required_string(
+            relationship.get("source"),
+            path=f"entity_relationships[{index}].source",
+            issues=issues,
+            issue_code="relationship_source_missing",
+            issue_message="Each entity relationship must include a source.",
+        )
+        target = _required_string(
+            relationship.get("target"),
+            path=f"entity_relationships[{index}].target",
+            issues=issues,
+            issue_code="relationship_target_missing",
+            issue_message="Each entity relationship must include a target.",
+        )
+        rationale = _optional_string(relationship.get("rationale"))
+
+        if relationship_id is None or source is None or target is None:
+            continue
+
+        if relationship_id in relationship_ids:
+            issues.append(
+                ArchitectureSpecificationValidationIssue(
+                    code="duplicate_relationship_id",
+                    message=(
+                        f"Entity relationship id {relationship_id!r} appears more "
+                        "than once."
+                    ),
+                    path=f"entity_relationships[{index}].id",
+                )
+            )
+            continue
+
+        if source not in entity_ids:
+            issues.append(
+                ArchitectureSpecificationValidationIssue(
+                    code="unknown_relationship_entity",
+                    message=(
+                        f"Relationship source {source!r} is not listed in entities."
+                    ),
+                    path=f"entity_relationships[{index}].source",
+                )
+            )
+        if target not in entity_ids:
+            issues.append(
+                ArchitectureSpecificationValidationIssue(
+                    code="unknown_relationship_entity",
+                    message=(
+                        f"Relationship target {target!r} is not listed in entities."
+                    ),
+                    path=f"entity_relationships[{index}].target",
+                )
+            )
+
+        _validate_rationale_references(
+            rationale,
+            path=f"entity_relationships[{index}].rationale",
+            system_reference_ids=system_reference_ids,
+            issues=issues,
+            require_reference=True,
+            missing_reference_code="missing_relationship_rationale_reference",
+            missing_reference_message=(
+                f"Entity relationship {relationship_id!r} is missing a rationale "
+                "that cites at least one current requirement or approach id in "
+                "quotes."
+            ),
+            unknown_reference_code="unknown_relationship_rationale_reference",
+        )
+        relationship_ids.add(relationship_id)
+
+    return relationship_ids
+
+
+def _collect_related_references(
+    raw_items: Sequence[object],
+    *,
+    section_name: str,
+    entity_ids: set[str],
+    relationship_ids: set[str],
+    issues: list[ArchitectureSpecificationValidationIssue],
+) -> None:
+    section_label = "invariant" if section_name == "invariants" else "guidance"
+    for index, raw_item in enumerate(raw_items):
+        item = _coerce_mapping(
+            raw_item,
+            path=f"{section_name}[{index}]",
+            issues=issues,
+            issue_code="invalid_section_entry",
+            issue_message=f"Each {section_label} entry must be a mapping.",
+        )
+        if item is None:
+            continue
+
+        item_id = _required_string(
+            item.get("id"),
+            path=f"{section_name}[{index}].id",
+            issues=issues,
+            issue_code="section_id_missing",
+            issue_message=f"Each {section_label} entry must include an id.",
+        )
+        if item_id is None:
+            continue
+
+        related = item.get("related")
+        if related is None:
+            continue
+
+        related_mapping = _coerce_mapping(
+            related,
+            path=f"{section_name}[{index}].related",
+            issues=issues,
+            issue_code="invalid_related_entry",
+            issue_message="related must be a mapping when present.",
+        )
+        if related_mapping is None:
+            continue
+
+        valid_related_reference_count = 0
+        for related_index, related_entity in enumerate(
+            _coerce_sequence(
+                related_mapping.get("entities"),
+                path=f"{section_name}[{index}].related.entities",
+                issues=issues,
+                issue_code="invalid_related_entities_section",
+                issue_message="related.entities must be a list of strings.",
+            )
+        ):
+            related_entity_id = _required_string(
+                related_entity,
+                path=f"{section_name}[{index}].related.entities[{related_index}]",
+                issues=issues,
+                issue_code="related_entity_missing",
+                issue_message="Related entity references must be strings.",
+            )
+            if related_entity_id is None:
+                continue
+
+            if related_entity_id not in entity_ids:
+                issues.append(
+                    ArchitectureSpecificationValidationIssue(
+                        code="unknown_related_entity",
+                        message=(
+                            f"Related entity {related_entity_id!r} is not listed in "
+                            "entities."
+                        ),
+                        path=(
+                            f"{section_name}[{index}].related.entities[{related_index}]"
+                        ),
+                    )
+                )
+            else:
+                valid_related_reference_count += 1
+
+        for related_index, related_relationship in enumerate(
+            _coerce_sequence(
+                related_mapping.get("entity_relationships"),
+                path=f"{section_name}[{index}].related.entity_relationships",
+                issues=issues,
+                issue_code="invalid_related_relationships_section",
+                issue_message="related.entity_relationships must be a list of strings.",
+            )
+        ):
+            related_relationship_id = _required_string(
+                related_relationship,
+                path=(
+                    f"{section_name}[{index}].related.entity_relationships["
+                    f"{related_index}]"
+                ),
+                issues=issues,
+                issue_code="related_relationship_missing",
+                issue_message="Related relationship references must be strings.",
+            )
+            if related_relationship_id is None:
+                continue
+
+            if related_relationship_id not in relationship_ids:
+                issues.append(
+                    ArchitectureSpecificationValidationIssue(
+                        code="unknown_related_relationship",
+                        message=(
+                            f"Related relationship {related_relationship_id!r} "
+                            "is not listed in entity_relationships."
+                        ),
+                        path=(
+                            f"{section_name}[{index}].related.entity_relationships["
+                            f"{related_index}]"
+                        ),
+                    )
+                )
+            else:
+                valid_related_reference_count += 1
+
+        if valid_related_reference_count == 0:
+            issues.append(
+                ArchitectureSpecificationValidationIssue(
+                    code="missing_related_reference",
+                    message=(
+                        f"Each {section_label} must reference at least one "
+                        "current entity or entity relationship in related."
+                    ),
+                    path=f"{section_name}[{index}].related",
+                )
+            )
+
+
+def _validate_rationale_references(
+    rationale: str | None,
+    *,
+    path: str,
+    system_reference_ids: set[str],
+    issues: list[ArchitectureSpecificationValidationIssue],
+    require_reference: bool,
+    missing_reference_code: str,
+    missing_reference_message: str,
+    unknown_reference_code: str,
+) -> None:
+    if rationale is None:
+        if require_reference:
+            issues.append(
+                ArchitectureSpecificationValidationIssue(
+                    code=missing_reference_code,
+                    message=missing_reference_message,
+                    path=path,
+                )
+            )
+        return
+
+    referenced_ids = {
+        match.group(1) for match in _RATIONALE_REFERENCE_PATTERN.finditer(rationale)
+    }
+    if not referenced_ids:
+        if require_reference:
+            issues.append(
+                ArchitectureSpecificationValidationIssue(
+                    code=missing_reference_code,
+                    message=missing_reference_message,
+                    path=path,
+                )
+            )
+        return
+
+    unknown_reference_ids = sorted(
+        referenced_id
+        for referenced_id in referenced_ids
+        if referenced_id not in system_reference_ids
+    )
+    if unknown_reference_ids:
+        issues.append(
+            ArchitectureSpecificationValidationIssue(
+                code=unknown_reference_code,
+                message=(
+                    f"Referenced ids {unknown_reference_ids!r} are not current "
+                    "requirement or approach ids."
+                ),
+                path=path,
+            )
+        )
+
+
+def _load_system_reference_ids(
+    system_specification_yaml: str | None,
+    system_specification_path: str,
+    *,
+    read_error: str | None,
+    issues: list[ArchitectureSpecificationValidationIssue],
+) -> set[str] | None:
+    if read_error is not None:
+        issues.append(
+            ArchitectureSpecificationValidationIssue(
+                code="invalid_system_specification",
+                message=f"Could not read {system_specification_path}: {read_error}",
+                path=system_specification_path,
+            )
+        )
+        return None
+    if system_specification_yaml is None:
+        issues.append(
+            ArchitectureSpecificationValidationIssue(
+                code="missing_system_specification",
+                message=(
+                    f"{system_specification_path} is required to validate architecture "
+                    "rationale references."
+                ),
+                path=system_specification_path,
+            )
+        )
+        return None
+
+    try:
+        system_spec = _load_yaml_mapping(system_specification_yaml)
+    except Exception as exc:  # noqa: BLE001
+        issues.append(
+            ArchitectureSpecificationValidationIssue(
+                code="invalid_system_specification",
+                message=f"Could not parse {system_specification_path}: {exc}",
+                path=system_specification_path,
+            )
+        )
+        return None
+
+    reference_ids: set[str] = set()
+    for section_name in ("requirements", "approach"):
+        raw_section = system_spec.get(section_name)
+        if not isinstance(raw_section, Sequence) or isinstance(
+            raw_section, (str, bytes)
+        ):
+            issues.append(
+                ArchitectureSpecificationValidationIssue(
+                    code="invalid_system_specification",
+                    message=(
+                        f"{section_name} must be a list in {system_specification_path}."
+                    ),
+                    path=f"{system_specification_path}.{section_name}",
+                )
+            )
+            continue
+        for item_index, raw_item in enumerate(raw_section):
+            item = _coerce_mapping(
+                raw_item,
+                path=f"{system_specification_path}.{section_name}[{item_index}]",
+                issues=issues,
+                issue_code="invalid_system_specification",
+                issue_message="System specification sections must contain mappings.",
+            )
+            if item is None:
+                continue
+            reference_id = _optional_string(item.get("id"))
+            if reference_id is not None:
+                reference_ids.add(reference_id)
+    return reference_ids
+
+
+def _load_yaml_mapping(raw_yaml: str) -> Mapping[str, Any]:
+    loaded = yaml.safe_load(raw_yaml)
+    if loaded is None:
+        return {}
+    if not isinstance(loaded, Mapping):
+        raise TypeError("Top-level architecture specification must be a mapping.")
+    return cast(Mapping[str, Any], loaded)
+
+
+def _coerce_sequence(
+    raw_value: object,
+    *,
+    path: str,
+    issues: list[ArchitectureSpecificationValidationIssue],
+    issue_code: str,
+    issue_message: str,
+) -> Sequence[object]:
+    if raw_value is None:
+        return ()
+    if isinstance(raw_value, Sequence) and not isinstance(raw_value, (str, bytes)):
+        return raw_value
+    issues.append(
+        ArchitectureSpecificationValidationIssue(
+            code=issue_code,
+            message=issue_message,
+            path=path,
+        )
+    )
+    return ()
+
+
+def _coerce_mapping(
+    raw_value: object,
+    *,
+    path: str,
+    issues: list[ArchitectureSpecificationValidationIssue],
+    issue_code: str,
+    issue_message: str,
+) -> Mapping[str, Any] | None:
+    if isinstance(raw_value, Mapping):
+        return cast(Mapping[str, Any], raw_value)
+
+    issues.append(
+        ArchitectureSpecificationValidationIssue(
+            code=issue_code,
+            message=issue_message,
+            path=path,
+        )
+    )
+    return None
+
+
+def _required_string(
+    raw_value: object,
+    *,
+    path: str,
+    issues: list[ArchitectureSpecificationValidationIssue],
+    issue_code: str,
+    issue_message: str,
+) -> str | None:
+    if raw_value is None:
+        issues.append(
+            ArchitectureSpecificationValidationIssue(
+                code=issue_code,
+                message=issue_message,
+                path=path,
+            )
+        )
+        return None
+
+    value = str(raw_value).strip()
+    if value == "":
+        issues.append(
+            ArchitectureSpecificationValidationIssue(
+                code=issue_code,
+                message=issue_message,
+                path=path,
+            )
+        )
+        return None
+
+    return value
+
+
+def _optional_string(raw_value: object) -> str | None:
+    if raw_value is None:
+        return None
+
+    value = str(raw_value).strip()
+    return value or None
+
+
+def _normalize_entity_types(entity_types: Sequence[str]) -> list[str]:
+    normalized_entity_types: list[str] = []
+    seen_entity_types: set[str] = set()
+    for raw_entity_type in entity_types:
+        entity_type = str(raw_entity_type).strip()
+        if not entity_type or entity_type in seen_entity_types:
+            continue
+
+        seen_entity_types.add(entity_type)
+        normalized_entity_types.append(entity_type)
+
+    return normalized_entity_types
+
+
+def _canonical_allowed_entity_type(
+    entity_type: str,
+    allowed_entity_types: Sequence[str],
+) -> str | None:
+    normalized_value = " ".join(entity_type.split()).casefold()
+    return next(
+        (
+            allowed_type
+            for allowed_type in allowed_entity_types
+            if " ".join(allowed_type.split()).casefold() == normalized_value
+        ),
+        None,
+    )
+
+
+def normalize_architecture_entity_types(entity_types: Sequence[str]) -> list[str]:
+    """Normalize taxonomy types using the architecture policy rules."""
+    return _normalize_entity_types(entity_types)

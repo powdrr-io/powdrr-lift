@@ -1,3 +1,5 @@
+"""Parse the entity taxonomy used by service-owned Structrr policy."""
+
 from __future__ import annotations
 
 import re

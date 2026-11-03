@@ -1,4 +1,4 @@
-"""Static discovery helpers for native validation task runners."""
+"""Service-owned static discovery of native validation task runners."""
 
 from __future__ import annotations
 

@@ -384,6 +384,9 @@ def discover_dependency_candidates(
             continue
         producer_text = f"{_dependency_unit_text(producer)} {pending.description}"
         output_phrase = _dependency_token_sequence(pending.description)
+        distinctive_output_token_count = sum(
+            document_frequency[token] < rare_token_limit for token in set(output_phrase)
+        )
         candidate_tokens = {
             token
             for token in _dependency_tokens(producer_text)
@@ -401,10 +404,12 @@ def discover_dependency_candidates(
                 for path in paths_by_unit[producer.id]
                 if path
             )
-            explicit_output_reference = len(
-                output_phrase
-            ) >= 2 and _contains_token_sequence(
-                _dependency_token_sequence(consumer_text), output_phrase
+            explicit_output_reference = (
+                len(output_phrase) >= 2
+                and distinctive_output_token_count >= 1
+                and _contains_token_sequence(
+                    _dependency_token_sequence(consumer_text), output_phrase
+                )
             )
             related_requirements = related_requirement_ids or {}
             shared_requirement_relation = any(

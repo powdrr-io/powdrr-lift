@@ -278,6 +278,85 @@ def test_dependency_discovery_keeps_specific_cross_path_candidates() -> None:
     assert discovery.confirmation_pairs == ((output, consumer),)
 
 
+def test_dependency_discovery_prunes_generic_output_phrases() -> None:
+    producer = replace(
+        _unit("unit-producer"),
+        deliverable="Implement behavior outcomes 1 through 4 in a Python module.",
+        implementation_step="Implement Python module implementing behavior outcomes.",
+        planned_writes=(
+            PlannedWrite("src/behavior_1_4.py", "implementation", "python", (), ()),
+        ),
+    )
+    consumers = tuple(
+        replace(
+            _unit(f"unit-consumer-{index}", f"req-{index + 1:04d}"),
+            deliverable=(
+                f"Implement behavior outcomes {index * 4 + 1} through "
+                f"{index * 4 + 4} in a Python module."
+            ),
+            implementation_step=(
+                "Implement Python module implementing behavior outcomes."
+            ),
+            planned_writes=(
+                PlannedWrite(
+                    f"src/behavior_{index * 4 + 1}_{index * 4 + 4}.py",
+                    "implementation",
+                    "python",
+                    (),
+                    (),
+                ),
+            ),
+        )
+        for index in range(1, 12)
+    )
+    generic_output = PendingUnitOutput(
+        producer.id,
+        "Python module implementing behavior outcomes",
+        producer.requirement_ids,
+    )
+
+    discovery = discover_dependency_candidates(
+        (producer, *consumers), (generic_output,)
+    )
+
+    assert discovery.confirmation_pairs == ()
+
+
+def test_dependency_discovery_keeps_output_with_one_distinctive_token() -> None:
+    producer = replace(
+        _unit("unit-producer"),
+        deliverable="Create the stable deployment manifest.",
+        implementation_step="Create stable deployment manifest.",
+        planned_writes=(
+            PlannedWrite("src/manifest.py", "implementation", "python", (), ()),
+        ),
+    )
+    consumers = tuple(
+        replace(
+            _unit(f"unit-consumer-{index}", f"req-{index + 1:04d}"),
+            deliverable="Implement the stable deployment process.",
+            implementation_step=(
+                "Consume the stable deployment manifest."
+                if index == 1
+                else "Implement the stable deployment process."
+            ),
+            planned_writes=(
+                PlannedWrite(
+                    f"src/consumer_{index}.py", "implementation", "python", (), ()
+                ),
+            ),
+        )
+        for index in range(1, 12)
+    )
+    output = PendingUnitOutput(
+        producer.id, "stable deployment manifest", producer.requirement_ids
+    )
+
+    discovery = discover_dependency_candidates((producer, *consumers), (output,))
+
+    assert discovery.confirmation_pairs == ((output, consumers[0]),)
+
+
 def test_dependency_discovery_uses_reference_evidence_without_lexical_overlap() -> None:
     producer = replace(
         _unit("unit-0001"),

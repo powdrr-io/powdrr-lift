@@ -30,6 +30,12 @@ from powdrr_service.specifications.proposed_pr_coverage import (
     ProposedPRSourceDocument,
     validate_proposed_pr_coverage_and_effects,
 )
+from powdrr_service.specifications.proposed_pr_validation import (
+    ProposedPRValidationIssue,
+    ProposedPRValidationReport,
+    build_proposed_pr_dependency_graph,
+    build_proposed_pr_specification_validation_report,
+)
 from powdrr_service.specifications.system import (
     SystemSpecificationValidationIssue,
     SystemSpecificationValidationReport,
@@ -62,4 +68,8 @@ __all__ = [
     "ProposedPRCoverageResult",
     "ProposedPRSourceDocument",
     "validate_proposed_pr_coverage_and_effects",
+    "ProposedPRValidationIssue",
+    "ProposedPRValidationReport",
+    "build_proposed_pr_dependency_graph",
+    "build_proposed_pr_specification_validation_report",
 ]

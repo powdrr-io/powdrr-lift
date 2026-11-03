@@ -112,6 +112,13 @@ def _owner(path: str) -> tuple[str, str, str]:
                 "YAML evidence",
                 "8",
             )
+        if path.endswith("/proposed_pr_validation.py"):
+            return (
+                "service",
+                "proposed-PR specification validation policy over supplied "
+                "repository evidence",
+                "8",
+            )
         return (
             "service",
             "service-owned structured specification validation policy",
@@ -151,6 +158,13 @@ def _owner(path: str) -> tuple[str, str, str]:
                 "split",
                 "agent collects architecture-specification evidence and handles "
                 "template/file I/O; service validates implementation content",
+                "8",
+            )
+        if path.endswith("/pr_specification.py"):
+            return (
+                "split",
+                "agent collects proposal files and feature IDs and handles "
+                "templates/search; service owns proposed-PR validation policy",
                 "8",
             )
         return (

@@ -1,0 +1,263 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1329
+title: Move proposed PR validation policy to service
+intent:
+  problem: Proposed PR specification validation still performed semantic checks and
+    dependency decisions in the agent.
+  goal: Move the complete validator policy into the service while the agent supplies
+    feature IDs and repository documents.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 1389
+    end_line: 1389
+  summary: Update ownership and imports for proposed-PR validation policy.
+  rationale: Keep the ownership inventory aligned with the extracted service policy.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 1395
+    end_line: 1395
+  summary: Update ownership and imports for proposed-PR validation policy.
+  rationale: Keep the ownership inventory aligned with the extracted service policy.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3834
+    end_line: 3846
+  summary: Update ownership and imports for proposed-PR validation policy.
+  rationale: Keep the ownership inventory aligned with the extracted service policy.
+- path: docs/plans/agent-service-code-split.md
+  type: modified
+  span:
+    start_line: 504
+    end_line: 506
+  summary: Record completion of proposed-PR validation extraction.
+  rationale: Keep the split plan aligned with the implemented boundary.
+- path: packages/service/src/powdrr_service/specifications/__init__.py
+  type: modified
+  span:
+    start_line: 33
+    end_line: 38
+  summary: Export the proposed-PR validation API.
+  rationale: Make the service validation contract explicit.
+- path: packages/service/src/powdrr_service/specifications/__init__.py
+  type: modified
+  span:
+    start_line: 71
+    end_line: 74
+  summary: Export the proposed-PR validation API.
+  rationale: Make the service validation contract explicit.
+- path: packages/service/src/powdrr_service/specifications/proposed_pr_validation.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 830
+  summary: Implement proposed-PR specification validation over supplied evidence.
+  rationale: Keep validation policy in service without repository access.
+- path: scripts/build-agent-service-ownership-inventory.py
+  type: modified
+  span:
+    start_line: 115
+    end_line: 121
+  summary: Classify proposed-PR validation modules in the ownership inventory.
+  rationale: Keep regenerated ownership records consistent.
+- path: scripts/build-agent-service-ownership-inventory.py
+  type: modified
+  span:
+    start_line: 163
+    end_line: 169
+  summary: Classify proposed-PR validation modules in the ownership inventory.
+  rationale: Keep regenerated ownership records consistent.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 12
+    end_line: 12
+  summary: Collect repository evidence locally and delegate validation to the service.
+  rationale: Keep agent file access separate from semantic validation policy.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 15
+    end_line: 15
+  summary: Collect repository evidence locally and delegate validation to the service.
+  rationale: Keep agent file access separate from semantic validation policy.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 15
+    end_line: 19
+  summary: Collect repository evidence locally and delegate validation to the service.
+  rationale: Keep agent file access separate from semantic validation policy.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 48
+    end_line: 67
+  summary: Collect repository evidence locally and delegate validation to the service.
+  rationale: Keep agent file access separate from semantic validation policy.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 799
+    end_line: 799
+  summary: Collect repository evidence locally and delegate validation to the service.
+  rationale: Keep agent file access separate from semantic validation policy.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 781
+    end_line: 786
+  summary: Collect repository evidence locally and delegate validation to the service.
+  rationale: Keep agent file access separate from semantic validation policy.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 788
+    end_line: 788
+  summary: Collect repository evidence locally and delegate validation to the service.
+  rationale: Keep agent file access separate from semantic validation policy.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 790
+    end_line: 794
+  summary: Collect repository evidence locally and delegate validation to the service.
+  rationale: Keep agent file access separate from semantic validation policy.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 796
+    end_line: 797
+  summary: Collect repository evidence locally and delegate validation to the service.
+  rationale: Keep agent file access separate from semantic validation policy.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 799
+    end_line: 799
+  summary: Collect repository evidence locally and delegate validation to the service.
+  rationale: Keep agent file access separate from semantic validation policy.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 868
+    end_line: 916
+  summary: Collect repository evidence locally and delegate validation to the service.
+  rationale: Keep agent file access separate from semantic validation policy.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 918
+    end_line: 933
+  summary: Collect repository evidence locally and delegate validation to the service.
+  rationale: Keep agent file access separate from semantic validation policy.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 935
+    end_line: 978
+  summary: Collect repository evidence locally and delegate validation to the service.
+  rationale: Keep agent file access separate from semantic validation policy.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 804
+    end_line: 812
+  summary: Collect repository evidence locally and delegate validation to the service.
+  rationale: Keep agent file access separate from semantic validation policy.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 814
+    end_line: 815
+  summary: Collect repository evidence locally and delegate validation to the service.
+  rationale: Keep agent file access separate from semantic validation policy.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 1109
+    end_line: 1173
+  summary: Collect repository evidence locally and delegate validation to the service.
+  rationale: Keep agent file access separate from semantic validation policy.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 866
+    end_line: 875
+  summary: Collect repository evidence locally and delegate validation to the service.
+  rationale: Keep agent file access separate from semantic validation policy.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 878
+    end_line: 881
+  summary: Collect repository evidence locally and delegate validation to the service.
+  rationale: Keep agent file access separate from semantic validation policy.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 884
+    end_line: 895
+  summary: Collect repository evidence locally and delegate validation to the service.
+  rationale: Keep agent file access separate from semantic validation policy.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 901
+    end_line: 904
+  summary: Collect repository evidence locally and delegate validation to the service.
+  rationale: Keep agent file access separate from semantic validation policy.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 1733
+    end_line: 1757
+  summary: Collect repository evidence locally and delegate validation to the service.
+  rationale: Keep agent file access separate from semantic validation policy.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 1762
+    end_line: 1905
+  summary: Collect repository evidence locally and delegate validation to the service.
+  rationale: Keep agent file access separate from semantic validation policy.
+- path: src/powdrr_lift/core/pr_specification.py
+  type: modified
+  span:
+    start_line: 1958
+    end_line: 1989
+  summary: Collect repository evidence locally and delegate validation to the service.
+  rationale: Keep agent file access separate from semantic validation policy.
+- path: tests/test_agent_service_contracts.py
+  type: modified
+  span:
+    start_line: 367
+    end_line: 369
+  summary: Assert proposed-PR validation policy is service-owned.
+  rationale: Guard the agent/service boundary against regression.
+- path: tests/test_agent_service_contracts.py
+  type: modified
+  span:
+    start_line: 376
+    end_line: 378
+  summary: Assert proposed-PR validation policy is service-owned.
+  rationale: Guard the agent/service boundary against regression.
+- path: tests/test_agent_service_contracts.py
+  type: modified
+  span:
+    start_line: 383
+    end_line: 397
+  summary: Assert proposed-PR validation policy is service-owned.
+  rationale: Guard the agent/service boundary against regression.
+- path: tests/test_proposed_pr_validation_service.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 128
+  summary: Exercise proposed-PR validation directly through the service API.
+  rationale: Prove validation works on supplied evidence without repository access.

@@ -60,6 +60,35 @@ from powdrr_lift.workrr.github_issue_queue import QueueIssue
 from powdrr_lift.workrr.planning.evidence import RequirementEvidenceSearch
 
 
+def test_planning_options_default_to_eight_concurrent_questions() -> None:
+    assert PlanningOptions(model="test-model").max_concurrent_questions == 8
+
+
+def test_runtime_facts_deduplicate_repeated_writes_to_the_same_typed_path() -> None:
+    unit = WorkUnit(
+        "unit-0001",
+        ("req-0001", "req-0002"),
+        "Implement one shared module change.",
+        "repository",
+        "python",
+        (
+            PlannedWrite(
+                "src/shared.py", "implementation", "python", ("anchor-1",), ()
+            ),
+            PlannedWrite(
+                "src/shared.py", "implementation", "python", ("anchor-2",), ()
+            ),
+        ),
+        "Update the shared module.",
+        ("Both behaviors are implemented.",),
+        ("validation-0001",),
+    )
+
+    assert SourceLedgerQuestionMachine._runtime_fact_records((unit,)) == [
+        {"unit_id": "unit-0001", "path": "src/shared.py", "runtime": "python"}
+    ]
+
+
 class _Client:
     def __init__(self) -> None:
         self.calls = 0

@@ -82,7 +82,7 @@ class PlanningSessionConfig:
     model: str | None = None
     api_key: str | None = None
     base_url: str | None = None
-    concurrency: int = 1
+    concurrency: int = 8
 
 
 @dataclass(frozen=True, slots=True)

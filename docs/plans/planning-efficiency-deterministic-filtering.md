@@ -1,7 +1,7 @@
 # Planning Efficiency Through Deterministic Filtering
 
-**Status:** Core reductions landed; the latest concurrency-four large live run completed in 9.5 minutes; dependency candidate filtering reduced confirmations from 190 to 14; the live structural check validates actual PR sizing rather than exact item count
-**Date:** 2026-11-01  
+**Status:** Core reductions landed; the latest large live run at concurrency eight completed in 6.5 minutes with one validation retry; dependency candidate filtering reduced confirmations from 190 to 14; live sizing passes independently of the fixture item count
+**Date:** 2026-11-03  
 **Owner:** Powdrr-Lift planning service  
 **Related change:** [PR #1283](https://github.com/powdrr-io/powdrr-lift/pull/1283) starts deterministic Structrr candidate selection for path-bound existing subjects.
 
@@ -602,6 +602,35 @@ or a controlled token comparison. The live structural gate passed: 61 items
 contained two work units and one contained three, with 8–12 requirements per
 item and four acceptance criteria each. The fixture's exact 50-item target was
 not met. The report is saved at `/tmp/planning-post-extraction-batching-live.json`.
+
+### Multi-requirement examples and repeated runtime facts (2026-11-03)
+
+An eight-concurrent live experiment exposed two independent failure cases. The
+first run stopped after 287.898 seconds because a work-unit answer did not cite
+one requirement's own source anchor after its two correction attempts. The
+work-unit example had shown only the first requirement in a four-requirement
+question. The example now includes every supplied requirement and a compact
+planned write citing each requirement's source anchor. A parser-valid test
+checks the complete example.
+
+The follow-up run reached plan compilation in 581.892 seconds, but compilation
+rejected repeated runtime facts when multiple planned writes in one unit target
+the same typed path. Runtime facts are a set of `(unit, path, runtime)` values,
+so emission now deduplicates those facts before manifest validation. That run
+used a larger, four-write example, had 30 validation retries and 385 calls, and
+failed compilation. The example was compacted to one write carrying the set of
+source anchors.
+
+With those fixes, the next eight-concurrent run compiled successfully in
+391.309 seconds with 343 calls, 500 requirements, and 125 work units. It had one
+validation retry, and its live structural gate passed: 61 items held two work
+units and three held three, with 8–12 requirements per item. The exact 50-item
+fixture target was missed. Compared with the preceding concurrency-four run
+(641.034 seconds, 355 calls, zero retries), the observed elapsed time was 39%
+lower. This is one successful higher-concurrency run without token telemetry,
+so it does not establish repeatability. The CLI, session configuration, and
+service defaults now use eight; local-provider execution remains forced to one.
+Continue tracking retry and compile outcomes in later large runs.
 
 ## Cross-cutting test requirements
 

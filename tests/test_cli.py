@@ -21,6 +21,7 @@ from powdrr_lift.cli import (
 )
 from powdrr_lift.workrr.human_task import HumanTaskRunnerConfig
 from powdrr_lift.workrr.planning_session import (
+    PlanningSessionConfig,
     _accepted_planning_answers,
     _bootstrap_planning_structrr_baseline,
 )
@@ -102,6 +103,24 @@ def test_plan_resume_cli_requires_repository_and_session_issue() -> None:
     assert args.func.__name__ == "_run_plan_resume"
     assert args.repository == "owner/repository"
     assert args.session_issue == 42
+    assert args.planning_concurrency == 8
+
+
+def test_plan_cli_defaults_to_eight_concurrent_questions() -> None:
+    args = build_parser().parse_args(
+        [
+            "plan",
+            "--source",
+            "plan.md",
+            "--plan-id",
+            "bounded-plan",
+            "--verification-command",
+            "make test",
+        ]
+    )
+
+    assert args.planning_concurrency == 8
+    assert PlanningSessionConfig(repo_root=None).concurrency == 8
 
 
 def test_planning_structrr_baseline_uses_temporary_artifacts(

@@ -7,7 +7,12 @@ from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 from typing import Any, cast
 
-from powdrr_service.planning.assembly import PendingUnitOutput, WorkUnit
+from powdrr_service.planning.assembly import (
+    AllocationGroup,
+    ItemDescription,
+    PendingUnitOutput,
+    WorkUnit,
+)
 from powdrr_service.planning.checkpoints import PlanningCheckpoint
 from powdrr_service.planning.contracts import PlanningContractError, Question
 
@@ -22,6 +27,8 @@ _SCRIPT_SPEC.loader.exec_module(_SCRIPT_MODULE)
 _BENCHMARK = cast(Any, _SCRIPT_MODULE)
 PROFILES = _BENCHMARK.PROFILES
 fixture_shape_mismatches = _BENCHMARK.fixture_shape_mismatches
+item_sizing_summary = _BENCHMARK.item_sizing_summary
+live_structural_issues = _BENCHMARK.live_structural_issues
 dependency_candidate_summary = _BENCHMARK.dependency_candidate_summary
 dependency_metrics_for = _BENCHMARK.dependency_metrics_for
 unresolved_question_diagnostics = _BENCHMARK.unresolved_question_diagnostics
@@ -71,6 +78,67 @@ def test_live_scale_shape_still_requires_requirement_and_pr_counts() -> None:
         "requirements": (39, 40),
         "plan_items": (6, 5),
     }
+
+
+def test_live_structural_gate_uses_item_size_bounds_not_exact_item_count() -> None:
+    profile = PROFILES["large"]
+    report = {
+        "terminal_status": "succeeded",
+        "requirements": profile.requirements,
+        "work_units": profile.work_units,
+        "plan_items": profile.plan_items + 8,
+        "item_sizing": {"violations": []},
+    }
+
+    assert fixture_shape_mismatches(profile, report)["plan_items"] == (
+        profile.plan_items + 8,
+        profile.plan_items,
+    )
+    assert live_structural_issues(profile, report) == []
+
+
+def test_item_sizing_summary_reports_units_requirements_and_criteria() -> None:
+    group = AllocationGroup(
+        "allocation-0001",
+        ("unit-0001", "unit-0002"),
+        tuple(f"req-{index:04d}" for index in range(1, 9)),
+        ("repository",),
+        "python",
+        5,
+    )
+    description = ItemDescription("Implement parser behavior", "", ())
+
+    summary = item_sizing_summary(((group, description),))
+
+    assert summary["item_count"] == 1
+    assert summary["work_units_per_item"] == {2: 1}
+    assert summary["requirements_per_item"] == {
+        "min": 8,
+        "max": 8,
+        "average": 8.0,
+    }
+    assert summary["acceptance_criteria_per_item"] == {
+        "min": 5,
+        "max": 5,
+        "average": 5.0,
+    }
+    assert summary["violations"] == []
+
+
+def test_item_sizing_summary_flags_oversized_allocations() -> None:
+    group = AllocationGroup(
+        "allocation-0001",
+        tuple(f"unit-{index:04d}" for index in range(1, 6)),
+        tuple(f"req-{index:04d}" for index in range(1, 21)),
+        ("one", "two", "three", "four"),
+        "python",
+        6,
+    )
+    description = ItemDescription("Large item", "", ())
+
+    summary = item_sizing_summary(((group, description),))
+
+    assert len(summary["violations"]) == 3
 
 
 def test_dependency_candidate_summary_counts_output_consumers_and_reviews() -> None:
@@ -253,6 +321,24 @@ def test_compact_summary_omits_large_shape_diagnostics_but_keeps_run_metrics() -
             ],
             "items": [{"title": "large generated item payload"} for _ in range(57)],
         },
+        "live_structural_status": "passed",
+        "live_structural_issues": [],
+        "item_sizing": {
+            "item_count": 57,
+            "work_units_per_item": {2: 57},
+            "requirements_per_item": {"min": 8, "max": 8, "average": 8.0},
+            "acceptance_criteria_per_item": {
+                "min": 2,
+                "max": 5,
+                "average": 4.1,
+            },
+            "components_per_item": {"min": 1, "max": 1, "average": 1.0},
+            "maximum_work_units": 4,
+            "maximum_acceptance_criteria": 5,
+            "maximum_components": 3,
+            "violations": [],
+            "items": [{"title": "large item diagnostic"} for _ in range(57)],
+        },
         "pending_questions": [],
     }
 
@@ -262,6 +348,8 @@ def test_compact_summary_omits_large_shape_diagnostics_but_keeps_run_metrics() -
     assert summary["elapsed_seconds"] == 972.3
     assert summary["provider_api_calls"] == 900
     assert summary["plan_items"] == 57
+    assert summary["live_structural_status"] == "passed"
+    assert summary["item_sizing"]["item_count"] == 57
     assert summary["phases"]["confirm_dependency"] == {
         "questions": 600,
         "api_calls": 150,
@@ -273,6 +361,7 @@ def test_compact_summary_omits_large_shape_diagnostics_but_keeps_run_metrics() -
     }
     assert "large raw requirement payload" not in serialized
     assert "large generated item payload" not in serialized
+    assert "large item diagnostic" not in serialized
     assert "by_output" not in serialized
     assert len(serialized) < 2_000
 

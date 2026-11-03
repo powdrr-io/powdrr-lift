@@ -1,4 +1,4 @@
-"""Discover Python project boundaries and declared development environments."""
+"""Service-owned discovery of Python components and environments."""
 
 from __future__ import annotations
 

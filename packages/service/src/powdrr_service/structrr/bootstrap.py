@@ -13,19 +13,22 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+
 from powdrr_service.changelog import parse_change_log
 from powdrr_service.decision_obligation import content_fingerprint
+from powdrr_service.structrr.entity_taxonomy import (
+    EntityTaxonomy,
+    load_entity_taxonomy,
+)
 from powdrr_service.structrr.source_manifest import (
     SourceManifest,
     compile_source_manifest,
     is_specification_path,
 )
+from powdrr_service.structrr.validation import validation_context
 from powdrr_service.structrr.validation_models import (
     validate_validation_records,
 )
-
-from powdrr_lift.core.entity_taxonomy import EntityTaxonomy, load_entity_taxonomy
-from powdrr_lift.structrr.validation import validation_context
 
 _SCHEMA = "https://powdrr.io/schema/changelog-v2"
 _BOOTSTRAP_SCHEMA = "https://powdrr.io/schema/structrr-bootstrap-v1"
@@ -1216,9 +1219,8 @@ def _build_document(
     validation_files: Sequence[str] = (),
 ) -> dict[str, Any]:
     from powdrr_service.structrr.active_intent import active_intent_section
-
-    from powdrr_lift.structrr.python_topology import discover_python_topology
-    from powdrr_lift.structrr.validation import (
+    from powdrr_service.structrr.python_topology import discover_python_topology
+    from powdrr_service.structrr.validation import (
         assign_python_topology,
         discover_validation_profiles,
         validation_inventory,

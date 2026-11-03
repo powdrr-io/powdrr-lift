@@ -3,8 +3,8 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-from powdrr_lift.structrr.bootstrap import bootstrap_structrr
-from powdrr_lift.structrr.python_topology import discover_python_topology
+from powdrr_service.structrr.bootstrap import bootstrap_structrr
+from powdrr_service.structrr.python_topology import discover_python_topology
 
 
 def test_distinguishes_project_metadata_from_environment_managers(

@@ -9,8 +9,9 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from powdrr_service.structrr.bootstrap import bootstrap_structrr
+
 from powdrr_lift.basedpyright_tools import execute_basedpyright_tool
-from powdrr_lift.structrr.bootstrap import bootstrap_structrr
 
 from .symbols import extract
 

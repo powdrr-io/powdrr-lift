@@ -3,8 +3,8 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, cast
 
-from powdrr_lift.structrr.validation import discover_validation_profiles
-from powdrr_lift.structrr.validation_tasks import (
+from powdrr_service.structrr.validation import discover_validation_profiles
+from powdrr_service.structrr.validation_tasks import (
     discover_hatch_configuration,
     discover_just_configuration,
     discover_make_configuration,

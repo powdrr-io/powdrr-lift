@@ -63,6 +63,10 @@ from powdrr_service.structrr.actual_diff import (
     StructrrActualDiff,
     compile_actual_structrr_diff,
 )
+from powdrr_service.structrr.bootstrap import (
+    bootstrap_structrr,
+    validate_bootstrap_sections,
+)
 from powdrr_service.structrr.candidate_comparison import compare_candidate_snapshot
 from powdrr_service.structrr.gate_compiler import (
     compile_proposal_worklist,
@@ -82,6 +86,9 @@ from powdrr_service.structrr.proposal_review import (
 )
 from powdrr_service.structrr.snapshot import snapshot_digest
 from powdrr_service.structrr.source_manifest import SourceManifest
+from powdrr_service.structrr.validation import (
+    DiscoveredValidationProfile,
+)
 from powdrr_service.structrr.verification_obligations import (
     VerificationObligationCompilation,
     compile_verification_obligations,
@@ -101,13 +108,6 @@ from powdrr_lift.core.spec_context import (
     render_gather_context_report,
 )
 from powdrr_lift.errors import PowdrrExecutionError
-from powdrr_lift.structrr.bootstrap import (
-    bootstrap_structrr,
-    validate_bootstrap_sections,
-)
-from powdrr_lift.structrr.validation import (
-    DiscoveredValidationProfile,
-)
 from powdrr_lift.workrr.actualization import reconcile_actualization
 from powdrr_lift.workrr.candidate_checkpoint import checkpoint_candidate_changes
 from powdrr_lift.workrr.candidate_safety import (

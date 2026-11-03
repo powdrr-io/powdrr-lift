@@ -5,15 +5,14 @@ import subprocess
 from pathlib import Path
 
 import yaml
-from powdrr_service.structrr.rebase import rebase_structrr_snapshot
-from powdrr_service.structrr.snapshot import snapshot_digest
-
-from powdrr_lift.structrr.bootstrap import (
+from powdrr_service.structrr.bootstrap import (
     BOOTSTRAP_SECTION_VERSIONS,
     bootstrap_structrr,
     validate_bootstrap_document,
     validate_bootstrap_sections,
 )
+from powdrr_service.structrr.rebase import rebase_structrr_snapshot
+from powdrr_service.structrr.snapshot import snapshot_digest
 
 
 def _git(repo: Path, *args: str) -> None:

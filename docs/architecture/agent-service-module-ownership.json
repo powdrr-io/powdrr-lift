@@ -833,9 +833,9 @@
       "extraction_pr": "3/6",
       "internal_imports": [
         "powdrr_lift.agent_runtime",
-        "powdrr_lift.core.entity_taxonomy",
+        "powdrr_service.structrr.entity_taxonomy",
         "powdrr_lift.errors",
-        "powdrr_lift.structrr.bootstrap",
+        "powdrr_service.structrr.bootstrap",
         "powdrr_lift.structrr.source_manifest",
         "powdrr_lift.workrr.run_artifacts"
       ],
@@ -923,7 +923,7 @@
       "internal_imports": [
         "powdrr_lift.change_log_template",
         "powdrr_lift.core.architecture_specification",
-        "powdrr_lift.core.entity_taxonomy",
+        "powdrr_service.structrr.entity_taxonomy",
         "powdrr_lift.core.implementation_specification",
         "powdrr_lift.core.index",
         "powdrr_lift.core.pr_specification",
@@ -961,7 +961,7 @@
         "powdrr_lift.core.capability_exception",
         "powdrr_lift.core.delivery_profile",
         "powdrr_lift.core.effective_contract",
-        "powdrr_lift.core.entity_taxonomy",
+        "powdrr_service.structrr.entity_taxonomy",
         "powdrr_lift.core.execution_plan",
         "powdrr_lift.core.pr_specification",
         "powdrr_lift.core.project_structure",
@@ -980,7 +980,7 @@
         "powdrr_lift.process.templates",
         "powdrr_lift.pull_request_description",
         "powdrr_lift.repository_state",
-        "powdrr_lift.structrr.bootstrap",
+        "powdrr_service.structrr.bootstrap",
         "powdrr_lift.structrr.intent",
         "powdrr_lift.workrr.chat_config",
         "powdrr_lift.workrr.chat_tui",
@@ -1256,12 +1256,12 @@
       "reviewed": false
     },
     {
-      "extraction_pr": "3/8",
+      "extraction_pr": "8",
       "internal_imports": [],
       "kind": "python_module",
-      "owner": "split",
-      "path": "src/powdrr_lift/core/entity_taxonomy.py",
-      "rationale": "classify each symbol as service policy or public exchanged data",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/structrr/entity_taxonomy.py",
+      "rationale": "Service-owned Structrr bootstrap, taxonomy, and validation discovery policy.",
       "reviewed": false
     },
     {
@@ -2142,7 +2142,7 @@
     {
       "extraction_pr": "3",
       "internal_imports": [
-        "powdrr_lift.structrr.bootstrap"
+        "powdrr_service.structrr.bootstrap"
       ],
       "kind": "python_module",
       "owner": "split",
@@ -2174,11 +2174,11 @@
       "reviewed": false
     },
     {
-      "extraction_pr": "3",
+      "extraction_pr": "8",
       "internal_imports": [
-        "powdrr_lift.core.entity_taxonomy",
-        "powdrr_lift.structrr.python_topology",
-        "powdrr_lift.structrr.validation",
+        "powdrr_service.structrr.entity_taxonomy",
+        "powdrr_service.structrr.python_topology",
+        "powdrr_service.structrr.validation",
         "powdrr_service.changelog",
         "powdrr_service.decision_obligation",
         "powdrr_service.structrr.active_intent",
@@ -2186,9 +2186,9 @@
         "powdrr_service.structrr.validation_models"
       ],
       "kind": "python_module",
-      "owner": "split",
-      "path": "src/powdrr_lift/structrr/bootstrap.py",
-      "rationale": "service semantics; agent supplies pinned repository evidence",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/structrr/bootstrap.py",
+      "rationale": "Service-owned Structrr bootstrap, taxonomy, and validation discovery policy.",
       "reviewed": false
     },
     {
@@ -2292,12 +2292,12 @@
       "reviewed": false
     },
     {
-      "extraction_pr": "3",
+      "extraction_pr": "8",
       "internal_imports": [],
       "kind": "python_module",
-      "owner": "split",
-      "path": "src/powdrr_lift/structrr/python_topology.py",
-      "rationale": "service semantics; agent supplies pinned repository evidence",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/structrr/python_topology.py",
+      "rationale": "Service-owned Structrr bootstrap, taxonomy, and validation discovery policy.",
       "reviewed": false
     },
     {
@@ -2323,16 +2323,16 @@
       "reviewed": false
     },
     {
-      "extraction_pr": "3",
+      "extraction_pr": "8",
       "internal_imports": [
-        "powdrr_lift.structrr.python_topology",
+        "powdrr_service.structrr.python_topology",
         "powdrr_service.structrr.validation_models",
-        "powdrr_lift.structrr.validation_tasks"
+        "powdrr_service.structrr.validation_tasks"
       ],
       "kind": "python_module",
-      "owner": "split",
-      "path": "src/powdrr_lift/structrr/validation.py",
-      "rationale": "service semantics; agent supplies pinned repository evidence",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/structrr/validation.py",
+      "rationale": "Service-owned Structrr bootstrap, taxonomy, and validation discovery policy.",
       "reviewed": false
     },
     {
@@ -2345,12 +2345,12 @@
       "reviewed": true
     },
     {
-      "extraction_pr": "3",
+      "extraction_pr": "8",
       "internal_imports": [],
       "kind": "python_module",
-      "owner": "split",
-      "path": "src/powdrr_lift/structrr/validation_tasks.py",
-      "rationale": "service semantics; agent supplies pinned repository evidence",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/structrr/validation_tasks.py",
+      "rationale": "Service-owned Structrr bootstrap, taxonomy, and validation discovery policy.",
       "reviewed": false
     },
     {
@@ -2809,8 +2809,8 @@
         "powdrr_lift.core.implementation_packet",
         "powdrr_lift.core.spec_context",
         "powdrr_lift.errors",
-        "powdrr_lift.structrr.bootstrap",
-        "powdrr_lift.structrr.validation",
+        "powdrr_service.structrr.bootstrap",
+        "powdrr_service.structrr.validation",
         "powdrr_lift.workrr.actualization",
         "powdrr_lift.workrr.candidate_checkpoint",
         "powdrr_lift.workrr.candidate_safety",
@@ -3050,7 +3050,7 @@
     {
       "extraction_pr": "7",
       "internal_imports": [
-        "powdrr_lift.structrr.validation",
+        "powdrr_service.structrr.validation",
         "powdrr_lift.workrr.test_obligations"
       ],
       "kind": "python_module",
@@ -3407,7 +3407,7 @@
         "powdrr_lift.process.tasks",
         "powdrr_contracts.models",
         "powdrr_local",
-        "powdrr_lift.structrr.bootstrap",
+        "powdrr_service.structrr.bootstrap",
         "powdrr_lift.structrr.proposal",
         "powdrr_lift.structrr.source_manifest",
         "powdrr_lift.workrr.action_operations",
@@ -3498,7 +3498,7 @@
     {
       "extraction_pr": "7",
       "internal_imports": [
-        "powdrr_lift.structrr.validation"
+        "powdrr_service.structrr.validation"
       ],
       "kind": "python_module",
       "owner": "split",

@@ -34,6 +34,7 @@ from powdrr_service.changelog.validation_policy import (
 from powdrr_service.specifications.system import (
     build_system_specification_validation_report,
 )
+from powdrr_service.structrr.entity_taxonomy import load_entity_taxonomy
 
 from powdrr_lift.change_log_template import (
     BranchDiffEntry,
@@ -45,7 +46,6 @@ from powdrr_lift.change_log_template import (
 from powdrr_lift.core.architecture_specification import (
     build_architecture_specification_validation_report,
 )
-from powdrr_lift.core.entity_taxonomy import load_entity_taxonomy
 from powdrr_lift.core.implementation_specification import (
     build_implementation_specification_validation_report,
 )

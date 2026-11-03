@@ -4,7 +4,6 @@ import ast
 import base64
 import hashlib
 import importlib.util
-import json
 from pathlib import Path
 
 import pytest
@@ -396,14 +395,8 @@ def test_proposed_pr_specification_validation_policy_is_service_owned() -> None:
     )
 
 
-def test_legacy_service_imports_are_explicitly_owned() -> None:
+def test_service_has_no_legacy_agent_imports() -> None:
     repository = Path(__file__).parents[1]
-    allowlist = json.loads(
-        (
-            repository / "docs/architecture/agent-service-legacy-import-allowlist.json"
-        ).read_text(encoding="utf-8")
-    )
-    expected = {entry["import"] for entry in allowlist["entries"]}
     actual: set[str] = set()
     package = repository / "packages/service/src/powdrr_service"
     for source in package.rglob("*.py"):
@@ -413,8 +406,10 @@ def test_legacy_service_imports_are_explicitly_owned() -> None:
                 for alias in node.names:
                     if node.module.startswith("powdrr_lift"):
                         actual.add(f"{node.module}.{alias.name}")
-    assert actual == expected
-    assert all(entry["owner_pr"] > 0 for entry in allowlist["entries"])
+    assert actual == set()
+    assert not (
+        repository / "docs/architecture/agent-service-legacy-import-allowlist.json"
+    ).exists()
 
 
 def test_procedrr_runtime_and_operation_dispatch_are_service_owned() -> None:

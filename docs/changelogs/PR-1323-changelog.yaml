@@ -1,0 +1,59 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1323
+title: Prefer pinned repository languages in planning proposals
+intent:
+  problem: Work-unit proposals could select an arbitrary implementation language even when the design and pinned repository clearly use another language, causing unsupported paths and blocked plans.
+  goal: Give planning questions explicit language preferences derived from tracked source files at the pinned base commit and retain the preference in the question digest.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/plans/planning-efficiency-deterministic-filtering.md
+    type: modified
+    span: {start_line: 3, end_line: 446}
+    summary: Record the repository-language guidance and the large live run outcome, including its plan-shape mismatch.
+    rationale: Distinguish a completed execution from a plan-quality pass and preserve the evidence behind the language preference.
+  - path: packages/service/src/powdrr_service/planning/assembly.py
+    type: modified
+    span: {start_line: 289, end_line: 858}
+    summary: Include preferred implementation runtimes as accepted work-unit context and in the question digest.
+    rationale: Make the pinned repository language preference part of the model input and invalidate stale answers when it changes.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 356, end_line: 985}
+    summary: Carry preferred runtimes through the planning question machine into work-unit questions.
+    rationale: Ensure runtime preferences reach the point where implementation paths and runtimes are proposed.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 29, end_line: 717}
+    summary: Give synthetic planning requirements explicit Python design context and expose unresolved validation diagnostics without model responses.
+    rationale: Keep the synthetic fixture grounded in its intended language and make future blocked runs diagnosable.
+  - path: src/powdrr_lift/workrr/planning_session.py
+    type: modified
+    span: {start_line: 11, end_line: 693}
+    summary: Derive up to three preferred runtimes from file suffix counts in the pinned Git tree.
+    rationale: Use deterministic evidence from the repository baseline rather than an unsupported model-selected language.
+  - path: tests/test_benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 9, end_line: 257}
+    summary: Cover unresolved diagnostics and the ungrounded C-path failure case.
+    rationale: Preserve a regression for the failure that exposed missing language context without retaining model output.
+  - path: tests/test_github_issue_plan_generation.py
+    type: modified
+    span: {start_line: 310, end_line: 1734}
+    summary: Verify stable language ranking and that preferences come from the pinned Git tree.
+    rationale: Keep the source of runtime preferences deterministic and tied to the planning base commit.
+  - path: tests/test_planning_assembly.py
+    type: modified
+    span: {start_line: 526, end_line: 551}
+    summary: Verify preferred languages are included in the work-unit prompt, accepted facts, and digest.
+    rationale: Prevent losing the implementation guidance or reusing answers after that guidance changes.
+entities:
+  - id: pinned-repository-runtime-preferences
+    type: Planning behavior
+    action: added
+entity_relationships: []
+invariants:
+  - id: work-unit-runtime-guidance-is-pinned
+    description: Preferred implementation runtimes are derived from tracked paths at the pinned base commit and included in work-unit question identity.
+    action: added
+guidance: []

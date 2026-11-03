@@ -1,0 +1,179 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1335
+title: Move planning inference retry policy into service
+intent:
+  problem: Planning question execution depended on legacy application modules for
+    model typing, malformed-response classification, and transient retry/backoff.
+  goal: Keep planning inference contracts and retry behavior service-owned while
+    preserving bounded retries, provider schema forwarding, malformed JSON repair,
+    and planning outcomes.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/architecture/agent-service-legacy-import-allowlist.json
+  type: modified
+  span:
+    start_line: 4
+    end_line: 8
+  summary: Remove the legacy planning execution error import from the service allowlist.
+  rationale: Planning malformed-response handling now uses the provider error code without importing the application execution error class.
+- path: docs/architecture/agent-service-legacy-import-allowlist.json
+  type: modified
+  span:
+    start_line: 14
+    end_line: 18
+  summary: Remove the legacy JSON completion retry helper from the service allowlist.
+  rationale: Planning retries now execute in a service-owned inference module.
+- path: docs/architecture/agent-service-legacy-import-allowlist.json
+  type: modified
+  span:
+    start_line: 28
+    end_line: 32
+  summary: Remove the legacy workflow model protocol from the service allowlist.
+  rationale: Planning uses a service-owned model protocol.
+- path: packages/service/src/powdrr_service/planning/inference.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 117
+  summary: Define the planning model protocol and structured completion retry policy.
+  rationale: Keep schema forwarding, transient provider retry classification, exponential backoff, and exhaustion errors in the service.
+- path: packages/service/src/powdrr_service/planning/questions.py
+  type: modified
+  span:
+    start_line: 11
+    end_line: 13
+  summary: Remove legacy execution and provider imports from planning questions.
+  rationale: Keep planning dependencies inside the service package.
+- path: packages/service/src/powdrr_service/planning/questions.py
+  type: modified
+  span:
+    start_line: 15
+    end_line: 18
+  summary: Import planning inference types and retry behavior from the service module.
+  rationale: Route bounded questions through service-owned inference behavior.
+- path: packages/service/src/powdrr_service/planning/questions.py
+  type: modified
+  span:
+    start_line: 464
+    end_line: 464
+  summary: Type question execution with the service planning model protocol.
+  rationale: Remove a direct dependency on the legacy workflow protocol.
+- path: packages/service/src/powdrr_service/planning/questions.py
+  type: modified
+  span:
+    start_line: 524
+    end_line: 525
+  summary: Detect malformed JSON using its error code without importing the legacy error class.
+  rationale: Preserve the existing correction path while keeping error ownership in service code.
+- path: packages/service/src/powdrr_service/planning/questions.py
+  type: modified
+  span:
+    start_line: 595
+    end_line: 595
+  summary: Type question batch recovery with the service planning model protocol.
+  rationale: Keep service-owned question execution independent of legacy model typing.
+- path: packages/service/src/powdrr_service/planning/questions.py
+  type: modified
+  span:
+    start_line: 676
+    end_line: 676
+  summary: Type multi-question execution with the service planning model protocol.
+  rationale: Keep service-owned question execution independent of legacy model typing.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 27
+    end_line: 27
+  summary: Remove the legacy workflow model protocol import.
+  rationale: Use service-owned planning inference types throughout the coordinator.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 33
+    end_line: 33
+  summary: Import the service planning model protocol.
+  rationale: Keep the planning coordinator typed within the service package.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 284
+    end_line: 284
+  summary: Type question telemetry with the service planning model protocol.
+  rationale: Keep service telemetry independent of legacy model types.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 450
+    end_line: 450
+  summary: Type planning advancement with the service planning model protocol.
+  rationale: Keep planning execution on the service-owned model contract.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 700
+    end_line: 700
+  summary: Type planning question batches with the service planning model protocol.
+  rationale: Keep planning execution on the service-owned model contract.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 941
+    end_line: 941
+  summary: Type the planning operation executor with the service planning model protocol.
+  rationale: Keep the service runtime independent of legacy model type imports.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 1007
+    end_line: 1007
+  summary: Type the Procedrr planning entry point with the service planning model protocol.
+  rationale: Keep the service runtime independent of legacy model type imports.
+- path: tests/test_planning_questions.py
+  type: modified
+  span:
+    start_line: 18
+    end_line: 18
+  summary: Import the service-owned retry exhaustion error in planning tests.
+  rationale: Assert the service inference boundary's terminal failure type.
+- path: tests/test_planning_questions.py
+  type: modified
+  span:
+    start_line: 40
+    end_line: 44
+  summary: Replace legacy model and execution errors in question tests with service provider errors.
+  rationale: Exercise service-owned inference error handling.
+- path: tests/test_planning_questions.py
+  type: modified
+  span:
+    start_line: 468
+    end_line: 468
+  summary: Use a service provider response error for malformed JSON repair coverage.
+  rationale: Verify planning correction behavior against service-owned error metadata.
+- path: tests/test_planning_questions.py
+  type: modified
+  span:
+    start_line: 500
+    end_line: 500
+  summary: Use the service HTTP error type in provider 429 retry coverage.
+  rationale: Verify service-owned transient provider classification.
+- path: tests/test_planning_questions.py
+  type: modified
+  span:
+    start_line: 506
+    end_line: 506
+  summary: Patch the service retry delay in provider backoff coverage.
+  rationale: Verify the service-owned retry policy deterministically.
+- path: tests/test_planning_questions.py
+  type: modified
+  span:
+    start_line: 523
+    end_line: 551
+  summary: Verify retry exhaustion count, backoff intervals, and the service-owned error.
+  rationale: Protect the finite provider retry budget.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []
+features: []
+proposed_prs: []

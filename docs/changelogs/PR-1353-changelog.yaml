@@ -1,0 +1,53 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1353
+title: Reduce duplicate planning structural review context
+intent:
+  problem: Structural review repeated every planned write in both its unit facts and its individual path facts, increasing request size.
+  goal: Remove the duplicated write payload while preserving the path evidence and binding the complete unit data to the question digest.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/plans/planning-efficiency-deterministic-filtering.md
+  type: modified
+  span:
+    start_line: 632
+    end_line: 633
+  summary: Record structural review payload compaction results and the rejected eight-question batch experiment.
+  rationale: Preserve measured call counts, live-run caveats, and the batch-size decision with the planning work.
+- path: docs/plans/planning-efficiency-deterministic-filtering.md
+  type: modified
+  span:
+    start_line: 636
+    end_line: 662
+  summary: Record structural review payload compaction results and the rejected eight-question batch experiment.
+  rationale: Preserve measured call counts, live-run caveats, and the batch-size decision with the planning work.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 586
+    end_line: 594
+  summary: Omit duplicated planned writes from structural unit facts.
+  rationale: The same writes remain available as path facts while complete unit data remains included in the input digest.
+- path: tests/test_planning_questions.py
+  type: modified
+  span:
+    start_line: 275
+    end_line: 293
+  summary: Assert the default question batch cap stays at four and preserves each member answer.
+  rationale: Keep batching bounded after the eight-question live experiment failed during work-unit generation.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span:
+    start_line: 226
+    end_line: 238
+  summary: Verify structural unit facts omit planned writes while path facts retain them.
+  rationale: Prevent prompt compaction from losing planned write evidence.
+entities: []
+entity_relationships: []
+invariants:
+- id: structural-review-retains-planned-write-evidence
+  description: Each planned write remains available to structural review as a path fact even though unit facts omit the duplicate payload.
+  action: added
+guidance: []
+features: []
+proposed_prs: []

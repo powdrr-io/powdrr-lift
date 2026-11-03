@@ -19,6 +19,7 @@ _MAX_RESULTS = 200
 _MAX_REFERENCE_FILES = 512
 _MAX_REFERENCE_SYMBOLS_PER_FILE = 512
 _MAX_REFERENCE_REQUESTS = 1_024
+_MAX_DOCUMENT_SYMBOLS_PER_FILE = 512
 
 
 def is_basedpyright_tool(tool: str) -> bool:
@@ -170,6 +171,71 @@ def find_workspace_reference_paths(
         for path, references in sorted(reference_paths.items())
         if references
     }
+
+
+def find_workspace_document_symbols(
+    paths: list[str], *, worktree_root: Path
+) -> dict[str, list[dict[str, Any]]]:
+    """Return BasedPyright document symbols for a bounded set of Python paths."""
+    root = worktree_root.resolve()
+    normalized_paths = tuple(
+        sorted(
+            {
+                str(path.resolve().relative_to(root))
+                for value in paths
+                if (path := _resolve_worktree_path(value, root)).is_file()
+                and path.suffix.casefold() in {".py", ".pyi"}
+            }
+        )
+    )
+    if len(normalized_paths) > _MAX_REFERENCE_FILES:
+        raise PowdrrExecutionError(
+            f"BasedPyright symbol search accepts at most {_MAX_REFERENCE_FILES} "
+            "planned Python files at once."
+        )
+    if not normalized_paths:
+        return {}
+
+    source_by_path = {
+        relative_path: _resolve_worktree_path(relative_path, root).read_text(
+            encoding="utf-8"
+        )
+        for relative_path in normalized_paths
+    }
+    with _BasedPyrightLanguageServer(root) as server:
+        for relative_path, source in source_by_path.items():
+            path = _resolve_worktree_path(relative_path, root)
+            server.notify(
+                "textDocument/didOpen",
+                {
+                    "textDocument": {
+                        "uri": path.as_uri(),
+                        "languageId": "python",
+                        "version": 1,
+                        "text": source,
+                    }
+                },
+            )
+        results: dict[str, list[dict[str, Any]]] = {}
+        for relative_path in normalized_paths:
+            path = _resolve_worktree_path(relative_path, root)
+            symbols = server.request(
+                "textDocument/documentSymbol",
+                {"textDocument": {"uri": path.as_uri()}},
+            )
+            if not isinstance(symbols, list):
+                raise PowdrrExecutionError(
+                    "basedpyright returned an invalid document symbol result."
+                )
+            if _document_symbol_count(symbols) > _MAX_DOCUMENT_SYMBOLS_PER_FILE:
+                raise PowdrrExecutionError(
+                    f"BasedPyright returned more than {_MAX_DOCUMENT_SYMBOLS_PER_FILE} "
+                    f"document symbols for {relative_path}."
+                )
+            results[relative_path] = [
+                _document_symbol_to_data(symbol, root) for symbol in symbols
+            ]
+    return results
 
 
 def _symbol_reference_positions(
@@ -494,6 +560,20 @@ def _document_symbol_to_data(symbol: Any, worktree_root: Path) -> dict[str, Any]
         ]
     _ = worktree_root
     return result
+
+
+def _document_symbol_count(symbols: list[Any]) -> int:
+    count = 0
+    pending = list(symbols)
+    while pending:
+        symbol = pending.pop()
+        if not isinstance(symbol, dict):
+            continue
+        count += 1
+        children = symbol.get("children")
+        if isinstance(children, list):
+            pending.extend(children)
+    return count
 
 
 _SYMBOL_KINDS = {

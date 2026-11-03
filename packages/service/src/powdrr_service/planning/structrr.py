@@ -560,6 +560,8 @@ def build_subject_enumeration_request(
     prior_subjects: Sequence[BoundStructuralSubject] = (),
     page_ordinal: int = 1,
     baseline_digest: str | None = None,
+    basedpyright_symbols_by_path: Mapping[str, Sequence[Mapping[str, Any]]]
+    | None = None,
 ) -> QuestionRequest[StructuralSubjectPage]:
     unit_ids = {unit.id for unit in units}
     requirement_ids = {req for unit in units for req in unit.requirement_ids}
@@ -628,7 +630,32 @@ def build_subject_enumeration_request(
             "next_anchor_if_more": f"structural-page-{page_ordinal + 1:04d}",
         },
     )
-    facts = (*unit_facts, *path_refs, baseline_fact, *prior_facts, pagination_fact)
+    symbol_paths = {
+        write.path for unit in units for write in unit.planned_writes if write.path
+    }
+    symbol_fact = (
+        ContextRecord(
+            f"basedpyright-symbols:{item_id}",
+            {
+                "symbols_by_path": {
+                    path: [
+                        dict(symbol) for symbol in basedpyright_symbols_by_path[path]
+                    ]
+                    for path in sorted(symbol_paths & set(basedpyright_symbols_by_path))
+                }
+            },
+        )
+        if basedpyright_symbols_by_path
+        else None
+    )
+    facts = (
+        *unit_facts,
+        *path_refs,
+        baseline_fact,
+        *prior_facts,
+        *((symbol_fact,) if symbol_fact is not None else ()),
+        pagination_fact,
+    )
     context_ids = (
         *(excerpt.ref_id for excerpt in excerpt_map),
         *(record.ref_id for record in facts),
@@ -674,6 +701,9 @@ def build_subject_enumeration_request(
                     "units": [unit.to_data() for unit in units],
                     "source": [(item.ref_id, item.text) for item in excerpt_map],
                     "prior": [item.to_data() for item in prior_subjects],
+                    "basedpyright_symbols": (
+                        None if symbol_fact is None else symbol_fact.value
+                    ),
                     "page": page_ordinal,
                 }
             ),
@@ -687,7 +717,10 @@ def build_subject_enumeration_request(
             "deterministically; do not return file subjects. Include only changes "
             "required by this item's allocated units. Use a supplied existing "
             "entity or relationship reference, or describe one new entity or "
-            "relationship identity. "
+            "relationship identity. Use the BasedPyright symbol inventory for "
+            "the planned Python paths to find relevant existing symbols; the "
+            "inventory is candidate evidence, not proof that every symbol changes. "
+            "Do not infer relationships from shared paths or names alone. "
             "Cite the requirements, units, and source anchors that "
             "justify each subject. Omit implementation details that do not change "
             "Structrr. "

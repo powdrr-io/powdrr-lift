@@ -9,6 +9,7 @@ from powdrr_lift.basedpyright_tools import (
     BASEDPYRIGHT_STRUCTURE_TOOL,
     BASEDPYRIGHT_SYMBOL_TOOL,
     execute_basedpyright_tool,
+    find_workspace_document_symbols,
     find_workspace_reference_paths,
 )
 from powdrr_lift.errors import PowdrrExecutionError
@@ -113,6 +114,37 @@ def test_basedpyright_structure_tool_returns_file_symbols(
     assert result["symbols"][0]["name"] == "Example"
     assert result["symbols"][0]["kind"] == "class"
     assert result["symbols"][0]["container_name"] == "module"
+
+
+def test_workspace_document_symbols_batches_planned_paths(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    (tmp_path / "src").mkdir()
+    for name in ("first.py", "second.py"):
+        (tmp_path / "src" / name).write_text("class Example: ...\n")
+    servers: list[_FakeServer] = []
+
+    def server_factory(root: Path) -> _FakeServer:
+        server = _FakeServer(root)
+        servers.append(server)
+        return server
+
+    monkeypatch.setattr(
+        "powdrr_lift.basedpyright_tools._BasedPyrightLanguageServer",
+        server_factory,
+    )
+
+    result = find_workspace_document_symbols(
+        ["src/second.py", "src/first.py", "src/first.py"],
+        worktree_root=tmp_path,
+    )
+
+    assert list(result) == ["src/first.py", "src/second.py"]
+    assert result["src/first.py"][0]["name"] == "Example"
+    assert result["src/first.py"][0]["kind"] == "class"
+    assert len(servers) == 1
+    assert len(servers[0].notifications) == 2
 
 
 def test_basedpyright_structure_tool_rejects_non_python_paths(tmp_path: Path) -> None:

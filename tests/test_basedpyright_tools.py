@@ -279,8 +279,7 @@ def test_reference_candidates_recall_labeled_cross_file_edges_without_decoys(
 ) -> None:
     sources = {
         "src/identity.py": (
-            "def normalize_id(value): ...\n"
-            "def validate_id(value): ...\n"
+            "def normalize_id(value): ...\ndef validate_id(value): ...\n"
         ),
         "src/storage.py": "def save_record(record): ...\ndef load_record(key): ...\n",
         "src/api.py": (

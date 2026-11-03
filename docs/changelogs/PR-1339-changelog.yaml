@@ -19,7 +19,7 @@ files:
     rationale: Exercise BasedPyright output through the same item-scoping helper used by Structrr.
   - path: tests/test_basedpyright_tools.py
     type: modified
-    span: {start_line: 274, end_line: 386}
+    span: {start_line: 274, end_line: 385}
     summary: Add a hand-labeled producer-to-consumer chain with an unplanned-file decoy.
     rationale: Prove the candidate path set retains all three expected edges while excluding references outside the planned files.
 entities: []

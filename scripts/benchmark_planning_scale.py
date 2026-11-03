@@ -31,7 +31,7 @@ from powdrr_service.planning.assembly import (
     MAX_ITEM_CRITERIA,
     MAX_ITEM_SCOPE_ENTRIES,
     MAX_PR_WORK_UNITS,
-    MAX_WORK_UNIT_REQUIREMENTS_PER_QUESTION,
+    MAX_WORK_UNIT_REQUIREMENTS_PER_PROPOSAL,
     AllocationGroup,
     ItemDescription,
     PathFact,
@@ -78,8 +78,8 @@ class Profile:
     def min_work_units(self) -> int:
         """Avoid requiring artificial splits when every unit can cover four reqs."""
         return (
-            self.requirements + MAX_WORK_UNIT_REQUIREMENTS_PER_QUESTION - 1
-        ) // MAX_WORK_UNIT_REQUIREMENTS_PER_QUESTION
+            self.requirements + MAX_WORK_UNIT_REQUIREMENTS_PER_PROPOSAL - 1
+        ) // MAX_WORK_UNIT_REQUIREMENTS_PER_PROPOSAL
 
 
 PROFILES = {

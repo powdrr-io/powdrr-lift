@@ -34,6 +34,7 @@ from powdrr_service.planning.questions import (
 from powdrr_service.planning.source import Requirement, SegmentedSource
 
 MAX_WORK_UNIT_CRITERIA = 2
+MAX_WORK_UNIT_REQUIREMENTS_PER_PROPOSAL = 4
 MAX_WORK_UNIT_REQUIREMENTS_PER_QUESTION = 4
 MAX_WORK_UNIT_PROPOSALS_PER_PAGE = 3
 MAX_ITEM_CRITERIA = 5
@@ -92,6 +93,7 @@ WORK_UNIT_PROPOSAL_PAGE_JSON_SCHEMA: dict[str, Any] = {
                     "requirement_ids": {
                         "type": "array",
                         "minItems": 1,
+                        "maxItems": MAX_WORK_UNIT_REQUIREMENTS_PER_PROPOSAL,
                         "items": {"type": "string"},
                     },
                     "deliverable": {
@@ -366,6 +368,7 @@ def parse_work_unit_proposal(
         "/requirement_ids",
         known=set(context.unresolved_requirement_ids),
         minimum=1,
+        maximum=MAX_WORK_UNIT_REQUIREMENTS_PER_PROPOSAL,
     )
     if len(context.component_ids) != 1:
         raise PlanningContractError(
@@ -821,13 +824,13 @@ def build_work_unit_proposal_request(
         question_identity["maximum_proposals"] = maximum_proposals
     question_key = _digest(question_identity)[-12:]
     question = Question(
-        question_id=f"propose-units-v3-{requirement_ids[0]}-{question_key}",
+        question_id=f"propose-units-v4-{requirement_ids[0]}-{question_key}",
         kind="propose_work_units",
-        contract_version=3,
+        contract_version=4,
         subject_ids=tuple(requirement_ids),
-        input_digest=_digest({"schema_version": 3, **input_facts}),
+        input_digest=_digest({"schema_version": 4, **input_facts}),
         context_ref_ids=all_refs,
-        expected_answer_schema="work-unit-proposals-v3",
+        expected_answer_schema="work-unit-proposals-v4",
         attempt=1,
     )
     request_context = replace(
@@ -868,7 +871,7 @@ def build_work_unit_proposal_request(
         exact_question=(
             "Enumerate concrete implementation work units for only the supplied "
             "unresolved requirements. Prefer a cohesive unit that addresses "
-            "several strongly related requirements together, up to four, when "
+            "several strongly related requirements together, up to four per unit, when "
             "they share a deliverable, code area, or validation boundary. Do not "
             "create one unit per requirement merely because the source lists them "
             "separately. Split requirements when they have independent deliverables "
@@ -1468,11 +1471,14 @@ def _text_list(
 
 
 def _reference_list(
-    value: Any, pointer: str, *, known: set[str], minimum: int
+    value: Any,
+    pointer: str,
+    *,
+    known: set[str],
+    minimum: int,
+    maximum: int = MAX_ENUMERATION_RECORDS,
 ) -> tuple[str, ...]:
-    result = _text_list(
-        value, pointer, minimum=minimum, maximum=MAX_ENUMERATION_RECORDS
-    )
+    result = _text_list(value, pointer, minimum=minimum, maximum=maximum)
     if len(set(result)) != len(result):
         raise PlanningContractError(pointer, "references must be unique")
     unknown = set(result) - known

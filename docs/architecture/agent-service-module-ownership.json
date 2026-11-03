@@ -996,7 +996,6 @@
         "powdrr_lift.workrr.coding_agent",
         "powdrr_lift.workrr.coding_agent_validation",
         "powdrr_lift.workrr.credential_check",
-        "powdrr_lift.workrr.differential_verification",
         "powdrr_lift.workrr.feature_endpoint",
         "powdrr_lift.workrr.feature_run",
         "powdrr_lift.workrr.git",
@@ -1025,7 +1024,8 @@
         "powdrr_service.specifications.system",
         "powdrr_service.structrr.intent_lineage",
         "powdrr_service.structrr.rebase",
-        "powdrr_service.structrr.verification_health"
+        "powdrr_service.structrr.verification_health",
+        "powdrr_service.verification.differential"
       ],
       "kind": "python_module",
       "owner": "split",
@@ -2693,9 +2693,9 @@
       "extraction_pr": "7",
       "internal_imports": [],
       "kind": "python_module",
-      "owner": "split",
-      "path": "src/powdrr_lift/workrr/differential_verification.py",
-      "rationale": "service probe/verification policy; agent runs local commands",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/verification/differential.py",
+      "rationale": "pure differential classification of base and candidate verification evidence",
       "reviewed": false
     },
     {
@@ -2855,12 +2855,14 @@
         "powdrr_service.structrr.snapshot",
         "powdrr_service.structrr.source_manifest",
         "powdrr_service.structrr.verification_contract",
-        "powdrr_service.structrr.verification_obligations"
+        "powdrr_service.structrr.verification_obligations",
+        "powdrr_agent.execution.postrun_probe_runner",
+        "powdrr_service.verification.probe_results"
       ],
       "kind": "python_module",
       "owner": "split",
       "path": "src/powdrr_lift/workrr/feature_endpoint.py",
-      "rationale": "agent orchestration and local effects; verification policy is requested from the service",
+      "rationale": "agent orchestration invokes local probe execution and service-owned probe outcome policy",
       "reviewed": false
     },
     {
@@ -3058,13 +3060,12 @@
     {
       "extraction_pr": "7",
       "internal_imports": [
-        "powdrr_service.structrr.validation",
         "powdrr_lift.workrr.test_obligations"
       ],
       "kind": "python_module",
       "owner": "split",
       "path": "src/powdrr_lift/workrr/postrun_probes.py",
-      "rationale": "service probe/verification policy; agent runs local commands",
+      "rationale": "probe source parsing and validation remain in the combined application; local execution and result policy are extracted",
       "reviewed": false
     },
     {
@@ -3875,6 +3876,28 @@
       "owner": "agent",
       "path": "packages/agent/src/powdrr_agent/execution/__init__.py",
       "rationale": "local agent process execution, monitoring, or repository capability",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "7",
+      "internal_imports": [
+        "powdrr_contracts.verification"
+      ],
+      "kind": "python_module",
+      "owner": "agent",
+      "path": "packages/agent/src/powdrr_agent/execution/postrun_probe_runner.py",
+      "rationale": "execute frozen behavior probes in the local repository process",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "7",
+      "internal_imports": [
+        "powdrr_contracts.verification"
+      ],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/verification/probe_results.py",
+      "rationale": "service-owned interpretation and classification of locally executed probe outcomes",
       "reviewed": false
     }
   ],

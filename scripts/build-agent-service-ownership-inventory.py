@@ -14,7 +14,13 @@ from typing import Any
 def _owner(path: str) -> tuple[str, str, str]:
     """Assign a first-pass owner and extraction step for one tracked path."""
     if path.startswith("packages/agent/src/powdrr_agent/execution/"):
-        if path.endswith(("/execute_pr_tests.py", "/verification_provider.py")):
+        if path.endswith(
+            (
+                "/execute_pr_tests.py",
+                "/verification_provider.py",
+                "/postrun_probe_runner.py",
+            )
+        ):
             return (
                 "agent",
                 "local verification command discovery and execution capabilities",
@@ -24,6 +30,15 @@ def _owner(path: str) -> tuple[str, str, str]:
             "agent",
             "local agent process execution, monitoring, or repository capability",
             "6",
+        )
+    if path in {
+        "packages/service/src/powdrr_service/verification/differential.py",
+        "packages/service/src/powdrr_service/verification/probe_results.py",
+    }:
+        return (
+            "service",
+            "service-owned verification outcome classification and policy",
+            "7",
         )
     if path == "packages/service/src/powdrr_service/artifact_state.py":
         return (
@@ -376,6 +391,8 @@ def main() -> int:
                 "packages/service/src/powdrr_service/procedrr_evaluator",
                 "packages/service/src/powdrr_service/structrr",
                 "packages/service/src/powdrr_service/artifact_state.py",
+                "packages/service/src/powdrr_service/verification/differential.py",
+                "packages/service/src/powdrr_service/verification/probe_results.py",
                 "packages/agent/src/powdrr_agent/artifact_state.py",
                 "packages/agent/src/powdrr_agent",
                 "packages/service/src/powdrr_service/resources/evaluations",

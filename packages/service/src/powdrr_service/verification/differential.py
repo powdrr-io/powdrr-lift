@@ -1,4 +1,4 @@
-"""Provider-neutral base/candidate verification comparison."""
+"""Service-owned provider-neutral base/candidate verification comparison."""
 
 from __future__ import annotations
 

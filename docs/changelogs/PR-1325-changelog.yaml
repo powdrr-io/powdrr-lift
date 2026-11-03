@@ -1,0 +1,268 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1325
+title: Move implementation specification policy to service
+intent:
+  problem: Implementation specification validation still parsed local architecture
+    files and applied semantic rules in the agent.
+  goal: Move implementation specification policy into the service and pass architecture
+    YAML evidence from the agent.
+human-decisions: []
+structured_files: []
+files:
+- path: packages/service/src/powdrr_service/specifications/implementation.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 909
+  summary: Implement implementation specification validation using supplied architecture
+    YAML evidence.
+  rationale: Keep semantic validation rules in the service without repository access.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 1313
+    end_line: 1314
+  summary: Record implementation validation ownership and its service import edges.
+  rationale: Keep the architecture inventory aligned with the extracted policy.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 1319
+    end_line: 1319
+  summary: Record implementation validation ownership and its service import edges.
+  rationale: Keep the architecture inventory aligned with the extracted policy.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3763
+    end_line: 3763
+  summary: Record implementation validation ownership and its service import edges.
+  rationale: Keep the architecture inventory aligned with the extracted policy.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3812
+    end_line: 3822
+  summary: Record implementation validation ownership and its service import edges.
+  rationale: Keep the architecture inventory aligned with the extracted policy.
+- path: docs/plans/agent-service-code-split.md
+  type: modified
+  span:
+    start_line: 499
+    end_line: 502
+  summary: Record implementation specification validation as service-owned and proposed
+    PR validation as remaining.
+  rationale: Keep the split plan aligned with completed work.
+- path: packages/service/src/powdrr_service/specifications/__init__.py
+  type: modified
+  span:
+    start_line: 19
+    end_line: 26
+  summary: Export implementation specification validation and architecture summary
+    policy.
+  rationale: Define the service package's supported validation API.
+- path: packages/service/src/powdrr_service/specifications/__init__.py
+  type: modified
+  span:
+    start_line: 49
+    end_line: 54
+  summary: Export implementation specification validation and architecture summary
+    policy.
+  rationale: Define the service package's supported validation API.
+- path: scripts/build-agent-service-ownership-inventory.py
+  type: modified
+  span:
+    start_line: 101
+    end_line: 107
+  summary: Classify implementation policy and the agent evidence adapter in the ownership
+    inventory.
+  rationale: Keep future inventory generation aligned with this extraction.
+- path: scripts/build-agent-service-ownership-inventory.py
+  type: modified
+  span:
+    start_line: 142
+    end_line: 148
+  summary: Classify implementation policy and the agent evidence adapter in the ownership
+    inventory.
+  rationale: Keep future inventory generation aligned with this extraction.
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 4
+    end_line: 4
+  summary: Keep local template and file operations while sending collected architecture
+    YAML to service policy.
+  rationale: Keep repository reads in the agent and validation semantics in the service.
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 6
+    end_line: 6
+  summary: Keep local template and file operations while sending collected architecture
+    YAML to service policy.
+  rationale: Keep repository reads in the agent and validation semantics in the service.
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 9
+    end_line: 14
+  summary: Keep local template and file operations while sending collected architecture
+    YAML to service policy.
+  rationale: Keep repository reads in the agent and validation semantics in the service.
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 29
+    end_line: 37
+  summary: Keep local template and file operations while sending collected architecture
+    YAML to service policy.
+  rationale: Keep repository reads in the agent and validation semantics in the service.
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 228
+    end_line: 228
+  summary: Keep local template and file operations while sending collected architecture
+    YAML to service policy.
+  rationale: Keep repository reads in the agent and validation semantics in the service.
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 230
+    end_line: 235
+  summary: Keep local template and file operations while sending collected architecture
+    YAML to service policy.
+  rationale: Keep repository reads in the agent and validation semantics in the service.
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 237
+    end_line: 244
+  summary: Keep local template and file operations while sending collected architecture
+    YAML to service policy.
+  rationale: Keep repository reads in the agent and validation semantics in the service.
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 247
+    end_line: 249
+  summary: Keep local template and file operations while sending collected architecture
+    YAML to service policy.
+  rationale: Keep repository reads in the agent and validation semantics in the service.
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 251
+    end_line: 251
+  summary: Keep local template and file operations while sending collected architecture
+    YAML to service policy.
+  rationale: Keep repository reads in the agent and validation semantics in the service.
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 253
+    end_line: 255
+  summary: Keep local template and file operations while sending collected architecture
+    YAML to service policy.
+  rationale: Keep repository reads in the agent and validation semantics in the service.
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 453
+    end_line: 477
+  summary: Keep local template and file operations while sending collected architecture
+    YAML to service policy.
+  rationale: Keep repository reads in the agent and validation semantics in the service.
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 265
+    end_line: 265
+  summary: Keep local template and file operations while sending collected architecture
+    YAML to service policy.
+  rationale: Keep repository reads in the agent and validation semantics in the service.
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 276
+    end_line: 276
+  summary: Keep local template and file operations while sending collected architecture
+    YAML to service policy.
+  rationale: Keep repository reads in the agent and validation semantics in the service.
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 278
+    end_line: 284
+  summary: Keep local template and file operations while sending collected architecture
+    YAML to service policy.
+  rationale: Keep repository reads in the agent and validation semantics in the service.
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 287
+    end_line: 294
+  summary: Keep local template and file operations while sending collected architecture
+    YAML to service policy.
+  rationale: Keep repository reads in the agent and validation semantics in the service.
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 296
+    end_line: 298
+  summary: Keep local template and file operations while sending collected architecture
+    YAML to service policy.
+  rationale: Keep repository reads in the agent and validation semantics in the service.
+- path: src/powdrr_lift/core/implementation_specification.py
+  type: modified
+  span:
+    start_line: 346
+    end_line: 349
+  summary: Keep local template and file operations while sending collected architecture
+    YAML to service policy.
+  rationale: Keep repository reads in the agent and validation semantics in the service.
+- path: tests/test_agent_service_contracts.py
+  type: modified
+  span:
+    start_line: 334
+    end_line: 362
+  summary: Assert implementation validation is service-owned and the service imports
+    no agent modules.
+  rationale: Prevent semantic policy from moving back into the agent.
+- path: tests/test_implementation_specification.py
+  type: modified
+  span:
+    start_line: 9
+    end_line: 9
+  summary: Exercise the direct service API, missing and unreadable evidence, and existing
+    agent adapter behavior.
+  rationale: Verify evidence crosses the boundary as content and preserve validation
+    behavior.
+- path: tests/test_implementation_specification.py
+  type: modified
+  span:
+    start_line: 62
+    end_line: 124
+  summary: Exercise the direct service API, missing and unreadable evidence, and existing
+    agent adapter behavior.
+  rationale: Verify evidence crosses the boundary as content and preserve validation
+    behavior.
+entities:
+- id: implementation-specification-validation-policy
+  type: Module
+  action: added
+- id: architecture-specification-summary-projection
+  type: Module
+  action: added
+- id: implementation-specification-service-boundary-tests
+  type: Regression test
+  action: added
+entity_relationships: []
+invariants:
+- id: implementation-validation-uses-supplied-architecture-evidence
+  description: The service validator receives architecture specification YAML and
+    a repository-relative evidence path; the agent performs local file reads.
+  action: added
+guidance: []
+features: []
+proposed_prs: []

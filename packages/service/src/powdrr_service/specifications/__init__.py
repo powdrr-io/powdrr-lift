@@ -16,6 +16,14 @@ from powdrr_service.specifications.common import (
     validate_no_explicit_empty_values,
     validate_related_module_references,
 )
+from powdrr_service.specifications.implementation import (
+    ArchitectureSpecificationSummary,
+    ArchitectureSpecificationSummaryResult,
+    ImplementationSpecificationValidationIssue,
+    ImplementationSpecificationValidationReport,
+    build_implementation_specification_validation_report,
+    summarize_architecture_specification_yaml,
+)
 from powdrr_service.specifications.system import (
     SystemSpecificationValidationIssue,
     SystemSpecificationValidationReport,
@@ -38,4 +46,10 @@ __all__ = [
     "validate_module_tool_sections",
     "validate_no_explicit_empty_values",
     "validate_related_module_references",
+    "ArchitectureSpecificationSummary",
+    "ArchitectureSpecificationSummaryResult",
+    "ImplementationSpecificationValidationIssue",
+    "ImplementationSpecificationValidationReport",
+    "build_implementation_specification_validation_report",
+    "summarize_architecture_specification_yaml",
 ]

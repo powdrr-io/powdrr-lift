@@ -14,6 +14,8 @@ from uuid import uuid4
 from powdrr_service.decision_classifier import JevSemanticClassifierClient
 from powdrr_service.procedrr import ProcessCatalog, ProcessDefinition
 from powdrr_service.procedrr_evaluator.evaluator import SuspendEvaluation
+from powdrr_service.procedrr_evaluator.model_client import ProcedrrModelClient
+from powdrr_service.procedrr_evaluator.operations import ProcedrrOperationExecutor
 from powdrr_service.procedrr_evaluator.runtime import (
     ProcedrrExecutionService,
     ProcessExecutionCheckpoint,
@@ -54,8 +56,6 @@ from powdrr_lift.workrr.execution_state import (
     _WorkflowExecutionState,
 )
 from powdrr_lift.workrr.paths import is_dedicated_worktree
-from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
-from powdrr_lift.workrr.procedrr_operations import WorkrrOperationExecutor
 from powdrr_lift.workrr.provider_runtime import WorkflowClientRegistry
 from powdrr_lift.workrr.review_feedback import prepare_review_feedback_ledger
 
@@ -65,7 +65,7 @@ WORKFLOW_CHAT_WAITING_FOR_INPUT = 3
 def run_procedrr_workflow_chat(
     config: WorkflowChatConfig,
     *,
-    procedrr_client_factory: Callable[[str], WorkrrProcedrrClient] | None = None,
+    procedrr_client_factory: Callable[[str], ProcedrrModelClient] | None = None,
     input_func: Callable[[], str] = input,
     stdout: TextIO = sys.stdout,
     stderr: TextIO = sys.stderr,
@@ -215,7 +215,7 @@ def run_procedrr_workflow_chat(
             progress_stream=stderr,
         )
     )
-    process_clients: dict[str, WorkrrProcedrrClient] = {}
+    process_clients: dict[str, ProcedrrModelClient] = {}
 
     def record_provider_attempt(record: Mapping[str, Any]) -> None:
         if record.get("outcome") != "retrying":
@@ -234,7 +234,7 @@ def run_procedrr_workflow_chat(
         }
         chat_events.emit(WorkflowChatEventKind.RETRY, data=retry_data)
 
-    def procedrr_client(role: str) -> WorkrrProcedrrClient:
+    def procedrr_client(role: str) -> ProcedrrModelClient:
         if procedrr_client_factory is not None:
             if role not in process_clients:
                 process_clients[role] = procedrr_client_factory(role)
@@ -244,7 +244,7 @@ def run_procedrr_workflow_chat(
         role_model = initial_model_for_provider(role_provider, config.model)
         cache_key = f"{role_provider}:{role_model}"
         if cache_key not in process_clients:
-            process_clients[cache_key] = WorkrrProcedrrClient(
+            process_clients[cache_key] = ProcedrrModelClient(
                 client_registry.client_for(
                     role_model,
                     role_provider,
@@ -675,12 +675,12 @@ def run_procedrr_workflow_chat(
 
         return dispatch
 
-    operation_executor = WorkrrOperationExecutor(
+    operation_executor = ProcedrrOperationExecutor(
         {name: operation_handler(name) for name in operation_names}
     )
     planning_client = procedrr_client("normal")
     jev_classifier = JevSemanticClassifierClient(planning_client)
-    jev_client = WorkrrProcedrrClient(
+    jev_client = ProcedrrModelClient(
         jev_classifier,
         process_directory=process_dir,
         max_retries=config.max_stalled_roundtrips,
@@ -915,7 +915,7 @@ def _restore_chat_state(
 
 def _select_process(
     catalog: ProcessCatalog,
-    llm: WorkrrProcedrrClient,
+    llm: ProcedrrModelClient,
     user_request: str,
     workflow_context: Mapping[str, Any],
 ) -> str | None:
@@ -937,7 +937,7 @@ def _select_process(
     service = ProcedrrExecutionService(
         selector,
         llm,
-        WorkrrOperationExecutor({}),
+        ProcedrrOperationExecutor({}),
     )
     try:
         result = service.execute(

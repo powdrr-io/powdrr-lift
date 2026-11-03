@@ -1,4 +1,4 @@
-"""Shared authorized operation dispatch for Procedrr callers."""
+"""Validated operation dispatch for service-owned Procedrr processes."""
 
 from __future__ import annotations
 
@@ -6,19 +6,13 @@ from collections.abc import Callable, Mapping
 from typing import Any
 
 from powdrr_service.procedrr.command_catalog import CommandCatalog
-
-from powdrr_lift.errors import PowdrrExecutionError
+from powdrr_service.procedrr_evaluator.evaluator import EvaluationError
 
 OperationHandler = Callable[[Mapping[str, Any]], Any]
 
 
-class WorkrrOperationExecutor:
-    """Validate Procedrr operations and dispatch through caller-owned handlers.
-
-    Each caller supplies the handlers that its existing authorization boundary
-    permits. The declaration can select among those handlers, but cannot add a
-    handler or broaden its capabilities.
-    """
+class ProcedrrOperationExecutor:
+    """Validate declared operations and dispatch to caller-authorized handlers."""
 
     def __init__(
         self,
@@ -32,9 +26,7 @@ class WorkrrOperationExecutor:
     def __call__(self, tool: str, parameters: Mapping[str, Any]) -> Any:
         handler = self._handlers.get(tool)
         if handler is None:
-            raise PowdrrExecutionError(
-                f"Procedrr requested unsupported operation {tool!r}."
-            )
+            raise EvaluationError(f"Procedrr requested unsupported operation {tool!r}.")
         if tool == "internal":
             self._validate_internal_command(parameters)
         return handler(parameters)
@@ -42,12 +34,12 @@ class WorkrrOperationExecutor:
     def _validate_internal_command(self, parameters: Mapping[str, Any]) -> None:
         command = parameters.get("command")
         if not isinstance(command, list) or not command:
-            raise PowdrrExecutionError(
+            raise EvaluationError(
                 "Procedrr internal operation command must be a non-empty list."
             )
         name = command[0]
         if not isinstance(name, str):
-            raise PowdrrExecutionError(
+            raise EvaluationError(
                 "Procedrr internal operation command name must be a string."
             )
         if self._command_catalog is None:
@@ -60,7 +52,7 @@ class WorkrrOperationExecutor:
                 {key: value for key, value in parameters.items() if key != "command"}
             )
         except ValueError as error:
-            raise PowdrrExecutionError(str(error)) from error
+            raise EvaluationError(str(error)) from error
 
 
-__all__ = ["OperationHandler", "WorkrrOperationExecutor"]
+__all__ = ["OperationHandler", "ProcedrrOperationExecutor"]

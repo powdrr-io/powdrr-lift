@@ -5,16 +5,6 @@
       "import": "powdrr_lift.structrr.bootstrap.bootstrap_structrr",
       "owner_pr": 8,
       "rationale": "Bootstrap still reuses the existing Structrr implementation over a service-owned snapshot; relocate it with the remaining Structrr product semantics."
-    },
-    {
-      "import": "powdrr_lift.workrr.procedrr.WorkrrProcedrrClient",
-      "owner_pr": 6,
-      "rationale": "Planning uses the existing Procedrr client for bounded model-backed questions; provider and private process runtime ownership is scheduled for inference-boundary extraction."
-    },
-    {
-      "import": "powdrr_lift.workrr.procedrr_operations.WorkrrOperationExecutor",
-      "owner_pr": 6,
-      "rationale": "Planning executes private Procedrr operations through the legacy executor; move this provider/process runtime behind the service inference boundary."
     }
   ]
 }

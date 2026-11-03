@@ -13,6 +13,7 @@ from typing import Any
 import pytest
 from powdrr_service.decision_classifier import JevSemanticClassifierClient
 from powdrr_service.procedrr import ProcessCatalog
+from powdrr_service.procedrr_evaluator.model_client import ProcedrrModelClient
 from powdrr_service.resources import bundled_process_directory
 
 from powdrr_lift.workrr import chat_context, procedrr_chat
@@ -21,7 +22,6 @@ from powdrr_lift.workrr.chat_events import (
     WorkflowChatEvent,
     WorkflowChatEventKind,
 )
-from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
 from powdrr_lift.workrr.procedrr_chat import (
     WORKFLOW_CHAT_WAITING_FOR_INPUT,
     _operation_to_action,
@@ -256,7 +256,7 @@ steps:
     monkeypatch.setattr(
         procedrr_chat, "_persist_workflow_context", lambda *_args, **_kwargs: None
     )
-    client = WorkrrProcedrrClient(
+    client = ProcedrrModelClient(
         _SelectingProvider(),  # type: ignore[arg-type]
         process_directory=process_dir,
         provider_retry_attempts=0,
@@ -332,7 +332,7 @@ steps:
 """,
         encoding="utf-8",
     )
-    client = WorkrrProcedrrClient(
+    client = ProcedrrModelClient(
         _SelectingProvider(),  # type: ignore[arg-type]
         process_directory=process_dir,
         provider_retry_attempts=0,
@@ -397,7 +397,7 @@ steps:
 """,
         encoding="utf-8",
     )
-    client = WorkrrProcedrrClient(
+    client = ProcedrrModelClient(
         _SelectingProvider(),  # type: ignore[arg-type]
         process_directory=process_dir,
         provider_retry_attempts=0,
@@ -526,7 +526,7 @@ steps:
 """,
         encoding="utf-8",
     )
-    client = WorkrrProcedrrClient(
+    client = ProcedrrModelClient(
         _SelectingProvider(),  # type: ignore[arg-type]
         process_directory=process_dir,
         provider_retry_attempts=0,
@@ -652,7 +652,7 @@ steps:
 """,
         encoding="utf-8",
     )
-    client = WorkrrProcedrrClient(
+    client = ProcedrrModelClient(
         _SelectingProvider(),  # type: ignore[arg-type]
         process_directory=process_dir,
         provider_retry_attempts=0,

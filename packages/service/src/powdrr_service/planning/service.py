@@ -22,8 +22,6 @@ from io import StringIO
 from pathlib import Path
 from typing import Any, Protocol
 
-from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
-from powdrr_lift.workrr.procedrr_operations import WorkrrOperationExecutor
 from powdrr_service.planning.checkpoints import (
     CheckpointStore,
     PlanningCheckpoint,
@@ -38,6 +36,8 @@ from powdrr_service.planning.questions import (
     build_question_messages,
     run_question,
 )
+from powdrr_service.procedrr_evaluator.model_client import ProcedrrModelClient
+from powdrr_service.procedrr_evaluator.operations import ProcedrrOperationExecutor
 
 PLANNING_LABEL = "powdrr:planning"
 _SESSION_MARKER = "<!-- powdrr-planning-session:v1 -->"
@@ -941,7 +941,7 @@ def planning_operation_executor(
     client: PlanningModelClient,
     options: PlanningOptions,
     stderr: Any,
-) -> WorkrrOperationExecutor:
+) -> ProcedrrOperationExecutor:
     """Register the two narrow planning commands used by plan-execution."""
 
     def dispatch(parameters: Mapping[str, Any]) -> Mapping[str, Any]:
@@ -995,7 +995,7 @@ def planning_operation_executor(
             ).to_data()
         raise PlanningServiceError(f"unsupported planning operation {command[0]!r}")
 
-    return WorkrrOperationExecutor({"internal": dispatch})
+    return ProcedrrOperationExecutor({"internal": dispatch})
 
 
 def run_planning_procedrr(
@@ -1013,7 +1013,7 @@ def run_planning_procedrr(
     from powdrr_service.procedrr_evaluator.runtime import ProcedrrExecutionService
 
     catalog = ProcessCatalog.load(Path(process_directory))
-    process_client = WorkrrProcedrrClient(
+    process_client = ProcedrrModelClient(
         client, process_directory=Path(process_directory)
     )
     executor = planning_operation_executor(

@@ -24,11 +24,11 @@ from urllib.request import Request, urlopen
 
 from powdrr_service.planning.semantic_contract_compiler import CLASSIFIER_DEFINITIONS
 from powdrr_service.planning.semantic_decision import DECISION_VALUES
+from powdrr_service.procedrr_evaluator.model_client import ProcedrrModelClient
 from powdrr_service.providers.config import default_llm_mappings
 from powdrr_service.providers.credentials import resolve_provider_credentials
 from powdrr_service.resources import bundled_process_directory
 
-from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
 from powdrr_lift.workrr.provider_runtime import build_workflow_client
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -293,7 +293,7 @@ def main() -> int:
 
     llm_mapping = default_llm_mappings(args.llm_provider)["standard_reasoning"]
     credentials = resolve_provider_credentials(llm_mapping.provider)
-    llm_client = WorkrrProcedrrClient(
+    llm_client = ProcedrrModelClient(
         build_workflow_client(
             credentials,
             model=llm_mapping.model,

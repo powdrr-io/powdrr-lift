@@ -6,6 +6,8 @@ from pathlib import Path
 from typing import Any, cast
 
 from powdrr_service.planning.assembly import PendingUnitOutput, WorkUnit
+from powdrr_service.planning.checkpoints import PlanningCheckpoint
+from powdrr_service.planning.contracts import PlanningContractError, Question
 
 _SCRIPT_PATH = (
     Path(__file__).resolve().parents[1] / "scripts" / "benchmark_planning_scale.py"
@@ -20,6 +22,7 @@ PROFILES = _BENCHMARK.PROFILES
 fixture_shape_mismatches = _BENCHMARK.fixture_shape_mismatches
 dependency_candidate_summary = _BENCHMARK.dependency_candidate_summary
 dependency_metrics_for = _BENCHMARK.dependency_metrics_for
+unresolved_question_diagnostics = _BENCHMARK.unresolved_question_diagnostics
 example_answer_client: Any = _BENCHMARK._ExampleAnswerClient
 
 
@@ -134,6 +137,121 @@ def test_dependency_metrics_preserve_incomplete_work_unit_checkpoint() -> None:
 
     assert metrics is None
     assert error == "work-unit proposals are incomplete at propose-units-1"
+
+
+def test_unresolved_question_diagnostics_show_validation_error_without_answer() -> None:
+    question = Question(
+        question_id="propose-units-v3-req-0001-test",
+        kind="propose_work_units",
+        contract_version=3,
+        subject_ids=("req-0001", "req-0002"),
+        input_digest="sha256:" + "a" * 64,
+        context_ref_ids=(),
+        expected_answer_schema="work-unit-proposals-v3",
+        attempt=3,
+    )
+    needs_answer = PlanningCheckpoint.needs_answer(
+        session_id="benchmark-session",
+        event_id="needs-answer-000001",
+        sequence=1,
+        parent_digest=None,
+        question=question,
+        error=PlanningContractError(
+            "/records/0/planned_writes/0/source_refs",
+            "must cite a source ref from each assigned requirement",
+        ),
+        previous_answer={"private": "response body is omitted"},
+        id_counters={},
+    )
+
+    assert unresolved_question_diagnostics((needs_answer,)) == [
+        {
+            "question_id": "propose-units-v3-req-0001-test",
+            "kind": "propose_work_units",
+            "subject_ids": ["req-0001", "req-0002"],
+            "attempt": 3,
+            "input_digest": "sha256:" + "a" * 64,
+            "error_pointer": "/records/0/planned_writes/0/source_refs",
+            "error_message": "must cite a source ref from each assigned requirement",
+        }
+    ]
+    assert "previous_answer" not in str(
+        unresolved_question_diagnostics((needs_answer,))
+    )
+
+
+def test_resolved_question_is_removed_from_unresolved_diagnostics() -> None:
+    question = Question(
+        question_id="propose-units-v3-req-0001-test",
+        kind="propose_work_units",
+        contract_version=3,
+        subject_ids=("req-0001",),
+        input_digest="sha256:" + "a" * 64,
+        context_ref_ids=(),
+        expected_answer_schema="work-unit-proposals-v3",
+        attempt=3,
+    )
+    needs_answer = PlanningCheckpoint.needs_answer(
+        session_id="benchmark-session",
+        event_id="needs-answer-000001",
+        sequence=1,
+        parent_digest=None,
+        question=question,
+        error=PlanningContractError("/records", "missing proposal"),
+        previous_answer={},
+        id_counters={},
+    )
+    accepted = PlanningCheckpoint.answer_accepted(
+        session_id="benchmark-session",
+        event_id="answer-accepted-000002",
+        sequence=2,
+        parent_digest=needs_answer.digest,
+        question=question,
+        accepted_answer={"records": []},
+        validation_result={"accepted": True},
+        id_counters={},
+    )
+
+    assert unresolved_question_diagnostics((needs_answer, accepted)) == []
+
+
+def test_blocked_live_report_diagnoses_unanchored_c_runtime_path() -> None:
+    profile = _BENCHMARK.Profile(
+        "blocked-work-units", requirements=8, work_units=2, plan_items=1
+    )
+
+    class InvalidProposalClient(example_answer_client):
+        def _propose_work_units(self, packet: Any) -> dict[str, Any]:
+            answer = super()._propose_work_units(packet)
+            for record in answer["records"]:
+                for write in record["planned_writes"]:
+                    write["path"] = "src/behavior_outcomes.c"
+            return answer
+
+    report = _BENCHMARK.run_profile(
+        profile,
+        repository_root=Path(__file__).resolve().parents[1],
+        client=InvalidProposalClient(profile),
+        enforce_fixture_shape=False,
+    )
+
+    assert report["terminal_status"] == "blocked"
+    diagnostics = report["unresolved_question_diagnostics"]
+    assert len(diagnostics) == 1
+    diagnostic = diagnostics[0]
+    assert diagnostic["kind"] == "propose_work_units"
+    assert diagnostic["subject_ids"] == [
+        "req-0001",
+        "req-0002",
+        "req-0003",
+        "req-0004",
+    ]
+    assert diagnostic["attempt"] == 3
+    assert diagnostic["error_pointer"] == "/planned_writes/path"
+    assert diagnostic["error_message"] == (
+        "runtime for planned path 'src/behavior_outcomes.c' needs repository evidence"
+    )
+    assert "previous_answer" not in diagnostic
 
 
 def test_live_report_includes_dependency_candidate_and_confirmation_counts() -> None:

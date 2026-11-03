@@ -307,6 +307,46 @@ def test_plan_sizing_splits_mixed_runtime_items_before_optimizing() -> None:
     assert all(len(_plan_item_refinement_issues([item])) == 0 for item in sized)
 
 
+def test_pinned_repository_runtime_preferences_use_file_counts_and_stable_ties() -> (
+    None
+):
+    paths = [
+        "src/a.py",
+        "src/b.py",
+        "src/c.py",
+        "src/d.py",
+        "src/a.swift",
+        "src/b.swift",
+        "src/a.js",
+        "scripts/tool.sh",
+    ]
+
+    assert planning_session._preferred_runtimes_from_paths(paths) == (
+        "python",
+        "swift",
+        "javascript",
+    )
+
+
+def test_planning_runtime_preferences_read_the_pinned_git_tree(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    calls: list[tuple[list[str], dict[str, Any]]] = []
+
+    def fake_run(command: list[str], **kwargs: Any) -> SimpleNamespace:
+        calls.append((command, kwargs))
+        return SimpleNamespace(stdout="src/feature.py\nSources/Feature.swift\n")
+
+    monkeypatch.setattr(planning_session.subprocess, "run", fake_run)
+
+    assert planning_session._planning_preferred_runtimes(tmp_path, "base-commit") == (
+        "python",
+        "swift",
+    )
+    assert calls[0][0] == ["git", "ls-tree", "-r", "--name-only", "base-commit"]
+    assert calls[0][1]["cwd"] == tmp_path
+
+
 def test_plan_generation_splits_mixed_runtime_response_before_refinement() -> None:
     foundation = _item("PR-01")
     foundation["scope"] = ["component: setup", "Establish shared protocol fixtures"]
@@ -1685,6 +1725,11 @@ def test_plan_cli_creates_tracking_issue_and_publishes_compiled_artifacts(
     )
     monkeypatch.setattr(
         planning_session, "_planning_repository_paths", lambda *_args: {}
+    )
+    monkeypatch.setattr(
+        planning_session,
+        "_planning_preferred_runtimes",
+        lambda *_args: ("python",),
     )
     monkeypatch.setattr(
         planning_session,

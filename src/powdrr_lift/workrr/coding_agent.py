@@ -21,14 +21,17 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any, Protocol, cast
 
+from powdrr_agent.execution.minisweagent_monitor import (
+    MiniSWEAgentSnapshot,
+    run_minisweagent,
+)
+from powdrr_agent.execution.opencode_monitor import run_opencode
 from powdrr_contracts.models import ChatCompletionRequest, ChatCompletionResponse
 from powdrr_service.behavior_contract import BehaviorScenario
 from powdrr_service.intent_packet import IntentPacket
 
 from powdrr_lift.core.execution_plan import ExecutionPlan, ExecutionUnit
 from powdrr_lift.core.implementation_packet import ImplementationPacket
-from powdrr_lift.minisweagent_monitor import MiniSWEAgentSnapshot, run_minisweagent
-from powdrr_lift.opencode_monitor import run_opencode
 
 CODING_AGENT_REQUEST_SCHEMA_VERSION = "implementation-request-v2"
 CODING_AGENT_ATTEMPT_SCHEMA_VERSION = "implementation-attempt-v2"
@@ -772,7 +775,11 @@ class MiniSWEAgentProvider:
         use_task_file = len(task_prompt.encode("utf-8")) > (
             MINISWEAGENT_MAX_TASK_ARGUMENT_BYTES
         )
-        command = [sys.executable, "-m", "powdrr_lift.minisweagent_session"]
+        command = [
+            sys.executable,
+            "-m",
+            "powdrr_agent.execution.minisweagent_session",
+        ]
         if self.session_trajectory is not None:
             command.extend(("--previous", str(self.session_trajectory)))
         if use_task_file:

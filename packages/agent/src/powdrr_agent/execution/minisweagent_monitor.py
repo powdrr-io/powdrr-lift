@@ -17,8 +17,12 @@ from typing import Any, Literal
 
 from powdrr_contracts.models import ChatCompletionRequest, ChatCompletionResponse
 
-from powdrr_lift.inference_ipc import InferenceIPCError, receive_frame, send_frame
-from powdrr_lift.opencode_monitor import append_diagnostic
+from powdrr_agent.execution.inference_ipc import (
+    InferenceIPCError,
+    receive_frame,
+    send_frame,
+)
+from powdrr_agent.execution.opencode_monitor import append_diagnostic
 
 MiniLiveness = Literal["active", "slow", "stalled", "completed", "failed"]
 

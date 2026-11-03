@@ -49,7 +49,7 @@ def main() -> int:
     if inference_fd is not None:
         model_settings.update(
             {
-                "model_class": "powdrr_lift.minisweagent_inference.IPCModel",
+                "model_class": "powdrr_agent.execution.minisweagent_inference.IPCModel",
                 "inference_fd": int(inference_fd),
             }
         )

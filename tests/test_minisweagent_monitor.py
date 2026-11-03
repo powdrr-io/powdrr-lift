@@ -5,7 +5,7 @@ import sys
 import time
 from pathlib import Path
 
-from powdrr_lift.minisweagent_monitor import (
+from powdrr_agent.execution.minisweagent_monitor import (
     MiniTrajectory,
     read_trajectory,
     run_minisweagent,

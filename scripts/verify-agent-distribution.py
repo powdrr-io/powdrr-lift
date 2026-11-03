@@ -92,9 +92,10 @@ def _check_agent_metadata(wheel: Path) -> None:
         for line in metadata.splitlines()
         if line.lower().startswith("requires-dist:")
     ]
-    if requirements != ["powdrr-contracts"]:
+    if set(requirements) != {"powdrr-contracts", "mini-swe-agent==2.4.6"}:
         raise AssertionError(
-            "The agent wheel must depend only on public contracts; "
+            "The agent wheel must depend only on public contracts and the "
+            "local MiniSWE runtime; "
             f"found dependencies {requirements}."
         )
 
@@ -113,20 +114,26 @@ def _install_and_import(wheels: Path, temporary_root: Path) -> None:
         "install",
         "--python",
         str(python),
-        "--no-index",
         str(contracts_wheel),
         str(agent_wheel),
     )
     smoke = (
         "import importlib, importlib.util, pkgutil, powdrr_agent, powdrr_contracts; "
-        "[importlib.import_module(f'powdrr_agent.{item.name}') "
-        "for item in pkgutil.iter_modules(powdrr_agent.__path__)]; "
+        "[importlib.import_module(item.name) "
+        "for item in pkgutil.walk_packages(powdrr_agent.__path__, 'powdrr_agent.')]; "
         "[importlib.import_module(f'powdrr_contracts.{item.name}') "
         "for item in pkgutil.iter_modules(powdrr_contracts.__path__)]; "
         "assert all(importlib.util.find_spec(name) is None for name in "
         "('powdrr_service', 'powdrr_local', 'powdrr_lift'))"
     )
     _run(str(python), "-I", "-c", smoke)
+    _run(
+        str(python),
+        "-I",
+        "-m",
+        "powdrr_agent.execution.minisweagent_session",
+        "--help",
+    )
 
 
 def _expected_agent_sources(repository: Path) -> set[str]:

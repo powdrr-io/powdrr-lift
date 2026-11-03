@@ -1996,39 +1996,40 @@
       "internal_imports": [],
       "kind": "python_module",
       "owner": "agent",
-      "path": "src/powdrr_lift/inference_ipc.py",
-      "rationale": "local IPC transport between the MiniSWE worker and service process",
+      "path": "packages/agent/src/powdrr_agent/execution/inference_ipc.py",
+      "rationale": "local framed IPC transport for MiniSWE requests to the service",
       "reviewed": false
     },
     {
       "extraction_pr": "6",
       "internal_imports": [
-        "powdrr_lift.inference_ipc"
+        "powdrr_agent.execution.inference_ipc"
       ],
       "kind": "python_module",
       "owner": "agent",
-      "path": "src/powdrr_lift/minisweagent_inference.py",
+      "path": "packages/agent/src/powdrr_agent/execution/minisweagent_inference.py",
       "rationale": "local MiniSWE model adapter that routes requests to the service process",
       "reviewed": false
     },
     {
-      "extraction_pr": "3/6",
+      "extraction_pr": "6",
       "internal_imports": [
-        "powdrr_lift.opencode_monitor"
+        "powdrr_agent.execution.inference_ipc",
+        "powdrr_agent.execution.opencode_monitor"
       ],
       "kind": "python_module",
       "owner": "agent",
-      "path": "src/powdrr_lift/minisweagent_monitor.py",
-      "rationale": "local UI, filesystem, process, Git, or analysis capability",
+      "path": "packages/agent/src/powdrr_agent/execution/minisweagent_monitor.py",
+      "rationale": "local MiniSWE worker process and inference IPC monitoring",
       "reviewed": false
     },
     {
-      "extraction_pr": "3/6",
+      "extraction_pr": "6",
       "internal_imports": [],
       "kind": "python_module",
       "owner": "agent",
-      "path": "src/powdrr_lift/minisweagent_session.py",
-      "rationale": "local UI, filesystem, process, Git, or analysis capability",
+      "path": "packages/agent/src/powdrr_agent/execution/minisweagent_session.py",
+      "rationale": "local MiniSWE session entry point and configuration",
       "reviewed": false
     },
     {
@@ -2043,12 +2044,12 @@
       "reviewed": false
     },
     {
-      "extraction_pr": "3/6",
+      "extraction_pr": "6",
       "internal_imports": [],
       "kind": "python_module",
       "owner": "agent",
-      "path": "src/powdrr_lift/opencode_monitor.py",
-      "rationale": "local UI, filesystem, process, Git, or analysis capability",
+      "path": "packages/agent/src/powdrr_agent/execution/opencode_monitor.py",
+      "rationale": "local OpenCode worker process and output monitoring",
       "reviewed": false
     },
     {
@@ -2572,8 +2573,8 @@
         "powdrr_lift.core.execution_plan",
         "powdrr_lift.core.implementation_packet",
         "powdrr_service.intent_packet",
-        "powdrr_lift.minisweagent_monitor",
-        "powdrr_lift.opencode_monitor",
+        "powdrr_agent.execution.minisweagent_monitor",
+        "powdrr_agent.execution.opencode_monitor",
         "powdrr_lift.workrr.coding_agent_validation"
       ],
       "kind": "python_module",
@@ -3869,6 +3870,15 @@
       "owner": "service",
       "path": "packages/service/src/powdrr_service/specifications/proposed_pr_validation.py",
       "rationale": "proposed-PR specification validation policy over supplied repository evidence",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "6",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "agent",
+      "path": "packages/agent/src/powdrr_agent/execution/__init__.py",
+      "rationale": "local agent process execution, monitoring, or repository capability",
       "reviewed": false
     }
   ],

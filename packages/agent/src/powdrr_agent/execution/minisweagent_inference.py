@@ -13,7 +13,7 @@ from minisweagent.models.litellm_model import LitellmModel
 from minisweagent.models.utils.actions_toolcall import BASH_TOOL
 from powdrr_contracts.models import ChatCompletionRequest, ChatCompletionResponse
 
-from powdrr_lift.inference_ipc import receive_frame, send_frame
+from powdrr_agent.execution.inference_ipc import receive_frame, send_frame
 
 _INFERENCE_FD_ENV = "POWDRR_MINISWE_INFERENCE_FD"
 

@@ -78,6 +78,9 @@ reference paths are collected in the same language-server session; each
 additional-subject question receives only compact path-pair evidence scoped to
 its item. The evidence is digest-bound and is a candidate signal only: a
 reference does not itself establish a Structrr relationship or a change.
+PR #1337 merged this path-pair evidence. The current hand-labeled fixture checks
+recall across a three-edge producer-to-consumer chain and excludes an unplanned
+file that also references one of the symbols.
 
 ### Milestone 0: Record a baseline and expose planning cost
 

@@ -17,6 +17,7 @@ from powdrr_contracts.models import (
     UserQuestion,
 )
 from powdrr_contracts.service import PowdrrService
+from powdrr_contracts.verification import VALIDATION_PROVIDER_INVENTORY_SCHEMA_VERSION
 
 __all__ = [
     "ActionReceipt",
@@ -34,4 +35,5 @@ __all__ = [
     "ServiceError",
     "UserAnswer",
     "UserQuestion",
+    "VALIDATION_PROVIDER_INVENTORY_SCHEMA_VERSION",
 ]

@@ -1,0 +1,285 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1345
+title: Move local verification runners into agent package
+intent:
+  problem: Verification command discovery and execution still lived in the legacy application package,
+    tying local test running to service and application modules.
+  goal: Move local exact-selector test execution and frozen generated-test handling into the agent package
+    while preserving service-owned obligation and evidence policy.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2411
+    end_line: 2411
+  summary: Move local verification runner ownership records into powdrr_agent.execution and update import
+    edges.
+  rationale: Keep the machine-readable ownership inventory aligned with the new local execution boundary.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2734
+    end_line: 2734
+  summary: Move local verification runner ownership records into powdrr_agent.execution and update import
+    edges.
+  rationale: Keep the machine-readable ownership inventory aligned with the new local execution boundary.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2736
+    end_line: 2738
+  summary: Move local verification runner ownership records into powdrr_agent.execution and update import
+    edges.
+  rationale: Keep the machine-readable ownership inventory aligned with the new local execution boundary.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 2836
+    end_line: 2836
+  summary: Move local verification runner ownership records into powdrr_agent.execution and update import
+    edges.
+  rationale: Keep the machine-readable ownership inventory aligned with the new local execution boundary.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3426
+    end_line: 3426
+  summary: Move local verification runner ownership records into powdrr_agent.execution and update import
+    edges.
+  rationale: Keep the machine-readable ownership inventory aligned with the new local execution boundary.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3497
+    end_line: 3497
+  summary: Move local verification runner ownership records into powdrr_agent.execution and update import
+    edges.
+  rationale: Keep the machine-readable ownership inventory aligned with the new local execution boundary.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3508
+    end_line: 3508
+  summary: Move local verification runner ownership records into powdrr_agent.execution and update import
+    edges.
+  rationale: Keep the machine-readable ownership inventory aligned with the new local execution boundary.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 3510
+    end_line: 3512
+  summary: Move local verification runner ownership records into powdrr_agent.execution and update import
+    edges.
+  rationale: Keep the machine-readable ownership inventory aligned with the new local execution boundary.
+- path: packages/agent/src/powdrr_agent/execution/execute_pr_tests.py
+  type: renamed
+  span:
+    start_line: 1
+    end_line: 167
+  summary: Move frozen generated-test installation, fingerprinting, and pytest execution into the agent
+    package.
+  rationale: Keep local file and subprocess effects with the agent while removing its dependency on legacy
+    application types.
+- path: packages/agent/src/powdrr_agent/execution/verification_provider.py
+  type: renamed
+  span:
+    start_line: 1
+    end_line: 559
+  summary: Move pytest and stestr verification discovery and exact-selector execution into the agent package.
+  rationale: Keep repository command execution local and make the adapter consume provider-neutral profile
+    data.
+- path: packages/contracts/src/powdrr_contracts/__init__.py
+  type: modified
+  span:
+    start_line: 20
+    end_line: 20
+  summary: Export the shared validation-provider inventory schema identifier from the public contracts
+    package.
+  rationale: Give agent adapters and service policy one public source for the exchanged inventory schema
+    version.
+- path: packages/contracts/src/powdrr_contracts/__init__.py
+  type: modified
+  span:
+    start_line: 38
+    end_line: 38
+  summary: Export the shared validation-provider inventory schema identifier from the public contracts
+    package.
+  rationale: Give agent adapters and service policy one public source for the exchanged inventory schema
+    version.
+- path: packages/contracts/src/powdrr_contracts/verification.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 3
+  summary: Define the public validation-provider inventory schema identifier.
+  rationale: Share the serialized inventory version across the local agent and service policy without
+    a service import.
+- path: packages/service/src/powdrr_service/structrr/validation_models.py
+  type: modified
+  span:
+    start_line: 9
+    end_line: 12
+  summary: Read the validation inventory schema identifier from powdrr_contracts.
+  rationale: Keep service validation records aligned with the public inventory contract.
+- path: scripts/build-agent-service-ownership-inventory.py
+  type: modified
+  span:
+    start_line: 17
+    end_line: 22
+  summary: Classify packaged local verification runtimes as agent-owned extraction PR 7 code.
+  rationale: Keep future ownership inventory generation consistent with the extracted modules.
+- path: scripts/build-agent-service-ownership-inventory.py
+  type: modified
+  span:
+    start_line: 252
+    end_line: 252
+  summary: Classify packaged local verification runtimes as agent-owned extraction PR 7 code.
+  rationale: Keep future ownership inventory generation consistent with the extracted modules.
+- path: scripts/build-agent-service-ownership-inventory.py
+  type: modified
+  span:
+    start_line: 255
+    end_line: 255
+  summary: Classify packaged local verification runtimes as agent-owned extraction PR 7 code.
+  rationale: Keep future ownership inventory generation consistent with the extracted modules.
+- path: src/powdrr_lift/workrr/__init__.py
+  type: modified
+  span:
+    start_line: 3
+    end_line: 14
+  summary: Export verification provider interfaces from powdrr_agent.execution.
+  rationale: Point the combined application's public Workrr surface at the relocated local adapters.
+- path: src/powdrr_lift/workrr/__init__.py
+  type: modified
+  span:
+    start_line: 81
+    end_line: 92
+  summary: Export verification provider interfaces from powdrr_agent.execution.
+  rationale: Point the combined application's public Workrr surface at the relocated local adapters.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 17
+    end_line: 19
+  summary: Use the agent package's local verification provider registry.
+  rationale: Keep command inventory and execution on the user machine after moving the adapters.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 166
+    end_line: 168
+  summary: Use the agent package's local verification provider registry.
+  rationale: Keep command inventory and execution on the user machine after moving the adapters.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 18
+    end_line: 24
+  summary: Use the agent package's frozen generated-test runner.
+  rationale: Keep generated test installation and subprocess execution in agent-owned code.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 153
+    end_line: 159
+  summary: Use the agent package's frozen generated-test runner.
+  rationale: Keep generated test installation and subprocess execution in agent-owned code.
+- path: src/powdrr_lift/workrr/verification_evidence.py
+  type: modified
+  span:
+    start_line: 14
+    end_line: 14
+  summary: Connect verification evidence orchestration to the relocated provider registry.
+  rationale: Preserve service-owned evidence evaluation while using agent-owned local execution.
+- path: src/powdrr_lift/workrr/verification_evidence.py
+  type: modified
+  span:
+    start_line: 19
+    end_line: 19
+  summary: Connect verification evidence orchestration to the relocated provider registry.
+  rationale: Preserve service-owned evidence evaluation while using agent-owned local execution.
+- path: tests/test_execute_pr_tests.py
+  type: modified
+  span:
+    start_line: 8
+    end_line: 15
+  summary: Import frozen generated-test runner coverage from powdrr_agent.execution.
+  rationale: Keep tests attached to the local runner's packaged implementation.
+- path: tests/test_execute_pr_tests.py
+  type: modified
+  span:
+    start_line: 23
+    end_line: 30
+  summary: Import frozen generated-test runner coverage from powdrr_agent.execution.
+  rationale: Keep tests attached to the local runner's packaged implementation.
+- path: tests/test_intent_verification_acceptance.py
+  type: modified
+  span:
+    start_line: 6
+    end_line: 9
+  summary: Use the packaged provider registry in acceptance evidence tests.
+  rationale: Exercise service evidence acceptance with the agent-owned local runner.
+- path: tests/test_intent_verification_acceptance.py
+  type: modified
+  span:
+    start_line: 12
+    end_line: 15
+  summary: Use the packaged provider registry in acceptance evidence tests.
+  rationale: Exercise service evidence acceptance with the agent-owned local runner.
+- path: tests/test_verification_evidence.py
+  type: modified
+  span:
+    start_line: 7
+    end_line: 12
+  summary: Use packaged local verification providers in evidence orchestration tests.
+  rationale: Preserve coverage of the agent-to-policy execution handoff.
+- path: tests/test_verification_evidence.py
+  type: modified
+  span:
+    start_line: 13
+    end_line: 18
+  summary: Use packaged local verification providers in evidence orchestration tests.
+  rationale: Preserve coverage of the agent-to-policy execution handoff.
+- path: tests/test_verification_provider.py
+  type: modified
+  span:
+    start_line: 8
+    end_line: 11
+  summary: Test provider interfaces and monkeypatch targets under powdrr_agent.execution.
+  rationale: Catch regressions in the relocated discovery and execution adapters.
+- path: tests/test_verification_provider.py
+  type: modified
+  span:
+    start_line: 21
+    end_line: 21
+  summary: Test provider interfaces and monkeypatch targets under powdrr_agent.execution.
+  rationale: Catch regressions in the relocated discovery and execution adapters.
+- path: tests/test_verification_provider.py
+  type: modified
+  span:
+    start_line: 53
+    end_line: 53
+  summary: Test provider interfaces and monkeypatch targets under powdrr_agent.execution.
+  rationale: Catch regressions in the relocated discovery and execution adapters.
+- path: tests/test_verification_provider.py
+  type: modified
+  span:
+    start_line: 58
+    end_line: 58
+  summary: Test provider interfaces and monkeypatch targets under powdrr_agent.execution.
+  rationale: Catch regressions in the relocated discovery and execution adapters.
+- path: tests/test_verification_provider.py
+  type: modified
+  span:
+    start_line: 121
+    end_line: 121
+  summary: Test provider interfaces and monkeypatch targets under powdrr_agent.execution.
+  rationale: Catch regressions in the relocated discovery and execution adapters.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []
+features: []
+proposed_prs: []

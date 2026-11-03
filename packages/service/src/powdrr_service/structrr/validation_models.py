@@ -6,7 +6,10 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, cast
 
-VALIDATION_INVENTORY_SCHEMA_VERSION = "verification-provider-inventory-v2"
+from powdrr_contracts.verification import (
+    VALIDATION_PROVIDER_INVENTORY_SCHEMA_VERSION as VALIDATION_INVENTORY_SCHEMA_VERSION,
+)
+
 VALIDATION_CONTEXT_SCHEMA_VERSION = "validation-context-v1"
 LEGACY_VALIDATION_INVENTORY_SCHEMA_VERSION = "verification-provider-inventory-v1"
 

@@ -14,6 +14,12 @@ from typing import Any
 def _owner(path: str) -> tuple[str, str, str]:
     """Assign a first-pass owner and extraction step for one tracked path."""
     if path.startswith("packages/agent/src/powdrr_agent/execution/"):
+        if path.endswith(("/execute_pr_tests.py", "/verification_provider.py")):
+            return (
+                "agent",
+                "local verification command discovery and execution capabilities",
+                "7",
+            )
         return (
             "agent",
             "local agent process execution, monitoring, or repository capability",
@@ -249,10 +255,8 @@ def _owner(path: str) -> tuple[str, str, str]:
             (
                 "/postrun_probes.py",
                 "/probe_repair.py",
-                "/execute_pr_tests.py",
                 "/differential_verification.py",
                 "/verification_evidence.py",
-                "/verification_provider.py",
             )
         ):
             return (

@@ -60,13 +60,17 @@ was too large for terminal capture. This follow-up adds a local full-report
 artifact and compact console summary, then records a second large run below.
 
 PR #1332 records actual per-item sizes and judges live results against the
-allocator's work-unit, acceptance-criteria, and component bounds. This follow-up
-adds a single bounded BasedPyright document-symbol query across planned Python
-write paths and supplies each Structrr enumeration question with only the symbol
-inventory for that item's paths. The symbol result is included in the question's
-input digest so resumed answers are invalidated if the pinned analysis changes.
-If BasedPyright is unavailable, planning keeps the existing baseline candidates
-and semantic review path.
+allocator's work-unit, acceptance-criteria, and component bounds. PR #1333 adds a
+single bounded BasedPyright document-symbol query across planned Python write
+paths. This follow-up binds those symbols by qualified name and kind to the
+baseline's source-subject and entity-binding records. Only matching bound
+entities seed deterministic item candidates; existing relationships are seeded
+when they touch one of those entities. These candidates are compiled before the
+additional-subject discovery question, and its projected baseline omits
+candidates already selected for that item. The question digest includes those
+candidate records, so resume detects changes without copying the full symbol
+inventory into the prompt. If BasedPyright is unavailable, planning keeps the
+existing baseline candidates and semantic review path.
 
 ### Milestone 0: Record a baseline and expose planning cost
 

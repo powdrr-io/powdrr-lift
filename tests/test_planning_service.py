@@ -1188,19 +1188,54 @@ def test_structural_candidates_follow_baseline_symbol_bindings_on_planned_paths(
     )
     baseline = {
         "entities": [
+            {"id": "entity:module", "type": "Module", "name": "parser"},
             {"id": "entity:parse", "type": "Function", "name": "parse"},
+            {"id": "entity:helper", "type": "Function", "name": "helper"},
             {"id": "entity:unrelated", "type": "Function", "name": "unrelated"},
         ],
         "source_subjects": [
             {
-                "id": "python:src/parser.py::src.parser.parse",
-                "stable_key": "python::src.parser.parse",
+                "id": "python:src/parser.py::src.parser",
+                "stable_key": "python::src.parser",
+                "kind": "module",
+                "qualified_name": "src.parser",
                 "path": "src/parser.py",
                 "file_entity_id": "file:src/parser.py",
-            }
+            },
+            {
+                "id": "python:src/parser.py::src.parser.parse",
+                "stable_key": "python::src.parser.parse",
+                "kind": "function",
+                "qualified_name": "src.parser.parse",
+                "path": "src/parser.py",
+                "file_entity_id": "file:src/parser.py",
+            },
+            {
+                "id": "python:src/parser.py::src.parser.helper",
+                "stable_key": "python::src.parser.helper",
+                "kind": "function",
+                "qualified_name": "src.parser.helper",
+                "path": "src/parser.py",
+                "file_entity_id": "file:src/parser.py",
+            },
         ],
         "source_bindings": [
             {"entity_id": "entity:parse", "path": "src/parser.py"},
+            {
+                "entity_id": "entity:parse",
+                "subject_id": "python:src/parser.py::src.parser.parse",
+                "path": "src/parser.py",
+            },
+            {
+                "entity_id": "entity:module",
+                "subject_id": "python:src/parser.py::src.parser",
+                "path": "src/parser.py",
+            },
+            {
+                "entity_id": "entity:helper",
+                "subject_id": "python:src/parser.py::src.parser.helper",
+                "path": "src/parser.py",
+            },
             {"entity_id": "entity:unrelated", "path": "src/other.py"},
         ],
         "entity_relationships": [
@@ -1214,6 +1249,11 @@ def test_structural_candidates_follow_baseline_symbol_bindings_on_planned_paths(
                 "source": "entity:unrelated",
                 "target": "entity:other",
             },
+            {
+                "id": "relationship:helper-calls-other",
+                "source": "entity:helper",
+                "target": "entity:other",
+            },
         ],
     }
 
@@ -1223,9 +1263,13 @@ def test_structural_candidates_follow_baseline_symbol_bindings_on_planned_paths(
         requirement_by_id={requirement.id: requirement},
         projected_baseline=baseline,
         fallback_source_refs=(anchor,),
+        basedpyright_symbols_by_path={
+            "src/parser.py": [{"name": "parse", "kind": "function", "children": []}]
+        },
     )
 
     assert {item.subject_id for item in candidates} == {
+        "entity:module",
         "entity:parse",
         "relationship:parse-calls-tokenize",
     }

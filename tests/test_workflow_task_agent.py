@@ -24,6 +24,9 @@ from powdrr_service.verification.execute_pr_test_authoring import (
     WORKSPACE_ROOT_PLACEHOLDER,
     build_execute_pr_test_author_prompt,
 )
+from powdrr_service.verification.test_obligations import (
+    acceptance_criteria_contract,
+)
 
 from powdrr_lift.core.spec_context import (
     gather_specification_context,
@@ -80,7 +83,6 @@ from powdrr_lift.workrr.task_agent import (
     _workflow_file_command_error,
     run_workflow_task,
 )
-from powdrr_lift.workrr.test_obligations import acceptance_criteria_contract
 
 
 def test_pr_body_discloses_inline_plan_adjustments_to_reviewer() -> None:

@@ -20,6 +20,7 @@ from powdrr_agent.execution.verification_provider import (
 )
 from powdrr_contracts.models import OperationRequest
 from powdrr_contracts.service import PowdrrService
+from powdrr_contracts.verification import PostRunProbe
 from powdrr_local import (
     JsonServiceBridge,
     LocalPowdrrService,
@@ -97,6 +98,11 @@ from powdrr_service.structrr.verification_obligations import (
     VerificationObligationCompilation,
     compile_verification_obligations,
 )
+from powdrr_service.verification.postrun_probes import (
+    POSTRUN_PROBE_SCHEMA_VERSION,
+    parse_generated_postrun_probe_source,
+    required_probe_coverage_gaps,
+)
 from powdrr_service.verification.probe_results import (
     baseline_probe_failures,
     baseline_probe_is_expected_failure,
@@ -153,12 +159,6 @@ from powdrr_lift.workrr.command_catalog import (
 )
 from powdrr_lift.workrr.evidence_reconciliation import reconcile_verification_evidence
 from powdrr_lift.workrr.git import integration_branch_name
-from powdrr_lift.workrr.postrun_probes import (
-    POSTRUN_PROBE_SCHEMA_VERSION,
-    PostRunProbe,
-    parse_generated_postrun_probe_source,
-    required_probe_coverage_gaps,
-)
 from powdrr_lift.workrr.protocol import WorkflowLLMClient
 from powdrr_lift.workrr.run_artifacts import (
     RunFailure,

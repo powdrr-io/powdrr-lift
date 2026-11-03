@@ -2695,7 +2695,7 @@
       "kind": "python_module",
       "owner": "service",
       "path": "packages/service/src/powdrr_service/verification/differential.py",
-      "rationale": "pure differential classification of base and candidate verification evidence",
+      "rationale": "service-owned verification outcome comparison policy",
       "reviewed": false
     },
     {
@@ -2827,7 +2827,6 @@
         "powdrr_lift.workrr.command_catalog",
         "powdrr_lift.workrr.evidence_reconciliation",
         "powdrr_lift.workrr.git",
-        "powdrr_lift.workrr.postrun_probes",
         "powdrr_service.procedrr_evaluator.model_client",
         "powdrr_service.procedrr_evaluator.operations",
         "powdrr_lift.workrr.protocol",
@@ -2857,7 +2856,9 @@
         "powdrr_service.structrr.verification_contract",
         "powdrr_service.structrr.verification_obligations",
         "powdrr_agent.execution.postrun_probe_runner",
-        "powdrr_service.verification.probe_results"
+        "powdrr_service.verification.probe_results",
+        "powdrr_service.verification.postrun_probes",
+        "powdrr_contracts.verification"
       ],
       "kind": "python_module",
       "owner": "split",
@@ -3060,12 +3061,13 @@
     {
       "extraction_pr": "7",
       "internal_imports": [
-        "powdrr_lift.workrr.test_obligations"
+        "powdrr_contracts.verification",
+        "powdrr_service.verification.test_obligations"
       ],
       "kind": "python_module",
-      "owner": "split",
-      "path": "src/powdrr_lift/workrr/postrun_probes.py",
-      "rationale": "probe source parsing and validation remain in the combined application; local execution and result policy are extracted",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/verification/postrun_probes.py",
+      "rationale": "service-owned generated-probe parsing, interaction validation, and coverage policy",
       "reviewed": false
     },
     {
@@ -3440,7 +3442,6 @@
         "powdrr_service.providers.config",
         "powdrr_lift.workrr.provider_runtime",
         "powdrr_lift.workrr.local_model",
-        "powdrr_lift.workrr.test_obligations",
         "powdrr_service.verification.execute_pr_test_authoring",
         "powdrr_service.planning.multipr_structrr",
         "powdrr_service.planning.repair_service",
@@ -3453,7 +3454,8 @@
         "powdrr_service.verification.execute_pr_test_corrections",
         "powdrr_service.verification.execute_pr_test_validation",
         "powdrr_service.verification.execute_pr_acceptance",
-        "powdrr_service.planning.reviewed_plan"
+        "powdrr_service.planning.reviewed_plan",
+        "powdrr_service.verification.test_obligations"
       ],
       "kind": "python_module",
       "owner": "split",
@@ -3475,12 +3477,12 @@
       "reviewed": false
     },
     {
-      "extraction_pr": "5/7",
+      "extraction_pr": "7",
       "internal_imports": [],
       "kind": "python_module",
-      "owner": "split",
-      "path": "src/powdrr_lift/workrr/test_obligations.py",
-      "rationale": "separate service decisions from agent I/O and orchestration",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/verification/test_obligations.py",
+      "rationale": "service-owned deterministic test-obligation and coverage policy",
       "reviewed": false
     },
     {
@@ -3897,7 +3899,7 @@
       "kind": "python_module",
       "owner": "service",
       "path": "packages/service/src/powdrr_service/verification/probe_results.py",
-      "rationale": "service-owned interpretation and classification of locally executed probe outcomes",
+      "rationale": "service-owned verification outcome classification and policy",
       "reviewed": false
     }
   ],

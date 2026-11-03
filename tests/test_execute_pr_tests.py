@@ -26,12 +26,12 @@ from powdrr_service.verification.execute_pr_test_validation import (
     validate_coverage_references,
     validate_generated_test_files,
 )
-
-from powdrr_lift.workrr.coding_agent_validation import ValidationProfile
-from powdrr_lift.workrr.test_obligations import (
+from powdrr_service.verification.test_obligations import (
     ObligationError,
     acceptance_criteria_contract,
 )
+
+from powdrr_lift.workrr.coding_agent_validation import ValidationProfile
 
 
 def test_generated_pytest_files_require_assertive_tests_under_test_root() -> None:

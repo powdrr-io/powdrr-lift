@@ -7,16 +7,14 @@ from typing import Any
 
 import pytest
 from powdrr_agent.execution.postrun_probe_runner import run_postrun_probes
-from powdrr_contracts.verification import PostRunProbeResult
+from powdrr_contracts.verification import PostRunProbe, PostRunProbeResult
+from powdrr_service.verification.postrun_probes import (
+    parse_generated_postrun_probe_source,
+    validate_probe_interaction_plan,
+)
 from powdrr_service.verification.probe_results import (
     baseline_probe_failures,
     probe_failures,
-)
-
-from powdrr_lift.workrr.postrun_probes import (
-    PostRunProbe,
-    parse_generated_postrun_probe_source,
-    validate_probe_interaction_plan,
 )
 
 
@@ -84,6 +82,34 @@ def _paired_engine_contract() -> dict[str, Any]:
             {"kind": "class", "name": "SyncEngine"},
             {"kind": "class", "name": "AsyncEngine"},
         ]
+    }
+
+
+def test_postrun_probe_contract_preserves_serialized_probe_fields() -> None:
+    probe = PostRunProbe(
+        probe_id="selector-probe",
+        scenario_id="selector-scenario",
+        oracle_basis="explicit instruction",
+        test_source="def test_probe(): pass\n",
+        function_name="test_probe",
+        obligation_id="selector-obligation",
+        obligation_category="transformation",
+        obligation_rule="value_matches",
+        interaction_ids=("interaction-1", "interaction-2"),
+        execution_path="sync",
+    )
+
+    assert probe.to_data() == {
+        "probe_id": "selector-probe",
+        "scenario_id": "selector-scenario",
+        "oracle_basis": "explicit instruction",
+        "function_name": "test_probe",
+        "test_source": "def test_probe(): pass\n",
+        "obligation_id": "selector-obligation",
+        "obligation_category": "transformation",
+        "obligation_rule": "value_matches",
+        "interaction_ids": ["interaction-1", "interaction-2"],
+        "execution_path": "sync",
     }
 
 

@@ -31,13 +31,25 @@ def _owner(path: str) -> tuple[str, str, str]:
             "local agent process execution, monitoring, or repository capability",
             "6",
         )
-    if path in {
-        "packages/service/src/powdrr_service/verification/differential.py",
-        "packages/service/src/powdrr_service/verification/probe_results.py",
-    }:
+    verification_modules = {
+        "packages/service/src/powdrr_service/verification/differential.py": (
+            "service-owned verification outcome comparison policy"
+        ),
+        "packages/service/src/powdrr_service/verification/probe_results.py": (
+            "service-owned verification outcome classification and policy"
+        ),
+        "packages/service/src/powdrr_service/verification/postrun_probes.py": (
+            "service-owned generated-probe parsing, interaction validation, "
+            "and coverage policy"
+        ),
+        "packages/service/src/powdrr_service/verification/test_obligations.py": (
+            "service-owned deterministic test-obligation and coverage policy"
+        ),
+    }
+    if path in verification_modules:
         return (
             "service",
-            "service-owned verification outcome classification and policy",
+            verification_modules[path],
             "7",
         )
     if path == "packages/service/src/powdrr_service/artifact_state.py":
@@ -392,7 +404,9 @@ def main() -> int:
                 "packages/service/src/powdrr_service/structrr",
                 "packages/service/src/powdrr_service/artifact_state.py",
                 "packages/service/src/powdrr_service/verification/differential.py",
+                "packages/service/src/powdrr_service/verification/postrun_probes.py",
                 "packages/service/src/powdrr_service/verification/probe_results.py",
+                "packages/service/src/powdrr_service/verification/test_obligations.py",
                 "packages/agent/src/powdrr_agent/artifact_state.py",
                 "packages/agent/src/powdrr_agent",
                 "packages/service/src/powdrr_service/resources/evaluations",

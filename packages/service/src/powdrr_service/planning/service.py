@@ -24,13 +24,13 @@ from typing import Any, Protocol
 
 from powdrr_lift.workrr.procedrr import WorkrrProcedrrClient
 from powdrr_lift.workrr.procedrr_operations import WorkrrOperationExecutor
-from powdrr_lift.workrr.protocol import WorkflowLLMClient
 from powdrr_service.planning.checkpoints import (
     CheckpointStore,
     PlanningCheckpoint,
     PlanningJournalError,
 )
 from powdrr_service.planning.contracts import PlanningContractError
+from powdrr_service.planning.inference import PlanningModelClient
 from powdrr_service.planning.questions import (
     AcceptedQuestionAnswer,
     NeedsQuestionAnswer,
@@ -281,7 +281,7 @@ class PlanningOptions:
 class _QuestionTelemetryClient:
     """Per-question client view that captures usage without shared-state races."""
 
-    def __init__(self, client: WorkflowLLMClient) -> None:
+    def __init__(self, client: PlanningModelClient) -> None:
         self._client = client
         self.prompt_chars = 0
         self.response_chars = 0
@@ -447,7 +447,7 @@ def advance_planning_session(
     session: PlanningSession,
     state_machine: PlanningStateMachine,
     checkpoint_store: CheckpointStore,
-    client: WorkflowLLMClient,
+    client: PlanningModelClient,
     options: PlanningOptions,
     stderr: Any,
 ) -> PlanningTransition:
@@ -697,7 +697,7 @@ def advance_planning_session(
 def _run_question_batch(
     requests: tuple[QuestionRequest[Any], ...],
     *,
-    client: WorkflowLLMClient,
+    client: PlanningModelClient,
     options: PlanningOptions,
     stderr: Any,
     prior_events: Sequence[Any] = (),
@@ -938,7 +938,7 @@ def planning_operation_executor(
     session: PlanningSession,
     state_machine: PlanningStateMachine,
     checkpoint_store: CheckpointStore,
-    client: WorkflowLLMClient,
+    client: PlanningModelClient,
     options: PlanningOptions,
     stderr: Any,
 ) -> WorkrrOperationExecutor:
@@ -1004,7 +1004,7 @@ def run_planning_procedrr(
     session: PlanningSession,
     state_machine: PlanningStateMachine,
     checkpoint_store: CheckpointStore,
-    client: WorkflowLLMClient,
+    client: PlanningModelClient,
     options: PlanningOptions,
     stderr: Any,
 ) -> Any:

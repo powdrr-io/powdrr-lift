@@ -15,6 +15,7 @@ from powdrr_service.planning.contracts import (
     Question,
     parse_coverage_answer,
 )
+from powdrr_service.planning.inference import PlanningInferenceError
 from powdrr_service.planning.questions import (
     MAX_QUESTION_ANSWER_CHARS,
     MAX_QUESTION_INPUT_CHARS,
@@ -36,9 +37,11 @@ from powdrr_service.planning.questions import (
 from powdrr_service.planning.questions import (
     run_question as service_run_question,
 )
-
-from powdrr_lift.errors import PowdrrExecutionError
-from powdrr_lift.workrr.llm import WorkflowLLMHTTPError
+from powdrr_service.providers.errors import (
+    ProviderClientError,
+    ProviderHTTPError,
+    ProviderResponseError,
+)
 
 _VALID_PAGE = {
     "records": [{"statement": "One requirement."}],
@@ -462,7 +465,7 @@ def test_needs_answer_stops_later_questions_until_resume() -> None:
 
 
 def test_malformed_json_provider_response_is_corrected_with_its_original_text() -> None:
-    malformed = PowdrrExecutionError(
+    malformed = ProviderResponseError(
         "response was not valid JSON\nResponse content:\n{not-json",
         error_code="invalid_json_response",
     )
@@ -494,13 +497,13 @@ def test_provider_429_uses_shared_transport_backoff(
     client = _ScriptedClient(
         {
             ("extract_requirements", "block-01"): [
-                WorkflowLLMHTTPError("deepinfra", 429, "rate limit"),
+                ProviderHTTPError("deepinfra", 429, "rate limit"),
                 _VALID_PAGE,
             ]
         }
     )
     delays: list[float] = []
-    monkeypatch.setattr("powdrr_lift.workrr.llm.time.sleep", delays.append)
+    monkeypatch.setattr("powdrr_service.planning.inference.time.sleep", delays.append)
 
     result = run_question(
         client,
@@ -515,6 +518,35 @@ def test_provider_429_uses_shared_transport_backoff(
     assert result.attempts == 1
     assert client.calls[("extract_requirements", "block-01")] == 2
     assert delays == [0.25]
+
+
+def test_provider_retry_exhaustion_preserves_retry_count_and_backoff(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = _ScriptedClient(
+        {
+            ("extract_requirements", "block-01"): [
+                ProviderClientError("request timed out"),
+                ProviderClientError("request timed out"),
+                ProviderClientError("request timed out"),
+            ]
+        }
+    )
+    delays: list[float] = []
+    monkeypatch.setattr("powdrr_service.planning.inference.time.sleep", delays.append)
+
+    with pytest.raises(PlanningInferenceError, match="failed after 2 retries"):
+        run_question(
+            client,
+            _request(_question("q-000001", "block-01")),
+            model="test-model",
+            stderr=None,
+            max_transport_retries=2,
+            transport_backoff_seconds=0.5,
+        )
+
+    assert client.calls[("extract_requirements", "block-01")] == 3
+    assert delays == [0.5, 1.0]
 
 
 def test_large_source_is_split_losslessly_into_bounded_child_questions() -> None:

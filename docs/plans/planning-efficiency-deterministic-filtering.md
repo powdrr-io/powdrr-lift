@@ -1,6 +1,6 @@
 # Planning Efficiency Through Deterministic Filtering
 
-**Status:** Core reductions landed; labeled dependency recall and candidate telemetry are covered; work-unit planning now receives implementation-language preferences derived from the pinned repository
+**Status:** Core reductions landed; labeled dependency recall and candidate telemetry are covered; work-unit planning receives pinned repository language preferences; the scale benchmark now saves full reports and prints compact summaries
 **Date:** 2026-11-01  
 **Owner:** Powdrr-Lift planning service  
 **Related change:** [PR #1283](https://github.com/powdrr-io/powdrr-lift/pull/1283) starts deterministic Structrr candidate selection for path-bound existing subjects.
@@ -52,9 +52,12 @@ PR #1300 added scale profiles and reduced large-run prompt/frontier costs. PR
 large-profile live reporting. The current BasedPyright adapter exposes
 workspace symbols and per-file structure; dependency discovery currently uses
 planned paths, named outputs, related requirements, and lexical candidates.
-The latest large live run reached work-unit planning but blocked on 16
-unanswered supplemental proposals, so it did not reach dependency analysis or
-establish the two-hour completion target.
+PR #1323 added implementation-language preferences from the pinned repository.
+The next large live run completed all planning phases in 1,262.1 seconds, but
+produced 58 items against the 50-item target. It is a completed execution and a
+shape mismatch, not a quality pass. The run's first copy of the full JSON report
+was too large for terminal capture. This follow-up adds a local full-report
+artifact and compact console summary, then records a second large run below.
 
 ### Milestone 0: Record a baseline and expose planning cost
 
@@ -340,10 +343,12 @@ before using this run as a planning-quality or scale result. Hardware: Apple
 Silicon MacBook Air, arm64, Darwin 25.5.0.
 
 The benchmark accepts an explicit live-provider mode. It makes real provider
-calls, does not publish a plan or create GitHub issues, and emits the same JSON
-report with the selected provider/model, elapsed time, phase and question-kind
-counts, token totals when the provider returns usage, validation retries, and
-fixture-shape differences:
+calls and does not publish a plan or create GitHub issues. It writes the complete
+JSON report to `.powdrr/benchmark-reports` by default (or to `--report-file`) and
+prints a compact JSON summary with the artifact path, elapsed time, phase and
+question-kind counts, token totals when the provider returns usage, validation
+retries, and fixture-shape differences. Phase `provider_call_elapsed_ms` values
+sum individual concurrent calls and can exceed end-to-end wall time:
 
 ```sh
 python scripts/benchmark_planning_scale.py --profile large --live --provider auto
@@ -434,15 +439,27 @@ After adding pinned repository runtime preferences, the `typical` live profile
 completed in 106.7 seconds with `deepinfra-cheap` /
 `deepseek-ai/DeepSeek-V4-Flash-0731`, concurrency 4, and a 30-second timeout.
 It produced 40 requirements, 10 work units, and 5 items with no validation
-retries or fixture mismatch. The subsequent large live profile completed with
-all 500 requirements and 57 plan items. It passed work-unit proposal validation
-instead of blocking on an unsupported `.c` path; the generated item titles
-specified Python modules. The expected item count is 50, so this is a successful
-execution but still a plan-shape mismatch, not a quality pass. The large-run
-terminal JSON was too large for the command capture and its elapsed time and
-provider-call totals were not retained; do not use this run as a timing result.
-This verifies the language preference on both profile sizes, while the large
-profile's plan shape and the missing concise live report remain follow-up work.
+retries or fixture mismatch.
+
+The next large live profile completed in 1,262.115 seconds (21.0 minutes) with
+854 provider API calls and 2,325 question members. It accepted 500 requirements,
+125 work units, and 58 items; the work-unit count met its allowed range, while
+the item count exceeded the 50-item target. The benchmark reported one
+validation retry, 985 accepted answer pages, 788 deterministic answers, and no
+unresolved questions. Dependency discovery produced 570 candidates, all
+confirmed independent, across 190 API calls. The compiler completed, but the
+benchmark exited with a fixture-shape mismatch and this is not a plan-quality
+pass. Provider token usage was unavailable. The full report is saved at
+`.powdrr/benchmark-reports/planning-scale-20261103T012143356842Z.json`; stdout
+contains only the compact summary and artifact path. Hardware: Apple Silicon
+MacBook Air, arm64, Darwin 25.5.0.
+
+By phase, it made 394 source-ledger calls, 71 repository-coverage calls, 125
+work-unit calls, 206 dependency/PR-slicing calls, and 58 structural-review
+calls. These counts point to source-ledger and dependency candidate review as
+the largest call groups. The 190 dependency-confirmation calls reviewed 570
+candidates and classified all 570 as independent, making candidate precision
+the clearest next optimization target.
 
 ## Cross-cutting test requirements
 

@@ -1,0 +1,106 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1326
+title: Save compact planning benchmark reports
+intent:
+  problem: Large planning benchmark output can overwhelm command capture and lose the timing, phase, request, and shape metrics needed to evaluate a run.
+  goal: Persist the complete report as a local artifact while printing a compact, bounded summary that retains the measurements needed for analysis.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/plans/planning-efficiency-deterministic-filtering.md
+    type: modified
+    span: {start_line: 3, end_line: 3}
+    summary: Update plan status to include full report artifacts and compact summaries.
+    rationale: Keep the plan's status current with the benchmark behavior.
+  - path: docs/plans/planning-efficiency-deterministic-filtering.md
+    type: modified
+    span: {start_line: 55, end_line: 60}
+    summary: Replace the stale blocked-run status with the completed large run and its shape mismatch.
+    rationale: Preserve accurate planning progress and the unresolved item-count issue.
+  - path: docs/plans/planning-efficiency-deterministic-filtering.md
+    type: modified
+    span: {start_line: 346, end_line: 351}
+    summary: Document the full JSON artifact and compact benchmark summary output.
+    rationale: Explain where the full report is stored and what the terminal output contains.
+  - path: docs/plans/planning-efficiency-deterministic-filtering.md
+    type: modified
+    span: {start_line: 442, end_line: 462}
+    summary: Record large-run timing, call counts, completion status, and 58-versus-50 item shape mismatch.
+    rationale: Separate measured execution from a planning-quality pass and identify dependency confirmation as a cost target.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 23, end_line: 23}
+    summary: Import UTC timestamp support for unique report artifact paths.
+    rationale: Avoid overwriting reports from separate runs.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 88, end_line: 194}
+    summary: Build compact profile summaries and persist complete JSON reports at timestamped paths.
+    rationale: Keep essential measurements on stdout while retaining full diagnostics in an artifact.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 255, end_line: 256}
+    summary: Rename the dependency output ordinal variable to satisfy type checking.
+    rationale: Keep benchmark script type validation clean.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 258, end_line: 258}
+    summary: Use the renamed dependency output ordinal to retrieve its summary record.
+    rationale: Preserve dependency summary behavior with a type-safe name.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 350, end_line: 350}
+    summary: Track completed provider calls for periodic progress reporting.
+    rationale: Avoid emitting one progress line per request on large runs.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 276, end_line: 280}
+    summary: Remove per-request start messages from live benchmark output.
+    rationale: Keep console output bounded while preserving periodic progress.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 399, end_line: 408}
+    summary: Emit one progress message every 25 completed calls.
+    rationale: Provide progress without flooding terminal output.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 928, end_line: 935}
+    summary: Add an optional path for the full JSON report artifact.
+    rationale: Allow users to choose an artifact location while providing a safe default.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 944, end_line: 946}
+    summary: Resolve relative report paths from the repository root.
+    rationale: Make artifact path behavior predictable from any working directory.
+  - path: scripts/benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 987, end_line: 994}
+    summary: Write the full report and print only its compact summary.
+    rationale: Ensure completed and shape-mismatched runs both retain complete diagnostics without dumping them to stdout.
+  - path: tests/test_benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 3, end_line: 3}
+    summary: Import JSON parsing for artifact and summary assertions.
+    rationale: Verify saved report data and compact output size.
+  - path: tests/test_benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 5, end_line: 5}
+    summary: Import UTC datetime support for deterministic artifact-path testing.
+    rationale: Test the default path without relying on the wall clock.
+  - path: tests/test_benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 28, end_line: 31}
+    summary: Expose compact summary, artifact, and progress helpers to tests.
+    rationale: Exercise reporting behavior directly without live provider calls.
+  - path: tests/test_benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 224, end_line: 322}
+    summary: Test compact output bounds, full artifact persistence, timestamped paths, and periodic progress.
+    rationale: Prevent large diagnostics from returning to terminal output or losing the saved full report.
+entities: []
+entity_relationships: []
+invariants:
+  - id: benchmark-console-output-is-bounded
+    description: The benchmark stores complete diagnostics in a report artifact and prints only bounded summary metrics.
+    action: added
+guidance: []

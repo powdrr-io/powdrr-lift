@@ -1,0 +1,46 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1358
+title: Accept shell runtime in planning manifests
+intent:
+  problem: Planning classifies shell scripts as the canonical shell runtime, but manifest validation used a separate allowlist that rejected it.
+  goal: Validate planned-write runtimes against the canonical runtime set used by planning, while retaining the neutral runtime.
+human-decisions: []
+structured_files: []
+files:
+  - path: packages/service/src/powdrr_service/planning/compiler.py
+    type: modified
+    span: {start_line: 23, end_line: 23}
+    summary: Use the canonical planned-runtime set when validating manifest writes.
+    rationale: Keep compiler validation aligned with runtime classification for `.sh` files and future supported runtimes.
+  - path: packages/service/src/powdrr_service/planning/compiler.py
+    type: modified
+    span: {start_line: 36, end_line: 36}
+    summary: Retain neutral writes while deriving supported runtimes from the canonical set.
+    rationale: Avoid a second runtime list that can drift from planning classification.
+  - path: tests/test_planning_compiler.py
+    type: modified
+    span: {start_line: 235, end_line: 254}
+    summary: Verify a shell verification script passes planning-manifest validation.
+    rationale: Reproduce the compiler failure found in the Gaterr planning session.
+entities:
+  - id: planning-manifest-runtime-validation
+    type: Compiler
+    action: added
+  - id: shell-runtime-compiler-regression
+    type: Regression test
+    action: added
+entity_relationships:
+  - id: shell-runtime-test-verifies-manifest-validation
+    type: verifies
+    source: shell-runtime-compiler-regression
+    target: planning-manifest-runtime-validation
+    action: added
+    description: The regression test verifies shell planned writes are accepted by manifest validation.
+invariants:
+  - id: manifest-runtimes-match-planning-runtime-catalog
+    description: Manifest validation accepts every canonical planning runtime and also accepts neutral writes.
+    action: added
+guidance:
+  - id: derive-runtime-allowlist-from-canonical-catalog
+    description: Keep manifest runtime validation derived from the canonical planning runtime catalog when adding supported runtimes.
+    action: added

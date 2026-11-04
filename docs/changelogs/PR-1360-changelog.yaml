@@ -1,0 +1,856 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1360
+title: Preserve source PR phases in generated plans
+intent:
+  problem: Explicit PR sequencing in an implementation plan was lost when the planner converted source
+    requirements into work units, producing many ready workflows with missing dependencies.
+  goal: Carry source-declared phases through work-unit planning, persist their metadata, and compile their
+    sequencing into explicit dependencies that block workflows in source order.
+human-decisions: []
+structured_files: []
+files:
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 34
+    end_line: 38
+  summary: Carry explicit source phase assignments through proposal validation, item grouping, and titles.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 90
+    end_line: 90
+  summary: Carry explicit source phase assignments through proposal validation, item grouping, and titles.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 98
+    end_line: 98
+  summary: Carry explicit source phase assignments through proposal validation, item grouping, and titles.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 230
+    end_line: 230
+  summary: Carry explicit source phase assignments through proposal validation, item grouping, and titles.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 235
+    end_line: 235
+  summary: Carry explicit source phase assignments through proposal validation, item grouping, and titles.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 259
+    end_line: 259
+  summary: Carry explicit source phase assignments through proposal validation, item grouping, and titles.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 265
+    end_line: 265
+  summary: Carry explicit source phase assignments through proposal validation, item grouping, and titles.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 303
+    end_line: 303
+  summary: Carry explicit source phase assignments through proposal validation, item grouping, and titles.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 370
+    end_line: 370
+  summary: Carry explicit source phase assignments through proposal validation, item grouping, and titles.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 385
+    end_line: 400
+  summary: Carry explicit source phase assignments through proposal validation, item grouping, and titles.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 474
+    end_line: 474
+  summary: Carry explicit source phase assignments through proposal validation, item grouping, and titles.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 718
+    end_line: 718
+  summary: Carry explicit source phase assignments through proposal validation, item grouping, and titles.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 730
+    end_line: 748
+  summary: Carry explicit source phase assignments through proposal validation, item grouping, and titles.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 847
+    end_line: 867
+  summary: Carry explicit source phase assignments through proposal validation, item grouping, and titles.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 876
+    end_line: 876
+  summary: Carry explicit source phase assignments through proposal validation, item grouping, and titles.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 893
+    end_line: 895
+  summary: Carry explicit source phase assignments through proposal validation, item grouping, and titles.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 900
+    end_line: 900
+  summary: Carry explicit source phase assignments through proposal validation, item grouping, and titles.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 908
+    end_line: 908
+  summary: Carry explicit source phase assignments through proposal validation, item grouping, and titles.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 910
+    end_line: 910
+  summary: Carry explicit source phase assignments through proposal validation, item grouping, and titles.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 912
+    end_line: 912
+  summary: Carry explicit source phase assignments through proposal validation, item grouping, and titles.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 914
+    end_line: 914
+  summary: Carry explicit source phase assignments through proposal validation, item grouping, and titles.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 936
+    end_line: 939
+  summary: Carry explicit source phase assignments through proposal validation, item grouping, and titles.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 982
+    end_line: 991
+  summary: Carry explicit source phase assignments through proposal validation, item grouping, and titles.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 1044
+    end_line: 1044
+  summary: Carry explicit source phase assignments through proposal validation, item grouping, and titles.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 1104
+    end_line: 1111
+  summary: Carry explicit source phase assignments through proposal validation, item grouping, and titles.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 1316
+    end_line: 1316
+  summary: Carry explicit source phase assignments through proposal validation, item grouping, and titles.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 1321
+    end_line: 1326
+  summary: Carry explicit source phase assignments through proposal validation, item grouping, and titles.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 1354
+    end_line: 1358
+  summary: Carry explicit source phase assignments through proposal validation, item grouping, and titles.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 1438
+    end_line: 1443
+  summary: Carry explicit source phase assignments through proposal validation, item grouping, and titles.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 1452
+    end_line: 1452
+  summary: Carry explicit source phase assignments through proposal validation, item grouping, and titles.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: packages/service/src/powdrr_service/planning/compiler.py
+  type: modified
+  span:
+    start_line: 15
+    end_line: 15
+  summary: Persist and validate phase metadata, phase boundaries, dependencies, and combined prerequisites.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: packages/service/src/powdrr_service/planning/compiler.py
+  type: modified
+  span:
+    start_line: 451
+    end_line: 483
+  summary: Persist and validate phase metadata, phase boundaries, dependencies, and combined prerequisites.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: packages/service/src/powdrr_service/planning/compiler.py
+  type: modified
+  span:
+    start_line: 539
+    end_line: 543
+  summary: Persist and validate phase metadata, phase boundaries, dependencies, and combined prerequisites.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: packages/service/src/powdrr_service/planning/compiler.py
+  type: modified
+  span:
+    start_line: 545
+    end_line: 545
+  summary: Persist and validate phase metadata, phase boundaries, dependencies, and combined prerequisites.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: packages/service/src/powdrr_service/planning/compiler.py
+  type: modified
+  span:
+    start_line: 622
+    end_line: 627
+  summary: Persist and validate phase metadata, phase boundaries, dependencies, and combined prerequisites.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: packages/service/src/powdrr_service/planning/compiler.py
+  type: modified
+  span:
+    start_line: 671
+    end_line: 705
+  summary: Persist and validate phase metadata, phase boundaries, dependencies, and combined prerequisites.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: packages/service/src/powdrr_service/planning/compiler.py
+  type: modified
+  span:
+    start_line: 829
+    end_line: 835
+  summary: Persist and validate phase metadata, phase boundaries, dependencies, and combined prerequisites.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: packages/service/src/powdrr_service/planning/compiler.py
+  type: modified
+  span:
+    start_line: 874
+    end_line: 879
+  summary: Persist and validate phase metadata, phase boundaries, dependencies, and combined prerequisites.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: packages/service/src/powdrr_service/planning/dependencies.py
+  type: modified
+  span:
+    start_line: 26
+    end_line: 30
+  summary: Expand source phase prerequisites into unit edges and share manual prerequisite aggregation.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: packages/service/src/powdrr_service/planning/dependencies.py
+  type: modified
+  span:
+    start_line: 291
+    end_line: 318
+  summary: Expand source phase prerequisites into unit edges and share manual prerequisite aggregation.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: packages/service/src/powdrr_service/planning/dependencies.py
+  type: modified
+  span:
+    start_line: 344
+    end_line: 387
+  summary: Expand source phase prerequisites into unit edges and share manual prerequisite aggregation.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 53
+    end_line: 53
+  summary: Supply source phases to planning, persist them, and compile their ordering with shared prerequisite
+    data.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 56
+    end_line: 56
+  summary: Supply source phases to planning, persist them, and compile their ordering with shared prerequisite
+    data.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 77
+    end_line: 77
+  summary: Supply source phases to planning, persist them, and compile their ordering with shared prerequisite
+    data.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 470
+    end_line: 470
+  summary: Supply source phases to planning, persist them, and compile their ordering with shared prerequisite
+    data.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 1151
+    end_line: 1151
+  summary: Supply source phases to planning, persist them, and compile their ordering with shared prerequisite
+    data.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 1167
+    end_line: 1171
+  summary: Supply source phases to planning, persist them, and compile their ordering with shared prerequisite
+    data.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 1218
+    end_line: 1218
+  summary: Supply source phases to planning, persist them, and compile their ordering with shared prerequisite
+    data.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 1324
+    end_line: 1338
+  summary: Supply source phases to planning, persist them, and compile their ordering with shared prerequisite
+    data.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 1343
+    end_line: 1346
+  summary: Supply source phases to planning, persist them, and compile their ordering with shared prerequisite
+    data.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 1367
+    end_line: 1367
+  summary: Supply source phases to planning, persist them, and compile their ordering with shared prerequisite
+    data.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 1381
+    end_line: 1381
+  summary: Supply source phases to planning, persist them, and compile their ordering with shared prerequisite
+    data.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 1513
+    end_line: 1517
+  summary: Supply source phases to planning, persist them, and compile their ordering with shared prerequisite
+    data.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 2368
+    end_line: 2370
+  summary: Supply source phases to planning, persist them, and compile their ordering with shared prerequisite
+    data.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 2432
+    end_line: 2434
+  summary: Supply source phases to planning, persist them, and compile their ordering with shared prerequisite
+    data.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: packages/service/src/powdrr_service/planning/plan_sizing.py
+  type: modified
+  span:
+    start_line: 85
+    end_line: 85
+  summary: Keep work from different source phases in separate plan items.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: packages/service/src/powdrr_service/planning/plan_sizing.py
+  type: modified
+  span:
+    start_line: 131
+    end_line: 131
+  summary: Keep work from different source phases in separate plan items.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: packages/service/src/powdrr_service/planning/plan_sizing.py
+  type: modified
+  span:
+    start_line: 135
+    end_line: 135
+  summary: Keep work from different source phases in separate plan items.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: packages/service/src/powdrr_service/planning/plan_sizing.py
+  type: modified
+  span:
+    start_line: 142
+    end_line: 142
+  summary: Keep work from different source phases in separate plan items.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: packages/service/src/powdrr_service/planning/source.py
+  type: modified
+  span:
+    start_line: 184
+    end_line: 203
+  summary: Parse and validate explicit implementation PR sequence tables, including titles, outcomes,
+    and prerequisites.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: packages/service/src/powdrr_service/planning/source.py
+  type: modified
+  span:
+    start_line: 627
+    end_line: 729
+  summary: Parse and validate explicit implementation PR sequence tables, including titles, outcomes,
+    and prerequisites.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: packages/service/src/powdrr_service/planning/source.py
+  type: modified
+  span:
+    start_line: 1599
+    end_line: 1599
+  summary: Parse and validate explicit implementation PR sequence tables, including titles, outcomes,
+    and prerequisites.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: packages/service/src/powdrr_service/planning/source.py
+  type: modified
+  span:
+    start_line: 1616
+    end_line: 1616
+  summary: Parse and validate explicit implementation PR sequence tables, including titles, outcomes,
+    and prerequisites.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: scripts/benchmark_planning_scale.py
+  type: modified
+  span:
+    start_line: 704
+    end_line: 704
+  summary: Keep synthetic work-unit answers aligned with the phase-aware proposal contract.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: tests/test_benchmark_planning_scale.py
+  type: modified
+  span:
+    start_line: 218
+    end_line: 218
+  summary: Update benchmark checkpoint fixtures for the phase-aware proposal schema.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: tests/test_benchmark_planning_scale.py
+  type: modified
+  span:
+    start_line: 220
+    end_line: 220
+  summary: Update benchmark checkpoint fixtures for the phase-aware proposal schema.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: tests/test_benchmark_planning_scale.py
+  type: modified
+  span:
+    start_line: 224
+    end_line: 224
+  summary: Update benchmark checkpoint fixtures for the phase-aware proposal schema.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: tests/test_benchmark_planning_scale.py
+  type: modified
+  span:
+    start_line: 243
+    end_line: 243
+  summary: Update benchmark checkpoint fixtures for the phase-aware proposal schema.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: tests/test_benchmark_planning_scale.py
+  type: modified
+  span:
+    start_line: 259
+    end_line: 259
+  summary: Update benchmark checkpoint fixtures for the phase-aware proposal schema.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: tests/test_benchmark_planning_scale.py
+  type: modified
+  span:
+    start_line: 261
+    end_line: 261
+  summary: Update benchmark checkpoint fixtures for the phase-aware proposal schema.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: tests/test_benchmark_planning_scale.py
+  type: modified
+  span:
+    start_line: 265
+    end_line: 265
+  summary: Update benchmark checkpoint fixtures for the phase-aware proposal schema.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 35
+    end_line: 35
+  summary: Verify required phase assignment and phase-safe sizing.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 87
+    end_line: 87
+  summary: Verify required phase assignment and phase-safe sizing.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 313
+    end_line: 355
+  summary: Verify required phase assignment and phase-safe sizing.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 495
+    end_line: 497
+  summary: Verify required phase assignment and phase-safe sizing.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 754
+    end_line: 754
+  summary: Verify required phase assignment and phase-safe sizing.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 859
+    end_line: 859
+  summary: Verify required phase assignment and phase-safe sizing.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 1013
+    end_line: 1013
+  summary: Verify required phase assignment and phase-safe sizing.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: tests/test_planning_compiler.py
+  type: modified
+  span:
+    start_line: 18
+    end_line: 18
+  summary: Verify phase metadata remains durable through compilation.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: tests/test_planning_compiler.py
+  type: modified
+  span:
+    start_line: 256
+    end_line: 351
+  summary: Verify phase metadata remains durable through compilation.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: tests/test_planning_dependencies.py
+  type: modified
+  span:
+    start_line: 39
+    end_line: 39
+  summary: Verify phase prerequisites create explicit edges and a single ready item.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: tests/test_planning_dependencies.py
+  type: modified
+  span:
+    start_line: 51
+    end_line: 51
+  summary: Verify phase prerequisites create explicit edges and a single ready item.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: tests/test_planning_dependencies.py
+  type: modified
+  span:
+    start_line: 120
+    end_line: 155
+  summary: Verify phase prerequisites create explicit edges and a single ready item.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 31
+    end_line: 31
+  summary: Update planning fixtures and checkpoints for the phase-aware proposal schema.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 36
+    end_line: 36
+  summary: Update planning fixtures and checkpoints for the phase-aware proposal schema.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 87
+    end_line: 89
+  summary: Update planning fixtures and checkpoints for the phase-aware proposal schema.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 222
+    end_line: 222
+  summary: Update planning fixtures and checkpoints for the phase-aware proposal schema.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 948
+    end_line: 948
+  summary: Update planning fixtures and checkpoints for the phase-aware proposal schema.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 950
+    end_line: 950
+  summary: Update planning fixtures and checkpoints for the phase-aware proposal schema.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 954
+    end_line: 954
+  summary: Update planning fixtures and checkpoints for the phase-aware proposal schema.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 971
+    end_line: 971
+  summary: Update planning fixtures and checkpoints for the phase-aware proposal schema.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 973
+    end_line: 973
+  summary: Update planning fixtures and checkpoints for the phase-aware proposal schema.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 977
+    end_line: 977
+  summary: Update planning fixtures and checkpoints for the phase-aware proposal schema.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1333
+    end_line: 1333
+  summary: Update planning fixtures and checkpoints for the phase-aware proposal schema.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1354
+    end_line: 1354
+  summary: Update planning fixtures and checkpoints for the phase-aware proposal schema.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: tests/test_planning_source.py
+  type: modified
+  span:
+    start_line: 30
+    end_line: 30
+  summary: Verify deterministic PR sequence parsing and validation.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: tests/test_planning_source.py
+  type: modified
+  span:
+    start_line: 155
+    end_line: 197
+  summary: Verify deterministic PR sequence parsing and validation.
+  rationale: Preserve source-declared PR order and make generated workflows explicitly depend on their
+    prerequisites.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 205
+    end_line: 230
+  summary: Delegate human prerequisite aggregation to the shared bounded-data builder.
+  rationale: Keep planning and compiler validation consistent for grouped manual setups.
+entities:
+- id: implementation-phase-source-parser
+  type: Function
+  action: added
+- id: source-phase-dependency-expansion
+  type: Dependency graph
+  action: added
+- id: phase-aware-work-unit-proposal-contract
+  type: Function
+  action: added
+- id: phase-sequence-compiler-validation
+  type: Function
+  action: added
+- id: implementation-phase-regression-tests
+  type: Regression test
+  action: added
+entity_relationships:
+- id: source-parser-builds-phase-dependency-graph
+  type: implements
+  source: implementation-phase-source-parser
+  target: source-phase-dependency-expansion
+  action: added
+  description: Parsed source phase prerequisites are expanded into explicit work-unit edges.
+- id: phase-regression-tests-verify-compiler
+  type: verifies
+  source: implementation-phase-regression-tests
+  target: phase-sequence-compiler-validation
+  action: added
+  description: Regression tests verify phase metadata and dependencies survive plan compilation.
+invariants:
+- id: source-phase-prerequisites-survive-compilation
+  description: Every item in a source phase depends on all items in each declared prerequisite phase.
+  action: added
+- id: phase-boundaries-remain-explicit
+  description: A generated item contains work units from exactly one source implementation phase.
+  action: added
+- id: ordered-phase-splits-have-one-ready-item
+  description: Multiple generated items within one source phase execute in stable order.
+  action: added
+guidance:
+- id: preserve-explicit-source-pr-sequence
+  description: When a pinned source document includes an implementation PR sequence table, keep each work
+    unit assigned to a declared phase and represent its prerequisites in the plan dependency graph.
+  action: added

@@ -384,7 +384,7 @@ Code analysis is a planning evidence provider. It does not own product intent, r
 ### 6.1 Flow
 
 1. **Pin the planning snapshot.** Planning records the base commit and loads Structrr's component inventory and language capability report for that revision.
-2. **Load or create analysis evidence.** Reuse a complete report matching the commit, component scope, provider versions, configuration, and controlled environment. Otherwise analyze relevant components and persist the report. Planning may continue with partial coverage only under an explicit degraded-evidence state; it must never label missing analysis complete.
+2. **Load or create analysis evidence.** Reuse a symbol artifact matching the commit, component scope, provider version, and configuration; otherwise index the relevant components and persist the artifact. Reuse or run diagnostic providers independently when planning needs findings. Planning can use complete symbol coverage while diagnostic coverage is unavailable, but must never label missing diagnostics as clean.
 3. **Give the planner a compact inventory.** Supply component IDs, languages, source/test roots, configured providers, coverage, and finding counts. Do not put every warning or raw output into the source-ledger prompt.
 4. **Allow scoped queries.** The planner may request `structrr-code-query-v1` for concrete questions against the pinned Structrr snapshot. Initial scope comes from proposal paths, requirements, Structrr entities, and component relationships. Journal filters, snapshot/artifact IDs, result fingerprint, and query purpose.
 5. **Ground code mapping.** Use symbol, reference, and dependency results to check whether a requirement may already be implemented, identify tests and callers, and propose candidate paths. A symbol match alone does not prove a requirement is implemented; a reference edge alone does not prove two work units depend on each other.
@@ -399,7 +399,8 @@ Code analysis is a planning evidence provider. It does not own product intent, r
 analysis_context:
   analysis_id: analysis:sha256:...
   revision: ...
-  coverage_status: complete | partial | unavailable
+  symbol_coverage: complete | partial | unavailable
+  diagnostic_coverage: complete | partial | unavailable
   affected_components: [...]
   counts: {new_errors: 0, existing_errors: 2, warnings: 5}
   relevant_findings: [finding-reference, ...]
@@ -410,12 +411,19 @@ analysis_context:
 
 Every reference resolves to a durable artifact and retains provider, path, range, rule, revision, and fingerprint. The model may explain the relationship between evidence and a requirement, but deterministic orchestration selects scope, enforces caps, and validates returned references.
 
+The early planner integration is gated by **symbol coverage**, not by completion
+of every diagnostic provider. A symbol artifact may be complete for the
+affected component while lint/type diagnostics are still unavailable; the
+planner can use the former and must report the latter separately. Missing
+diagnostic results are never interpreted as a clean analyzer run.
+
 The planner must not copy unfiltered transcripts into questions, treat checker errors as user requirements, make repair of old findings mandatory without user intent, infer unsupported coverage from another component, or claim semantic completeness from syntax-only indexing.
 
 ### 6.3 Existing planner code
 
-- Route `find_workspace_symbols` and `search_structural_document_analysis` through Structrr's artifact-backed symbol query while retaining BasedPyright as the Python provider that produces the first artifact.
-- Route the symbol lookup loop in `github_issue_plan_generation.py` through the same contract so queries can specify component, symbol kind, path scope, and result limit.
+- `PlanningSession` already queries BasedPyright symbols and cross-file references for paths proposed by work units. The first planner slice replaces the ephemeral symbol results with queries over a revision-pinned symbol artifact, preserving exact symbol IDs, names, signatures, and source ranges in the planning journal.
+- `github_issue_plan_generation.py` already asks bounded workspace-symbol questions. Route it through the same Structrr symbol query so the response includes component/path scope and durable evidence references.
+- For both callers, build/reuse the symbol artifact once per pinned component revision, then query only proposal paths, planned writes, or requested symbol names. Do not require whole-repository reference discovery for this slice.
 - Extend `PlanningSession`'s structural cache to key on Structrr snapshot ID, symbol-artifact digest, analysis/index ID, and normalized filters. A path list alone is insufficient when checkout, provider, or configuration changes.
 - Journal query requests and deterministic results with existing planning questions. Resume reuses accepted evidence and detects stale inputs.
 - Keep semantic confirmation for ambiguous cases. Deterministic candidate selection reduces the question; it does not replace judgment.
@@ -490,29 +498,57 @@ Analysis run status is `complete`, `partial`, `unavailable`, or `failed`. Provid
 
 Each milestone is a separate reviewable PR unless implementation evidence shows adjacent work cannot be separated. Do not replace BasedPyright before a measured Python fixture demonstrates an unresolved capability gap.
 
-### PR 1: Analysis contracts and artifact persistence
+### PR 1: Structrr symbol contracts and artifact references
 
-Add typed versioned analysis-run, finding, provider-result, coverage, code-symbol, code-symbol-relationship, query, and query-response records. Add deterministic YAML serialization, fingerprints, and persistence through existing execution/run artifact boundaries. Add a compact Structrr artifact-reference section, without embedding symbol arrays. Do not change planner behavior.
+Add the versioned code-symbol, relationship, artifact-reference, query, and
+coverage contracts. Add deterministic YAML serialization, fingerprints, and
+artifact persistence. Extend Structrr bootstrap validation so its snapshot
+references a separate symbol artifact without embedding the symbol arrays.
 
-Acceptance: deterministic round trips; rejection of invalid statuses, path escapes, duplicate IDs, and bad fingerprints; byte-bounded raw outputs with explicit truncation; replay retrieves report content by reference; existing diagnostic hooks continue to work during migration.
+Acceptance: deterministic round trips; rejection of path escapes, duplicate
+IDs, mismatched revisions, bad digests, and invalid relationship endpoints;
+replay retrieves the artifact by reference; missing artifacts are reported as
+unavailable rather than as an empty successful index.
 
-### PR 2: Python diagnostics adapter and project-aware invocation
+### PR 2: Python symbol index and immediate planner integration
 
-Build a BasedPyright JSON adapter. Resolve Python component, project configuration, interpreter, source roots, and execution environment from repository metadata. Add Ruff JSON as a separate provider when declared. Normalize findings and distinguish setup failures.
+Produce the first artifact from the existing BasedPyright symbol provider and
+route `PlanningSession` plus `github_issue_plan_generation.py` through scoped
+Structrr symbol queries. Build/reuse the index once per pinned component
+revision; query planned paths and requested symbols. Preserve exact source
+locations and journal artifact/query provenance. Keep cross-file references
+bounded and optional; this slice must not require a whole-repository reference
+graph.
 
-Acceptance: a src-layout fixture resolves imports when its config/environment require it; wrong-root analysis is marked as configuration/coverage failure; every diagnostic survives normalization; invalid JSON, timeout, missing executable, and import resolution have distinct outcomes; a gaterr-like fixture separates actual type errors from unresolved import roots.
+Acceptance: an end-to-end planner fixture identifies an existing function,
+signature, and source range for a requirement; the plan records the symbol and
+artifact references; resume reuses the index for an unchanged snapshot; stale
+revision/config/provider fingerprints trigger a rebuild; a missing or
+incomplete reference result does not discard valid symbol-location evidence.
 
-### PR 3: Baseline comparison and compact report views
+### PR 3: Python diagnostics adapter and project-aware invocation
 
-Implement component/provider-aware baseline matching and a compact summary renderer. Persist base report references and candidate deltas.
+Build a BasedPyright JSON adapter for diagnostics. Resolve Python component,
+project configuration, interpreter, source roots, and execution environment
+from repository metadata. Add Ruff JSON as a separate provider when declared.
+Normalize findings and distinguish setup failures.
 
-Acceptance: exact, relocated, new, resolved, uncertain, and incomparable cases; incomplete coverage cannot mark findings resolved; default output shows aggregate counts plus bounded new findings; full reports and raw output remain inspectable.
+Acceptance: a src-layout fixture resolves imports when its config/environment
+require it; wrong-root analysis is marked as configuration/coverage failure;
+every diagnostic survives normalization; invalid JSON, timeout, missing
+executable, and import resolution have distinct outcomes; a gaterr-like
+fixture separates actual type errors from unresolved import roots.
 
-### PR 4: Scoped code/project query interface
+### PR 4: Baseline comparison and compact report queries
 
-Add `structrr-code-query-v1` and resolve code-structure queries through the symbol-artifact reference in the requested snapshot. Adapt existing BasedPyright symbols, structure, and references as the first YAML artifact producer. Implement deterministic component/path/language/severity/rule/status/kind filters and bounded pagination.
+Implement component/provider-aware baseline matching, a compact summary
+renderer, and finding filters in `structrr-code-query-v1`. Persist base report
+references and candidate deltas.
 
-Acceptance: queries return exactly matching records and filter provenance; semantic relationships are emitted only when supported; path traversal, unbounded limits, stale artifact IDs, and unsupported kinds fail clearly; existing BasedPyright tools remain available through the common provider.
+Acceptance: exact, relocated, new, resolved, uncertain, and incomparable cases;
+incomplete coverage cannot mark findings resolved; default output shows
+aggregate counts plus bounded new findings; full reports and raw output remain
+inspectable; queries return exact filters and provenance.
 
 ### PR 5: Symbol comparison and reviewer context
 
@@ -525,23 +561,35 @@ coverage cases are deterministic; every changed-symbol record links to base
 and candidate source ranges; unrelated symbols are absent from a scoped review
 query; missing index data cannot be interpreted as a deletion.
 
-### PR 6: Planner evidence integration
+### PR 6: Multi-language structure and analyzer providers
 
-Add analysis evidence to `PlanningSession` and GitHub issue plan generation. Use revision-bound component summaries, bounded queries, and query fingerprints. Include relevant evidence references in planning context and work units; add post-implementation analysis obligations for code changes.
+Integrate with the component/capability registry in
+`polyglot-repository-and-go-support.md`. Normalize language-provider output
+into the Structrr-owned YAML symbol schema. Use semantic indexers that emit
+SCIP as provider inputs where available. Use Tree-sitter or equivalent only
+for syntax outlines. Add native analyzer adapters as their language/component
+capability is supported.
 
-Acceptance: planner answers implementation questions with bounded symbol/reference queries and no diagnostic dump; replay reuses matching evidence and re-queries on stale revision/provider/config/scope; analysis failure cannot become pass or become a user requirement; only new findings in changed scope become default repair candidates; implementation plans bind validation and analysis to affected components.
+Acceptance: mixed-language reports retain per-provider status;
+Python/Go/TypeScript structures retain language namespaces and provenance;
+syntax-only results cannot answer semantic reference queries; provider failure
+does not erase another provider's findings and yields partial status;
+unsupported files have explicit coverage and no fabricated symbols.
 
-### PR 7: Multi-language structure and analyzer providers
+### PR 7: End-to-end planner and reviewer verification
 
-Integrate with the component/capability registry in `polyglot-repository-and-go-support.md`. Normalize language-provider output into the Structrr-owned YAML symbol schema. Use semantic indexers that emit SCIP as provider inputs where available. Use Tree-sitter or equivalent only for syntax outlines. Add native analyzer adapters as their language/component capability is supported.
+Add hermetic fixtures for Python src layouts, Python monorepos, mixed
+languages, incomplete environments, baseline debt, changed-code findings, and
+symbol-level review. Verify artifact persistence, query scoping, planner
+provenance, compact summaries, repair routing, reviewer deltas, resume, and
+stale-report rejection.
 
-Acceptance: mixed-language reports retain per-provider status; Python/Go/TypeScript structures retain language namespaces and provenance; syntax-only results cannot answer semantic reference queries; provider failure does not erase another provider's findings and yields partial status; unsupported files have explicit coverage and no fabricated symbols.
-
-### PR 8: End-to-end planner and reviewer verification
-
-Add hermetic fixtures for Python src layouts, Python monorepos, mixed languages, incomplete environments, baseline debt, changed-code findings, and symbol-level review. Verify artifact persistence, query scoping, planner provenance, compact summaries, repair routing, reviewer deltas, resume, and stale-report rejection.
-
-Acceptance: no planner or reviewer prompt contains an unbounded transcript or whole-repository index; every presented finding/symbol delta resolves to durable revision-bound artifacts; base/candidate comparison requires compatible scope; stored artifacts can be queried without rerunning providers; results are stable across filesystem ordering; outputs distinguish source findings, setup issues, analyzer failures, and unsupported coverage.
+Acceptance: no planner or reviewer prompt contains an unbounded transcript or
+whole-repository index; every presented finding/symbol delta resolves to
+durable revision-bound artifacts; base/candidate comparison requires
+compatible scope; stored artifacts can be queried without rerunning providers;
+results are stable across filesystem ordering; outputs distinguish source
+findings, setup issues, analyzer failures, and unsupported coverage.
 
 ## 10. Verification strategy
 

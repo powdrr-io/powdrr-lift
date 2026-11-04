@@ -9,9 +9,9 @@ structured_files: []
 files:
   - path: docs/plans/code-analysis-artifacts-and-scoped-queries.md
     type: added
-    span: {start_line: 1, end_line: 558}
-    summary: Specify a Structrr-owned code-symbol YAML index, revision-pair symbol diffs for reviewers, analysis findings, scoped queries, baseline comparison, and planner integration.
-    rationale: Let planning and review use revision-pinned symbol/location evidence while keeping generated indexes separate from authoritative source and the compact Structrr snapshot.
+    span: {start_line: 1, end_line: 606}
+    summary: Specify an early Python symbol-index slice for current planning, then revision-pair symbol diffs for reviewers, analysis findings, scoped queries, and multi-language expansion.
+    rationale: Deliver revision-pinned symbol/location evidence to existing planning flows first, while keeping generated indexes separate from authoritative source and the compact Structrr snapshot.
 entities:
   - id: code-analysis-artifacts-and-scoped-queries
     type: Design doc

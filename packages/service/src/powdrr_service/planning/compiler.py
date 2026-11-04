@@ -20,6 +20,7 @@ from powdrr_service.planning.plan_document import (
     serialize_reviewed_plan_yaml,
 )
 from powdrr_service.planning.plan_models import PlannedWorkItem, ReviewedExecutionPlan
+from powdrr_service.planning.plan_sizing import CANONICAL_RUNTIMES
 from powdrr_service.planning.workflow_ids import slugify_workflow_id
 from powdrr_service.planning.workflow_instance import (
     PLAN_WORKFLOW_PROCESS,
@@ -32,28 +33,7 @@ PLANNING_MANIFEST_SCHEMA = "https://powdrr.io/schemas/planning-manifest-v1"
 _SHA1_RE = re.compile(r"^[0-9a-f]{40,64}$")
 _SHA256_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 _SAFE_ID = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._/-]{0,99}$")
-_RUNTIMES = frozenset(
-    {
-        "python",
-        "swift",
-        "rust",
-        "golang",
-        "java",
-        "javascript",
-        "typescript",
-        "kotlin",
-        "ruby",
-        "php",
-        "scala",
-        "elixir",
-        "erlang",
-        "dart",
-        "c++",
-        "c#",
-        "objective-c",
-        "neutral",
-    }
-)
+_RUNTIMES = CANONICAL_RUNTIMES | {"neutral"}
 
 
 class PlanningCompilationError(ValueError):

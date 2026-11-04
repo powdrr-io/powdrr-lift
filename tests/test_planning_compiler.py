@@ -232,6 +232,26 @@ def test_compiler_round_trips_plan_and_emits_linked_artifacts() -> None:
         )
 
 
+def test_manifest_accepts_canonical_shell_runtime() -> None:
+    _, manifest, _ = _fixture()
+    records = json.loads(json.dumps(manifest.to_data()))
+    records.pop("semantic_revision_digest")
+    write = records["units"][0]["planned_writes"][0]
+    write["path"] = "attestation/scripts/verify-all.sh"
+    write["runtime"] = "shell"
+    records["runtime_facts"] = [
+        {
+            "unit_id": "unit-01",
+            "path": write["path"],
+            "runtime": "shell",
+        }
+    ]
+
+    validated = PlanningManifest.create(records)
+
+    assert validated.data["runtime_facts"] == records["runtime_facts"]
+
+
 def test_compiled_artifact_validation_detects_tampering() -> None:
     plan, manifest, proposal = _fixture()
     compiled = compile_plan(

@@ -1,9 +1,9 @@
 schema: https://powdrr.io/schema/changelog-v2
 change_id: 1365
-title: Allow requirements across runtime-specific work units
+title: Keep runtime-specific work units executable
 intent:
-  problem: The planner can propose mixed-runtime work units, and data or template paths can be mistaken for files needing an implementation runtime.
-  goal: Partition mixed-runtime proposals deterministically, recognize fixture binaries and known configuration templates, and retain evidence requirements for ambiguous paths.
+  problem: The planner can propose mixed-runtime work units, mistake data or template paths for implementation languages, and infer dependencies that contradict a source plan's PR sequence.
+  goal: Partition mixed-runtime proposals deterministically, classify known data and template paths safely, and preserve source-declared dependency order during dependency discovery.
 human-decisions: []
 structured_files: []
 files:
@@ -57,6 +57,26 @@ files:
     span: {start_line: 295, end_line: 296}
     summary: Add binary fixture and CODEOWNERS template paths to runtime-neutral cases.
     rationale: Ensure the planner can propose these non-language data artifacts without runtime errors.
+  - path: packages/service/src/powdrr_service/planning/dependencies.py
+    type: modified
+    span: {start_line: 419, end_line: 419}
+    summary: Accept the source implementation phase order when discovering dependency candidates.
+    rationale: Use the plan's explicit PR sequence to constrain inferred dependencies.
+  - path: packages/service/src/powdrr_service/planning/dependencies.py
+    type: modified
+    span: {start_line: 475, end_line: 494}
+    summary: Skip same-phase and backward-phase semantic dependency candidates.
+    rationale: Prevent model-confirmed edges from contradicting the source sequence and creating dependency cycles.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 1583, end_line: 1590}
+    summary: Pass source phase ordering into dependency discovery.
+    rationale: Apply explicit implementation PR ordering to candidate selection.
+  - path: tests/test_planning_dependencies.py
+    type: modified
+    span: {start_line: 323, end_line: 387}
+    summary: Verify dependency discovery keeps forward cross-phase edges and drops same-phase and backward edges.
+    rationale: Prevent dependency reviews from introducing cycles into a source-declared PR sequence.
 entities:
   - id: work-unit-proposal-builder
     type: Function
@@ -67,6 +87,12 @@ entities:
   - id: mixed-runtime-proposal-splitter
     type: Function
     action: added
+  - id: source-phase-dependency-filter
+    type: Function
+    action: added
+  - id: dependency-phase-order-regression
+    type: Regression test
+    action: added
 entity_relationships:
   - id: regression-verifies-runtime-specific-coverage
     type: verifies
@@ -74,8 +100,17 @@ entity_relationships:
     target: mixed-runtime-proposal-splitter
     action: added
     description: The regression checks that one mixed-runtime model proposal becomes runtime-homogeneous units with exact requirement coverage.
+  - id: regression-verifies-source-phase-dependency-order
+    type: verifies
+    source: dependency-phase-order-regression
+    target: source-phase-dependency-filter
+    action: added
+    description: The regression confirms that inferred dependencies cannot reverse or redundantly repeat source-declared phase ordering.
 invariants:
   - id: work-units-have-one-implementation-runtime
     description: A work unit contains writes for at most one implementation runtime; one requirement may be represented in more than one runtime-specific unit.
     action: altered
+  - id: dependencies-respect-source-phase-order
+    description: Inferred dependency candidates may connect source implementation phases only in their declared order; same-phase ordering is supplied deterministically.
+    action: added
 guidance: []

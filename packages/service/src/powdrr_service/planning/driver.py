@@ -1580,6 +1580,14 @@ class SourceLedgerQuestionMachine:
             allocation.pending_outputs,
             related_requirement_ids=related_requirement_ids,
             code_reference_paths=self._dependency_reference_cache,
+            implementation_phase_order=(
+                {
+                    phase.id: index
+                    for index, phase in enumerate(self._implementation_phases)
+                }
+                if self._implementation_phases
+                else None
+            ),
         )
         return allocation, discovery
 

@@ -320,6 +320,71 @@ def test_dependency_discovery_keeps_specific_cross_path_candidates() -> None:
     assert discovery.confirmation_pairs == ((output, consumer),)
 
 
+def test_dependency_discovery_respects_source_implementation_phase_order() -> None:
+    first_phase_producer = replace(
+        _unit("unit-0001"),
+        implementation_phase_id="pr-01",
+        deliverable="Create the signed verifier manifest.",
+        implementation_step="Create a canonical signed verifier manifest.",
+    )
+    same_phase_consumer = replace(
+        _unit("unit-0002", "req-0002"),
+        implementation_phase_id="pr-01",
+        deliverable="Consume the verifier manifest.",
+        implementation_step="Consume the canonical signed verifier manifest.",
+    )
+    later_phase_consumer = replace(
+        _unit("unit-0003", "req-0003"),
+        implementation_phase_id="pr-02",
+        deliverable="Consume the verifier manifest.",
+        implementation_step="Consume the canonical signed verifier manifest.",
+    )
+    later_phase_producer = replace(
+        _unit("unit-0004", "req-0004"),
+        implementation_phase_id="pr-02",
+        deliverable="Create the signed verifier manifest.",
+        implementation_step="Create a canonical signed verifier manifest.",
+    )
+    earlier_phase_consumer = replace(
+        _unit("unit-0005", "req-0005"),
+        implementation_phase_id="pr-01",
+        deliverable="Consume the verifier manifest.",
+        implementation_step="Consume the canonical signed verifier manifest.",
+    )
+    output = PendingUnitOutput(
+        first_phase_producer.id,
+        "The canonical signed verifier manifest.",
+        first_phase_producer.requirement_ids,
+    )
+    later_output = PendingUnitOutput(
+        later_phase_producer.id,
+        "The canonical signed verifier manifest.",
+        later_phase_producer.requirement_ids,
+    )
+
+    discovery = discover_dependency_candidates(
+        (
+            first_phase_producer,
+            same_phase_consumer,
+            later_phase_consumer,
+            later_phase_producer,
+            earlier_phase_consumer,
+        ),
+        (output, later_output),
+        code_reference_paths={
+            (first_phase_producer.id, later_phase_consumer.id): (
+                "src/manifest.py -> src/consumer.py",
+            ),
+            (later_phase_producer.id, earlier_phase_consumer.id): (
+                "src/later.py -> src/earlier.py",
+            ),
+        },
+        implementation_phase_order={"pr-01": 0, "pr-02": 1},
+    )
+
+    assert discovery.confirmation_pairs == ((output, later_phase_consumer),)
+
+
 def test_dependency_discovery_prunes_generic_output_phrases() -> None:
     producer = replace(
         _unit("unit-producer"),

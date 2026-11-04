@@ -261,6 +261,8 @@ def test_requirement_search_supplies_pinned_implementation_and_test_evidence(
     service_request.validate()
     assert service_request.question == request.question
     assert service_request.exact_question == request.exact_question
+    assert "at most 300 characters" in request.exact_question
+    assert "at most 300 characters" in request.answer_field_definitions["reason"]
     assert service_request.repository_evidence == request.repository_evidence
     assert service_request.accepted_facts == request.accepted_facts
     with pytest.raises(EvidenceError, match="content digest"):

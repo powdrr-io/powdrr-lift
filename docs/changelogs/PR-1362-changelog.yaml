@@ -1,0 +1,43 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1362
+title: Keep coverage reasons concise
+intent:
+  problem: Coverage answers can exceed the reason field's 1,000-character limit after repeated retries, blocking planning even when the status and evidence IDs are valid.
+  goal: Tell the model to keep the explanation concise and use the dedicated evidence ID field for citations.
+human-decisions: []
+structured_files: []
+files:
+  - path: packages/service/src/powdrr_service/planning/coverage.py
+    type: modified
+    span: {start_line: 289, end_line: 291}
+    summary: Limit coverage reasons to one concise sentence and direct evidence citations to evidence_ids.
+    rationale: Avoid exhausting retries on verbose explanations when the supported verdict and evidence IDs are valid.
+  - path: packages/service/src/powdrr_service/planning/coverage.py
+    type: modified
+    span: {start_line: 300, end_line: 304}
+    summary: Define the same concise reason limit for the answer field.
+    rationale: Keep model instructions consistent across the question and answer field definitions.
+  - path: tests/test_planning_evidence.py
+    type: modified
+    span: {start_line: 264, end_line: 265}
+    summary: Assert the coverage question and field definition both state the concise-reason limit.
+    rationale: Keep the instruction aligned across the model prompt and answer schema context.
+entities:
+  - id: coverage-question-reason-guidance
+    type: Function
+    action: added
+  - id: concise-coverage-reason-regression
+    type: Regression test
+    action: added
+entity_relationships:
+  - id: regression-checks-concise-coverage-guidance
+    type: verifies
+    source: concise-coverage-reason-regression
+    target: coverage-question-reason-guidance
+    action: added
+    description: The regression test checks that the bounded reason guidance reaches both prompt fields.
+invariants:
+  - id: coverage-reason-guidance-is-bounded
+    description: Coverage answers are instructed to explain the verdict in at most 300 characters and keep evidence references in evidence_ids.
+    action: added
+guidance: []

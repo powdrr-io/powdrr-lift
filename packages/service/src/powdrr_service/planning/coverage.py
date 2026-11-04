@@ -286,7 +286,9 @@ def build_requirement_coverage_request(
             "complete, cite either an execution_receipt or both relevant "
             "implementation/configuration evidence and relevant test evidence. "
             "Include the IDs for both kinds in evidence_ids; implementation alone "
-            "is partial, not complete."
+            "is partial, not complete. Keep reason to one concise sentence of at "
+            "most 300 characters; put evidence citations in evidence_ids instead "
+            "of listing files in reason."
         ),
         answer_field_definitions={
             "status": "missing, partial, or complete.",
@@ -295,7 +297,11 @@ def build_requirement_coverage_request(
                 "requires an execution_receipt, or relevant implementation/"
                 "configuration and test evidence together."
             ),
-            "reason": "What the evidence establishes or fails to establish.",
+            "reason": (
+                "One concise sentence of at most 300 characters stating what the "
+                "evidence establishes or fails to establish. Put evidence IDs in "
+                "evidence_ids; do not list filenames here."
+            ),
             "remaining_statement": "For partial, the concrete unmet obligation.",
         },
         # The requirement statement has already passed source-fidelity review.

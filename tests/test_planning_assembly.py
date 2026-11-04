@@ -234,6 +234,16 @@ def test_unknown_extension_requires_runtime_classification() -> None:
         parse_work_unit_proposal(answer, context=context)
 
 
+def test_binary_file_outside_fixture_directory_requires_runtime_evidence() -> None:
+    path = "attestation/bin/verifier.bin"
+    context, anchor = _context(path=path, runtime="python")
+    context = replace(context, repository_paths={})
+    answer = _proposal(context, anchor, path=path, runtime="python")
+
+    with pytest.raises(RuntimeClassificationRequired):
+        parse_work_unit_proposal(answer, context=context)
+
+
 def test_new_extensionless_data_file_can_be_explicitly_runtime_neutral() -> None:
     context, anchor = _context()
     context = replace(context, repository_paths={})
@@ -261,6 +271,7 @@ def test_new_extensionless_data_file_can_be_explicitly_runtime_neutral() -> None
         "installer/launchd.plist",
         "config/install-paths.conf",
         "test-results/section13-macos-github.log",
+        "attestation/fixtures/golden_dsse.bin",
     ],
 )
 def test_platform_data_file_extensions_are_runtime_neutral(path: str) -> None:

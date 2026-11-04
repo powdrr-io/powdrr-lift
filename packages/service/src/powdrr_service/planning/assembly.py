@@ -761,7 +761,9 @@ def _derive_planned_write_runtime(
         raise PlanningContractError("/planned_writes/path", "write path is a symlink")
     suffix = PurePosixPath(path).suffix.lower()
     derived = None if suffix == ".h" else PATH_RUNTIME_SUFFIXES.get(suffix)
-    if derived is None and suffix in _NEUTRAL_SUFFIXES:
+    if derived is None and suffix == ".bin" and "fixtures" in PurePosixPath(path).parts:
+        derived = None
+    elif derived is None and suffix in _NEUTRAL_SUFFIXES:
         derived = None
     elif (
         derived is None

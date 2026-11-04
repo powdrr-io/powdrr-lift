@@ -26,12 +26,14 @@ from powdrr_service.planning.contracts import (
 )
 from powdrr_service.planning.dependencies import (
     DependencyCandidateDiscovery,
+    ManualSetup,
     UnitDependencyEdge,
 )
 from powdrr_service.planning.driver import (
     SourceLedgerQuestionMachine,
     _deterministic_block_disposition,
     _is_completed_zero_hit_search,
+    _manual_prerequisite_data,
     _planned_existing_structural_subjects,
     _planned_reference_path_pairs,
 )
@@ -58,6 +60,41 @@ from powdrr_service.resources import bundled_process_directory
 
 from powdrr_lift.workrr.github_issue_queue import QueueIssue
 from powdrr_lift.workrr.planning.evidence import Evidence, RequirementEvidenceSearch
+
+
+def test_combined_manual_prerequisites_keep_a_bounded_title_and_named_steps() -> None:
+    setups = tuple(
+        ManualSetup(
+            id=f"setup-{index:04d}",
+            requirement_ids=(f"req-{index:04d}",),
+            owner="human",
+            title=title,
+            instructions=(f"Complete {label} setup.",),
+            verification=f"Verify {label} is ready.",
+            trigger="after_implementation_before_validation",
+            unblocks_validation_ids=("validation-0001",),
+            source_refs=(f"anchor-{index:04d}",),
+        )
+        for index, (title, label) in enumerate(
+            (
+                ("Install the first required integration", "first"),
+                ("Install the second required integration", "second"),
+            ),
+            start=1,
+        )
+    )
+
+    prerequisite = _manual_prerequisite_data(
+        setups, validation_target="bash scripts/verify.sh"
+    )
+
+    assert prerequisite["title"] == "Complete manual setup prerequisites"
+    assert len(prerequisite["title"]) <= 160
+    assert prerequisite["instructions"] == [
+        "Install the first required integration: Complete first setup.",
+        "Install the second required integration: Complete second setup.",
+    ]
+    assert prerequisite["unblocks"] == "bash scripts/verify.sh"
 
 
 def test_planning_options_default_to_eight_concurrent_questions() -> None:

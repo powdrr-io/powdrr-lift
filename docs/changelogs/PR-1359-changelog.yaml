@@ -1,0 +1,56 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1359
+title: Bound combined manual prerequisite titles
+intent:
+  problem: Combining multiple human setup titles for one plan item can exceed the plan document's title limit even though each individual title is valid.
+  goal: Keep aggregate prerequisite titles bounded and preserve each setup's name alongside its instructions.
+human-decisions: []
+structured_files: []
+files:
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 205, end_line: 230}
+    summary: Build a bounded aggregate title and retain setup names in their instructions.
+    rationale: Allow multiple human interventions to share a plan item without producing invalid plan YAML.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 2359, end_line: 2361}
+    summary: Use the bounded manual-prerequisite builder during plan compilation.
+    rationale: Keep compiled item metadata within the plan document contract.
+  - path: tests/test_planning_service.py
+    type: modified
+    span: {start_line: 29, end_line: 29}
+    summary: Import the manual setup type for prerequisite aggregation coverage.
+    rationale: Construct realistic grouped human setup records in the regression test.
+  - path: tests/test_planning_service.py
+    type: modified
+    span: {start_line: 36, end_line: 36}
+    summary: Import the deterministic prerequisite builder for focused regression coverage.
+    rationale: Verify aggregation behavior without a provider call.
+  - path: tests/test_planning_service.py
+    type: modified
+    span: {start_line: 65, end_line: 99}
+    summary: Verify combined setup titles stay bounded and instructions retain their setup names.
+    rationale: Prevent plan compilation from failing when one item has several human prerequisites.
+entities:
+  - id: manual-prerequisite-plan-builder
+    type: Function
+    action: added
+  - id: combined-manual-prerequisite-title-regression
+    type: Regression test
+    action: added
+entity_relationships:
+  - id: prerequisite-title-test-verifies-plan-builder
+    type: verifies
+    source: combined-manual-prerequisite-title-regression
+    target: manual-prerequisite-plan-builder
+    action: added
+    description: The regression test verifies bounded titles and named human setup instructions.
+invariants:
+  - id: combined-prerequisite-title-fits-plan-contract
+    description: A compiled manual-prerequisite title remains within the 160-character plan document limit.
+    action: added
+guidance:
+  - id: preserve-human-setup-names
+    description: When combining several human setups, use a short aggregate title and retain individual setup names with their instructions.
+    action: added

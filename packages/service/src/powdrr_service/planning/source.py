@@ -686,7 +686,7 @@ def extract_implementation_phases(
         raw_dependencies = row["dependencies"].strip()
         if re.fullmatch(r"(?:none|n/?a|—|-)", raw_dependencies, re.IGNORECASE):
             dependency_ids: tuple[str, ...] | None = ()
-        elif re.fullmatch(r"all\s+prior", raw_dependencies, re.IGNORECASE):
+        elif re.fullmatch(r"all\s+prior(?:\s+prs?)?", raw_dependencies, re.IGNORECASE):
             dependency_ids = None
         else:
             numbers = re.findall(r"\d+", raw_dependencies)

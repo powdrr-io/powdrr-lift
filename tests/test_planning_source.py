@@ -160,7 +160,7 @@ def test_extracts_explicit_implementation_pr_sequence_and_dependencies() -> None
         "| --- | --- | --- | --- |\n"
         "| 01 | Define schemas | None | Frozen contract |\n"
         "| 02 | Implement verifier | 01 | Offline verifier |\n"
-        "| 03 | Release | All prior | Reviewed release |\n\n"
+        "| 03 | Release | All prior PRs | Reviewed release |\n\n"
         "### PR 01: Define schemas\n\nWrite schemas.\n"
     )
 

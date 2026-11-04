@@ -1,17 +1,17 @@
 schema: https://powdrr.io/schema/changelog-v2
 change_id: 1364
-title: Plan code analysis artifacts and scoped project queries
+title: Plan revision-pinned code-symbol evidence for planning
 intent:
-  problem: Static analysis output is retained as opaque text and current project navigation is Python-specific, making it difficult for the planner and user to distinguish actionable findings from setup noise or ask bounded questions about project structure.
-  goal: Define a staged, language-neutral analysis artifact and query interface that feeds compact, revision-bound evidence to the planner while preserving complete underlying results.
+  problem: Planning uses transient BasedPyright symbol and reference results, so questions about existing code and candidate paths lack shared artifact reuse and durable evidence provenance.
+  goal: Define and stage only the Python symbol-artifact and scoped-query work needed by current planning callers, with explicit revision, coverage, replay, and verification behavior.
 human-decisions: []
 structured_files: []
 files:
   - path: docs/plans/code-analysis-artifacts-and-scoped-queries.md
     type: added
-    span: {start_line: 1, end_line: 606}
-    summary: Specify an early Python symbol-index slice for current planning, then revision-pair symbol diffs for reviewers, analysis findings, scoped queries, and multi-language expansion.
-    rationale: Deliver revision-pinned symbol/location evidence to existing planning flows first, while keeping generated indexes separate from authoritative source and the compact Structrr snapshot.
+    span: {start_line: 1, end_line: 391}
+    summary: Specify the planning-only Python symbol index, Structrr artifact reference, bounded symbol/reference queries, caller migration, evidence journaling, reuse, and end-to-end verification.
+    rationale: Let current planning flows reuse revision-pinned symbol/location evidence and cite exactly what informed their plans, without expanding this work into diagnostics, reviewer changes, or other languages.
 entities:
   - id: code-analysis-artifacts-and-scoped-queries
     type: Design doc

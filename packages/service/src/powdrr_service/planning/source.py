@@ -747,7 +747,6 @@ def build_extract_requirements_request(
     anchors: Mapping[str, SourceAnchor],
     related_blocks: Sequence[SourceBlock] = (),
     after_anchor: str | None = None,
-    accepted_records: Sequence[Mapping[str, Any]] = (),
 ) -> QuestionRequest[RequirementExtractionPage]:
     """Build one bounded obligation enumeration request for a source block."""
     empty = {"records": [], "has_more": False, "next_anchor": None}
@@ -775,18 +774,22 @@ def build_extract_requirements_request(
         -1 if after_anchor is None else current_anchor_ids.index(after_anchor)
     )
     pagination_candidates = current_anchor_ids[cursor_index + 1 :]
-    anchor_id = current_anchor_ids[0]
+    anchor_id = pagination_candidates[0] if pagination_candidates else None
     valid = {
-        "records": [
-            {
-                "statement": "The block's independently checkable obligation.",
-                "kind": "behavior",
-                "source_refs": [anchor_id],
-                "related_source_refs": [],
-            }
-        ],
-        "has_more": bool(pagination_candidates),
-        "next_anchor": (pagination_candidates[0] if pagination_candidates else None),
+        "records": (
+            [
+                {
+                    "statement": "The block's independently checkable obligation.",
+                    "kind": "behavior",
+                    "source_refs": [anchor_id],
+                    "related_source_refs": [],
+                }
+            ]
+            if anchor_id is not None
+            else []
+        ),
+        "has_more": len(pagination_candidates) > 1,
+        "next_anchor": anchor_id if len(pagination_candidates) > 1 else None,
     }
     excerpts = tuple(
         SourceExcerpt(item.id, item.text, item.start_offset) for item in supplied_blocks
@@ -815,15 +818,9 @@ def build_extract_requirements_request(
             },
         ),
     )
-    accepted = tuple(accepted_records)
-    if accepted:
-        anchor_facts += (
-            ContextRecord(
-                f"accepted-requirements-{block.id}",
-                {"records": [dict(item) for item in accepted]},
-            ),
-        )
-    allowed_refs = set(supplied_anchor_ids)
+    eligible_current_anchor_ids = set(pagination_candidates)
+    related_anchor_ids = set(supplied_anchor_ids) - set(current_anchor_ids)
+    allowed_refs = eligible_current_anchor_ids | related_anchor_ids
     input_digest = _digest_json(
         {
             "block": source_block_input_digest(block),
@@ -831,14 +828,35 @@ def build_extract_requirements_request(
                 source_block_input_digest(item) for item in related_blocks
             ],
             "anchor_registry": [
-                {"id": item.ref_id, "value": dict(item.value)}
-                for item in anchor_facts
-                if item.ref_id != f"accepted-requirements-{block.id}"
+                {"id": item.ref_id, "value": dict(item.value)} for item in anchor_facts
             ],
             "after_anchor": after_anchor,
-            "accepted_records": [dict(item) for item in accepted],
         }
     )
+
+    def parse(answer: Mapping[str, Any]) -> RequirementExtractionPage:
+        page = parse_requirement_page(
+            answer,
+            allowed_source_refs=allowed_refs,
+            pagination_anchor_ids=current_anchor_ids,
+            after_anchor=after_anchor,
+        )
+        last_processed_index = (
+            current_anchor_ids.index(page.next_anchor)
+            if page.has_more and page.next_anchor is not None
+            else len(current_anchor_ids) - 1
+        )
+        processed_current_anchors = set(
+            current_anchor_ids[cursor_index + 1 : last_processed_index + 1]
+        )
+        for index, record in enumerate(page.records):
+            if not set(record["source_refs"]) <= processed_current_anchors:
+                raise PlanningContractError(
+                    f"/records/{index}/source_refs",
+                    "must cite current-block anchors processed on this page",
+                )
+        return page
+
     return _source_question_request(
         question_kind="extract_requirements",
         subject_id=block.id,
@@ -848,13 +866,17 @@ def build_extract_requirements_request(
             "Which independently checkable obligations does this block impose? "
             "Cite direct anchors and related anchors from supplied adjacent blocks "
             "when needed. The anchor registry gives IDs and exact source ranges. "
-            "Do not repeat accepted records. Return at most eight; if more remain, "
-            "set next_anchor to one of the IDs in the pagination-candidates fact "
-            "in accepted facts. Only those IDs may be used for "
+            "For direct source_refs, use only current-block anchors after the "
+            "pagination cursor; earlier current-block anchors are already complete. "
+            "Return at most eight. If current-block anchors remain after this page, "
+            "set next_anchor to the last current-block anchor processed on this "
+            "page, selected from the pagination-candidates fact. The next page "
+            "starts after that cursor. Do not cite current-block anchors after it. "
+            "Only current-block anchors may be used for "
             "next_anchor; anchors from adjacent blocks may be cited by records "
             "but must never be used as pagination cursors. next_anchor is a cursor, "
-            "not a citation. If this block has no further obligations, or there are "
-            "no pagination candidates, return has_more=false and next_anchor=null. "
+            "not a citation. If this page reaches the final current-block anchor, "
+            "return has_more=false and next_anchor=null. "
             "Always include both pagination fields: has_more=true requires a "
             "non-null next_anchor from the candidates; has_more=false requires "
             "next_anchor=null."
@@ -870,7 +892,8 @@ def build_extract_requirements_request(
             ),
             "next_anchor": (
                 "If has_more is true, exactly one ID from the pagination-candidates "
-                "fact in accepted facts. This is only a pagination cursor, not a "
+                "fact in accepted facts, representing the last current-block anchor "
+                "processed on this page. This is only a pagination cursor, not a "
                 "source citation. Otherwise null."
             ),
         },
@@ -879,12 +902,7 @@ def build_extract_requirements_request(
         valid_example=valid,
         empty_example=empty,
         schema=_ENUMERATION_SCHEMA,
-        parse=lambda answer: parse_requirement_page(
-            answer,
-            allowed_source_refs=allowed_refs,
-            pagination_anchor_ids=current_anchor_ids,
-            after_anchor=after_anchor,
-        ),
+        parse=parse,
     )
 
 

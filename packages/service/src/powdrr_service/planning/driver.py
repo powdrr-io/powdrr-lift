@@ -202,6 +202,32 @@ def _planned_reference_path_pairs(
     )
 
 
+def _manual_prerequisite_data(
+    setups: Sequence[ManualSetup], *, validation_target: str
+) -> Mapping[str, Any]:
+    """Bind one item's manual setup details without overflowing its title field."""
+    titles = tuple(dict.fromkeys(setup.title for setup in setups))
+    multiple_titles = len(titles) > 1
+    instructions = tuple(
+        dict.fromkeys(
+            f"{setup.title}: {instruction}" if multiple_titles else instruction
+            for setup in setups
+            for instruction in setup.instructions
+        )
+    )
+    return {
+        "title": titles[0]
+        if not multiple_titles
+        else "Complete manual setup prerequisites",
+        "instructions": list(instructions),
+        "verification": "; ".join(
+            dict.fromkeys(setup.verification for setup in setups)
+        ),
+        "trigger": setups[0].trigger,
+        "unblocks": validation_target,
+    }
+
+
 def _planned_existing_structural_subjects(
     item_id: str,
     units: Sequence[WorkUnit],
@@ -2330,26 +2356,9 @@ class SourceLedgerQuestionMachine:
         plan_items = tuple(
             replace(
                 item,
-                manual_prerequisite={
-                    "title": "; ".join(
-                        dict.fromkeys(
-                            setup.title for setup in setups_by_owner[item.item_id]
-                        )
-                    ),
-                    "instructions": [
-                        instruction
-                        for setup in setups_by_owner[item.item_id]
-                        for instruction in setup.instructions
-                    ],
-                    "verification": "; ".join(
-                        dict.fromkeys(
-                            setup.verification
-                            for setup in setups_by_owner[item.item_id]
-                        )
-                    ),
-                    "trigger": setups_by_owner[item.item_id][0].trigger,
-                    "unblocks": validation.target,
-                },
+                manual_prerequisite=_manual_prerequisite_data(
+                    setups_by_owner[item.item_id], validation_target=validation.target
+                ),
             )
             if item.item_id in setups_by_owner
             else item

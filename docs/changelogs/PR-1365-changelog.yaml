@@ -2,14 +2,14 @@ schema: https://powdrr.io/schema/changelog-v2
 change_id: 1365
 title: Allow requirements across runtime-specific work units
 intent:
-  problem: The planner can propose one unit that mixes implementation runtimes, even after the model is asked to split it.
-  goal: Partition mixed-runtime proposals deterministically by write runtime and assign each resulting unit only requirements cited by its source refs.
+  problem: The planner can propose mixed-runtime work units, and language-neutral binary fixtures can be mistaken for files needing runtime evidence.
+  goal: Partition mixed-runtime proposals deterministically and recognize fixture binaries as runtime-neutral while retaining evidence requirements for other binary files.
 human-decisions: []
 structured_files: []
 files:
   - path: packages/service/src/powdrr_service/planning/assembly.py
     type: modified
-    span: {start_line: 1094, end_line: 1100}
+    span: {start_line: 1096, end_line: 1102}
     summary: Clarify that one requirement may be repeated across separate runtime-specific work-unit proposals.
     rationale: Let the planner split a requirement spanning multiple runtimes without combining those runtimes in one unit.
   - path: packages/service/src/powdrr_service/planning/assembly.py
@@ -37,6 +37,21 @@ files:
     span: {start_line: 632, end_line: 741}
     summary: Split mixed proposals by runtime and assign requirements using their cited source refs.
     rationale: Avoid repeated LLM correction failures while retaining the existing single-runtime invariant for each work unit.
+  - path: packages/service/src/powdrr_service/planning/assembly.py
+    type: modified
+    span: {start_line: 764, end_line: 766}
+    summary: Classify binary files under fixture directories as runtime-neutral.
+    rationale: Permit binary test fixtures without assigning them an implementation language, while leaving other binary paths evidence-bound.
+  - path: tests/test_planning_assembly.py
+    type: modified
+    span: {start_line: 237, end_line: 246}
+    summary: Verify non-fixture binary files still require runtime evidence.
+    rationale: Keep binary runtime inference narrow to fixture data.
+  - path: tests/test_planning_assembly.py
+    type: modified
+    span: {start_line: 274, end_line: 274}
+    summary: Add the binary DSSE fixture path to runtime-neutral data cases.
+    rationale: Ensure the planner can propose the existing golden binary fixture.
 entities:
   - id: work-unit-proposal-builder
     type: Function

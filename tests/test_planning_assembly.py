@@ -26,7 +26,7 @@ from powdrr_service.planning.assembly import (
 )
 from powdrr_service.planning.contracts import PlanningContractError
 from powdrr_service.planning.driver import SourceLedgerQuestionMachine
-from powdrr_service.planning.evidence import Evidence
+from powdrr_service.planning.evidence import Evidence, EvidenceKind
 from powdrr_service.planning.plan_sizing import (
     ExplicitWorkUnit,
     allocate_explicit_work_units,
@@ -590,7 +590,12 @@ def test_work_unit_question_bounds_evidence_without_losing_evidence_kinds() -> N
     requirement_ids = tuple(requirements)
     evidence_by_requirement = {}
     all_evidence = {}
-    kinds = ("implementation", "configuration", "test", "execution_receipt")
+    kinds: tuple[EvidenceKind, ...] = (
+        "implementation",
+        "configuration",
+        "test",
+        "execution_receipt",
+    )
     for requirement_id in requirement_ids:
         records = tuple(
             Evidence(

@@ -759,9 +759,18 @@ def _derive_planned_write_runtime(
     fact = context.repository_paths.get(path)
     if fact is not None and fact.is_symlink:
         raise PlanningContractError("/planned_writes/path", "write path is a symlink")
-    suffix = PurePosixPath(path).suffix.lower()
+    parsed_path = PurePosixPath(path)
+    suffix = parsed_path.suffix.lower()
+    template_base = parsed_path.stem if suffix == ".template" else ""
+    template_suffix = PurePosixPath(template_base).suffix.lower()
     derived = None if suffix == ".h" else PATH_RUNTIME_SUFFIXES.get(suffix)
+    if suffix == ".template":
+        derived = PATH_RUNTIME_SUFFIXES.get(template_suffix)
     if derived is None and suffix == ".bin" and "fixtures" in PurePosixPath(path).parts:
+        derived = None
+    elif suffix == ".template" and template_base.casefold() == "codeowners":
+        derived = None
+    elif suffix == ".template" and template_suffix in _NEUTRAL_SUFFIXES:
         derived = None
     elif derived is None and suffix in _NEUTRAL_SUFFIXES:
         derived = None

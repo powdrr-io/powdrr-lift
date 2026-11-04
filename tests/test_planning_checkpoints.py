@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import stat
 import subprocess
+import tempfile
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
@@ -292,26 +294,29 @@ def test_local_checkpoint_journal_does_not_dirty_pinned_checkout(
         capture_output=True,
     ).stdout
     assert status == b""
+    common_directory = Path(
+        subprocess.run(
+            [
+                "git",
+                "-C",
+                str(repository),
+                "rev-parse",
+                "--path-format=absolute",
+                "--git-common-dir",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+    ).resolve()
+    repository_key = hashlib.sha256(str(common_directory).encode()).hexdigest()[:24]
     assert store.directory == (
-        Path(
-            subprocess.run(
-                [
-                    "git",
-                    "-C",
-                    str(repository),
-                    "rev-parse",
-                    "--path-format=absolute",
-                    "--git-common-dir",
-                ],
-                check=True,
-                capture_output=True,
-                text=True,
-            ).stdout.strip()
-        )
+        Path(tempfile.gettempdir())
         / "powdrr-lift"
-        / "planning"
-        / "checkpoints"
+        / "planning-checkpoints"
+        / repository_key
     )
+    assert common_directory not in store.directory.parents
 
 
 def test_accepted_answer_and_id_counters_resume_without_a_local_cache(

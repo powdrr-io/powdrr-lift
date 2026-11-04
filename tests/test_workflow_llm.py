@@ -566,7 +566,7 @@ def test_timeout_retry_retries_empty_provider_content(monkeypatch: Any) -> None:
             _ = messages
             self.calls += 1
             if self.calls == 1:
-                raise RuntimeError("OpenAI response message content was empty.")
+                raise RuntimeError("Provider response message content was empty.")
             return {"answer": "ok"}
 
     monkeypatch.setattr("powdrr_lift.workrr.llm.time.sleep", lambda _: None)

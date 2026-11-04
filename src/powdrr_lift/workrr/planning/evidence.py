@@ -2,10 +2,15 @@
 
 from __future__ import annotations
 
+import atexit
 import hashlib
 import re
+import subprocess
+import tarfile
+import tempfile
 from collections import Counter
 from collections.abc import Mapping, Sequence
+from contextlib import suppress
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path, PurePosixPath
@@ -18,7 +23,6 @@ from powdrr_agent.repository import (
     find_workspace_document_symbols,
     find_workspace_reference_paths,
     find_workspace_symbols,
-    inspect_pinned_checkout,
     read_pinned_file,
 )
 from powdrr_service.planning.contracts import (
@@ -91,6 +95,66 @@ _COVERAGE_STOPWORDS = frozenset(
         "within",
     }
 )
+_PINNED_ANALYSIS_TEMPORARIES: dict[
+    tuple[str, str], tempfile.TemporaryDirectory[str]
+] = {}
+
+
+def _cleanup_pinned_analysis_temporaries() -> None:
+    for temporary in _PINNED_ANALYSIS_TEMPORARIES.values():
+        with suppress(OSError):
+            temporary.cleanup()
+    _PINNED_ANALYSIS_TEMPORARIES.clear()
+
+
+atexit.register(_cleanup_pinned_analysis_temporaries)
+
+
+def _pinned_analysis_root(repository_root: Path, base_commit: str) -> Path:
+    """Materialize one immutable Git tree for code analysis tools."""
+    root = repository_root.resolve()
+    key = (str(root), base_commit)
+    cached = _PINNED_ANALYSIS_TEMPORARIES.get(key)
+    if cached is not None:
+        return Path(cached.name) / "repository"
+
+    temporary = tempfile.TemporaryDirectory(prefix="powdrr-pinned-analysis-")
+    snapshot = Path(temporary.name) / "repository"
+    snapshot.mkdir()
+    process: subprocess.Popen[bytes] | None = None
+    try:
+        process = subprocess.Popen(
+            ["git", "-C", str(root), "archive", "--format=tar", base_commit],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        assert process.stdout is not None
+        with tarfile.open(fileobj=process.stdout, mode="r|") as archive:
+            archive.extractall(snapshot, filter="data")
+        stderr = b"" if process.stderr is None else process.stderr.read()
+        return_code = process.wait()
+        if return_code != 0:
+            raise EvidenceError(
+                "could not materialize the pinned code-analysis snapshot: "
+                + (
+                    stderr.decode("utf-8", errors="replace").strip()
+                    or "git archive failed"
+                )
+            )
+    except (OSError, tarfile.TarError, EvidenceError) as error:
+        if process is not None and process.poll() is None:
+            process.kill()
+            process.wait()
+        temporary.cleanup()
+        if isinstance(error, EvidenceError):
+            raise
+        raise EvidenceError(
+            f"could not materialize pinned code-analysis snapshot: {error}"
+        ) from error
+    _PINNED_ANALYSIS_TEMPORARIES[key] = temporary
+    return snapshot
+
+
 _COVERAGE_SEARCH_PATHS = (
     "*.py",
     "*.pyi",
@@ -166,7 +230,7 @@ def search_requirements_evidence(
 ) -> dict[str, RequirementEvidenceSearch]:
     """Search all plan requirements in one basedpyright session and rg passes."""
     root = Path(repository_root).resolve()
-    _require_clean_pinned_checkout(root, base_commit)
+    analysis_root = _pinned_analysis_root(root, base_commit)
     requirements_by_id = {item.id: item for item in requirements}
     if len(requirements_by_id) != len(requirements):
         raise EvidenceError("requirement IDs must be unique for repository search")
@@ -186,7 +250,7 @@ def search_requirements_evidence(
     if symbol_queries:
         try:
             symbols_by_query = find_workspace_symbols(
-                list(symbol_queries), worktree_root=root, limit=20
+                list(symbol_queries), worktree_root=analysis_root, limit=20
             )
         except PowdrrExecutionError:
             # Ripgrep still provides local multi-language evidence when the
@@ -227,7 +291,7 @@ def search_requirements_evidence(
         command.append(".")
         try:
             receipt, stdout, stderr = execute_command(
-                root, tuple(command), timeout_seconds=300
+                analysis_root, tuple(command), timeout_seconds=300
             )
         except OSError as error:
             raise EvidenceError(
@@ -392,14 +456,14 @@ def search_dependency_reference_paths(
 ) -> dict[tuple[str, str], tuple[str, ...]]:
     """Map planned unit pairs connected by BasedPyright symbol references."""
     root = Path(repository_root).resolve()
-    _require_clean_pinned_checkout(root, base_commit)
+    analysis_root = _pinned_analysis_root(root, base_commit)
     owners_by_path: dict[str, set[str]] = {}
     for unit_id, paths in paths_by_unit.items():
         for path in paths:
             if Path(path).suffix.casefold() in {".py", ".pyi"}:
                 owners_by_path.setdefault(path, set()).add(unit_id)
     reference_paths = find_workspace_reference_paths(
-        sorted(owners_by_path), worktree_root=root
+        sorted(owners_by_path), worktree_root=analysis_root
     )
     candidate_paths: dict[tuple[str, str], set[str]] = {}
     for producer_path, consumer_paths in reference_paths.items():
@@ -420,13 +484,13 @@ def search_structural_document_symbols(
     base_commit: str,
     paths: Sequence[str],
 ) -> dict[str, list[dict[str, Any]]]:
-    """Read BasedPyright symbols from the clean checkout pinned by the plan."""
+    """Read BasedPyright symbols from a materialized pinned Git tree."""
     root = Path(repository_root).resolve()
-    _require_clean_pinned_checkout(root, base_commit)
+    analysis_root = _pinned_analysis_root(root, base_commit)
     normalized_paths = tuple(sorted(set(paths)))
     try:
         return find_workspace_document_symbols(
-            list(normalized_paths), worktree_root=root
+            list(normalized_paths), worktree_root=analysis_root
         )
     except PowdrrExecutionError as error:
         raise EvidenceError(f"structural symbol search failed: {error}") from error
@@ -439,11 +503,11 @@ def search_structural_document_analysis(
 ) -> tuple[dict[str, list[dict[str, Any]]], dict[str, tuple[str, ...]]]:
     """Read symbols and cross-file references from one pinned BasedPyright session."""
     root = Path(repository_root).resolve()
-    _require_clean_pinned_checkout(root, base_commit)
+    analysis_root = _pinned_analysis_root(root, base_commit)
     normalized_paths = tuple(sorted(set(paths)))
     try:
         return find_workspace_document_analysis(
-            list(normalized_paths), worktree_root=root
+            list(normalized_paths), worktree_root=analysis_root
         )
     except PowdrrExecutionError as error:
         raise EvidenceError(f"structural document analysis failed: {error}") from error
@@ -523,13 +587,13 @@ def lookup_symbols_in_pinned_file(
 ) -> SymbolLookupResult:
     """Read a file first, then search symbol names and filter to that file.
 
-    File paths are never sent as workspace-symbol queries. The checkout must be
-    a clean realization of `base_commit` so basedpyright cannot inspect edits
-    that are absent from the pinned source.
+    File paths are never sent as workspace-symbol queries. BasedPyright runs on
+    a temporary materialization of `base_commit`, so local edits cannot affect
+    the evidence result.
     """
     root = Path(repository_root).resolve()
     normalized_path, text = read_pinned_code_file(root, base_commit, path)
-    _require_clean_pinned_checkout(root, base_commit)
+    analysis_root = _pinned_analysis_root(root, base_commit)
     evidence_kind = _kind(kind)
     if evidence_kind in {"configuration", "execution_receipt"}:
         raise EvidenceError("symbol evidence must be implementation or test code")
@@ -538,7 +602,9 @@ def lookup_symbols_in_pinned_file(
     finder = symbol_finder or find_workspace_symbols
     try:
         results = finder(
-            normalized_queries, worktree_root=root, limit=MAX_SYMBOL_QUERIES * 4
+            normalized_queries,
+            worktree_root=analysis_root,
+            limit=MAX_SYMBOL_QUERIES * 4,
         )
     except PowdrrExecutionError as error:
         raise EvidenceError(f"symbol lookup failed: {error}") from error
@@ -619,17 +685,6 @@ def build_requirement_coverage_request(
         evidence_excerpts=excerpts,
         repository_search=repository_search,
     )
-
-
-def _require_clean_pinned_checkout(root: Path, base_commit: str) -> None:
-    try:
-        head, clean = inspect_pinned_checkout(root)
-    except LocalActionError as error:
-        raise EvidenceError("could not verify pinned analysis checkout") from error
-    if head != base_commit:
-        raise EvidenceError("symbol lookup checkout does not match pinned base commit")
-    if not clean:
-        raise EvidenceError("symbol lookup requires a clean pinned checkout")
 
 
 def _read_evidence_excerpt(repository_root: str | Path, evidence: Evidence) -> str:

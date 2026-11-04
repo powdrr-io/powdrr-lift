@@ -7,7 +7,7 @@ import json
 from collections.abc import Callable, Mapping, Sequence
 from copy import deepcopy
 from dataclasses import dataclass, replace
-from typing import Any
+from typing import Any, Protocol
 
 from powdrr_service.planning.contracts import (
     PlanningContractError,
@@ -97,6 +97,10 @@ class ContextRecord:
     value: Mapping[str, Any]
 
 
+class _ContextReference(Protocol):
+    ref_id: str
+
+
 @dataclass(frozen=True, slots=True)
 class QuestionRequest[AnswerT]:
     """Complete, bounded-input definition for one typed question."""
@@ -137,7 +141,12 @@ class QuestionRequest[AnswerT]:
             *(item.ref_id for item in self.accepted_facts),
         ]
         if len(set(refs)) != len(refs):
-            raise ValueError("context reference IDs must be unique within a question")
+            normalized = _normalize_question_context(self)
+            refs = [
+                *(item.ref_id for item in normalized.source_excerpts),
+                *(item.ref_id for item in normalized.repository_evidence),
+                *(item.ref_id for item in normalized.accepted_facts),
+            ]
         if set(refs) != set(self.question.context_ref_ids):
             raise ValueError(
                 "question context_ref_ids must exactly match the supplied context"
@@ -154,6 +163,46 @@ class QuestionRequest[AnswerT]:
                 raise ValueError(
                     f"{name} does not pass its answer parser: {error}"
                 ) from error
+
+
+def _normalize_question_context(
+    request: QuestionRequest[Any],
+) -> QuestionRequest[Any]:
+    """Collapse repeated identical references before sending a question."""
+    seen: dict[str, tuple[str, Any]] = {}
+
+    def unique_items[T: _ContextReference](
+        items: Sequence[T], category: str
+    ) -> tuple[T, ...]:
+        output: list[T] = []
+        for item in items:
+            ref_id = item.ref_id
+            prior = seen.get(ref_id)
+            if prior is None:
+                seen[ref_id] = (category, item)
+                output.append(item)
+                continue
+            prior_category, prior_item = prior
+            if prior_category != category or prior_item != item:
+                raise ValueError(
+                    f"context reference ID {ref_id!r} identifies conflicting facts"
+                )
+        return tuple(output)
+
+    source_excerpts = unique_items(request.source_excerpts, "source")
+    repository_evidence = unique_items(request.repository_evidence, "repository")
+    accepted_facts = unique_items(request.accepted_facts, "accepted")
+    refs = tuple(
+        item.ref_id
+        for item in (*source_excerpts, *repository_evidence, *accepted_facts)
+    )
+    return replace(
+        request,
+        question=replace(request.question, context_ref_ids=refs),
+        source_excerpts=source_excerpts,
+        repository_evidence=repository_evidence,
+        accepted_facts=accepted_facts,
+    )
 
 
 def batch_question_requests(
@@ -173,7 +222,8 @@ def batch_question_requests(
         )
         pending.clear()
 
-    for request in requests:
+    for original_request in requests:
+        request = _normalize_question_context(original_request)
         request.validate()
         batch_limit = max_batch_size or (
             6 if request.question.kind == "extract_requirements" else 4
@@ -451,6 +501,7 @@ def build_question_messages(
     schema_in_response: bool = False,
 ) -> list[dict[str, str]]:
     """Build prompt sections in the normative order and enforce the input cap."""
+    request = _normalize_question_context(request)
     request.validate()
     current_question = (
         request.question
@@ -532,6 +583,7 @@ def run_question[AnswerT](
     use_provider_schema: bool = True,
 ) -> QuestionResult[AnswerT]:
     """Run one bounded question with transport retry and two semantic corrections."""
+    request = _normalize_question_context(request)
     request.validate()
     previous_answer: Mapping[str, Any] = {}
     last_error: PlanningContractError | None = None

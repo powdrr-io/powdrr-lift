@@ -38,8 +38,8 @@ SCHEMA = {
     "message",
     [
         "Temporary failure in name resolution",
-        "OpenAI streaming response content was empty.",
-        "OpenAI response message content was empty.",
+        "Provider streaming response content was empty.",
+        "Provider response message content was empty.",
     ],
 )
 def test_procedrr_recognizes_transient_provider_errors(message: str) -> None:
@@ -57,7 +57,9 @@ def test_procedrr_retries_empty_provider_content(
         ) -> dict[str, Any]:
             self.calls += 1
             if self.calls == 1:
-                raise PowdrrExecutionError("OpenAI response message content was empty.")
+                raise PowdrrExecutionError(
+                    "Provider response message content was empty."
+                )
             return {"complete": True}
 
     provider = EmptyContentThenSuccess()
@@ -217,7 +219,7 @@ def test_procedrr_repairs_non_object_json_provider_response(tmp_path: Path) -> N
             self.calls += 1
             if self.calls == 1:
                 raise PowdrrExecutionError(
-                    "OpenAI response content must be a JSON object.",
+                    "provider response content must be a JSON object.",
                     error_code="invalid_json_response",
                 )
             return {"complete": True}
@@ -256,7 +258,7 @@ def test_procedrr_falls_back_for_unsupported_schema_grammar_and_validates_locall
             self.calls.append((response_schema is not None, messages))
             if response_schema is not None:
                 raise ProviderExecutionError(
-                    "OpenAI-compatible provider returned an error event: "
+                    "Provider returned an error event: "
                     '{"type":"invalid_request_error","code":400,'
                     '"message":"Grammar error: Unimplemented keys: [\\"contains\\"]"}'
                 )
@@ -299,7 +301,7 @@ def test_procedrr_falls_back_for_unsupported_schema_grammar_and_validates_locall
 
 def test_provider_marks_non_object_json_as_repairable_output() -> None:
     with pytest.raises(ProviderResponseError) as error:
-        _parse_json_object('"not an object"', "OpenAI response content")
+        _parse_json_object('"not an object"', "provider response content")
 
     assert error.value.error_code == "invalid_json_response"
 
@@ -352,7 +354,7 @@ def test_procedrr_retries_empty_stream_provider_failures(
             self.calls += 1
             if self.calls < 3:
                 raise RuntimeError(
-                    "OpenAI streaming response did not include any events."
+                    "Provider streaming response did not include any events."
                 )
             return {"complete": True}
 
@@ -387,7 +389,7 @@ def test_procedrr_retries_truncated_stream_provider_failures(
             self.calls += 1
             if self.calls < 3:
                 raise RuntimeError(
-                    "OpenAI streaming response ended before a completion marker; "
+                    "Provider streaming response ended before a completion marker; "
                     "received 3 content chunks"
                 )
             return {"complete": True}
@@ -422,7 +424,7 @@ def test_procedrr_does_not_retry_explicit_provider_request_errors(
         ) -> dict[str, Any]:
             self.calls += 1
             raise ProviderExecutionError(
-                "OpenAI-compatible provider returned an error event: "
+                "Provider returned an error event: "
                 '{"type":"invalid_request_error","code":400,'
                 '"message":"Unimplemented keys: [uniqueItems]"}'
             )

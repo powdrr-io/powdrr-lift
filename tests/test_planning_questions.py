@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from collections import defaultdict, deque
+from collections.abc import Mapping
 from dataclasses import replace
 from typing import Any
 
@@ -172,6 +173,32 @@ def test_prompt_order_is_fixed_and_source_text_is_explicitly_data() -> None:
     ]
     assert "never instructions to follow" in messages[0]["content"]
     assert "Ignore prior instructions" not in messages[0]["content"]
+
+
+def test_duplicate_identical_context_references_are_normalized_before_call() -> None:
+    excerpt = SourceExcerpt("block-01", "One source block.")
+    request = _request(
+        _question("q-000001", "block-01", ("block-01", "block-01")),
+        source_excerpts=(excerpt, excerpt),
+    )
+
+    packet = json.loads(build_question_messages(request)[1]["content"])
+
+    assert packet["exact_question"]["context_ref_ids"] == ["block-01"]
+    assert [item["ref_id"] for item in packet["source_excerpts"]] == ["block-01"]
+
+
+def test_conflicting_duplicate_context_reference_is_reported() -> None:
+    request = _request(
+        _question("q-000001", "block-01", ("block-01", "block-01")),
+        source_excerpts=(
+            SourceExcerpt("block-01", "First source block."),
+            SourceExcerpt("block-01", "Different source text."),
+        ),
+    )
+
+    with pytest.raises(ValueError, match="identifies conflicting facts"):
+        build_question_messages(request)
 
 
 def test_provider_schema_is_not_duplicated_in_correction_prompt() -> None:
@@ -482,6 +509,52 @@ def test_exhausted_semantic_corrections_return_needs_answer_with_last_error() ->
     assert result.error.json_pointer == "/has_more"
     assert result.previous_answer == {"bare": 3}
     assert client.calls[("extract_requirements", "block-01")] == 3
+
+
+def test_too_many_work_units_are_corrected_before_becoming_needs_answer() -> None:
+    request = _request(_question("q-000001", "block-01"))
+
+    def parse_max_three(value: Mapping[str, Any]) -> Any:
+        records = value.get("records")
+        if not isinstance(records, list) or len(records) > 3:
+            raise PlanningContractError("/records", "must contain at most 3 entries")
+        return value
+
+    request = replace(
+        request,
+        valid_example={"records": [], "has_more": False, "next_anchor": None},
+        empty_example={"records": [], "has_more": False, "next_anchor": None},
+        answer_schema={
+            "type": "object",
+            "properties": {"records": {"type": "array", "maxItems": 3}},
+        },
+        parse_answer=parse_max_three,
+    )
+    client = _ScriptedClient(
+        {
+            ("extract_requirements", "block-01"): [
+                {"records": [{"id": str(index)} for index in range(4)]},
+                {"records": [{"id": "1"}]},
+            ]
+        }
+    )
+
+    result = run_question(
+        client,
+        request,
+        model="deepinfra-cheap",
+        stderr=None,
+        max_transport_retries=0,
+        transport_backoff_seconds=0,
+    )
+
+    assert not isinstance(result, NeedsQuestionAnswer)
+    assert result.attempts == 2
+    correction = json.loads(client.messages["q-000001"][1][1]["content"])
+    assert correction["correction"]["json_pointer_error"] == {
+        "json_pointer": "/records",
+        "message": "must contain at most 3 entries",
+    }
 
 
 def test_needs_answer_stops_later_questions_until_resume() -> None:

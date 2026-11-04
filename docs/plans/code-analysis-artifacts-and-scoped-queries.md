@@ -301,8 +301,9 @@ artifact layout without changing planner contracts.
 ### 5.5 Query contract
 
 ```yaml
-schema_version: code-query-v1
-analysis_id: analysis:sha256:...
+schema_version: structrr-code-query-v1
+structrr_snapshot_id: structrr:sha256:...
+analysis_id: analysis:sha256:... # required for findings/coverage queries
 query_kind: findings | symbols | references | dependencies | components | coverage
 filters:
   component_ids: []
@@ -317,7 +318,7 @@ filters:
 limit: 50
 ```
 
-The response includes the exact normalized filters, matching records, omitted count, truncation flag, and artifact references. Query size is bounded by record count and encoded bytes. Paths are repository-relative and cannot escape the worktree.
+Structrr resolves the symbol-artifact reference from `structrr_snapshot_id`; callers do not supply arbitrary artifact paths. `analysis_id` is required only for finding/coverage queries and must belong to the same snapshot revision. The response echoes the snapshot ID, resolved artifact IDs, exact normalized filters, matching records, omitted count, truncation flag, and evidence references. Query size is bounded by record count and encoded bytes. Paths are repository-relative and cannot escape the worktree.
 
 ## 6. Planner integration
 
@@ -328,7 +329,7 @@ Code analysis is a planning evidence provider. It does not own product intent, r
 1. **Pin the planning snapshot.** Planning records the base commit and loads Structrr's component inventory and language capability report for that revision.
 2. **Load or create analysis evidence.** Reuse a complete report matching the commit, component scope, provider versions, configuration, and controlled environment. Otherwise analyze relevant components and persist the report. Planning may continue with partial coverage only under an explicit degraded-evidence state; it must never label missing analysis complete.
 3. **Give the planner a compact inventory.** Supply component IDs, languages, source/test roots, configured providers, coverage, and finding counts. Do not put every warning or raw output into the source-ledger prompt.
-4. **Allow scoped queries.** The planner may request `code-query-v1` for concrete questions. Initial scope comes from proposal paths, requirements, Structrr entities, and component relationships. Journal filters, analysis ID, result fingerprint, and query purpose.
+4. **Allow scoped queries.** The planner may request `structrr-code-query-v1` for concrete questions against the pinned Structrr snapshot. Initial scope comes from proposal paths, requirements, Structrr entities, and component relationships. Journal filters, snapshot/artifact IDs, result fingerprint, and query purpose.
 5. **Ground code mapping.** Use symbol, reference, and dependency results to check whether a requirement may already be implemented, identify tests and callers, and propose candidate paths. A symbol match alone does not prove a requirement is implemented; a reference edge alone does not prove two work units depend on each other.
 6. **Compile an evidence-bound plan.** Each implementation item records affected components, relevant source entities, required validation profiles, baseline analysis ID, and planned post-edit analysis scope.
 7. **Analyze after implementation.** Run applicable read-only analyzers on affected components and compare with the pinned base report. Persist the candidate report and compact delta summary as review evidence.
@@ -430,7 +431,7 @@ Acceptance: exact, relocated, new, resolved, uncertain, and incomparable cases; 
 
 ### PR 4: Scoped code/project query interface
 
-Add `code-query-v1` through Structrr and resolve it against the referenced code-symbol JSON artifact. Adapt existing BasedPyright symbols, structure, and references as the first artifact producer. Implement deterministic component/path/language/severity/rule/status/kind filters and bounded pagination.
+Add `structrr-code-query-v1` and resolve code-structure queries through the symbol-artifact reference in the requested snapshot. Adapt existing BasedPyright symbols, structure, and references as the first artifact producer. Implement deterministic component/path/language/severity/rule/status/kind filters and bounded pagination.
 
 Acceptance: queries return exactly matching records and filter provenance; semantic relationships are emitted only when supported; path traversal, unbounded limits, stale artifact IDs, and unsupported kinds fail clearly; existing BasedPyright tools remain available through the common provider.
 

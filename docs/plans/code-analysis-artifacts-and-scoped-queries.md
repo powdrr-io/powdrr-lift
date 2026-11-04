@@ -154,17 +154,17 @@ Severity remains the provider's severity. Powdrr may add policy priority as a se
 
 ### 5.3 Structrr code-symbol format and artifact boundary
 
-The canonical persisted format is **versioned JSON**, with media type
-`application/vnd.powdrr.structrr-code-symbols+json` and schema URI
-`https://powdrr.io/schema/structrr-code-symbols-v1`. JSON is the interchange
-format owned by Structrr; it is deterministic, inspectable, streamable, and
-compatible with the existing JSON artifact and snapshot tooling. SCIP indexes
-may be an input to a provider, but they are not the Structrr storage contract.
-Tree-sitter or another syntax parser may also feed this format, with every
-record labeled `syntactic` rather than `semantic`.
+The canonical persisted format is **versioned YAML**, with media type
+`application/vnd.powdrr.structrr-code-symbols+yaml` and schema URI
+`https://powdrr.io/schema/structrr-code-symbols-v1`. This matches Structrr's
+existing human-reviewed snapshot format while giving the symbol inventory its
+own file and lifecycle. SCIP indexes may be an input to a provider, but they
+are not the Structrr storage contract. Tree-sitter or another syntax parser
+may also feed this format, with every record labeled `syntactic` rather than
+`semantic`.
 
 Store the symbol inventory as a separate immutable content-addressed artifact,
-for example `artifacts/structrr/code-symbols/sha256-<digest>.json`. Do not copy
+for example `artifacts/structrr/code-symbols/sha256-<digest>.yaml`. Do not copy
 the symbol or relationship arrays into the Structrr bootstrap YAML or ordinary
 planner prompts. The bootstrap contains only a compact reference:
 
@@ -173,8 +173,8 @@ structrr_schema: https://powdrr.io/schema/structrr-bootstrap-v2
 code_symbol_artifact:
   schema: https://powdrr.io/schema/structrr-code-symbol-artifact-ref-v1
   artifact_id: structrr-code-symbols:sha256:<digest>
-  content_ref: artifacts/structrr/code-symbols/sha256-<digest>.json
-  media_type: application/vnd.powdrr.structrr-code-symbols+json
+  content_ref: artifacts/structrr/code-symbols/sha256-<digest>.yaml
+  media_type: application/vnd.powdrr.structrr-code-symbols+yaml
   content_digest: sha256:<digest>
   source_revision: <40-character-git-object-id>
   component_fingerprints:
@@ -185,64 +185,51 @@ code_symbol_artifact:
   relationship_count: 411
 ```
 
-The JSON artifact has this top-level shape. Object keys are canonicalized for
-fingerprinting; record arrays are sorted by stable ID before serialization.
-The content digest is SHA-256 over canonical UTF-8 JSON with sorted object keys
-and no insignificant whitespace; the Structrr reference carries that digest
-and uses it in the content-addressed artifact path and artifact ID.
+The YAML artifact has this top-level shape. Mapping keys are emitted in the
+schema's documented order, aliases are disabled, line endings are LF, and
+record arrays are sorted by stable ID. Compute the content digest over the
+exact UTF-8 YAML bytes; the Structrr reference uses that digest in the
+content-addressed artifact path and artifact ID.
 
-```json
-{
-  "schema": "https://powdrr.io/schema/structrr-code-symbols-v1",
-  "source_revision": "<40-character-git-object-id>",
-  "components": [
-    {
-      "component_id": "component:python:attestation/verifier",
-      "language": "python",
-      "root": "attestation/verifier",
-      "source_roots": ["attestation/verifier/src"],
-      "provider_id": "basedpyright",
-      "provider_version": "1.39.9",
-      "provider_fingerprint": "sha256:...",
-      "coverage": "complete"
-    }
-  ],
-  "symbols": [
-    {
-      "symbol_id": "symbol:python:attestation/verifier:powdrr_attestation.policy.parse_policy:function",
-      "component_id": "component:python:attestation/verifier",
-      "language": "python",
-      "kind": "function",
-      "name": "parse_policy",
-      "qualified_name": "powdrr_attestation.policy.parse_policy",
-      "path": "attestation/verifier/src/powdrr_attestation/policy.py",
-      "span": {"start_line": 92, "start_column": 0, "end_line": 130, "end_column": 1},
-      "signature": "parse_policy(data: Mapping[str, object]) -> Policy",
-      "resolution": "semantic",
-      "provider_id": "basedpyright",
-      "source_fingerprint": "sha256:..."
-    }
-  ],
-  "relationships": [
-    {
-      "relationship_id": "relationship:sha256:...",
-      "source_symbol_id": "symbol:...",
-      "target_symbol_id": "symbol:...",
-      "kind": "references",
-      "resolution": "semantic",
-      "provider_id": "basedpyright"
-    }
-  ],
-  "coverage": [
-    {
-      "component_id": "component:python:attestation/verifier",
-      "indexed_paths": 6,
-      "excluded_paths": [],
-      "unsupported_paths": [],
-      "diagnostics": []
-    }
-  ]
-}
+```yaml
+schema: https://powdrr.io/schema/structrr-code-symbols-v1
+source_revision: <40-character-git-object-id>
+components:
+  - component_id: component:python:attestation/verifier
+    language: python
+    root: attestation/verifier
+    source_roots:
+      - attestation/verifier/src
+    provider_id: basedpyright
+    provider_version: 1.39.9
+    provider_fingerprint: sha256:...
+    coverage: complete
+symbols:
+  - symbol_id: symbol:python:attestation/verifier:powdrr_attestation.policy.parse_policy:function
+    component_id: component:python:attestation/verifier
+    language: python
+    kind: function
+    name: parse_policy
+    qualified_name: powdrr_attestation.policy.parse_policy
+    path: attestation/verifier/src/powdrr_attestation/policy.py
+    span: {start_line: 92, start_column: 0, end_line: 130, end_column: 1}
+    signature: 'parse_policy(data: Mapping[str, object]) -> Policy'
+    resolution: semantic
+    provider_id: basedpyright
+    source_fingerprint: sha256:...
+relationships:
+  - relationship_id: relationship:sha256:...
+    source_symbol_id: symbol:...
+    target_symbol_id: symbol:...
+    kind: references
+    resolution: semantic
+    provider_id: basedpyright
+coverage:
+  - component_id: component:python:attestation/verifier
+    indexed_paths: 6
+    excluded_paths: []
+    unsupported_paths: []
+    diagnostics: []
 ```
 
 Symbol IDs are language- and component-qualified and derive from canonical
@@ -257,7 +244,7 @@ symbol identity. Relationships distinguish `contains`, `imports`, `calls`,
 
 Structrr remains the owner of code-symbol meaning and use:
 
-- Add a versioned `code_symbol_artifact` reference to the Structrr snapshot and
+- Add a versioned `code_symbol_artifact` reference to the Structrr YAML snapshot and
   bootstrap schema. Validate schema URI, content digest, source revision,
   component fingerprints, counts, unique IDs, path containment, and referenced
   relationship endpoints when loading the artifact.
@@ -268,7 +255,7 @@ Structrr remains the owner of code-symbol meaning and use:
 - Add Structrr context lenses for component inventory, symbols by path/name,
   references/callers, dependency neighborhoods, and relevant findings. Lenses
   return bounded projections with artifact IDs and provider/coverage
-  provenance; they do not expose the entire JSON artifact by default.
+  provenance; they do not expose the entire YAML artifact by default.
 - Extend Structrr source comparison and rebase to compare symbol IDs,
   signatures, source fingerprints, and relationships from the referenced
   artifacts. Missing/stale artifacts or partial provider coverage yield an
@@ -374,7 +361,7 @@ The planner must not copy unfiltered transcripts into questions, treat checker e
 
 ### 7.1 Storage
 
-- Write the normalized report/findings and bounded raw output under the run's existing artifact directory. Write the Structrr code-symbol inventory as its own versioned JSON artifact with a content digest.
+- Write the normalized report/findings and bounded raw output under the run's existing artifact directory. Write the Structrr code-symbol inventory as its own versioned YAML artifact with a content digest.
 - Register `ExecutionArtifact` references for the report and the symbol inventory, with distinct artifact types, schema versions, owners, and content references. The Structrr snapshot stores only the compact symbol-artifact descriptor and its provenance.
 - Include revision, component fingerprints, analyzer versions, configuration digests, environment identity, and scope in every report.
 - Artifacts are immutable. A rerun creates a new report; acceptance references the chosen report.
@@ -413,7 +400,7 @@ Each milestone is a separate reviewable PR unless implementation evidence shows 
 
 ### PR 1: Analysis contracts and artifact persistence
 
-Add typed versioned analysis-run, finding, provider-result, coverage, code-symbol, code-symbol-relationship, query, and query-response records. Add canonical JSON serialization, fingerprints, and persistence through existing execution/run artifact boundaries. Add a compact Structrr artifact-reference section, without embedding symbol arrays. Do not change planner behavior.
+Add typed versioned analysis-run, finding, provider-result, coverage, code-symbol, code-symbol-relationship, query, and query-response records. Add deterministic YAML serialization, fingerprints, and persistence through existing execution/run artifact boundaries. Add a compact Structrr artifact-reference section, without embedding symbol arrays. Do not change planner behavior.
 
 Acceptance: deterministic round trips; rejection of invalid statuses, path escapes, duplicate IDs, and bad fingerprints; byte-bounded raw outputs with explicit truncation; replay retrieves report content by reference; existing diagnostic hooks continue to work during migration.
 
@@ -431,7 +418,7 @@ Acceptance: exact, relocated, new, resolved, uncertain, and incomparable cases; 
 
 ### PR 4: Scoped code/project query interface
 
-Add `structrr-code-query-v1` and resolve code-structure queries through the symbol-artifact reference in the requested snapshot. Adapt existing BasedPyright symbols, structure, and references as the first artifact producer. Implement deterministic component/path/language/severity/rule/status/kind filters and bounded pagination.
+Add `structrr-code-query-v1` and resolve code-structure queries through the symbol-artifact reference in the requested snapshot. Adapt existing BasedPyright symbols, structure, and references as the first YAML artifact producer. Implement deterministic component/path/language/severity/rule/status/kind filters and bounded pagination.
 
 Acceptance: queries return exactly matching records and filter provenance; semantic relationships are emitted only when supported; path traversal, unbounded limits, stale artifact IDs, and unsupported kinds fail clearly; existing BasedPyright tools remain available through the common provider.
 
@@ -443,7 +430,7 @@ Acceptance: planner answers implementation questions with bounded symbol/referen
 
 ### PR 6: Multi-language structure and analyzer providers
 
-Integrate with the component/capability registry in `polyglot-repository-and-go-support.md`. Normalize language-provider output into the Structrr-owned JSON symbol schema. Use semantic indexers that emit SCIP as provider inputs where available. Use Tree-sitter or equivalent only for syntax outlines. Add native analyzer adapters as their language/component capability is supported.
+Integrate with the component/capability registry in `polyglot-repository-and-go-support.md`. Normalize language-provider output into the Structrr-owned YAML symbol schema. Use semantic indexers that emit SCIP as provider inputs where available. Use Tree-sitter or equivalent only for syntax outlines. Add native analyzer adapters as their language/component capability is supported.
 
 Acceptance: mixed-language reports retain per-provider status; Python/Go/TypeScript structures retain language namespaces and provenance; syntax-only results cannot answer semantic reference queries; provider failure does not erase another provider's findings and yields partial status; unsupported files have explicit coverage and no fabricated symbols.
 

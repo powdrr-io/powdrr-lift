@@ -36,6 +36,7 @@ from powdrr_service.planning.dependencies import (
     compile_dependency_graph,
     compile_manual_setup_ownership,
     discover_dependency_candidates,
+    implementation_phase_dependency_edges,
     parse_dependency_confirmation,
     parse_human_setup_need,
     parse_manual_setup_proposal,
@@ -47,6 +48,7 @@ from powdrr_service.planning.dependencies import (
 )
 from powdrr_service.planning.questions import build_question_messages
 from powdrr_service.planning.source import (
+    ImplementationPhase,
     PinnedSourceDocument,
     Requirement,
     SegmentedSource,
@@ -113,6 +115,42 @@ def _unit(unit_id: str, requirement_id: str = "req-0001") -> WorkUnit:
         (f"{unit_id} works.",),
         ("val-0001",),
     )
+
+
+def test_source_phase_dependencies_expand_to_explicit_unit_edges() -> None:
+    first = replace(_unit("unit-0001", "req-0001"), implementation_phase_id="pr-01")
+    second = replace(_unit("unit-0002", "req-0002"), implementation_phase_id="pr-02")
+    later_first_phase = replace(
+        _unit("unit-0003", "req-0003"), implementation_phase_id="pr-01"
+    )
+    phases = (
+        ImplementationPhase("pr-01", "Define schemas", ()),
+        ImplementationPhase("pr-02", "Implement verifier", ("pr-01",)),
+    )
+
+    edges = implementation_phase_dependency_edges(
+        (first, later_first_phase, second), phases
+    )
+
+    assert [(edge.before_unit_id, edge.after_unit_id) for edge in edges] == [
+        (first.id, later_first_phase.id),
+        (first.id, second.id),
+        (later_first_phase.id, second.id),
+    ]
+    assert edges[0].requirement_ids == ("req-0001",)
+    assert "split into ordered reviewable items" in edges[0].reason
+    assert "source implementation sequence" in edges[1].reason
+    graph = compile_dependency_graph(
+        (first, later_first_phase, second),
+        {
+            first.id: "item-01",
+            later_first_phase.id: "item-02",
+            second.id: "item-03",
+        },
+        edges,
+        item_order_hint=("item-01", "item-02", "item-03"),
+    )
+    assert graph.ready_item_ids == ("item-01",)
 
 
 def _setup(

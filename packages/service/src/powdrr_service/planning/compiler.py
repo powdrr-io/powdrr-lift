@@ -12,6 +12,7 @@ from typing import Any
 
 import yaml
 
+from powdrr_service.planning.dependencies import combine_manual_prerequisite_data
 from powdrr_service.planning.evidence import Evidence, EvidenceError
 from powdrr_service.planning.multipr_structrr import MultiPRStructrrProposal
 from powdrr_service.planning.plan_document import (
@@ -447,6 +448,39 @@ def _validate_plan_record_links(
             raise PlanningCompilationError(
                 f"item {item_id!r} omits a work-unit dependency"
             )
+    phase_records = data.get("implementation_phases", [])
+    if phase_records:
+        phase_items: dict[str, list[str]] = {}
+        for item in plan.items:
+            item_phases = {
+                unit_by_id[unit_id].get("implementation_phase_id")
+                for unit_id in allocation_by_item[item.item_id]
+            }
+            if len(item_phases) != 1:
+                raise PlanningCompilationError(
+                    f"item {item.item_id!r} crosses implementation phases"
+                )
+            phase_id = next(iter(item_phases))
+            if not isinstance(phase_id, str):
+                raise PlanningCompilationError(
+                    f"item {item.item_id!r} has no implementation phase"
+                )
+            phase_items.setdefault(phase_id, []).append(item.item_id)
+        for phase in phase_records:
+            phase_id = str(phase["id"])
+            items = phase_items.get(phase_id, [])
+            for prior_id, current_id in zip(items, items[1:], strict=False):
+                if prior_id not in set(item_by_id[current_id].dependencies):
+                    raise PlanningCompilationError(
+                        f"item {current_id!r} omits its prior item in phase {phase_id}"
+                    )
+            for dependency_id in phase["dependencies"]:
+                required_items = phase_items.get(str(dependency_id), [])
+                for item_id in items:
+                    if not set(required_items) <= set(item_by_id[item_id].dependencies):
+                        raise PlanningCompilationError(
+                            f"item {item_id!r} omits a source phase dependency"
+                        )
     criteria_bindings = {
         (binding["item_id"], binding["criterion"]): binding
         for binding in data["validation_coverage"]
@@ -502,28 +536,13 @@ def _validate_plan_record_links(
             )
             expected_prerequisite = None
             if owned_setups:
-                expected_prerequisite = {
-                    "title": "; ".join(
-                        dict.fromkeys(str(setup["title"]) for setup in owned_setups)
+                expected_prerequisite = combine_manual_prerequisite_data(
+                    owned_setups,
+                    validation_targets=tuple(
+                        str(validation_by_id[validation_id]["target"])
+                        for validation_id in expected_validation_ids
                     ),
-                    "instructions": [
-                        instruction
-                        for setup in owned_setups
-                        for instruction in setup["instructions"]
-                    ],
-                    "verification": "; ".join(
-                        dict.fromkeys(
-                            str(setup["verification"]) for setup in owned_setups
-                        )
-                    ),
-                    "trigger": owned_setups[0]["trigger"],
-                    "unblocks": "; ".join(
-                        dict.fromkeys(
-                            str(validation_by_id[validation_id]["target"])
-                            for validation_id in expected_validation_ids
-                        )
-                    ),
-                }
+                )
             if (
                 expected_prerequisite != declared
                 or set(expected_validation_ids) - unit_validations
@@ -600,7 +619,12 @@ def _validate_manifest(value: Mapping[str, Any]) -> None:
         "semantic_revision_digest",
         "latest_repair",
     }
-    _exact(value, expected, "planning")
+    fields = frozenset(value)
+    if fields not in {
+        frozenset(expected),
+        frozenset(expected | {"implementation_phases"}),
+    }:
+        raise PlanningCompilationError("planning manifest fields are invalid")
     if value["schema"] != PLANNING_MANIFEST_SCHEMA:
         raise PlanningCompilationError("unsupported planning manifest schema")
     source = value["source"]
@@ -644,6 +668,41 @@ def _validate_manifest(value: Mapping[str, Any]) -> None:
     requirements = _records(value, "requirements", "id")
     evidence = _records(value, "evidence", "id")
     units = _records(value, "units", "id")
+    raw_phases = value.get("implementation_phases", [])
+    if not isinstance(raw_phases, list) or not all(
+        isinstance(phase, Mapping) for phase in raw_phases
+    ):
+        raise PlanningCompilationError("implementation_phases must be a list")
+    phase_ids: set[str] = set()
+    for phase in raw_phases:
+        phase_fields = {"id", "title", "dependencies"}
+        if "reviewable_result" in phase:
+            phase_fields.add("reviewable_result")
+        _exact(phase, phase_fields, "implementation phase")
+        phase_id = phase.get("id")
+        title = phase.get("title")
+        if (
+            not isinstance(phase_id, str)
+            or not _SAFE_ID.fullmatch(phase_id)
+            or phase_id in phase_ids
+            or not _nonempty(title)
+        ):
+            raise PlanningCompilationError("implementation phase is malformed")
+        dependencies = _string_refs(
+            phase.get("dependencies"),
+            "implementation phase dependencies",
+            allow_empty=True,
+        )
+        if (
+            len(dependencies) != len(set(dependencies))
+            or not set(dependencies) <= phase_ids
+        ):
+            raise PlanningCompilationError(
+                "implementation phase dependencies must reference earlier phases"
+            )
+        if "reviewable_result" in phase and not _nonempty(phase["reviewable_result"]):
+            raise PlanningCompilationError("implementation phase result is malformed")
+        phase_ids.add(phase_id)
     validations = _records(value, "validations", "id")
     setups = _records(value, "setups", "id")
     _records(value, "coverage", "requirement_id")
@@ -767,6 +826,13 @@ def _validate_manifest(value: Mapping[str, Any]) -> None:
             )
 
     for unit in units.values():
+        implementation_phase_id = unit.get("implementation_phase_id")
+        if implementation_phase_id is not None and (
+            not isinstance(implementation_phase_id, str)
+            or not _SAFE_ID.fullmatch(implementation_phase_id)
+            or implementation_phase_id not in phase_ids
+        ):
+            raise PlanningCompilationError("unit implementation phase ID is malformed")
         if (
             set(_string_refs(unit.get("requirement_ids"), "unit requirements"))
             - requirement_ids
@@ -805,6 +871,12 @@ def _validate_manifest(value: Mapping[str, Any]) -> None:
                 raise PlanningCompilationError("planned write runtime is invalid")
             if write.get("implementation_runtime") is not None:
                 raise PlanningCompilationError("runtime must be recorded per write")
+    if phase_ids and any(
+        unit.get("implementation_phase_id") not in phase_ids for unit in units.values()
+    ):
+        raise PlanningCompilationError(
+            "every work unit must belong to a source implementation phase"
+        )
     allocation = value["item_unit_ids"]
     if not isinstance(allocation, Mapping) or not allocation:
         raise PlanningCompilationError("item_unit_ids must be a non-empty mapping")

@@ -82,6 +82,7 @@ class ExplicitWorkUnit:
     component: str
     implementation_runtime: str
     acceptance_criteria_count: int
+    cohort_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -127,15 +128,18 @@ def allocate_explicit_work_units(
         runtimes: set[str] = set()
         criteria_count = 0
         has_standalone = False
+        cohorts: set[str | None] = set()
         for end in range(start + 1, min(count, start + max_units) + 1):
             unit = units[end - 1]
             has_standalone = has_standalone or unit.id in standalone_unit_ids
+            cohorts.add(unit.cohort_id)
             components.add(unit.component)
             if unit.implementation_runtime != "neutral":
                 runtimes.add(unit.implementation_runtime)
             criteria_count += unit.acceptance_criteria_count
             if (
                 (has_standalone and end - start > 1)
+                or len(cohorts) > 1
                 or criteria_count > max_criteria
                 or len(components) > max_components
                 or len(runtimes) > 1

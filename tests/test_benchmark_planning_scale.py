@@ -215,13 +215,13 @@ def test_dependency_metrics_preserve_incomplete_work_unit_checkpoint() -> None:
 
 def test_unresolved_question_diagnostics_show_validation_error_without_answer() -> None:
     question = Question(
-        question_id="propose-units-v4-req-0001-test",
+        question_id="propose-units-v5-req-0001-test",
         kind="propose_work_units",
-        contract_version=4,
+        contract_version=5,
         subject_ids=("req-0001", "req-0002"),
         input_digest="sha256:" + "a" * 64,
         context_ref_ids=(),
-        expected_answer_schema="work-unit-proposals-v4",
+        expected_answer_schema="work-unit-proposals-v5",
         attempt=3,
     )
     needs_answer = PlanningCheckpoint.needs_answer(
@@ -240,7 +240,7 @@ def test_unresolved_question_diagnostics_show_validation_error_without_answer() 
 
     assert unresolved_question_diagnostics((needs_answer,)) == [
         {
-            "question_id": "propose-units-v4-req-0001-test",
+            "question_id": "propose-units-v5-req-0001-test",
             "kind": "propose_work_units",
             "subject_ids": ["req-0001", "req-0002"],
             "attempt": 3,
@@ -256,13 +256,13 @@ def test_unresolved_question_diagnostics_show_validation_error_without_answer() 
 
 def test_resolved_question_is_removed_from_unresolved_diagnostics() -> None:
     question = Question(
-        question_id="propose-units-v4-req-0001-test",
+        question_id="propose-units-v5-req-0001-test",
         kind="propose_work_units",
-        contract_version=4,
+        contract_version=5,
         subject_ids=("req-0001",),
         input_digest="sha256:" + "a" * 64,
         context_ref_ids=(),
-        expected_answer_schema="work-unit-proposals-v4",
+        expected_answer_schema="work-unit-proposals-v5",
         attempt=3,
     )
     needs_answer = PlanningCheckpoint.needs_answer(

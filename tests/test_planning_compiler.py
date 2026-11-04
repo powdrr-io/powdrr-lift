@@ -15,6 +15,7 @@ from powdrr_service.planning.compiler import (
     serialize_reviewed_plan_yaml,
     validate_compiled_plan,
 )
+from powdrr_service.planning.dependencies import combine_manual_prerequisite_data
 from powdrr_service.planning.multipr_structrr import compile_multi_pr_proposal
 from powdrr_service.planning.plan_document import (
     PlanDocumentError,
@@ -250,6 +251,102 @@ def test_manifest_accepts_canonical_shell_runtime() -> None:
     validated = PlanningManifest.create(records)
 
     assert validated.data["runtime_facts"] == records["runtime_facts"]
+
+
+def test_compiler_validates_combined_manual_prerequisite_context() -> None:
+    plan, manifest, proposal = _fixture()
+    setups = [
+        {
+            "id": f"setup-{index:02d}",
+            "requirement_ids": ["req-01"],
+            "owner": "human",
+            "title": title,
+            "instructions": [instruction],
+            "verification": verification,
+            "trigger": "after_implementation_before_validation",
+            "unblocks_validation_ids": ["validation-01"],
+            "source_refs": ["anchor-01"],
+            "owner_item_id": "item-01",
+        }
+        for index, (title, instruction, verification) in enumerate(
+            (
+                (
+                    "Install the first required integration",
+                    "Complete first setup.",
+                    "Verify the first integration is ready.",
+                ),
+                (
+                    "Install the second required integration",
+                    "Complete second setup.",
+                    "Verify the second integration is ready.",
+                ),
+            ),
+            start=1,
+        )
+    ]
+    prerequisite = combine_manual_prerequisite_data(
+        setups,
+        validation_targets=(str(manifest.data["validations"][0]["target"]),),
+    )
+    plan = replace(
+        plan,
+        items=(replace(plan.items[0], manual_prerequisite=prerequisite),),
+    )
+    records = manifest.to_data()
+    records.pop("schema")
+    records.pop("semantic_revision_digest")
+    records["setups"] = setups
+    combined_manifest = PlanningManifest.create(records)
+
+    compiled = compile_plan(
+        plan=plan,
+        planning_manifest=combined_manifest,
+        repository_snapshot={
+            "source": combined_manifest.data["source"],
+            "base": combined_manifest.data["base"],
+        },
+        structrr_proposal=proposal,
+        verification_command="pytest -q",
+        plan_path="docs/plans/bounded-plan.yaml",
+    )
+
+    reparsed = parse_reviewed_plan_yaml(compiled.files["docs/plans/bounded-plan.yaml"])
+    assert reparsed.items[0].manual_prerequisite == prerequisite
+
+
+def test_compiler_keeps_source_phase_metadata_in_the_durable_manifest() -> None:
+    plan, manifest, proposal = _fixture()
+    records = manifest.to_data()
+    records.pop("schema")
+    records.pop("semantic_revision_digest")
+    records["implementation_phases"] = [
+        {
+            "id": "pr-01",
+            "title": "Define schemas and fixtures",
+            "dependencies": [],
+            "reviewable_result": "Frozen protocol contract.",
+        }
+    ]
+    records["units"][0]["implementation_phase_id"] = "pr-01"
+    phased_manifest = PlanningManifest.create(records)
+
+    compiled = compile_plan(
+        plan=plan,
+        planning_manifest=phased_manifest,
+        repository_snapshot={
+            "source": phased_manifest.data["source"],
+            "base": phased_manifest.data["base"],
+        },
+        structrr_proposal=proposal,
+        verification_command="pytest -q",
+        plan_path="docs/plans/bounded-plan.yaml",
+    )
+
+    assert compiled.plan.planning is not None
+    assert (
+        compiled.plan.planning["implementation_phases"]
+        == records["implementation_phases"]
+    )
 
 
 def test_compiled_artifact_validation_detects_tampering() -> None:

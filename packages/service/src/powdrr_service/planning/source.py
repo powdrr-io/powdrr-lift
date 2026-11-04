@@ -182,6 +182,26 @@ class SourceAnchor:
 
 
 @dataclass(frozen=True, slots=True)
+class ImplementationPhase:
+    """A source-declared implementation PR and its prerequisite PRs."""
+
+    id: str
+    title: str
+    dependencies: tuple[str, ...]
+    reviewable_result: str | None = None
+
+    def to_data(self) -> dict[str, Any]:
+        result: dict[str, Any] = {
+            "id": self.id,
+            "title": self.title,
+            "dependencies": list(self.dependencies),
+        }
+        if self.reviewable_result is not None:
+            result["reviewable_result"] = self.reviewable_result
+        return result
+
+
+@dataclass(frozen=True, slots=True)
 class SourceBlock:
     id: str
     source_blob_sha: str
@@ -602,6 +622,109 @@ def segment_markdown_source(
     result = SegmentedSource(document, ledger, tuple(blocks), tuple(anchors))
     result.validate()
     return result
+
+
+def extract_implementation_phases(
+    source: SegmentedSource,
+) -> tuple[ImplementationPhase, ...]:
+    """Read an explicit PR sequence table without asking a model to reconstruct it."""
+    lines = source.document.text.splitlines()
+    sequence_heading: int | None = None
+    for index, line in enumerate(lines):
+        heading = re.match(r"^\s{0,3}#{2,6}\s+(.+?)\s*#*\s*$", line)
+        if heading and re.search(
+            r"implementation\s+(?:pr|pull request)\s+sequence",
+            heading.group(1),
+            re.IGNORECASE,
+        ):
+            sequence_heading = index
+            break
+    if sequence_heading is None:
+        return ()
+
+    header_index: int | None = None
+    headers: list[str] = []
+    for index in range(sequence_heading + 1, len(lines)):
+        if lines[index].lstrip().startswith("#"):
+            break
+        cells = _markdown_table_cells(lines[index])
+        if cells and {"pr", "title", "dependencies"} <= {
+            re.sub(r"[^a-z]", "", cell.casefold()) for cell in cells
+        }:
+            header_index = index
+            headers = [re.sub(r"[^a-z]", "", cell.casefold()) for cell in cells]
+            break
+    if header_index is None:
+        raise PlanningSourceError(
+            "implementation PR sequence heading has no PR/title/dependencies table"
+        )
+
+    phases: list[ImplementationPhase] = []
+    pending: list[tuple[str, str, tuple[str, ...] | None, str | None]] = []
+    for line in lines[header_index + 1 :]:
+        if line.lstrip().startswith("#"):
+            break
+        cells = _markdown_table_cells(line)
+        if not cells:
+            if phases or pending:
+                break
+            continue
+        if all(re.fullmatch(r":?-{3,}:?", cell.replace(" ", "")) for cell in cells):
+            continue
+        if len(cells) != len(headers):
+            raise PlanningSourceError(
+                "implementation PR sequence table row is malformed"
+            )
+        row = dict(zip(headers, cells, strict=True))
+        match = re.fullmatch(r"(?:pr\s*)?0*(\d+)", row["pr"], re.IGNORECASE)
+        title = row["title"].strip()
+        if match is None or not title:
+            raise PlanningSourceError(
+                "implementation PR sequence row has invalid PR/title"
+            )
+        phase_id = f"pr-{int(match.group(1)):02d}"
+        raw_dependencies = row["dependencies"].strip()
+        if re.fullmatch(r"(?:none|n/?a|—|-)", raw_dependencies, re.IGNORECASE):
+            dependency_ids: tuple[str, ...] | None = ()
+        elif re.fullmatch(r"all\s+prior", raw_dependencies, re.IGNORECASE):
+            dependency_ids = None
+        else:
+            numbers = re.findall(r"\d+", raw_dependencies)
+            if not numbers:
+                raise PlanningSourceError(
+                    f"implementation PR {phase_id} has unparseable dependencies"
+                )
+            dependency_ids = tuple(f"pr-{int(number):02d}" for number in numbers)
+        reviewable_result = row.get("reviewableresult", row.get("result", "")).strip()
+        pending.append((phase_id, title, dependency_ids, reviewable_result or None))
+
+    if not pending:
+        raise PlanningSourceError("implementation PR sequence table has no data rows")
+    known_ids: set[str] = set()
+    for phase_id, title, dependencies, reviewable_result in pending:
+        if phase_id in known_ids:
+            raise PlanningSourceError(f"duplicate implementation phase {phase_id}")
+        if dependencies is None:
+            resolved = tuple(item.id for item in phases)
+        else:
+            unknown = set(dependencies) - known_ids
+            if unknown:
+                raise PlanningSourceError(
+                    f"implementation PR {phase_id} has unknown or forward "
+                    "dependencies: "
+                    f"{sorted(unknown)}"
+                )
+            resolved = dependencies
+        phases.append(ImplementationPhase(phase_id, title, resolved, reviewable_result))
+        known_ids.add(phase_id)
+    return tuple(phases)
+
+
+def _markdown_table_cells(line: str) -> list[str] | None:
+    if "|" not in line:
+        return None
+    cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+    return cells if len(cells) > 1 else None
 
 
 def parse_requirement_page(
@@ -1473,6 +1596,7 @@ __all__ = [
     "BlockDisposition",
     "EquivalenceDecision",
     "FidelityDecision",
+    "ImplementationPhase",
     "MAX_SOURCE_BLOCK_CHARS",
     "MAX_CLAUSES_PER_SOURCE_BLOCK",
     "PinnedSourceDocument",
@@ -1489,6 +1613,7 @@ __all__ = [
     "build_equivalence_request",
     "build_extract_requirements_request",
     "build_fidelity_request",
+    "extract_implementation_phases",
     "merge_equivalent_requirements",
     "allocate_requirements",
     "deduplicate_requirement_records",

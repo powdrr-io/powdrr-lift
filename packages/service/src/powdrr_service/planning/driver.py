@@ -50,8 +50,10 @@ from powdrr_service.planning.dependencies import (
     build_confirmed_dependency_details_request,
     build_dependency_candidate_review_request,
     build_human_setup_description_request,
+    combine_manual_prerequisite_data,
     compile_dependency_graph,
     discover_dependency_candidates,
+    implementation_phase_dependency_edges,
 )
 from powdrr_service.planning.evidence import Evidence
 from powdrr_service.planning.multipr_structrr import (
@@ -72,6 +74,7 @@ from powdrr_service.planning.source import (
     build_extract_requirements_request,
     build_fidelity_request,
     deduplicate_requirement_records,
+    extract_implementation_phases,
 )
 from powdrr_service.planning.structrr import (
     BoundStructuralSubject,
@@ -200,32 +203,6 @@ def _planned_reference_path_pairs(
             if target_path in path_set
         )
     )
-
-
-def _manual_prerequisite_data(
-    setups: Sequence[ManualSetup], *, validation_target: str
-) -> Mapping[str, Any]:
-    """Bind one item's manual setup details without overflowing its title field."""
-    titles = tuple(dict.fromkeys(setup.title for setup in setups))
-    multiple_titles = len(titles) > 1
-    instructions = tuple(
-        dict.fromkeys(
-            f"{setup.title}: {instruction}" if multiple_titles else instruction
-            for setup in setups
-            for instruction in setup.instructions
-        )
-    )
-    return {
-        "title": titles[0]
-        if not multiple_titles
-        else "Complete manual setup prerequisites",
-        "instructions": list(instructions),
-        "verification": "; ".join(
-            dict.fromkeys(setup.verification for setup in setups)
-        ),
-        "trigger": setups[0].trigger,
-        "unblocks": validation_target,
-    }
 
 
 def _planned_existing_structural_subjects(
@@ -490,6 +467,7 @@ class SourceLedgerQuestionMachine:
     ) -> None:
         source.validate()
         self.source = source
+        self._implementation_phases = extract_implementation_phases(source)
         self.evidence_by_requirement = dict(evidence_by_requirement or {})
         self.evidence_search = evidence_search
         self.evidence_excerpt_reader = evidence_excerpt_reader
@@ -1170,6 +1148,7 @@ class SourceLedgerQuestionMachine:
             ambiguous_runtime_resolutions={},
             preferred_runtimes=self.preferred_runtimes,
             evidence_by_requirement=evidence_by_requirement,
+            implementation_phases=self._implementation_phases,
         )
 
     def _work_unit_example(
@@ -1185,6 +1164,11 @@ class SourceLedgerQuestionMachine:
             "records": [
                 {
                     "requirement_ids": list(requirement_ids),
+                    "implementation_phase_id": (
+                        context.implementation_phases[0].id
+                        if context.implementation_phases
+                        else None
+                    ),
                     "deliverable": "One cohesive illustrative deliverable.",
                     "planned_writes": [
                         {
@@ -1231,7 +1215,7 @@ class SourceLedgerQuestionMachine:
         proposal_answers = {
             question_id: answer
             for question_id, answer in accepted_answers.items()
-            if question_id.startswith("propose-units-v4-")
+            if question_id.startswith("propose-units-v5-")
         }
         cache_key = hashlib.sha256(
             json.dumps(
@@ -1337,11 +1321,29 @@ class SourceLedgerQuestionMachine:
         if not units:
             return ()
         by_id = {unit.id: unit for unit in units}
+        phase_by_id = {phase.id: phase for phase in self._implementation_phases}
+
+        def phase_for_group(group: AllocationGroup) -> Any:
+            phase_ids = {
+                by_id[unit_id].implementation_phase_id
+                for unit_id in group.unit_ids
+                if by_id[unit_id].implementation_phase_id is not None
+            }
+            if len(phase_ids) > 1:
+                raise PlanningCompilationError(
+                    "one allocated item crosses source implementation phases"
+                )
+            phase_id = next(iter(phase_ids), None)
+            return None if phase_id is None else phase_by_id.get(phase_id)
+
         requests: list[QuestionRequest[Any]] = []
         accepted_titles: list[tuple[str, str]] = []
         for group in allocate_work_unit_groups(units).groups:
             request = build_item_description_request(
-                group, by_id, already_used_titles=accepted_titles
+                group,
+                by_id,
+                already_used_titles=accepted_titles,
+                implementation_phase=phase_for_group(group),
             )
             answer = accepted_answers.get(request.question.question_id)
             if answer is None:
@@ -1362,6 +1364,7 @@ class SourceLedgerQuestionMachine:
                         by_id,
                         already_used_titles=accepted_titles,
                         title_issue=issue,
+                        implementation_phase=phase_for_group(group),
                     )
                 )
                 continue
@@ -1375,6 +1378,7 @@ class SourceLedgerQuestionMachine:
                         by_id,
                         already_used_titles=accepted_titles,
                         title_issue=str(error),
+                        implementation_phase=phase_for_group(group),
                     )
                 )
                 continue
@@ -1506,6 +1510,11 @@ class SourceLedgerQuestionMachine:
         allocation, discovery = self._dependency_discovery(accepted_answers)
         units = {unit.id: unit for unit in allocation.units}
         edges = list(discovery.write_order_edges)
+        edges.extend(
+            implementation_phase_dependency_edges(
+                allocation.units, self._implementation_phases
+            )
+        )
         for pending_output, consumer in discovery.confirmation_pairs:
             producer = units[pending_output.unit_id]
             allowed_requirement_ids = set(producer.requirement_ids) | set(
@@ -2356,8 +2365,9 @@ class SourceLedgerQuestionMachine:
         plan_items = tuple(
             replace(
                 item,
-                manual_prerequisite=_manual_prerequisite_data(
-                    setups_by_owner[item.item_id], validation_target=validation.target
+                manual_prerequisite=combine_manual_prerequisite_data(
+                    [setup.to_data() for setup in setups_by_owner[item.item_id]],
+                    validation_targets=(validation.target,),
                 ),
             )
             if item.item_id in setups_by_owner
@@ -2419,6 +2429,9 @@ class SourceLedgerQuestionMachine:
                 "validation_coverage": validation_coverage,
                 "evidence": [item.to_data() for item in evidence.values()],
                 "units": [unit.to_data() for unit in assembly.units],
+                "implementation_phases": [
+                    phase.to_data() for phase in self._implementation_phases
+                ],
                 "item_unit_ids": {
                     item_id: list(unit_ids)
                     for item_id, unit_ids in assembly.item_unit_ids.items()

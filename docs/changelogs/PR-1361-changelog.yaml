@@ -1,0 +1,38 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1361
+title: Parse all-prior PR dependencies
+intent:
+  problem: The source plan's final phase says "All prior PRs", which the phase parser rejected instead of expanding into dependencies on every earlier phase.
+  goal: Accept that documented wording so phase-aware planning can preserve the final release phase's dependency edges.
+human-decisions: []
+structured_files: []
+files:
+  - path: packages/service/src/powdrr_service/planning/source.py
+    type: modified
+    span: {start_line: 689, end_line: 689}
+    summary: Parse "All prior PRs" as a dependency on every earlier implementation phase.
+    rationale: Match the source plan's explicit dependency wording and keep the final phase blocked until its prerequisites complete.
+  - path: tests/test_planning_source.py
+    type: modified
+    span: {start_line: 163, end_line: 163}
+    summary: Exercise the exact "All prior PRs" table value and its expanded dependency set.
+    rationale: Prevent future planning runs from rejecting the repository's implementation sequence.
+entities:
+  - id: implementation-phase-dependency-parser
+    type: Function
+    action: added
+  - id: all-prior-pr-dependencies-regression
+    type: Regression test
+    action: added
+entity_relationships:
+  - id: regression-checks-phase-parser
+    type: verifies
+    source: all-prior-pr-dependencies-regression
+    target: implementation-phase-dependency-parser
+    action: added
+    description: The regression test verifies that all-prior dependencies expand to every earlier phase.
+invariants:
+  - id: all-prior-dependencies-expand
+    description: A phase declaring "All prior PRs" depends on each preceding phase in the source sequence.
+    action: added
+guidance: []

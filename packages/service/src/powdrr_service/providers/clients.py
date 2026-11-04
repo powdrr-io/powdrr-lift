@@ -168,20 +168,20 @@ class OpenAIChatClient:
                 )
         except HTTPError as exc:
             raise ProviderHTTPError(
-                "OpenAI",
+                "provider",
                 exc.code,
                 exc.read().decode("utf-8", errors="replace"),
             ) from exc
         except URLError as exc:
-            raise ProviderClientError(f"OpenAI request failed: {exc.reason}") from exc
+            raise ProviderClientError(f"Provider request failed: {exc.reason}") from exc
         except ConnectionError as exc:
             raise ProviderClientError(
-                f"OpenAI request connection dropped: {exc}"
+                f"Provider request connection dropped: {exc}"
             ) from exc
         except TimeoutError as exc:
             raise ProviderClientError(
                 _provider_timeout_message(
-                    provider="OpenAI-compatible",
+                    provider="configured",
                     model=self._model,
                     endpoint=request.full_url,
                     timeout=self._timeout,
@@ -195,21 +195,23 @@ class OpenAIChatClient:
 
         loaded_response = _parse_json_object(
             raw_response,
-            "OpenAI response",
+            "provider response",
         )
         _raise_openai_provider_error(loaded_response)
         usage = loaded_response.get("usage")
         self.last_usage = dict(usage) if isinstance(usage, dict) else {}
         choices = loaded_response.get("choices")
         if not isinstance(choices, list) or not choices:
-            raise ProviderResponseError("OpenAI response did not include any choices.")
+            raise ProviderResponseError(
+                "Provider response did not include any choices."
+            )
         first_choice = choices[0]
         if not isinstance(first_choice, dict):
-            raise ProviderResponseError("OpenAI response choice was not an object.")
+            raise ProviderResponseError("Provider response choice was not an object.")
         message = first_choice.get("message")
         if not isinstance(message, dict):
             raise ProviderResponseError(
-                "OpenAI response choice message was not an object."
+                "Provider response choice message was not an object."
             )
         content = message.get("content")
         if not isinstance(content, str) or not content.strip():
@@ -231,11 +233,10 @@ class OpenAIChatClient:
             if finish_reason not in (None, ""):
                 detail += f"; finish_reason={finish_reason!r}"
             raise ProviderResponseError(
-                f"OpenAI-compatible provider response message content was empty"
-                f"{detail}."
+                f"Provider response message content was empty{detail}."
             )
 
-        return _parse_json_object(content, "OpenAI response content")
+        return _parse_json_object(content, "provider response content")
 
 
 def _read_openai_response(
@@ -292,7 +293,7 @@ def _read_openai_response(
             event = json.loads(event_payload)
         except json.JSONDecodeError as exc:
             raise ProviderResponseError(
-                f"OpenAI streaming response contained invalid JSON: {exc.msg}"
+                f"Provider streaming response contained invalid JSON: {exc.msg}"
             ) from exc
         if not isinstance(event, dict):
             continue
@@ -323,7 +324,7 @@ def _read_openai_response(
             if chunk_count > _MAX_STREAM_CHUNKS or content_length > max_content_chars:
                 excerpt = _stream_excerpt(content_parts)
                 raise _ModelUnavailableError(
-                    "OpenAI streaming response exceeded the bounded output limit "
+                    "Provider streaming response exceeded the bounded output limit "
                     f"({chunk_count} chunks, {content_length} characters; "
                     f"limit={max_content_chars} characters); "
                     f"partial content prefix: {excerpt!r}"
@@ -342,7 +343,7 @@ def _read_openai_response(
 
     if response_metadata is None:
         raise ProviderClientError(
-            "OpenAI streaming response did not include any events."
+            "Provider streaming response did not include any events."
         )
     if not content_parts:
         metadata = response_metadata or {}
@@ -354,11 +355,11 @@ def _read_openai_response(
                 + json.dumps({"choices": choices}, ensure_ascii=False)[:1000]
             )
         raise ProviderResponseError(
-            f"OpenAI streaming response content was empty{detail}."
+            f"Provider streaming response content was empty{detail}."
         )
     if not stream_complete:
         raise _ModelUnavailableError(
-            "OpenAI streaming response ended before a completion marker; "
+            "Provider streaming response ended before a completion marker; "
             f"received {chunk_count} content chunks; "
             f"partial content: {_stream_excerpt(content_parts)!r}"
         )
@@ -394,9 +395,7 @@ def _raise_openai_provider_error(response: Mapping[str, Any]) -> None:
     rendered = json.dumps(details, ensure_ascii=False, default=str)
     if len(rendered) > 1500:
         rendered = rendered[:1497] + "..."
-    raise ProviderClientError(
-        f"OpenAI-compatible provider returned an error event: {rendered}"
-    )
+    raise ProviderClientError(f"Provider returned an error event: {rendered}")
 
 
 def _stream_excerpt(content_parts: Sequence[str]) -> str:

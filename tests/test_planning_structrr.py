@@ -955,6 +955,70 @@ def test_structural_page_example_does_not_repeat_prior_subjects() -> None:
     request.parse_answer(request.valid_example)
 
 
+def test_structural_page_uses_parser_valid_example_if_candidate_is_stale(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    text = "# Plan\n\nUpdate the module.\n"
+    source = segment_markdown_source(
+        PinnedSourceDocument(
+            repository="owner/repo",
+            commit_sha="a" * 40,
+            path="docs/plan.md",
+            blob_sha="b" * 40,
+            content_sha256=hashlib.sha256(text.encode()).hexdigest(),
+            text=text,
+        )
+    )
+    source_ref = source.anchors[0].id
+    unit = _unit()
+    monkeypatch.setattr(
+        structrr_module,
+        "_example_subject_page",
+        lambda **_kwargs: _candidate_page(
+            [_record("removed-entity")], has_more=False, next_anchor=None
+        ),
+    )
+
+    request = build_subject_enumeration_request(
+        plan_id="plan-01",
+        item_id="item-0001",
+        units=(unit,),
+        source=source,
+        source_refs=(source_ref,),
+        projected_baseline={"entities": [{"id": "entity-01"}]},
+    )
+
+    assert request.valid_example == {
+        "records": [],
+        "has_more": False,
+        "next_anchor": None,
+    }
+    request.parse_answer(request.valid_example)
+
+
+def test_structural_page_coalesces_repeated_entity_within_one_item() -> None:
+    units = (
+        _unit("unit-01", ("req-01",)),
+        _unit("unit-02", ("req-02",)),
+    )
+    records = [_record("entity-01"), _record("entity-01", requirement_ids=["req-02"])]
+    records[1]["unit_ids"] = ["unit-02"]
+    records[1]["source_refs"] = ["anchor-02"]
+
+    page = _parse_page(
+        _candidate_page(records, has_more=False, next_anchor=None),
+        units=units,
+        requirements={"req-01", "req-02"},
+        baseline={"entities": [{"id": "entity-01"}]},
+        source_ids={"anchor-01", "anchor-02"},
+    )
+
+    assert len(page.records) == 1
+    assert page.records[0].requirement_ids == ("req-01", "req-02")
+    assert page.records[0].unit_ids == ("unit-01", "unit-02")
+    assert page.records[0].source_refs == ("anchor-01", "anchor-02")
+
+
 def test_structural_page_correction_fits_with_many_prior_subjects() -> None:
     text = (
         "# Plan\n\n## First area\n"

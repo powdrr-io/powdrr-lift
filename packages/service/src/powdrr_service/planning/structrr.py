@@ -143,6 +143,33 @@ def _merge_duplicate_planned_file_subject(
     )
 
 
+def _merge_duplicate_subject_in_page(
+    existing: BoundStructuralSubject,
+    duplicate: BoundStructuralSubject,
+) -> BoundStructuralSubject | None:
+    """Merge repeated same-action references to one subject within an item."""
+    if (
+        existing.section != duplicate.section
+        or existing.subject_id != duplicate.subject_id
+        or existing.item_id != duplicate.item_id
+        or existing.action != duplicate.action
+        or existing.is_new != duplicate.is_new
+        or existing.planned_path != duplicate.planned_path
+    ):
+        return None
+    return BoundStructuralSubject(
+        existing.subject_id,
+        existing.section,
+        existing.item_id,
+        existing.action,
+        tuple(sorted(set(existing.requirement_ids) | set(duplicate.requirement_ids))),
+        tuple(sorted(set(existing.unit_ids) | set(duplicate.unit_ids))),
+        tuple(sorted(set(existing.source_refs) | set(duplicate.source_refs))),
+        existing.is_new,
+        existing.planned_path,
+    )
+
+
 def coalesce_structural_subjects(
     subjects: Iterable[BoundStructuralSubject],
 ) -> tuple[BoundStructuralSubject, ...]:
@@ -352,7 +379,7 @@ def parse_structural_subject_page(
         if key in page_keys:
             existing_index = page_record_indexes[key]
             existing = records[existing_index]
-            merged = _merge_duplicate_planned_file_subject(
+            merged = _merge_duplicate_subject_in_page(
                 existing,
                 BoundStructuralSubject(
                     subject_id,
@@ -366,11 +393,10 @@ def parse_structural_subject_page(
                     planned_path,
                 ),
             )
-            if merged is None or planned_path not in planned_paths:
+            if merged is None:
                 raise PlanningContractError(pointer, "subject was already enumerated")
-            # Multiple work units can legitimately plan changes to one shared
-            # file. Keep one structural subject and combine all supporting
-            # units, requirements, and evidence.
+            # One PR item can have multiple units that affect the same subject.
+            # Keep one structural subject and combine its supporting evidence.
             records[existing_index] = merged
             continue
         page_keys.add(key)
@@ -690,6 +716,16 @@ def build_subject_enumeration_request(
             )
         return page
 
+    valid_example = example
+    try:
+        parse(valid_example)
+    except PlanningContractError:
+        # The projected baseline can contain aliases that resolve to the same
+        # canonical subject. Prefer a parser-proven empty shape over letting a
+        # stale example stop the complete planning run before any model call.
+        valid_example = {"records": [], "has_more": False, "next_anchor": None}
+        parse(valid_example)
+
     return QuestionRequest(
         question=Question(
             f"structural-subjects-{item_id}-{page_ordinal:04d}",
@@ -766,7 +802,7 @@ def build_subject_enumeration_request(
         source_excerpts=excerpt_map,
         repository_evidence=(),
         accepted_facts=facts,
-        valid_example=example,
+        valid_example=valid_example,
         empty_example={"records": [], "has_more": False, "next_anchor": None},
         answer_schema=_subject_page_schema(
             sections=("entities", "entity_relationships")

@@ -427,7 +427,11 @@ def run_planning_session(
             if journal.events:
                 issue_checkpoint_store.publish_archive(journal.events)
             raise PlanningServiceError(
-                f"Procedrr planning process ended {result.terminal_status.value}"
+                _planning_terminal_status_message(
+                    result.terminal_status.value,
+                    journal.events,
+                    issue_number=session.issue.number,
+                )
             )
         journal = checkpoint_store.load()
         if journal.events:
@@ -498,9 +502,9 @@ def run_planning_session(
             try:
                 github.add_issue_comment(
                     session.issue.number,
-                    "Planning stopped after a terminal error. "
+                    "Planning stopped before producing a plan. "
                     f"Resume with `powdrr plan-resume --session-issue "
-                    f"{session.issue.number}`. Error: {error}",
+                    f"{session.issue.number}`. Details: {error}",
                 )
             except GitHubIssueQueueError as update_error:
                 print(
@@ -511,6 +515,45 @@ def run_planning_session(
         raise PlanningSessionExecutionError(
             f"Could not create execution plan: {error}"
         ) from error
+
+
+def _planning_terminal_status_message(
+    status: str,
+    events: Sequence[Any],
+    *,
+    issue_number: int,
+) -> str:
+    """Report the actionable pending question when Procedrr blocks planning."""
+    base = f"Procedrr planning process ended {status}"
+    for event in reversed(events):
+        if getattr(event, "event_type", None) != "needs_answer":
+            continue
+        payload = getattr(event, "payload", {})
+        question = payload.get("question") if isinstance(payload, Mapping) else None
+        validation = (
+            payload.get("validation_result") if isinstance(payload, Mapping) else None
+        )
+        if not isinstance(question, Mapping):
+            continue
+        question_id = question.get("question_id")
+        question_kind = question.get("kind")
+        detail = "the answer did not satisfy its contract"
+        if isinstance(validation, Mapping):
+            pointer = validation.get("json_pointer")
+            message = validation.get("message")
+            if isinstance(pointer, str) and isinstance(message, str):
+                detail = f"{pointer}: {message}"
+        identity = (
+            f" {question_kind} question {question_id}"
+            if isinstance(question_kind, str) and isinstance(question_id, str)
+            else " a planning question"
+        )
+        return (
+            f"{base} while waiting for{identity}: {detail}. The question is "
+            f"durable on planning issue #{issue_number}; inspect its latest "
+            "checkpoint before resuming."
+        )
+    return base
 
 
 def _write_planning_telemetry_summary(

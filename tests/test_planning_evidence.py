@@ -34,6 +34,7 @@ from powdrr_lift.workrr.planning.evidence import (
     record_file_evidence,
     search_dependency_reference_paths,
     search_requirement_evidence,
+    search_requirements_evidence,
 )
 
 
@@ -107,10 +108,6 @@ def test_dependency_reference_evidence_maps_planned_paths_to_units(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     repository, base_commit = _repository(tmp_path)
-    monkeypatch.setattr(
-        "powdrr_lift.workrr.planning.evidence._require_clean_pinned_checkout",
-        lambda root, commit: None,
-    )
     monkeypatch.setattr(
         "powdrr_lift.workrr.planning.evidence.find_workspace_reference_paths",
         lambda paths, *, worktree_root: {
@@ -201,7 +198,8 @@ def test_requirement_search_supplies_pinned_implementation_and_test_evidence(
     def find_symbols(
         queries: list[str], *, worktree_root: Path, limit: int = 50
     ) -> dict[str, list[dict[str, Any]]]:
-        assert worktree_root == repository.resolve()
+        assert worktree_root != repository.resolve()
+        assert (worktree_root / "src/schema.py").is_file()
         assert limit == 20
         assert "payload" in queries
         return {
@@ -444,7 +442,8 @@ def test_symbol_lookup_reads_file_before_search_and_never_searches_a_path(
     def finder(
         queries: list[str], *, worktree_root: Path, limit: int = 50
     ) -> dict[str, list[dict[str, Any]]]:
-        assert worktree_root == repository.resolve()
+        assert worktree_root != repository.resolve()
+        assert (worktree_root / "src/schema.py").is_file()
         assert limit == 32
         calls.append(queries)
         return {"parse_payload": [_symbol("parse_payload", "src/schema.py", 1, 2)]}
@@ -475,7 +474,7 @@ def test_symbol_lookup_reads_file_before_search_and_never_searches_a_path(
         )
 
 
-def test_invented_symbols_paths_dirty_checkouts_and_unpinned_heads_fail(
+def test_symbol_search_uses_the_pinned_tree_for_dirty_or_advanced_checkouts(
     tmp_path: Path,
 ) -> None:
     repository, commit = _repository(tmp_path)
@@ -510,30 +509,71 @@ def test_invented_symbols_paths_dirty_checkouts_and_unpinned_heads_fail(
         )
 
     (repository / "src/schema.py").write_text("# dirty\n", encoding="utf-8")
-    with pytest.raises(EvidenceError, match="clean pinned checkout"):
-        lookup_symbols_in_pinned_file(
-            repository,
-            commit,
-            "src/schema.py",
-            ["parse_payload"],
-            kind="implementation",
-            first_ordinal=1,
-            symbol_finder=invented_symbol,
-        )
+
+    def pinned_symbol(
+        queries: list[str], *, worktree_root: Path, limit: int = 50
+    ) -> dict[str, list[dict[str, Any]]]:
+        del limit
+        pinned_content = (worktree_root / "src/schema.py").read_text(encoding="utf-8")
+        assert "parse_payload" in pinned_content
+        assert "dirty" not in pinned_content
+        return {queries[0]: [_symbol("parse_payload", "src/schema.py", 1, 2)]}
+
+    result = lookup_symbols_in_pinned_file(
+        repository,
+        commit,
+        "src/schema.py",
+        ["parse_payload"],
+        kind="implementation",
+        first_ordinal=2,
+        symbol_finder=pinned_symbol,
+    )
+    assert result.evidence[0].symbol == "parse_payload"
+
     original = _git(repository, "show", f"{commit}:src/schema.py")
     (repository / "src/schema.py").write_text(original, encoding="utf-8")
     _git(repository, "add", "src/schema.py")
     _git(repository, "commit", "-qm", "advance base")
-    with pytest.raises(EvidenceError, match="does not match pinned"):
-        lookup_symbols_in_pinned_file(
-            repository,
-            commit,
-            "src/schema.py",
-            ["parse_payload"],
-            kind="implementation",
-            first_ordinal=1,
-            symbol_finder=invented_symbol,
-        )
+    advanced = lookup_symbols_in_pinned_file(
+        repository,
+        commit,
+        "src/schema.py",
+        ["parse_payload"],
+        kind="implementation",
+        first_ordinal=3,
+        symbol_finder=pinned_symbol,
+    )
+    assert advanced.evidence[0].symbol == "parse_payload"
+
+
+def test_requirement_coverage_search_uses_pinned_code_not_local_edits(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repository, commit = _repository(tmp_path)
+    requirement, source = _requirement(commit)
+    requirement = Requirement(
+        requirement.id,
+        "Parse payload values with the existing parser.",
+        requirement.kind,
+        requirement.source_refs,
+        requirement.source_group_ids,
+        requirement.related_requirement_ids,
+    )
+    (repository / "src/schema.py").write_text(
+        "def unrelated_dirty_code():\n    return False\n", encoding="utf-8"
+    )
+    monkeypatch.setattr(
+        evidence_module,
+        "find_workspace_symbols",
+        lambda queries, *, worktree_root, limit: {query: [] for query in queries},
+    )
+
+    result = search_requirements_evidence(repository, commit, (requirement,))[
+        requirement.id
+    ]
+
+    assert result.base_commit == commit
+    assert any(item.path == "src/schema.py" for item in result.evidence)
 
 
 def test_coverage_contract_distinguishes_complete_partial_and_missing(

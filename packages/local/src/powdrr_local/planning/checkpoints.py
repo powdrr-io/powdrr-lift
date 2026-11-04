@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import subprocess
@@ -41,7 +42,7 @@ def _compact_json(value: Mapping[str, Any]) -> str:
 
 
 class LocalCheckpointStore:
-    """Durable, hash-linked planning journal stored in Git metadata."""
+    """Local cache for the hash-linked journal persisted durably in GitHub."""
 
     def __init__(self, repo_root: str | Path, *, session_id: str) -> None:
         validate_session_id(session_id)
@@ -66,8 +67,14 @@ class LocalCheckpointStore:
                 "could not locate Git metadata for the local planning journal"
             ) from error
         common_git_directory = Path(result.stdout.strip()).resolve()
+        repository_key = hashlib.sha256(
+            str(common_git_directory).encode("utf-8")
+        ).hexdigest()[:24]
         self.directory = (
-            common_git_directory / "powdrr-lift" / "planning" / "checkpoints"
+            Path(tempfile.gettempdir())
+            / "powdrr-lift"
+            / "planning-checkpoints"
+            / repository_key
         )
         self.path = self.directory / f"{session_id}.json"
         self.lock_path = self.directory / f"{session_id}.lock"

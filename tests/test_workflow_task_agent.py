@@ -3217,7 +3217,7 @@ def test_process_workflow_task_repairs_invalid_json_response(
             self.calls += 1
             if self.calls == 1:
                 raise RuntimeError(
-                    "OpenAI response content was not valid JSON: Expecting value"
+                    "provider response content was not valid JSON: Expecting value"
                 )
             if self.calls == 2:
                 return {

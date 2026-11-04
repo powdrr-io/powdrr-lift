@@ -1,0 +1,48 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1364
+title: Allow requirements across runtime-specific work units
+intent:
+  problem: A single source requirement may require deliverables in multiple implementation runtimes, but proposal guidance implied that the requirement could only be assigned to one proposal.
+  goal: Tell the planner to repeat such a requirement in each runtime-specific proposal and verify that allocation accepts the resulting units.
+human-decisions: []
+structured_files: []
+files:
+  - path: packages/service/src/powdrr_service/planning/assembly.py
+    type: modified
+    span: {start_line: 983, end_line: 989}
+    summary: Clarify that one requirement may be repeated across separate runtime-specific work-unit proposals.
+    rationale: Let the planner split a requirement spanning multiple runtimes without combining those runtimes in one unit.
+  - path: tests/test_planning_assembly.py
+    type: modified
+    span: {start_line: 89, end_line: 89}
+    summary: Allow test proposals to specify the planned-write role.
+    rationale: Build a realistic shell implementation proposal for the multi-runtime allocation regression.
+  - path: tests/test_planning_assembly.py
+    type: modified
+    span: {start_line: 98, end_line: 98}
+    summary: Use the supplied role in generated test proposals.
+    rationale: Let the regression represent a shell implementation write accurately.
+  - path: tests/test_planning_assembly.py
+    type: modified
+    span: {start_line: 184, end_line: 216}
+    summary: Verify one requirement can be covered by separate shell and Python work units.
+    rationale: Prevent valid multi-runtime implementation plans from failing proposal validation.
+entities:
+  - id: work-unit-proposal-builder
+    type: Function
+    action: added
+  - id: runtime-specific-requirement-coverage-regression
+    type: Regression test
+    action: added
+entity_relationships:
+  - id: regression-verifies-runtime-specific-coverage
+    type: verifies
+    source: runtime-specific-requirement-coverage-regression
+    target: work-unit-proposal-builder
+    action: added
+    description: The regression checks that prompt guidance and work-unit allocation support splitting one requirement across runtime-specific units.
+invariants:
+  - id: work-units-have-one-implementation-runtime
+    description: A work unit contains writes for at most one implementation runtime; one requirement may be represented in more than one runtime-specific unit.
+    action: altered
+guidance: []

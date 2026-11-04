@@ -161,6 +161,7 @@ def applicable_references(
     index: SourceReferenceIndex, start: int, end: int
 ) -> tuple[SourceAnnotation, ...]: ...
 
+
 # reference_catalog.py
 def compile_reference_catalog(
     accepted_document: Mapping[str, Any],
@@ -170,10 +171,12 @@ def compile_reference_catalog(
 ) -> ReferenceCatalog: ...
 def resolve_reference(catalog: ReferenceCatalog, ref: str) -> ReferenceResolution: ...
 
+
 # source_reader.py
 def read_source(
     workspace: Path, catalog: ReferenceCatalog, path: str, start: int, end: int
 ) -> SourceReadResult: ...
+
 
 # reference_validation.py
 def validate_reference_placements(

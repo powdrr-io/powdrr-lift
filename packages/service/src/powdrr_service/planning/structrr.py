@@ -6,7 +6,7 @@ import hashlib
 import json
 import re
 from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import PurePosixPath
 from typing import Any, Literal
 
@@ -1115,7 +1115,16 @@ def partition_subject_enumeration_units(
     current: list[WorkUnit] = []
 
     def scope_id(group: Sequence[WorkUnit]) -> str:
-        return _digest({"unit_ids": [unit.id for unit in group]})[7:19]
+        return _digest(
+            {
+                "unit_ids": [unit.id for unit in group],
+                "writes": [
+                    (unit.id, write.to_data())
+                    for unit in group
+                    for write in unit.planned_writes
+                ],
+            }
+        )[7:19]
 
     def request_for(
         group: Sequence[WorkUnit],
@@ -1127,12 +1136,25 @@ def partition_subject_enumeration_units(
                 for requirement_id in unit.requirement_ids
             )
         )
-        source_refs = tuple(
+        write_source_refs = {
+            source_ref
+            for unit in group
+            for write in unit.planned_writes
+            for source_ref in write.source_refs
+        }
+        requirement_source_ref_values = tuple(
             dict.fromkeys(
                 source_ref
                 for requirement_id in requirement_ids
                 for source_ref in requirement_source_refs.get(requirement_id, ())
             )
+        )
+        source_refs = (
+            tuple(
+                ref for ref in requirement_source_ref_values if ref in write_source_refs
+            )
+            if write_source_refs
+            else requirement_source_ref_values
         )
         paths = {write.path for unit in group for write in unit.planned_writes}
         reference_pairs = tuple(
@@ -1162,18 +1184,27 @@ def partition_subject_enumeration_units(
         except QuestionInputTooLarge:
             raise
 
-    for unit in units:
+    def append_bounded(unit: WorkUnit) -> None:
+        nonlocal current
         candidate = (*current, unit)
         try:
             ensure_bounded(candidate)
         except QuestionInputTooLarge:
-            if not current:
-                raise
-            scopes.append((scope_id(current), tuple(current)))
-            current = [unit]
-            ensure_bounded(current)
+            if current:
+                scopes.append((scope_id(current), tuple(current)))
+                current = []
+                append_bounded(unit)
+                return
+            if len(unit.planned_writes) > 1:
+                for write in unit.planned_writes:
+                    append_bounded(replace(unit, planned_writes=(write,)))
+                return
+            raise
         else:
-            current.append(unit)
+            current = [*current, unit]
+
+    for unit in units:
+        append_bounded(unit)
     if current:
         scopes.append((scope_id(current), tuple(current)))
     return tuple(scopes)

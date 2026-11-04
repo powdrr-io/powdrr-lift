@@ -302,12 +302,10 @@ def test_large_structural_subject_context_is_partitioned_into_bounded_scopes(
         _unit(
             "unit-01",
             ("req-01",),
-            writes=(PlannedWrite("src/first.py", "implementation", "python", (), ()),),
-        ),
-        _unit(
-            "unit-02",
-            ("req-02",),
-            writes=(PlannedWrite("src/second.py", "implementation", "python", (), ()),),
+            writes=(
+                PlannedWrite("src/first.py", "implementation", "python", (), ()),
+                PlannedWrite("src/second.py", "implementation", "python", (), ()),
+            ),
         ),
     )
     baseline = {
@@ -332,15 +330,14 @@ def test_large_structural_subject_context_is_partitioned_into_bounded_scopes(
         plan_id="plan-01",
         item_id="item-0001",
         units=units,
-        requirement_source_refs={
-            "req-01": (source_ref,),
-            "req-02": (source_ref,),
-        },
+        requirement_source_refs={"req-01": (source_ref,)},
         source=source,
         projected_baseline=baseline,
     )
 
     assert len(scopes) == 2
+    assert all(len(scope_units) == 1 for _, scope_units in scopes)
+    assert all(len(scope_units[0].planned_writes) == 1 for _, scope_units in scopes)
     for scope_id, scope_units in scopes:
         request = build_subject_enumeration_request(
             plan_id="plan-01",

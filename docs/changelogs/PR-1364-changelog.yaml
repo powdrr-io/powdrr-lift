@@ -1,0 +1,23 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1364
+title: Plan code analysis artifacts and scoped project queries
+intent:
+  problem: Static analysis output is retained as opaque text and current project navigation is Python-specific, making it difficult for the planner and user to distinguish actionable findings from setup noise or ask bounded questions about project structure.
+  goal: Define a staged, language-neutral analysis artifact and query interface that feeds compact, revision-bound evidence to the planner while preserving complete underlying results.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/plans/code-analysis-artifacts-and-scoped-queries.md
+    type: added
+    span: {start_line: 1, end_line: 348}
+    summary: Specify normalized analysis artifacts, scoped code and structure queries, baseline comparison, provider coverage, safety limits, and an implementation sequence.
+    rationale: Give implementation work a complete contract for reducing diagnostic noise while retaining queryable evidence and integrating analysis with planning.
+entities:
+  - id: code-analysis-artifacts-and-scoped-queries
+    type: Design doc
+    action: added
+entity_relationships: []
+invariants: []
+guidance: []
+features: []
+proposed_prs: []

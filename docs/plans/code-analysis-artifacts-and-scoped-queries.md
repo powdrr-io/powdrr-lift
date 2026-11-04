@@ -6,7 +6,7 @@ Owner: Powdrr-Lift planning and execution
 
 ## 1. Outcome
 
-Give Powdrr a durable, useful view of code health and project structure across languages. Analysis must help the planner understand the repository and help the implementation agent inspect only code relevant to a task. It must not flood either agent or user with unfiltered checker output.
+Give Powdrr a durable, useful view of code health and project structure across languages. Analysis must help the planner understand the repository, help the implementation agent inspect relevant code, and help the reviewer see which symbols changed. It must not flood any of them with unfiltered checker output.
 
 The system will:
 
@@ -17,6 +17,7 @@ The system will:
 5. Answer bounded questions about findings and project structure using explicit filters and evidence references.
 6. Feed the planner concise, task-relevant evidence and record which reports and queries informed the plan.
 7. Keep analyzer coverage and failures visible. Missing tools, invalid project configuration, and import-resolution failures must not be presented as source defects or as successful analysis.
+8. Give reviewers a deterministic symbol-level view of what changed between the base and candidate revisions, with old/new source locations and links to the exact symbol indexes used.
 
 The primary design decision is to keep language-specific analyzers behind shared contracts. BasedPyright remains the Python type-analysis and semantic-navigation provider; it is not the universal analysis engine. Powdrr uses the repository's applicable analyzer for each language and normalizes results for storage, filtering, comparison, and presentation.
 
@@ -65,6 +66,8 @@ The repository already has useful pieces that this work must extend rather than 
 - `ExecutionArtifact` records an artifact ID, type, schema version, owner, and content reference.
 - `execution.checkpoints.run_diagnostics` bounds captured text, while `runtime.diagnose` records whether each hook succeeded.
 - Structrr bootstrap currently serializes Python source subjects and bindings inline in its YAML document; the new schema moves the exhaustive symbol inventory to a separate referenced artifact.
+- A local timing against this worktree indexed symbols in 300 tracked source files in 1.18 seconds, yielding 35,762 symbols including nested declarations and a 9.67 MiB YAML serialization of current raw provider records. This is a size estimate before relationship data and schema normalization.
+- The current cross-file reference helper exceeded its 1,024-request safety cap after about 46 seconds on the same scope and returned no complete index. The initial product must not depend on whole-repository references; it can use indexed definitions/locations and bounded on-demand reference queries until a scalable relationship provider exists.
 
 The gaps are:
 
@@ -270,6 +273,13 @@ Structrr remains the owner of code-symbol meaning and use:
   signatures, source fingerprints, and relationships from the referenced
   artifacts. Missing/stale artifacts or partial provider coverage yield an
   explicit incomplete comparison, never an empty-symbol success.
+- Produce a deterministic, revision-pair-bound symbol diff for reviewer use.
+  The diff references the base and candidate symbol artifact IDs and includes
+  added, removed, and modified symbols with old/new paths, spans, signatures,
+  and source fingerprints. Symbol moves are matched only when stable identity
+  and evidence support the match; ambiguous renames remain an added/removed
+  pair with an optional `rename_candidate` hint. The diff is a derived artifact,
+  not a separate source of truth.
 - Keep analyzer findings in the separate code-analysis report artifact. The
   Structrr symbol artifact may reference related finding IDs, but it does not
   duplicate diagnostic messages or own their severity/baseline lifecycle.
@@ -301,7 +311,8 @@ artifact layout without changing planner contracts.
 schema_version: structrr-code-query-v1
 structrr_snapshot_id: structrr:sha256:...
 analysis_id: analysis:sha256:... # required for findings/coverage queries
-query_kind: findings | symbols | references | dependencies | components | coverage
+comparison_id: comparison:sha256:... # required for symbol_changes queries
+query_kind: findings | symbols | references | dependencies | components | coverage | symbol_changes
 filters:
   component_ids: []
   paths: [attestation/verifier/**]
@@ -315,7 +326,56 @@ filters:
 limit: 50
 ```
 
-Structrr resolves the symbol-artifact reference from `structrr_snapshot_id`; callers do not supply arbitrary artifact paths. `analysis_id` is required only for finding/coverage queries and must belong to the same snapshot revision. The response echoes the snapshot ID, resolved artifact IDs, exact normalized filters, matching records, omitted count, truncation flag, and evidence references. Query size is bounded by record count and encoded bytes. Paths are repository-relative and cannot escape the worktree.
+Structrr resolves the symbol-artifact reference from `structrr_snapshot_id`; callers do not supply arbitrary artifact paths. `analysis_id` is required only for finding/coverage queries and must belong to the same snapshot revision. `comparison_id` is required only for `symbol_changes` and identifies the base/candidate pair and its diff artifact. The response echoes the snapshot/comparison IDs, resolved artifact IDs, exact normalized filters, matching records, omitted count, truncation flag, and evidence references. Query size is bounded by record count and encoded bytes. Paths are repository-relative and cannot escape the worktree.
+
+### 5.6 Symbol-diff artifact for review
+
+Build reviewer diffs from the two revision-bound symbol artifacts, not by
+asking a model to infer which declarations changed. Persist the comparison as
+a separate derived artifact:
+
+```yaml
+schema: https://powdrr.io/schema/structrr-code-symbol-diff-v1
+base_revision: <base-git-object-id>
+candidate_revision: <candidate-git-object-id>
+base_symbol_artifact_id: structrr-code-symbols:sha256:<base-digest>
+candidate_symbol_artifact_id: structrr-code-symbols:sha256:<candidate-digest>
+status: complete | partial
+changes:
+  - change_id: symbol-change:sha256:...
+    change_kind: modified
+    symbol_id: symbol:python:component:path.qualified_name:function
+    before:
+      path: src/package/module.py
+      span: {start_line: 20, start_column: 0, end_line: 28, end_column: 1}
+      signature: 'function(value: str) -> str'
+      source_fingerprint: sha256:...
+    after:
+      path: src/package/module.py
+      span: {start_line: 22, start_column: 0, end_line: 31, end_column: 1}
+      signature: 'function(value: str, strict: bool = True) -> str'
+      source_fingerprint: sha256:...
+    changed_line_overlap: true
+    related_symbol_ids: []
+coverage:
+  complete_components: [component:python:package]
+  incomplete_components: []
+```
+
+`change_kind` is `added`, `removed`, `modified`, or `moved`. A path or span
+move with unchanged stable identity is `moved`; a signature/body change is
+`modified`. Ambiguous renames remain an added/removed pair and may carry a
+non-authoritative `rename_candidate` link. A missing symbol is considered
+removed only when both artifacts have complete coverage for that component.
+Line-range overlap with the Git diff is a deterministic review signal, not
+proof of semantic correctness. Relationship changes are included only when
+providers supplied comparable coverage.
+
+The reviewer query accepts a comparison ID and filters by component, path,
+symbol kind, and change kind. It returns changed declarations and old/new
+locations; broader caller/callee context is fetched through bounded symbol
+queries when needed. It does not require a complete whole-repository
+reference graph.
 
 ## 6. Planner integration
 
@@ -331,6 +391,7 @@ Code analysis is a planning evidence provider. It does not own product intent, r
 6. **Compile an evidence-bound plan.** Each implementation item records affected components, relevant source entities, required validation profiles, baseline analysis ID, and planned post-edit analysis scope.
 7. **Analyze after implementation.** Run applicable read-only analyzers on affected components and compare with the pinned base report. Persist the candidate report and compact delta summary as review evidence.
 8. **Route findings into repair.** New findings in changed/relevant scope become actionable validation evidence. Unchanged findings remain context unless the intent asks to fix them. Resolved findings are recorded as improvement evidence. Uncertain matches remain visible for review.
+9. **Give reviewers a symbol delta.** Compare base and candidate symbol artifacts and pass a compact changed-symbol artifact alongside the textual diff. Include declaration names, signatures, source locations, changed-line overlap, and artifact references so the reviewer can inspect impacted code.
 
 ### 6.2 Planner evidence packet
 
@@ -367,12 +428,31 @@ The planner must not copy unfiltered transcripts into questions, treat checker e
 - Candidate findings are fresh validation evidence, but the planner checks scope and changed-path relevance before routing them to repair.
 - Analyzer output cannot approve proposal coverage, implementation correctness, or release readiness by itself.
 
+### 6.5 Reviewer integration
+
+- After candidate validation, Structrr builds `structrr-code-symbol-diff-v1`
+  from the base and candidate artifacts using stable IDs, signatures, source
+  fingerprints, and spans.
+- The review context packet includes changed/added/removed symbols whose
+  locations overlap the patch, plus containing symbols for changed lines that
+  do not declare a new symbol. It cites both revisions and artifact IDs.
+- The reviewer can query the diff by file, component, symbol kind, and change
+  kind, then request bounded definitions or references around a selected
+  symbol. Full symbol inventories and full reference graphs are never inserted
+  into the review prompt.
+- The diff is deterministic evidence. The semantic reviewer still decides
+  whether the symbol changes fulfill the requested behavior and whether
+  affected callers/tests need changes.
+- If either side has incomplete component coverage, the diff reports that
+  coverage explicitly and does not infer removals from missing index entries.
+
 ## 7. Artifact lifecycle and comparison
 
 ### 7.1 Storage
 
 - Write the normalized report/findings and bounded raw output under the run's existing artifact directory. Write the Structrr code-symbol inventory as its own versioned YAML artifact with a content digest.
-- Register `ExecutionArtifact` references for the report and the symbol inventory, with distinct artifact types, schema versions, owners, and content references. The Structrr snapshot stores only the compact symbol-artifact descriptor and its provenance.
+- When a review comparison runs, write `structrr-code-symbol-diff-v1` as a separate compact artifact that references the base/candidate symbol artifacts; do not duplicate either full symbol inventory in the diff.
+- Register `ExecutionArtifact` references for the report, symbol inventory, and reviewer diff, with distinct artifact types, schema versions, owners, and content references. The Structrr snapshot stores only the compact symbol-artifact descriptor and its provenance.
 - Include revision, component fingerprints, analyzer versions, configuration digests, environment identity, and scope in every report.
 - Reports and index artifacts are immutable generated outputs. A rerun creates a new artifact when any input fingerprint changes; matching source/provider/configuration fingerprints may reuse an existing artifact.
 - The source tree remains authoritative. If a referenced index artifact is missing, corrupt, or mismatched to the pinned revision/provider fingerprint, Structrr rejects it and requests regeneration; it never treats that state as an empty complete index.
@@ -434,23 +514,34 @@ Add `structrr-code-query-v1` and resolve code-structure queries through the symb
 
 Acceptance: queries return exactly matching records and filter provenance; semantic relationships are emitted only when supported; path traversal, unbounded limits, stale artifact IDs, and unsupported kinds fail clearly; existing BasedPyright tools remain available through the common provider.
 
-### PR 5: Planner evidence integration
+### PR 5: Symbol comparison and reviewer context
+
+Add the revision-pair-bound `structrr-code-symbol-diff-v1` artifact and a
+Structrr query lens for changed symbols. Connect it to the existing diff review
+context without requiring a full repository reference graph.
+
+Acceptance: added, removed, modified, moved, ambiguous rename, and incomplete
+coverage cases are deterministic; every changed-symbol record links to base
+and candidate source ranges; unrelated symbols are absent from a scoped review
+query; missing index data cannot be interpreted as a deletion.
+
+### PR 6: Planner evidence integration
 
 Add analysis evidence to `PlanningSession` and GitHub issue plan generation. Use revision-bound component summaries, bounded queries, and query fingerprints. Include relevant evidence references in planning context and work units; add post-implementation analysis obligations for code changes.
 
 Acceptance: planner answers implementation questions with bounded symbol/reference queries and no diagnostic dump; replay reuses matching evidence and re-queries on stale revision/provider/config/scope; analysis failure cannot become pass or become a user requirement; only new findings in changed scope become default repair candidates; implementation plans bind validation and analysis to affected components.
 
-### PR 6: Multi-language structure and analyzer providers
+### PR 7: Multi-language structure and analyzer providers
 
 Integrate with the component/capability registry in `polyglot-repository-and-go-support.md`. Normalize language-provider output into the Structrr-owned YAML symbol schema. Use semantic indexers that emit SCIP as provider inputs where available. Use Tree-sitter or equivalent only for syntax outlines. Add native analyzer adapters as their language/component capability is supported.
 
 Acceptance: mixed-language reports retain per-provider status; Python/Go/TypeScript structures retain language namespaces and provenance; syntax-only results cannot answer semantic reference queries; provider failure does not erase another provider's findings and yields partial status; unsupported files have explicit coverage and no fabricated symbols.
 
-### PR 7: End-to-end planner and user verification
+### PR 8: End-to-end planner and reviewer verification
 
-Add hermetic fixtures for Python src layouts, Python monorepos, mixed languages, incomplete environments, baseline debt, and changed-code findings. Verify artifact persistence, query scoping, planner provenance, compact summaries, repair routing, resume, and stale-report rejection.
+Add hermetic fixtures for Python src layouts, Python monorepos, mixed languages, incomplete environments, baseline debt, changed-code findings, and symbol-level review. Verify artifact persistence, query scoping, planner provenance, compact summaries, repair routing, reviewer deltas, resume, and stale-report rejection.
 
-Acceptance: no default planner prompt contains an unbounded transcript; every presented finding resolves to a durable report and revision; base/candidate comparison requires compatible scope; stored reports can be queried without rerunning providers; results are stable across filesystem ordering; outputs distinguish source findings, setup issues, analyzer failures, and unsupported coverage.
+Acceptance: no planner or reviewer prompt contains an unbounded transcript or whole-repository index; every presented finding/symbol delta resolves to durable revision-bound artifacts; base/candidate comparison requires compatible scope; stored artifacts can be queried without rerunning providers; results are stable across filesystem ordering; outputs distinguish source findings, setup issues, analyzer failures, and unsupported coverage.
 
 ## 10. Verification strategy
 
@@ -458,10 +549,10 @@ Use golden normalized records and real provider-output fixtures, plus hermetic e
 
 The first end-to-end Python fixture reproduces the gaterr issue: a src-layout package, missing generic arguments, imports resolvable only from the declared source root, and a noisy repository-root invocation. The report must retain all findings, identify invocation/coverage problems, and prioritize actionable type errors without silently discarding warnings or claiming import errors are harmless.
 
-The planner fixture starts from a requirement about existing cross-file behavior, queries only relevant components and symbols, creates a plan with evidence references, introduces one analyzer finding, and shows only the relevant new finding routed to repair. An unrelated pre-existing finding remains queryable without swamping the planner.
+The planner fixture starts from a requirement about existing cross-file behavior, queries only relevant components and symbols, and creates a plan with evidence references. The reviewer fixture compares base and candidate symbol artifacts after edits, reports exact changed declarations and locations, and omits unrelated symbols. An introduced analyzer finding routes to repair while unrelated pre-existing findings remain queryable without swamping either stage. Both fixtures include incomplete reference-provider coverage so symbol/location support is proven independently of whole-repository references.
 
 ## 11. Non-goals and exit condition
 
 Non-goals: replacing BasedPyright solely because output is noisy; running every analyzer on every repository at every planning step; treating a successful type check as proof of proposal fulfillment; automatically fixing or suppressing findings; asking an LLM to classify raw output; building a remote analysis service or uploading whole-repository indexes; claiming full semantic cross-language analysis without a semantic provider.
 
-The plan is complete when a planner can pin a revision, reuse or produce a durable analysis artifact, ask bounded questions about findings and project structure, use cited evidence to plan affected work, and compare post-implementation findings against the base without flooding the model or user. Supported and unsupported scope is explicit, and all underlying findings remain inspectable.
+The plan is complete when the planner can use bounded, cited symbol/location evidence to plan affected work and the reviewer can inspect a deterministic symbol-level base-to-candidate delta, while analysis findings are compared against the base without flooding the model or user. The symbol inventory remains a rebuildable artifact of pinned source, supported and unsupported scope is explicit, and all underlying findings remain inspectable.

@@ -23,8 +23,10 @@ from powdrr_service.planning.multipr_structrr import (
 )
 from powdrr_service.planning.questions import (
     ContextRecord,
+    QuestionInputTooLarge,
     QuestionRequest,
     SourceExcerpt,
+    build_question_messages,
 )
 from powdrr_service.planning.source import SegmentedSource
 from powdrr_service.structrr.snapshot import snapshot_digest
@@ -182,7 +184,7 @@ def coalesce_structural_subjects(
             indexes[key] = len(records)
             records.append(subject)
             continue
-        merged = _merge_duplicate_planned_file_subject(records[existing_index], subject)
+        merged = _merge_duplicate_subject_in_page(records[existing_index], subject)
         if merged is None:
             raise StructrrPlanningError("subject enumeration contains duplicates")
         records[existing_index] = merged
@@ -588,6 +590,7 @@ def build_subject_enumeration_request(
     basedpyright_reference_path_pairs: Sequence[tuple[str, str]] = (),
     page_ordinal: int = 1,
     baseline_digest: str | None = None,
+    scope_id: str | None = None,
 ) -> QuestionRequest[StructuralSubjectPage]:
     unit_ids = {unit.id for unit in units}
     requirement_ids = {req for unit in units for req in unit.requirement_ids}
@@ -728,7 +731,11 @@ def build_subject_enumeration_request(
 
     return QuestionRequest(
         question=Question(
-            f"structural-subjects-{item_id}-{page_ordinal:04d}",
+            (
+                f"structural-subjects-{item_id}-{scope_id}-{page_ordinal:04d}"
+                if scope_id is not None
+                else f"structural-subjects-{item_id}-{page_ordinal:04d}"
+            ),
             "enumerate_structural_subjects",
             1,
             (item_id, *sorted(unit_ids)),
@@ -1088,6 +1095,88 @@ def build_structural_change_request(
             known_entity_ids=relevant_entity_ids,
         ),
     )
+
+
+def partition_subject_enumeration_units(
+    *,
+    plan_id: str,
+    item_id: str,
+    units: Sequence[WorkUnit],
+    requirement_source_refs: Mapping[str, Sequence[str]],
+    source: SegmentedSource,
+    projected_baseline: Mapping[str, Any],
+    prior_subjects: Sequence[BoundStructuralSubject] = (),
+    excluded_subject_ids: Sequence[tuple[str, str]] = (),
+    basedpyright_reference_path_pairs: Sequence[tuple[str, str]] = (),
+    baseline_digest: str | None = None,
+) -> tuple[tuple[str, tuple[WorkUnit, ...]], ...]:
+    """Greedily bound per-item subject queries to the planner input limit."""
+    scopes: list[tuple[str, tuple[WorkUnit, ...]]] = []
+    current: list[WorkUnit] = []
+
+    def scope_id(group: Sequence[WorkUnit]) -> str:
+        return _digest({"unit_ids": [unit.id for unit in group]})[7:19]
+
+    def request_for(
+        group: Sequence[WorkUnit],
+    ) -> QuestionRequest[StructuralSubjectPage]:
+        requirement_ids = tuple(
+            dict.fromkeys(
+                requirement_id
+                for unit in group
+                for requirement_id in unit.requirement_ids
+            )
+        )
+        source_refs = tuple(
+            dict.fromkeys(
+                source_ref
+                for requirement_id in requirement_ids
+                for source_ref in requirement_source_refs.get(requirement_id, ())
+            )
+        )
+        paths = {write.path for unit in group for write in unit.planned_writes}
+        reference_pairs = tuple(
+            pair
+            for pair in basedpyright_reference_path_pairs
+            if pair[0] in paths and pair[1] in paths
+        )
+        return build_subject_enumeration_request(
+            plan_id=plan_id,
+            item_id=item_id,
+            units=group,
+            source=source,
+            source_refs=source_refs,
+            projected_baseline=projected_baseline,
+            prior_subjects=prior_subjects,
+            excluded_subject_ids=excluded_subject_ids,
+            basedpyright_reference_path_pairs=reference_pairs,
+            page_ordinal=1,
+            baseline_digest=baseline_digest,
+            scope_id=scope_id(group),
+        )
+
+    def ensure_bounded(group: Sequence[WorkUnit]) -> None:
+        request = request_for(group)
+        try:
+            build_question_messages(request)
+        except QuestionInputTooLarge:
+            raise
+
+    for unit in units:
+        candidate = (*current, unit)
+        try:
+            ensure_bounded(candidate)
+        except QuestionInputTooLarge:
+            if not current:
+                raise
+            scopes.append((scope_id(current), tuple(current)))
+            current = [unit]
+            ensure_bounded(current)
+        else:
+            current.append(unit)
+    if current:
+        scopes.append((scope_id(current), tuple(current)))
+    return tuple(scopes)
 
 
 def _example_subject_page(

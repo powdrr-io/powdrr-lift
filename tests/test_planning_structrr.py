@@ -32,10 +32,12 @@ from powdrr_service.planning.structrr import (
     build_structural_candidate_review_request,
     build_structural_change_request,
     build_subject_enumeration_request,
+    coalesce_structural_subjects,
     compile_structrr_plan,
     complete_subject_enumeration,
     parse_structural_change,
     parse_structural_subject_page,
+    partition_subject_enumeration_units,
 )
 
 
@@ -279,6 +281,106 @@ def test_structural_questions_send_only_relevant_baseline_subjects(
     )
     assert "python::unrelated_0" not in change_input
     assert unrelated_payload not in change_input
+
+
+def test_large_structural_subject_context_is_partitioned_into_bounded_scopes(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    text = "# Plan\n\nUpdate both modules.\n"
+    source = segment_markdown_source(
+        PinnedSourceDocument(
+            repository="owner/repo",
+            commit_sha="a" * 40,
+            path="docs/plan.md",
+            blob_sha="b" * 40,
+            content_sha256=hashlib.sha256(text.encode()).hexdigest(),
+            text=text,
+        )
+    )
+    source_ref = source.anchors[0].id
+    units = (
+        _unit(
+            "unit-01",
+            ("req-01",),
+            writes=(PlannedWrite("src/first.py", "implementation", "python", (), ()),),
+        ),
+        _unit(
+            "unit-02",
+            ("req-02",),
+            writes=(PlannedWrite("src/second.py", "implementation", "python", (), ()),),
+        ),
+    )
+    baseline = {
+        "entities": [
+            {
+                "id": f"symbol:{path}:{index}",
+                "type": "Function",
+                "name": "x" * 1_200,
+                "path": path,
+            }
+            for path in ("src/first.py", "src/second.py")
+            for index in range(10)
+        ],
+        "entity_relationships": [],
+        "files": [],
+    }
+    monkeypatch.setattr(
+        structrr_module, "snapshot_digest", lambda _snapshot: "sha256:constant"
+    )
+
+    scopes = partition_subject_enumeration_units(
+        plan_id="plan-01",
+        item_id="item-0001",
+        units=units,
+        requirement_source_refs={
+            "req-01": (source_ref,),
+            "req-02": (source_ref,),
+        },
+        source=source,
+        projected_baseline=baseline,
+    )
+
+    assert len(scopes) == 2
+    for scope_id, scope_units in scopes:
+        request = build_subject_enumeration_request(
+            plan_id="plan-01",
+            item_id="item-0001",
+            units=scope_units,
+            source=source,
+            source_refs=(source_ref,),
+            projected_baseline=baseline,
+            scope_id=scope_id,
+        )
+        assert len(build_question_messages(request)[1]["content"]) < 24_000
+
+
+def test_structural_subjects_from_separate_scopes_merge_supporting_references() -> None:
+    first = BoundStructuralSubject(
+        "entity-01",
+        "entities",
+        "item-0001",
+        "changed",
+        ("req-01",),
+        ("unit-01",),
+        ("anchor-01",),
+        False,
+    )
+    second = BoundStructuralSubject(
+        "entity-01",
+        "entities",
+        "item-0001",
+        "changed",
+        ("req-02",),
+        ("unit-02",),
+        ("anchor-02",),
+        False,
+    )
+
+    (merged,) = coalesce_structural_subjects((first, second))
+
+    assert merged.requirement_ids == ("req-01", "req-02")
+    assert merged.unit_ids == ("unit-01", "unit-02")
+    assert merged.source_refs == ("anchor-01", "anchor-02")
 
 
 def test_structural_subject_answer_is_reasked_when_projected_context_changes() -> None:

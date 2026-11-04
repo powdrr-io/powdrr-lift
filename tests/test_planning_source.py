@@ -471,7 +471,8 @@ def test_requirement_question_distinguishes_cursors_from_adjacent_citations() ->
     segmented = segment_markdown_source(
         _document(
             "# Plan\n\n"
-            "First requirement must work. Second requirement must persist.\n\n"
+            "First requirement must work. Second requirement must persist. "
+            "Third requirement must be checked.\n\n"
             "Adjacent context explains the first requirement.\n"
         )
     )
@@ -510,6 +511,101 @@ def test_requirement_question_distinguishes_cursors_from_adjacent_citations() ->
                 "next_anchor": adjacent.anchor_ids[0],
             }
         )
+
+    next_request = build_extract_requirements_request(
+        block,
+        anchors=anchor_by_id,
+        related_blocks=(adjacent,),
+        after_anchor=obligation_anchors[0],
+    )
+    assert next_request.valid_example["records"][0]["source_refs"] == [
+        obligation_anchors[1]
+    ]
+    assert next_request.valid_example["has_more"] is True
+    assert next_request.valid_example["next_anchor"] == obligation_anchors[1]
+    next_request.parse_answer(next_request.valid_example)
+    with pytest.raises(PlanningContractError, match="outside supplied context"):
+        next_request.parse_answer(
+            {
+                "records": [
+                    {
+                        "statement": "Repeat the already extracted obligation.",
+                        "kind": "behavior",
+                        "source_refs": [obligation_anchors[0]],
+                        "related_source_refs": [],
+                    }
+                ],
+                "has_more": False,
+                "next_anchor": None,
+            }
+        )
+
+    with pytest.raises(PlanningContractError, match="processed on this page"):
+        next_request.parse_answer(
+            {
+                "records": [
+                    {
+                        "statement": "Skip forward and omit an intervening clause.",
+                        "kind": "behavior",
+                        "source_refs": [obligation_anchors[2]],
+                        "related_source_refs": [],
+                    }
+                ],
+                "has_more": True,
+                "next_anchor": obligation_anchors[1],
+            }
+        )
+
+    final_request = build_extract_requirements_request(
+        block,
+        anchors=anchor_by_id,
+        related_blocks=(adjacent,),
+        after_anchor=obligation_anchors[1],
+    )
+    assert final_request.valid_example["records"][0]["source_refs"] == [
+        obligation_anchors[2]
+    ]
+    assert final_request.valid_example["has_more"] is False
+    assert final_request.valid_example["next_anchor"] is None
+    final_request.parse_answer(final_request.valid_example)
+
+    exhausted_request = build_extract_requirements_request(
+        block,
+        anchors=anchor_by_id,
+        related_blocks=(adjacent,),
+        after_anchor=obligation_anchors[-1],
+    )
+    assert exhausted_request.valid_example == {
+        "records": [],
+        "has_more": False,
+        "next_anchor": None,
+    }
+    exhausted_request.parse_answer(exhausted_request.valid_example)
+
+
+def test_source_extraction_cursor_pages_keep_question_input_bounded() -> None:
+    clauses = [
+        f"Requirement {index:02d} must preserve its own behavior and validation result"
+        for index in range(1, 41)
+    ]
+    segmented = segment_markdown_source(
+        _document("# Plan\n\n" + ". ".join(clauses) + ".\n")
+    )
+    block = next(item for item in segmented.blocks if item.kind == "paragraph")
+    anchors = {item.id: item for item in segmented.anchors}
+    obligation_anchors = tuple(
+        ref for ref in block.anchor_ids if anchors[ref].clause_id is not None
+    )
+    assert len(obligation_anchors) >= 40
+
+    for after_anchor in (None, *obligation_anchors[:-1]):
+        request = build_extract_requirements_request(
+            block,
+            anchors=anchors,
+            after_anchor=after_anchor,
+        )
+        build_question_messages(request)
+        request.parse_answer(request.valid_example)
 
 
 def test_extraction_questions_batch_with_distinct_pagination_candidates() -> None:

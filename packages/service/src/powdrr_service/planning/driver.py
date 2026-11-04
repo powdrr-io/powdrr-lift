@@ -664,7 +664,6 @@ class SourceLedgerQuestionMachine:
                     anchors=anchor_by_id,
                     related_blocks=self._adjacent_blocks(block),
                     after_anchor=after_anchor,
-                    accepted_records=page_records,
                 )
                 answer = accepted_answers.get(extract_request.question.question_id)
                 if answer is None:
@@ -2483,7 +2482,6 @@ class SourceLedgerQuestionMachine:
                     anchors=anchor_by_id,
                     related_blocks=self._adjacent_blocks(block),
                     after_anchor=cursor,
-                    accepted_records=records,
                 )
                 page = extract_request.parse_answer(
                     accepted_answers[extract_request.question.question_id]

@@ -64,6 +64,7 @@ The repository already has useful pieces that this work must extend rather than 
 - GitHub issue plan generation asks bounded symbol questions and retrieves matching declarations and excerpts.
 - `ExecutionArtifact` records an artifact ID, type, schema version, owner, and content reference.
 - `execution.checkpoints.run_diagnostics` bounds captured text, while `runtime.diagnose` records whether each hook succeeded.
+- Structrr bootstrap currently serializes Python source subjects and bindings inline in its YAML document; the new schema moves the exhaustive symbol inventory to a separate referenced artifact.
 
 The gaps are:
 
@@ -88,6 +89,7 @@ Do not add a second independent Python symbol/reference pipeline. Route the new 
 9. **Prioritize change relevance.** Interactive summaries show new findings in affected components and changed paths first. Pre-existing findings remain queryable and visible in aggregate counts.
 10. **Reuse component discovery.** Depend on the component and capability model in `polyglot-repository-and-go-support.md`; do not create a competing monorepo detector.
 11. **Keep source local.** Analysis and indexes are produced and queried in the local worktree for this plan. Do not upload full source or raw output to a hosted service.
+12. **Structrr owns the symbol contract, not the inventory payload.** The Structrr snapshot declares the code-symbol schema, artifact identity, revision, digest, and coverage. The potentially large symbol and relationship arrays live in a separate artifact and are loaded through Structrr's provider.
 
 ## 5. Canonical records
 
@@ -120,7 +122,7 @@ summary:
   setup_issue_count: 0
 finding_artifact_ref: artifact://...
 raw_output_artifact_refs: [artifact://...]
-structure_index_ref: artifact://...
+code_symbol_artifact_ref: artifact://...
 fingerprint: sha256:...
 ```
 
@@ -150,36 +152,153 @@ evidence_refs: [artifact://...]
 
 Severity remains the provider's severity. Powdrr may add policy priority as a separate field; it must not silently rewrite warnings as errors or vice versa. Import-resolution findings may be categorized as configuration/environment only when component and environment evidence supports that classification. Otherwise retain the original provider rule and use `uncertain`.
 
-### 5.3 Project structure index
+### 5.3 Structrr code-symbol format and artifact boundary
+
+The canonical persisted format is **versioned JSON**, with media type
+`application/vnd.powdrr.structrr-code-symbols+json` and schema URI
+`https://powdrr.io/schema/structrr-code-symbols-v1`. JSON is the interchange
+format owned by Structrr; it is deterministic, inspectable, streamable, and
+compatible with the existing JSON artifact and snapshot tooling. SCIP indexes
+may be an input to a provider, but they are not the Structrr storage contract.
+Tree-sitter or another syntax parser may also feed this format, with every
+record labeled `syntactic` rather than `semantic`.
+
+Store the symbol inventory as a separate immutable content-addressed artifact,
+for example `artifacts/structrr/code-symbols/sha256-<digest>.json`. Do not copy
+the symbol or relationship arrays into the Structrr bootstrap YAML or ordinary
+planner prompts. The bootstrap contains only a compact reference:
 
 ```yaml
-schema_version: code-structure-index-v1
-index_id: structure:sha256:...
-revision: 40-character-git-object-id
-components: [...]
-symbols:
-  - symbol_id: symbol:python:component-id:qualified-name
-    language: python
-    kind: function | class | method | variable | module | package
-    name: parse_policy
-    qualified_name: powdrr_attestation.policy.parse_policy
-    path: attestation/verifier/src/powdrr_attestation/policy.py
-    range: {start_line: 92, start_column: 0, end_line: 130, end_column: 1}
-    resolution: semantic | syntactic
-    provider_id: basedpyright
-relationships:
-  - source_symbol_id: symbol:...
-    target_symbol_id: symbol:...
-    kind: references | imports | calls | implements | contains
-    resolution: semantic | syntactic
-    provider_id: scip-python
-coverage: {...}
-fingerprint: sha256:...
+structrr_schema: https://powdrr.io/schema/structrr-bootstrap-v2
+code_symbol_artifact:
+  schema: https://powdrr.io/schema/structrr-code-symbol-artifact-ref-v1
+  artifact_id: structrr-code-symbols:sha256:<digest>
+  content_ref: artifacts/structrr/code-symbols/sha256-<digest>.json
+  media_type: application/vnd.powdrr.structrr-code-symbols+json
+  content_digest: sha256:<digest>
+  source_revision: <40-character-git-object-id>
+  component_fingerprints:
+    - component_id: component:python:attestation/verifier
+      fingerprint: sha256:...
+      coverage: complete | partial | unavailable | failed
+  symbol_count: 248
+  relationship_count: 411
 ```
 
-Only provider-supported relationships are emitted. `resolution` distinguishes semantic evidence from syntax-based candidates. The v1 query contract may consume existing BasedPyright responses without requiring an immediate graph database.
+The JSON artifact has this top-level shape. Object keys are canonicalized for
+fingerprinting; record arrays are sorted by stable ID before serialization.
+The content digest is SHA-256 over canonical UTF-8 JSON with sorted object keys
+and no insignificant whitespace; the Structrr reference carries that digest
+and uses it in the content-addressed artifact path and artifact ID.
 
-### 5.4 Query contract
+```json
+{
+  "schema": "https://powdrr.io/schema/structrr-code-symbols-v1",
+  "source_revision": "<40-character-git-object-id>",
+  "components": [
+    {
+      "component_id": "component:python:attestation/verifier",
+      "language": "python",
+      "root": "attestation/verifier",
+      "source_roots": ["attestation/verifier/src"],
+      "provider_id": "basedpyright",
+      "provider_version": "1.39.9",
+      "provider_fingerprint": "sha256:...",
+      "coverage": "complete"
+    }
+  ],
+  "symbols": [
+    {
+      "symbol_id": "symbol:python:attestation/verifier:powdrr_attestation.policy.parse_policy:function",
+      "component_id": "component:python:attestation/verifier",
+      "language": "python",
+      "kind": "function",
+      "name": "parse_policy",
+      "qualified_name": "powdrr_attestation.policy.parse_policy",
+      "path": "attestation/verifier/src/powdrr_attestation/policy.py",
+      "span": {"start_line": 92, "start_column": 0, "end_line": 130, "end_column": 1},
+      "signature": "parse_policy(data: Mapping[str, object]) -> Policy",
+      "resolution": "semantic",
+      "provider_id": "basedpyright",
+      "source_fingerprint": "sha256:..."
+    }
+  ],
+  "relationships": [
+    {
+      "relationship_id": "relationship:sha256:...",
+      "source_symbol_id": "symbol:...",
+      "target_symbol_id": "symbol:...",
+      "kind": "references",
+      "resolution": "semantic",
+      "provider_id": "basedpyright"
+    }
+  ],
+  "coverage": [
+    {
+      "component_id": "component:python:attestation/verifier",
+      "indexed_paths": 6,
+      "excluded_paths": [],
+      "unsupported_paths": [],
+      "diagnostics": []
+    }
+  ]
+}
+```
+
+Symbol IDs are language- and component-qualified and derive from canonical
+qualified name plus kind, not line number. A rename or kind change creates a
+new ID and is reconciled by Structrr's existing diff/rebase review rather than
+silently reusing an unrelated identity. Every relationship endpoint must
+resolve to a symbol in the same artifact or to an explicitly declared external
+symbol identity. Relationships distinguish `contains`, `imports`, `calls`,
+`references`, and `implements`; providers emit only kinds they can support.
+
+### 5.4 How the artifact extends Structrr
+
+Structrr remains the owner of code-symbol meaning and use:
+
+- Add a versioned `code_symbol_artifact` reference to the Structrr snapshot and
+  bootstrap schema. Validate schema URI, content digest, source revision,
+  component fingerprints, counts, unique IDs, path containment, and referenced
+  relationship endpoints when loading the artifact.
+- Make code symbols and relationships addressable Structrr source subjects.
+  `source_bindings` and proposals can refer to `symbol_id` plus artifact ID;
+  they do not inline symbol rows. Semantic entities remain in the normal
+  Structrr entity collection, with bindings linking those entities to symbols.
+- Add Structrr context lenses for component inventory, symbols by path/name,
+  references/callers, dependency neighborhoods, and relevant findings. Lenses
+  return bounded projections with artifact IDs and provider/coverage
+  provenance; they do not expose the entire JSON artifact by default.
+- Extend Structrr source comparison and rebase to compare symbol IDs,
+  signatures, source fingerprints, and relationships from the referenced
+  artifacts. Missing/stale artifacts or partial provider coverage yield an
+  explicit incomplete comparison, never an empty-symbol success.
+- Keep analyzer findings in the separate code-analysis report artifact. The
+  Structrr symbol artifact may reference related finding IDs, but it does not
+  duplicate diagnostic messages or own their severity/baseline lifecycle.
+- Bump the Structrr bootstrap schema/section version for the reference and
+  binding semantics. Do not preserve a second full inline symbol inventory as
+  a compatibility representation; migrate consumers to the artifact-backed
+  Structrr query contract in the same staged rollout.
+
+For example, a compact snapshot binding can identify the semantic entity and
+external source symbol without copying the symbol record:
+
+```yaml
+source_bindings:
+  - id: binding:feature:policy-validation:parse-policy
+    entity_id: feature:policy-validation
+    symbol_artifact_id: structrr-code-symbols:sha256:<digest>
+    symbol_id: symbol:python:attestation/verifier:powdrr_attestation.policy.parse_policy:function
+    relationship: implemented_by
+```
+
+The v1 Structrr query contract can read the artifact directly without a graph
+database. Storage, digest verification, schema validation, and query behavior
+remain behind Structrr APIs, so future implementations can change the physical
+artifact layout without changing planner contracts.
+
+### 5.5 Query contract
 
 ```yaml
 schema_version: code-query-v1
@@ -236,9 +355,9 @@ The planner must not copy unfiltered transcripts into questions, treat checker e
 
 ### 6.3 Existing planner code
 
-- Route `find_workspace_symbols` and `search_structural_document_analysis` through the common query provider while retaining BasedPyright as the Python adapter.
+- Route `find_workspace_symbols` and `search_structural_document_analysis` through Structrr's artifact-backed symbol query while retaining BasedPyright as the Python provider that produces the first artifact.
 - Route the symbol lookup loop in `github_issue_plan_generation.py` through the same contract so queries can specify component, symbol kind, path scope, and result limit.
-- Extend `PlanningSession`'s structural cache to key on analysis/index ID and normalized filters. A path list alone is insufficient when checkout, provider, or configuration changes.
+- Extend `PlanningSession`'s structural cache to key on Structrr snapshot ID, symbol-artifact digest, analysis/index ID, and normalized filters. A path list alone is insufficient when checkout, provider, or configuration changes.
 - Journal query requests and deterministic results with existing planning questions. Resume reuses accepted evidence and detects stale inputs.
 - Keep semantic confirmation for ambiguous cases. Deterministic candidate selection reduces the question; it does not replace judgment.
 
@@ -254,8 +373,8 @@ The planner must not copy unfiltered transcripts into questions, treat checker e
 
 ### 7.1 Storage
 
-- Write normalized report, findings, queryable structure data, provider metadata, and bounded raw output under the run's existing artifact directory.
-- Register an `ExecutionArtifact` for each report with a versioned artifact type, owner persona, and content reference. Store large finding/raw-output payloads separately and reference their content hashes.
+- Write the normalized report/findings and bounded raw output under the run's existing artifact directory. Write the Structrr code-symbol inventory as its own versioned JSON artifact with a content digest.
+- Register `ExecutionArtifact` references for the report and the symbol inventory, with distinct artifact types, schema versions, owners, and content references. The Structrr snapshot stores only the compact symbol-artifact descriptor and its provenance.
 - Include revision, component fingerprints, analyzer versions, configuration digests, environment identity, and scope in every report.
 - Artifacts are immutable. A rerun creates a new report; acceptance references the chosen report.
 - Keep full reports out of ordinary chat and event summaries. Persist a compact summary and artifact reference.
@@ -293,7 +412,7 @@ Each milestone is a separate reviewable PR unless implementation evidence shows 
 
 ### PR 1: Analysis contracts and artifact persistence
 
-Add typed versioned analysis-run, finding, provider-result, coverage, query, and query-response records. Add canonical serialization, fingerprints, and persistence through existing execution/run artifact boundaries. Do not change planner behavior.
+Add typed versioned analysis-run, finding, provider-result, coverage, code-symbol, code-symbol-relationship, query, and query-response records. Add canonical JSON serialization, fingerprints, and persistence through existing execution/run artifact boundaries. Add a compact Structrr artifact-reference section, without embedding symbol arrays. Do not change planner behavior.
 
 Acceptance: deterministic round trips; rejection of invalid statuses, path escapes, duplicate IDs, and bad fingerprints; byte-bounded raw outputs with explicit truncation; replay retrieves report content by reference; existing diagnostic hooks continue to work during migration.
 
@@ -311,7 +430,7 @@ Acceptance: exact, relocated, new, resolved, uncertain, and incomparable cases; 
 
 ### PR 4: Scoped code/project query interface
 
-Add `code-query-v1`. Adapt existing BasedPyright symbols, structure, and references behind it. Implement deterministic component/path/language/severity/rule/status/kind filters and bounded pagination.
+Add `code-query-v1` through Structrr and resolve it against the referenced code-symbol JSON artifact. Adapt existing BasedPyright symbols, structure, and references as the first artifact producer. Implement deterministic component/path/language/severity/rule/status/kind filters and bounded pagination.
 
 Acceptance: queries return exactly matching records and filter provenance; semantic relationships are emitted only when supported; path traversal, unbounded limits, stale artifact IDs, and unsupported kinds fail clearly; existing BasedPyright tools remain available through the common provider.
 
@@ -323,7 +442,7 @@ Acceptance: planner answers implementation questions with bounded symbol/referen
 
 ### PR 6: Multi-language structure and analyzer providers
 
-Integrate with the component/capability registry in `polyglot-repository-and-go-support.md`. Use semantic indexers that emit SCIP where available. Use Tree-sitter or equivalent only for syntax outlines. Add native analyzer adapters as their language/component capability is supported.
+Integrate with the component/capability registry in `polyglot-repository-and-go-support.md`. Normalize language-provider output into the Structrr-owned JSON symbol schema. Use semantic indexers that emit SCIP as provider inputs where available. Use Tree-sitter or equivalent only for syntax outlines. Add native analyzer adapters as their language/component capability is supported.
 
 Acceptance: mixed-language reports retain per-provider status; Python/Go/TypeScript structures retain language namespaces and provenance; syntax-only results cannot answer semantic reference queries; provider failure does not erase another provider's findings and yields partial status; unsupported files have explicit coverage and no fabricated symbols.
 

@@ -9,9 +9,9 @@ structured_files: []
 files:
   - path: docs/plans/code-analysis-artifacts-and-scoped-queries.md
     type: added
-    span: {start_line: 1, end_line: 348}
-    summary: Specify normalized analysis artifacts, scoped code and structure queries, baseline comparison, provider coverage, safety limits, and an implementation sequence.
-    rationale: Give implementation work a complete contract for reducing diagnostic noise while retaining queryable evidence and integrating analysis with planning.
+    span: {start_line: 1, end_line: 467}
+    summary: Specify a Structrr-owned code-symbol JSON schema stored in a separate content-addressed artifact, plus analysis findings, scoped queries, baseline comparison, and planner integration.
+    rationale: Keep the Structrr snapshot compact while giving implementation work a complete contract for queryable cross-language code structure and focused analysis evidence.
 entities:
   - id: code-analysis-artifacts-and-scoped-queries
     type: Design doc

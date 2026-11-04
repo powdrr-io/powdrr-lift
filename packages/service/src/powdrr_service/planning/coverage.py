@@ -282,11 +282,19 @@ def build_requirement_coverage_request(
             "are candidates; ignore irrelevant matches. If the supplied matches "
             "do not implement this behavior, mark it missing. Missing means this "
             "requirement is work to plan, not a reason to stop. A search with no "
-            "matches is a valid missing result; do not invent evidence."
+            "matches is a valid missing result; do not invent evidence. To mark "
+            "complete, cite either an execution_receipt or both relevant "
+            "implementation/configuration evidence and relevant test evidence. "
+            "Include the IDs for both kinds in evidence_ids; implementation alone "
+            "is partial, not complete."
         ),
         answer_field_definitions={
             "status": "missing, partial, or complete.",
-            "evidence_ids": "Supplied evidence IDs that support this assessment.",
+            "evidence_ids": (
+                "Supplied evidence IDs that support this assessment. Complete "
+                "requires an execution_receipt, or relevant implementation/"
+                "configuration and test evidence together."
+            ),
             "reason": "What the evidence establishes or fails to establish.",
             "remaining_statement": "For partial, the concrete unmet obligation.",
         },

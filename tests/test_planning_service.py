@@ -57,7 +57,7 @@ from powdrr_service.procedrr.catalog import ProcessCatalog
 from powdrr_service.resources import bundled_process_directory
 
 from powdrr_lift.workrr.github_issue_queue import QueueIssue
-from powdrr_lift.workrr.planning.evidence import RequirementEvidenceSearch
+from powdrr_lift.workrr.planning.evidence import Evidence, RequirementEvidenceSearch
 
 
 def test_planning_options_default_to_eight_concurrent_questions() -> None:
@@ -1213,12 +1213,22 @@ def test_source_question_machine_accounts_for_normative_and_context_blocks() -> 
     )
     source = segment_markdown_source(source_document)
     searched_requirements: list[str] = []
+    existing_excerpt = "existing behavior\n"
+    searched_evidence = Evidence(
+        id="evidence-0001",
+        base_commit=source_document.commit_sha,
+        path="src/existing.py",
+        start_line=1,
+        end_line=1,
+        content_sha256=hashlib.sha256(existing_excerpt.encode()).hexdigest(),
+        kind="implementation",
+    )
 
     def search_evidence(requirements: Any) -> dict[str, RequirementEvidenceSearch]:
         searched_requirements.extend(item.id for item in requirements)
         return {
             item.id: RequirementEvidenceSearch(
-                (), ("behavior",), 0, 0, source_document.commit_sha
+                (searched_evidence,), ("behavior",), 1, 1, source_document.commit_sha
             )
             for item in requirements
         }
@@ -1226,6 +1236,7 @@ def test_source_question_machine_accounts_for_normative_and_context_blocks() -> 
     machine = SourceLedgerQuestionMachine(
         source,
         evidence_search=search_evidence,
+        evidence_excerpt_reader=lambda _item: existing_excerpt,
         plan_id="bounded-plan",
         structrr_baseline={
             "entities": [],
@@ -1322,6 +1333,13 @@ def test_source_question_machine_accounts_for_normative_and_context_blocks() -> 
         elif question.kind == "describe_item":
             answer = dict(request.valid_example)
             answer["title"] = f"Implement behavior in {question.subject_ids[0]}"
+        elif question.kind == "assess_requirement_coverage":
+            answer = {
+                "status": "partial",
+                "evidence_ids": [searched_evidence.id],
+                "reason": "Existing implementation evidence covers part of it.",
+                "remaining_statement": "Complete the requested behavior.",
+            }
         elif question.kind == "review_dependency_candidate":
             answer = {"required": True}
         elif question.kind == "describe_confirmed_dependency":
@@ -1358,7 +1376,8 @@ def test_source_question_machine_accounts_for_normative_and_context_blocks() -> 
     }
     coverage = machine.accepted_coverage(answers)
     assert len(coverage) == 1
-    assert coverage[0].answer.status == "missing"
+    assert coverage[0].answer.status == "partial"
+    assert coverage[0].answer.evidence_ids == (searched_evidence.id,)
     assert [unit.id for unit in machine.accepted_work_units(answers)] == [
         "unit-0001",
         "unit-0002",
@@ -1381,6 +1400,10 @@ def test_source_question_machine_accounts_for_normative_and_context_blocks() -> 
     )
     assert set(compiled.destinations) == set(compiled.files)
     assert compiled.ready_item_ids == ("item-0001",)
+    assert compiled.plan.planning is not None
+    assert [item["id"] for item in compiled.plan.planning["evidence"]] == [
+        searched_evidence.id
+    ]
     assert machine.next_question(answers) is None
     assert searched_requirements == ["req-0001"]
 

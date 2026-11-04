@@ -199,6 +199,7 @@ def test_requirement_search_supplies_pinned_implementation_and_test_evidence(
         queries: list[str], *, worktree_root: Path, limit: int = 50
     ) -> dict[str, list[dict[str, Any]]]:
         assert worktree_root != repository.resolve()
+        assert worktree_root == worktree_root.resolve()
         assert (worktree_root / "src/schema.py").is_file()
         assert limit == 20
         assert "payload" in queries
@@ -226,6 +227,14 @@ def test_requirement_search_supplies_pinned_implementation_and_test_evidence(
         commit,
         requirement,
         first_ordinal=17,
+    )
+    assert any(
+        item.path == "src/schema.py" and item.kind == "implementation"
+        for item in search.evidence
+    )
+    assert any(
+        item.path == "tests/test_schema.py" and item.kind == "test"
+        for item in search.evidence
     )
     request = build_requirement_coverage_request(
         requirement,
@@ -709,6 +718,15 @@ def test_coverage_evidence_policy_and_request_context_are_strict(
     assert "def parse_payload" in request.repository_evidence[0].value["source_excerpt"]
     assert request.question.subject_ids == (requirement.id,)
     assert request.source_excerpts == ()
+    assert (
+        "both relevant implementation/configuration evidence and relevant test"
+        in request.exact_question
+    )
+    assert request.valid_example == {
+        "status": "complete",
+        "evidence_ids": [implementation.id, test.id],
+        "reason": "Pinned implementation and relevant tests cover it.",
+    }
     assert set(request.question.context_ref_ids) == {
         implementation.id,
         test.id,
@@ -761,3 +779,10 @@ def test_test_evidence_requires_a_test_or_fixture_path(tmp_path: Path) -> None:
         record_file_evidence(
             repository, commit, "src/schema.py", kind="test", ordinal=1
         )
+
+
+def test_attestation_source_path_is_not_misclassified_as_test() -> None:
+    assert not evidence_module._is_test_path(
+        "attestation/verifier/src/powdrr_attestation/decision.py"
+    )
+    assert evidence_module._is_test_path("attestation/verifier/tests/test_decision.py")

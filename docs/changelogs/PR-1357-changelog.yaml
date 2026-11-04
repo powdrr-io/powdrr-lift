@@ -1,0 +1,594 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1357
+title: Fix planning source and evidence quality failures
+intent:
+  problem: Live planning exposed repeated source extraction, incomplete evidence handoff, and ambiguous
+    work-unit proposal failures.
+  goal: Keep source extraction cursor-scoped, carry pinned repository evidence through planning compilation,
+    and make proposal validation failures actionable.
+human-decisions: []
+structured_files: []
+files:
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 387
+    end_line: 387
+  summary: Explain mixed-runtime and missing-source-reference proposal failures with the affected paths
+    and anchors.
+  rationale: Give the planner enough detail to split invalid proposals correctly on retry.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 389
+    end_line: 389
+  summary: Explain mixed-runtime and missing-source-reference proposal failures with the affected paths
+    and anchors.
+  rationale: Give the planner enough detail to split invalid proposals correctly on retry.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 392
+    end_line: 396
+  summary: Explain mixed-runtime and missing-source-reference proposal failures with the affected paths
+    and anchors.
+  rationale: Give the planner enough detail to split invalid proposals correctly on retry.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 399
+    end_line: 401
+  summary: Explain mixed-runtime and missing-source-reference proposal failures with the affected paths
+    and anchors.
+  rationale: Give the planner enough detail to split invalid proposals correctly on retry.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 432
+    end_line: 434
+  summary: Explain mixed-runtime and missing-source-reference proposal failures with the affected paths
+    and anchors.
+  rationale: Give the planner enough detail to split invalid proposals correctly on retry.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 893
+    end_line: 894
+  summary: Explain mixed-runtime and missing-source-reference proposal failures with the affected paths
+    and anchors.
+  rationale: Give the planner enough detail to split invalid proposals correctly on retry.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 899
+    end_line: 901
+  summary: Explain mixed-runtime and missing-source-reference proposal failures with the affected paths
+    and anchors.
+  rationale: Give the planner enough detail to split invalid proposals correctly on retry.
+- path: packages/service/src/powdrr_service/planning/coverage.py
+  type: modified
+  span:
+    start_line: 285
+    end_line: 289
+  summary: State the evidence required to mark a requirement complete.
+  rationale: Make coverage decisions follow the implementation, test, and execution-receipt policy.
+- path: packages/service/src/powdrr_service/planning/coverage.py
+  type: modified
+  span:
+    start_line: 293
+    end_line: 297
+  summary: State the evidence required to mark a requirement complete.
+  rationale: Make coverage decisions follow the implementation, test, and execution-receipt policy.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 467
+    end_line: 467
+  summary: Scope extraction to the current block and cursor, and carry searched evidence into work-unit
+    context and the compiled manifest.
+  rationale: Prevent duplicate extraction and ensure coverage references resolve during compilation.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 665
+    end_line: 665
+  summary: Scope extraction to the current block and cursor, and carry searched evidence into work-unit
+    context and the compiled manifest.
+  rationale: Prevent duplicate extraction and ensure coverage references resolve during compilation.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 839
+    end_line: 839
+  summary: Scope extraction to the current block and cursor, and carry searched evidence into work-unit
+    context and the compiled manifest.
+  rationale: Prevent duplicate extraction and ensure coverage references resolve during compilation.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 961
+    end_line: 984
+  summary: Scope extraction to the current block and cursor, and carry searched evidence into work-unit
+    context and the compiled manifest.
+  rationale: Prevent duplicate extraction and ensure coverage references resolve during compilation.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 1119
+    end_line: 1122
+  summary: Scope extraction to the current block and cursor, and carry searched evidence into work-unit
+    context and the compiled manifest.
+  rationale: Prevent duplicate extraction and ensure coverage references resolve during compilation.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 1125
+    end_line: 1125
+  summary: Scope extraction to the current block and cursor, and carry searched evidence into work-unit
+    context and the compiled manifest.
+  rationale: Prevent duplicate extraction and ensure coverage references resolve during compilation.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 1146
+    end_line: 1146
+  summary: Scope extraction to the current block and cursor, and carry searched evidence into work-unit
+    context and the compiled manifest.
+  rationale: Prevent duplicate extraction and ensure coverage references resolve during compilation.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 2272
+    end_line: 2272
+  summary: Scope extraction to the current block and cursor, and carry searched evidence into work-unit
+    context and the compiled manifest.
+  rationale: Prevent duplicate extraction and ensure coverage references resolve during compilation.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 2483
+    end_line: 2483
+  summary: Scope extraction to the current block and cursor, and carry searched evidence into work-unit
+    context and the compiled manifest.
+  rationale: Prevent duplicate extraction and ensure coverage references resolve during compilation.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 2596
+    end_line: 2596
+  summary: Scope extraction to the current block and cursor, and carry searched evidence into work-unit
+    context and the compiled manifest.
+  rationale: Prevent duplicate extraction and ensure coverage references resolve during compilation.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 2636
+    end_line: 2647
+  summary: Scope extraction to the current block and cursor, and carry searched evidence into work-unit
+    context and the compiled manifest.
+  rationale: Prevent duplicate extraction and ensure coverage references resolve during compilation.
+- path: packages/service/src/powdrr_service/planning/questions.py
+  type: modified
+  span:
+    start_line: 229
+    end_line: 233
+  summary: Ask work-unit proposal questions individually.
+  rationale: Avoid losing a requested work unit in a batched model response.
+- path: packages/service/src/powdrr_service/planning/source.py
+  type: modified
+  span:
+    start_line: 748
+    end_line: 748
+  summary: Limit extraction context and citations to the active block and remaining pagination range.
+  rationale: Stop previously extracted obligations from being repeated on later pages.
+- path: packages/service/src/powdrr_service/planning/source.py
+  type: modified
+  span:
+    start_line: 750
+    end_line: 750
+  summary: Limit extraction context and citations to the active block and remaining pagination range.
+  rationale: Stop previously extracted obligations from being repeated on later pages.
+- path: packages/service/src/powdrr_service/planning/source.py
+  type: modified
+  span:
+    start_line: 752
+    end_line: 752
+  summary: Limit extraction context and citations to the active block and remaining pagination range.
+  rationale: Stop previously extracted obligations from being repeated on later pages.
+- path: packages/service/src/powdrr_service/planning/source.py
+  type: modified
+  span:
+    start_line: 754
+    end_line: 754
+  summary: Limit extraction context and citations to the active block and remaining pagination range.
+  rationale: Stop previously extracted obligations from being repeated on later pages.
+- path: packages/service/src/powdrr_service/planning/source.py
+  type: modified
+  span:
+    start_line: 766
+    end_line: 772
+  summary: Limit extraction context and citations to the active block and remaining pagination range.
+  rationale: Stop previously extracted obligations from being repeated on later pages.
+- path: packages/service/src/powdrr_service/planning/source.py
+  type: modified
+  span:
+    start_line: 761
+    end_line: 761
+  summary: Limit extraction context and citations to the active block and remaining pagination range.
+  rationale: Stop previously extracted obligations from being repeated on later pages.
+- path: packages/service/src/powdrr_service/planning/source.py
+  type: modified
+  span:
+    start_line: 779
+    end_line: 796
+  summary: Limit extraction context and citations to the active block and remaining pagination range.
+  rationale: Stop previously extracted obligations from being repeated on later pages.
+- path: packages/service/src/powdrr_service/planning/source.py
+  type: modified
+  span:
+    start_line: 811
+    end_line: 811
+  summary: Limit extraction context and citations to the active block and remaining pagination range.
+  rationale: Stop previously extracted obligations from being repeated on later pages.
+- path: packages/service/src/powdrr_service/planning/source.py
+  type: modified
+  span:
+    start_line: 822
+    end_line: 822
+  summary: Limit extraction context and citations to the active block and remaining pagination range.
+  rationale: Stop previously extracted obligations from being repeated on later pages.
+- path: packages/service/src/powdrr_service/planning/source.py
+  type: modified
+  span:
+    start_line: 827
+    end_line: 829
+  summary: Limit extraction context and citations to the active block and remaining pagination range.
+  rationale: Stop previously extracted obligations from being repeated on later pages.
+- path: packages/service/src/powdrr_service/planning/source.py
+  type: modified
+  span:
+    start_line: 848
+    end_line: 850
+  summary: Limit extraction context and citations to the active block and remaining pagination range.
+  rationale: Stop previously extracted obligations from being repeated on later pages.
+- path: packages/service/src/powdrr_service/planning/source.py
+  type: modified
+  span:
+    start_line: 852
+    end_line: 855
+  summary: Limit extraction context and citations to the active block and remaining pagination range.
+  rationale: Stop previously extracted obligations from being repeated on later pages.
+- path: packages/service/src/powdrr_service/planning/source.py
+  type: modified
+  span:
+    start_line: 860
+    end_line: 889
+  summary: Limit extraction context and citations to the active block and remaining pagination range.
+  rationale: Stop previously extracted obligations from being repeated on later pages.
+- path: packages/service/src/powdrr_service/planning/source.py
+  type: modified
+  span:
+    start_line: 897
+    end_line: 902
+  summary: Limit extraction context and citations to the active block and remaining pagination range.
+  rationale: Stop previously extracted obligations from being repeated on later pages.
+- path: packages/service/src/powdrr_service/planning/source.py
+  type: modified
+  span:
+    start_line: 910
+    end_line: 910
+  summary: Limit extraction context and citations to the active block and remaining pagination range.
+  rationale: Stop previously extracted obligations from being repeated on later pages.
+- path: packages/service/src/powdrr_service/planning/source.py
+  type: modified
+  span:
+    start_line: 921
+    end_line: 925
+  summary: Limit extraction context and citations to the active block and remaining pagination range.
+  rationale: Stop previously extracted obligations from being repeated on later pages.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 119
+    end_line: 119
+  summary: Canonicalize pinned analysis paths and classify test evidence using test directories and filenames.
+  rationale: Keep path authorization stable and avoid treating production files under an attestation directory
+    as tests.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 155
+    end_line: 155
+  summary: Canonicalize pinned analysis paths and classify test evidence using test directories and filenames.
+  rationale: Keep path authorization stable and avoid treating production files under an attestation directory
+    as tests.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 751
+    end_line: 761
+  summary: Canonicalize pinned analysis paths and classify test evidence using test directories and filenames.
+  rationale: Keep path authorization stable and avoid treating production files under an attestation directory
+    as tests.
+- path: tests/test_benchmark_planning_scale.py
+  type: modified
+  span:
+    start_line: 505
+    end_line: 507
+  summary: Reflect individual work-unit proposal calls in the benchmark metric assertion.
+  rationale: Keep the benchmark aligned with the omission-resistant question policy.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 170
+    end_line: 171
+  summary: Cover runtime diagnostics, source-anchor diagnostics, and individual proposal requests.
+  rationale: Prevent recurrence of ambiguous or silently omitted work-unit proposals.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 457
+    end_line: 458
+  summary: Cover runtime diagnostics, source-anchor diagnostics, and individual proposal requests.
+  rationale: Prevent recurrence of ambiguous or silently omitted work-unit proposals.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 532
+    end_line: 569
+  summary: Cover runtime diagnostics, source-anchor diagnostics, and individual proposal requests.
+  rationale: Prevent recurrence of ambiguous or silently omitted work-unit proposals.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 794
+    end_line: 795
+  summary: Cover runtime diagnostics, source-anchor diagnostics, and individual proposal requests.
+  rationale: Prevent recurrence of ambiguous or silently omitted work-unit proposals.
+- path: tests/test_planning_evidence.py
+  type: modified
+  span:
+    start_line: 202
+    end_line: 202
+  summary: Cover canonical pinned paths, coverage evidence requirements, and test-path classification.
+  rationale: Protect the evidence search and classification behavior used by live planning.
+- path: tests/test_planning_evidence.py
+  type: modified
+  span:
+    start_line: 231
+    end_line: 238
+  summary: Cover canonical pinned paths, coverage evidence requirements, and test-path classification.
+  rationale: Protect the evidence search and classification behavior used by live planning.
+- path: tests/test_planning_evidence.py
+  type: modified
+  span:
+    start_line: 721
+    end_line: 729
+  summary: Cover canonical pinned paths, coverage evidence requirements, and test-path classification.
+  rationale: Protect the evidence search and classification behavior used by live planning.
+- path: tests/test_planning_evidence.py
+  type: modified
+  span:
+    start_line: 782
+    end_line: 788
+  summary: Cover canonical pinned paths, coverage evidence requirements, and test-path classification.
+  rationale: Protect the evidence search and classification behavior used by live planning.
+- path: tests/test_planning_questions.py
+  type: modified
+  span:
+    start_line: 323
+    end_line: 340
+  summary: Verify work-unit proposal requests are not batched.
+  rationale: Ensure each proposal receives an independent answer boundary.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 60
+    end_line: 60
+  summary: Exercise searched evidence through coverage acceptance and final plan compilation.
+  rationale: Catch missing evidence records before a real planning session reaches compilation.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1216
+    end_line: 1225
+  summary: Exercise searched evidence through coverage acceptance and final plan compilation.
+  rationale: Catch missing evidence records before a real planning session reaches compilation.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1231
+    end_line: 1231
+  summary: Exercise searched evidence through coverage acceptance and final plan compilation.
+  rationale: Catch missing evidence records before a real planning session reaches compilation.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1239
+    end_line: 1239
+  summary: Exercise searched evidence through coverage acceptance and final plan compilation.
+  rationale: Catch missing evidence records before a real planning session reaches compilation.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1336
+    end_line: 1342
+  summary: Exercise searched evidence through coverage acceptance and final plan compilation.
+  rationale: Catch missing evidence records before a real planning session reaches compilation.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1379
+    end_line: 1380
+  summary: Exercise searched evidence through coverage acceptance and final plan compilation.
+  rationale: Catch missing evidence records before a real planning session reaches compilation.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1403
+    end_line: 1406
+  summary: Exercise searched evidence through coverage acceptance and final plan compilation.
+  rationale: Catch missing evidence records before a real planning session reaches compilation.
+- path: tests/test_planning_source.py
+  type: modified
+  span:
+    start_line: 394
+    end_line: 394
+  summary: Cover block-scoped extraction, cursor trimming, repeated-reference removal, and pagination
+    progress.
+  rationale: Ensure later extraction pages only add obligations from the unprocessed source range.
+- path: tests/test_planning_source.py
+  type: modified
+  span:
+    start_line: 396
+    end_line: 396
+  summary: Cover block-scoped extraction, cursor trimming, repeated-reference removal, and pagination
+    progress.
+  rationale: Ensure later extraction pages only add obligations from the unprocessed source range.
+- path: tests/test_planning_source.py
+  type: modified
+  span:
+    start_line: 469
+    end_line: 469
+  summary: Cover block-scoped extraction, cursor trimming, repeated-reference removal, and pagination
+    progress.
+  rationale: Ensure later extraction pages only add obligations from the unprocessed source range.
+- path: tests/test_planning_source.py
+  type: modified
+  span:
+    start_line: 485
+    end_line: 488
+  summary: Cover block-scoped extraction, cursor trimming, repeated-reference removal, and pagination
+    progress.
+  rationale: Ensure later extraction pages only add obligations from the unprocessed source range.
+- path: tests/test_planning_source.py
+  type: modified
+  span:
+    start_line: 489
+    end_line: 489
+  summary: Cover block-scoped extraction, cursor trimming, repeated-reference removal, and pagination
+    progress.
+  rationale: Ensure later extraction pages only add obligations from the unprocessed source range.
+- path: tests/test_planning_source.py
+  type: modified
+  span:
+    start_line: 501
+    end_line: 501
+  summary: Cover block-scoped extraction, cursor trimming, repeated-reference removal, and pagination
+    progress.
+  rationale: Ensure later extraction pages only add obligations from the unprocessed source range.
+- path: tests/test_planning_source.py
+  type: modified
+  span:
+    start_line: 503
+    end_line: 505
+  summary: Cover block-scoped extraction, cursor trimming, repeated-reference removal, and pagination
+    progress.
+  rationale: Ensure later extraction pages only add obligations from the unprocessed source range.
+- path: tests/test_planning_source.py
+  type: modified
+  span:
+    start_line: 516
+    end_line: 516
+  summary: Cover block-scoped extraction, cursor trimming, repeated-reference removal, and pagination
+    progress.
+  rationale: Ensure later extraction pages only add obligations from the unprocessed source range.
+- path: tests/test_planning_source.py
+  type: modified
+  span:
+    start_line: 518
+    end_line: 518
+  summary: Cover block-scoped extraction, cursor trimming, repeated-reference removal, and pagination
+    progress.
+  rationale: Ensure later extraction pages only add obligations from the unprocessed source range.
+- path: tests/test_planning_source.py
+  type: modified
+  span:
+    start_line: 528
+    end_line: 535
+  summary: Cover block-scoped extraction, cursor trimming, repeated-reference removal, and pagination
+    progress.
+  rationale: Ensure later extraction pages only add obligations from the unprocessed source range.
+- path: tests/test_planning_source.py
+  type: modified
+  span:
+    start_line: 539
+    end_line: 573
+  summary: Cover block-scoped extraction, cursor trimming, repeated-reference removal, and pagination
+    progress.
+  rationale: Ensure later extraction pages only add obligations from the unprocessed source range.
+- path: tests/test_planning_source.py
+  type: modified
+  span:
+    start_line: 579
+    end_line: 579
+  summary: Cover block-scoped extraction, cursor trimming, repeated-reference removal, and pagination
+    progress.
+  rationale: Ensure later extraction pages only add obligations from the unprocessed source range.
+- path: tests/test_planning_source.py
+  type: modified
+  span:
+    start_line: 581
+    end_line: 581
+  summary: Cover block-scoped extraction, cursor trimming, repeated-reference removal, and pagination
+    progress.
+  rationale: Ensure later extraction pages only add obligations from the unprocessed source range.
+- path: tests/test_planning_source.py
+  type: modified
+  span:
+    start_line: 562
+    end_line: 562
+  summary: Cover block-scoped extraction, cursor trimming, repeated-reference removal, and pagination
+    progress.
+  rationale: Ensure later extraction pages only add obligations from the unprocessed source range.
+- path: tests/test_planning_source.py
+  type: modified
+  span:
+    start_line: 575
+    end_line: 575
+  summary: Cover block-scoped extraction, cursor trimming, repeated-reference removal, and pagination
+    progress.
+  rationale: Ensure later extraction pages only add obligations from the unprocessed source range.
+entities:
+- id: build_extract_requirements_request
+  type: Function
+  action: added
+- id: SourceLedgerQuestionMachine
+  type: Class
+  action: added
+- id: parse_work_unit_proposal
+  type: Function
+  action: added
+- id: planning-quality-regression-tests
+  type: Test suite
+  action: added
+entity_relationships:
+- id: planning-tests-verify-evidence-compilation
+  type: verifies
+  source: planning-quality-regression-tests
+  target: SourceLedgerQuestionMachine
+  action: added
+  description: Regression tests verify searched evidence remains available through accepted coverage and
+    plan compilation.
+invariants:
+- id: extraction-stays-within-active-cursor
+  description: Each extraction page cites only the target block's unprocessed source range and does not
+    re-emit already accepted obligations.
+  action: added
+- id: searched-evidence-reaches-compiled-plan
+  description: Evidence found by pinned repository search is included in the compiled evidence catalog
+    used to validate coverage references.
+  action: added
+- id: complete-coverage-has-sufficient-evidence
+  description: Complete coverage requires an execution receipt or relevant implementation/configuration
+    and test evidence.
+  action: added
+- id: work-unit-proposals-are-individually-answered
+  description: Work-unit proposal questions are not batched, preventing omission of a requested proposal
+    member.
+  action: added
+guidance:
+- id: split-runtime-mixed-proposals
+  description: When a proposal spans multiple implementation runtimes, split it into separate proposals
+    and assign each requirement to the proposal that cites its source anchors.
+  action: added

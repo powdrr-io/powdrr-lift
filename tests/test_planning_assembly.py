@@ -6,6 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 from powdrr_service.planning.assembly import (
+    MAX_WORK_UNIT_EVIDENCE_PER_REQUIREMENT,
     MAX_WORK_UNIT_PROPOSALS_PER_PAGE,
     MAX_WORK_UNIT_REQUIREMENTS_PER_PROPOSAL,
     MAX_WORK_UNIT_REQUIREMENTS_PER_QUESTION,
@@ -25,12 +26,16 @@ from powdrr_service.planning.assembly import (
 )
 from powdrr_service.planning.contracts import PlanningContractError
 from powdrr_service.planning.driver import SourceLedgerQuestionMachine
-from powdrr_service.planning.evidence import Evidence
+from powdrr_service.planning.evidence import Evidence, EvidenceKind
 from powdrr_service.planning.plan_sizing import (
     ExplicitWorkUnit,
     allocate_explicit_work_units,
 )
-from powdrr_service.planning.questions import batch_question_requests
+from powdrr_service.planning.questions import (
+    MAX_QUESTION_INPUT_CHARS,
+    batch_question_requests,
+    build_question_messages,
+)
 from powdrr_service.planning.source import (
     ImplementationPhase,
     PinnedSourceDocument,
@@ -572,6 +577,87 @@ def test_work_unit_question_has_a_parser_valid_example_and_exact_context() -> No
                 "next_anchor": None,
             }
         )
+
+
+def test_work_unit_question_bounds_evidence_without_losing_evidence_kinds() -> None:
+    context, anchor = _context()
+    requirements = {
+        f"req-{index:04d}": replace(
+            context.requirements["req-0001"], id=f"req-{index:04d}"
+        )
+        for index in range(1, 5)
+    }
+    requirement_ids = tuple(requirements)
+    evidence_by_requirement = {}
+    all_evidence = {}
+    kinds: tuple[EvidenceKind, ...] = (
+        "implementation",
+        "configuration",
+        "test",
+        "execution_receipt",
+    )
+    for requirement_id in requirement_ids:
+        records = tuple(
+            Evidence(
+                id=f"evidence-{int(requirement_id[-4:]) * 10 + index:04d}",
+                base_commit="a" * 40,
+                path=(
+                    f"tests/test_{requirement_id}_{index}.py"
+                    if kind == "test"
+                    else f"src/{requirement_id}_{index}.py"
+                ),
+                start_line=1,
+                end_line=1,
+                content_sha256="b" * 64,
+                kind=kind,
+            )
+            for index, kind in enumerate((*kinds, *kinds), start=1)
+        )
+        evidence_by_requirement[requirement_id] = records
+        all_evidence.update({item.id: item for item in records})
+    context = replace(
+        context,
+        requirements=requirements,
+        unresolved_requirement_ids=requirement_ids,
+        evidence=all_evidence,
+        evidence_by_requirement=evidence_by_requirement,
+    )
+    phases = (
+        ImplementationPhase("pr-01", "Define schemas", ()),
+        ImplementationPhase("pr-02", "Implement verifier", ("pr-01",)),
+    )
+    context = replace(context, implementation_phases=phases)
+    proposal = _proposal(context, anchor)
+    proposal["requirement_ids"] = list(requirement_ids)
+    proposal["implementation_phase_id"] = "pr-01"
+    request = build_work_unit_proposal_request(
+        context,
+        requirement_ids,
+        valid_example={
+            "records": [proposal],
+            "has_more": False,
+            "next_anchor": None,
+        },
+    )
+
+    request.validate()
+    supplied = [item.value for item in request.repository_evidence]
+
+    assert MAX_WORK_UNIT_EVIDENCE_PER_REQUIREMENT == 4
+    assert (
+        len(supplied) == len(requirement_ids) * MAX_WORK_UNIT_EVIDENCE_PER_REQUIREMENT
+    )
+    for requirement_id in requirement_ids:
+        first_id = int(requirement_id[-4:]) * 10 + 1
+        own = [
+            item
+            for item in supplied
+            if first_id <= int(item["id"].split("-")[-1]) < first_id + 8
+        ]
+        assert {item["kind"] for item in own} == set(kinds)
+    assert (
+        len(build_question_messages(request)[1]["content"]) < MAX_QUESTION_INPUT_CHARS
+    )
 
 
 def test_work_unit_source_ref_error_names_required_and_supplied_anchors() -> None:

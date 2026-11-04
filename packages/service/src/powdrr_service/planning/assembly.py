@@ -384,15 +384,21 @@ def parse_work_unit_proposal(
         _parse_planned_write(item, pointer=f"/planned_writes/{index}", context=context)
         for index, item in enumerate(raw_writes)
     )
+    runtime_by_path = {write.path: _write_runtime(write, context) for write in writes}
     non_neutral_runtimes = {
-        runtime
-        for write in writes
-        if (runtime := _write_runtime(write, context)) is not None
+        runtime for runtime in runtime_by_path.values() if runtime is not None
     }
     if len(non_neutral_runtimes) > 1:
+        runtime_details = ", ".join(
+            f"{path} ({runtime})"
+            for path, runtime in sorted(runtime_by_path.items())
+            if runtime is not None
+        )
         raise PlanningContractError(
             "/planned_writes",
-            "one work unit cannot mix implementation runtimes; split the work",
+            "one work unit cannot mix implementation runtimes. Planned paths "
+            f"resolve to: {runtime_details}. Split these writes into separate "
+            "proposals and assign requirements by their cited source_refs.",
         )
     derived_runtime = next(iter(non_neutral_runtimes), "neutral")
     step = _text(value["implementation_step"], "/implementation_step")
@@ -423,7 +429,9 @@ def parse_work_unit_proposal(
         if not source_refs.intersection(requirement.source_refs):
             raise PlanningContractError(
                 "/planned_writes",
-                f"writes for {requirement_id} need one of its source anchors",
+                f"writes for {requirement_id} need one of source anchors "
+                f"{sorted(requirement.source_refs)}, but this unit cites "
+                f"{sorted(source_refs)}",
             )
     return WorkUnitProposal(
         requirement_ids,
@@ -882,10 +890,15 @@ def build_work_unit_proposal_request(
             "requirement, evidence, or source IDs. Component, validation, and "
             "runtime are derived from supplied catalogs and planned paths. Split "
             "different implementation runtimes into separate units. "
+            "A .sh file is a shell write even when it supports validation; do not "
+            "label a production script as a test to merge it with another runtime. "
             "When the preferred_implementation_runtimes fact is supplied, prefer "
             "those pinned repository languages if they can satisfy the source. "
             "Use another runtime only when the requirements or repository evidence "
             "require it. "
+            "For example, if a proposal needs both .sh and .py implementation "
+            "files, return separate proposals and assign each requirement to the "
+            "proposal whose writes cite that requirement's source_refs. "
             "For each requirement ID in a unit, at least one planned write must "
             "cite one of that requirement's own source_refs from its requirement "
             "fact; do not cite only a neighboring requirement's anchors. "

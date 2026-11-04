@@ -391,10 +391,9 @@ def test_source_question_builders_bind_context_examples_and_digests() -> None:
     extraction = build_extract_requirements_request(
         first_block,
         anchors={item.id: item for item in segmented.anchors},
-        related_blocks=(second_block,),
     )
     assert extraction.question.kind == "extract_requirements"
-    assert len(extraction.source_excerpts) == 2
+    assert len(extraction.source_excerpts) == 1
     extraction.validate()
 
     requirement_a = Requirement(
@@ -467,7 +466,7 @@ def test_requirement_extraction_pagination_cursor_must_advance_in_block() -> Non
         )
 
 
-def test_requirement_question_distinguishes_cursors_from_adjacent_citations() -> None:
+def test_requirement_question_is_scoped_to_current_block_and_cursor() -> None:
     segmented = segment_markdown_source(
         _document(
             "# Plan\n\n"
@@ -483,10 +482,13 @@ def test_requirement_question_distinguishes_cursors_from_adjacent_citations() ->
     obligation_anchors = tuple(
         ref for ref in block.anchor_ids if anchor_by_id[ref].clause_id is not None
     )
+    adjacent_anchor = next(
+        (ref for ref in adjacent.anchor_ids if anchor_by_id[ref].clause_id is not None),
+        adjacent.anchor_ids[0],
+    )
     request = build_extract_requirements_request(
         block,
         anchors=anchor_by_id,
-        related_blocks=(adjacent,),
     )
 
     pagination_fact = next(
@@ -496,8 +498,11 @@ def test_requirement_question_distinguishes_cursors_from_adjacent_citations() ->
     )
     assert pagination_fact.value["allowed_next_anchor_ids"] == list(obligation_anchors)
     assert ", ".join(obligation_anchors) not in request.exact_question
-    assert "must never be used as pagination cursors" in request.exact_question
+    assert "only the target block" in request.exact_question
     assert "has_more=true requires a non-null next_anchor" in request.exact_question
+    assert len(request.source_excerpts) == 1
+    assert request.source_excerpts[0].ref_id == block.id
+    assert adjacent_anchor not in request.question.context_ref_ids
     assert request.valid_example["has_more"] is True
     assert request.valid_example["next_anchor"] == obligation_anchors[0]
     assert block.anchor_ids[0] not in request.question.context_ref_ids
@@ -508,30 +513,72 @@ def test_requirement_question_distinguishes_cursors_from_adjacent_citations() ->
             {
                 "records": [],
                 "has_more": True,
-                "next_anchor": adjacent.anchor_ids[0],
+                "next_anchor": adjacent_anchor,
             }
         )
 
     next_request = build_extract_requirements_request(
         block,
         anchors=anchor_by_id,
-        related_blocks=(adjacent,),
         after_anchor=obligation_anchors[0],
     )
     assert next_request.valid_example["records"][0]["source_refs"] == [
         obligation_anchors[1]
     ]
+    assert obligation_anchors[0] not in next_request.question.context_ref_ids
+    assert obligation_anchors[1] in next_request.question.context_ref_ids
+    assert (
+        next_request.source_excerpts[0].text
+        == block.text[
+            anchor_by_id[obligation_anchors[0]].end_offset - block.start_offset :
+        ]
+    )
     assert next_request.valid_example["has_more"] is True
     assert next_request.valid_example["next_anchor"] == obligation_anchors[1]
     next_request.parse_answer(next_request.valid_example)
+    repeated = next_request.parse_answer(
+        {
+            "records": [
+                {
+                    "statement": "Repeat the already extracted obligation.",
+                    "kind": "behavior",
+                    "source_refs": [obligation_anchors[0]],
+                    "related_source_refs": [],
+                }
+            ],
+            "has_more": False,
+            "next_anchor": None,
+        }
+    )
+    assert repeated.records == ()
+
+    mixed_page = next_request.parse_answer(
+        {
+            "records": [
+                {
+                    "statement": "Repeat an old clause and add the next one.",
+                    "kind": "behavior",
+                    "source_refs": [
+                        obligation_anchors[0],
+                        obligation_anchors[1],
+                    ],
+                    "related_source_refs": [],
+                }
+            ],
+            "has_more": True,
+            "next_anchor": obligation_anchors[1],
+        }
+    )
+    assert mixed_page.records[0]["source_refs"] == (obligation_anchors[1],)
+
     with pytest.raises(PlanningContractError, match="outside supplied context"):
         next_request.parse_answer(
             {
                 "records": [
                     {
-                        "statement": "Repeat the already extracted obligation.",
+                        "statement": "Cite an unknown anchor.",
                         "kind": "behavior",
-                        "source_refs": [obligation_anchors[0]],
+                        "source_refs": ["anchor-9999"],
                         "related_source_refs": [],
                     }
                 ],
@@ -559,7 +606,6 @@ def test_requirement_question_distinguishes_cursors_from_adjacent_citations() ->
     final_request = build_extract_requirements_request(
         block,
         anchors=anchor_by_id,
-        related_blocks=(adjacent,),
         after_anchor=obligation_anchors[1],
     )
     assert final_request.valid_example["records"][0]["source_refs"] == [
@@ -572,7 +618,6 @@ def test_requirement_question_distinguishes_cursors_from_adjacent_citations() ->
     exhausted_request = build_extract_requirements_request(
         block,
         anchors=anchor_by_id,
-        related_blocks=(adjacent,),
         after_anchor=obligation_anchors[-1],
     )
     assert exhausted_request.valid_example == {

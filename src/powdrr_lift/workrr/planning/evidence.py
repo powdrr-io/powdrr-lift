@@ -116,7 +116,7 @@ def _pinned_analysis_root(repository_root: Path, base_commit: str) -> Path:
     key = (str(root), base_commit)
     cached = _PINNED_ANALYSIS_TEMPORARIES.get(key)
     if cached is not None:
-        return Path(cached.name) / "repository"
+        return (Path(cached.name) / "repository").resolve()
 
     temporary = tempfile.TemporaryDirectory(prefix="powdrr-pinned-analysis-")
     snapshot = Path(temporary.name) / "repository"
@@ -152,7 +152,7 @@ def _pinned_analysis_root(repository_root: Path, base_commit: str) -> Path:
             f"could not materialize pinned code-analysis snapshot: {error}"
         ) from error
     _PINNED_ANALYSIS_TEMPORARIES[key] = temporary
-    return snapshot
+    return snapshot.resolve()
 
 
 _COVERAGE_SEARCH_PATHS = (
@@ -748,9 +748,17 @@ def _coverage_search_terms(statement: str) -> tuple[str, ...]:
 
 
 def _is_test_path(path: str) -> bool:
-    return any(
-        "test" in part.casefold() or "fixture" in part.casefold()
-        for part in PurePosixPath(path).parts
+    parts = PurePosixPath(path).parts
+    if any(
+        part.casefold()
+        in {"test", "tests", "testing", "__tests__", "fixture", "fixtures"}
+        for part in parts[:-1]
+    ):
+        return True
+    name = parts[-1].casefold() if parts else ""
+    return name.startswith(("test_", "test.", "test-")) or any(
+        marker in name
+        for marker in ("_test.", ".test.", ".spec.", "_spec.", ".fixture.")
     )
 
 

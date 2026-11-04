@@ -226,7 +226,11 @@ def batch_question_requests(
         request = _normalize_question_context(original_request)
         request.validate()
         batch_limit = max_batch_size or (
-            6 if request.question.kind == "extract_requirements" else 4
+            6
+            if request.question.kind == "extract_requirements"
+            else 1
+            if request.question.kind == "propose_work_units"
+            else 4
         )
         if pending and (
             len(pending) >= batch_limit

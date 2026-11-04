@@ -464,7 +464,6 @@ class SourceLedgerQuestionMachine:
     ) -> None:
         source.validate()
         self.source = source
-        self._source_blocks_by_id = {item.id: item for item in source.blocks}
         self.evidence_by_requirement = dict(evidence_by_requirement or {})
         self.evidence_search = evidence_search
         self.evidence_excerpt_reader = evidence_excerpt_reader
@@ -662,7 +661,6 @@ class SourceLedgerQuestionMachine:
                 extract_request = build_extract_requirements_request(
                     block,
                     anchors=anchor_by_id,
-                    related_blocks=self._adjacent_blocks(block),
                     after_anchor=after_anchor,
                 )
                 answer = accepted_answers.get(extract_request.question.question_id)
@@ -838,9 +836,7 @@ class SourceLedgerQuestionMachine:
         coverage_requests: list[QuestionRequest[Any]] = []
         for requirement in ledger.requirements:
             search = self._evidence_search_cache.get(requirement.id)
-            evidence = self.evidence_by_requirement.get(
-                requirement.id, () if search is None else search.evidence
-            )
+            evidence = self._evidence_for_requirement(requirement.id)
             coverage_request = self._coverage_request_cache.get(requirement.id)
             if coverage_request is None:
                 coverage_request = self._build_coverage_request(
@@ -961,6 +957,30 @@ class SourceLedgerQuestionMachine:
                     "repository evidence search used the wrong base commit"
                 )
             self._evidence_search_cache[requirement_id] = result
+
+    def _evidence_for_requirement(self, requirement_id: str) -> tuple[Evidence, ...]:
+        """Return explicit evidence or the pinned search result for one requirement."""
+        supplied = self.evidence_by_requirement.get(requirement_id)
+        if supplied is not None:
+            return supplied
+        search = self._evidence_search_cache.get(requirement_id)
+        return () if search is None else search.evidence
+
+    def _evidence_catalog(self) -> dict[str, Evidence]:
+        """Collect every evidence record available to this planning session."""
+        evidence: dict[str, Evidence] = {}
+        sources = [*self.evidence_by_requirement.values()]
+        sources.extend(
+            search.evidence for search in self._evidence_search_cache.values()
+        )
+        for records in sources:
+            for item in records:
+                existing = evidence.setdefault(item.id, item)
+                if existing != item:
+                    raise ValueError(
+                        f"planning evidence ID {item.id} has conflicting records"
+                    )
+        return evidence
 
     def _work_unit_requests(
         self, accepted_answers: Mapping[str, Mapping[str, Any]]
@@ -1096,9 +1116,13 @@ class SourceLedgerQuestionMachine:
         self, ledger: SourceLedger, unresolved: tuple[str, ...]
     ) -> WorkUnitContext:
         requirements = {item.id: item for item in ledger.requirements}
+        evidence_by_requirement = {
+            requirement_id: self._evidence_for_requirement(requirement_id)
+            for requirement_id in requirements
+        }
         evidence = {
             item.id: item
-            for items in self.evidence_by_requirement.values()
+            for items in evidence_by_requirement.values()
             for item in items
         }
         validation_catalog = {
@@ -1119,7 +1143,7 @@ class SourceLedgerQuestionMachine:
             repository_paths=self.repository_paths,
             ambiguous_runtime_resolutions={},
             preferred_runtimes=self.preferred_runtimes,
-            evidence_by_requirement=self.evidence_by_requirement,
+            evidence_by_requirement=evidence_by_requirement,
         )
 
     def _work_unit_example(
@@ -2245,11 +2269,7 @@ class SourceLedgerQuestionMachine:
         proposal = self.accepted_structrr_proposal(accepted_answers)
         dispositions = {item.block_id: item for item in ledger.dispositions}
         coverage_by_id = {item.requirement_id: item for item in coverage}
-        evidence = {
-            item.id: item
-            for items in self.evidence_by_requirement.values()
-            for item in items
-        }
+        evidence = self._evidence_catalog()
         validation = Validation(
             "validation-0001",
             "Run the configured repository verification command.",
@@ -2480,7 +2500,6 @@ class SourceLedgerQuestionMachine:
                 extract_request = build_extract_requirements_request(
                     block,
                     anchors=anchor_by_id,
-                    related_blocks=self._adjacent_blocks(block),
                     after_anchor=cursor,
                 )
                 page = extract_request.parse_answer(
@@ -2574,9 +2593,7 @@ class SourceLedgerQuestionMachine:
         self._search_requirements_evidence(ledger.requirements)
         for requirement in ledger.requirements:
             search = self._evidence_search_cache.get(requirement.id)
-            evidence = self.evidence_by_requirement.get(
-                requirement.id, () if search is None else search.evidence
-            )
+            evidence = self._evidence_for_requirement(requirement.id)
             request = self._coverage_request_cache.get(requirement.id)
             if request is None:
                 request = self._build_coverage_request(requirement, evidence, search)
@@ -2632,18 +2649,6 @@ class SourceLedgerQuestionMachine:
             evidence_excerpts=excerpts,
             repository_search=None if search is None else search.to_data(),
         )
-
-    def _adjacent_blocks(self, block: Any) -> tuple[Any, ...]:
-        result = []
-        for block_id in (block.previous_block_id, block.next_block_id):
-            adjacent = (
-                self._source_blocks_by_id.get(block_id)
-                if block_id is not None
-                else None
-            )
-            if adjacent is not None:
-                result.append(adjacent)
-        return tuple(result)
 
 
 def _normalized_block_fingerprint(text: str) -> str:

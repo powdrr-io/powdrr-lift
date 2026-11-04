@@ -502,7 +502,9 @@ def test_live_report_includes_dependency_candidate_and_confirmation_counts() -> 
         enforce_fixture_shape=True,
     )
 
-    assert report["by_question_kind"]["propose_work_units"]["api_calls"] == 1
+    # Proposal pages are asked individually because batched proposals were
+    # repeatedly omitting one of their requested work units.
+    assert report["by_question_kind"]["propose_work_units"]["api_calls"] == 2
     assert "check_requirement_fidelity" not in report["by_question_kind"]
     assert "assess_requirement_coverage" not in report["by_question_kind"]
     assert report["dependency_candidates"] == {

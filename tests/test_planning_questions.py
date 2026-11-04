@@ -320,6 +320,24 @@ def test_batch_question_requests_keep_non_extraction_default_at_four() -> None:
         ) == {request.question.question_id: _VALID_PAGE for request in members}
 
 
+def test_work_unit_proposals_are_not_batched() -> None:
+    requests = tuple(
+        _request(
+            _question(
+                f"q-{index:06d}",
+                f"block-{index:02d}",
+                kind="propose_work_units",
+            )
+        )
+        for index in range(1, 4)
+    )
+
+    batches = batch_question_requests(requests)
+
+    assert batches == requests
+    assert all(not batch.batch_members for batch in batches)
+
+
 def test_extraction_batch_uses_six_when_input_bound_allows() -> None:
     requests = tuple(
         _request(_question(f"q-{index:06d}", f"block-{index:02d}"))

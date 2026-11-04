@@ -167,7 +167,8 @@ def test_actual_python_and_swift_writes_cannot_share_a_unit() -> None:
     answer["planned_writes"] = [answer["planned_writes"][0], python_write]  # type: ignore[index]
 
     with pytest.raises(
-        PlanningContractError, match="cannot mix implementation runtimes"
+        PlanningContractError,
+        match=r"cannot mix implementation runtimes.*tests/test_helper.py \(python\)",
     ):
         parse_work_unit_proposal(answer, context=context)
 
@@ -453,6 +454,8 @@ def test_work_unit_question_has_a_parser_valid_example_and_exact_context() -> No
     assert "Do not create one unit per requirement" in request.exact_question
     assert "requirement's own source_refs" in request.exact_question
     assert "runtime are derived" in request.exact_question
+    assert "return separate proposals" in request.exact_question
+    assert "A .sh file is a shell write" in request.exact_question
     assert "If every supplied requirement is covered" in request.exact_question
     assert (
         "requirements remain uncovered" in request.answer_field_definitions["has_more"]
@@ -524,6 +527,44 @@ def test_work_unit_question_has_a_parser_valid_example_and_exact_context() -> No
                 "next_anchor": None,
             }
         )
+
+
+def test_work_unit_source_ref_error_names_required_and_supplied_anchors() -> None:
+    text = "# Plan\n\n- First obligation.\n- Second obligation.\n"
+    document = PinnedSourceDocument(
+        "repo",
+        "a" * 40,
+        "plan.md",
+        "b" * 40,
+        hashlib.sha256(text.encode()).hexdigest(),
+        text,
+    )
+    source = segment_markdown_source(document)
+    anchors = tuple(item for item in source.anchors if item.clause_id is not None)
+    first, second = anchors[:2]
+    requirements = {
+        "req-0001": Requirement(
+            "req-0001", "First obligation.", "behavior", (first.id,), (), ()
+        ),
+        "req-0002": Requirement(
+            "req-0002", "Second obligation.", "behavior", (second.id,), (), ()
+        ),
+    }
+    context, _ = _context()
+    context = replace(
+        context,
+        requirements=requirements,
+        unresolved_requirement_ids=("req-0001", "req-0002"),
+        source=source,
+    )
+    proposal = _proposal(context, first.id)
+    proposal["requirement_ids"] = ["req-0001", "req-0002"]
+
+    with pytest.raises(PlanningContractError) as exc_info:
+        parse_work_unit_proposal(proposal, context=context)
+
+    assert second.id in str(exc_info.value)
+    assert first.id in str(exc_info.value)
 
 
 def test_work_unit_example_maps_each_requirement_to_its_own_source_anchor() -> None:
@@ -750,23 +791,8 @@ def test_work_unit_proposals_scope_evidence_and_batch_independent_groups() -> No
         for item in explicitly_unindexed_request.repository_evidence
     )
     batches = batch_question_requests(small_context_requests)
-    assert len(batches) == 2
-    assert sorted(len(batch.batch_members) for batch in batches) == [0, 3]
-    first_member_id = batches[0].batch_members[0].question.question_id
-    member_schema = batches[0].answer_schema["properties"]["answers"]["properties"][
-        first_member_id
-    ]
-    proposal_properties = member_schema["properties"]["records"]["items"]["properties"]
-    assert "enum" not in proposal_properties["requirement_ids"]["items"]
-    assert (
-        "enum"
-        not in proposal_properties["planned_writes"]["items"]["properties"][
-            "evidence_ids"
-        ]["items"]
-    )
-    assert proposal_properties["planned_writes"]["items"]["properties"]["role"][
-        "enum"
-    ] == ["configuration", "documentation", "implementation", "test"]
+    assert len(batches) == 4
+    assert all(not batch.batch_members for batch in batches)
 
     first_group_evidence_ids = {
         record.id

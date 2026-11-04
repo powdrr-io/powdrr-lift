@@ -23,6 +23,7 @@ from powdrr_service.planning.assembly import (
     build_work_unit_proposal_request,
     parse_item_description,
     parse_work_unit_proposal,
+    parse_work_unit_proposal_page,
 )
 from powdrr_service.planning.contracts import PlanningContractError
 from powdrr_service.planning.driver import SourceLedgerQuestionMachine
@@ -86,7 +87,6 @@ def _proposal(
     *,
     path: str = "Tests/Validator.swift",
     runtime: str = "swift",
-    role: str = "test",
 ) -> dict[str, object]:
     return {
         "requirement_ids": ["req-0001"],
@@ -95,7 +95,7 @@ def _proposal(
         "planned_writes": [
             {
                 "path": path,
-                "role": role,
+                "role": "test",
                 "source_refs": [anchor],
                 "evidence_ids": [],
             }
@@ -183,25 +183,33 @@ def test_actual_python_and_swift_writes_cannot_share_a_unit() -> None:
 
 def test_requirement_can_be_covered_by_runtime_specific_units() -> None:
     context, anchor = _context()
-    shell_answer = _proposal(
-        context,
-        anchor,
-        path="scripts/verify.sh",
-        runtime="shell",
-        role="implementation",
-    )
-    python_answer = _proposal(
-        context, anchor, path="tests/test_verify.py", runtime="python"
-    )
+    mixed_answer = _proposal(context, anchor)
+    mixed_answer["planned_writes"] = [
+        {
+            "path": "scripts/verify.sh",
+            "role": "implementation",
+            "source_refs": [anchor],
+            "evidence_ids": [],
+        },
+        {
+            "path": "tests/test_verify.py",
+            "role": "test",
+            "source_refs": [anchor],
+            "evidence_ids": [],
+        },
+    ]
     request = build_work_unit_proposal_request(
         context,
         ("req-0001",),
-        valid_example=shell_answer,
+        valid_example=_proposal(context, anchor),
     )
 
-    shell_unit = parse_work_unit_proposal(shell_answer, context=context)
-    python_unit = parse_work_unit_proposal(python_answer, context=context)
-    allocated = allocate_work_units((shell_unit, python_unit), context=context)
+    page = parse_work_unit_proposal_page(
+        {"records": [mixed_answer], "has_more": False, "next_anchor": None},
+        context=context,
+        requirement_order=("req-0001",),
+    )
+    allocated = allocate_work_units(page.records, context=context)
 
     assert "Repeat that requirement ID" in request.exact_question
     assert [unit.requirement_ids for unit in allocated.units] == [

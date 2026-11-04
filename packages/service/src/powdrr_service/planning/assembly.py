@@ -546,10 +546,11 @@ def parse_work_unit_proposal_page(
     _exact_fields(value, {"records", "has_more", "next_anchor"}, "/")
     raw_records = _array(value["records"], "/records", maximum=maximum_proposals)
     proposals = tuple(
-        parse_work_unit_proposal(item, context=context)
-        if isinstance(item, Mapping)
-        else _invalid_record(f"/records/{index}")
+        proposal
         for index, item in enumerate(raw_records)
+        for proposal in _parse_or_split_work_unit_proposal(
+            item, pointer=f"/records/{index}", context=context
+        )
     )
     allowed_requirement_ids = set(requirement_order)
     if any(
@@ -626,6 +627,116 @@ def parse_work_unit_proposal_page(
             )
         anchor = None
     return RequirementEnumerationPage(proposals, has_more, anchor)
+
+
+def _parse_or_split_work_unit_proposal(
+    value: Any, *, pointer: str, context: WorkUnitContext
+) -> tuple[WorkUnitProposal, ...]:
+    if not isinstance(value, Mapping):
+        _invalid_record(pointer)
+    try:
+        return (parse_work_unit_proposal(value, context=context),)
+    except PlanningContractError as error:
+        if error.json_pointer != "/planned_writes" or not error.message.startswith(
+            "one work unit cannot mix"
+        ):
+            raise
+    return _split_mixed_runtime_proposal(value, context=context)
+
+
+def _split_mixed_runtime_proposal(
+    value: Mapping[str, Any], *, context: WorkUnitContext
+) -> tuple[WorkUnitProposal, ...]:
+    requirement_ids = _reference_list(
+        value.get("requirement_ids"),
+        "/requirement_ids",
+        known=set(context.unresolved_requirement_ids),
+        minimum=1,
+        maximum=MAX_WORK_UNIT_REQUIREMENTS_PER_PROPOSAL,
+    )
+    writes = tuple(
+        _parse_planned_write(item, pointer=f"/planned_writes/{index}", context=context)
+        for index, item in enumerate(
+            _array(value.get("planned_writes"), "/planned_writes", maximum=20)
+        )
+    )
+    writes_by_runtime: dict[str | None, list[PlannedWrite]] = {}
+    for write in writes:
+        writes_by_runtime.setdefault(write.runtime, []).append(write)
+    if len({runtime for runtime in writes_by_runtime if runtime is not None}) < 2:
+        raise PlanningContractError(
+            "/planned_writes", "could not safely partition mixed-runtime writes"
+        )
+
+    original_outputs = tuple(
+        _parse_required_output(
+            item,
+            pointer=f"/required_outputs/{index}",
+            requirement_ids=set(context.unresolved_requirement_ids),
+        )
+        for index, item in enumerate(
+            _array(value.get("required_outputs"), "/required_outputs", maximum=8)
+        )
+    )
+    split_proposals: list[WorkUnitProposal] = []
+    for runtime, runtime_writes in writes_by_runtime.items():
+        runtime_refs = {ref for write in runtime_writes for ref in write.source_refs}
+        runtime_requirement_ids = tuple(
+            requirement_id
+            for requirement_id in requirement_ids
+            if runtime_refs.intersection(
+                context.requirements[requirement_id].source_refs
+            )
+        )
+        if not runtime_requirement_ids:
+            paths = sorted(write.path for write in runtime_writes)
+            raise PlanningContractError(
+                "/planned_writes",
+                "cannot assign runtime-specific writes to a supplied requirement "
+                f"by its source refs: {paths}",
+            )
+
+        runtime_name = runtime or "runtime-neutral"
+        split_value = dict(value)
+        split_value["requirement_ids"] = list(runtime_requirement_ids)
+        split_value["planned_writes"] = [
+            {
+                "path": write.path,
+                "role": write.role,
+                "source_refs": list(write.source_refs),
+                "evidence_ids": list(write.evidence_ids),
+            }
+            for write in runtime_writes
+        ]
+        original_deliverable = _text(
+            value.get("deliverable"), "/deliverable", max_length=1_000
+        )
+        runtime_deliverable = f"{runtime_name} work: {original_deliverable}"
+        split_value["deliverable"] = (
+            runtime_deliverable
+            if len(runtime_deliverable) <= 1_000
+            else original_deliverable
+        )
+        original_step = _text(value.get("implementation_step"), "/implementation_step")
+        scoped_step = f"{original_step} Restrict this unit to {runtime_name} writes."
+        split_value["implementation_step"] = (
+            scoped_step
+            if len(scoped_step) <= MAX_CONTRACT_TEXT_LENGTH
+            else original_step
+        )
+        split_value["required_outputs"] = [
+            {
+                "description": (
+                    f"{runtime_name}: {output.description}"
+                    if len(f"{runtime_name}: {output.description}") <= 1_000
+                    else output.description
+                ),
+                "requirement_ids": list(output.requirement_ids),
+            }
+            for output in original_outputs
+        ]
+        split_proposals.append(parse_work_unit_proposal(split_value, context=context))
+    return tuple(split_proposals)
 
 
 def _write_runtime(write: PlannedWrite, context: WorkUnitContext) -> str | None:

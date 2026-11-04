@@ -1,5 +1,5 @@
 schema: https://powdrr.io/schema/changelog-v2
-change_id: 1364
+change_id: 1365
 title: Allow requirements across runtime-specific work units
 intent:
   problem: A single source requirement may require deliverables in multiple implementation runtimes, but proposal guidance implied that the requirement could only be assigned to one proposal.

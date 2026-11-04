@@ -23,7 +23,11 @@ from powdrr_service.planning.questions import (
     QuestionRequest,
     SourceExcerpt,
 )
-from powdrr_service.planning.source import Requirement, SegmentedSource
+from powdrr_service.planning.source import (
+    ImplementationPhase,
+    Requirement,
+    SegmentedSource,
+)
 
 _VALIDATION_KINDS = frozenset({"local_command", "ci_check", "manual_observation"})
 _SETUP_TRIGGER: Literal["after_implementation_before_validation"] = (
@@ -284,6 +288,34 @@ class ManualSetup:
         }
 
 
+def combine_manual_prerequisite_data(
+    setups: Sequence[Mapping[str, Any]], *, validation_targets: Sequence[str]
+) -> dict[str, Any]:
+    """Build the single plan-item record for one or more accepted human setups."""
+    if not setups:
+        raise ValueError("manual prerequisite aggregation needs at least one setup")
+    titles = tuple(dict.fromkeys(str(setup["title"]) for setup in setups))
+    multiple_titles = len(titles) > 1
+    instructions = tuple(
+        dict.fromkeys(
+            f"{setup['title']}: {instruction}" if multiple_titles else instruction
+            for setup in setups
+            for instruction in setup["instructions"]
+        )
+    )
+    return {
+        "title": titles[0]
+        if not multiple_titles
+        else "Complete manual setup prerequisites",
+        "instructions": list(instructions),
+        "verification": "; ".join(
+            dict.fromkeys(str(setup["verification"]) for setup in setups)
+        ),
+        "trigger": setups[0]["trigger"],
+        "unblocks": "; ".join(dict.fromkeys(validation_targets)),
+    }
+
+
 @dataclass(frozen=True, slots=True)
 class DependencyCandidate:
     unit_id: str
@@ -307,6 +339,50 @@ class UnitDependencyEdge:
             "reason": self.reason,
             "requirement_ids": list(self.requirement_ids),
         }
+
+
+def implementation_phase_dependency_edges(
+    units: Sequence[WorkUnit], phases: Sequence[ImplementationPhase]
+) -> tuple[UnitDependencyEdge, ...]:
+    """Expand source-declared PR prerequisites into explicit work-unit edges."""
+    units_by_phase: dict[str, list[WorkUnit]] = defaultdict(list)
+    for unit in units:
+        if unit.implementation_phase_id is not None:
+            units_by_phase[unit.implementation_phase_id].append(unit)
+    edges: list[UnitDependencyEdge] = []
+    for phase in phases:
+        phase_units = units_by_phase.get(phase.id, ())
+        for producer, consumer in zip(phase_units, phase_units[1:], strict=False):
+            edges.append(
+                UnitDependencyEdge(
+                    producer.id,
+                    consumer.id,
+                    f"Completed earlier work in {phase.id}",
+                    (
+                        f"Work from source phase {phase.id} is split into ordered "
+                        "reviewable items; execute these units in their stable "
+                        "plan order."
+                    ),
+                    producer.requirement_ids[:1],
+                )
+            )
+        for dependency_id in phase.dependencies:
+            for producer in units_by_phase.get(dependency_id, ()):
+                for consumer in phase_units:
+                    edges.append(
+                        UnitDependencyEdge(
+                            producer.id,
+                            consumer.id,
+                            f"Completed {dependency_id} implementation work",
+                            (
+                                f"The source implementation sequence requires "
+                                f"{phase.id} ({phase.title}) to wait for "
+                                f"{dependency_id}."
+                            ),
+                            producer.requirement_ids[:1],
+                        )
+                    )
+    return tuple(edges)
 
 
 @dataclass(frozen=True, slots=True)

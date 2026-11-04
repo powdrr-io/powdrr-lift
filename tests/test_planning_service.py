@@ -28,12 +28,12 @@ from powdrr_service.planning.dependencies import (
     DependencyCandidateDiscovery,
     ManualSetup,
     UnitDependencyEdge,
+    combine_manual_prerequisite_data,
 )
 from powdrr_service.planning.driver import (
     SourceLedgerQuestionMachine,
     _deterministic_block_disposition,
     _is_completed_zero_hit_search,
-    _manual_prerequisite_data,
     _planned_existing_structural_subjects,
     _planned_reference_path_pairs,
 )
@@ -84,8 +84,9 @@ def test_combined_manual_prerequisites_keep_a_bounded_title_and_named_steps() ->
         )
     )
 
-    prerequisite = _manual_prerequisite_data(
-        setups, validation_target="bash scripts/verify.sh"
+    prerequisite = combine_manual_prerequisite_data(
+        [setup.to_data() for setup in setups],
+        validation_targets=("bash scripts/verify.sh",),
     )
 
     assert prerequisite["title"] == "Complete manual setup prerequisites"
@@ -218,6 +219,7 @@ class _PlanningScriptClient:
                 "records": [
                     {
                         "requirement_ids": ["req-0001"],
+                        "implementation_phase_id": None,
                         "deliverable": "Implement the requested behavior.",
                         "planned_writes": [
                             {
@@ -943,13 +945,13 @@ def test_oversized_work_unit_answer_replays_as_a_smaller_question_group() -> Non
         ),
     )
     question = Question(
-        question_id="propose-units-v4-req-0057-example",
+        question_id="propose-units-v5-req-0057-example",
         kind="propose_work_units",
-        contract_version=4,
+        contract_version=5,
         subject_ids=("req-0057", "req-0058", "req-0059", "req-0060"),
         input_digest="sha256:" + "0" * 64,
         context_ref_ids=(),
-        expected_answer_schema="work-unit-proposals-v4",
+        expected_answer_schema="work-unit-proposals-v5",
         attempt=1,
     )
     event = PlanningCheckpoint.needs_answer(
@@ -966,13 +968,13 @@ def test_oversized_work_unit_answer_replays_as_a_smaller_question_group() -> Non
     )
     store.append(event, expected_parent_digest=None)
     single_question = Question(
-        question_id="propose-units-v4-req-0058-single",
+        question_id="propose-units-v5-req-0058-single",
         kind="propose_work_units",
-        contract_version=4,
+        contract_version=5,
         subject_ids=("req-0058",),
         input_digest="sha256:" + "1" * 64,
         context_ref_ids=(),
-        expected_answer_schema="work-unit-proposals-v4",
+        expected_answer_schema="work-unit-proposals-v5",
         attempt=1,
     )
     single_event = PlanningCheckpoint.needs_answer(
@@ -1328,6 +1330,7 @@ def test_source_question_machine_accounts_for_normative_and_context_blocks() -> 
                 "records": [
                     {
                         "requirement_ids": ["req-0001"],
+                        "implementation_phase_id": None,
                         "deliverable": "Implement the requested behavior.",
                         "planned_writes": [
                             {
@@ -1348,6 +1351,7 @@ def test_source_question_machine_accounts_for_normative_and_context_blocks() -> 
                     },
                     {
                         "requirement_ids": ["req-0001"],
+                        "implementation_phase_id": None,
                         "deliverable": (
                             "Test the requested behavior in src/behavior.txt."
                         ),

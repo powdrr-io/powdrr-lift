@@ -27,6 +27,7 @@ from powdrr_service.planning.source import (
     build_extract_requirements_request,
     build_fidelity_request,
     deduplicate_requirement_records,
+    extract_implementation_phases,
     merge_equivalent_requirements,
     parse_block_disposition,
     parse_equivalence_decision,
@@ -149,6 +150,49 @@ def test_segments_markdown_with_headings_late_setup_and_cross_references() -> No
         for index, block in enumerate(segmented.blocks[:-1])
     )
     assert source_block_input_digest(late_block).startswith("sha256:")
+
+
+def test_extracts_explicit_implementation_pr_sequence_and_dependencies() -> None:
+    source = _document(
+        "# Plan\n\n"
+        "## Implementation PR sequence\n\n"
+        "| PR | Title | Dependencies | Reviewable result |\n"
+        "| --- | --- | --- | --- |\n"
+        "| 01 | Define schemas | None | Frozen contract |\n"
+        "| 02 | Implement verifier | 01 | Offline verifier |\n"
+        "| 03 | Release | All prior | Reviewed release |\n\n"
+        "### PR 01: Define schemas\n\nWrite schemas.\n"
+    )
+
+    phases = extract_implementation_phases(segment_markdown_source(source))
+
+    assert [
+        (phase.id, phase.title, phase.dependencies, phase.reviewable_result)
+        for phase in phases
+    ] == [
+        ("pr-01", "Define schemas", (), "Frozen contract"),
+        ("pr-02", "Implement verifier", ("pr-01",), "Offline verifier"),
+        (
+            "pr-03",
+            "Release",
+            ("pr-01", "pr-02"),
+            "Reviewed release",
+        ),
+    ]
+
+
+def test_rejects_forward_dependency_in_implementation_sequence() -> None:
+    source = _document(
+        "# Plan\n\n"
+        "## Implementation PR sequence\n\n"
+        "| PR | Title | Dependencies | Reviewable result |\n"
+        "| --- | --- | --- | --- |\n"
+        "| 01 | First | 02 | First output |\n"
+        "| 02 | Second | None | Second output |\n"
+    )
+
+    with pytest.raises(PlanningSourceError, match="unknown or forward"):
+        extract_implementation_phases(segment_markdown_source(source))
 
 
 def test_oversized_fence_is_split_without_losing_ranges() -> None:

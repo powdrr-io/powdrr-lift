@@ -701,6 +701,7 @@ class _ExampleAnswerClient:
             records.append(
                 {
                     "requirement_ids": list(partition),
+                    "implementation_phase_id": None,
                     "deliverable": f"Implement behavior outcome {first_number}.",
                     "planned_writes": [
                         {

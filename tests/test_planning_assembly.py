@@ -32,6 +32,7 @@ from powdrr_service.planning.plan_sizing import (
 )
 from powdrr_service.planning.questions import batch_question_requests
 from powdrr_service.planning.source import (
+    ImplementationPhase,
     PinnedSourceDocument,
     Requirement,
     segment_markdown_source,
@@ -83,6 +84,7 @@ def _proposal(
 ) -> dict[str, object]:
     return {
         "requirement_ids": ["req-0001"],
+        "implementation_phase_id": None,
         "deliverable": "A focused acceptance test.",
         "planned_writes": [
             {
@@ -308,6 +310,49 @@ def test_explicit_sizing_does_not_infer_runtime_from_unit_prose() -> None:
     assert result.groups == (("unit-0001", "unit-0002"),)
 
 
+def test_explicit_sizing_never_merges_work_from_different_source_phases() -> None:
+    result = allocate_explicit_work_units(
+        [
+            ExplicitWorkUnit("unit-0001", "tests", "swift", 1, "pr-01"),
+            ExplicitWorkUnit("unit-0002", "tests", "swift", 1, "pr-02"),
+        ]
+    )
+
+    assert result.groups == (("unit-0001",), ("unit-0002",))
+
+
+def test_work_unit_question_requires_the_source_declared_phase() -> None:
+    context, anchor = _context()
+    context = replace(
+        context,
+        implementation_phases=(
+            ImplementationPhase("pr-01", "Define schemas", ()),
+            ImplementationPhase("pr-02", "Implement verifier", ("pr-01",)),
+        ),
+    )
+    proposal = _proposal(context, anchor)
+    proposal["implementation_phase_id"] = "pr-02"
+    request = build_work_unit_proposal_request(
+        context,
+        ["req-0001"],
+        valid_example={"records": [proposal], "has_more": False, "next_anchor": None},
+    )
+
+    parsed = request.parse_answer(
+        {"records": [proposal], "has_more": False, "next_anchor": None}
+    )
+
+    assert parsed.records[0].implementation_phase_id == "pr-02"
+    assert request.answer_schema["properties"]["records"]["items"]["properties"][
+        "implementation_phase_id"
+    ]["enum"] == ["pr-01", "pr-02"]
+    unassigned = {**proposal, "implementation_phase_id": None}
+    with pytest.raises(PlanningContractError, match="source-declared"):
+        request.parse_answer(
+            {"records": [unassigned], "has_more": False, "next_anchor": None}
+        )
+
+
 def test_explicit_sizing_handles_large_plan_deterministically() -> None:
     units = [
         ExplicitWorkUnit(f"unit-{index:04d}", "core", "neutral", 1)
@@ -447,9 +492,9 @@ def test_work_unit_question_has_a_parser_valid_example_and_exact_context() -> No
 
     request.validate()
     assert request.question.kind == "propose_work_units"
-    assert request.question.contract_version == 4
-    assert request.question.expected_answer_schema == "work-unit-proposals-v4"
-    assert request.question.question_id.startswith("propose-units-v4-")
+    assert request.question.contract_version == 5
+    assert request.question.expected_answer_schema == "work-unit-proposals-v5"
+    assert request.question.question_id.startswith("propose-units-v5-")
     assert "several strongly related requirements together" in request.exact_question
     assert "Do not create one unit per requirement" in request.exact_question
     assert "requirement's own source_refs" in request.exact_question
@@ -706,6 +751,7 @@ def test_work_unit_proposals_scope_evidence_and_batch_independent_groups() -> No
                 "records": [
                     {
                         "requirement_ids": list(all_requirement_ids[:5]),
+                        "implementation_phase_id": None,
                         "deliverable": "Implement one bounded unit.",
                         "planned_writes": [],
                         "implementation_step": "Implement the bounded change.",
@@ -810,6 +856,7 @@ def test_work_unit_proposals_scope_evidence_and_batch_independent_groups() -> No
                 "records": [
                     {
                         "requirement_ids": [all_requirement_ids[0]],
+                        "implementation_phase_id": None,
                         "deliverable": "Implement the scoped behavior.",
                         "planned_writes": [
                             {
@@ -963,6 +1010,7 @@ def test_work_unit_continuation_only_includes_uncovered_requirements(
     assert len(example_records) == 1
     assert set(example_records[0]) == {
         "requirement_ids",
+        "implementation_phase_id",
         "deliverable",
         "planned_writes",
         "implementation_step",

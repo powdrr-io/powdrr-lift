@@ -31,7 +31,11 @@ from powdrr_service.planning.questions import (
     QuestionRequest,
     SourceExcerpt,
 )
-from powdrr_service.planning.source import Requirement, SegmentedSource
+from powdrr_service.planning.source import (
+    ImplementationPhase,
+    Requirement,
+    SegmentedSource,
+)
 
 MAX_WORK_UNIT_CRITERIA = 2
 MAX_WORK_UNIT_REQUIREMENTS_PER_PROPOSAL = 4
@@ -83,6 +87,7 @@ WORK_UNIT_PROPOSAL_PAGE_JSON_SCHEMA: dict[str, Any] = {
                 "additionalProperties": False,
                 "required": [
                     "requirement_ids",
+                    "implementation_phase_id",
                     "deliverable",
                     "planned_writes",
                     "implementation_step",
@@ -90,6 +95,7 @@ WORK_UNIT_PROPOSAL_PAGE_JSON_SCHEMA: dict[str, Any] = {
                     "required_outputs",
                 ],
                 "properties": {
+                    "implementation_phase_id": {"type": ["string", "null"]},
                     "requirement_ids": {
                         "type": "array",
                         "minItems": 1,
@@ -221,10 +227,12 @@ class WorkUnitProposal:
     acceptance_criteria: tuple[str, ...]
     validation_ids: tuple[str, ...]
     required_outputs: tuple[RequiredOutputProposal, ...]
+    implementation_phase_id: str | None = None
 
     def to_data(self) -> dict[str, Any]:
         return {
             "requirement_ids": list(self.requirement_ids),
+            "implementation_phase_id": self.implementation_phase_id,
             "deliverable": self.deliverable,
             "component": self.component,
             "implementation_runtime": self.implementation_runtime,
@@ -248,11 +256,13 @@ class WorkUnit:
     acceptance_criteria: tuple[str, ...]
     validation_ids: tuple[str, ...]
     prerequisite_unit_ids: tuple[str, ...] = ()
+    implementation_phase_id: str | None = None
 
     def to_data(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "requirement_ids": list(self.requirement_ids),
+            "implementation_phase_id": self.implementation_phase_id,
             "deliverable": self.deliverable,
             "component": self.component,
             "implementation_runtime": self.implementation_runtime,
@@ -290,6 +300,7 @@ class WorkUnitContext:
     ambiguous_runtime_resolutions: Mapping[str, str]
     preferred_runtimes: tuple[str, ...] = ()
     evidence_by_requirement: Mapping[str, tuple[Evidence, ...]] | None = None
+    implementation_phases: tuple[ImplementationPhase, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -356,6 +367,7 @@ def parse_work_unit_proposal(
     """Parse one proposal and bind all model references to supplied catalogs."""
     expected = {
         "requirement_ids",
+        "implementation_phase_id",
         "deliverable",
         "planned_writes",
         "implementation_step",
@@ -370,6 +382,22 @@ def parse_work_unit_proposal(
         minimum=1,
         maximum=MAX_WORK_UNIT_REQUIREMENTS_PER_PROPOSAL,
     )
+    raw_phase_id = value["implementation_phase_id"]
+    phase_ids = {phase.id for phase in context.implementation_phases}
+    if context.implementation_phases:
+        if not isinstance(raw_phase_id, str) or raw_phase_id not in phase_ids:
+            raise PlanningContractError(
+                "/implementation_phase_id",
+                "must select one source-declared implementation phase",
+            )
+        implementation_phase_id: str | None = raw_phase_id
+    elif raw_phase_id is None:
+        implementation_phase_id = None
+    else:
+        raise PlanningContractError(
+            "/implementation_phase_id",
+            "must be null when the source has no implementation PR sequence",
+        )
     if len(context.component_ids) != 1:
         raise PlanningContractError(
             "/component", "component cannot be derived from the supplied catalog"
@@ -443,6 +471,7 @@ def parse_work_unit_proposal(
         criteria,
         validation_ids,
         outputs,
+        implementation_phase_id,
     )
 
 
@@ -686,6 +715,7 @@ def allocate_work_units(
                 implementation_step=proposal.implementation_step,
                 acceptance_criteria=proposal.acceptance_criteria,
                 validation_ids=proposal.validation_ids,
+                implementation_phase_id=proposal.implementation_phase_id,
             )
         )
         pending.extend(
@@ -696,6 +726,25 @@ def allocate_work_units(
         missing = sorted(unresolved - seen_requirements)
         raise AssemblyError(
             f"work units leave unresolved requirements uncovered: {missing}"
+        )
+    if context.implementation_phases:
+        phase_order = {
+            phase.id: index for index, phase in enumerate(context.implementation_phases)
+        }
+        unknown_phases = {
+            unit.implementation_phase_id
+            for unit in units
+            if unit.implementation_phase_id not in phase_order
+        }
+        if unknown_phases:
+            raise AssemblyError(
+                "work units omit or reference an unknown source implementation phase"
+            )
+        units.sort(
+            key=lambda unit: (
+                phase_order[unit.implementation_phase_id or ""],
+                unit.id,
+            )
         )
     return AllocatedWorkUnits(tuple(units), tuple(pending))
 
@@ -795,7 +844,27 @@ def build_work_unit_proposal_request(
         if context.preferred_runtimes
         else ()
     )
-    accepted = (*requirement_facts, *validations, *components, *preferred_runtimes)
+    phases = (
+        (
+            ContextRecord(
+                "source_implementation_phases",
+                {
+                    "phases": [
+                        phase.to_data() for phase in context.implementation_phases
+                    ]
+                },
+            ),
+        )
+        if context.implementation_phases
+        else ()
+    )
+    accepted = (
+        *requirement_facts,
+        *validations,
+        *components,
+        *preferred_runtimes,
+        *phases,
+    )
     all_refs = tuple(
         [
             *(item.ref_id for item in excerpts),
@@ -804,7 +873,7 @@ def build_work_unit_proposal_request(
             *(item.ref_id for item in accepted),
         ]
     )
-    input_facts = {
+    input_facts: dict[str, Any] = {
         "requirements": [
             context.requirements[item].statement for item in requirement_ids
         ],
@@ -821,10 +890,14 @@ def build_work_unit_proposal_request(
         "validations": [item.value for item in validations],
         "components": sorted(context.component_ids),
         "preferred_runtimes": list(context.preferred_runtimes),
+        "implementation_phases": [
+            phase.to_data() for phase in context.implementation_phases
+        ],
         "page_after": page_after,
     }
     question_identity: dict[str, Any] = {
         "requirement_ids": list(requirement_ids),
+        "implementation_phases": [phase.id for phase in context.implementation_phases],
         "page_after": page_after,
     }
     if maximum_proposals != MAX_WORK_UNIT_PROPOSALS_PER_PAGE:
@@ -832,13 +905,13 @@ def build_work_unit_proposal_request(
         question_identity["maximum_proposals"] = maximum_proposals
     question_key = _digest(question_identity)[-12:]
     question = Question(
-        question_id=f"propose-units-v4-{requirement_ids[0]}-{question_key}",
+        question_id=f"propose-units-v5-{requirement_ids[0]}-{question_key}",
         kind="propose_work_units",
-        contract_version=4,
+        contract_version=5,
         subject_ids=tuple(requirement_ids),
-        input_digest=_digest({"schema_version": 4, **input_facts}),
+        input_digest=_digest({"schema_version": 5, **input_facts}),
         context_ref_ids=all_refs,
-        expected_answer_schema="work-unit-proposals-v4",
+        expected_answer_schema="work-unit-proposals-v5",
         attempt=1,
     )
     request_context = replace(
@@ -860,6 +933,10 @@ def build_work_unit_proposal_request(
     answer_schema["properties"]["records"]["maxItems"] = maximum_proposals
     record_properties = answer_schema["properties"]["records"]["items"]["properties"]
     record_properties["requirement_ids"]["items"]["enum"] = list(requirement_ids)
+    record_properties["implementation_phase_id"]["enum"] = [
+        *[phase.id for phase in context.implementation_phases],
+        *([None] if not context.implementation_phases else []),
+    ]
     write_properties = record_properties["planned_writes"]["items"]["properties"]
     write_properties["source_refs"]["items"]["enum"] = list(source_refs)
     write_properties["evidence_ids"]["items"]["enum"] = sorted(request_evidence)
@@ -902,7 +979,16 @@ def build_work_unit_proposal_request(
             "For each requirement ID in a unit, at least one planned write must "
             "cite one of that requirement's own source_refs from its requirement "
             "fact; do not cite only a neighboring requirement's anchors. "
-            "Use pinned repository facts for paths whose runtime cannot be "
+            + (
+                "The source defines an explicit implementation PR sequence. Set "
+                "implementation_phase_id to one supplied phase ID for every "
+                "proposal, follow the dependency table, and do not combine work "
+                "from different phases. "
+                if context.implementation_phases
+                else "Set implementation_phase_id to null because the source has "
+                "no explicit implementation PR sequence. "
+            )
+            + "Use pinned repository facts for paths whose runtime cannot be "
             "derived from their extension. Do not mix implementation runtimes. "
             "Use the valid example for field shape only; do not copy its "
             "placeholder path or example wording. "
@@ -955,6 +1041,7 @@ def allocate_work_unit_groups(
                     unit.component,
                     unit.implementation_runtime,
                     len(unit.acceptance_criteria),
+                    unit.implementation_phase_id,
                 )
                 for unit in units
             ],
@@ -1014,6 +1101,14 @@ def parse_cohesion_decision(
         else _invalid_record(f"/replacements/{index}")
         for index, item in enumerate(raw)
     )
+    if any(
+        replacement.implementation_phase_id != original.implementation_phase_id
+        for replacement in replacements
+    ):
+        raise PlanningContractError(
+            "/replacements",
+            "must preserve the original implementation phase",
+        )
     original_requirements = set(original.requirement_ids)
     replacement_requirements = [
         req for item in replacements for req in item.requirement_ids
@@ -1218,11 +1313,17 @@ def build_item_description_request(
     *,
     already_used_titles: Sequence[tuple[str, str]] = (),
     title_issue: str | None = None,
+    implementation_phase: ImplementationPhase | None = None,
 ) -> QuestionRequest[ItemDescription]:
     """Build the singular, frozen-group item-description question."""
     selected = [units[unit_id] for unit_id in group.unit_ids]
     accepted = tuple(ContextRecord(unit.id, unit.to_data()) for unit in selected)
-    context_ids = tuple(record.ref_id for record in accepted)
+    phase_context = (
+        (ContextRecord("implementation-phase", implementation_phase.to_data()),)
+        if implementation_phase is not None
+        else ()
+    )
+    context_ids = tuple(record.ref_id for record in (*accepted, *phase_context))
     title_review_facts: tuple[ContextRecord, ...] = (
         ContextRecord(
             "prior-item-titles",
@@ -1250,6 +1351,11 @@ def build_item_description_request(
                     "implementation_runtime": group.implementation_runtime,
                 },
                 "units": [units[unit_id].to_data() for unit_id in group.unit_ids],
+                "implementation_phase": (
+                    None
+                    if implementation_phase is None
+                    else implementation_phase.to_data()
+                ),
                 "schema_version": 2,
                 "already_used_titles": [list(item) for item in already_used_titles],
                 "title_issue": title_issue,
@@ -1329,6 +1435,12 @@ def build_item_description_request(
             "concise title and objective. Scope membership is derived from the "
             "allocated units and their components. Make the title specific to the "
             "group's deliverable and distinct from prior item titles."
+            + (
+                " Keep the title and objective aligned with the source-declared "
+                f"phase result: {implementation_phase.title}."
+                if implementation_phase is not None
+                else ""
+            )
             + (f" Repair the title issue: {title_issue}" if title_issue else "")
         ),
         answer_field_definitions={
@@ -1337,7 +1449,7 @@ def build_item_description_request(
         },
         source_excerpts=(),
         repository_evidence=(),
-        accepted_facts=(*accepted, *title_review_facts),
+        accepted_facts=(*accepted, *phase_context, *title_review_facts),
         valid_example=example,
         empty_example=example,
         answer_schema={

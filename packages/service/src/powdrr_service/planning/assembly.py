@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from copy import deepcopy
 from dataclasses import dataclass, replace
 from pathlib import PurePosixPath
@@ -41,6 +41,7 @@ MAX_WORK_UNIT_CRITERIA = 2
 MAX_WORK_UNIT_REQUIREMENTS_PER_PROPOSAL = 4
 MAX_WORK_UNIT_REQUIREMENTS_PER_QUESTION = 4
 MAX_WORK_UNIT_PROPOSALS_PER_PAGE = 3
+MAX_WORK_UNIT_EVIDENCE_PER_REQUIREMENT = 4
 MAX_ITEM_CRITERIA = 5
 MAX_ITEM_SCOPE_ENTRIES = 3
 _ROLES = frozenset({"implementation", "test", "configuration", "documentation"})
@@ -788,10 +789,14 @@ def build_work_unit_proposal_request(
         request_evidence = {
             evidence.id: evidence
             for requirement_id in requirement_ids
-            for evidence in context.evidence_by_requirement.get(requirement_id, ())
+            for evidence in _work_unit_evidence(
+                context.evidence_by_requirement.get(requirement_id, ())
+            )
         }
     else:
-        request_evidence = dict(context.evidence)
+        request_evidence = {
+            item.id: item for item in _work_unit_evidence(context.evidence.values())
+        }
     excerpt_text = "\n".join(item.text for item in excerpts)
     requirement_text = "\n".join(
         context.requirements[requirement_id].statement
@@ -1023,6 +1028,20 @@ def build_work_unit_proposal_request(
         answer_schema=answer_schema,
         parse_answer=parse,
     )
+
+
+def _work_unit_evidence(evidence: Iterable[Evidence]) -> tuple[Evidence, ...]:
+    """Keep one search-ranked record per evidence kind in bounded work prompts."""
+    selected: list[Evidence] = []
+    seen_kinds: set[str] = set()
+    for item in evidence:
+        if item.kind in seen_kinds:
+            continue
+        selected.append(item)
+        seen_kinds.add(item.kind)
+        if len(selected) == MAX_WORK_UNIT_EVIDENCE_PER_REQUIREMENT:
+            break
+    return tuple(selected)
 
 
 def allocate_work_unit_groups(

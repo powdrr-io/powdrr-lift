@@ -90,6 +90,7 @@ Do not add a second independent Python symbol/reference pipeline. Route the new 
 10. **Reuse component discovery.** Depend on the component and capability model in `polyglot-repository-and-go-support.md`; do not create a competing monorepo detector.
 11. **Keep source local.** Analysis and indexes are produced and queried in the local worktree for this plan. Do not upload full source or raw output to a hosted service.
 12. **Structrr owns the symbol contract, not the inventory payload.** The Structrr snapshot declares the code-symbol schema, artifact identity, revision, digest, and coverage. The potentially large symbol and relationship arrays live in a separate artifact and are loaded through Structrr's provider.
+13. **Source is authoritative; the symbol artifact is derived.** The code-symbol artifact is a rebuildable materialized index, never a second source of truth. Missing or stale data is regenerated from the pinned source revision and reported as unavailable until regeneration succeeds.
 
 ## 5. Canonical records
 
@@ -162,6 +163,15 @@ own file and lifecycle. SCIP indexes may be an input to a provider, but they
 are not the Structrr storage contract. Tree-sitter or another syntax parser
 may also feed this format, with every record labeled `syntactic` rather than
 `semantic`.
+
+The artifact is **not authoritative repository state**. The pinned source tree
+is the truth; this file is a derived index produced by a named provider and
+configuration. Keep it separate because symbol inventories and relationships
+can be large, are regenerated when source or indexer inputs change, and should
+not make the human-maintained semantic snapshot noisy. Persisting the
+content-addressed result lets planner questions and resumed runs reuse the same
+index and cite exactly what was queried. It may be evicted under artifact
+retention policy and rebuilt; it must never be edited independently of source.
 
 Store the symbol inventory as a separate immutable content-addressed artifact,
 for example `artifacts/structrr/code-symbols/sha256-<digest>.yaml`. Do not copy
@@ -364,7 +374,9 @@ The planner must not copy unfiltered transcripts into questions, treat checker e
 - Write the normalized report/findings and bounded raw output under the run's existing artifact directory. Write the Structrr code-symbol inventory as its own versioned YAML artifact with a content digest.
 - Register `ExecutionArtifact` references for the report and the symbol inventory, with distinct artifact types, schema versions, owners, and content references. The Structrr snapshot stores only the compact symbol-artifact descriptor and its provenance.
 - Include revision, component fingerprints, analyzer versions, configuration digests, environment identity, and scope in every report.
-- Artifacts are immutable. A rerun creates a new report; acceptance references the chosen report.
+- Reports and index artifacts are immutable generated outputs. A rerun creates a new artifact when any input fingerprint changes; matching source/provider/configuration fingerprints may reuse an existing artifact.
+- The source tree remains authoritative. If a referenced index artifact is missing, corrupt, or mismatched to the pinned revision/provider fingerprint, Structrr rejects it and requests regeneration; it never treats that state as an empty complete index.
+- The index can be evicted and rebuilt from source. Artifact retention improves replay and performance but does not create a new manually maintained code model.
 - Keep full reports out of ordinary chat and event summaries. Persist a compact summary and artifact reference.
 - Query artifacts only for the active repository and execution unless another revision is explicitly requested.
 

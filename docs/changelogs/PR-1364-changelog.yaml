@@ -9,9 +9,9 @@ structured_files: []
 files:
   - path: docs/plans/code-analysis-artifacts-and-scoped-queries.md
     type: added
-    span: {start_line: 1, end_line: 455}
+    span: {start_line: 1, end_line: 467}
     summary: Specify a Structrr-owned code-symbol YAML schema stored in a separate content-addressed artifact, plus analysis findings, scoped queries, baseline comparison, and planner integration.
-    rationale: Match Structrr's YAML format while keeping the snapshot compact and giving implementation work a complete contract for queryable cross-language code structure and focused analysis evidence.
+    rationale: Match Structrr's YAML format while keeping the snapshot compact; define the symbol data as a rebuildable index of pinned source, not a second source of truth.
 entities:
   - id: code-analysis-artifacts-and-scoped-queries
     type: Design doc

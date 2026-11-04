@@ -86,6 +86,7 @@ def _proposal(
     *,
     path: str = "Tests/Validator.swift",
     runtime: str = "swift",
+    role: str = "test",
 ) -> dict[str, object]:
     return {
         "requirement_ids": ["req-0001"],
@@ -94,7 +95,7 @@ def _proposal(
         "planned_writes": [
             {
                 "path": path,
-                "role": "test",
+                "role": role,
                 "source_refs": [anchor],
                 "evidence_ids": [],
             }
@@ -178,6 +179,39 @@ def test_actual_python_and_swift_writes_cannot_share_a_unit() -> None:
         match=r"cannot mix implementation runtimes.*tests/test_helper.py \(python\)",
     ):
         parse_work_unit_proposal(answer, context=context)
+
+
+def test_requirement_can_be_covered_by_runtime_specific_units() -> None:
+    context, anchor = _context()
+    shell_answer = _proposal(
+        context,
+        anchor,
+        path="scripts/verify.sh",
+        runtime="shell",
+        role="implementation",
+    )
+    python_answer = _proposal(
+        context, anchor, path="tests/test_verify.py", runtime="python"
+    )
+    request = build_work_unit_proposal_request(
+        context,
+        ("req-0001",),
+        valid_example=shell_answer,
+    )
+
+    shell_unit = parse_work_unit_proposal(shell_answer, context=context)
+    python_unit = parse_work_unit_proposal(python_answer, context=context)
+    allocated = allocate_work_units((shell_unit, python_unit), context=context)
+
+    assert "Repeat that requirement ID" in request.exact_question
+    assert [unit.requirement_ids for unit in allocated.units] == [
+        ("req-0001",),
+        ("req-0001",),
+    ]
+    assert [unit.implementation_runtime for unit in allocated.units] == [
+        "shell",
+        "python",
+    ]
 
 
 def test_unknown_extension_requires_runtime_classification() -> None:

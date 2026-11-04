@@ -2,31 +2,41 @@ schema: https://powdrr.io/schema/changelog-v2
 change_id: 1365
 title: Allow requirements across runtime-specific work units
 intent:
-  problem: A single source requirement may require deliverables in multiple implementation runtimes, but proposal guidance implied that the requirement could only be assigned to one proposal.
-  goal: Tell the planner to repeat such a requirement in each runtime-specific proposal and verify that allocation accepts the resulting units.
+  problem: The planner can propose one unit that mixes implementation runtimes, even after the model is asked to split it.
+  goal: Partition mixed-runtime proposals deterministically by write runtime and assign each resulting unit only requirements cited by its source refs.
 human-decisions: []
 structured_files: []
 files:
   - path: packages/service/src/powdrr_service/planning/assembly.py
     type: modified
-    span: {start_line: 983, end_line: 989}
+    span: {start_line: 1094, end_line: 1100}
     summary: Clarify that one requirement may be repeated across separate runtime-specific work-unit proposals.
     rationale: Let the planner split a requirement spanning multiple runtimes without combining those runtimes in one unit.
+  - path: packages/service/src/powdrr_service/planning/assembly.py
+    type: modified
+    span: {start_line: 549, end_line: 549}
+    summary: Begin normalizing each parsed proposal into one or more runtime-specific work units.
+    rationale: Enforce runtime boundaries deterministically after proposal generation.
+  - path: packages/service/src/powdrr_service/planning/assembly.py
+    type: modified
+    span: {start_line: 551, end_line: 553}
+    summary: Flatten normalized runtime-specific proposals into the accepted work-unit page.
+    rationale: Keep requirement coverage and cursor handling consistent after deterministic splitting.
   - path: tests/test_planning_assembly.py
     type: modified
-    span: {start_line: 89, end_line: 89}
-    summary: Allow test proposals to specify the planned-write role.
-    rationale: Build a realistic shell implementation proposal for the multi-runtime allocation regression.
+    span: {start_line: 26, end_line: 26}
+    summary: Import the work-unit page parser used by the mixed-runtime regression.
+    rationale: Exercise deterministic splitting through the production parser path.
   - path: tests/test_planning_assembly.py
     type: modified
-    span: {start_line: 98, end_line: 98}
-    summary: Use the supplied role in generated test proposals.
-    rationale: Let the regression represent a shell implementation write accurately.
-  - path: tests/test_planning_assembly.py
+    span: {start_line: 184, end_line: 224}
+    summary: Verify one mixed-runtime response becomes separate work units that jointly cover the requirement.
+    rationale: Prevent a valid multi-runtime plan from blocking after the model fails to follow runtime-splitting guidance.
+  - path: packages/service/src/powdrr_service/planning/assembly.py
     type: modified
-    span: {start_line: 184, end_line: 216}
-    summary: Verify one requirement can be covered by separate shell and Python work units.
-    rationale: Prevent valid multi-runtime implementation plans from failing proposal validation.
+    span: {start_line: 632, end_line: 741}
+    summary: Split mixed proposals by runtime and assign requirements using their cited source refs.
+    rationale: Avoid repeated LLM correction failures while retaining the existing single-runtime invariant for each work unit.
 entities:
   - id: work-unit-proposal-builder
     type: Function
@@ -34,13 +44,16 @@ entities:
   - id: runtime-specific-requirement-coverage-regression
     type: Regression test
     action: added
+  - id: mixed-runtime-proposal-splitter
+    type: Function
+    action: added
 entity_relationships:
   - id: regression-verifies-runtime-specific-coverage
     type: verifies
     source: runtime-specific-requirement-coverage-regression
-    target: work-unit-proposal-builder
+    target: mixed-runtime-proposal-splitter
     action: added
-    description: The regression checks that prompt guidance and work-unit allocation support splitting one requirement across runtime-specific units.
+    description: The regression checks that one mixed-runtime model proposal becomes runtime-homogeneous units with exact requirement coverage.
 invariants:
   - id: work-units-have-one-implementation-runtime
     description: A work unit contains writes for at most one implementation runtime; one requirement may be represented in more than one runtime-specific unit.

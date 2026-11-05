@@ -89,6 +89,7 @@ from powdrr_service.planning.structrr import (
     compile_structrr_plan,
     complete_subject_enumeration,
     index_structural_baseline,
+    partition_subject_enumeration_units,
     reject_unordered_subject_conflicts,
 )
 from powdrr_service.planning.workflow_ids import slugify_workflow_id
@@ -511,6 +512,17 @@ class SourceLedgerQuestionMachine:
         ] = {}
         self._structural_change_request_cache: dict[
             tuple[tuple[str, ...], str], QuestionRequest[Any]
+        ] = {}
+        self._structural_subject_scope_cache: dict[
+            str, tuple[tuple[str, tuple[WorkUnit, ...]], ...]
+        ] = {}
+        self._structural_subject_context_cache: dict[
+            str,
+            tuple[
+                tuple[BoundStructuralSubject, ...],
+                tuple[tuple[str, str], ...],
+                tuple[tuple[str, str], ...],
+            ],
         ] = {}
         self._accepted_assembly_cache_key: tuple[Any, ...] | None = None
         self._accepted_assembly_cache_value: PlanningAssembly | None = None
@@ -1580,6 +1592,14 @@ class SourceLedgerQuestionMachine:
             allocation.pending_outputs,
             related_requirement_ids=related_requirement_ids,
             code_reference_paths=self._dependency_reference_cache,
+            implementation_phase_order=(
+                {
+                    phase.id: index
+                    for index, phase in enumerate(self._implementation_phases)
+                }
+                if self._implementation_phases
+                else None
+            ),
         )
         return allocation, discovery
 
@@ -1950,67 +1970,116 @@ class SourceLedgerQuestionMachine:
                     for write in unit.planned_writes
                     if write.path.casefold().endswith((".py", ".pyi"))
                 }
-                item_symbols_by_path = {
-                    path: self._structural_symbol_cache[path]
-                    for path in sorted(item_python_paths)
-                    if path in self._structural_symbol_cache
-                }
                 item_reference_path_pairs = _planned_reference_path_pairs(
                     tuple(item_python_paths), self._structural_reference_cache
                 )
                 item_subjects, excluded_subject_ids = candidate_subjects_by_item[
                     item_id
                 ]
-                page_ordinal = 1
-                item_pages: list[StructuralSubjectPage] = []
-                while True:
-                    enumeration_request = build_subject_enumeration_request(
-                        plan_id=self.plan_id,
-                        item_id=item_id,
-                        units=units,
-                        source=self.source,
-                        source_refs=source_refs,
-                        projected_baseline=projected,
-                        prior_subjects=item_subjects,
-                        excluded_subject_ids=excluded_subject_ids,
-                        basedpyright_reference_path_pairs=item_reference_path_pairs,
-                        page_ordinal=page_ordinal,
-                        baseline_digest=baseline_digest,
-                    )
-                    answer = accepted_answers.get(
-                        enumeration_request.question.question_id
-                    )
-                    question_id = enumeration_request.question.question_id
-                    if (
-                        answer is not None
-                        and self._accepted_question_input_digests is not None
-                        and self._accepted_question_input_digests.get(question_id)
-                        != enumeration_request.question.input_digest
-                    ):
-                        self._invalid_accepted_question_ids.add(question_id)
-                        answer = None
-                    if answer is None:
-                        pending_enumerations.append(enumeration_request)
-                        break
-                    try:
-                        page = enumeration_request.parse_answer(answer)
-                    except PlanningContractError:
-                        self._invalid_accepted_question_ids.add(question_id)
-                        pending_enumerations.append(enumeration_request)
-                        break
-                    item_pages.append(page)
-                    item_subjects = tuple(
-                        coalesce_structural_subjects((*item_subjects, *page.records))
-                    )
-                    if not page.has_more:
-                        subjects_by_item[item_id] = coalesce_structural_subjects(
-                            (
-                                *item_subjects,
-                                *complete_subject_enumeration(item_pages),
-                            )
+                self._structural_subject_context_cache[item_id] = (
+                    item_subjects,
+                    excluded_subject_ids,
+                    item_reference_path_pairs,
+                )
+                scopes = partition_subject_enumeration_units(
+                    plan_id=self.plan_id,
+                    item_id=item_id,
+                    units=units,
+                    requirement_source_refs={
+                        requirement_id: requirement_by_id[requirement_id].source_refs
+                        for unit in units
+                        for requirement_id in unit.requirement_ids
+                    },
+                    source=self.source,
+                    projected_baseline=projected,
+                    prior_subjects=item_subjects,
+                    excluded_subject_ids=excluded_subject_ids,
+                    basedpyright_reference_path_pairs=item_reference_path_pairs,
+                    baseline_digest=baseline_digest,
+                )
+                self._structural_subject_scope_cache[item_id] = scopes
+                completed_item_subjects: list[BoundStructuralSubject] = list(
+                    item_subjects
+                )
+                for scope_id, scope_units in scopes:
+                    scope_requirement_ids = tuple(
+                        dict.fromkeys(
+                            requirement_id
+                            for unit in scope_units
+                            for requirement_id in unit.requirement_ids
                         )
-                        break
-                    page_ordinal += 1
+                    )
+                    scope_source_refs = tuple(
+                        dict.fromkeys(
+                            source_ref
+                            for requirement_id in scope_requirement_ids
+                            for source_ref in requirement_by_id[
+                                requirement_id
+                            ].source_refs
+                        )
+                    )
+                    scope_paths = {
+                        write.path
+                        for unit in scope_units
+                        for write in unit.planned_writes
+                    }
+                    scope_reference_pairs = tuple(
+                        pair
+                        for pair in item_reference_path_pairs
+                        if pair[0] in scope_paths and pair[1] in scope_paths
+                    )
+                    page_ordinal = 1
+                    scope_pages: list[StructuralSubjectPage] = []
+                    scope_subjects: list[BoundStructuralSubject] = []
+                    while True:
+                        enumeration_request = build_subject_enumeration_request(
+                            plan_id=self.plan_id,
+                            item_id=item_id,
+                            units=scope_units,
+                            source=self.source,
+                            source_refs=scope_source_refs,
+                            projected_baseline=projected,
+                            prior_subjects=(*item_subjects, *scope_subjects),
+                            excluded_subject_ids=excluded_subject_ids,
+                            basedpyright_reference_path_pairs=scope_reference_pairs,
+                            page_ordinal=page_ordinal,
+                            baseline_digest=baseline_digest,
+                            scope_id=scope_id,
+                        )
+                        question_id = enumeration_request.question.question_id
+                        answer = accepted_answers.get(question_id)
+                        if (
+                            answer is not None
+                            and self._accepted_question_input_digests is not None
+                            and self._accepted_question_input_digests.get(question_id)
+                            != enumeration_request.question.input_digest
+                        ):
+                            self._invalid_accepted_question_ids.add(question_id)
+                            answer = None
+                        if answer is None:
+                            pending_enumerations.append(enumeration_request)
+                            break
+                        try:
+                            page = enumeration_request.parse_answer(answer)
+                        except PlanningContractError:
+                            self._invalid_accepted_question_ids.add(question_id)
+                            pending_enumerations.append(enumeration_request)
+                            break
+                        scope_pages.append(page)
+                        scope_subjects.extend(page.records)
+                        if not page.has_more:
+                            completed_item_subjects.extend(
+                                complete_subject_enumeration(scope_pages)
+                            )
+                            break
+                        page_ordinal += 1
+                if not any(
+                    request.question.subject_ids[0] == item_id
+                    for request in pending_enumerations
+                ):
+                    subjects_by_item[item_id] = coalesce_structural_subjects(
+                        completed_item_subjects
+                    )
             if pending_enumerations:
                 return self._batch_requests(pending_enumerations)
 
@@ -2104,38 +2173,83 @@ class SourceLedgerQuestionMachine:
         self,
         item_id: str,
         units: tuple[WorkUnit, ...],
-        source_refs: tuple[str, ...],
+        requirement_source_refs: Mapping[str, Sequence[str]],
         projected_baseline: Mapping[str, Any],
         accepted_answers: Mapping[str, Mapping[str, Any]],
     ) -> tuple[BoundStructuralSubject, ...]:
         subjects: list[BoundStructuralSubject] = []
-        page_ordinal = 1
-        prior_subjects: list[BoundStructuralSubject] = []
-        pages: list[StructuralSubjectPage] = []
-        while True:
-            request = build_subject_enumeration_request(
+        scopes = self._structural_subject_scope_cache.get(item_id)
+        item_subjects, excluded_subject_ids, reference_path_pairs = (
+            self._structural_subject_context_cache.get(item_id, ((), (), ()))
+        )
+        if scopes is None:
+            scopes = partition_subject_enumeration_units(
                 plan_id=self.plan_id,
                 item_id=item_id,
                 units=units,
+                requirement_source_refs=requirement_source_refs,
                 source=self.source,
-                source_refs=source_refs,
                 projected_baseline=projected_baseline,
-                prior_subjects=prior_subjects,
-                page_ordinal=page_ordinal,
+                prior_subjects=item_subjects,
+                excluded_subject_ids=excluded_subject_ids,
+                basedpyright_reference_path_pairs=reference_path_pairs,
             )
-            answer = accepted_answers.get(request.question.question_id)
-            if answer is None:
-                raise ValueError(
-                    f"Structrr subject enumeration is incomplete at "
-                    f"{request.question.question_id}"
+        for scope_id, scope_units in scopes:
+            requirement_ids = tuple(
+                dict.fromkeys(
+                    requirement_id
+                    for unit in scope_units
+                    for requirement_id in unit.requirement_ids
                 )
-            page = request.parse_answer(answer)
-            pages.append(page)
-            subjects = list(coalesce_structural_subjects((*subjects, *page.records)))
-            prior_subjects = subjects
-            if not page.has_more:
-                return complete_subject_enumeration(pages)
-            page_ordinal += 1
+            )
+            source_refs = tuple(
+                dict.fromkeys(
+                    source_ref
+                    for requirement_id in requirement_ids
+                    for source_ref in requirement_source_refs.get(requirement_id, ())
+                )
+            )
+            scope_paths = {
+                write.path for unit in scope_units for write in unit.planned_writes
+            }
+            scope_reference_pairs = tuple(
+                pair
+                for pair in reference_path_pairs
+                if pair[0] in scope_paths and pair[1] in scope_paths
+            )
+            page_ordinal = 1
+            prior_subjects: list[BoundStructuralSubject] = []
+            pages: list[StructuralSubjectPage] = []
+            while True:
+                request = build_subject_enumeration_request(
+                    plan_id=self.plan_id,
+                    item_id=item_id,
+                    units=scope_units,
+                    source=self.source,
+                    source_refs=source_refs,
+                    projected_baseline=projected_baseline,
+                    prior_subjects=(*item_subjects, *prior_subjects),
+                    excluded_subject_ids=excluded_subject_ids,
+                    basedpyright_reference_path_pairs=scope_reference_pairs,
+                    page_ordinal=page_ordinal,
+                    scope_id=scope_id,
+                )
+                answer = accepted_answers.get(request.question.question_id)
+                if answer is None:
+                    raise ValueError(
+                        "Structrr subject enumeration is incomplete at "
+                        f"{request.question.question_id}"
+                    )
+                page = request.parse_answer(answer)
+                pages.append(page)
+                prior_subjects = list(
+                    coalesce_structural_subjects((*prior_subjects, *page.records))
+                )
+                if not page.has_more:
+                    subjects.extend(complete_subject_enumeration(pages))
+                    break
+                page_ordinal += 1
+        return coalesce_structural_subjects(subjects)
 
     def _structrr_source_ref(self) -> str:
         return (
@@ -2164,18 +2278,13 @@ class SourceLedgerQuestionMachine:
             item_id = str(record["id"])
             item_operations: list[Mapping[str, Any]] = []
             units = tuple(record["units"])
-            source_refs = tuple(
-                dict.fromkeys(
-                    ref
-                    for unit in units
-                    for requirement_id in unit.requirement_ids
-                    for ref in requirement_by_id[requirement_id].source_refs
-                )
-            )
             subjects = self._accepted_structural_subjects(
                 item_id,
                 units,
-                source_refs,
+                {
+                    requirement_id: requirement.source_refs
+                    for requirement_id, requirement in requirement_by_id.items()
+                },
                 projected,
                 accepted_answers,
             )

@@ -416,6 +416,7 @@ def discover_dependency_candidates(
     *,
     related_requirement_ids: Mapping[str, Sequence[str]] | None = None,
     code_reference_paths: Mapping[tuple[str, str], Sequence[str]] | None = None,
+    implementation_phase_order: Mapping[str, int] | None = None,
 ) -> DependencyCandidateDiscovery:
     """Avoid all-pairs dependency questions by pruning to concrete evidence."""
     by_id = {unit.id: unit for unit in units}
@@ -471,6 +472,26 @@ def discover_dependency_candidates(
         for consumer in units:
             if consumer.id == producer.id:
                 continue
+            if implementation_phase_order is not None:
+                producer_phase = producer.implementation_phase_id
+                consumer_phase = consumer.implementation_phase_id
+                if producer_phase is None or consumer_phase is None:
+                    raise DependencyError(
+                        "source implementation phases must be assigned to every "
+                        "work unit before dependency discovery"
+                    )
+                producer_rank = implementation_phase_order.get(producer_phase)
+                consumer_rank = implementation_phase_order.get(consumer_phase)
+                if producer_rank is None or consumer_rank is None:
+                    raise DependencyError(
+                        "work unit references an unknown source implementation phase"
+                    )
+                # The source sequence already orders units within each phase and
+                # declares cross-phase prerequisites. Semantic discovery may add
+                # forward cross-phase edges, but must not reverse that order or
+                # add redundant same-phase edges that can close a cycle.
+                if producer_rank >= consumer_rank:
+                    continue
             if paths_by_unit[producer.id] & paths_by_unit[consumer.id]:
                 # Same-file work is ordered deterministically above.
                 continue

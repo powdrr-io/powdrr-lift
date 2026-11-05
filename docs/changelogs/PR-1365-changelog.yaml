@@ -1,0 +1,261 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1365
+title: Bound planning work units and structural queries
+intent:
+  problem: The planner can propose mixed-runtime work units, mistake data or template paths for implementation languages, infer dependencies that contradict a source plan's PR sequence, and build structural questions larger than the accepted input limit.
+  goal: Partition mixed-runtime proposals and oversized structural queries deterministically, classify known data and template paths safely, and preserve source-declared dependency order during dependency discovery.
+human-decisions: []
+structured_files: []
+files:
+  - path: packages/service/src/powdrr_service/planning/assembly.py
+    type: modified
+    span: {start_line: 1105, end_line: 1111}
+    summary: Clarify that one requirement may be repeated across separate runtime-specific work-unit proposals.
+    rationale: Let the planner split a requirement spanning multiple runtimes without combining those runtimes in one unit.
+  - path: packages/service/src/powdrr_service/planning/assembly.py
+    type: modified
+    span: {start_line: 549, end_line: 549}
+    summary: Begin normalizing each parsed proposal into one or more runtime-specific work units.
+    rationale: Enforce runtime boundaries deterministically after proposal generation.
+  - path: packages/service/src/powdrr_service/planning/assembly.py
+    type: modified
+    span: {start_line: 551, end_line: 553}
+    summary: Flatten normalized runtime-specific proposals into the accepted work-unit page.
+    rationale: Keep requirement coverage and cursor handling consistent after deterministic splitting.
+  - path: tests/test_planning_assembly.py
+    type: modified
+    span: {start_line: 26, end_line: 26}
+    summary: Import the work-unit page parser used by the mixed-runtime regression.
+    rationale: Exercise deterministic splitting through the production parser path.
+  - path: tests/test_planning_assembly.py
+    type: modified
+    span: {start_line: 184, end_line: 224}
+    summary: Verify one mixed-runtime response becomes separate work units that jointly cover the requirement.
+    rationale: Prevent a valid multi-runtime plan from blocking after the model fails to follow runtime-splitting guidance.
+  - path: packages/service/src/powdrr_service/planning/assembly.py
+    type: modified
+    span: {start_line: 632, end_line: 741}
+    summary: Split mixed proposals by runtime and assign requirements using their cited source refs.
+    rationale: Avoid repeated LLM correction failures while retaining the existing single-runtime invariant for each work unit.
+  - path: packages/service/src/powdrr_service/planning/assembly.py
+    type: modified
+    span: {start_line: 762, end_line: 765}
+    summary: Inspect the underlying payload suffix for template paths.
+    rationale: Preserve deterministic language inference when source files have an added template suffix.
+  - path: packages/service/src/powdrr_service/planning/assembly.py
+    type: modified
+    span: {start_line: 767, end_line: 775}
+    summary: Keep fixture binaries and recognizable configuration templates runtime-neutral; infer known payload languages and retain evidence checks for ambiguous templates.
+    rationale: Avoid unnecessary runtime questions without treating every template or binary path as language-neutral.
+  - path: tests/test_planning_assembly.py
+    type: modified
+    span: {start_line: 237, end_line: 267}
+    summary: Verify non-fixture binaries and unknown templates remain evidence-bound while source templates inherit a known runtime.
+    rationale: Keep deterministic classification limited to recognizable data and template paths.
+  - path: tests/test_planning_assembly.py
+    type: modified
+    span: {start_line: 295, end_line: 296}
+    summary: Add binary fixture and CODEOWNERS template paths to runtime-neutral cases.
+    rationale: Ensure the planner can propose these non-language data artifacts without runtime errors.
+  - path: packages/service/src/powdrr_service/planning/dependencies.py
+    type: modified
+    span: {start_line: 419, end_line: 419}
+    summary: Accept the source implementation phase order when discovering dependency candidates.
+    rationale: Use the plan's explicit PR sequence to constrain inferred dependencies.
+  - path: packages/service/src/powdrr_service/planning/dependencies.py
+    type: modified
+    span: {start_line: 475, end_line: 494}
+    summary: Skip same-phase and backward-phase semantic dependency candidates.
+    rationale: Prevent model-confirmed edges from contradicting the source sequence and creating dependency cycles.
+  - path: tests/test_planning_dependencies.py
+    type: modified
+    span: {start_line: 323, end_line: 387}
+    summary: Verify dependency discovery keeps forward cross-phase edges and drops same-phase and backward edges.
+    rationale: Prevent dependency reviews from introducing cycles into a source-declared PR sequence.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 92, end_line: 92}
+    summary: Import deterministic structural query partitioning.
+    rationale: Keep large subject questions within the planner input limit.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 516, end_line: 526}
+    summary: Cache structural query scopes and their review context.
+    rationale: Rebuild accepted structural answers using the exact questions that were reviewed.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 1595, end_line: 1602}
+    summary: Pass explicit source phase order into dependency discovery.
+    rationale: Prevent inferred dependency candidates from contradicting the planned PR sequence.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 1953, end_line: 1957}
+    summary: Remove redundant per-item query context that is no longer needed after scope partitioning.
+    rationale: Build each structural request from only the requirements and paths in its scope.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 1979, end_line: 2010}
+    summary: Create bounded structural query scopes for each plan item.
+    rationale: Partition oversized subject enumeration without omitting planned work.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 2012, end_line: 2019}
+    summary: Select source references for the current structural scope.
+    rationale: Keep evidence context specific to the units under review.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 2021, end_line: 2029}
+    summary: Restrict reference evidence to paths in the current structural scope.
+    rationale: Avoid repeating unrelated BasedPyright references in subject questions.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 2031, end_line: 2047}
+    summary: Build paginated structural subject requests with stable scope identifiers.
+    rationale: Give each bounded query a durable checkpoint identity.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 2049, end_line: 2082}
+    summary: Validate scoped answers and merge completed subjects into the plan item.
+    rationale: Retain complete structural coverage after deterministic partitioning.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 2121, end_line: 2121}
+    summary: Preserve requirement ownership when binding planned file subjects.
+    rationale: Keep deterministic file operations linked to their requirements.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 2167, end_line: 2174}
+    summary: Define structural answer reconstruction over scoped queries.
+    rationale: Make plan compilation consume the same bounded subject questions.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 2176, end_line: 2176}
+    summary: Supply the requirement-to-source mapping for structural reconstruction.
+    rationale: Rebuild the same evidence scope used during question generation.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 2181, end_line: 2186}
+    summary: Load cached query context or deterministically recreate bounded scopes.
+    rationale: Keep accepted answers aligned with their reviewed subject context.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 2190, end_line: 2190}
+    summary: Pass scope units into structural query reconstruction.
+    rationale: Keep each accepted answer bound to its precise unit subset.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 2193, end_line: 2195}
+    summary: Restore excluded structural candidates when reconstructing accepted answers.
+    rationale: Prevent already-reviewed subjects from being enumerated again.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 2197, end_line: 2209}
+    summary: Resolve scope-specific requirement and source references.
+    rationale: Retain traceability while reducing query context size.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 2211, end_line: 2252}
+    summary: Parse each scoped page sequence and coalesce its subjects.
+    rationale: Compile all bounded responses into the original plan item.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 2284, end_line: 2287}
+    summary: Pass requirement source anchors into structural answer reconstruction.
+    rationale: Preserve exact evidence context from planning through compilation.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 26, end_line: 26}
+    summary: Import the bounded question input error used by scope partitioning.
+    rationale: Detect and split structural contexts that exceed the serialization limit.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 29, end_line: 29}
+    summary: Import the normative question serializer for deterministic size checks.
+    rationale: Measure the same request packet sent to the planning provider.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 187, end_line: 187}
+    summary: Merge matching structural subjects returned from separate query scopes.
+    rationale: Combine their requirement, unit, and source references on the parent plan item.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 593, end_line: 593}
+    summary: Allow structural subject question IDs to include a stable scope identifier.
+    rationale: Give each bounded unit group a durable, distinct checkpoint identity.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 734, end_line: 738}
+    summary: Include the scope identifier in structural subject question IDs when present.
+    rationale: Resume each bounded query independently while preserving legacy IDs for unscoped calls.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 1100, end_line: 1181}
+    summary: Greedily partition structural subject questions until each request fits the planner input bound.
+    rationale: Avoid failing plan assembly when a single item's complete subject context is too large.
+  - path: tests/test_planning_structrr.py
+    type: modified
+    span: {start_line: 35, end_line: 35}
+    summary: Import the bounded-scope helper and subject coalescer for structural regressions.
+    rationale: Exercise the production query partition and result merge paths.
+  - path: tests/test_planning_structrr.py
+    type: modified
+    span: {start_line: 40, end_line: 40}
+    summary: Import the bounded subject scope partitioner for structural regressions.
+    rationale: Exercise the production query partition and result merge paths.
+  - path: tests/test_planning_structrr.py
+    type: modified
+    span: {start_line: 286, end_line: 385}
+    summary: Verify oversized structural context splits into bounded scopes and duplicate subjects merge their supporting references.
+    rationale: Prevent input-size failures while retaining complete traceability across query scopes.
+entities:
+  - id: work-unit-proposal-builder
+    type: Function
+    action: added
+  - id: runtime-specific-requirement-coverage-regression
+    type: Regression test
+    action: added
+  - id: mixed-runtime-proposal-splitter
+    type: Function
+    action: added
+  - id: source-phase-dependency-filter
+    type: Function
+    action: added
+  - id: dependency-phase-order-regression
+    type: Regression test
+    action: added
+  - id: bounded-subject-query-partitioning
+    type: Function
+    action: added
+  - id: structural-context-size-regression
+    type: Regression test
+    action: added
+entity_relationships:
+  - id: regression-verifies-runtime-specific-coverage
+    type: verifies
+    source: runtime-specific-requirement-coverage-regression
+    target: mixed-runtime-proposal-splitter
+    action: added
+    description: The regression checks that one mixed-runtime model proposal becomes runtime-homogeneous units with exact requirement coverage.
+  - id: regression-verifies-source-phase-dependency-order
+    type: verifies
+    source: dependency-phase-order-regression
+    target: source-phase-dependency-filter
+    action: added
+    description: The regression confirms that inferred dependencies cannot reverse or redundantly repeat source-declared phase ordering.
+  - id: regression-verifies-bounded-structural-queries
+    type: verifies
+    source: structural-context-size-regression
+    target: bounded-subject-query-partitioning
+    action: added
+    description: The regression confirms that large structural baselines are split into individually bounded requests and their duplicate subjects retain combined evidence.
+invariants:
+  - id: work-units-have-one-implementation-runtime
+    description: A work unit contains writes for at most one implementation runtime; one requirement may be represented in more than one runtime-specific unit.
+    action: altered
+  - id: dependencies-respect-source-phase-order
+    description: Inferred dependency candidates may connect source implementation phases only in their declared order; same-phase ordering is supplied deterministically.
+    action: added
+  - id: structural-subject-questions-fit-input-bound
+    description: Structural subject enumeration subdivides work-unit context until each serialized question fits the configured planner input limit.
+    action: added
+guidance: []

@@ -23,6 +23,7 @@ from powdrr_service.planning.assembly import (
     build_work_unit_proposal_request,
     parse_item_description,
     parse_work_unit_proposal,
+    parse_work_unit_proposal_page,
 )
 from powdrr_service.planning.contracts import PlanningContractError
 from powdrr_service.planning.driver import SourceLedgerQuestionMachine
@@ -180,6 +181,47 @@ def test_actual_python_and_swift_writes_cannot_share_a_unit() -> None:
         parse_work_unit_proposal(answer, context=context)
 
 
+def test_requirement_can_be_covered_by_runtime_specific_units() -> None:
+    context, anchor = _context()
+    mixed_answer = _proposal(context, anchor)
+    mixed_answer["planned_writes"] = [
+        {
+            "path": "scripts/verify.sh",
+            "role": "implementation",
+            "source_refs": [anchor],
+            "evidence_ids": [],
+        },
+        {
+            "path": "tests/test_verify.py",
+            "role": "test",
+            "source_refs": [anchor],
+            "evidence_ids": [],
+        },
+    ]
+    request = build_work_unit_proposal_request(
+        context,
+        ("req-0001",),
+        valid_example=_proposal(context, anchor),
+    )
+
+    page = parse_work_unit_proposal_page(
+        {"records": [mixed_answer], "has_more": False, "next_anchor": None},
+        context=context,
+        requirement_order=("req-0001",),
+    )
+    allocated = allocate_work_units(page.records, context=context)
+
+    assert "Repeat that requirement ID" in request.exact_question
+    assert [unit.requirement_ids for unit in allocated.units] == [
+        ("req-0001",),
+        ("req-0001",),
+    ]
+    assert [unit.implementation_runtime for unit in allocated.units] == [
+        "shell",
+        "python",
+    ]
+
+
 def test_unknown_extension_requires_runtime_classification() -> None:
     context, anchor = _context(path="include/Widget.h", runtime="c++")
     answer = _proposal(context, anchor, path="include/Widget.h", runtime="c++")
@@ -187,6 +229,37 @@ def test_unknown_extension_requires_runtime_classification() -> None:
         context,
         repository_paths={"include/Widget.h": PathFact("include/Widget.h")},
     )
+
+    with pytest.raises(RuntimeClassificationRequired):
+        parse_work_unit_proposal(answer, context=context)
+
+
+def test_binary_file_outside_fixture_directory_requires_runtime_evidence() -> None:
+    path = "attestation/bin/verifier.bin"
+    context, anchor = _context(path=path, runtime="python")
+    context = replace(context, repository_paths={})
+    answer = _proposal(context, anchor, path=path, runtime="python")
+
+    with pytest.raises(RuntimeClassificationRequired):
+        parse_work_unit_proposal(answer, context=context)
+
+
+def test_source_template_inherits_runtime_from_its_suffix() -> None:
+    path = "templates/validator.py.template"
+    context, anchor = _context(path=path, runtime="python")
+    context = replace(context, repository_paths={})
+    answer = _proposal(context, anchor, path=path, runtime="python")
+
+    proposal = parse_work_unit_proposal(answer, context=context)
+
+    assert proposal.implementation_runtime == "python"
+
+
+def test_unrecognized_template_still_requires_runtime_evidence() -> None:
+    path = "templates/unknown.template"
+    context, anchor = _context(path=path, runtime="python")
+    context = replace(context, repository_paths={})
+    answer = _proposal(context, anchor, path=path, runtime="python")
 
     with pytest.raises(RuntimeClassificationRequired):
         parse_work_unit_proposal(answer, context=context)
@@ -219,6 +292,8 @@ def test_new_extensionless_data_file_can_be_explicitly_runtime_neutral() -> None
         "installer/launchd.plist",
         "config/install-paths.conf",
         "test-results/section13-macos-github.log",
+        "attestation/fixtures/golden_dsse.bin",
+        ".github/CODEOWNERS.template",
     ],
 )
 def test_platform_data_file_extensions_are_runtime_neutral(path: str) -> None:

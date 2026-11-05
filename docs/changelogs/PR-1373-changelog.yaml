@@ -1,0 +1,213 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1373
+title: Journal planning symbol evidence
+intent:
+  problem: Planning proposal artifacts retain symbol provenance, but the durable planning
+    journal records only question identities and input digests, leaving the exact
+    code evidence used by each question unavailable for inspection.
+  goal: Record compact code-evidence references with accepted and needs-answer checkpoints,
+    and bind question replay to the evidence used to form its input.
+human-decisions: []
+structured_files: []
+files:
+- path: packages/service/src/powdrr_service/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 120
+    end_line: 120
+  summary: Add optional code-evidence references to accepted and needs-answer checkpoint
+    payloads.
+  rationale: Persist artifact, query, filter, source-location, and snapshot references
+    with the planning session without storing full source content.
+- path: packages/service/src/powdrr_service/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 122
+    end_line: 132
+  summary: Add optional code-evidence references to accepted and needs-answer checkpoint
+    payloads.
+  rationale: Persist artifact, query, filter, source-location, and snapshot references
+    with the planning session without storing full source content.
+- path: packages/service/src/powdrr_service/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 139
+    end_line: 139
+  summary: Add optional code-evidence references to accepted and needs-answer checkpoint
+    payloads.
+  rationale: Persist artifact, query, filter, source-location, and snapshot references
+    with the planning session without storing full source content.
+- path: packages/service/src/powdrr_service/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 155
+    end_line: 155
+  summary: Add optional code-evidence references to accepted and needs-answer checkpoint
+    payloads.
+  rationale: Persist artifact, query, filter, source-location, and snapshot references
+    with the planning session without storing full source content.
+- path: packages/service/src/powdrr_service/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 157
+    end_line: 168
+  summary: Add optional code-evidence references to accepted and needs-answer checkpoint
+    payloads.
+  rationale: Persist artifact, query, filter, source-location, and snapshot references
+    with the planning session without storing full source content.
+- path: packages/service/src/powdrr_service/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 175
+    end_line: 175
+  summary: Add optional code-evidence references to accepted and needs-answer checkpoint
+    payloads.
+  rationale: Persist artifact, query, filter, source-location, and snapshot references
+    with the planning session without storing full source content.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 47
+    end_line: 71
+  summary: Extract code-evidence references from each question context and attach
+    them to its durable checkpoint event.
+  rationale: Make the exact symbol provenance used by a planning question inspectable
+    after acceptance or resume.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 623
+    end_line: 627
+  summary: Extract code-evidence references from each question context and attach
+    them to its durable checkpoint event.
+  rationale: Make the exact symbol provenance used by a planning question inspectable
+    after acceptance or resume.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 782
+    end_line: 784
+  summary: Extract code-evidence references from each question context and attach
+    them to its durable checkpoint event.
+  rationale: Make the exact symbol provenance used by a planning question inspectable
+    after acceptance or resume.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 799
+    end_line: 801
+  summary: Extract code-evidence references from each question context and attach
+    them to its durable checkpoint event.
+  rationale: Make the exact symbol provenance used by a planning question inspectable
+    after acceptance or resume.
+- path: tests/test_planning_checkpoints.py
+  type: modified
+  span:
+    start_line: 86
+    end_line: 114
+  summary: Verify checkpoint code-evidence references round-trip through serialization
+    and the local journal.
+  rationale: Protect durable provenance when planning state is recovered from disk.
+- path: tests/test_planning_checkpoints.py
+  type: modified
+  span:
+    start_line: 170
+    end_line: 176
+  summary: Verify checkpoint code-evidence references round-trip through serialization
+    and the local journal.
+  rationale: Protect durable provenance when planning state is recovered from disk.
+- path: tests/test_planning_checkpoints.py
+  type: modified
+  span:
+    start_line: 194
+    end_line: 194
+  summary: Verify checkpoint code-evidence references round-trip through serialization
+    and the local journal.
+  rationale: Protect durable provenance when planning state is recovered from disk.
+- path: tests/test_planning_checkpoints.py
+  type: modified
+  span:
+    start_line: 217
+    end_line: 217
+  summary: Verify checkpoint code-evidence references round-trip through serialization
+    and the local journal.
+  rationale: Protect durable provenance when planning state is recovered from disk.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1824
+    end_line: 1824
+  summary: Assert the end-to-end planning journal records symbol references for existing-code
+    questions and none for new-path questions.
+  rationale: Verify query provenance follows the question into durable planning state.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1844
+    end_line: 1844
+  summary: Assert the end-to-end planning journal records symbol references for existing-code
+    questions and none for new-path questions.
+  rationale: Verify query provenance follows the question into durable planning state.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1849
+    end_line: 1849
+  summary: Assert the end-to-end planning journal records symbol references for existing-code
+    questions and none for new-path questions.
+  rationale: Verify query provenance follows the question into durable planning state.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1860
+    end_line: 1865
+  summary: Assert the end-to-end planning journal records symbol references for existing-code
+    questions and none for new-path questions.
+  rationale: Verify query provenance follows the question into durable planning state.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span:
+    start_line: 965
+    end_line: 1018
+  summary: Verify a structural question's input digest changes when its symbol query
+    evidence changes.
+  rationale: Ensure replay cannot reuse an accepted answer against refreshed code
+    evidence under the same question identity.
+entities:
+- id: checkpoint-symbol-evidence-metadata
+  type: Function
+  action: added
+- id: planning-question-evidence-extractor
+  type: Function
+  action: added
+- id: journal-symbol-evidence-regression
+  type: Regression test
+  action: added
+- id: evidence-bound-question-digest-regression
+  type: Regression test
+  action: added
+entity_relationships:
+- id: journal-test-verifies-evidence-metadata
+  type: verifies
+  source: journal-symbol-evidence-regression
+  target: checkpoint-symbol-evidence-metadata
+  action: added
+  description: The tests verify evidence references persist with checkpoint events
+    and are emitted by the planning coordinator.
+- id: digest-test-verifies-replay-binding
+  type: verifies
+  source: evidence-bound-question-digest-regression
+  target: planning-question-evidence-extractor
+  action: added
+  description: The test verifies refreshed symbol query evidence changes the structural
+    question input digest.
+invariants:
+- id: journal-records-only-compact-code-provenance
+  description: Planning checkpoints record query and artifact references without copying
+    full source contents into the journal.
+  action: added
+- id: accepted-answer-binds-evidence-input-digest
+  description: A structural question accepted against one symbol evidence set cannot
+    be replayed as valid when that evidence changes.
+  action: added
+guidance: []

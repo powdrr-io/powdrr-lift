@@ -117,20 +117,26 @@ class PlanningCheckpoint:
         accepted_answer: Mapping[str, Any],
         validation_result: Mapping[str, Any],
         id_counters: Mapping[str, int],
+        code_evidence_refs: Sequence[Mapping[str, Any]] = (),
     ) -> PlanningCheckpoint:
+        payload: dict[str, Any] = {
+            "question": question.to_data(),
+            "input_digest": question.input_digest,
+            "accepted_answer": dict(accepted_answer),
+            "validation_result": dict(validation_result),
+            "state_transition": "question_accepted",
+        }
+        if code_evidence_refs:
+            payload["code_evidence_refs"] = [
+                dict(reference) for reference in code_evidence_refs
+            ]
         return cls.create(
             session_id=session_id,
             event_id=event_id,
             sequence=sequence,
             parent_digest=parent_digest,
             event_type="answer_accepted",
-            payload={
-                "question": question.to_data(),
-                "input_digest": question.input_digest,
-                "accepted_answer": dict(accepted_answer),
-                "validation_result": dict(validation_result),
-                "state_transition": "question_accepted",
-            },
+            payload=payload,
             id_counters=id_counters,
         )
 
@@ -146,21 +152,27 @@ class PlanningCheckpoint:
         error: PlanningContractError,
         previous_answer: Mapping[str, Any],
         id_counters: Mapping[str, int],
+        code_evidence_refs: Sequence[Mapping[str, Any]] = (),
     ) -> PlanningCheckpoint:
+        payload: dict[str, Any] = {
+            "question": question.to_data(),
+            "input_digest": question.input_digest,
+            "accepted_answer": None,
+            "previous_answer": dict(previous_answer),
+            "validation_result": error.to_data(),
+            "state_transition": "needs_answer",
+        }
+        if code_evidence_refs:
+            payload["code_evidence_refs"] = [
+                dict(reference) for reference in code_evidence_refs
+            ]
         return cls.create(
             session_id=session_id,
             event_id=event_id,
             sequence=sequence,
             parent_digest=parent_digest,
             event_type="needs_answer",
-            payload={
-                "question": question.to_data(),
-                "input_digest": question.input_digest,
-                "accepted_answer": None,
-                "previous_answer": dict(previous_answer),
-                "validation_result": error.to_data(),
-                "state_transition": "needs_answer",
-            },
+            payload=payload,
             id_counters=id_counters,
         )
 

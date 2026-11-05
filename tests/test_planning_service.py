@@ -1821,6 +1821,7 @@ def test_procedrr_runs_real_planning_machine_through_compiled_artifacts(
         for subject in subjects
     )
     expected_code_evidence: tuple[Mapping[str, Any], ...]
+    expected_journal_evidence: tuple[Mapping[str, Any], ...]
     if planned_path == "src/behavior.py":
         evidence = symbol_records[0]["code_evidence"]
         assert evidence["artifact_id"].startswith("structrr-code-symbols:sha256:")
@@ -1840,10 +1841,12 @@ def test_procedrr_runs_real_planning_machine_through_compiled_artifacts(
                 "references": [evidence],
             },
         )
+        expected_journal_evidence = (evidence,)
     else:
         assert not symbol_records
         assert not any(subject.code_evidence for subject in subjects)
         expected_code_evidence = ()
+        expected_journal_evidence = ()
     expected_provider_calls = [
         "planning_question_batch",
         "propose_work_units",
@@ -1854,6 +1857,12 @@ def test_procedrr_runs_real_planning_machine_through_compiled_artifacts(
         expected_provider_calls.append("describe_structural_change")
     assert provider.calls == expected_provider_calls
     journal = store.load()
+    journal_evidence = tuple(
+        reference
+        for event in journal.events
+        for reference in event.payload.get("code_evidence_refs", [])
+    )
+    assert journal_evidence == expected_journal_evidence
     deterministic_events = [
         event
         for event in journal.events

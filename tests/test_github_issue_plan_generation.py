@@ -1947,6 +1947,8 @@ def test_issue_code_inspection_uses_shared_revision_artifact(
     assert "parse_policy" in context
     assert "structrr-code-symbols:sha256:" in context
     assert "artifact_digest" in context
+    assert "query:sha256:" in context
+    assert "code_evidence" in context
     assert "def parse_policy(raw: str) -> bool" in context
 
 

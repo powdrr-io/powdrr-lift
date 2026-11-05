@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import subprocess
 from collections.abc import Mapping
 from dataclasses import replace
 from pathlib import Path
@@ -59,6 +60,7 @@ from powdrr_service.procedrr.catalog import ProcessCatalog
 from powdrr_service.resources import bundled_process_directory
 
 from powdrr_lift.workrr.github_issue_queue import QueueIssue
+from powdrr_lift.workrr.planning import evidence as planning_evidence
 from powdrr_lift.workrr.planning.evidence import Evidence, RequirementEvidenceSearch
 
 
@@ -150,6 +152,7 @@ class _PlanningScriptClient:
 
     def __init__(self) -> None:
         self.calls: list[str] = []
+        self.planned_path = "src/behavior.txt"
 
     def complete_json(
         self,
@@ -223,7 +226,7 @@ class _PlanningScriptClient:
                         "deliverable": "Implement the requested behavior.",
                         "planned_writes": [
                             {
-                                "path": "src/behavior.txt",
+                                "path": self.planned_path,
                                 "role": "implementation",
                                 "source_refs": [anchor_ref],
                                 "evidence_ids": [],
@@ -251,6 +254,12 @@ class _PlanningScriptClient:
             }
         if kind == "enumerate_structural_subjects":
             return {"records": [], "has_more": False, "next_anchor": None}
+        if kind == "describe_structural_change":
+            return {
+                "result": "change",
+                "desired_content": {"summary": "Update the existing behavior."},
+                "reason": "The planned requirement changes this existing behavior.",
+            }
         if kind == "review_dependency_graph":
             return {"edges": []}
         raise AssertionError(f"unexpected planning question: {kind}")
@@ -1639,17 +1648,96 @@ def test_structural_candidates_follow_baseline_symbol_bindings_on_planned_paths(
     assert all(item.unit_ids == (unit.id,) for item in candidates)
 
 
-def test_procedrr_runs_real_planning_machine_through_compiled_artifacts() -> None:
+def test_procedrr_runs_real_planning_machine_through_compiled_artifacts(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     text = "# Plan\n\nImplement the requested behavior.\n\nBackground only.\n"
+    repository = tmp_path / "repo"
+    (repository / "src").mkdir(parents=True)
+    (repository / "docs").mkdir()
+    (repository / "src/behavior.py").write_text(
+        "def parse_payload(raw: str) -> str:\n    return raw.strip()\n",
+        encoding="utf-8",
+    )
+    (repository / "docs/plan.md").write_text(text, encoding="utf-8")
+
+    def git(*args: str) -> str:
+        return subprocess.run(
+            ["git", "-C", str(repository), *args],
+            check=True,
+            capture_output=True,
+            text=True,
+        ).stdout.strip()
+
+    git("init", "-q")
+    git("config", "user.email", "planning@example.test")
+    git("config", "user.name", "Planning Test")
+    git("add", ".")
+    git("commit", "-qm", "planning fixture")
+    base_commit = git("rev-parse", "HEAD")
+    source_blob_sha = git("rev-parse", "HEAD:docs/plan.md")
+
+    def document_symbols(
+        paths: list[str], *, worktree_root: Path
+    ) -> dict[str, list[dict[str, Any]]]:
+        assert worktree_root.name == "repository"
+        assert paths == ["src/behavior.py"]
+        return {
+            "src/behavior.py": [
+                {
+                    "name": "parse_payload",
+                    "kind": "function",
+                    "range": {
+                        "start_line": 1,
+                        "start_character": 0,
+                        "end_line": 2,
+                        "end_character": 0,
+                    },
+                    "children": [],
+                }
+            ]
+        }
+
+    monkeypatch.setattr(
+        planning_evidence, "find_workspace_document_symbols", document_symbols
+    )
     source_document = PinnedSourceDocument(
         repository="owner/repo",
-        commit_sha="a" * 40,
+        commit_sha=base_commit,
         path="docs/plan.md",
-        blob_sha="b" * 40,
+        blob_sha=source_blob_sha,
         content_sha256=hashlib.sha256(text.encode()).hexdigest(),
         text=text,
     )
     source = segment_markdown_source(source_document)
+    structrr_baseline = {
+        "entities": [
+            {"id": "entity:parse_payload", "type": "Function", "name": "parse_payload"}
+        ],
+        "entity_relationships": [],
+        "files": [],
+        "source_subjects": [
+            {
+                "id": "python:src/behavior.py::src.behavior",
+                "kind": "module",
+                "qualified_name": "src.behavior",
+                "path": "src/behavior.py",
+            },
+            {
+                "id": "python:src/behavior.py::src.behavior.parse_payload",
+                "kind": "function",
+                "qualified_name": "src.behavior.parse_payload",
+                "path": "src/behavior.py",
+            },
+        ],
+        "source_bindings": [
+            {
+                "entity_id": "entity:parse_payload",
+                "subject_id": "python:src/behavior.py::src.behavior.parse_payload",
+                "path": "src/behavior.py",
+            }
+        ],
+    }
     machine = SourceLedgerQuestionMachine(
         source,
         evidence_search=lambda requirements: {
@@ -1660,20 +1748,22 @@ def test_procedrr_runs_real_planning_machine_through_compiled_artifacts() -> Non
         },
         verification_command="make test",
         plan_id="bounded-plan",
-        structrr_baseline={
-            "entities": [],
-            "entity_relationships": [],
-            "files": [],
-        },
+        structural_symbol_search=lambda paths: (
+            planning_evidence.search_structural_document_symbols(
+                repository, base_commit, paths
+            )
+        ),
+        structural_reference_search=lambda _paths: {},
+        structrr_baseline=structrr_baseline,
     )
     session_id = "planning-e2e"
     session = PlanningSession(
         session_id=session_id,
         plan_id="bounded-plan",
         repository="owner/repo",
-        base_commit="a" * 40,
+        base_commit=base_commit,
         source_path="docs/plan.md",
-        source_blob_sha="b" * 40,
+        source_blob_sha=source_blob_sha,
         verification_command="make test",
         issue=QueueIssue(
             42,
@@ -1685,6 +1775,18 @@ def test_procedrr_runs_real_planning_machine_through_compiled_artifacts() -> Non
         ),
     )
     provider = _PlanningScriptClient()
+    provider.planned_path = "src/behavior.py"
+
+    class DecisionClient:
+        def complete_json(
+            self,
+            messages: list[dict[str, str]],
+            *,
+            response_schema: dict[str, Any] | None = None,
+        ) -> dict[str, Any]:
+            del messages, response_schema
+            return {"relevant": True}
+
     store = InMemoryCheckpointStore(session_id=session_id)
     Path(__file__).parents[1]
 
@@ -1696,7 +1798,7 @@ def test_procedrr_runs_real_planning_machine_through_compiled_artifacts() -> Non
         client=provider,
         options=PlanningOptions(
             model="scripted-model",
-            decision_client=provider,
+            decision_client=DecisionClient(),
             decision_model="scripted-model",
         ),
         stderr=None,
@@ -1705,11 +1807,21 @@ def test_procedrr_runs_real_planning_machine_through_compiled_artifacts() -> Non
     assert result.terminal_status.value == "succeeded", (
         store.load().events[-1].payload.get("validation_result")
     )
+    evidence = machine._structural_symbol_cache["src/behavior.py"][0]["code_evidence"]
+    assert evidence["artifact_id"].startswith("structrr-code-symbols:sha256:")
+    assert evidence["query_id"].startswith("query:sha256:")
+    assert evidence["source_revision"] == base_commit
+    assert any(
+        subject.subject_id == "entity:parse_payload"
+        and subject.code_evidence == (evidence,)
+        for subject in machine._structural_subject_context_cache["item-0001"][0]
+    )
     assert provider.calls == [
         "planning_question_batch",
         "propose_work_units",
         "describe_item",
         "enumerate_structural_subjects",
+        "describe_structural_change",
     ]
     journal = store.load()
     deterministic_events = [
@@ -1748,6 +1860,22 @@ def test_procedrr_runs_real_planning_machine_through_compiled_artifacts() -> Non
     )
     assert compiled.ready_item_ids == ("item-0001",)
     assert len(compiled.files) == 3
+    proposal = machine.accepted_structrr_proposal(accepted)
+    assert proposal.full_proposal.code_evidence == (
+        {
+            "operation_id": "item-0001:entities:entity:parse_payload",
+            "item_id": "item-0001",
+            "section": "entities",
+            "subject_id": "entity:parse_payload",
+            "references": [evidence],
+        },
+    )
+    persisted_proposal = json.loads(
+        compiled.files["docs/plans/bounded-plan-structrr-proposal.json"]
+    )
+    assert persisted_proposal["full_proposal"]["code_evidence"] == list(
+        proposal.full_proposal.code_evidence
+    )
     accepted_questions = [
         event.payload["question"]
         for event in journal.events

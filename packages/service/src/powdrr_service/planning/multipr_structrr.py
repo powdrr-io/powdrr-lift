@@ -86,6 +86,10 @@ def compile_multi_pr_proposal(
     grouped: dict[str, dict[str, list[dict[str, Any]]]] = {
         item_id: {} for item_id in item_by_id
     }
+    evidence_by_item: dict[str, list[Mapping[str, Any]]] = {
+        item_id: [] for item_id in item_by_id
+    }
+    all_code_evidence: list[Mapping[str, Any]] = []
     all_sections: dict[str, list[dict[str, Any]]] = {}
     operation_ids: set[str] = set()
     for index, raw in enumerate(proposed_operations, start=1):
@@ -140,6 +144,24 @@ def compile_multi_pr_proposal(
         normalized = {**dict(content), identity_key: subject_id, "action": action}
         grouped[item_id].setdefault(section, []).append(normalized)
         all_sections.setdefault(section, []).append(normalized)
+        raw_evidence = raw.get("code_evidence", [])
+        if not isinstance(raw_evidence, list) or not all(
+            isinstance(item, Mapping) for item in raw_evidence
+        ):
+            raise ValueError(
+                f"Structrr operation {operation_id!r} code_evidence must be "
+                "a list of objects"
+            )
+        if raw_evidence:
+            evidence_record = {
+                "operation_id": operation_id,
+                "item_id": item_id,
+                "section": section,
+                "subject_id": subject_id,
+                "references": [dict(item) for item in raw_evidence],
+            }
+            evidence_by_item[item_id].append(evidence_record)
+            all_code_evidence.append(evidence_record)
         operation_ids.add(operation_id)
 
     def compile(
@@ -147,6 +169,7 @@ def compile_multi_pr_proposal(
         selected_items: Sequence[Mapping[str, Any]],
         sections: Mapping[str, list[dict[str, Any]]],
         baseline: Mapping[str, Any],
+        code_evidence: Sequence[Mapping[str, Any]],
     ) -> ProposalRevision:
         criteria = tuple(
             criterion
@@ -177,10 +200,15 @@ def compile_multi_pr_proposal(
             non_goals=non_goals,
             allowed_paths=allowed_paths or (".",),
             source_refs=(source_ref,),
+            code_evidence=code_evidence,
         )
 
     full = compile(
-        f"{plan_id}:full", tuple(item_by_id.values()), all_sections, baseline_snapshot
+        f"{plan_id}:full",
+        tuple(item_by_id.values()),
+        all_sections,
+        baseline_snapshot,
+        all_code_evidence,
     )
     projected = dict(baseline_snapshot)
     item_proposals: dict[str, ProposalRevision] = {}
@@ -188,7 +216,11 @@ def compile_multi_pr_proposal(
     for item_id, item in item_by_id.items():
         item_baselines[item_id] = dict(projected)
         item_proposals[item_id] = compile(
-            f"{plan_id}:{item_id}", (item,), grouped[item_id], projected
+            f"{plan_id}:{item_id}",
+            (item,),
+            grouped[item_id],
+            projected,
+            evidence_by_item[item_id],
         )
         projected = _apply_sections(projected, grouped[item_id])
     expected_final = projected

@@ -82,6 +82,7 @@ from powdrr_service.planning.structrr import (
     StructuralChange,
     StructuralSubjectEnumerationScope,
     StructuralSubjectPage,
+    _merge_code_evidence,
     bind_structural_operation,
     build_structural_candidate_review_request,
     build_structural_change_request,
@@ -268,18 +269,20 @@ def _planned_existing_structural_subjects(
             ):
                 entity_paths_by_id.setdefault(entity_id, set()).add(path)
     candidates: dict[str, dict[str, set[str]]] = {}
-    symbol_entity_ids_by_path = (
-        {}
-        if basedpyright_symbols_by_path is None
-        else {
-            path: _bound_entities_for_basedpyright_symbols(
+    symbol_evidence_by_entity: dict[str, tuple[Mapping[str, Any], ...]] = {}
+    symbol_entity_ids_by_path: dict[str, set[str]] = {}
+    if basedpyright_symbols_by_path is not None:
+        for path, symbols in basedpyright_symbols_by_path.items():
+            evidence_by_entity = _bound_code_evidence_for_basedpyright_symbols(
                 path,
                 symbols,
                 projected_baseline=projected_baseline,
             )
-            for path, symbols in basedpyright_symbols_by_path.items()
-        }
-    )
+            symbol_entity_ids_by_path[path] = set(evidence_by_entity)
+            for entity_id, evidence in evidence_by_entity.items():
+                symbol_evidence_by_entity[entity_id] = _merge_code_evidence(
+                    symbol_evidence_by_entity.get(entity_id, ()), evidence
+                )
     for entity in entities:
         entity_id = entity.get("id")
         if not isinstance(entity_id, str):
@@ -322,6 +325,8 @@ def _planned_existing_structural_subjects(
                 tuple(sorted(owner["units"])),
                 tuple(sorted(owner["sources"])) or tuple(fallback_source_refs),
                 False,
+                None,
+                symbol_evidence_by_entity.get(entity_id, ()),
             )
         )
 
@@ -359,16 +364,16 @@ def _planned_existing_structural_subjects(
     return tuple(result)
 
 
-def _bound_entities_for_basedpyright_symbols(
+def _bound_code_evidence_for_basedpyright_symbols(
     path: str,
     symbols: Sequence[Mapping[str, Any]],
     *,
     projected_baseline: Mapping[str, Any],
-) -> set[str]:
-    """Bind file-local BasedPyright declarations to indexed Structrr entities."""
+) -> dict[str, tuple[Mapping[str, Any], ...]]:
+    """Bind each indexed declaration and its query provenance to Structrr."""
     source_subjects = projected_baseline.get("source_subjects", [])
     if not isinstance(source_subjects, list):
-        return set()
+        return {}
     module_names = {
         str(subject["qualified_name"])
         for subject in source_subjects
@@ -378,6 +383,7 @@ def _bound_entities_for_basedpyright_symbols(
         and isinstance(subject.get("qualified_name"), str)
     }
     matched_keys: set[tuple[str, str]] = {("module", name) for name in module_names}
+    evidence_by_key: dict[tuple[str, str], list[Mapping[str, Any]]] = {}
 
     def visit(items: Sequence[Mapping[str, Any]], prefix: str) -> None:
         for symbol in items:
@@ -387,6 +393,11 @@ def _bound_entities_for_basedpyright_symbols(
                 continue
             qualified_name = f"{prefix}.{name}" if prefix else name
             matched_keys.add((kind, qualified_name))
+            evidence = symbol.get("code_evidence")
+            if isinstance(evidence, Mapping):
+                evidence_by_key.setdefault((kind, qualified_name), []).append(
+                    dict(evidence)
+                )
             children = symbol.get("children")
             if isinstance(children, list):
                 visit(
@@ -396,8 +407,8 @@ def _bound_entities_for_basedpyright_symbols(
 
     for module_name in sorted(module_names):
         visit(symbols, module_name)
-    matched_subject_ids = {
-        str(subject["id"])
+    matched_subjects = {
+        str(subject["id"]): (subject.get("kind"), subject.get("qualified_name"))
         for subject in source_subjects
         if isinstance(subject, Mapping)
         and subject.get("path") == path
@@ -406,15 +417,27 @@ def _bound_entities_for_basedpyright_symbols(
     }
     bindings = projected_baseline.get("source_bindings", [])
     if not isinstance(bindings, list):
-        return set()
-    return {
-        str(binding["entity_id"])
-        for binding in bindings
-        if isinstance(binding, Mapping)
-        and binding.get("path") == path
-        and binding.get("subject_id") in matched_subject_ids
-        and isinstance(binding.get("entity_id"), str)
-    }
+        return {}
+    output: dict[str, tuple[Mapping[str, Any], ...]] = {}
+    for binding in bindings:
+        if not isinstance(binding, Mapping) or binding.get("path") != path:
+            continue
+        subject_id = binding.get("subject_id")
+        entity_id = binding.get("entity_id")
+        if (
+            not isinstance(subject_id, str)
+            or subject_id not in matched_subjects
+            or not isinstance(entity_id, str)
+        ):
+            continue
+        kind, qualified_name = matched_subjects[subject_id]
+        if not isinstance(kind, str) or not isinstance(qualified_name, str):
+            continue
+        key = (kind, qualified_name)
+        output[entity_id] = _merge_code_evidence(
+            output.get(entity_id, ()), evidence_by_key.get(key, ())
+        )
+    return output
 
 
 @dataclass(frozen=True, slots=True)
@@ -2166,11 +2189,11 @@ class SourceLedgerQuestionMachine:
         projected_baseline: Mapping[str, Any],
         accepted_answers: Mapping[str, Mapping[str, Any]],
     ) -> tuple[BoundStructuralSubject, ...]:
-        subjects: list[BoundStructuralSubject] = []
         scopes = self._structural_subject_scope_cache.get(item_id)
         item_subjects, excluded_subject_ids, reference_path_pairs = (
             self._structural_subject_context_cache.get(item_id, ((), (), ()))
         )
+        subjects: list[BoundStructuralSubject] = list(item_subjects)
         if scopes is None:
             scopes = partition_subject_enumeration_units(
                 plan_id=self.plan_id,
@@ -2268,6 +2291,28 @@ class SourceLedgerQuestionMachine:
                 accepted_answers,
             )
             for subject in subjects:
+                if subject.section == "files":
+                    change = StructuralChange(
+                        subject.subject_id,
+                        subject.section,
+                        subject.item_id,
+                        subject.action,
+                        "change" if subject.is_new else "unchanged",
+                        {"path": subject.planned_path}
+                        if subject.is_new and subject.planned_path is not None
+                        else None,
+                        "Planned file path is absent from projected baseline."
+                        if subject.is_new
+                        else "File path already exists in projected baseline.",
+                        subject.requirement_ids,
+                        subject.unit_ids,
+                        subject.source_refs,
+                        subject.code_evidence,
+                    )
+                    operation = bind_structural_operation(change)
+                    if operation is not None:
+                        item_operations.append(operation)
+                    continue
                 request = build_structural_change_request(
                     subject,
                     projected_baseline=projected,

@@ -118,6 +118,7 @@ class PlanningCheckpoint:
         validation_result: Mapping[str, Any],
         id_counters: Mapping[str, int],
         code_evidence_refs: Sequence[Mapping[str, Any]] = (),
+        code_symbol_coverage: Sequence[Mapping[str, Any]] = (),
     ) -> PlanningCheckpoint:
         payload: dict[str, Any] = {
             "question": question.to_data(),
@@ -129,6 +130,10 @@ class PlanningCheckpoint:
         if code_evidence_refs:
             payload["code_evidence_refs"] = [
                 dict(reference) for reference in code_evidence_refs
+            ]
+        if code_symbol_coverage:
+            payload["code_symbol_coverage"] = [
+                dict(coverage) for coverage in code_symbol_coverage
             ]
         return cls.create(
             session_id=session_id,
@@ -153,6 +158,7 @@ class PlanningCheckpoint:
         previous_answer: Mapping[str, Any],
         id_counters: Mapping[str, int],
         code_evidence_refs: Sequence[Mapping[str, Any]] = (),
+        code_symbol_coverage: Sequence[Mapping[str, Any]] = (),
     ) -> PlanningCheckpoint:
         payload: dict[str, Any] = {
             "question": question.to_data(),
@@ -165,6 +171,10 @@ class PlanningCheckpoint:
         if code_evidence_refs:
             payload["code_evidence_refs"] = [
                 dict(reference) for reference in code_evidence_refs
+            ]
+        if code_symbol_coverage:
+            payload["code_symbol_coverage"] = [
+                dict(coverage) for coverage in code_symbol_coverage
             ]
         return cls.create(
             session_id=session_id,

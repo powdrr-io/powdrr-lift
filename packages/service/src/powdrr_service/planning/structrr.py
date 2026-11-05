@@ -617,6 +617,7 @@ def build_subject_enumeration_request(
     baseline_digest: str | None = None,
     scope_id: str | None = None,
     baseline_subject_index: Mapping[str, Any] | None = None,
+    code_symbol_coverage: Mapping[str, Any] | None = None,
 ) -> QuestionRequest[StructuralSubjectPage]:
     unit_ids = {unit.id for unit in units}
     requirement_ids = {req for unit in units for req in unit.requirement_ids}
@@ -693,6 +694,16 @@ def build_subject_enumeration_request(
             ]
         },
     )
+    coverage_facts = (
+        (
+            ContextRecord(
+                f"code-symbol-coverage:{item_id}",
+                {"code_symbol_coverage": dict(code_symbol_coverage)},
+            ),
+        )
+        if code_symbol_coverage is not None
+        else ()
+    )
     prior_counts: dict[str, int] = {}
     for subject in prior_subjects:
         prior_counts[subject.section] = prior_counts.get(subject.section, 0) + 1
@@ -718,6 +729,7 @@ def build_subject_enumeration_request(
         *path_refs,
         baseline_fact,
         reference_fact,
+        *coverage_facts,
         *prior_facts,
         pagination_fact,
     )
@@ -780,6 +792,11 @@ def build_subject_enumeration_request(
                     "prior": [item.to_data() for item in prior_subjects],
                     "excluded_subject_ids": sorted(excluded_ids),
                     "basedpyright_references": reference_fact.value,
+                    "code_symbol_coverage": (
+                        None
+                        if code_symbol_coverage is None
+                        else dict(code_symbol_coverage)
+                    ),
                     "page": page_ordinal,
                 }
             ),
@@ -791,8 +808,11 @@ def build_subject_enumeration_request(
             "Find additional entity and relationship subjects this one plan item "
             "changes in Structrr beyond the deterministic candidates already "
             "selected from its planned paths. Those known candidates are omitted "
-            "from the projected baseline fact and must not be rediscovered. Planned "
-            "file paths have already been registered deterministically; do not "
+            "from the projected baseline fact and must not be rediscovered. "
+            "Use code-symbol-coverage facts to distinguish indexed paths with no "
+            "declarations from paths the provider could not index; do not treat an "
+            "unindexed path as evidence that a subject is absent. "
+            "Planned file paths have already been registered deterministically; do not "
             "return file subjects. Include only changes required by this item's "
             "allocated units. BasedPyright references between planned paths are "
             "candidate evidence for possible relationships; use them only when "

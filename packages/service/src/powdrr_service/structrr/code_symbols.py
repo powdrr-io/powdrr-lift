@@ -6,7 +6,7 @@ import ast
 import hashlib
 import json
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import PurePosixPath
 from typing import Any, Literal
@@ -60,6 +60,23 @@ class CodeSymbolArtifact:
 
 
 @dataclass(frozen=True, slots=True)
+class CodeSymbolSearchResult(Mapping[str, list[dict[str, Any]]]):
+    """Path-scoped symbols plus coverage needed to interpret empty results."""
+
+    symbols_by_path: Mapping[str, list[dict[str, Any]]]
+    coverage: Mapping[str, Any]
+
+    def __getitem__(self, path: str) -> list[dict[str, Any]]:
+        return self.symbols_by_path[path]
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(self.symbols_by_path)
+
+    def __len__(self) -> int:
+        return len(self.symbols_by_path)
+
+
+@dataclass(frozen=True, slots=True)
 class CodeSymbolQuery:
     structrr_snapshot_id: str
     query_kind: Literal["symbols", "references"]
@@ -95,13 +112,16 @@ def build_python_symbol_artifact(
         raise CodeSymbolError("source_tree_digest must be a SHA-256 digest")
 
     symbols: list[dict[str, Any]] = []
-    indexed_paths: list[str] = []
+    indexed_paths = sorted(set(symbols_by_path) & set(source_by_path))
+    unindexed_paths = sorted(set(source_by_path) - set(symbols_by_path))
+    coverage_status: Literal["complete", "partial"] = (
+        "partial" if unindexed_paths else "complete"
+    )
     for path in sorted(symbols_by_path):
         _validate_path(path)
         source = source_by_path.get(path)
         if not isinstance(source, str):
             raise CodeSymbolError(f"source text is missing for indexed path {path!r}")
-        indexed_paths.append(path)
         signatures = _python_signatures(source)
         _flatten_symbols(
             symbols_by_path[path],
@@ -124,7 +144,7 @@ def build_python_symbol_artifact(
                 "provider_id": "basedpyright",
                 "provider_version": provider_version,
                 "configuration_fingerprint": configuration_fingerprint,
-                "coverage": "complete",
+                "coverage": coverage_status,
             }
         ],
         "symbols": symbols,
@@ -135,7 +155,8 @@ def build_python_symbol_artifact(
                 "indexed_paths": indexed_paths,
                 "excluded_paths": [],
                 "unsupported_paths": [],
-                "status": "complete",
+                "unindexed_paths": unindexed_paths,
+                "status": coverage_status,
             }
         ],
     }
@@ -164,7 +185,7 @@ def build_python_symbol_artifact(
         configuration_fingerprint=configuration_fingerprint,
         symbol_count=len(symbols),
         relationship_count=0,
-        coverage="complete",
+        coverage=coverage_status,
     )
     return content, reference, document
 
@@ -312,16 +333,30 @@ def load_code_symbol_artifact(
             "symbol artifact source tree does not match its reference"
         )
     components = value.get("components")
-    if not isinstance(components, list) or not any(
-        isinstance(component, Mapping)
-        and component.get("component_id") == reference.get("component_id")
-        and component.get("provider_id") == reference.get("provider_id")
-        and component.get("provider_version") == reference.get("provider_version")
-        and component.get("configuration_fingerprint")
-        == reference.get("configuration_fingerprint")
-        for component in components
-    ):
+    component = (
+        next(
+            (
+                item
+                for item in components
+                if isinstance(item, Mapping)
+                and item.get("component_id") == reference.get("component_id")
+                and item.get("provider_id") == reference.get("provider_id")
+                and item.get("provider_version") == reference.get("provider_version")
+                and item.get("configuration_fingerprint")
+                == reference.get("configuration_fingerprint")
+            ),
+            None,
+        )
+        if isinstance(components, list)
+        else None
+    )
+    if not isinstance(component, Mapping):
         raise CodeSymbolError("symbol artifact component provenance is invalid")
+    coverage_status = component.get("coverage")
+    if coverage_status not in {"complete", "partial", "unavailable", "failed"}:
+        raise CodeSymbolError("symbol artifact component coverage is invalid")
+    if reference.get("coverage") != coverage_status:
+        raise CodeSymbolError("symbol artifact coverage does not match its reference")
     symbols = value.get("symbols")
     if not isinstance(symbols, list):
         raise CodeSymbolError("symbol artifact symbols must be an array")
@@ -350,6 +385,42 @@ def load_code_symbol_artifact(
             raise CodeSymbolError(
                 "relationship endpoints must identify indexed symbols"
             )
+    coverage = value.get("coverage")
+    if not isinstance(coverage, list):
+        raise CodeSymbolError("symbol artifact coverage must be an array")
+    coverage_record = next(
+        (
+            item
+            for item in coverage
+            if isinstance(item, Mapping)
+            and item.get("component_id") == reference.get("component_id")
+        ),
+        None,
+    )
+    if not isinstance(coverage_record, Mapping):
+        raise CodeSymbolError("symbol artifact component coverage is missing")
+    indexed_paths = coverage_record.get("indexed_paths")
+    unindexed_paths = coverage_record.get("unindexed_paths", [])
+    if not isinstance(indexed_paths, list) or not isinstance(unindexed_paths, list):
+        raise CodeSymbolError("symbol artifact coverage paths must be arrays")
+    if not all(isinstance(path, str) for path in (*indexed_paths, *unindexed_paths)):
+        raise CodeSymbolError("symbol artifact coverage paths must be strings")
+    for path in (*indexed_paths, *unindexed_paths):
+        _validate_path(path)
+    if len(indexed_paths) != len(set(indexed_paths)) or len(unindexed_paths) != len(
+        set(unindexed_paths)
+    ):
+        raise CodeSymbolError("symbol artifact coverage paths must be unique")
+    if set(indexed_paths) & set(unindexed_paths):
+        raise CodeSymbolError("indexed and unindexed paths must not overlap")
+    if coverage_record.get("status") != coverage_status:
+        raise CodeSymbolError("symbol artifact coverage status is inconsistent")
+    if coverage_status == "complete" and unindexed_paths:
+        raise CodeSymbolError("complete symbol coverage cannot have unindexed paths")
+    if coverage_status == "partial" and not unindexed_paths:
+        raise CodeSymbolError("partial symbol coverage must identify unindexed paths")
+    if any(symbol.get("path") not in indexed_paths for symbol in symbols):
+        raise CodeSymbolError("symbol records must belong to indexed paths")
     if reference.get("symbol_count") != len(symbols):
         raise CodeSymbolError("symbol artifact count does not match its reference")
     if reference.get("relationship_count") != len(relationships):
@@ -535,6 +606,7 @@ __all__ = [
     "CodeSymbolArtifact",
     "CodeSymbolError",
     "CodeSymbolQuery",
+    "CodeSymbolSearchResult",
     "build_python_symbol_artifact",
     "load_code_symbol_artifact",
     "query_python_references",

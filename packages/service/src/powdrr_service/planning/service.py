@@ -69,6 +69,26 @@ def _code_evidence_refs_for_question(
     return tuple(unique[key] for key in sorted(unique))
 
 
+def _code_symbol_coverage_for_question(
+    request: QuestionRequest[Any],
+) -> tuple[Mapping[str, Any], ...]:
+    """Extract component coverage summaries from the question's supplied context."""
+    unique: dict[str, Mapping[str, Any]] = {}
+    for record in (*request.repository_evidence, *request.accepted_facts):
+        coverage = record.value.get("code_symbol_coverage")
+        if not isinstance(coverage, Mapping):
+            continue
+        normalized = dict(coverage)
+        key = json.dumps(
+            normalized,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+        )
+        unique[key] = normalized
+    return tuple(unique[key] for key in sorted(unique))
+
+
 class PlanningServiceError(RuntimeError):
     """A planning session cannot safely start, advance, or resume."""
 
@@ -625,6 +645,11 @@ def advance_planning_session(
         for request in requests
         for member in (request.batch_members or (request,))
     }
+    code_symbol_coverage_by_question_id = {
+        member.question.question_id: _code_symbol_coverage_for_question(member)
+        for request in requests
+        for member in (request.batch_members or (request,))
+    }
     for request in requests:
         request.validate()
         for member in request.batch_members or (request,):
@@ -782,6 +807,9 @@ def advance_planning_session(
                 code_evidence_refs=code_evidence_by_question_id.get(
                     result.question.question_id, ()
                 ),
+                code_symbol_coverage=code_symbol_coverage_by_question_id.get(
+                    result.question.question_id, ()
+                ),
             )
         )
     if needs_answers:
@@ -797,6 +825,9 @@ def advance_planning_session(
                 previous_answer=result.previous_answer,
                 id_counters=journal.id_counters,
                 code_evidence_refs=code_evidence_by_question_id.get(
+                    result.question.question_id, ()
+                ),
+                code_symbol_coverage=code_symbol_coverage_by_question_id.get(
                     result.question.question_id, ()
                 ),
             )

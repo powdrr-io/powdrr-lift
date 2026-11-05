@@ -95,6 +95,7 @@ from powdrr_service.planning.structrr import (
     reject_unordered_subject_conflicts,
 )
 from powdrr_service.planning.workflow_ids import slugify_workflow_id
+from powdrr_service.structrr.code_symbols import CodeSymbolSearchResult
 from powdrr_service.structrr.snapshot import snapshot_digest
 
 
@@ -476,7 +477,8 @@ class SourceLedgerQuestionMachine:
         ]
         | None = None,
         structural_symbol_search: Callable[
-            [Sequence[str]], Mapping[str, Sequence[Mapping[str, Any]]]
+            [Sequence[str]],
+            Mapping[str, Sequence[Mapping[str, Any]]] | CodeSymbolSearchResult,
         ]
         | None = None,
         structural_reference_search: Callable[
@@ -501,6 +503,7 @@ class SourceLedgerQuestionMachine:
         self.structural_reference_search = structural_reference_search
         self._structural_symbol_cache_key: tuple[str, ...] | None = None
         self._structural_symbol_cache: Mapping[str, Sequence[Mapping[str, Any]]] = {}
+        self._structural_symbol_coverage: Mapping[str, Any] = {}
         self._structural_reference_cache_key: tuple[str, ...] | None = None
         self._structural_reference_cache: Mapping[str, Sequence[str]] = {}
         self._dependency_reference_cache_key: tuple[Any, ...] | None = None
@@ -1835,9 +1838,13 @@ class SourceLedgerQuestionMachine:
             and planned_python_paths
             and planned_python_paths != self._structural_symbol_cache_key
         ):
-            self._structural_symbol_cache = self.structural_symbol_search(
-                planned_python_paths
-            )
+            symbol_search = self.structural_symbol_search(planned_python_paths)
+            if isinstance(symbol_search, CodeSymbolSearchResult):
+                self._structural_symbol_cache = symbol_search.symbols_by_path
+                self._structural_symbol_coverage = symbol_search.coverage
+            else:
+                self._structural_symbol_cache = symbol_search
+                self._structural_symbol_coverage = {}
             self._structural_symbol_cache_key = planned_python_paths
         if (
             self.structural_reference_search is not None
@@ -2057,6 +2064,7 @@ class SourceLedgerQuestionMachine:
                             baseline_digest=baseline_digest,
                             scope_id=scope_id,
                             baseline_subject_index=scope.baseline_subject_index,
+                            code_symbol_coverage=self._structural_symbol_coverage,
                         )
                         question_id = enumeration_request.question.question_id
                         answer = accepted_answers.get(question_id)
@@ -2235,6 +2243,7 @@ class SourceLedgerQuestionMachine:
                     page_ordinal=page_ordinal,
                     scope_id=scope_id,
                     baseline_subject_index=scope.baseline_subject_index,
+                    code_symbol_coverage=self._structural_symbol_coverage,
                 )
                 answer = accepted_answers.get(request.question.question_id)
                 if answer is None:

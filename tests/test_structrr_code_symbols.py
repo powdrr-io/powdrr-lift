@@ -163,7 +163,9 @@ def test_artifact_loader_rejects_digest_revision_paths_and_duplicate_ids() -> No
         load_code_symbol_artifact(content, wrong_revision)
 
     duplicate = dict(document)
-    duplicate["symbols"] = [*document["symbols"], document["symbols"][0]]
+    symbols = document["symbols"]
+    assert isinstance(symbols, list) and symbols
+    duplicate["symbols"] = [*symbols, symbols[0]]
     import yaml
 
     duplicate_content = yaml.safe_dump(

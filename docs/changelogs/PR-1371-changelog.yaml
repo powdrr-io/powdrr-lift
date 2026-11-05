@@ -1,0 +1,38 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1371
+title: Normalize DeepInfra model IDs from MiniSWE
+intent:
+  problem: MiniSWE uses LiteLLM's deepinfra/ provider prefix in its configured model name, but the direct DeepInfra inference client forwards that prefix as part of the API model ID and receives HTTP 404.
+  goal: Strip only the DeepInfra routing prefix before sending the model ID to DeepInfra and cover the request payload with a regression test.
+human-decisions: []
+structured_files: []
+files:
+  - path: packages/service/src/powdrr_service/providers/inference.py
+    type: modified
+    span: {start_line: 69, end_line: 72}
+    summary: Remove the LiteLLM DeepInfra routing prefix from model IDs sent to the direct DeepInfra API.
+    rationale: Use the provider model identifier expected by DeepInfra while preserving all other request fields.
+  - path: tests/test_service_inference.py
+    type: modified
+    span: {start_line: 107, end_line: 140}
+    summary: Verify a prefixed MiniSWE model is sent as the underlying DeepInfra model ID.
+    rationale: Prevent HTTP 404 failures before the coding agent can make its first model call.
+entities:
+  - id: deepinfra-model-id-normalization
+    type: Function
+    action: added
+  - id: miniswe-deepinfra-prefix-regression
+    type: Regression test
+    action: added
+entity_relationships:
+  - id: regression-verifies-deepinfra-model-normalization
+    type: verifies
+    source: miniswe-deepinfra-prefix-regression
+    target: deepinfra-model-id-normalization
+    action: added
+    description: The regression confirms that the DeepInfra HTTP payload contains the API model ID without the LiteLLM provider routing prefix.
+invariants:
+  - id: deepinfra-http-model-ids-omit-provider-routing-prefix
+    description: Requests sent directly to DeepInfra use the provider's model ID without the LiteLLM deepinfra/ routing prefix.
+    action: added
+guidance: []

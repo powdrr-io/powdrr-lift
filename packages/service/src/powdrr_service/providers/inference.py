@@ -66,7 +66,10 @@ class DeepInfraInferenceClient:
                 error_code="invalid_inference_request",
             )
         payload = dict(request.options)
-        payload["model"] = request.model
+        # MiniSWE's LiteLLM configuration uses "deepinfra/" to select a
+        # provider. This client already targets DeepInfra directly, whose API
+        # expects only the provider's model ID.
+        payload["model"] = request.model.removeprefix("deepinfra/")
         payload["messages"] = list(request.messages)
         if request.tools:
             payload["tools"] = list(request.tools)

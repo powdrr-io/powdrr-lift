@@ -160,6 +160,11 @@ def run_planning_session(
             repository_name = _discover_github_repository(repo_root)
             github = GitHubIssueClient(repository_name)
 
+        base_commit = (
+            session.base_commit if session is not None else _git_head(repo_root)
+        )
+        _require_clean_planning_checkout(repo_root, base_commit)
+
         output_path = (
             _repository_file_path(config.output, repo_root, "Output plan")
             if not config.resume and config.output is not None
@@ -176,10 +181,6 @@ def run_planning_session(
                 "so the reviewed plan is not overwritten."
             )
 
-        base_commit = (
-            session.base_commit if session is not None else _git_head(repo_root)
-        )
-        _require_clean_planning_checkout(repo_root, base_commit)
         assert github is not None
         pinned_source = read_pinned_source(
             str(repo_root),

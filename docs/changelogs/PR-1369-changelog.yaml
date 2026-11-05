@@ -1,0 +1,43 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1369
+title: Restore the pinned checkout before checking resume artifacts
+intent:
+  problem: Resuming a failed planning run checks for an existing plan artifact before it restores the clean pinned base checkout, so the generated artifact on the failed plan branch prevents the recovery logic from running.
+  goal: Restore and validate the pinned checkout before checking whether the output plan already exists, and cover this retry path with a regression test.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/planning_session.py
+    type: modified
+    span: {start_line: 161, end_line: 165}
+    summary: Resolve and validate the pinned base checkout before calculating and checking the output plan path.
+    rationale: Let resume leave a clean generated plan branch before its generated output file can trigger the no-overwrite guard.
+  - path: src/powdrr_lift/workrr/planning_session.py
+    type: modified
+    span: {start_line: 177, end_line: 180}
+    summary: Remove the later duplicate checkout validation.
+    rationale: Ensure output existence checks only run after the checkout has been restored and validated.
+  - path: tests/test_github_issue_plan_generation.py
+    type: modified
+    span: {start_line: 2041, end_line: 2101}
+    summary: Verify resume restores the checkout before checking for a stale generated plan artifact.
+    rationale: Prevent regression to the immediate failure encountered when resuming issue #104.
+entities:
+  - id: resume-checkout-before-output-guard
+    type: Function
+    action: added
+  - id: resume-stale-output-regression
+    type: Regression test
+    action: added
+entity_relationships:
+  - id: regression-verifies-resume-checkout-order
+    type: verifies
+    source: resume-stale-output-regression
+    target: resume-checkout-before-output-guard
+    action: added
+    description: The test confirms that checkout restoration runs before stale generated output is checked.
+invariants:
+  - id: resume-cleans-pinned-checkout-before-output-check
+    description: A planning resume validates the session's pinned checkout before checking whether the plan output path already exists.
+    action: added
+guidance: []

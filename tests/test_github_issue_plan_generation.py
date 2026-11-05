@@ -2128,6 +2128,67 @@ def test_resume_returns_from_failed_generated_plan_branch_to_pinned_main(
     assert commands[-1] == ["git", "switch", "main"]
 
 
+def test_plan_resume_restores_checkout_before_checking_existing_output(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Any
+) -> None:
+    output_path = tmp_path / "docs" / "plans" / "plan-execution-plan.yaml"
+    output_path.parent.mkdir(parents=True)
+    output_path.write_text("generated on failed branch", encoding="utf-8")
+    session = SimpleNamespace(
+        plan_id="plan",
+        source_path="docs/source.md",
+        verification_command="make test",
+        base_commit="a" * 40,
+        source_blob_sha="b" * 40,
+        session_id="session-01",
+        issue=SimpleNamespace(number=42, url="https://example/issues/42"),
+    )
+
+    class FakeGitHubClient:
+        repository = "owner/repo"
+
+        def add_issue_comment(self, *_args: Any, **_kwargs: Any) -> None:
+            pass
+
+    def restore_checkout(_repo_root: Path, _base_commit: str) -> None:
+        output_path.unlink()
+
+    monkeypatch.setattr(planning_session, "resolve_repo_root", lambda _path: tmp_path)
+    monkeypatch.setattr(
+        planning_session,
+        "GitHubIssueClient",
+        lambda _repository: FakeGitHubClient(),
+    )
+    monkeypatch.setattr(
+        planning_session,
+        "_planning_session_operation",
+        lambda *_args, **_kwargs: session,
+    )
+    monkeypatch.setattr(
+        planning_session, "_require_clean_planning_checkout", restore_checkout
+    )
+    monkeypatch.setattr(
+        planning_session,
+        "read_pinned_source",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(
+            RuntimeError("reached pinned source lookup")
+        ),
+    )
+
+    with pytest.raises(
+        planning_session.PlanningSessionExecutionError,
+        match="reached pinned source lookup",
+    ):
+        planning_session.run_planning_session(
+            planning_session.PlanningSessionConfig(
+                repo_root=tmp_path,
+                resume=True,
+                repository="owner/repo",
+                session_issue=42,
+            )
+        )
+
+
 def test_publish_execution_plan_pull_request_rejects_detached_head(
     tmp_path: Any,
 ) -> None:

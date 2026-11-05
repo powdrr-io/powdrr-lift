@@ -1,0 +1,238 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1367
+title: Bound plan publication and structural baseline queries
+intent:
+  problem: Large planning runs can exceed the provider question limit when a single planned write has a large baseline subject index, and can exceed GitHub's pull request body limit when the dependency graph is large. A failed plan publication can also leave the repository checked out on an unsubmitted generated plan branch, preventing clean resume.
+  goal: Partition oversized baseline subject indexes without dropping records, keep generated plan pull request bodies concise, and restore the pinned base checkout after failed publication or before resuming a clean failed generated plan.
+human-decisions: []
+structured_files: []
+files:
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 594, end_line: 594}
+    summary: Allow a structural question to use a prepartitioned baseline subject index.
+    rationale: Send each query scope only its own slice of baseline subjects.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 627, end_line: 635}
+    summary: Use the supplied baseline index when constructing a structural subject question.
+    rationale: Ensure the serialized question matches the scope-specific subject index.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 1108, end_line: 1115}
+    summary: Define a scope that retains its ID, units, source references, and baseline index.
+    rationale: Keep all context needed to ask and resume each bounded question together.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 1128, end_line: 1128}
+    summary: Return structured structural enumeration scopes.
+    rationale: Preserve query context through partitioning and answer reconstruction.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 1130, end_line: 1130}
+    summary: Collect structured enumeration scopes during partitioning.
+    rationale: Carry each scope's baseline index and source references to the driver.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 1133, end_line: 1138}
+    summary: Build a baseline subject index and include it in the stable scope identifier.
+    rationale: Invalidate durable answers if the evidence slice changes.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 1147, end_line: 1147}
+    summary: Bind the exact baseline subject index into the scope identifier.
+    rationale: Keep resume checkpoints specific to the question context.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 1151, end_line: 1193}
+    summary: Split large baseline subject lists into serialized-size chunks.
+    rationale: Bound requests without omitting baseline evidence.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 1196, end_line: 1196}
+    summary: Accept the subject index when constructing a scoped request.
+    rationale: Build questions with the same context used to derive their scope IDs.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 1198, end_line: 1230}
+    summary: Build a question request from scoped units, references, and subject index.
+    rationale: Keep evidence and baseline context bounded to the current scope.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 1251, end_line: 1251}
+    summary: Return source references selected for a scope.
+    rationale: Retain only evidence applicable to scoped planned writes.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 1159, end_line: 1178}
+    summary: Measure and chunk baseline subject records by serialized size.
+    rationale: Keep each request below the planner input bound.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 1259, end_line: 1270}
+    summary: Append scopes only after validating that their requests fit the input bound.
+    rationale: Reject or split any scope that remains oversized.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 1275, end_line: 1275}
+    summary: Compute the candidate baseline subject index for each unit group.
+    rationale: Check the full request context before accepting a scope.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 1277, end_line: 1277}
+    summary: Validate candidate requests with their exact baseline subject index.
+    rationale: Detect oversized source subject lists during deterministic partitioning.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 1280, end_line: 1280}
+    summary: Append completed unit scopes with their baseline context.
+    rationale: Preserve evidence when a combined scope exceeds the bound.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 1288, end_line: 1292}
+    summary: Split an oversized single-unit baseline index into multiple scopes.
+    rationale: Handle large baselines even when there is only one planned write.
+  - path: packages/service/src/powdrr_service/planning/structrr.py
+    type: modified
+    span: {start_line: 1299, end_line: 1299}
+    summary: Append the final scope with its complete baseline subject index.
+    rationale: Preserve exact context for answer reconstruction.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 83, end_line: 83}
+    summary: Import the structured scope type used by structural enumeration.
+    rationale: Consume all context retained by the bounded partitioner.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 518, end_line: 518}
+    summary: Cache structured enumeration scopes instead of unit and ID tuples.
+    rationale: Reuse exact scope context when reconstructing accepted answers.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 2005, end_line: 2008}
+    summary: Read identifiers, units, and references from the structured scope.
+    rationale: Ask each question with its bounded evidence selection.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 2036, end_line: 2036}
+    summary: Pass the scope-specific baseline index into each question request.
+    rationale: Match the checkpoint identity to the exact question context.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 2186, end_line: 2189}
+    summary: Reconstruct accepted answers from each structured scope's exact context.
+    rationale: Keep compilation consistent with the reviewed structural question.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 2214, end_line: 2214}
+    summary: Reuse the scoped baseline index when rebuilding accepted requests.
+    rationale: Prevent accepted answers from replaying against different evidence.
+  - path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+    type: modified
+    span: {start_line: 1415, end_line: 1443}
+    summary: Return to the selected base branch when plan pull request creation fails.
+    rationale: Keep local planning resumable while leaving the generated branch available remotely.
+  - path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+    type: modified
+    span: {start_line: 1495, end_line: 1508}
+    summary: Render a bounded preview of plan items and their dependency counts.
+    rationale: Avoid repeating large dependency lists in the pull request body.
+  - path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+    type: modified
+    span: {start_line: 1510, end_line: 1511}
+    summary: Calculate total dependency links and initially ready items.
+    rationale: Show plan shape without expanding the full graph.
+  - path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+    type: modified
+    span: {start_line: 1524, end_line: 1530}
+    summary: Add plan counts and label the item preview in the PR body.
+    rationale: Keep review context concise while pointing to the full plan artifacts.
+  - path: src/powdrr_lift/workrr/planning_session.py
+    type: modified
+    span: {start_line: 742, end_line: 742}
+    summary: Restore a failed generated plan checkout before checking the pinned head.
+    rationale: Resume clean interrupted plan runs from their source base.
+  - path: src/powdrr_lift/workrr/planning_session.py
+    type: modified
+    span: {start_line: 760, end_line: 810}
+    summary: Switch a clean generated plan branch only when it matches the pinned base commit.
+    rationale: Recover safely without discarding changes or switching unrelated branches.
+  - path: tests/test_github_issue_plan_generation.py
+    type: modified
+    span: {start_line: 30, end_line: 30}
+    summary: Import the plan body renderer for focused size regression coverage.
+    rationale: Test the same renderer used by plan publication.
+  - path: tests/test_github_issue_plan_generation.py
+    type: modified
+    span: {start_line: 1933, end_line: 2040}
+    summary: Verify large dependency graphs produce bounded PR bodies and failed publication or resume restores the pinned base branch.
+    rationale: Cover the real-run failures that prevented the execution plan PR from opening.
+  - path: tests/test_planning_structrr.py
+    type: modified
+    span: {start_line: 339, end_line: 341}
+    summary: Update bounded scope assertions to use structured scope values.
+    rationale: Keep planned-write partitioning covered after scope context is retained.
+  - path: tests/test_planning_structrr.py
+    type: modified
+    span: {start_line: 345, end_line: 345}
+    summary: Use scoped units when rebuilding a bounded structural request.
+    rationale: Exercise the structured enumeration scope API.
+  - path: tests/test_planning_structrr.py
+    type: modified
+    span: {start_line: 347, end_line: 347}
+    summary: Use source references retained by the bounded scope.
+    rationale: Ensure each request receives the partitioner's selected evidence.
+  - path: tests/test_planning_structrr.py
+    type: modified
+    span: {start_line: 349, end_line: 422}
+    summary: Verify oversized baseline source-subject indexes are chunked without dropping records.
+    rationale: Prevent large repository baselines from exceeding the question limit while preserving coverage.
+entities:
+  - id: bounded-baseline-subject-index-partitioning
+    type: Function
+    action: added
+  - id: bounded-plan-pull-request-summary
+    type: Function
+    action: added
+  - id: failed-plan-publication-checkout-recovery
+    type: Function
+    action: added
+  - id: bounded-baseline-subject-index-regression
+    type: Regression test
+    action: added
+  - id: bounded-plan-pull-request-body-regression
+    type: Regression test
+    action: added
+  - id: failed-plan-checkout-recovery-regression
+    type: Regression test
+    action: added
+entity_relationships:
+  - id: baseline-index-regression-verifies-partitioning
+    type: verifies
+    source: bounded-baseline-subject-index-regression
+    target: bounded-baseline-subject-index-partitioning
+    action: added
+    description: The regression confirms that all source subject records are retained across individually bounded structural query scopes.
+  - id: body-regression-verifies-bounded-summary
+    type: verifies
+    source: bounded-plan-pull-request-body-regression
+    target: bounded-plan-pull-request-summary
+    action: added
+    description: The regression confirms that a large dependency graph has a concise summary and item preview within the pull request body limit.
+  - id: checkout-regression-verifies-publication-recovery
+    type: verifies
+    source: failed-plan-checkout-recovery-regression
+    target: failed-plan-publication-checkout-recovery
+    action: added
+    description: The regression confirms that failed publication and clean resume return to the pinned base branch.
+invariants:
+  - id: structural-baseline-index-records-are-preserved
+    description: Partitioning a structural subject index preserves every indexed entity, relationship, and source subject across query scopes.
+    action: added
+  - id: plan-publication-summary-is-bounded
+    description: Generated plan pull request bodies summarize dependencies and show a bounded item preview; the full graph remains in plan artifacts.
+    action: added
+  - id: failed-plan-resume-preserves-user-changes
+    description: Resume may switch from a generated plan branch only when that branch is clean and the pinned base commit is the current main or master branch.
+    action: added
+guidance: []

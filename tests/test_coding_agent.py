@@ -800,6 +800,48 @@ def test_worker_out_of_scope_change_is_policy_denied(tmp_path: Path) -> None:
     assert attempt.out_of_scope_paths == ("README.md",)
 
 
+def test_worker_change_to_protected_path_is_policy_denied(tmp_path: Path) -> None:
+    worktree = _git_repo(tmp_path)
+
+    class ProtectedFileProvider:
+        provider_name = "fake"
+
+        def run(
+            self,
+            request: ImplementationRequest,
+            *,
+            worktree_root: Path,
+            attempt_id: str,
+        ) -> subprocess.CompletedProcess[str]:
+            del request, attempt_id
+            protected = worktree_root / "tests" / "test_protected.py"
+            protected.parent.mkdir(parents=True)
+            protected.write_text("def test_behavior():\n    assert True\n")
+            return subprocess.CompletedProcess(["fake"], 0, "", "")
+
+    request = replace(
+        _request(_head(worktree)),
+        allowed_paths=("src", "tests"),
+        protected_paths=("tests/test_protected.py",),
+    )
+    attempt = run_coding_agent(
+        ProtectedFileProvider(),
+        request,
+        worktree_root=worktree,
+        attempt_id="attempt-protected-file",
+    )
+
+    assert attempt.status is CodingAgentStatus.POLICY_DENIED
+    assert attempt.error == "worker changed protected paths"
+    assert attempt.changed_paths == ("tests/test_protected.py",)
+
+
+def test_implementation_request_round_trips_protected_paths() -> None:
+    request = replace(_request("a" * 40), protected_paths=("tests",))
+
+    assert ImplementationRequest.from_data(request.to_data()) == request
+
+
 def test_worker_commit_within_scope_is_accepted_and_recorded(tmp_path: Path) -> None:
     worktree = _git_repo(tmp_path)
     attempt = run_coding_agent(

@@ -105,6 +105,7 @@ class ImplementationRequest:
     ephemeral_paths: tuple[str, ...] = ()
     planned_additions: tuple[Mapping[str, Any], ...] = ()
     planned_deletions: tuple[Mapping[str, Any], ...] = ()
+    protected_paths: tuple[str, ...] = ()
     intent_packet: IntentPacket | None = None
     implementation_packet: ImplementationPacket | None = None
     allow_existing_changes: bool = False
@@ -126,6 +127,7 @@ class ImplementationRequest:
             "ephemeral_paths": list(self.ephemeral_paths),
             "planned_additions": [dict(item) for item in self.planned_additions],
             "planned_deletions": [dict(item) for item in self.planned_deletions],
+            "protected_paths": list(self.protected_paths),
             "allow_existing_changes": self.allow_existing_changes,
             "intent_packet": (
                 self.intent_packet.to_data() if self.intent_packet is not None else None
@@ -203,6 +205,7 @@ class ImplementationRequest:
             planned_deletions=tuple(
                 cast(list[Mapping[str, Any]], data.get("planned_deletions", []))
             ),
+            protected_paths=tuple(cast(list[str], data.get("protected_paths", []))),
             allow_existing_changes=bool(data.get("allow_existing_changes", False)),
             intent_packet=(
                 IntentPacket.from_data(cast(Mapping[str, Any], packet))
@@ -1295,15 +1298,22 @@ def run_coding_agent(
             path, (*request.allowed_paths, *request.ephemeral_paths)
         )
     )
+    protected_changes = tuple(
+        path
+        for path in changed_paths
+        if _path_is_allowed(path, request.protected_paths)
+    )
     fingerprint = _worktree_fingerprint(worktree_root, changed_paths)
     head_rewritten = before_head != after_head and not _git_is_ancestor(
         worktree_root, before_head, after_head
     )
-    if head_rewritten or out_of_scope:
+    if head_rewritten or out_of_scope or protected_changes:
         status = CodingAgentStatus.POLICY_DENIED
         terminal_error = (
             "worker rewrote HEAD instead of adding commits"
             if head_rewritten
+            else "worker changed protected paths"
+            if protected_changes
             else "worker changed paths outside the implementation request"
         )
     elif completed.returncode == 124:

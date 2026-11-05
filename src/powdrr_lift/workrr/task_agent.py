@@ -446,6 +446,71 @@ def _issue_worker_implementation_request(
     return replace(request, allow_existing_changes=True), validation_profile
 
 
+def _ci_repair_implementation_request(
+    repair_request: Mapping[str, Any], *, base_commit: str
+) -> ImplementationRequest:
+    """Validate the service-compiled CI request at the worker boundary."""
+    head_sha = repair_request.get("head_sha")
+    failure_id = repair_request.get("failure_id")
+    prompt = repair_request.get("prompt")
+    contract_fingerprint = repair_request.get("contract_fingerprint")
+    if not isinstance(head_sha, str) or not head_sha.strip():
+        raise PowdrrExecutionError("CI repair request requires a head SHA")
+    if not isinstance(failure_id, str) or not failure_id.strip():
+        raise PowdrrExecutionError("CI repair request requires a failure ID")
+    if not isinstance(prompt, str) or not prompt.strip():
+        raise PowdrrExecutionError("CI repair request requires a prompt")
+    if not isinstance(contract_fingerprint, str) or not contract_fingerprint.strip():
+        raise PowdrrExecutionError("CI repair request requires a contract fingerprint")
+    if head_sha != base_commit:
+        raise PowdrrExecutionError(
+            "CI repair request head does not match the current worker base"
+        )
+    allowed_paths = repair_request.get("allowed_paths")
+    protected_paths = repair_request.get("protected_paths", [])
+    acceptance_command = repair_request.get("acceptance_command")
+    if (
+        not isinstance(allowed_paths, list)
+        or not allowed_paths
+        or any(not isinstance(path, str) or not path.strip() for path in allowed_paths)
+    ):
+        raise PowdrrExecutionError("CI repair request has no valid allowed paths")
+    if not isinstance(protected_paths, list) or any(
+        not isinstance(path, str) or not path.strip() for path in protected_paths
+    ):
+        raise PowdrrExecutionError("CI repair request has invalid protected paths")
+    if (
+        not isinstance(acceptance_command, list)
+        or not acceptance_command
+        or any(not isinstance(token, str) or not token for token in acceptance_command)
+    ):
+        raise PowdrrExecutionError(
+            "CI repair request requires an explicit acceptance command"
+        )
+    for path in (*allowed_paths, *protected_paths):
+        relative = Path(path)
+        if relative.is_absolute() or ".." in relative.parts or not relative.parts:
+            raise PowdrrExecutionError("CI repair paths must be repository-relative")
+    if set(allowed_paths) & set(protected_paths):
+        raise PowdrrExecutionError("CI repair path is both allowed and protected")
+    request_id = "ci-repair-" + hashlib.sha256(failure_id.encode()).hexdigest()[:16]
+    return ImplementationRequest(
+        request_id=request_id,
+        objective=f"Repair CI failure {failure_id}",
+        prompt=prompt,
+        base_commit=base_commit,
+        plan_fingerprint=contract_fingerprint,
+        allowed_paths=tuple(allowed_paths),
+        protected_paths=tuple(protected_paths),
+        acceptance_criteria=(
+            "Address only the pinned CI failure described by the service prompt.",
+            "Preserve protected tests and verification behavior.",
+        ),
+        validation_profiles=(),
+        allowed_commands=(" ".join(acceptance_command),),
+    )
+
+
 def _issue_worker_plan_amendment_paths(
     repo_root: Path, proposed: Mapping[str, Any], *, workflow_id: str
 ) -> tuple[str, ...]:
@@ -2871,6 +2936,8 @@ class _TaskWorkflowExecutionStrategy:
         mode: str = "implementation",
         mode_context: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
+        if mode == "ci-repair":
+            return self._run_ci_repair_agent(mode_context or {})
         if mode == "plan-amendment":
             return self._run_plan_amendment_agent(mode_context or {})
         if mode != "implementation":
@@ -3587,6 +3654,63 @@ class _TaskWorkflowExecutionStrategy:
             "continuations": len(attempt_records) - 1,
         }
         self.events.append({"kind": "coding_agent", "result": result})
+        return result
+
+    def _run_ci_repair_agent(self, mode_context: Mapping[str, Any]) -> dict[str, Any]:
+        """Dispatch a service-compiled, exact-head repair to MiniSWE once."""
+        repair_request = mode_context.get("repair_request")
+        if not isinstance(repair_request, Mapping):
+            raise PowdrrExecutionError("CI repair mode requires repair_request data")
+        current_head = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=self.repo_root,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if current_head.returncode:
+            raise PowdrrExecutionError("could not identify the CI repair base commit")
+        base_commit = current_head.stdout.strip()
+        request = _ci_repair_implementation_request(
+            repair_request, base_commit=base_commit
+        )
+        request_store = (
+            Path(tempfile.gettempdir())
+            / "powdrr-lift-ci-repair"
+            / request.plan_fingerprint[:24]
+        )
+        attempt_id = request.request_id + "-attempt-01"
+        provider = MiniSWEAgentProvider(
+            inference_handler=create_miniswe_inference_handler(
+                self.config.coding_agent_timeout_seconds
+            ),
+            executable=self.config.minisweagent_executable,
+            model=self.config.minisweagent_model,
+            timeout_seconds=self.config.coding_agent_timeout_seconds,
+            diagnostics_root=request_store / "diagnostics",
+        )
+        runner = CodingAgentRunner(
+            provider=provider,
+            store=CodingAgentAttemptStore(request_store / "attempts"),
+        )
+        attempt = runner.run(
+            request,
+            worktree_root=self.repo_root,
+            attempt_id=attempt_id,
+        )
+        result = {
+            "passed": attempt.status.value == "completed",
+            "attempt_id": attempt.attempt_id,
+            "status": attempt.status.value,
+            "head_sha": base_commit,
+            "failure_id": repair_request["failure_id"],
+            "changed_paths": list(attempt.changed_paths),
+            "protected_paths": list(request.protected_paths),
+            "error": attempt.error,
+            "diff_fingerprint": attempt.diff_fingerprint,
+            "worker_committed": attempt.worker_committed,
+        }
+        self.events.append({"kind": "ci_repair_coding_agent", "result": result})
         return result
 
     def record_action_error(self, action: WorkflowAction, error: Exception) -> None:

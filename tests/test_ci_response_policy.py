@@ -10,11 +10,17 @@ from powdrr_contracts.ci import (
     LocalReproduction,
 )
 from powdrr_service.ci_response import (
+    RepairContract,
     build_failure_units,
     compare_local_reproduction,
+    compile_miniswe_repair_prompt,
+    github_actions_research_queries,
     normalize_github_snapshot,
     render_ci_observation_checkpoint,
+    select_github_actions_sources,
+    validate_repair_patch,
 )
+from powdrr_service.ci_response.evidence import CIFailureUnit
 
 HEAD = "6c85b1e5c334a113b3db274b2c1b7a8f350b9707"
 
@@ -130,6 +136,154 @@ def test_green_comparable_execution_is_a_non_reproduction() -> None:
 def test_reproduction_contract_rejects_ambiguous_reproduced_state() -> None:
     with pytest.raises(ContractError, match="matching_failure=true"):
         LocalReproduction("reproduced", "uncertain")
+
+
+def _repair_fixture(
+    status: str = "not_reproduced",
+) -> tuple[RepairContract, CIFailureUnit]:
+    failure = build_failure_units(
+        (
+            CIJobObservation(
+                job_id=10,
+                run_id=11,
+                run_attempt=1,
+                head_sha=HEAD,
+                status="completed",
+                conclusion="failure",
+                steps=({"name": "pytest", "conclusion": "failure"},),
+            ),
+        )
+    )[0]
+    reproduction = (
+        LocalReproduction(
+            "not_reproduced", "Comparable command was green.", matching_failure=False
+        )
+        if status == "not_reproduced"
+        else LocalReproduction(
+            "reproduced", "Same failure appeared locally.", matching_failure=True
+        )
+    )
+    contract = RepairContract(
+        repository="powdrr-io/example",
+        pull_request=42,
+        head_sha=HEAD,
+        failure_id=failure.failure_id,
+        failure_signature=failure.signature,
+        reproduction=reproduction,
+        allowed_paths=(".github/workflows/ci.yml",),
+        protected_paths=("tests/test_behavior.py",),
+        required_behavior=(
+            "Run the configured test suite successfully on supported runners."
+        ),
+        acceptance_command=("pytest", "tests/test_behavior.py"),
+    )
+    return contract, failure
+
+
+def test_repair_prompt_is_pinned_scoped_and_explicit_when_ci_only() -> None:
+    contract, failure = _repair_fixture()
+    prompt = compile_miniswe_repair_prompt(
+        contract, failure, research_evidence=("GitHub docs describe runner labels.",)
+    )
+
+    assert HEAD in prompt
+    assert failure.failure_id in prompt
+    assert "Treat this correction as GitHub Actions specific" in prompt
+    assert ".github/workflows/ci.yml" in prompt
+    assert "tests/test_behavior.py" in prompt
+    assert "Do not delete, empty, weaken" in prompt
+    assert "GitHub docs describe runner labels." in prompt
+
+
+def test_repair_prompt_rejects_evidence_from_a_different_head_or_failure() -> None:
+    from dataclasses import replace
+
+    contract, failure = _repair_fixture()
+    with pytest.raises(ValueError, match="does not match"):
+        compile_miniswe_repair_prompt(contract, replace(failure, head_sha="0" * 40))
+
+
+def test_contract_fingerprint_is_stable_and_changes_with_authorized_paths() -> None:
+    from dataclasses import replace
+
+    contract, _ = _repair_fixture()
+    assert contract.fingerprint == contract.fingerprint
+    assert (
+        replace(contract, allowed_paths=(".github/workflows/other.yml",)).fingerprint
+        != contract.fingerprint
+    )
+
+
+def test_patch_gate_rejects_tests_and_verification_weakening() -> None:
+    contract, _ = _repair_fixture()
+    findings = validate_repair_patch(
+        contract=contract,
+        changed_files={
+            ".github/workflows/ci.yml": "continue-on-error: true\n",
+            "tests/test_behavior.py": "def test_behavior():\n    assert True\n",
+        },
+    )
+
+    assert any("verification weakening" in finding for finding in findings)
+    assert any("protected path changed" in finding for finding in findings)
+    assert any("test path" in finding for finding in findings)
+
+
+def test_patch_gate_accepts_scoped_workflow_change() -> None:
+    contract, _ = _repair_fixture()
+    assert (
+        validate_repair_patch(
+            contract=contract,
+            changed_files={
+                ".github/workflows/ci.yml": (
+                    "jobs:\n  test:\n    runs-on: ubuntu-latest\n"
+                )
+            },
+        )
+        == ()
+    )
+
+
+def test_ci_research_is_limited_and_grounded_in_observed_context() -> None:
+    queries = github_actions_research_queries(
+        failure_signature="runner configuration is not supported",
+        workflow_path=".github/workflows/ci.yml",
+        runner_labels=("macos-14-arm64-us-default",),
+    )
+
+    assert len(queries) == 2
+    assert all("site:docs.github.com/actions" in item["query"] for item in queries)
+    assert "macos-14-arm64-us-default" in queries[1]["query"]
+
+
+def test_ci_research_source_selection_filters_domains_and_caps_results() -> None:
+    searches = {
+        "searches": [
+            {
+                "research_question": "Documented runner behavior?",
+                "candidates": [
+                    {"url": "https://attacker.example/docs", "title": "Fake"},
+                    {
+                        "url": "https://docs.github.com/actions/runners",
+                        "title": "Runners",
+                    },
+                    {
+                        "url": "http://docs.github.com/actions/self-hosted-runners",
+                        "title": "Insecure",
+                    },
+                    {
+                        "url": "https://docs.github.com/actions/hosting",
+                        "title": "Hosting",
+                    },
+                ],
+            }
+        ]
+    }
+    sources = select_github_actions_sources(searches, maximum=1)
+
+    assert len(sources) == 1
+    assert sources[0]["url"] == "https://docs.github.com/actions/runners"
+    assert select_github_actions_sources(searches, maximum=0) == ()
 
 
 def test_non_failure_jobs_do_not_create_failure_units() -> None:

@@ -3,9 +3,23 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import StrEnum
 from typing import Any
 
 VALIDATION_PROVIDER_INVENTORY_SCHEMA_VERSION = "verification-provider-inventory-v2"
+VERIFICATION_EVIDENCE_SCHEMA_VERSION = "verification-evidence-v1"
+
+
+class EvidenceStatus(StrEnum):
+    PASSED = "passed"
+    FAILED = "failed"
+    SKIPPED = "skipped"
+    XFAILED = "xfailed"
+    DESELECTED = "deselected"
+    NOT_COLLECTED = "not_collected"
+    ERRORED = "errored"
+    TIMED_OUT = "timed_out"
+    MISSING = "missing"
 
 
 @dataclass(frozen=True, slots=True)
@@ -58,5 +72,48 @@ class PostRunProbeResult:
             "command": list(self.command),
             "returncode": self.returncode,
             "output": self.output,
+            "error": self.error,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class VerificationEvidence:
+    """Transport-independent result of one verification obligation run."""
+
+    obligation_id: str
+    contract_id: str
+    provider: str
+    selector: str
+    profile: str
+    status: EvidenceStatus
+    candidate_tree: str
+    contract_fingerprint: str
+    verifier_fingerprint: str
+    protected_inputs_fingerprint: str
+    command_fingerprint: str
+    provider_version: str | None = None
+    returncode: int | None = None
+    duration_ms: int | None = None
+    artifact_refs: tuple[str, ...] = ()
+    error: str | None = None
+
+    def to_data(self) -> dict[str, Any]:
+        return {
+            "schema_version": VERIFICATION_EVIDENCE_SCHEMA_VERSION,
+            "obligation_id": self.obligation_id,
+            "contract_id": self.contract_id,
+            "provider": self.provider,
+            "selector": self.selector,
+            "profile": self.profile,
+            "status": self.status.value,
+            "candidate_tree": self.candidate_tree,
+            "contract_fingerprint": self.contract_fingerprint,
+            "verifier_fingerprint": self.verifier_fingerprint,
+            "protected_inputs_fingerprint": self.protected_inputs_fingerprint,
+            "command_fingerprint": self.command_fingerprint,
+            "provider_version": self.provider_version,
+            "returncode": self.returncode,
+            "duration_ms": self.duration_ms,
+            "artifact_refs": list(self.artifact_refs),
             "error": self.error,
         }

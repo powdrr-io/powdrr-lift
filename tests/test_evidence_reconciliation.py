@@ -1,4 +1,6 @@
-from powdrr_lift.workrr.evidence_reconciliation import reconcile_verification_evidence
+from powdrr_service.verification.evidence_reconciliation import (
+    reconcile_verification_evidence,
+)
 
 
 def _obligation() -> dict[str, str]:

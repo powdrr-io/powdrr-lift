@@ -2708,14 +2708,12 @@
       "reviewed": false
     },
     {
-      "extraction_pr": "5/7",
-      "internal_imports": [
-        "powdrr_lift.workrr.verification_evidence"
-      ],
+      "extraction_pr": "7",
+      "internal_imports": [],
       "kind": "python_module",
-      "owner": "split",
-      "path": "src/powdrr_lift/workrr/evidence_reconciliation.py",
-      "rationale": "separate service decisions from agent I/O and orchestration",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/verification/evidence_reconciliation.py",
+      "rationale": "service-owned acceptance and freshness policy for verification evidence",
       "reviewed": false
     },
     {
@@ -2825,13 +2823,11 @@
         "powdrr_lift.workrr.coding_agent",
         "powdrr_lift.workrr.coding_agent_validation",
         "powdrr_lift.workrr.command_catalog",
-        "powdrr_lift.workrr.evidence_reconciliation",
         "powdrr_lift.workrr.git",
         "powdrr_service.procedrr_evaluator.model_client",
         "powdrr_service.procedrr_evaluator.operations",
         "powdrr_lift.workrr.protocol",
         "powdrr_lift.workrr.run_artifacts",
-        "powdrr_lift.workrr.verification_evidence",
         "powdrr_agent.execution.verification_provider",
         "powdrr_service.behavior_contract",
         "powdrr_service.changelog",
@@ -2858,7 +2854,9 @@
         "powdrr_agent.execution.postrun_probe_runner",
         "powdrr_service.verification.probe_results",
         "powdrr_service.verification.postrun_probes",
-        "powdrr_contracts.verification"
+        "powdrr_contracts.verification",
+        "powdrr_agent.execution.verification_evidence",
+        "powdrr_service.verification.evidence_reconciliation"
       ],
       "kind": "python_module",
       "owner": "split",
@@ -3497,13 +3495,12 @@
     {
       "extraction_pr": "7",
       "internal_imports": [
-        "powdrr_agent.execution.verification_provider",
-        "powdrr_service.structrr.verification_obligations"
+        "powdrr_agent.execution.verification_provider"
       ],
       "kind": "python_module",
-      "owner": "split",
-      "path": "src/powdrr_lift/workrr/verification_evidence.py",
-      "rationale": "service probe/verification policy; agent runs local commands",
+      "owner": "agent",
+      "path": "packages/agent/src/powdrr_agent/execution/verification_evidence.py",
+      "rationale": "local verification provider execution and evidence artifact materialization",
       "reviewed": false
     },
     {

@@ -22,6 +22,10 @@ from powdrr_agent.artifact_state import (
     RepositorySnapshotError,
     collect_artifact_state_snapshot,
 )
+from powdrr_agent.execution.github_actions import (
+    GitHubActionsClient,
+    GitHubActionsError,
+)
 from powdrr_contracts.models import (
     Artifact,
     OperationRequest,
@@ -32,6 +36,11 @@ from powdrr_local import JsonServiceBridge, LocalPowdrrService
 from powdrr_local.planning.repair_publication import (
     RepairPublicationError,
     publish_repair_pull_request,
+)
+from powdrr_service.ci_response import (
+    build_failure_units,
+    normalize_github_snapshot,
+    render_ci_observation_checkpoint,
 )
 from powdrr_service.evaluations.deepswe_design_evaluation import (
     DEFAULT_STATE_DATA_RUBRIC,
@@ -349,6 +358,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="Repository root to inspect; defaults to the current worktree.",
     )
     repository_state_parser.set_defaults(func=_run_repository_state)
+
+    ci_response_parser = subparsers.add_parser(
+        "respond-to-pr-ci",
+        help="Record and deterministically classify CI failures for a pull request.",
+    )
+    ci_response_parser.add_argument("--repository", required=True)
+    ci_response_parser.add_argument("--pr", type=int, required=True)
+    ci_response_parser.add_argument("--issue", type=int, required=True)
+    ci_response_parser.set_defaults(func=_run_respond_to_pr_ci)
 
     publish_plan_issues_parser = subparsers.add_parser(
         "publish-plan-issues",
@@ -2937,6 +2955,93 @@ def _run_publish_plan_issues(args: argparse.Namespace) -> int:
             indent=2,
         )
     )
+    return 0
+
+
+def _run_respond_to_pr_ci(args: argparse.Namespace) -> int:
+    """Capture current-head Actions evidence and checkpoint deterministic triage."""
+    try:
+        client = GitHubActionsClient(args.repository)
+        snapshot = client.observe_pull_request(args.pr)
+        issue = client.get_issue(args.issue)
+        prior = client.list_issue_comments(args.issue)
+        issue_body = issue.get("body")
+        pr_url = snapshot.pull_request.get("html_url")
+        related_text = [
+            issue_body if isinstance(issue_body, str) else "",
+            *(
+                comment.get("body", "")
+                for comment in prior
+                if isinstance(comment.get("body"), str)
+            ),
+        ]
+        associated = any(
+            (isinstance(pr_url, str) and pr_url in text)
+            or re.search(rf"(?<![\w#])#{args.pr}(?!\d)", text) is not None
+            for text in related_text
+        )
+        if not associated:
+            raise GitHubActionsError(
+                f"issue #{args.issue} does not identify PR #{args.pr}; "
+                "refusing to checkpoint unrelated work"
+            )
+        jobs = normalize_github_snapshot(
+            {
+                "pull_request": snapshot.pull_request,
+                "runs": snapshot.runs,
+                "jobs_by_run": snapshot.jobs_by_run,
+                "annotations_by_check_run": snapshot.annotations_by_check_run,
+            }
+        )
+        failures = build_failure_units(jobs)
+        head = snapshot.pull_request.get("head")
+        head_sha = head.get("sha") if isinstance(head, Mapping) else None
+        if not isinstance(head_sha, str):
+            raise GitHubActionsError("GitHub did not return the current PR head SHA")
+        observation_id, comment = render_ci_observation_checkpoint(
+            repository=args.repository,
+            pull_request_number=args.pr,
+            issue_number=args.issue,
+            head_sha=head_sha,
+            jobs=jobs,
+            failures=failures,
+        )
+        duplicate = any(
+            isinstance(item.get("body"), str)
+            and f"`{observation_id[:16]}`" in str(item.get("body"))
+            for item in prior
+        )
+        if not duplicate:
+            client.add_issue_comment(args.issue, comment)
+        result = {
+            "repository": args.repository,
+            "pull_request": args.pr,
+            "issue": args.issue,
+            "head_sha": head_sha,
+            "observation_id": observation_id,
+            "checkpoint_written": not duplicate,
+            "jobs_observed": len(jobs),
+            "failures": [
+                {
+                    "failure_id": item.failure_id,
+                    "job_id": item.job_id,
+                    "run_id": item.run_id,
+                    "phase": item.phase,
+                    "signature": item.signature,
+                    "evidence": list(item.evidence),
+                    "local_reproduction": (
+                        "not_executable_locally"
+                        if not item.locally_executable
+                        else "not_started"
+                    ),
+                }
+                for item in failures
+            ],
+        }
+    except (GitHubActionsError, ValueError) as error:
+        print(str(error), file=sys.stderr)
+        return 2
+    print(json.dumps(result, indent=2))
     return 0
 
 

@@ -1,0 +1,60 @@
+version: 1
+name: respond-to-pr-ci
+description: Observe CI for a specific pull request, classify runner provisioning failures deterministically, and checkpoint current-head evidence on its tracking issue.
+inputs:
+- name: user_request
+  type: string
+  required: true
+- name: workflow_context
+  type: object
+  required: true
+limits:
+  llm_activations: 20
+  tool_calls: 20
+  context_chars: 16000
+  context_value_chars: 6000
+steps:
+- specialize:
+    process: generate-fragment
+    max_steps: 8
+    context: [user_request, workflow_context]
+    bind: observation_workflow
+    question: >-
+      Resolve only the repository, pull request number, and associated tracking issue
+      number from the supplied context. Require explicit values; ask the user if any
+      are missing. Execute the embedded procedure exactly. Do not diagnose the cause,
+      edit files, rerun checks, or call a coding agent in this observation-only
+      procedure. Pass all identifiers literally to the declared CLI command. Do not
+      claim a CI failure reproduced locally; this version only recognizes failures
+      that occurred before a runner or command started. Preserve the command result
+      and stop if the issue is not associated with the pull request.
+
+      Embedded procedure:
+      ---
+      name: respond-to-pr-ci-observation
+      steps:
+      - id: capture-current-head
+        description: Fetch current PR checks and append a deduplicated issue checkpoint.
+        step_type: invoke_tool
+        llm_type: simple_task
+        tool_invocations:
+        - tool: shell
+          command:
+          - powdrr-lift
+          - respond-to-pr-ci
+          - --repository
+          - <repository>
+          - --pr
+          - <pull_request_number>
+          - --issue
+          - <issue_number>
+        outputs:
+        - name: ci_observation_result
+          type: object
+          required_for_next_step: true
+          schema: {type: object, additionalProperties: true}
+      allowed_tools: [invoke_tool]
+- call:
+    fragment: ${observation_workflow}
+    max_steps: 8
+- terminal: succeeded

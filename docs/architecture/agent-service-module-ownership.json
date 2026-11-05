@@ -3898,6 +3898,90 @@
       "path": "packages/service/src/powdrr_service/verification/probe_results.py",
       "rationale": "service-owned verification outcome classification and policy",
       "reviewed": false
+    },
+    {
+      "extraction_pr": "1380",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "agent",
+      "path": "packages/agent/src/powdrr_agent/execution/github_actions.py",
+      "rationale": "authenticated GitHub Actions evidence transport and issue checkpoint publication",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "1380",
+      "internal_imports": [
+        "powdrr_contracts.ci"
+      ],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/ci_response/__init__.py",
+      "rationale": "public imports for service-owned CI response policy",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "1380",
+      "internal_imports": [
+        "powdrr_contracts.ci",
+        "powdrr_service.ci_response.evidence"
+      ],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/ci_response/checkpoint.py",
+      "rationale": "deterministic compact issue checkpoint rendering for CI observation",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "1380",
+      "internal_imports": [
+        "powdrr_contracts.ci"
+      ],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/ci_response/evidence.py",
+      "rationale": "service-owned normalization and deterministic failure phase classification",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "1380",
+      "internal_imports": [
+        "powdrr_contracts.ci"
+      ],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/ci_response/observation.py",
+      "rationale": "service-owned normalization from raw GitHub API evidence into typed CI records",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "1380",
+      "internal_imports": [
+        "powdrr_contracts.ci",
+        "powdrr_service.ci_response.evidence"
+      ],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/ci_response/reproduction.py",
+      "rationale": "deterministic local versus remote failure comparison policy",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "1380",
+      "internal_imports": [],
+      "kind": "resource",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/resources/processes/respond-to-pr-ci.yaml",
+      "rationale": "Procedrr-owned CI observation entry point",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "1380",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "contracts",
+      "path": "packages/contracts/src/powdrr_contracts/ci.py",
+      "rationale": "versioned public transport types for CI evidence and local reproduction",
+      "reviewed": false
     }
   ],
   "inventory_scope": [

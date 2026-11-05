@@ -131,11 +131,40 @@ def _request() -> dict[str, Any]:
 
 def test_shared_repair_service_binds_cas_and_preserves_unrelated_item() -> None:
     draft = _draft()
+    evidence = {
+        "snapshot_id": "structrr:sha256:" + "1" * 64,
+        "source_revision": "a" * 40,
+        "artifact_id": "structrr-code-symbols:sha256:" + "2" * 64,
+        "artifact_digest": "sha256:" + "2" * 64,
+        "query_id": "query:sha256:" + "3" * 64,
+        "query_filters": {"paths": ["src/policy.py"]},
+        "symbol_id": "symbol:python:policy:parse:function",
+        "path": "src/policy.py",
+        "span": {
+            "start_line": 1,
+            "start_column": 0,
+            "end_line": 3,
+            "end_column": 1,
+        },
+        "truncated": False,
+        "omitted_count": 0,
+    }
+    draft = replace(
+        draft,
+        plan=replace(
+            draft.plan,
+            items=(
+                replace(draft.plan.items[0], code_evidence=(evidence,)),
+                *draft.plan.items[1:],
+            ),
+        ),
+    )
     repaired = apply_repair_request(draft, _request(), compile_candidate=_compile)
     old = {item.item_id: item_content_digest(item) for item in draft.plan.items}
     new = {item.item_id: item_content_digest(item) for item in repaired.plan.items}
     assert new["item-01"] != old["item-01"]
     assert new["item-02"] == old["item-02"]
+    assert repaired.plan.items[0].code_evidence == (evidence,)
     assert (
         repaired.artifacts["docs/workflows/plan/item-02.yaml"]
         == draft.artifacts["docs/workflows/plan/item-02.yaml"]

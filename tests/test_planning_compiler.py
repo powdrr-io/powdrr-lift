@@ -391,6 +391,61 @@ def test_legacy_plan_without_manifest_remains_readable() -> None:
     assert parsed.plan_id == plan.plan_id
 
 
+def test_plan_round_trips_revision_pinned_code_evidence() -> None:
+    plan, _, _ = _fixture()
+    reference = {
+        "snapshot_id": "structrr:sha256:" + "1" * 64,
+        "source_revision": "a" * 40,
+        "artifact_id": "structrr-code-symbols:sha256:" + "2" * 64,
+        "artifact_digest": "sha256:" + "2" * 64,
+        "query_id": "query:sha256:" + "3" * 64,
+        "query_filters": {"paths": ["src/app.py"]},
+        "symbol_id": "symbol:python:app:run:function",
+        "path": "src/app.py",
+        "span": {
+            "start_line": 4,
+            "start_column": 0,
+            "end_line": 8,
+            "end_column": 1,
+        },
+        "truncated": False,
+        "omitted_count": 0,
+    }
+    plan = replace(plan, items=(replace(plan.items[0], code_evidence=(reference,)),))
+
+    rendered = serialize_reviewed_plan_yaml(plan)
+    parsed = parse_reviewed_plan_yaml(rendered)
+
+    assert parsed.items[0].code_evidence == (reference,)
+    assert serialize_reviewed_plan_yaml(parsed) == rendered
+
+
+def test_plan_rejects_code_evidence_that_escapes_repository() -> None:
+    plan, _, _ = _fixture()
+    reference = {
+        "snapshot_id": "structrr:sha256:" + "1" * 64,
+        "source_revision": "a" * 40,
+        "artifact_id": "structrr-code-symbols:sha256:" + "2" * 64,
+        "artifact_digest": "sha256:" + "2" * 64,
+        "query_id": "query:sha256:" + "3" * 64,
+        "query_filters": {"paths": ["../outside.py"]},
+        "symbol_id": "symbol:python:app:run:function",
+        "path": "../outside.py",
+        "span": {
+            "start_line": 4,
+            "start_column": 0,
+            "end_line": 8,
+            "end_column": 1,
+        },
+        "truncated": False,
+        "omitted_count": 0,
+    }
+    plan = replace(plan, items=(replace(plan.items[0], code_evidence=(reference,)),))
+
+    with pytest.raises(PlanDocumentError, match="must stay in the repository"):
+        parse_reviewed_plan_yaml(serialize_reviewed_plan_yaml(plan))
+
+
 def test_manifest_rejects_unresolved_source_refs_and_missing_work_allocation() -> None:
     plan, manifest, proposal = _fixture()
     data = manifest.to_data()

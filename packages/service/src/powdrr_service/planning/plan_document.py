@@ -16,6 +16,21 @@ QUEUE_SCHEMA = "https://powdrr.io/schemas/github-issue-execution-plan-v1"
 MANUAL_PREREQUISITE_TRIGGER = "after_implementation_before_validation"
 PLAN_REPAIR_MARKER = "<!-- powdrr-plan-repair:v1 -->"
 _SAFE_ID = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._/-]{0,99}$")
+_SHA256 = re.compile(r"^sha256:[a-f0-9]{64}$")
+_GIT_REVISION = re.compile(r"^(?:[a-f0-9]{40}|[a-f0-9]{64})$")
+_CODE_EVIDENCE_FIELDS = {
+    "snapshot_id",
+    "source_revision",
+    "artifact_id",
+    "artifact_digest",
+    "query_id",
+    "query_filters",
+    "symbol_id",
+    "path",
+    "span",
+    "truncated",
+    "omitted_count",
+}
 
 
 class PlanDocumentError(ValueError):
@@ -70,7 +85,12 @@ def parse_reviewed_plan_yaml(text: str) -> ReviewedExecutionPlan:
             not common_fields <= set(raw)
             or len(workflow_keys) != 1
             or not optional_keys
-            <= {"implementation_steps", "allowed_paths", "manual_prerequisite"}
+            <= {
+                "implementation_steps",
+                "allowed_paths",
+                "manual_prerequisite",
+                "code_evidence",
+            }
         ):
             raise PlanDocumentError(f"{field} has unknown or missing fields")
         item_id = raw.get("id")
@@ -118,10 +138,22 @@ def parse_reviewed_plan_yaml(text: str) -> ReviewedExecutionPlan:
                 if "manual_prerequisite" in raw
                 else None
             ),
+            code_evidence=(
+                _code_evidence_list(raw["code_evidence"], field)
+                if "code_evidence" in raw
+                else ()
+            ),
         )
         if not item.scope or not item.acceptance_criteria:
             raise PlanDocumentError(
                 f"{field} must declare scope and acceptance criteria"
+            )
+        if any(
+            not _repository_path_is_in_scope(str(reference["path"]), item.allowed_paths)
+            for reference in item.code_evidence
+        ):
+            raise PlanDocumentError(
+                f"{field}.code_evidence must stay within allowed_paths"
             )
         if "implementation_steps" in raw and (
             len(item.scope) > 5 or not 1 <= len(item.implementation_steps) <= 8
@@ -183,6 +215,10 @@ def serialize_reviewed_plan_yaml(plan: ReviewedExecutionPlan) -> str:
             record["allowed_paths"] = list(item.allowed_paths)
         if item.manual_prerequisite is not None:
             record["manual_prerequisite"] = dict(item.manual_prerequisite)
+        if item.code_evidence:
+            record["code_evidence"] = [
+                dict(reference) for reference in item.code_evidence
+            ]
         items.append(record)
     data["items"] = items
     if plan.planning is not None:
@@ -192,6 +228,101 @@ def serialize_reviewed_plan_yaml(plan: ReviewedExecutionPlan) -> str:
     return yaml.safe_dump(
         data, allow_unicode=True, default_flow_style=False, sort_keys=False
     )
+
+
+def _code_evidence_list(value: Any, field: str) -> tuple[Mapping[str, Any], ...]:
+    """Validate bounded, durable references to symbol-query evidence."""
+    if not isinstance(value, list) or not 1 <= len(value) <= 50:
+        raise PlanDocumentError(
+            f"{field}.code_evidence must contain between 1 and 50 references"
+        )
+    references: list[Mapping[str, Any]] = []
+    seen: set[tuple[str, str]] = set()
+    for index, raw in enumerate(value):
+        reference_field = f"{field}.code_evidence[{index}]"
+        if not isinstance(raw, Mapping) or set(raw) != _CODE_EVIDENCE_FIELDS:
+            raise PlanDocumentError(f"{reference_field} has unknown or missing fields")
+        snapshot_id = raw.get("snapshot_id")
+        source_revision = raw.get("source_revision")
+        artifact_id = raw.get("artifact_id")
+        artifact_digest = raw.get("artifact_digest")
+        query_id = raw.get("query_id")
+        symbol_id = raw.get("symbol_id")
+        path = raw.get("path")
+        query_filters = raw.get("query_filters")
+        span = raw.get("span")
+        if not isinstance(snapshot_id, str) or not snapshot_id.startswith("structrr:"):
+            raise PlanDocumentError(f"{reference_field}.snapshot_id is invalid")
+        if not isinstance(source_revision, str) or not _GIT_REVISION.fullmatch(
+            source_revision
+        ):
+            raise PlanDocumentError(f"{reference_field}.source_revision is invalid")
+        if (
+            not isinstance(artifact_id, str)
+            or not artifact_id.startswith("structrr-code-symbols:")
+            or not isinstance(artifact_digest, str)
+            or not _SHA256.fullmatch(artifact_digest)
+        ):
+            raise PlanDocumentError(f"{reference_field} artifact reference is invalid")
+        if not isinstance(query_id, str) or not re.fullmatch(
+            r"query:sha256:[a-f0-9]{64}", query_id
+        ):
+            raise PlanDocumentError(f"{reference_field}.query_id is invalid")
+        if not isinstance(symbol_id, str) or not symbol_id.startswith("symbol:"):
+            raise PlanDocumentError(f"{reference_field}.symbol_id is invalid")
+        if (
+            not isinstance(path, str)
+            or not path.strip()
+            or Path(path).is_absolute()
+            or ".." in Path(path).parts
+        ):
+            raise PlanDocumentError(
+                f"{reference_field}.path must stay in the repository"
+            )
+        if not isinstance(query_filters, Mapping):
+            raise PlanDocumentError(
+                f"{reference_field}.query_filters must be a mapping"
+            )
+        if not isinstance(span, Mapping) or set(span) != {
+            "start_line",
+            "start_column",
+            "end_line",
+            "end_column",
+        }:
+            raise PlanDocumentError(f"{reference_field}.span is invalid")
+        if any(
+            isinstance(span[key], bool)
+            or not isinstance(span[key], int)
+            or span[key] < 0
+            for key in span
+        ):
+            raise PlanDocumentError(f"{reference_field}.span coordinates are invalid")
+        if (
+            not isinstance(raw.get("truncated"), bool)
+            or isinstance(raw.get("omitted_count"), bool)
+            or not isinstance(raw.get("omitted_count"), int)
+            or raw["omitted_count"] < 0
+        ):
+            raise PlanDocumentError(f"{reference_field} query coverage is invalid")
+        identity = (query_id, symbol_id)
+        if identity in seen:
+            raise PlanDocumentError(
+                f"{reference_field} duplicates an evidence reference"
+            )
+        seen.add(identity)
+        references.append(dict(raw))
+    return tuple(references)
+
+
+def _repository_path_is_in_scope(path: str, allowed_paths: Sequence[str]) -> bool:
+    """Check that a repository-relative file belongs to an allowed path."""
+    for allowed_path in allowed_paths:
+        normalized = allowed_path.rstrip("/")
+        if normalized in {"", "."} or path == normalized:
+            return True
+        if path.startswith(f"{normalized}/"):
+            return True
+    return False
 
 
 def render_plan_repair_metadata(

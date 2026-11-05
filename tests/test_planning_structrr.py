@@ -962,6 +962,60 @@ def test_file_structural_change_omits_unrelated_entity_identity_index() -> None:
     assert len(serialized_input) < 24_000
 
 
+def test_structural_change_question_digest_binds_symbol_evidence() -> None:
+    baseline = {
+        "entities": [{"id": "entity:parse", "type": "Function", "name": "parse"}],
+        "entity_relationships": [],
+        "files": [],
+    }
+
+    def request_for(query_id: str) -> Any:
+        evidence = {
+            "snapshot_id": "structrr:sha256:" + "a" * 64,
+            "source_revision": "b" * 40,
+            "artifact_id": "structrr-code-symbols:sha256:" + "c" * 64,
+            "artifact_digest": "c" * 64,
+            "query_id": query_id,
+            "query_filters": {"paths": ["src/parser.py"]},
+            "symbol_id": "symbol:python:" + "d" * 64,
+            "path": "src/parser.py",
+            "span": {"start_line": 4, "end_line": 8},
+        }
+        subject = BoundStructuralSubject(
+            "entity:parse",
+            "entities",
+            "item-0001",
+            "changed",
+            ("req-01",),
+            ("unit-01",),
+            ("anchor-01",),
+            False,
+            "src/parser.py",
+            (evidence,),
+        )
+        return build_structural_change_request(
+            subject,
+            projected_baseline=baseline,
+            taxonomy_entity_types=("Function",),
+            planned_paths={"src/parser.py"},
+            known_entity_ids={"entity:parse"},
+            valid_example={"result": "unchanged", "reason": "Already satisfied."},
+        )
+
+    original_query_id = "query:sha256:" + "e" * 64
+    original = request_for(original_query_id)
+    refreshed = request_for("query:sha256:" + "f" * 64)
+
+    assert original.question.question_id == refreshed.question.question_id
+    assert original.question.input_digest != refreshed.question.input_digest
+    subject_fact = next(
+        fact
+        for fact in original.accepted_facts
+        if fact.ref_id == "subject:entities:entity:parse"
+    )
+    assert subject_fact.value["code_evidence"][0]["query_id"] == original_query_id
+
+
 def test_entity_structural_change_omits_sibling_baseline_records() -> None:
     subject = BoundStructuralSubject(
         "python::module",

@@ -44,6 +44,31 @@ _SESSION_MARKER = "<!-- powdrr-planning-session:v1 -->"
 _PLAN_ID = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._/-]{0,99}$")
 
 
+def _code_evidence_refs_for_question(
+    request: QuestionRequest[Any],
+) -> tuple[Mapping[str, Any], ...]:
+    """Extract compact symbol provenance from the exact context sent to a question."""
+    unique: dict[str, Mapping[str, Any]] = {}
+    for record in (*request.repository_evidence, *request.accepted_facts):
+        raw_refs = record.value.get("code_evidence")
+        if isinstance(raw_refs, Mapping):
+            raw_refs = (raw_refs,)
+        if not isinstance(raw_refs, Sequence) or isinstance(raw_refs, (str, bytes)):
+            continue
+        for reference in raw_refs:
+            if not isinstance(reference, Mapping):
+                continue
+            normalized = dict(reference)
+            key = json.dumps(
+                normalized,
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=False,
+            )
+            unique[key] = normalized
+    return tuple(unique[key] for key in sorted(unique))
+
+
 class PlanningServiceError(RuntimeError):
     """A planning session cannot safely start, advance, or resume."""
 
@@ -595,6 +620,11 @@ def advance_planning_session(
     ]
     if len(question_ids) != len(set(question_ids)):
         raise PlanningServiceError("planning frontier contains duplicate question IDs")
+    code_evidence_by_question_id = {
+        member.question.question_id: _code_evidence_refs_for_question(member)
+        for request in requests
+        for member in (request.batch_members or (request,))
+    }
     for request in requests:
         request.validate()
         for member in request.batch_members or (request,):
@@ -749,6 +779,9 @@ def advance_planning_session(
                     ),
                 },
                 id_counters=journal.id_counters,
+                code_evidence_refs=code_evidence_by_question_id.get(
+                    result.question.question_id, ()
+                ),
             )
         )
     if needs_answers:
@@ -763,6 +796,9 @@ def advance_planning_session(
                 error=result.error,
                 previous_answer=result.previous_answer,
                 id_counters=journal.id_counters,
+                code_evidence_refs=code_evidence_by_question_id.get(
+                    result.question.question_id, ()
+                ),
             )
         )
     if errors:

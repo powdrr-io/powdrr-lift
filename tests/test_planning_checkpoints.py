@@ -83,6 +83,35 @@ def _initialize_git_repository(path: Path) -> Path:
     return path
 
 
+def test_accepted_checkpoint_round_trips_code_evidence_refs() -> None:
+    evidence = {
+        "snapshot_id": "structrr:sha256:" + "a" * 64,
+        "source_revision": "b" * 40,
+        "artifact_id": "structrr-code-symbols:sha256:" + "c" * 64,
+        "artifact_digest": "d" * 64,
+        "query_id": "query:sha256:" + "e" * 64,
+        "query_filters": {"paths": ["src/parser.py"]},
+        "symbol_id": "symbol:python:" + "f" * 64,
+        "path": "src/parser.py",
+        "span": {"start_line": 4, "end_line": 8},
+    }
+    checkpoint = PlanningCheckpoint.answer_accepted(
+        session_id="planning-session-1",
+        event_id="answer-accepted-1",
+        sequence=1,
+        parent_digest=None,
+        question=Question.from_mapping(_question()),
+        accepted_answer={"records": []},
+        validation_result={"accepted": True},
+        id_counters={},
+        code_evidence_refs=(evidence,),
+    )
+
+    restored = PlanningCheckpoint.from_data(checkpoint.to_data())
+
+    assert restored.payload["code_evidence_refs"] == [evidence]
+
+
 def test_question_start_survives_crash_before_answer_and_resume_reuses_identity() -> (
     None
 ):
@@ -138,6 +167,13 @@ def test_local_checkpoint_store_appends_compact_events_without_rewriting_history
     _initialize_git_repository(tmp_path)
     store = LocalCheckpointStore(tmp_path, session_id="planning-session-1")
     question = Question.from_mapping(_question())
+    evidence_ref = {
+        "snapshot_id": "structrr:sha256:" + "a" * 64,
+        "artifact_id": "structrr-code-symbols:sha256:" + "b" * 64,
+        "query_id": "query:sha256:" + "c" * 64,
+        "path": "src/parser.py",
+        "symbol_id": "symbol:python:" + "d" * 64,
+    }
     started = PlanningCheckpoint.question_started(
         session_id="planning-session-1",
         event_id="event-start-1",
@@ -155,6 +191,7 @@ def test_local_checkpoint_store_appends_compact_events_without_rewriting_history
         accepted_answer={"records": [], "has_more": False, "next_anchor": None},
         validation_result={"valid": True},
         id_counters={"anchor": 1, "requirement": 0},
+        code_evidence_refs=(evidence_ref,),
     )
     store.append(started, expected_parent_digest=None)
 
@@ -177,6 +214,7 @@ def test_local_checkpoint_store_appends_compact_events_without_rewriting_history
         started,
         accepted,
     )
+    assert updated.events[-1].payload["code_evidence_refs"] == [evidence_ref]
 
 
 def test_local_checkpoint_store_truncates_an_unacknowledged_partial_event(

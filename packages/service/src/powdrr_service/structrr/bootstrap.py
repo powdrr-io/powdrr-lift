@@ -9,7 +9,7 @@ import shlex
 import subprocess
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 import yaml
@@ -86,6 +86,8 @@ BOOTSTRAP_SECTION_VERSIONS: dict[str, int] = {
     "entity_relationships": 1,
     "source_subjects": 1,
     "source_bindings": 1,
+    "code_symbol_artifact": 1,
+    "structrr_snapshot_id": 1,
     "invariants": 1,
     "guidance": 1,
     "tools": 1,
@@ -544,6 +546,21 @@ def validate_bootstrap_document(
         entity_ids,
         root_path,
     )
+    _validate_code_symbol_artifact_reference(
+        issues, document.get("code_symbol_artifact"), root_path
+    )
+    snapshot_id = document.get("structrr_snapshot_id")
+    if snapshot_id is not None and (
+        not isinstance(snapshot_id, str)
+        or not re.fullmatch(r"structrr:sha256:[0-9a-f]{64}", snapshot_id)
+    ):
+        issues.append(
+            BootstrapIssue(
+                "structrr_snapshot_id_invalid",
+                "structrr_snapshot_id must be a SHA-256 Structrr identity or null.",
+                "structrr_snapshot_id",
+            )
+        )
 
     _validate_lifecycle_section(
         issues, document.get("invariants"), "invariant", root_path
@@ -600,6 +617,84 @@ def validate_bootstrap_sections(
                 )
             )
     return tuple(issues)
+
+
+def _validate_code_symbol_artifact_reference(
+    issues: list[BootstrapIssue], value: object, root: Path
+) -> None:
+    if value is None:
+        return
+    if not isinstance(value, Mapping):
+        issues.append(
+            BootstrapIssue(
+                "code_symbol_artifact_invalid",
+                "code_symbol_artifact must be a mapping or null.",
+                "code_symbol_artifact",
+            )
+        )
+        return
+    required = {
+        "schema": "https://powdrr.io/schema/structrr-code-symbol-artifact-ref-v1",
+        "media_type": "application/vnd.powdrr.structrr-code-symbols+yaml",
+    }
+    for key, expected in required.items():
+        if value.get(key) != expected:
+            issues.append(
+                BootstrapIssue(
+                    "code_symbol_artifact_invalid",
+                    f"code_symbol_artifact.{key} is invalid.",
+                    "code_symbol_artifact",
+                )
+            )
+    content_ref = value.get("content_ref")
+    if not isinstance(content_ref, str):
+        issues.append(
+            BootstrapIssue(
+                "code_symbol_artifact_invalid",
+                "code_symbol_artifact.content_ref is required.",
+                "code_symbol_artifact",
+            )
+        )
+        return
+    relative = Path(content_ref)
+    posix_ref = PurePosixPath(content_ref)
+    resolved = (root / relative).resolve()
+    if (
+        relative.is_absolute()
+        or posix_ref.as_posix() != content_ref
+        or any(part in {"", ".", ".."} for part in content_ref.split("/"))
+        or (resolved != root and root not in resolved.parents)
+    ):
+        issues.append(
+            BootstrapIssue(
+                "code_symbol_artifact_path_invalid",
+                "Code-symbol artifact path must remain inside the repository.",
+                content_ref,
+            )
+        )
+        return
+    if not resolved.is_file():
+        issues.append(
+            BootstrapIssue(
+                "code_symbol_artifact_missing",
+                "Referenced code-symbol artifact does not exist.",
+                content_ref,
+            )
+        )
+        return
+    try:
+        from powdrr_service.structrr.code_symbols import load_code_symbol_artifact
+
+        artifact_bytes = resolved.read_bytes()
+        load_code_symbol_artifact(artifact_bytes, value)
+    except (OSError, ValueError) as error:
+        issues.append(
+            BootstrapIssue(
+                "code_symbol_artifact_invalid",
+                f"Referenced code-symbol artifact could not be validated: {error}",
+                content_ref,
+            )
+        )
 
 
 def _validate_validation_inventory(
@@ -1392,6 +1487,8 @@ def _build_document(
         "entity_relationships": [relationships[key] for key in sorted(relationships)],
         "source_subjects": source_subjects,
         "source_bindings": source_bindings,
+        "code_symbol_artifact": None,
+        "structrr_snapshot_id": None,
         "invariants": [invariants[key] for key in sorted(invariants)],
         "guidance": [guidance[key] for key in sorted(guidance)]
         + [

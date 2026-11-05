@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import atexit
 import hashlib
+import json
+import os
 import re
 import subprocess
 import tarfile
@@ -13,9 +15,11 @@ from collections.abc import Mapping, Sequence
 from contextlib import suppress
 from dataclasses import dataclass
 from functools import lru_cache
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path, PurePosixPath
 from typing import Any, Literal, Protocol
 
+import yaml
 from powdrr_agent.repository import (
     LocalActionError,
     execute_command,
@@ -48,6 +52,14 @@ from powdrr_service.planning.source import (
     SegmentedSource,
     pinned_source_document,
 )
+from powdrr_service.structrr.code_symbols import (
+    CodeSymbolArtifact,
+    CodeSymbolQuery,
+    build_python_symbol_artifact,
+    load_code_symbol_artifact,
+    query_python_references,
+    query_python_symbols,
+)
 
 from powdrr_lift.errors import PowdrrExecutionError
 
@@ -56,6 +68,7 @@ MAX_SYMBOL_QUERY_CHARS = 120
 MAX_SYMBOL_EVIDENCE_CHARS = 8_000
 MAX_COVERAGE_SEARCH_TERMS = 8
 MAX_BASEDPYRIGHT_COVERAGE_QUERIES = 2_048
+MAX_CODE_SYMBOL_FILES_PER_PROVIDER_REQUEST = 512
 MAX_RG_COVERAGE_TERMS_PER_PASS = 512
 MAX_COVERAGE_EVIDENCE_PER_KIND = 4
 MAX_COVERAGE_EVIDENCE_PER_REQUIREMENT = MAX_COVERAGE_EVIDENCE_PER_KIND * 2
@@ -249,10 +262,13 @@ def search_requirements_evidence(
     basedpyright_available = True
     if symbol_queries:
         try:
-            symbols_by_query = find_workspace_symbols(
-                list(symbol_queries), worktree_root=analysis_root, limit=20
+            symbols_by_query = search_pinned_workspace_symbols(
+                root,
+                base_commit,
+                list(symbol_queries),
+                limit=20,
             )
-        except PowdrrExecutionError:
+        except (EvidenceError, PowdrrExecutionError):
             # Ripgrep still provides local multi-language evidence when the
             # Python language server is unavailable or cannot index this repo.
             basedpyright_available = False
@@ -486,31 +502,551 @@ def search_structural_document_symbols(
 ) -> dict[str, list[dict[str, Any]]]:
     """Read BasedPyright symbols from a materialized pinned Git tree."""
     root = Path(repository_root).resolve()
-    analysis_root = _pinned_analysis_root(root, base_commit)
     normalized_paths = tuple(sorted(set(paths)))
+    _, reference, document = _load_or_build_pinned_symbol_artifact(root, base_commit)
+    rows = document.get("symbols", [])
+    selected = [
+        row
+        for row in rows
+        if isinstance(row, Mapping) and row.get("path") in normalized_paths
+    ]
+    return _group_index_symbols(selected, reference)
+
+
+def _load_or_build_pinned_symbol_artifact(
+    repository_root: Path, base_commit: str
+) -> tuple[bytes, CodeSymbolArtifact, dict[str, Any]]:
+    """Load or materialize one reusable Python symbol artifact for a Git tree."""
+    analysis_root = _pinned_analysis_root(repository_root, base_commit)
+    return _load_or_build_symbol_artifact(
+        repository_root, analysis_root, source_revision=base_commit
+    )
+
+
+def _load_or_build_symbol_artifact(
+    repository_root: Path,
+    source_root: Path,
+    *,
+    source_revision: str,
+) -> tuple[bytes, CodeSymbolArtifact, dict[str, Any]]:
+    """Index an exact file snapshot; commit plus tree digest identifies dirty trees."""
     try:
-        return find_workspace_document_symbols(
-            list(normalized_paths), worktree_root=analysis_root
+        provider_version = version("basedpyright")
+    except PackageNotFoundError as error:
+        raise EvidenceError("BasedPyright provider is not installed") from error
+    config_fingerprint = _python_configuration_fingerprint(source_root)
+    component_id = f"component:python:{repository_root.name}"
+    python_paths = tuple(
+        sorted(
+            path.relative_to(source_root).as_posix()
+            for path in source_root.rglob("*")
+            if path.is_file()
+            and not path.is_symlink()
+            and path.suffix.casefold() in {".py", ".pyi"}
+            and not _excluded_python_index_path(path.relative_to(source_root))
         )
-    except PowdrrExecutionError as error:
-        raise EvidenceError(f"structural symbol search failed: {error}") from error
+    )
+    source_by_path = {
+        path: (source_root / path).read_text(encoding="utf-8") for path in python_paths
+    }
+    source_tree_digest = _source_tree_digest(source_by_path)
+    cache_key = hashlib.sha256(
+        json.dumps(
+            {
+                "source_revision": source_revision,
+                "source_tree_digest": source_tree_digest,
+                "component_id": component_id,
+                "provider_id": "basedpyright",
+                "provider_version": provider_version,
+                "configuration_fingerprint": config_fingerprint,
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+    ).hexdigest()
+    cache_root = repository_root / ".powdrr" / "cache" / "structrr-code-symbols"
+    manifest_path = cache_root / f"{cache_key}.json"
+    if manifest_path.is_file():
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            reference_data = manifest["reference"]
+            content_ref = reference_data["content_ref"]
+            content_path = (repository_root / content_ref).resolve()
+            if repository_root.resolve() not in content_path.parents:
+                raise EvidenceError("cached symbol artifact path escapes repository")
+            content = content_path.read_bytes()
+            reference = _symbol_artifact_from_data(reference_data)
+            document = load_code_symbol_artifact(content, reference.to_data())
+            return content, reference, document
+        except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError):
+            # A missing or corrupt cache entry is rebuilt from the pinned source.
+            pass
+
+    checked_in = _find_checked_in_symbol_artifact(
+        repository_root,
+        source_tree_digest=source_tree_digest,
+        component_id=component_id,
+        provider_version=provider_version,
+        configuration_fingerprint=config_fingerprint,
+    )
+    if checked_in is not None:
+        content, reference, document = checked_in
+        cache_root.mkdir(parents=True, exist_ok=True)
+        _write_atomically(
+            manifest_path,
+            json.dumps(
+                {"cache_key": cache_key, "reference": reference.to_data()},
+                sort_keys=True,
+                indent=2,
+            ).encode("utf-8")
+            + b"\n",
+        )
+        return content, reference, document
+
+    symbols_by_path: dict[str, list[dict[str, Any]]] = {}
+    for offset in range(
+        0, len(python_paths), MAX_CODE_SYMBOL_FILES_PER_PROVIDER_REQUEST
+    ):
+        batch = python_paths[
+            offset : offset + MAX_CODE_SYMBOL_FILES_PER_PROVIDER_REQUEST
+        ]
+        try:
+            batch_result = find_workspace_document_symbols(
+                list(batch), worktree_root=source_root
+            )
+        except PowdrrExecutionError as error:
+            raise EvidenceError(f"Python symbol indexing failed: {error}") from error
+        symbols_by_path.update(batch_result)
+    content, reference, document = build_python_symbol_artifact(
+        source_revision=source_revision,
+        source_tree_digest=source_tree_digest,
+        component_id=component_id,
+        provider_version=provider_version,
+        configuration_fingerprint=config_fingerprint,
+        symbols_by_path=symbols_by_path,
+        source_by_path=source_by_path,
+    )
+    content_path = repository_root / reference.content_ref
+    content_path.parent.mkdir(parents=True, exist_ok=True)
+    _write_atomically(content_path, content)
+    cache_root.mkdir(parents=True, exist_ok=True)
+    _write_atomically(
+        manifest_path,
+        json.dumps(
+            {"cache_key": cache_key, "reference": reference.to_data()},
+            sort_keys=True,
+            indent=2,
+        ).encode("utf-8")
+        + b"\n",
+    )
+    return content, reference, document
+
+
+def _find_checked_in_symbol_artifact(
+    repository_root: Path,
+    *,
+    source_tree_digest: str,
+    component_id: str,
+    provider_version: str,
+    configuration_fingerprint: str,
+) -> tuple[bytes, CodeSymbolArtifact, dict[str, Any]] | None:
+    """Reuse a versioned artifact when its indexed Python tree still matches."""
+    artifact_root = repository_root / "artifacts" / "structrr" / "code-symbols"
+    if not artifact_root.is_dir():
+        return None
+    for content_path in sorted(artifact_root.glob("sha256-*.yaml")):
+        try:
+            content = content_path.read_bytes()
+            document = yaml.safe_load(content)
+            components = (
+                document.get("components") if isinstance(document, dict) else None
+            )
+            if (
+                not isinstance(document, dict)
+                or document.get("source_tree_digest") != f"sha256:{source_tree_digest}"
+                or not isinstance(components, list)
+            ):
+                continue
+            component = next(
+                (
+                    row
+                    for row in components
+                    if isinstance(row, Mapping)
+                    and row.get("component_id") == component_id
+                    and row.get("provider_id") == "basedpyright"
+                    and row.get("provider_version") == provider_version
+                    and row.get("configuration_fingerprint")
+                    == configuration_fingerprint
+                ),
+                None,
+            )
+            if component is None:
+                continue
+            digest = hashlib.sha256(content).hexdigest()
+            symbols = document.get("symbols")
+            relationships = document.get("relationships")
+            if not isinstance(symbols, list) or not isinstance(relationships, list):
+                continue
+            reference = CodeSymbolArtifact(
+                artifact_id=f"structrr-code-symbols:sha256:{digest}",
+                content_ref=content_path.relative_to(repository_root).as_posix(),
+                content_digest=digest,
+                source_revision=document["source_revision"],
+                source_tree_digest=source_tree_digest,
+                component_id=component_id,
+                provider_id="basedpyright",
+                provider_version=provider_version,
+                configuration_fingerprint=configuration_fingerprint,
+                symbol_count=len(symbols),
+                relationship_count=len(relationships),
+                coverage=component.get("coverage", "unavailable"),
+            )
+            validated = load_code_symbol_artifact(content, reference.to_data())
+            return content, reference, validated
+        except (KeyError, OSError, TypeError, ValueError, yaml.YAMLError):
+            # Invalid checked-in artifacts are ignored and rebuilt from source.
+            continue
+    return None
+
+
+def _symbol_artifact_from_data(value: Mapping[str, Any]) -> CodeSymbolArtifact:
+    digest = value.get("content_digest")
+    if not isinstance(digest, str) or not digest.startswith("sha256:"):
+        raise EvidenceError("cached symbol artifact reference has an invalid digest")
+    coverage = value.get("coverage")
+    if coverage not in {"complete", "partial", "unavailable", "failed"}:
+        raise EvidenceError("cached symbol artifact coverage is invalid")
+    fields = (
+        "artifact_id",
+        "content_ref",
+        "source_revision",
+        "source_tree_digest",
+        "component_id",
+        "provider_id",
+        "provider_version",
+        "configuration_fingerprint",
+    )
+    if not all(isinstance(value.get(field), str) for field in fields):
+        raise EvidenceError("cached symbol artifact reference is incomplete")
+    tree_digest = value.get("source_tree_digest")
+    if not isinstance(tree_digest, str) or not tree_digest.startswith("sha256:"):
+        raise EvidenceError("cached symbol artifact tree digest is invalid")
+    symbol_count = value.get("symbol_count")
+    relationship_count = value.get("relationship_count")
+    if (
+        isinstance(symbol_count, bool)
+        or not isinstance(symbol_count, int)
+        or isinstance(relationship_count, bool)
+        or not isinstance(relationship_count, int)
+    ):
+        raise EvidenceError("cached symbol artifact counts are invalid")
+    return CodeSymbolArtifact(
+        artifact_id=str(value["artifact_id"]),
+        content_ref=str(value["content_ref"]),
+        content_digest=digest.removeprefix("sha256:"),
+        source_revision=str(value["source_revision"]),
+        source_tree_digest=tree_digest.removeprefix("sha256:"),
+        component_id=str(value["component_id"]),
+        provider_id=str(value["provider_id"]),
+        provider_version=str(value["provider_version"]),
+        configuration_fingerprint=str(value["configuration_fingerprint"]),
+        symbol_count=symbol_count,
+        relationship_count=relationship_count,
+        coverage=coverage,
+    )
+
+
+def _python_configuration_fingerprint(root: Path) -> str:
+    names = {
+        "pyproject.toml",
+        "pyrightconfig.json",
+        "pyrightconfig.jsonc",
+        "setup.cfg",
+        "tox.ini",
+        "uv.lock",
+        "poetry.lock",
+        "requirements.txt",
+    }
+    digest = hashlib.sha256()
+    for path in sorted(
+        item
+        for item in root.rglob("*")
+        if item.is_file()
+        and item.name in names
+        and not _excluded_python_index_path(item.relative_to(root))
+    ):
+        relative = path.relative_to(root).as_posix()
+        digest.update(relative.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(path.read_bytes())
+        digest.update(b"\0")
+    return digest.hexdigest()
+
+
+def _excluded_python_index_path(path: Path) -> bool:
+    return any(
+        part.casefold()
+        in {
+            ".git",
+            ".powdrr",
+            ".venv",
+            "venv",
+            "vendor",
+            "node_modules",
+            "build",
+            "dist",
+        }
+        for part in path.parts
+    )
+
+
+def _write_atomically(path: Path, content: bytes) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary = tempfile.mkstemp(
+        prefix=f".{path.name}.", suffix=".tmp", dir=path.parent
+    )
+    try:
+        with os.fdopen(descriptor, "wb") as stream:
+            stream.write(content)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+    finally:
+        Path(temporary).unlink(missing_ok=True)
+
+
+def _planning_structrr_snapshot_id(
+    repository_root: Path, base_commit: str, reference: CodeSymbolArtifact
+) -> str:
+    fingerprint = hashlib.sha256(
+        f"{repository_root.name}\0{base_commit}\0{reference.source_tree_digest}\0{reference.artifact_id}".encode()
+    ).hexdigest()
+    return f"structrr:sha256:{fingerprint}"
+
+
+def _index_symbol_to_provider_record(
+    record: Mapping[str, Any], reference: CodeSymbolArtifact
+) -> dict[str, Any]:
+    span = record.get("span")
+    if not isinstance(span, Mapping):
+        return {}
+    return {
+        "name": record.get("name"),
+        "kind": record.get("kind"),
+        "path": record.get("path"),
+        "range": {
+            "start_line": span.get("start_line"),
+            "start_character": span.get("start_column"),
+            "end_line": span.get("end_line"),
+            "end_character": span.get("end_column"),
+        },
+        "symbol_id": record.get("symbol_id"),
+        "qualified_name": record.get("qualified_name"),
+        "signature": record.get("signature"),
+        "artifact_id": reference.artifact_id,
+        "artifact_digest": reference.content_digest,
+    }
+
+
+def _group_index_symbols(
+    records: Sequence[Mapping[str, Any]],
+    reference: CodeSymbolArtifact,
+) -> dict[str, list[dict[str, Any]]]:
+    grouped: dict[str, list[Mapping[str, Any]]] = {}
+    for record in records:
+        path = record.get("path")
+        if isinstance(path, str):
+            grouped.setdefault(path, []).append(record)
+    output: dict[str, list[dict[str, Any]]] = {}
+    for path, path_records in sorted(grouped.items()):
+        by_name: dict[str, dict[str, Any]] = {}
+        roots: list[dict[str, Any]] = []
+        for record in sorted(
+            path_records,
+            key=lambda item: (
+                len(str(item.get("qualified_name", "")).split(".")),
+                str(item.get("qualified_name", "")),
+            ),
+        ):
+            provider_record = _index_symbol_to_provider_record(record, reference)
+            qualified = record.get("qualified_name")
+            if not isinstance(qualified, str):
+                continue
+            provider_record["children"] = []
+            by_name[qualified] = provider_record
+            parent = qualified.rpartition(".")[0]
+            if parent in by_name:
+                by_name[parent]["children"].append(provider_record)
+            else:
+                roots.append(provider_record)
+        output[path] = roots
+    return output
+
+
+def search_pinned_workspace_symbols(
+    repository_root: str | Path,
+    base_commit: str,
+    queries: Sequence[str],
+    *,
+    limit: int = 50,
+) -> dict[str, list[dict[str, Any]]]:
+    """Search the revision-pinned Structrr symbol artifact by deterministic name."""
+    root = Path(repository_root).resolve()
+    content, reference, document = _load_or_build_pinned_symbol_artifact(
+        root, base_commit
+    )
+    del content
+    snapshot_id = _planning_structrr_snapshot_id(root, base_commit, reference)
+    return _query_symbol_artifact(
+        document,
+        reference,
+        snapshot_id=snapshot_id,
+        queries=queries,
+        limit=limit,
+    )
+
+
+def search_workspace_symbols_from_worktree(
+    repository_root: str | Path,
+    queries: Sequence[str],
+    *,
+    limit: int = 50,
+) -> dict[str, list[dict[str, Any]]]:
+    """Search the current worktree snapshot, including dirty and untracked files."""
+    root = Path(repository_root).resolve()
+    revision_result = subprocess.run(
+        ["git", "-C", str(root), "rev-parse", "--verify", "HEAD^{commit}"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    revision = revision_result.stdout.strip()
+    if revision_result.returncode != 0 or not _is_git_revision(revision):
+        raise EvidenceError("workspace symbol indexing needs a full Git revision")
+    _, reference, document = _load_or_build_symbol_artifact(
+        root, root, source_revision=revision
+    )
+    snapshot_id = _planning_structrr_snapshot_id(root, revision, reference)
+    return _query_symbol_artifact(
+        document,
+        reference,
+        snapshot_id=snapshot_id,
+        queries=queries,
+        limit=limit,
+    )
+
+
+def _query_symbol_artifact(
+    document: Mapping[str, Any],
+    reference: CodeSymbolArtifact,
+    *,
+    snapshot_id: str,
+    queries: Sequence[str],
+    limit: int,
+) -> dict[str, list[dict[str, Any]]]:
+    output: dict[str, list[dict[str, Any]]] = {}
+    for query_text in queries:
+        query = CodeSymbolQuery(
+            structrr_snapshot_id=snapshot_id,
+            query_kind="symbols",
+            symbol_names=(query_text,),
+            limit=limit,
+            purpose="planning workspace symbol lookup",
+        )
+        result = query_python_symbols(
+            document, query, artifact_id=reference.artifact_id
+        )
+        output[query_text] = [
+            _index_symbol_to_provider_record(row, reference)
+            for row in result["records"]
+        ]
+    return output
+
+
+def _source_tree_digest(source_by_path: Mapping[str, str]) -> str:
+    digest = hashlib.sha256()
+    for path, source in sorted(source_by_path.items()):
+        digest.update(path.encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(hashlib.sha256(source.encode("utf-8")).digest())
+        digest.update(b"\0")
+    return digest.hexdigest()
+
+
+def _is_git_revision(value: str) -> bool:
+    return bool(re.fullmatch(r"(?:[0-9a-f]{40}|[0-9a-f]{64})", value))
+
+
+def pinned_code_symbol_artifact_reference(
+    repository_root: str | Path, base_commit: str
+) -> tuple[dict[str, Any], str]:
+    """Return the durable Structrr reference and planning snapshot identity."""
+    root = Path(repository_root).resolve()
+    _, reference, _ = _load_or_build_pinned_symbol_artifact(root, base_commit)
+    return (
+        reference.to_data(),
+        _planning_structrr_snapshot_id(root, base_commit, reference),
+    )
 
 
 def search_structural_document_analysis(
     repository_root: str | Path,
     base_commit: str,
     paths: Sequence[str],
-) -> tuple[dict[str, list[dict[str, Any]]], dict[str, tuple[str, ...]]]:
-    """Read symbols and cross-file references from one pinned BasedPyright session."""
+) -> tuple[
+    dict[str, list[dict[str, Any]]],
+    dict[str, tuple[str, ...]],
+    Literal["complete", "partial", "unavailable"],
+]:
+    """Read artifact-backed symbols and bounded references for pinned files."""
     root = Path(repository_root).resolve()
     analysis_root = _pinned_analysis_root(root, base_commit)
     normalized_paths = tuple(sorted(set(paths)))
+    _, reference, document = _load_or_build_pinned_symbol_artifact(root, base_commit)
+    selected_symbols = [
+        row
+        for row in document.get("symbols", [])
+        if isinstance(row, Mapping) and row.get("path") in normalized_paths
+    ]
+    symbols = _group_index_symbols(selected_symbols, reference)
     try:
-        return find_workspace_document_analysis(
+        _, references = find_workspace_document_analysis(
             list(normalized_paths), worktree_root=analysis_root
         )
-    except PowdrrExecutionError as error:
-        raise EvidenceError(f"structural document analysis failed: {error}") from error
+    except PowdrrExecutionError:
+        return symbols, {}, "unavailable"
+    query = CodeSymbolQuery(
+        structrr_snapshot_id=_planning_structrr_snapshot_id(
+            root, base_commit, reference
+        ),
+        query_kind="references",
+        paths=normalized_paths,
+        relationship_kinds=("references",),
+        limit=200,
+        max_encoded_bytes=32_768,
+        purpose="identify cross-file dependencies among planned Python paths",
+    )
+    query_result = query_python_references(
+        document,
+        query,
+        artifact_id=reference.artifact_id,
+        references_by_path=references,
+    )
+    result_references: dict[str, set[str]] = {}
+    for record in query_result["records"]:
+        source_path = record.get("source_path")
+        target_path = record.get("target_path")
+        if isinstance(source_path, str) and isinstance(target_path, str):
+            result_references.setdefault(source_path, set()).add(target_path)
+    normalized_references = {
+        path: tuple(sorted(targets))
+        for path, targets in sorted(result_references.items())
+    }
+    return (
+        symbols,
+        normalized_references,
+        "partial" if query_result["truncated"] else "complete",
+    )
 
 
 def read_pinned_code_file(
@@ -798,8 +1334,13 @@ __all__ = [
     "build_requirement_coverage_request",
     "create_requirement_coverage",
     "lookup_symbols_in_pinned_file",
+    "pinned_code_symbol_artifact_reference",
     "read_pinned_code_file",
     "record_file_evidence",
     "search_requirement_evidence",
     "search_requirements_evidence",
+    "search_pinned_workspace_symbols",
+    "search_structural_document_analysis",
+    "search_structural_document_symbols",
+    "search_workspace_symbols_from_worktree",
 ]

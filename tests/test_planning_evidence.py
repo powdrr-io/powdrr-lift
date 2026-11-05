@@ -33,8 +33,12 @@ from powdrr_lift.workrr.planning.evidence import (
     read_pinned_code_file,
     record_file_evidence,
     search_dependency_reference_paths,
+    search_pinned_workspace_symbols,
     search_requirement_evidence,
     search_requirements_evidence,
+    search_structural_document_analysis,
+    search_structural_document_symbols,
+    search_workspace_symbols_from_worktree,
 )
 
 
@@ -159,6 +163,176 @@ def test_pinned_file_evidence_reads_exact_commit_and_rejects_invented_paths(
         )
 
 
+def test_pinned_symbol_queries_reuse_revision_artifact_and_keep_provenance(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repository, base_commit = _repository(tmp_path)
+    provider_calls: list[tuple[str, ...]] = []
+
+    def document_symbols(
+        paths: list[str], *, worktree_root: Path
+    ) -> dict[str, list[dict[str, Any]]]:
+        assert worktree_root.name == "repository"
+        provider_calls.append(tuple(paths))
+        return {
+            path: [
+                {
+                    "name": "parse_payload",
+                    "kind": "function",
+                    "range": {
+                        "start_line": 1,
+                        "start_character": 0,
+                        "end_line": 2,
+                        "end_character": 0,
+                    },
+                    "children": [],
+                }
+            ]
+            for path in paths
+            if path == "src/schema.py"
+        }
+
+    monkeypatch.setattr(
+        evidence_module, "find_workspace_document_symbols", document_symbols
+    )
+
+    first = search_pinned_workspace_symbols(
+        repository, base_commit, ["parse_payload"], limit=20
+    )
+    second = search_pinned_workspace_symbols(
+        repository, base_commit, ["parse_payload"], limit=20
+    )
+    structural = search_structural_document_symbols(
+        repository, base_commit, ["src/schema.py"]
+    )
+
+    assert len(provider_calls) == 1
+    assert first == second
+    symbol = first["parse_payload"][0]
+    assert symbol["path"] == "src/schema.py"
+    assert symbol["range"]["start_line"] == 1
+    assert symbol["artifact_id"].startswith("structrr-code-symbols:sha256:")
+    assert symbol["artifact_digest"]
+    assert structural["src/schema.py"][0]["name"] == "parse_payload"
+    checked_in_artifacts = list(
+        (repository / "artifacts" / "structrr" / "code-symbols").glob("sha256-*.yaml")
+    )
+    assert len(checked_in_artifacts) == 1
+    assert (repository / ".powdrr" / "cache" / "structrr-code-symbols").is_dir()
+
+    _git(repository, "add", "artifacts/structrr/code-symbols")
+    _git(repository, "commit", "-qm", "check in symbol artifact")
+    artifact_commit = _git(repository, "rev-parse", "HEAD")
+    after_artifact_commit = search_pinned_workspace_symbols(
+        repository, artifact_commit, ["parse_payload"], limit=20
+    )
+    assert len(provider_calls) == 1
+    assert (
+        after_artifact_commit["parse_payload"][0]["artifact_id"]
+        == symbol["artifact_id"]
+    )
+    checked_in_reference, _ = evidence_module.pinned_code_symbol_artifact_reference(
+        repository, artifact_commit
+    )
+    assert checked_in_reference["source_revision"] == base_commit
+
+
+def test_worktree_symbol_artifact_invalidates_when_dirty_python_source_changes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repository, _ = _repository(tmp_path)
+    provider_calls = 0
+
+    def document_symbols(
+        paths: list[str], *, worktree_root: Path
+    ) -> dict[str, list[dict[str, Any]]]:
+        nonlocal provider_calls
+        provider_calls += 1
+        return {
+            "src/schema.py": [
+                {
+                    "name": "parse_payload",
+                    "kind": "function",
+                    "range": {
+                        "start_line": 1,
+                        "start_character": 0,
+                        "end_line": 2,
+                        "end_character": 0,
+                    },
+                }
+            ]
+        }
+
+    monkeypatch.setattr(
+        evidence_module, "find_workspace_document_symbols", document_symbols
+    )
+    first = search_workspace_symbols_from_worktree(
+        repository, ["parse_payload"], limit=10
+    )
+    (repository / "src/schema.py").write_text(
+        "def parse_payload(raw: str) -> dict[str, str]:\n"
+        '    return {"value": raw.strip()}  # revised\n',
+        encoding="utf-8",
+    )
+    second = search_workspace_symbols_from_worktree(
+        repository, ["parse_payload"], limit=10
+    )
+
+    assert provider_calls == 2
+    assert (
+        first["parse_payload"][0]["artifact_id"]
+        != second["parse_payload"][0]["artifact_id"]
+    )
+    assert (
+        first["parse_payload"][0]["artifact_digest"]
+        != second["parse_payload"][0]["artifact_digest"]
+    )
+
+
+def test_unavailable_reference_lookup_keeps_indexed_symbol_evidence(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repository, base_commit = _repository(tmp_path)
+    monkeypatch.setattr(
+        evidence_module,
+        "find_workspace_document_symbols",
+        lambda paths, **_kwargs: {
+            "src/schema.py": [
+                {
+                    "name": "parse_payload",
+                    "kind": "function",
+                    "range": {
+                        "start_line": 1,
+                        "start_character": 0,
+                        "end_line": 2,
+                        "end_character": 0,
+                    },
+                }
+            ]
+        },
+    )
+
+    def unavailable_references(*_args: Any, **_kwargs: Any) -> Any:
+        raise PowdrrExecutionError("reference request cap reached")
+
+    monkeypatch.setattr(
+        evidence_module,
+        "find_workspace_document_analysis",
+        unavailable_references,
+    )
+
+    symbols, references, status = search_structural_document_analysis(
+        repository, base_commit, ["src/schema.py"]
+    )
+
+    assert status == "unavailable"
+    assert references == {}
+    assert symbols["src/schema.py"][0]["name"] == "parse_payload"
+    assert symbols["src/schema.py"][0]["artifact_id"].startswith(
+        "structrr-code-symbols:sha256:"
+    )
+
+
 def test_pinned_code_file_reads_each_repository_blob_once(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -195,31 +369,36 @@ def test_requirement_search_supplies_pinned_implementation_and_test_evidence(
         requirement.related_requirement_ids,
     )
 
-    def find_symbols(
-        queries: list[str], *, worktree_root: Path, limit: int = 50
+    def find_document_symbols(
+        paths: list[str], *, worktree_root: Path
     ) -> dict[str, list[dict[str, Any]]]:
         assert worktree_root != repository.resolve()
         assert worktree_root == worktree_root.resolve()
         assert (worktree_root / "src/schema.py").is_file()
-        assert limit == 20
-        assert "payload" in queries
         return {
-            "payload": [
+            path: [
                 {
-                    "name": "parse_payload",
-                    "path": "src/schema.py",
-                    "range": {"start_line": 1, "end_line": 2},
-                },
-                {
-                    "name": "test_parse_payload",
-                    "path": "tests/test_schema.py",
-                    "range": {"start_line": 3, "end_line": 4},
-                },
+                    "name": symbol,
+                    "kind": "function",
+                    "range": {
+                        "start_line": start,
+                        "start_character": 0,
+                        "end_line": end,
+                        "end_character": 0,
+                    },
+                    "children": [],
+                }
             ]
+            for path, symbol, start, end in (
+                ("src/schema.py", "parse_payload", 1, 2),
+                ("tests/test_schema.py", "test_parse_payload", 3, 4),
+            )
+            if path in paths
         }
 
     monkeypatch.setattr(
-        "powdrr_lift.workrr.planning.evidence.find_workspace_symbols", find_symbols
+        "powdrr_lift.workrr.planning.evidence.find_workspace_document_symbols",
+        find_document_symbols,
     )
 
     search = search_requirement_evidence(
@@ -336,8 +515,8 @@ def test_requirement_search_with_no_matches_allows_missing_coverage(
         requirement.related_requirement_ids,
     )
     monkeypatch.setattr(
-        "powdrr_lift.workrr.planning.evidence.find_workspace_symbols",
-        lambda queries, **kwargs: {},
+        "powdrr_lift.workrr.planning.evidence.find_workspace_document_symbols",
+        lambda paths, **kwargs: {path: [] for path in paths},
     )
 
     search = search_requirement_evidence(
@@ -378,8 +557,8 @@ def test_requirement_search_reports_agent_command_timeout(
     repository, commit = _repository(tmp_path)
     requirement, _ = _requirement(commit)
     monkeypatch.setattr(
-        "powdrr_lift.workrr.planning.evidence.find_workspace_symbols",
-        lambda queries, **kwargs: {},
+        "powdrr_lift.workrr.planning.evidence.find_workspace_document_symbols",
+        lambda paths, **kwargs: {path: [] for path in paths},
     )
     monkeypatch.setattr(
         "powdrr_lift.workrr.planning.evidence.execute_command",
@@ -426,7 +605,7 @@ def test_requirement_search_uses_rg_for_non_python_when_basedpyright_fails(
         raise PowdrrExecutionError("basedpyright is unavailable")
 
     monkeypatch.setattr(
-        "powdrr_lift.workrr.planning.evidence.find_workspace_symbols",
+        "powdrr_lift.workrr.planning.evidence.find_workspace_document_symbols",
         fail_basedpyright,
     )
 

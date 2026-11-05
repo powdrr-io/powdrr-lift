@@ -56,9 +56,11 @@ from powdrr_lift.workrr.github_issue_queue import (
     GitHubIssueQueueError,
 )
 from powdrr_lift.workrr.planning.evidence import (
+    pinned_code_symbol_artifact_reference,
     read_evidence_excerpt,
     search_requirements_evidence,
     search_structural_document_analysis,
+    search_structural_document_symbols,
 )
 from powdrr_lift.workrr.provider_runtime import (
     build_workflow_client,
@@ -202,7 +204,7 @@ def run_planning_session(
             )
 
         structrr_baseline = _bootstrap_planning_structrr_baseline(
-            repo_root, session.session_id
+            repo_root, session.session_id, base_commit
         )
         planning_provider = resolve_workflow_provider(config.provider)
         planning_mapping = configured_model_mapping(planning_provider, config.model)
@@ -257,9 +259,17 @@ def run_planning_session(
                 (
                     structural_symbol_cache,
                     structural_reference_cache,
+                    reference_status,
                 ) = search_structural_document_analysis(
                     repo_root, base_commit, analysis_paths
                 )
+                if reference_status != "complete":
+                    print(
+                        "BasedPyright reference lookup is "
+                        f"{reference_status} for planned paths; "
+                        "symbol/location evidence remains available.",
+                        file=stream,
+                    )
                 structural_analysis_cache_key = analysis_paths
                 candidate_paths: dict[tuple[str, str], set[str]] = {}
                 for producer_path, consumer_paths in structural_reference_cache.items():
@@ -296,12 +306,10 @@ def run_planning_session(
             if cache_key == structural_analysis_cache_key:
                 return structural_symbol_cache
             try:
-                (
-                    structural_symbol_cache,
-                    structural_reference_cache,
-                ) = search_structural_document_analysis(
+                structural_symbol_cache = search_structural_document_symbols(
                     repo_root, base_commit, cache_key
                 )
+                structural_reference_cache = {}
             except EvidenceError as error:
                 print(
                     "BasedPyright Structrr document analysis unavailable; "
@@ -316,7 +324,30 @@ def run_planning_session(
         def search_structural_references(
             paths: Sequence[str],
         ) -> Mapping[str, Sequence[str]]:
-            search_structural_symbols(paths)
+            nonlocal structural_reference_cache
+            cache_key = tuple(sorted(set(paths)))
+            try:
+                (
+                    structural_symbol_cache,
+                    structural_reference_cache,
+                    reference_status,
+                ) = search_structural_document_analysis(
+                    repo_root, base_commit, cache_key
+                )
+                if reference_status != "complete":
+                    print(
+                        "BasedPyright reference lookup is "
+                        f"{reference_status} for planned paths; "
+                        "symbol/location evidence remains available.",
+                        file=stream,
+                    )
+            except EvidenceError as error:
+                structural_reference_cache = {}
+                print(
+                    "BasedPyright reference lookup unavailable; "
+                    f"symbol/location evidence remains available: {error}",
+                    file=stream,
+                )
             return structural_reference_cache
 
         machine = SourceLedgerQuestionMachine(
@@ -687,7 +718,7 @@ def _accepted_planning_answers(events: Sequence[Any]) -> dict[str, dict[str, Any
 
 
 def _bootstrap_planning_structrr_baseline(
-    repo_root: Path, session_id: str
+    repo_root: Path, session_id: str, base_commit: str
 ) -> dict[str, Any]:
     with tempfile.TemporaryDirectory(prefix="powdrr-lift-plan-structrr-") as temp_dir:
         result = bootstrap_structrr(
@@ -702,7 +733,13 @@ def _bootstrap_planning_structrr_baseline(
             raise PlanningServiceError(
                 f"Structrr bootstrap failed before planning: {details}"
             )
-        return result.document
+        artifact_reference, snapshot_id = pinned_code_symbol_artifact_reference(
+            repo_root, base_commit
+        )
+        document = dict(result.document)
+        document["code_symbol_artifact"] = artifact_reference
+        document["structrr_snapshot_id"] = snapshot_id
+        return document
 
 
 def _discover_github_repository(repo_root: Path) -> str:

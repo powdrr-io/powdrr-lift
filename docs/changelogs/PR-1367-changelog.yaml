@@ -2,71 +2,591 @@ schema: https://powdrr.io/schema/changelog-v2
 change_id: 1367
 title: Persist revision-pinned code symbols for planning
 intent:
-  problem: Planning callers receive transient BasedPyright results, so the code evidence used to choose work paths is not consistently reusable or available from a clean checkout.
-  goal: Persist deterministic Python symbol indexes as checked-in Structrr artifacts and route both planning entry points through bounded, provenance-aware queries.
+  problem: Planning callers receive transient BasedPyright results, so the code evidence
+    used to choose work paths is not consistently reusable or available from a clean
+    checkout.
+  goal: Persist deterministic Python symbol indexes as checked-in Structrr artifacts
+    and route both planning entry points through bounded, provenance-aware queries.
 human-decisions: []
 structured_files: []
 files:
-  - path: docs/plans/code-analysis-artifacts-and-scoped-queries.md
-    type: modified
-    span: {start_line: 27, end_line: 331}
-    summary: Clarify that content-addressed symbol artifacts are checked in, while ignored Powdrr cache files hold only local lookup metadata.
-    rationale: Make source-tree digest reuse explicit so adding a tracked artifact does not force a redundant index build at the next commit.
-  - path: packages/service/src/powdrr_service/structrr/bootstrap.py
-    type: modified
-    span: {start_line: 89, end_line: 1491}
-    summary: Validate optional Structrr code-symbol artifact references and snapshot identities in bootstrap state.
-    rationale: Reject missing, corrupt, mismatched, or repository-escaping artifact references before planning consumes them.
-  - path: packages/service/src/powdrr_service/structrr/code_symbols.py
-    type: added
-    span: {start_line: 1, end_line: 542}
-    summary: Define deterministic YAML code-symbol artifacts, content-addressed references, validation, and bounded symbol and reference queries.
-    rationale: Give Structrr a stable artifact and query contract that planning can use without inlining whole-repository symbol inventories.
-  - path: src/powdrr_lift/workrr/github_issue_plan_generation.py
-    type: modified
-    span: {start_line: 37, end_line: 1146}
-    summary: Route issue-plan workspace symbol searches through the shared artifact-backed query implementation.
-    rationale: Ensure issue planning and interactive planning use the same persisted symbol evidence and provenance.
-  - path: src/powdrr_lift/workrr/planning/evidence.py
-    type: modified
-    span: {start_line: 71, end_line: 1346}
-    summary: Build and reuse pinned Python symbol artifacts, persist them under artifacts/structrr/code-symbols, and expose bounded planner queries.
-    rationale: Preserve the source snapshot, provider version, configuration, coverage, and artifact identity behind planning evidence while keeping only lookup manifests in the ignored local cache.
-  - path: src/powdrr_lift/workrr/planning_session.py
-    type: modified
-    span: {start_line: 59, end_line: 743}
-    summary: Attach the symbol artifact reference to transient Structrr planning baselines and query its symbols through the shared evidence layer.
-    rationale: Make planning snapshots identify the code evidence that informed candidate paths and dependencies.
-  - path: tests/fixtures/structrr/golden-python-symbols.yaml
-    type: modified
-    span: {start_line: 8, end_line: 21}
-    summary: Update golden source ranges for the changed Structrr bootstrap module.
-    rationale: Keep deterministic source-location fixtures aligned with current code.
-  - path: tests/test_cli.py
-    type: modified
-    span: {start_line: 150, end_line: 167}
-    summary: Cover planning baseline construction with a pinned code-symbol artifact reference.
-    rationale: Verify baseline generation preserves artifact and snapshot provenance.
-  - path: tests/test_github_issue_plan_generation.py
-    type: modified
-    span: {start_line: 1780, end_line: 1952}
-    summary: Add an issue-planning integration case that obtains symbols through the checked-in artifact path.
-    rationale: Prove the second planning entry point uses the shared implementation.
-  - path: tests/test_planning_evidence.py
-    type: modified
-    span: {start_line: 36, end_line: 616}
-    summary: Cover deterministic artifact reuse, source-tree invalidation, provenance, and reuse after committing the generated artifact.
-    rationale: Verify a clean revision can load the checked-in artifact without rerunning BasedPyright when the indexed Python source is unchanged.
-  - path: tests/test_structrr_bootstrap.py
-    type: modified
-    span: {start_line: 14, end_line: 461}
-    summary: Validate Structrr bootstrap references to present and malformed code-symbol artifacts.
-    rationale: Ensure snapshots reject invalid persisted artifact references.
-  - path: tests/test_structrr_code_symbols.py
-    type: added
-    span: {start_line: 1, end_line: 193}
-    summary: Test deterministic serialization, scoped queries, response bounds, artifact integrity, and reference results.
-    rationale: Exercise the Structrr artifact contract independently of planning callers.
+- path: docs/plans/code-analysis-artifacts-and-scoped-queries.md
+  type: modified
+  summary: Clarify that content-addressed symbol artifacts are checked in, while ignored
+    Powdrr cache files hold only local lookup metadata.
+  rationale: Make source-tree digest reuse explicit so adding a tracked artifact does
+    not force a redundant index build at the next commit.
+  span:
+    start_line: 27
+    end_line: 34
+- path: docs/plans/code-analysis-artifacts-and-scoped-queries.md
+  type: modified
+  summary: Clarify that content-addressed symbol artifacts are checked in, while ignored
+    Powdrr cache files hold only local lookup metadata.
+  rationale: Make source-tree digest reuse explicit so adding a tracked artifact does
+    not force a redundant index build at the next commit.
+  span:
+    start_line: 326
+    end_line: 329
+- path: packages/service/src/powdrr_service/structrr/bootstrap.py
+  type: modified
+  summary: Validate optional Structrr code-symbol artifact references and snapshot
+    identities in bootstrap state.
+  rationale: Reject missing, corrupt, mismatched, or repository-escaping artifact
+    references before planning consumes them.
+  span:
+    start_line: 12
+    end_line: 12
+- path: packages/service/src/powdrr_service/structrr/bootstrap.py
+  type: modified
+  summary: Validate optional Structrr code-symbol artifact references and snapshot
+    identities in bootstrap state.
+  rationale: Reject missing, corrupt, mismatched, or repository-escaping artifact
+    references before planning consumes them.
+  span:
+    start_line: 89
+    end_line: 90
+- path: packages/service/src/powdrr_service/structrr/bootstrap.py
+  type: modified
+  summary: Validate optional Structrr code-symbol artifact references and snapshot
+    identities in bootstrap state.
+  rationale: Reject missing, corrupt, mismatched, or repository-escaping artifact
+    references before planning consumes them.
+  span:
+    start_line: 549
+    end_line: 563
+- path: packages/service/src/powdrr_service/structrr/bootstrap.py
+  type: modified
+  summary: Validate optional Structrr code-symbol artifact references and snapshot
+    identities in bootstrap state.
+  rationale: Reject missing, corrupt, mismatched, or repository-escaping artifact
+    references before planning consumes them.
+  span:
+    start_line: 622
+    end_line: 699
+- path: packages/service/src/powdrr_service/structrr/bootstrap.py
+  type: modified
+  summary: Validate optional Structrr code-symbol artifact references and snapshot
+    identities in bootstrap state.
+  rationale: Reject missing, corrupt, mismatched, or repository-escaping artifact
+    references before planning consumes them.
+  span:
+    start_line: 1490
+    end_line: 1491
+- path: packages/service/src/powdrr_service/structrr/code_symbols.py
+  type: added
+  summary: Define deterministic YAML code-symbol artifacts, content-addressed references,
+    validation, and bounded symbol and reference queries.
+  rationale: Give Structrr a stable artifact and query contract that planning can
+    use without inlining whole-repository symbol inventories.
+  span:
+    start_line: 1
+    end_line: 542
+- path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+  type: modified
+  summary: Route issue-plan workspace symbol searches through the shared artifact-backed
+    query implementation.
+  rationale: Ensure issue planning and interactive planning use the same persisted
+    symbol evidence and provenance.
+  span:
+    start_line: 38
+    end_line: 38
+- path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+  type: modified
+  summary: Route issue-plan workspace symbol searches through the shared artifact-backed
+    query implementation.
+  rationale: Ensure issue planning and interactive planning use the same persisted
+    symbol evidence and provenance.
+  span:
+    start_line: 49
+    end_line: 52
+- path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+  type: modified
+  summary: Route issue-plan workspace symbol searches through the shared artifact-backed
+    query implementation.
+  rationale: Ensure issue planning and interactive planning use the same persisted
+    symbol evidence and provenance.
+  span:
+    start_line: 82
+    end_line: 90
+- path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+  type: modified
+  summary: Route issue-plan workspace symbol searches through the shared artifact-backed
+    query implementation.
+  rationale: Ensure issue planning and interactive planning use the same persisted
+    symbol evidence and provenance.
+  span:
+    start_line: 1145
+    end_line: 1145
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  summary: Build and reuse pinned Python symbol artifacts, persist them under artifacts/structrr/code-symbols,
+    and expose bounded planner queries.
+  rationale: Preserve the source snapshot, provider version, configuration, coverage,
+    and artifact identity behind planning evidence while keeping only lookup manifests
+    in the ignored local cache.
+  span:
+    start_line: 7
+    end_line: 8
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  summary: Build and reuse pinned Python symbol artifacts, persist them under artifacts/structrr/code-symbols,
+    and expose bounded planner queries.
+  rationale: Preserve the source snapshot, provider version, configuration, coverage,
+    and artifact identity behind planning evidence while keeping only lookup manifests
+    in the ignored local cache.
+  span:
+    start_line: 18
+    end_line: 18
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  summary: Build and reuse pinned Python symbol artifacts, persist them under artifacts/structrr/code-symbols,
+    and expose bounded planner queries.
+  rationale: Preserve the source snapshot, provider version, configuration, coverage,
+    and artifact identity behind planning evidence while keeping only lookup manifests
+    in the ignored local cache.
+  span:
+    start_line: 22
+    end_line: 22
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  summary: Build and reuse pinned Python symbol artifacts, persist them under artifacts/structrr/code-symbols,
+    and expose bounded planner queries.
+  rationale: Preserve the source snapshot, provider version, configuration, coverage,
+    and artifact identity behind planning evidence while keeping only lookup manifests
+    in the ignored local cache.
+  span:
+    start_line: 55
+    end_line: 62
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  summary: Build and reuse pinned Python symbol artifacts, persist them under artifacts/structrr/code-symbols,
+    and expose bounded planner queries.
+  rationale: Preserve the source snapshot, provider version, configuration, coverage,
+    and artifact identity behind planning evidence while keeping only lookup manifests
+    in the ignored local cache.
+  span:
+    start_line: 71
+    end_line: 71
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  summary: Build and reuse pinned Python symbol artifacts, persist them under artifacts/structrr/code-symbols,
+    and expose bounded planner queries.
+  rationale: Preserve the source snapshot, provider version, configuration, coverage,
+    and artifact identity behind planning evidence while keeping only lookup manifests
+    in the ignored local cache.
+  span:
+    start_line: 265
+    end_line: 269
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  summary: Build and reuse pinned Python symbol artifacts, persist them under artifacts/structrr/code-symbols,
+    and expose bounded planner queries.
+  rationale: Preserve the source snapshot, provider version, configuration, coverage,
+    and artifact identity behind planning evidence while keeping only lookup manifests
+    in the ignored local cache.
+  span:
+    start_line: 271
+    end_line: 271
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  summary: Build and reuse pinned Python symbol artifacts, persist them under artifacts/structrr/code-symbols,
+    and expose bounded planner queries.
+  rationale: Preserve the source snapshot, provider version, configuration, coverage,
+    and artifact identity behind planning evidence while keeping only lookup manifests
+    in the ignored local cache.
+  span:
+    start_line: 489
+    end_line: 489
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  summary: Build and reuse pinned Python symbol artifacts, persist them under artifacts/structrr/code-symbols,
+    and expose bounded planner queries.
+  rationale: Preserve the source snapshot, provider version, configuration, coverage,
+    and artifact identity behind planning evidence while keeping only lookup manifests
+    in the ignored local cache.
+  span:
+    start_line: 506
+    end_line: 532
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  summary: Build and reuse pinned Python symbol artifacts, persist them under artifacts/structrr/code-symbols,
+    and expose bounded planner queries.
+  rationale: Preserve the source snapshot, provider version, configuration, coverage,
+    and artifact identity behind planning evidence while keeping only lookup manifests
+    in the ignored local cache.
+  span:
+    start_line: 534
+    end_line: 546
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  summary: Build and reuse pinned Python symbol artifacts, persist them under artifacts/structrr/code-symbols,
+    and expose bounded planner queries.
+  rationale: Preserve the source snapshot, provider version, configuration, coverage,
+    and artifact identity behind planning evidence while keeping only lookup manifests
+    in the ignored local cache.
+  span:
+    start_line: 548
+    end_line: 989
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  summary: Build and reuse pinned Python symbol artifacts, persist them under artifacts/structrr/code-symbols,
+    and expose bounded planner queries.
+  rationale: Preserve the source snapshot, provider version, configuration, coverage,
+    and artifact identity behind planning evidence while keeping only lookup manifests
+    in the ignored local cache.
+  span:
+    start_line: 996
+    end_line: 1001
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  summary: Build and reuse pinned Python symbol artifacts, persist them under artifacts/structrr/code-symbols,
+    and expose bounded planner queries.
+  rationale: Preserve the source snapshot, provider version, configuration, coverage,
+    and artifact identity behind planning evidence while keeping only lookup manifests
+    in the ignored local cache.
+  span:
+    start_line: 1005
+    end_line: 1011
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  summary: Build and reuse pinned Python symbol artifacts, persist them under artifacts/structrr/code-symbols,
+    and expose bounded planner queries.
+  rationale: Preserve the source snapshot, provider version, configuration, coverage,
+    and artifact identity behind planning evidence while keeping only lookup manifests
+    in the ignored local cache.
+  span:
+    start_line: 1013
+    end_line: 1013
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  summary: Build and reuse pinned Python symbol artifacts, persist them under artifacts/structrr/code-symbols,
+    and expose bounded planner queries.
+  rationale: Preserve the source snapshot, provider version, configuration, coverage,
+    and artifact identity behind planning evidence while keeping only lookup manifests
+    in the ignored local cache.
+  span:
+    start_line: 1016
+    end_line: 1049
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  summary: Build and reuse pinned Python symbol artifacts, persist them under artifacts/structrr/code-symbols,
+    and expose bounded planner queries.
+  rationale: Preserve the source snapshot, provider version, configuration, coverage,
+    and artifact identity behind planning evidence while keeping only lookup manifests
+    in the ignored local cache.
+  span:
+    start_line: 1337
+    end_line: 1337
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  summary: Build and reuse pinned Python symbol artifacts, persist them under artifacts/structrr/code-symbols,
+    and expose bounded planner queries.
+  rationale: Preserve the source snapshot, provider version, configuration, coverage,
+    and artifact identity behind planning evidence while keeping only lookup manifests
+    in the ignored local cache.
+  span:
+    start_line: 1342
+    end_line: 1345
+- path: src/powdrr_lift/workrr/planning_session.py
+  type: modified
+  summary: Attach the symbol artifact reference to transient Structrr planning baselines
+    and query its symbols through the shared evidence layer.
+  rationale: Make planning snapshots identify the code evidence that informed candidate
+    paths and dependencies.
+  span:
+    start_line: 59
+    end_line: 59
+- path: src/powdrr_lift/workrr/planning_session.py
+  type: modified
+  summary: Attach the symbol artifact reference to transient Structrr planning baselines
+    and query its symbols through the shared evidence layer.
+  rationale: Make planning snapshots identify the code evidence that informed candidate
+    paths and dependencies.
+  span:
+    start_line: 63
+    end_line: 63
+- path: src/powdrr_lift/workrr/planning_session.py
+  type: modified
+  summary: Attach the symbol artifact reference to transient Structrr planning baselines
+    and query its symbols through the shared evidence layer.
+  rationale: Make planning snapshots identify the code evidence that informed candidate
+    paths and dependencies.
+  span:
+    start_line: 207
+    end_line: 207
+- path: src/powdrr_lift/workrr/planning_session.py
+  type: modified
+  summary: Attach the symbol artifact reference to transient Structrr planning baselines
+    and query its symbols through the shared evidence layer.
+  rationale: Make planning snapshots identify the code evidence that informed candidate
+    paths and dependencies.
+  span:
+    start_line: 262
+    end_line: 262
+- path: src/powdrr_lift/workrr/planning_session.py
+  type: modified
+  summary: Attach the symbol artifact reference to transient Structrr planning baselines
+    and query its symbols through the shared evidence layer.
+  rationale: Make planning snapshots identify the code evidence that informed candidate
+    paths and dependencies.
+  span:
+    start_line: 266
+    end_line: 272
+- path: src/powdrr_lift/workrr/planning_session.py
+  type: modified
+  summary: Attach the symbol artifact reference to transient Structrr planning baselines
+    and query its symbols through the shared evidence layer.
+  rationale: Make planning snapshots identify the code evidence that informed candidate
+    paths and dependencies.
+  span:
+    start_line: 309
+    end_line: 309
+- path: src/powdrr_lift/workrr/planning_session.py
+  type: modified
+  summary: Attach the symbol artifact reference to transient Structrr planning baselines
+    and query its symbols through the shared evidence layer.
+  rationale: Make planning snapshots identify the code evidence that informed candidate
+    paths and dependencies.
+  span:
+    start_line: 312
+    end_line: 312
+- path: src/powdrr_lift/workrr/planning_session.py
+  type: modified
+  summary: Attach the symbol artifact reference to transient Structrr planning baselines
+    and query its symbols through the shared evidence layer.
+  rationale: Make planning snapshots identify the code evidence that informed candidate
+    paths and dependencies.
+  span:
+    start_line: 327
+    end_line: 350
+- path: src/powdrr_lift/workrr/planning_session.py
+  type: modified
+  summary: Attach the symbol artifact reference to transient Structrr planning baselines
+    and query its symbols through the shared evidence layer.
+  rationale: Make planning snapshots identify the code evidence that informed candidate
+    paths and dependencies.
+  span:
+    start_line: 721
+    end_line: 721
+- path: src/powdrr_lift/workrr/planning_session.py
+  type: modified
+  summary: Attach the symbol artifact reference to transient Structrr planning baselines
+    and query its symbols through the shared evidence layer.
+  rationale: Make planning snapshots identify the code evidence that informed candidate
+    paths and dependencies.
+  span:
+    start_line: 736
+    end_line: 742
+- path: tests/fixtures/structrr/golden-python-symbols.yaml
+  type: modified
+  summary: Update golden source ranges for the changed Structrr bootstrap module.
+  rationale: Keep deterministic source-location fixtures aligned with current code.
+  span:
+    start_line: 8
+    end_line: 8
+- path: tests/fixtures/structrr/golden-python-symbols.yaml
+  type: modified
+  summary: Update golden source ranges for the changed Structrr bootstrap module.
+  rationale: Keep deterministic source-location fixtures aligned with current code.
+  span:
+    start_line: 14
+    end_line: 15
+- path: tests/fixtures/structrr/golden-python-symbols.yaml
+  type: modified
+  summary: Update golden source ranges for the changed Structrr bootstrap module.
+  rationale: Keep deterministic source-location fixtures aligned with current code.
+  span:
+    start_line: 21
+    end_line: 22
+- path: tests/test_cli.py
+  type: modified
+  summary: Cover planning baseline construction with a pinned code-symbol artifact
+    reference.
+  rationale: Verify baseline generation preserves artifact and snapshot provenance.
+  span:
+    start_line: 150
+    end_line: 157
+- path: tests/test_cli.py
+  type: modified
+  summary: Cover planning baseline construction with a pinned code-symbol artifact
+    reference.
+  rationale: Verify baseline generation preserves artifact and snapshot provenance.
+  span:
+    start_line: 159
+    end_line: 159
+- path: tests/test_cli.py
+  type: modified
+  summary: Cover planning baseline construction with a pinned code-symbol artifact
+    reference.
+  rationale: Verify baseline generation preserves artifact and snapshot provenance.
+  span:
+    start_line: 162
+    end_line: 166
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  summary: Add an issue-planning integration case that obtains symbols through the
+    checked-in artifact path.
+  rationale: Prove the second planning entry point uses the shared implementation.
+  span:
+    start_line: 45
+    end_line: 45
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  summary: Add an issue-planning integration case that obtains symbols through the
+    checked-in artifact path.
+  rationale: Prove the second planning entry point uses the shared implementation.
+  span:
+    start_line: 1780
+    end_line: 1791
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  summary: Add an issue-planning integration case that obtains symbols through the
+    checked-in artifact path.
+  rationale: Prove the second planning entry point uses the shared implementation.
+  span:
+    start_line: 1854
+    end_line: 1857
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  summary: Add an issue-planning integration case that obtains symbols through the
+    checked-in artifact path.
+  rationale: Prove the second planning entry point uses the shared implementation.
+  span:
+    start_line: 1879
+    end_line: 1951
+- path: tests/test_planning_evidence.py
+  type: modified
+  summary: Cover deterministic artifact reuse, source-tree invalidation, provenance,
+    and reuse after committing the generated artifact.
+  rationale: Verify a clean revision can load the checked-in artifact without rerunning
+    BasedPyright when the indexed Python source is unchanged.
+  span:
+    start_line: 36
+    end_line: 36
+- path: tests/test_planning_evidence.py
+  type: modified
+  summary: Cover deterministic artifact reuse, source-tree invalidation, provenance,
+    and reuse after committing the generated artifact.
+  rationale: Verify a clean revision can load the checked-in artifact without rerunning
+    BasedPyright when the indexed Python source is unchanged.
+  span:
+    start_line: 39
+    end_line: 41
+- path: tests/test_planning_evidence.py
+  type: modified
+  summary: Cover deterministic artifact reuse, source-tree invalidation, provenance,
+    and reuse after committing the generated artifact.
+  rationale: Verify a clean revision can load the checked-in artifact without rerunning
+    BasedPyright when the indexed Python source is unchanged.
+  span:
+    start_line: 166
+    end_line: 335
+- path: tests/test_planning_evidence.py
+  type: modified
+  summary: Cover deterministic artifact reuse, source-tree invalidation, provenance,
+    and reuse after committing the generated artifact.
+  rationale: Verify a clean revision can load the checked-in artifact without rerunning
+    BasedPyright when the indexed Python source is unchanged.
+  span:
+    start_line: 372
+    end_line: 373
+- path: tests/test_planning_evidence.py
+  type: modified
+  summary: Cover deterministic artifact reuse, source-tree invalidation, provenance,
+    and reuse after committing the generated artifact.
+  rationale: Verify a clean revision can load the checked-in artifact without rerunning
+    BasedPyright when the indexed Python source is unchanged.
+  span:
+    start_line: 204
+    end_line: 205
+- path: tests/test_planning_evidence.py
+  type: modified
+  summary: Cover deterministic artifact reuse, source-tree invalidation, provenance,
+    and reuse after committing the generated artifact.
+  rationale: Verify a clean revision can load the checked-in artifact without rerunning
+    BasedPyright when the indexed Python source is unchanged.
+  span:
+    start_line: 379
+    end_line: 379
+- path: tests/test_planning_evidence.py
+  type: modified
+  summary: Cover deterministic artifact reuse, source-tree invalidation, provenance,
+    and reuse after committing the generated artifact.
+  rationale: Verify a clean revision can load the checked-in artifact without rerunning
+    BasedPyright when the indexed Python source is unchanged.
+  span:
+    start_line: 381
+    end_line: 390
+- path: tests/test_planning_evidence.py
+  type: modified
+  summary: Cover deterministic artifact reuse, source-tree invalidation, provenance,
+    and reuse after committing the generated artifact.
+  rationale: Verify a clean revision can load the checked-in artifact without rerunning
+    BasedPyright when the indexed Python source is unchanged.
+  span:
+    start_line: 392
+    end_line: 396
+- path: tests/test_planning_evidence.py
+  type: modified
+  summary: Cover deterministic artifact reuse, source-tree invalidation, provenance,
+    and reuse after committing the generated artifact.
+  rationale: Verify a clean revision can load the checked-in artifact without rerunning
+    BasedPyright when the indexed Python source is unchanged.
+  span:
+    start_line: 400
+    end_line: 401
+- path: tests/test_planning_evidence.py
+  type: modified
+  summary: Cover deterministic artifact reuse, source-tree invalidation, provenance,
+    and reuse after committing the generated artifact.
+  rationale: Verify a clean revision can load the checked-in artifact without rerunning
+    BasedPyright when the indexed Python source is unchanged.
+  span:
+    start_line: 518
+    end_line: 519
+- path: tests/test_planning_evidence.py
+  type: modified
+  summary: Cover deterministic artifact reuse, source-tree invalidation, provenance,
+    and reuse after committing the generated artifact.
+  rationale: Verify a clean revision can load the checked-in artifact without rerunning
+    BasedPyright when the indexed Python source is unchanged.
+  span:
+    start_line: 560
+    end_line: 561
+- path: tests/test_planning_evidence.py
+  type: modified
+  summary: Cover deterministic artifact reuse, source-tree invalidation, provenance,
+    and reuse after committing the generated artifact.
+  rationale: Verify a clean revision can load the checked-in artifact without rerunning
+    BasedPyright when the indexed Python source is unchanged.
+  span:
+    start_line: 608
+    end_line: 608
+- path: tests/test_structrr_bootstrap.py
+  type: modified
+  summary: Validate Structrr bootstrap references to present and malformed code-symbol
+    artifacts.
+  rationale: Ensure snapshots reject invalid persisted artifact references.
+  span:
+    start_line: 14
+    end_line: 15
+- path: tests/test_structrr_bootstrap.py
+  type: modified
+  summary: Validate Structrr bootstrap references to present and malformed code-symbol
+    artifacts.
+  rationale: Ensure snapshots reject invalid persisted artifact references.
+  span:
+    start_line: 416
+    end_line: 461
+- path: tests/test_structrr_code_symbols.py
+  type: added
+  summary: Test deterministic serialization, scoped queries, response bounds, artifact
+    integrity, and reference results.
+  rationale: Exercise the Structrr artifact contract independently of planning callers.
+  span:
+    start_line: 1
+    end_line: 193
 entities: []
 entity_relationships: []
 invariants: []

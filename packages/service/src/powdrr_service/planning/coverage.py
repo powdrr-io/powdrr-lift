@@ -67,9 +67,11 @@ class RequirementEvidenceSearch:
     basedpyright_match_count: int = 0
     rg_match_count: int = 0
     basedpyright_available: bool = True
+    code_symbol_coverage: Mapping[str, Any] | None = None
+    rg_search_status: str = "complete"
 
     def to_data(self) -> dict[str, Any]:
-        return {
+        result: dict[str, Any] = {
             "method": "basedpyright-symbols-and-rg-v1",
             "base_commit": self.base_commit,
             "terms": list(self.terms),
@@ -80,8 +82,12 @@ class RequirementEvidenceSearch:
             "basedpyright_match_count": self.basedpyright_match_count,
             "rg_match_count": self.rg_match_count,
             "basedpyright_available": self.basedpyright_available,
+            "rg_search_status": self.rg_search_status,
             "scope": "tracked source, test, and configuration files",
         }
+        if self.code_symbol_coverage is not None:
+            result["code_symbol_coverage"] = dict(self.code_symbol_coverage)
+        return result
 
 
 def _validated_evidence_excerpt(evidence: Evidence, excerpt: str | None) -> str:
@@ -281,8 +287,11 @@ def build_requirement_coverage_request(
             "the supplied code evidence and repository-search record. Search hits "
             "are candidates; ignore irrelevant matches. If the supplied matches "
             "do not implement this behavior, mark it missing. Missing means this "
-            "requirement is work to plan, not a reason to stop. A search with no "
-            "matches is a valid missing result; do not invent evidence. To mark "
+            "requirement is work to plan, not a reason to stop. Empty symbol "
+            "matches do not establish absence on paths omitted by partial code-symbol "
+            "coverage. A no-match result supports missing only when repository-search "
+            "reports rg_search_status=complete for its configured source paths; do "
+            "not invent evidence. To mark "
             "complete, cite either an execution_receipt or both relevant "
             "implementation/configuration evidence and relevant test evidence. "
             "Include the IDs for both kinds in evidence_ids; implementation alone "

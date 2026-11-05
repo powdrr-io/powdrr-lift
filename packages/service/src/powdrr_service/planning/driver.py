@@ -605,8 +605,14 @@ class SourceLedgerQuestionMachine:
                     "basedpyright_query_count": search.basedpyright_query_count,
                     "basedpyright_match_count": search.basedpyright_match_count,
                     "rg_match_count": search.rg_match_count,
+                    "rg_search_status": search.rg_search_status,
                     "basedpyright_available": search.basedpyright_available,
                     "base_commit": search.base_commit,
+                    **(
+                        {"code_symbol_coverage": dict(search.code_symbol_coverage)}
+                        if search.code_symbol_coverage is not None
+                        else {}
+                    ),
                 },
             )
             for requirement_id, search in sorted(self._evidence_search_cache.items())
@@ -2872,10 +2878,18 @@ def _deterministic_block_disposition(
 
 def _is_completed_zero_hit_search(search: Any, *, pinned_commit: str) -> bool:
     """Accept only explicit complete, pinned, available searches with no hits."""
+    code_symbol_coverage = getattr(search, "code_symbol_coverage", None)
+    coverage_status = (
+        code_symbol_coverage.get("status")
+        if isinstance(code_symbol_coverage, Mapping)
+        else "complete"
+    )
     return (
         search is not None
         and search.base_commit == pinned_commit
         and search.basedpyright_available is True
+        and search.rg_search_status == "complete"
+        and coverage_status == "complete"
         and not search.evidence
         and search.matching_line_count == 0
         and search.matching_path_count == 0

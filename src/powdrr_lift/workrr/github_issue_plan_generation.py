@@ -34,6 +34,7 @@ from powdrr_service.planning.workflow_instance import (
 from powdrr_service.planning.workflow_instance import (
     parse_plan_workflow_instance_yaml as _parse_plan_workflow_instance_yaml,
 )
+from powdrr_service.structrr.code_symbols import CodeSymbolSearchResult
 
 from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.workrr.github_issue_queue import (
@@ -83,7 +84,7 @@ MANUAL_PREREQUISITE_RESPONSE_SCHEMA: dict[str, Any] = {
 
 def find_workspace_symbols(
     queries: list[str], *, worktree_root: Path, limit: int = 50
-) -> dict[str, list[dict[str, Any]]]:
+) -> CodeSymbolSearchResult:
     """Expose the shared artifact-backed symbol query to issue planning."""
     return search_workspace_symbols_from_worktree(worktree_root, queries, limit=limit)
 
@@ -1104,8 +1105,11 @@ def inspect_repository_code(
                 "Python class/function/method symbols that can clarify which "
                 "requirements are already implemented, partially implemented, or "
                 "missing. Search for both implementation and relevant tests. You "
-                "may ask follow-up symbol queries after seeing results. Return only "
-                "the requested JSON. Set done=true when further symbol lookups are "
+                "may ask follow-up symbol queries after seeing results. Use each "
+                "code_symbol_coverage record to interpret empty matches. Partial, "
+                "unavailable, or failed coverage means missing symbol matches are "
+                "unknown, not proof that implementation is absent. Return only the "
+                "requested JSON. Set done=true when further symbol lookups are "
                 "unlikely to change the assessment."
             ),
         },
@@ -1144,7 +1148,17 @@ def inspect_repository_code(
             )
         except (EvidenceError, PowdrrExecutionError) as error:
             symbols_by_query = {}
-            round_results.append({"error": str(error)})
+            round_results.append(
+                {
+                    "code_symbol_coverage": {
+                        "status": "failed",
+                        "error": str(error),
+                    }
+                }
+            )
+        symbol_coverage = getattr(symbols_by_query, "coverage", None)
+        if isinstance(symbol_coverage, Mapping):
+            round_results.append({"code_symbol_coverage": dict(symbol_coverage)})
         for query in unique_queries:
             symbols = symbols_by_query.get(query, [])
             excerpts: list[dict[str, Any]] = []
@@ -1225,7 +1239,10 @@ def inspect_repository_code(
                     "the symbol results, request targeted follow-up Python symbols "
                     "or tests needed to distinguish implemented, partial, and "
                     "missing behavior. Avoid repeating prior queries. Return only "
-                    "the requested JSON. Set done=true when the evidence is enough."
+                    "the requested JSON. Use code_symbol_coverage to interpret "
+                    "empty matches: partial, unavailable, or failed coverage means "
+                    "missing symbol matches are unknown. Set done=true when the "
+                    "evidence is enough."
                 ),
             },
             {
@@ -1245,7 +1262,10 @@ def inspect_repository_code(
     return (
         context_header
         + " Evidence from bounded, model-directed basedpyright symbol lookups follows. "
-        + "Symbol definitions and tests are evidence; they do not prove tests pass.\n"
+        + "Use code_symbol_coverage to interpret empty matches: omitted paths are "
+        + "unknown when coverage is partial, unavailable, or failed. Complete coverage "
+        + "means the paths were indexed, not that behavior is implemented. Symbol "
+        + "definitions and tests are evidence; they do not prove tests pass.\n"
         + code_context
     )
 

@@ -104,6 +104,40 @@ def test_service_infer_forwards_chat_request_and_preserves_tool_response(
     assert "service-secret" not in json.dumps(response.to_dict())
 
 
+def test_service_infer_removes_litellm_provider_prefix_from_model_id(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured: dict[str, Any] = {}
+
+    def open_request(request: Any, *, timeout: float) -> io.BytesIO:
+        del timeout
+        captured["body"] = json.loads(request.data)
+        return io.BytesIO(
+            json.dumps(
+                {
+                    "choices": [
+                        {
+                            "finish_reason": "stop",
+                            "message": {"role": "assistant", "content": "ready"},
+                        }
+                    ]
+                }
+            ).encode()
+        )
+
+    monkeypatch.setattr(inference, "urlopen", open_request)
+    request = ChatCompletionRequest(
+        model="deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731",
+        messages=({"role": "user", "content": "test"},),
+        request_id="prefixed-model-request",
+    )
+
+    response = DeepInfraInferenceClient(api_key="key").complete(request)
+
+    assert captured["body"]["model"] == "deepseek-ai/DeepSeek-V4-Flash-0731"
+    assert response.content == "ready"
+
+
 def test_service_infer_requires_a_service_side_credential(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

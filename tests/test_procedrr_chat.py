@@ -102,6 +102,7 @@ def test_all_supported_workflow_names_have_procedrr_processes() -> None:
         "review-skill-workflow",
         "review-system",
         "run-tests-and-fix",
+        "respond-to-pr-ci",
         "security-review",
         "spec-v1-design-review",
         "specify-a-feature",
@@ -110,6 +111,16 @@ def test_all_supported_workflow_names_have_procedrr_processes() -> None:
         "specify-system",
         "start-implementing-feature",
     } <= names
+
+
+def test_ci_response_procedure_is_observation_only_and_uses_cli_gate() -> None:
+    process = ProcessCatalog.load(bundled_process_directory()).get("respond-to-pr-ci")
+    question = process.document["steps"][0]["specialize"]["question"]
+
+    assert "powdrr-lift" in question
+    assert "respond-to-pr-ci" in question
+    assert "Do not diagnose the cause" in question
+    assert "call a coding agent" in question
 
 
 def test_specify_feature_interviews_until_structured_spec_has_no_open_assumptions() -> (

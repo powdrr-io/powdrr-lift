@@ -1,5 +1,10 @@
 """Public, transport-independent Powdrr data contracts."""
 
+from powdrr_contracts.ci import (
+    CIAnnotation,
+    CIJobObservation,
+    LocalReproduction,
+)
 from powdrr_contracts.models import (
     ActionReceipt,
     Artifact,
@@ -31,9 +36,12 @@ __all__ = [
     "Artifact",
     "ChatCompletionRequest",
     "ChatCompletionResponse",
+    "CIAnnotation",
+    "CIJobObservation",
     "ContractError",
     "EvidenceStatus",
     "LocalAction",
+    "LocalReproduction",
     "OperationInput",
     "OperationReference",
     "OperationRequest",

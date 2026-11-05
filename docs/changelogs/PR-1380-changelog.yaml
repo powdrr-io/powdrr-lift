@@ -1,0 +1,154 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1380
+title: Add deterministic CI response observations
+intent:
+  problem: Failed pull-request checks may provide no job steps or runner logs when GitHub rejects runner provisioning. Powdrr needs to preserve current-head evidence and distinguish that platform failure from a locally executable failure.
+  goal: Add a Procedrr entry point and CLI action that collect exact-head GitHub Actions jobs and annotations, classify known pre-runner rejections deterministically, and append a bounded idempotent checkpoint to the associated issue. Provide a pinned disposable-worktree command capability and conservative failure-signature comparison for the next response stages.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 3901, end_line: 3984}
+  summary: Record CI response contracts, service policy, agent transport, and Procedrr process ownership.
+  rationale: Keep the service and agent responsibilities visible as this feature crosses the process boundary.
+- path: packages/contracts/src/powdrr_contracts/__init__.py
+  type: modified
+  span: {start_line: 3, end_line: 7}
+  summary: Export typed CI annotation, job observation, and reproduction records.
+  rationale: Make the CI evidence boundary available to service and agent packages through the public contracts package.
+- path: packages/contracts/src/powdrr_contracts/__init__.py
+  type: modified
+  span: {start_line: 39, end_line: 40}
+  summary: Export typed CI annotation, job observation, and reproduction records.
+  rationale: Make the CI evidence boundary available to service and agent packages through the public contracts package.
+- path: packages/contracts/src/powdrr_contracts/__init__.py
+  type: modified
+  span: {start_line: 44, end_line: 44}
+  summary: Export the local-reproduction record from the public contracts package.
+  rationale: Keep the public contract API explicit and discoverable.
+- path: packages/contracts/src/powdrr_contracts/ci.py
+  type: added
+  span: {start_line: 1, end_line: 266}
+  summary: Define versioned GitHub job, annotation, and local-reproduction records with validation.
+  rationale: Preserve exact commit identities, native check states, annotation integrity, and conservative reproduction outcomes across the agent/service boundary.
+- path: packages/agent/src/powdrr_agent/execution/github_actions.py
+  type: added
+  span: {start_line: 1, end_line: 336}
+  summary: Fetch pull-request Actions jobs and annotations, checkpoint issue observations, and run explicit commands in disposable pinned worktrees.
+  rationale: Keep GitHub credentials and local repository execution in the agent while reporting bounded raw evidence to service policy.
+- path: packages/service/src/powdrr_service/ci_response/__init__.py
+  type: added
+  span: {start_line: 1, end_line: 19}
+  summary: Expose service-owned CI normalization, classification, reproduction comparison, and checkpoint rendering.
+  rationale: Keep response policy importable from the service package.
+- path: packages/service/src/powdrr_service/ci_response/checkpoint.py
+  type: added
+  span: {start_line: 1, end_line: 79}
+  summary: Render stable, bounded issue checkpoints keyed to the exact pull-request head and observed jobs.
+  rationale: Store useful CI transitions without loading or duplicating large issue histories.
+- path: packages/service/src/powdrr_service/ci_response/evidence.py
+  type: added
+  span: {start_line: 1, end_line: 139}
+  summary: Normalize failure signatures and identify runner-provisioning rejections that occurred before steps or runner assignment.
+  rationale: Route the observed unsupported-runner case to a GitHub Actions-specific path without implying that a replacement label or owner is known.
+- path: packages/service/src/powdrr_service/ci_response/observation.py
+  type: added
+  span: {start_line: 1, end_line: 152}
+  summary: Convert GitHub API responses into validated CI job and annotation contracts.
+  rationale: Keep raw API interpretation and source-integrity hashing in the service.
+- path: packages/service/src/powdrr_service/ci_response/reproduction.py
+  type: added
+  span: {start_line: 1, end_line: 73}
+  summary: Compare an exact local failure signature with remote evidence and preserve inconclusive environment or phase results.
+  rationale: Avoid treating an earlier local setup error or a similar assertion as a CI non-reproduction.
+- path: packages/service/src/powdrr_service/resources/processes/respond-to-pr-ci.yaml
+  type: added
+  span: {start_line: 1, end_line: 60}
+  summary: Add an observation-only Procedrr process that requires explicit repository, PR, and issue identifiers.
+  rationale: Use the process catalog for the entry point and keep this first stage from making repair decisions.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 25, end_line: 28}
+  summary: Compose the CLI with agent-side GitHub Actions transport.
+  rationale: Keep authenticated GitHub reads and writes on the agent side of the boundary.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 40, end_line: 44}
+  summary: Compose the CLI with agent transport and service-owned CI policy.
+  rationale: Keep the executable as a boundary adapter rather than duplicating diagnosis logic.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 362, end_line: 370}
+  summary: Register the respond-to-pr-ci command with explicit repository, PR, and issue arguments.
+  rationale: Provide a direct operator entry point for CI observation.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 2961, end_line: 3047}
+  summary: Verify issue linkage, observe the current head, classify failures, and append an idempotent issue checkpoint.
+  rationale: Keep progress durable and prevent unrelated issue updates or stale-head claims.
+- path: tests/test_ci_response_cli.py
+  type: added
+  span: {start_line: 1, end_line: 70}
+  summary: Verify runner-provisioning evidence is checkpointed once through the CLI.
+  rationale: Cover the product command and repeat-run idempotence with a nontrivial mocked GitHub response.
+- path: tests/test_ci_response_policy.py
+  type: added
+  span: {start_line: 1, end_line: 192}
+  summary: Cover runner rejection, comparable and inconclusive reproduction outcomes, token redaction, and stable checkpoints.
+  rationale: Verify deterministic service decisions against concrete evidence and prevent false local conclusions.
+- path: tests/test_github_actions_transport.py
+  type: added
+  span: {start_line: 1, end_line: 184}
+  summary: Cover paginated GitHub responses, bounded newest-first issue comments, annotations without runner steps, and pinned worktree execution.
+  rationale: Exercise the agent boundary with mocked GitHub payloads and a real temporary Git repository.
+- path: tests/test_procedrr_chat.py
+  type: modified
+  span: {start_line: 105, end_line: 105}
+  summary: Register the CI response process in the supported Procedrr catalog.
+  rationale: Ensure process selection can discover the new entry point.
+- path: tests/test_procedrr_chat.py
+  type: modified
+  span: {start_line: 116, end_line: 125}
+  summary: Register and inspect the observation-only CI response process.
+  rationale: Ensure the Procedrr catalog exposes the intended narrow first-stage workflow.
+entities:
+- id: ci-response-command
+  type: Command
+  action: added
+- id: github-actions-evidence-transport
+  type: Module
+  action: added
+- id: ci-response-evidence-policy
+  type: Module
+  action: added
+- id: pinned-local-reproduction
+  type: Function
+  action: added
+- id: ci-runner-rejection-regression
+  type: Regression test
+  action: added
+entity_relationships:
+- id: cli-composes-agent-evidence-and-service-policy
+  type: invokes
+  source: ci-response-command
+  target: github-actions-evidence-transport
+  action: added
+  description: The CLI obtains GitHub evidence from the agent and sends its typed projection through service-owned normalization and classification.
+- id: regression-covers-runner-rejection
+  type: verifies
+  source: ci-runner-rejection-regression
+  target: ci-response-evidence-policy
+  action: added
+  description: Mocked API evidence verifies that a pre-runner unsupported-configuration annotation is classified as not executable locally.
+invariants:
+- id: current-head-only-ci-observation
+  description: The command uses the current PR head SHA, filters out runs for other SHAs, and checkpoints that SHA with every observation.
+  action: added
+- id: runner-rejection-is-not-a-local-non-reproduction
+  description: A failure before runner assignment or executable steps is classified as not executable locally and never as not reproduced.
+  action: added
+- id: ci-checkpoint-does-not-establish-review-readiness
+  description: Observation comments record evidence only and do not transition the PR or issue to an awaiting-review state.
+  action: added
+guidance: []

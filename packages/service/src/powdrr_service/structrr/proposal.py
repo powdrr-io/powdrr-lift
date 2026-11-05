@@ -42,6 +42,7 @@ class ProposalRevision:
     non_goals: tuple[str, ...]
     allowed_paths: tuple[str, ...]
     source_refs: tuple[str, ...]
+    code_evidence: tuple[Mapping[str, Any], ...] = ()
     schema_version: str = PROPOSAL_REVISION_SCHEMA_VERSION
 
     def to_data(self, *, include_fingerprint: bool = True) -> dict[str, Any]:
@@ -56,6 +57,8 @@ class ProposalRevision:
             "allowed_paths": list(self.allowed_paths),
             "source_refs": list(self.source_refs),
         }
+        if self.code_evidence:
+            data["code_evidence"] = [dict(item) for item in self.code_evidence]
         if include_fingerprint:
             data["fingerprint"] = self.fingerprint
         return data
@@ -93,6 +96,7 @@ class ProposalRevision:
             non_goals=_string_tuple(raw, "non_goals"),
             allowed_paths=_string_tuple(raw, "allowed_paths"),
             source_refs=_string_tuple(raw, "source_refs"),
+            code_evidence=_mapping_tuple(raw, "code_evidence", optional=True),
             schema_version=schema_version,
         )
         if raw.get("fingerprint") != revision.fingerprint:
@@ -110,6 +114,7 @@ def compile_proposal_revision(
     non_goals: Sequence[str],
     allowed_paths: Sequence[str],
     source_refs: Sequence[str],
+    code_evidence: Sequence[Mapping[str, Any]] = (),
 ) -> ProposalRevision:
     """Compile one canonical proposal identity from validated plan inputs."""
     operations: list[ProposalOperation] = []
@@ -154,6 +159,7 @@ def compile_proposal_revision(
         non_goals=tuple(dict.fromkeys(non_goals)),
         allowed_paths=tuple(dict.fromkeys(allowed_paths)),
         source_refs=tuple(dict.fromkeys(source_refs)),
+        code_evidence=tuple(dict(item) for item in code_evidence),
     )
 
 
@@ -213,6 +219,17 @@ def _string_tuple(raw: Mapping[str, Any], key: str) -> tuple[str, ...]:
     if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
         raise ValueError(f"proposal revision field {key!r} must be a list of strings")
     return tuple(value)
+
+
+def _mapping_tuple(
+    raw: Mapping[str, Any], key: str, *, optional: bool = False
+) -> tuple[Mapping[str, Any], ...]:
+    value = raw.get(key, [] if optional else None)
+    if not isinstance(value, list) or not all(
+        isinstance(item, Mapping) for item in value
+    ):
+        raise ValueError(f"proposal revision field {key!r} must be a list of mappings")
+    return tuple(dict(item) for item in value)
 
 
 __all__ = [

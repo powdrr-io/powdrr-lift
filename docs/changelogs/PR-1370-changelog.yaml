@@ -1,0 +1,625 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1370
+title: Carry planning symbol evidence through proposals
+intent:
+  problem: Planning symbol queries produce revision-pinned evidence, but selected
+    symbol and file candidates can be dropped during deterministic proposal reconstruction,
+    and query provenance is not retained in serialized proposals.
+  goal: Preserve accepted symbol-backed candidates and their query provenance through
+    structural binding, proposal compilation, and persisted proposal artifacts, with
+    end-to-end coverage.
+human-decisions: []
+structured_files: []
+files:
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 85
+    end_line: 85
+  summary: Carry symbol query provenance through deterministic planning subjects and
+    include accepted candidates in proposal reconstruction.
+  rationale: Keep symbol-backed planned subjects and the selected files in the compiled
+    proposal so the plan reflects the evidence the planner considered.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 272
+    end_line: 276
+  summary: Carry symbol query provenance through deterministic planning subjects and
+    include accepted candidates in proposal reconstruction.
+  rationale: Keep symbol-backed planned subjects and the selected files in the compiled
+    proposal so the plan reflects the evidence the planner considered.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 281
+    end_line: 285
+  summary: Carry symbol query provenance through deterministic planning subjects and
+    include accepted candidates in proposal reconstruction.
+  rationale: Keep symbol-backed planned subjects and the selected files in the compiled
+    proposal so the plan reflects the evidence the planner considered.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 328
+    end_line: 329
+  summary: Carry symbol query provenance through deterministic planning subjects and
+    include accepted candidates in proposal reconstruction.
+  rationale: Keep symbol-backed planned subjects and the selected files in the compiled
+    proposal so the plan reflects the evidence the planner considered.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 367
+    end_line: 367
+  summary: Carry symbol query provenance through deterministic planning subjects and
+    include accepted candidates in proposal reconstruction.
+  rationale: Keep symbol-backed planned subjects and the selected files in the compiled
+    proposal so the plan reflects the evidence the planner considered.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 372
+    end_line: 373
+  summary: Carry symbol query provenance through deterministic planning subjects and
+    include accepted candidates in proposal reconstruction.
+  rationale: Keep symbol-backed planned subjects and the selected files in the compiled
+    proposal so the plan reflects the evidence the planner considered.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 376
+    end_line: 376
+  summary: Carry symbol query provenance through deterministic planning subjects and
+    include accepted candidates in proposal reconstruction.
+  rationale: Keep symbol-backed planned subjects and the selected files in the compiled
+    proposal so the plan reflects the evidence the planner considered.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 386
+    end_line: 386
+  summary: Carry symbol query provenance through deterministic planning subjects and
+    include accepted candidates in proposal reconstruction.
+  rationale: Keep symbol-backed planned subjects and the selected files in the compiled
+    proposal so the plan reflects the evidence the planner considered.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 396
+    end_line: 400
+  summary: Carry symbol query provenance through deterministic planning subjects and
+    include accepted candidates in proposal reconstruction.
+  rationale: Keep symbol-backed planned subjects and the selected files in the compiled
+    proposal so the plan reflects the evidence the planner considered.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 410
+    end_line: 411
+  summary: Carry symbol query provenance through deterministic planning subjects and
+    include accepted candidates in proposal reconstruction.
+  rationale: Keep symbol-backed planned subjects and the selected files in the compiled
+    proposal so the plan reflects the evidence the planner considered.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 420
+    end_line: 440
+  summary: Carry symbol query provenance through deterministic planning subjects and
+    include accepted candidates in proposal reconstruction.
+  rationale: Keep symbol-backed planned subjects and the selected files in the compiled
+    proposal so the plan reflects the evidence the planner considered.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 2169
+    end_line: 2169
+  summary: Carry symbol query provenance through deterministic planning subjects and
+    include accepted candidates in proposal reconstruction.
+  rationale: Keep symbol-backed planned subjects and the selected files in the compiled
+    proposal so the plan reflects the evidence the planner considered.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 2196
+    end_line: 2196
+  summary: Carry symbol query provenance through deterministic planning subjects and
+    include accepted candidates in proposal reconstruction.
+  rationale: Keep symbol-backed planned subjects and the selected files in the compiled
+    proposal so the plan reflects the evidence the planner considered.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 2294
+    end_line: 2315
+  summary: Carry symbol query provenance through deterministic planning subjects and
+    include accepted candidates in proposal reconstruction.
+  rationale: Keep symbol-backed planned subjects and the selected files in the compiled
+    proposal so the plan reflects the evidence the planner considered.
+- path: packages/service/src/powdrr_service/planning/multipr_structrr.py
+  type: modified
+  span:
+    start_line: 89
+    end_line: 92
+  summary: Collect code evidence per plan item and attach it to serialized proposal
+    revisions.
+  rationale: Make the provenance available to consumers of both the full proposal
+    and individual plan items without changing projected Structrr state.
+- path: packages/service/src/powdrr_service/planning/multipr_structrr.py
+  type: modified
+  span:
+    start_line: 147
+    end_line: 164
+  summary: Collect code evidence per plan item and attach it to serialized proposal
+    revisions.
+  rationale: Make the provenance available to consumers of both the full proposal
+    and individual plan items without changing projected Structrr state.
+- path: packages/service/src/powdrr_service/planning/multipr_structrr.py
+  type: modified
+  span:
+    start_line: 172
+    end_line: 172
+  summary: Collect code evidence per plan item and attach it to serialized proposal
+    revisions.
+  rationale: Make the provenance available to consumers of both the full proposal
+    and individual plan items without changing projected Structrr state.
+- path: packages/service/src/powdrr_service/planning/multipr_structrr.py
+  type: modified
+  span:
+    start_line: 203
+    end_line: 203
+  summary: Collect code evidence per plan item and attach it to serialized proposal
+    revisions.
+  rationale: Make the provenance available to consumers of both the full proposal
+    and individual plan items without changing projected Structrr state.
+- path: packages/service/src/powdrr_service/planning/multipr_structrr.py
+  type: modified
+  span:
+    start_line: 207
+    end_line: 211
+  summary: Collect code evidence per plan item and attach it to serialized proposal
+    revisions.
+  rationale: Make the provenance available to consumers of both the full proposal
+    and individual plan items without changing projected Structrr state.
+- path: packages/service/src/powdrr_service/planning/multipr_structrr.py
+  type: modified
+  span:
+    start_line: 219
+    end_line: 223
+  summary: Collect code evidence per plan item and attach it to serialized proposal
+    revisions.
+  rationale: Make the provenance available to consumers of both the full proposal
+    and individual plan items without changing projected Structrr state.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 62
+    end_line: 62
+  summary: Preserve code evidence while binding, merging, and compiling structural
+    subjects.
+  rationale: Avoid losing query provenance as candidate subjects become compiled operations.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 65
+    end_line: 65
+  summary: Preserve code evidence while binding, merging, and compiling structural
+    subjects.
+  rationale: Avoid losing query provenance as candidate subjects become compiled operations.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 76
+    end_line: 78
+  summary: Preserve code evidence while binding, merging, and compiling structural
+    subjects.
+  rationale: Avoid losing query provenance as candidate subjects become compiled operations.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 114
+    end_line: 114
+  summary: Preserve code evidence while binding, merging, and compiling structural
+    subjects.
+  rationale: Avoid losing query provenance as candidate subjects become compiled operations.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 150
+    end_line: 150
+  summary: Preserve code evidence while binding, merging, and compiling structural
+    subjects.
+  rationale: Avoid losing query provenance as candidate subjects become compiled operations.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 178
+    end_line: 178
+  summary: Preserve code evidence while binding, merging, and compiling structural
+    subjects.
+  rationale: Avoid losing query provenance as candidate subjects become compiled operations.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 182
+    end_line: 194
+  summary: Preserve code evidence while binding, merging, and compiling structural
+    subjects.
+  rationale: Avoid losing query provenance as candidate subjects become compiled operations.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 504
+    end_line: 504
+  summary: Preserve code evidence while binding, merging, and compiling structural
+    subjects.
+  rationale: Avoid losing query provenance as candidate subjects become compiled operations.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 534
+    end_line: 534
+  summary: Preserve code evidence while binding, merging, and compiling structural
+    subjects.
+  rationale: Avoid losing query provenance as candidate subjects become compiled operations.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 548
+    end_line: 548
+  summary: Preserve code evidence while binding, merging, and compiling structural
+    subjects.
+  rationale: Avoid losing query provenance as candidate subjects become compiled operations.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 556
+    end_line: 558
+  summary: Preserve code evidence while binding, merging, and compiling structural
+    subjects.
+  rationale: Avoid losing query provenance as candidate subjects become compiled operations.
+- path: packages/service/src/powdrr_service/structrr/proposal.py
+  type: modified
+  span:
+    start_line: 45
+    end_line: 45
+  summary: Add optional code evidence metadata to proposal revisions and their serialization.
+  rationale: Persist provenance as proposal metadata rather than part of the Structrr
+    snapshot.
+- path: packages/service/src/powdrr_service/structrr/proposal.py
+  type: modified
+  span:
+    start_line: 60
+    end_line: 61
+  summary: Add optional code evidence metadata to proposal revisions and their serialization.
+  rationale: Persist provenance as proposal metadata rather than part of the Structrr
+    snapshot.
+- path: packages/service/src/powdrr_service/structrr/proposal.py
+  type: modified
+  span:
+    start_line: 99
+    end_line: 99
+  summary: Add optional code evidence metadata to proposal revisions and their serialization.
+  rationale: Persist provenance as proposal metadata rather than part of the Structrr
+    snapshot.
+- path: packages/service/src/powdrr_service/structrr/proposal.py
+  type: modified
+  span:
+    start_line: 117
+    end_line: 117
+  summary: Add optional code evidence metadata to proposal revisions and their serialization.
+  rationale: Persist provenance as proposal metadata rather than part of the Structrr
+    snapshot.
+- path: packages/service/src/powdrr_service/structrr/proposal.py
+  type: modified
+  span:
+    start_line: 162
+    end_line: 162
+  summary: Add optional code evidence metadata to proposal revisions and their serialization.
+  rationale: Persist provenance as proposal metadata rather than part of the Structrr
+    snapshot.
+- path: packages/service/src/powdrr_service/structrr/proposal.py
+  type: modified
+  span:
+    start_line: 224
+    end_line: 234
+  summary: Add optional code evidence metadata to proposal revisions and their serialization.
+  rationale: Persist provenance as proposal metadata rather than part of the Structrr
+    snapshot.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 507
+    end_line: 527
+  summary: Attach bounded symbol-query provenance to symbol records returned to planning
+    callers.
+  rationale: Make selected declarations traceable to the pinned snapshot, artifact,
+    filters, and source span.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 842
+    end_line: 845
+  summary: Attach bounded symbol-query provenance to symbol records returned to planning
+    callers.
+  rationale: Make selected declarations traceable to the pinned snapshot, artifact,
+    filters, and source span.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 850
+    end_line: 850
+  summary: Attach bounded symbol-query provenance to symbol records returned to planning
+    callers.
+  rationale: Make selected declarations traceable to the pinned snapshot, artifact,
+    filters, and source span.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 866
+    end_line: 888
+  summary: Attach bounded symbol-query provenance to symbol records returned to planning
+    callers.
+  rationale: Make selected declarations traceable to the pinned snapshot, artifact,
+    filters, and source span.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 894
+    end_line: 895
+  summary: Attach bounded symbol-query provenance to symbol records returned to planning
+    callers.
+  rationale: Make selected declarations traceable to the pinned snapshot, artifact,
+    filters, and source span.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 913
+    end_line: 922
+  summary: Attach bounded symbol-query provenance to symbol records returned to planning
+    callers.
+  rationale: Make selected declarations traceable to the pinned snapshot, artifact,
+    filters, and source span.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 1011
+    end_line: 1011
+  summary: Attach bounded symbol-query provenance to symbol records returned to planning
+    callers.
+  rationale: Make selected declarations traceable to the pinned snapshot, artifact,
+    filters, and source span.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 1057
+    end_line: 1079
+  summary: Attach bounded symbol-query provenance to symbol records returned to planning
+    callers.
+  rationale: Make selected declarations traceable to the pinned snapshot, artifact,
+    filters, and source span.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 1087
+    end_line: 1087
+  summary: Attach bounded symbol-query provenance to symbol records returned to planning
+    callers.
+  rationale: Make selected declarations traceable to the pinned snapshot, artifact,
+    filters, and source span.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 1950
+    end_line: 1951
+  summary: Assert issue planning context includes symbol query and code evidence provenance.
+  rationale: Protect the existing issue-planning caller from dropping the new provenance.
+- path: tests/test_multipr_structrr.py
+  type: modified
+  span:
+    start_line: 203
+    end_line: 261
+  summary: Verify code evidence survives proposal write and load while remaining outside
+    Structrr state.
+  rationale: Prove provenance is durable without affecting the projected state comparison.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 5
+    end_line: 5
+  summary: Exercise a real hermetic planning run against a temporary Git repository
+    and assert symbol evidence reaches persisted proposal output.
+  rationale: Cover symbol indexing, planning, deterministic candidate reconstruction,
+    and proposal persistence in one end-to-end test.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 63
+    end_line: 63
+  summary: Exercise a real hermetic planning run against a temporary Git repository
+    and assert symbol evidence reaches persisted proposal output.
+  rationale: Cover symbol indexing, planning, deterministic candidate reconstruction,
+    and proposal persistence in one end-to-end test.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 155
+    end_line: 155
+  summary: Exercise a real hermetic planning run against a temporary Git repository
+    and assert symbol evidence reaches persisted proposal output.
+  rationale: Cover symbol indexing, planning, deterministic candidate reconstruction,
+    and proposal persistence in one end-to-end test.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 229
+    end_line: 229
+  summary: Exercise a real hermetic planning run against a temporary Git repository
+    and assert symbol evidence reaches persisted proposal output.
+  rationale: Cover symbol indexing, planning, deterministic candidate reconstruction,
+    and proposal persistence in one end-to-end test.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 257
+    end_line: 262
+  summary: Exercise a real hermetic planning run against a temporary Git repository
+    and assert symbol evidence reaches persisted proposal output.
+  rationale: Cover symbol indexing, planning, deterministic candidate reconstruction,
+    and proposal persistence in one end-to-end test.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1651
+    end_line: 1653
+  summary: Exercise a real hermetic planning run against a temporary Git repository
+    and assert symbol evidence reaches persisted proposal output.
+  rationale: Cover symbol indexing, planning, deterministic candidate reconstruction,
+    and proposal persistence in one end-to-end test.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1655
+    end_line: 1703
+  summary: Exercise a real hermetic planning run against a temporary Git repository
+    and assert symbol evidence reaches persisted proposal output.
+  rationale: Cover symbol indexing, planning, deterministic candidate reconstruction,
+    and proposal persistence in one end-to-end test.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1706
+    end_line: 1706
+  summary: Exercise a real hermetic planning run against a temporary Git repository
+    and assert symbol evidence reaches persisted proposal output.
+  rationale: Cover symbol indexing, planning, deterministic candidate reconstruction,
+    and proposal persistence in one end-to-end test.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1708
+    end_line: 1708
+  summary: Exercise a real hermetic planning run against a temporary Git repository
+    and assert symbol evidence reaches persisted proposal output.
+  rationale: Cover symbol indexing, planning, deterministic candidate reconstruction,
+    and proposal persistence in one end-to-end test.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1713
+    end_line: 1740
+  summary: Exercise a real hermetic planning run against a temporary Git repository
+    and assert symbol evidence reaches persisted proposal output.
+  rationale: Cover symbol indexing, planning, deterministic candidate reconstruction,
+    and proposal persistence in one end-to-end test.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1751
+    end_line: 1757
+  summary: Exercise a real hermetic planning run against a temporary Git repository
+    and assert symbol evidence reaches persisted proposal output.
+  rationale: Cover symbol indexing, planning, deterministic candidate reconstruction,
+    and proposal persistence in one end-to-end test.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1764
+    end_line: 1764
+  summary: Exercise a real hermetic planning run against a temporary Git repository
+    and assert symbol evidence reaches persisted proposal output.
+  rationale: Cover symbol indexing, planning, deterministic candidate reconstruction,
+    and proposal persistence in one end-to-end test.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1766
+    end_line: 1766
+  summary: Exercise a real hermetic planning run against a temporary Git repository
+    and assert symbol evidence reaches persisted proposal output.
+  rationale: Cover symbol indexing, planning, deterministic candidate reconstruction,
+    and proposal persistence in one end-to-end test.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1778
+    end_line: 1789
+  summary: Exercise a real hermetic planning run against a temporary Git repository
+    and assert symbol evidence reaches persisted proposal output.
+  rationale: Cover symbol indexing, planning, deterministic candidate reconstruction,
+    and proposal persistence in one end-to-end test.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1801
+    end_line: 1801
+  summary: Exercise a real hermetic planning run against a temporary Git repository
+    and assert symbol evidence reaches persisted proposal output.
+  rationale: Cover symbol indexing, planning, deterministic candidate reconstruction,
+    and proposal persistence in one end-to-end test.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1810
+    end_line: 1818
+  summary: Exercise a real hermetic planning run against a temporary Git repository
+    and assert symbol evidence reaches persisted proposal output.
+  rationale: Cover symbol indexing, planning, deterministic candidate reconstruction,
+    and proposal persistence in one end-to-end test.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1824
+    end_line: 1824
+  summary: Exercise a real hermetic planning run against a temporary Git repository
+    and assert symbol evidence reaches persisted proposal output.
+  rationale: Cover symbol indexing, planning, deterministic candidate reconstruction,
+    and proposal persistence in one end-to-end test.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1863
+    end_line: 1878
+  summary: Exercise a real hermetic planning run against a temporary Git repository
+    and assert symbol evidence reaches persisted proposal output.
+  rationale: Cover symbol indexing, planning, deterministic candidate reconstruction,
+    and proposal persistence in one end-to-end test.
+entities:
+- id: planning-symbol-subject-provenance
+  type: Function
+  action: added
+- id: accepted-candidate-proposal-reconstruction
+  type: Function
+  action: added
+- id: planning-symbol-provenance-round-trip
+  type: Regression test
+  action: added
+- id: planning-symbol-planning-e2e
+  type: Regression test
+  action: added
+entity_relationships:
+- id: provenance-round-trip-verifies-proposal-metadata
+  type: verifies
+  source: planning-symbol-provenance-round-trip
+  target: planning-symbol-subject-provenance
+  action: added
+  description: The test verifies code evidence is retained by persisted proposal metadata
+    and excluded from projected Structrr state.
+- id: planning-e2e-verifies-candidate-reconstruction
+  type: verifies
+  source: planning-symbol-planning-e2e
+  target: accepted-candidate-proposal-reconstruction
+  action: added
+  description: The end-to-end test verifies selected symbol-backed candidates and
+    query provenance reach the persisted planning proposal.
+invariants:
+- id: proposal-code-evidence-is-provenance
+  description: Code evidence remains provenance metadata on proposal revisions and
+    does not alter projected Structrr state.
+  action: added
+- id: accepted-symbol-candidates-survive-reconstruction
+  description: Accepted deterministic file and symbol-backed structural candidates
+    remain represented in the compiled proposal.
+  action: added
+guidance: []

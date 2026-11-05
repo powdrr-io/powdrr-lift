@@ -59,9 +59,10 @@ class BoundStructuralSubject:
     source_refs: tuple[str, ...]
     is_new: bool
     planned_path: str | None = None
+    code_evidence: tuple[Mapping[str, Any], ...] = ()
 
     def to_data(self) -> dict[str, Any]:
-        return {
+        data = {
             "subject_id": self.subject_id,
             "section": self.section,
             "item_id": self.item_id,
@@ -72,6 +73,9 @@ class BoundStructuralSubject:
             "is_new": self.is_new,
             "planned_path": self.planned_path,
         }
+        if self.code_evidence:
+            data["code_evidence"] = [dict(item) for item in self.code_evidence]
+        return data
 
 
 @dataclass(frozen=True, slots=True)
@@ -107,6 +111,7 @@ class StructuralChange:
     requirement_ids: tuple[str, ...]
     unit_ids: tuple[str, ...]
     source_refs: tuple[str, ...]
+    code_evidence: tuple[Mapping[str, Any], ...] = ()
 
 
 class StructrrPlanningError(ValueError):
@@ -142,6 +147,7 @@ def _merge_duplicate_planned_file_subject(
         tuple(sorted(set(existing.source_refs) | set(duplicate.source_refs))),
         existing.is_new,
         existing.planned_path,
+        _merge_code_evidence(existing.code_evidence, duplicate.code_evidence),
     )
 
 
@@ -169,7 +175,21 @@ def _merge_duplicate_subject_in_page(
         tuple(sorted(set(existing.source_refs) | set(duplicate.source_refs))),
         existing.is_new,
         existing.planned_path,
+        _merge_code_evidence(existing.code_evidence, duplicate.code_evidence),
     )
+
+
+def _merge_code_evidence(
+    *collections: Sequence[Mapping[str, Any]],
+) -> tuple[Mapping[str, Any], ...]:
+    unique = {
+        json.dumps(
+            item, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+        ): dict(item)
+        for collection in collections
+        for item in collection
+    }
+    return tuple(unique[key] for key in sorted(unique))
 
 
 def coalesce_structural_subjects(
@@ -481,6 +501,7 @@ def parse_structural_change(
             subject.requirement_ids,
             subject.unit_ids,
             subject.source_refs,
+            subject.code_evidence,
         )
     if result != "change":
         raise PlanningContractError("/result", "must be unchanged or change")
@@ -510,6 +531,7 @@ def parse_structural_change(
         subject.requirement_ids,
         subject.unit_ids,
         subject.source_refs,
+        subject.code_evidence,
     )
 
 
@@ -523,7 +545,7 @@ def bind_structural_operation(change: StructuralChange) -> dict[str, Any] | None
         content.setdefault("id", f"file:{content.get('path', change.subject_id)}")
     content["action"] = change.action
     operation_id = f"{change.item_id}:{change.section}:{change.subject_id}"
-    return {
+    operation: dict[str, Any] = {
         "operation_id": operation_id,
         "item_id": change.item_id,
         "section": change.section,
@@ -531,6 +553,9 @@ def bind_structural_operation(change: StructuralChange) -> dict[str, Any] | None
         "action": change.action,
         "content": content,
     }
+    if change.code_evidence:
+        operation["code_evidence"] = [dict(item) for item in change.code_evidence]
+    return operation
 
 
 def compile_structrr_plan(

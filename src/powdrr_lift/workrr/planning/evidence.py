@@ -504,13 +504,27 @@ def search_structural_document_symbols(
     root = Path(repository_root).resolve()
     normalized_paths = tuple(sorted(set(paths)))
     _, reference, document = _load_or_build_pinned_symbol_artifact(root, base_commit)
-    rows = document.get("symbols", [])
-    selected = [
-        row
-        for row in rows
-        if isinstance(row, Mapping) and row.get("path") in normalized_paths
-    ]
-    return _group_index_symbols(selected, reference)
+    snapshot_id = _planning_structrr_snapshot_id(root, base_commit, reference)
+    selected: list[Mapping[str, Any]] = []
+    query_results: dict[str, Mapping[str, Any]] = {}
+    for path in normalized_paths:
+        query_result = query_python_symbols(
+            document,
+            CodeSymbolQuery(
+                structrr_snapshot_id=snapshot_id,
+                query_kind="symbols",
+                paths=(path,),
+                limit=200,
+                max_encoded_bytes=32_768,
+                purpose="select symbols for planned Python paths",
+            ),
+            artifact_id=reference.artifact_id,
+        )
+        query_results[path] = query_result
+        selected.extend(
+            row for row in query_result["records"] if isinstance(row, Mapping)
+        )
+    return _group_index_symbols(selected, reference, query_results=query_results)
 
 
 def _load_or_build_pinned_symbol_artifact(
@@ -825,12 +839,15 @@ def _planning_structrr_snapshot_id(
 
 
 def _index_symbol_to_provider_record(
-    record: Mapping[str, Any], reference: CodeSymbolArtifact
+    record: Mapping[str, Any],
+    reference: CodeSymbolArtifact,
+    *,
+    query_result: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     span = record.get("span")
     if not isinstance(span, Mapping):
         return {}
-    return {
+    provider_record = {
         "name": record.get("name"),
         "kind": record.get("kind"),
         "path": record.get("path"),
@@ -846,11 +863,36 @@ def _index_symbol_to_provider_record(
         "artifact_id": reference.artifact_id,
         "artifact_digest": reference.content_digest,
     }
+    if query_result is not None:
+        result_fingerprint = query_result.get("result_fingerprint")
+        snapshot_id = query_result.get("structrr_snapshot_id")
+        filters = query_result.get("filters")
+        if (
+            isinstance(result_fingerprint, str)
+            and isinstance(snapshot_id, str)
+            and isinstance(filters, Mapping)
+        ):
+            provider_record["code_evidence"] = {
+                "snapshot_id": snapshot_id,
+                "source_revision": reference.source_revision,
+                "artifact_id": reference.artifact_id,
+                "artifact_digest": reference.content_digest,
+                "query_id": f"query:sha256:{result_fingerprint}",
+                "query_filters": dict(filters),
+                "symbol_id": record.get("symbol_id"),
+                "path": record.get("path"),
+                "span": dict(span),
+                "truncated": query_result.get("truncated", False),
+                "omitted_count": query_result.get("omitted_count", 0),
+            }
+    return provider_record
 
 
 def _group_index_symbols(
     records: Sequence[Mapping[str, Any]],
     reference: CodeSymbolArtifact,
+    *,
+    query_results: Mapping[str, Mapping[str, Any]] | None = None,
 ) -> dict[str, list[dict[str, Any]]]:
     grouped: dict[str, list[Mapping[str, Any]]] = {}
     for record in records:
@@ -868,7 +910,16 @@ def _group_index_symbols(
                 str(item.get("qualified_name", "")),
             ),
         ):
-            provider_record = _index_symbol_to_provider_record(record, reference)
+            record_path = record.get("path")
+            provider_record = _index_symbol_to_provider_record(
+                record,
+                reference,
+                query_result=(
+                    query_results.get(record_path)
+                    if isinstance(record_path, str) and query_results is not None
+                    else None
+                ),
+            )
             qualified = record.get("qualified_name")
             if not isinstance(qualified, str):
                 continue
@@ -957,7 +1008,7 @@ def _query_symbol_artifact(
             document, query, artifact_id=reference.artifact_id
         )
         output[query_text] = [
-            _index_symbol_to_provider_record(row, reference)
+            _index_symbol_to_provider_record(row, reference, query_result=result)
             for row in result["records"]
         ]
     return output
@@ -1003,12 +1054,29 @@ def search_structural_document_analysis(
     analysis_root = _pinned_analysis_root(root, base_commit)
     normalized_paths = tuple(sorted(set(paths)))
     _, reference, document = _load_or_build_pinned_symbol_artifact(root, base_commit)
-    selected_symbols = [
-        row
-        for row in document.get("symbols", [])
-        if isinstance(row, Mapping) and row.get("path") in normalized_paths
-    ]
-    symbols = _group_index_symbols(selected_symbols, reference)
+    snapshot_id = _planning_structrr_snapshot_id(root, base_commit, reference)
+    selected_symbols: list[Mapping[str, Any]] = []
+    symbol_query_results: dict[str, Mapping[str, Any]] = {}
+    for path in normalized_paths:
+        symbol_query = query_python_symbols(
+            document,
+            CodeSymbolQuery(
+                structrr_snapshot_id=snapshot_id,
+                query_kind="symbols",
+                paths=(path,),
+                limit=200,
+                max_encoded_bytes=32_768,
+                purpose="select symbols for planned Python paths",
+            ),
+            artifact_id=reference.artifact_id,
+        )
+        symbol_query_results[path] = symbol_query
+        selected_symbols.extend(
+            row for row in symbol_query["records"] if isinstance(row, Mapping)
+        )
+    symbols = _group_index_symbols(
+        selected_symbols, reference, query_results=symbol_query_results
+    )
     try:
         _, references = find_workspace_document_analysis(
             list(normalized_paths), worktree_root=analysis_root
@@ -1016,9 +1084,7 @@ def search_structural_document_analysis(
     except PowdrrExecutionError:
         return symbols, {}, "unavailable"
     query = CodeSymbolQuery(
-        structrr_snapshot_id=_planning_structrr_snapshot_id(
-            root, base_commit, reference
-        ),
+        structrr_snapshot_id=snapshot_id,
         query_kind="references",
         paths=normalized_paths,
         relationship_kinds=("references",),

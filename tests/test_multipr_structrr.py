@@ -200,6 +200,65 @@ def test_multi_pr_proposal_round_trips_with_fingerprints(tmp_path: Path) -> None
     }
 
 
+def test_multi_pr_proposal_preserves_code_evidence_outside_structrr_state(
+    tmp_path: Path,
+) -> None:
+    evidence = {
+        "snapshot_id": "structrr:sha256:" + "a" * 64,
+        "artifact_id": "structrr-code-symbols:sha256:" + "b" * 64,
+        "query_id": "query:sha256:" + "c" * 64,
+        "symbol_id": "symbol:python:" + "d" * 64,
+        "path": "src/parser.py",
+        "span": {"start_line": 4, "end_line": 8},
+    }
+    proposal = compile_multi_pr_proposal(
+        plan_id="parser-v1",
+        baseline_snapshot={
+            "entities": [{"id": "entity:parser", "type": "Function", "summary": "old"}],
+            "entity_relationships": [],
+            "files": [],
+        },
+        items=[_plan_item("parser")],
+        proposed_operations=[
+            {
+                "operation_id": "parser-change",
+                "item_id": "parser",
+                "section": "entities",
+                "subject_id": "entity:parser",
+                "action": "changed",
+                "content": {
+                    "id": "entity:parser",
+                    "action": "changed",
+                    "summary": "new",
+                },
+                "code_evidence": [evidence],
+            }
+        ],
+        source_ref="docs/plans/parser.md",
+    )
+    path = tmp_path / "proposal-with-evidence.json"
+
+    write_multi_pr_proposal(path, proposal)
+    loaded = load_multi_pr_proposal(path)
+
+    assert proposal.expected_final_snapshot["entities"] == [
+        {"id": "entity:parser", "type": "Function", "summary": "new"}
+    ]
+    assert loaded.full_proposal.code_evidence == (
+        {
+            "operation_id": "parser-change",
+            "item_id": "parser",
+            "section": "entities",
+            "subject_id": "entity:parser",
+            "references": [evidence],
+        },
+    )
+    assert (
+        loaded.item_proposals["parser"].code_evidence
+        == loaded.full_proposal.code_evidence
+    )
+
+
 def test_active_decision_drift_detects_edit_or_removal_but_allows_new_decisions() -> (
     None
 ):

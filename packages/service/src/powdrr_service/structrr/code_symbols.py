@@ -395,7 +395,7 @@ def _flatten_symbols(
         }
         excerpt = "\n".join(source.splitlines()[start_line - 1 : end_line])
         fingerprint = hashlib.sha256(excerpt.encode("utf-8")).hexdigest()
-        stable_identity = f"python\0{component_id}\0{qualified_name}\0{kind}"
+        stable_identity = f"python\0{component_id}\0{path}\0{qualified_name}\0{kind}"
         symbol_id = (
             "symbol:python:"
             + hashlib.sha256(stable_identity.encode("utf-8")).hexdigest()

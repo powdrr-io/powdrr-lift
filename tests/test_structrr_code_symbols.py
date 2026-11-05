@@ -75,6 +75,44 @@ def test_python_symbol_artifact_serialization_is_deterministic_and_validated() -
     assert first[1].symbol_count == 2
 
 
+def test_same_named_symbols_in_different_paths_have_distinct_stable_ids() -> None:
+    content, reference, _ = build_python_symbol_artifact(
+        source_revision=REVISION,
+        component_id="component:python:repository",
+        provider_version="1.39.9",
+        configuration_fingerprint=CONFIGURATION_FINGERPRINT,
+        symbols_by_path={
+            path: [
+                {
+                    "name": "parse",
+                    "kind": "function",
+                    "range": {
+                        "start_line": 1,
+                        "start_character": 0,
+                        "end_line": 2,
+                        "end_character": 0,
+                    },
+                }
+            ]
+            for path in ("src/first.py", "src/second.py")
+        },
+        source_by_path={
+            "src/first.py": "def parse(value: str) -> str:\n    return value\n",
+            "src/second.py": "def parse(value: bytes) -> bytes:\n    return value\n",
+        },
+    )
+
+    document = load_code_symbol_artifact(content, reference.to_data())
+
+    assert len(document["symbols"]) == 2
+    assert {symbol["path"] for symbol in document["symbols"]} == {
+        "src/first.py",
+        "src/second.py",
+    }
+    assert len({symbol["symbol_id"] for symbol in document["symbols"]}) == 2
+    assert {symbol["qualified_name"] for symbol in document["symbols"]} == {"parse"}
+
+
 def test_symbol_query_is_scoped_stable_and_bounded() -> None:
     content, reference, _ = _build_artifact()
     document = load_code_symbol_artifact(content, reference.to_data())

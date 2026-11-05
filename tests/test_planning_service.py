@@ -1648,8 +1648,11 @@ def test_structural_candidates_follow_baseline_symbol_bindings_on_planned_paths(
     assert all(item.unit_ids == (unit.id,) for item in candidates)
 
 
+@pytest.mark.parametrize(
+    "planned_path", ("src/behavior.py", "src/new_behavior.py"), ids=("existing", "new")
+)
 def test_procedrr_runs_real_planning_machine_through_compiled_artifacts(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, planned_path: str
 ) -> None:
     text = "# Plan\n\nImplement the requested behavior.\n\nBackground only.\n"
     repository = tmp_path / "repo"
@@ -1715,7 +1718,11 @@ def test_procedrr_runs_real_planning_machine_through_compiled_artifacts(
             {"id": "entity:parse_payload", "type": "Function", "name": "parse_payload"}
         ],
         "entity_relationships": [],
-        "files": [],
+        "files": (
+            [{"id": "file:src/behavior.py", "path": "src/behavior.py"}]
+            if planned_path == "src/behavior.py"
+            else []
+        ),
         "source_subjects": [
             {
                 "id": "python:src/behavior.py::src.behavior",
@@ -1775,7 +1782,7 @@ def test_procedrr_runs_real_planning_machine_through_compiled_artifacts(
         ),
     )
     provider = _PlanningScriptClient()
-    provider.planned_path = "src/behavior.py"
+    provider.planned_path = planned_path
 
     class DecisionClient:
         def complete_json(
@@ -1807,22 +1814,45 @@ def test_procedrr_runs_real_planning_machine_through_compiled_artifacts(
     assert result.terminal_status.value == "succeeded", (
         store.load().events[-1].payload.get("validation_result")
     )
-    evidence = machine._structural_symbol_cache["src/behavior.py"][0]["code_evidence"]
-    assert evidence["artifact_id"].startswith("structrr-code-symbols:sha256:")
-    assert evidence["query_id"].startswith("query:sha256:")
-    assert evidence["source_revision"] == base_commit
+    symbol_records = machine._structural_symbol_cache.get(planned_path, ())
+    subjects = machine._structural_subject_context_cache["item-0001"][0]
     assert any(
-        subject.subject_id == "entity:parse_payload"
-        and subject.code_evidence == (evidence,)
-        for subject in machine._structural_subject_context_cache["item-0001"][0]
+        subject.section == "files" and subject.planned_path == planned_path
+        for subject in subjects
     )
-    assert provider.calls == [
+    expected_code_evidence: tuple[Mapping[str, Any], ...]
+    if planned_path == "src/behavior.py":
+        evidence = symbol_records[0]["code_evidence"]
+        assert evidence["artifact_id"].startswith("structrr-code-symbols:sha256:")
+        assert evidence["query_id"].startswith("query:sha256:")
+        assert evidence["source_revision"] == base_commit
+        assert any(
+            subject.subject_id == "entity:parse_payload"
+            and subject.code_evidence == (evidence,)
+            for subject in subjects
+        )
+        expected_code_evidence = (
+            {
+                "operation_id": "item-0001:entities:entity:parse_payload",
+                "item_id": "item-0001",
+                "section": "entities",
+                "subject_id": "entity:parse_payload",
+                "references": [evidence],
+            },
+        )
+    else:
+        assert not symbol_records
+        assert not any(subject.code_evidence for subject in subjects)
+        expected_code_evidence = ()
+    expected_provider_calls = [
         "planning_question_batch",
         "propose_work_units",
         "describe_item",
         "enumerate_structural_subjects",
-        "describe_structural_change",
     ]
+    if planned_path == "src/behavior.py":
+        expected_provider_calls.append("describe_structural_change")
+    assert provider.calls == expected_provider_calls
     journal = store.load()
     deterministic_events = [
         event
@@ -1861,19 +1891,15 @@ def test_procedrr_runs_real_planning_machine_through_compiled_artifacts(
     assert compiled.ready_item_ids == ("item-0001",)
     assert len(compiled.files) == 3
     proposal = machine.accepted_structrr_proposal(accepted)
-    assert proposal.full_proposal.code_evidence == (
-        {
-            "operation_id": "item-0001:entities:entity:parse_payload",
-            "item_id": "item-0001",
-            "section": "entities",
-            "subject_id": "entity:parse_payload",
-            "references": [evidence],
-        },
+    assert proposal.full_proposal.code_evidence == expected_code_evidence
+    assert any(
+        item.get("path") == planned_path
+        for item in proposal.expected_final_snapshot["source_subjects"]
     )
     persisted_proposal = json.loads(
         compiled.files["docs/plans/bounded-plan-structrr-proposal.json"]
     )
-    assert persisted_proposal["full_proposal"]["code_evidence"] == list(
+    assert persisted_proposal["full_proposal"].get("code_evidence", []) == list(
         proposal.full_proposal.code_evidence
     )
     accepted_questions = [

@@ -35,7 +35,6 @@ from powdrr_service.planning.workflow_instance import (
     parse_plan_workflow_instance_yaml as _parse_plan_workflow_instance_yaml,
 )
 
-from powdrr_lift.basedpyright_tools import find_workspace_symbols
 from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.workrr.github_issue_queue import (
     MANUAL_PREREQUISITE_TRIGGER,
@@ -47,6 +46,10 @@ from powdrr_lift.workrr.github_issue_queue import (
     parse_reviewed_plan_yaml,
 )
 from powdrr_lift.workrr.llm import WorkflowLLMClient, complete_json
+from powdrr_lift.workrr.planning.evidence import (
+    EvidenceError,
+    search_workspace_symbols_from_worktree,
+)
 
 MAX_SOURCE_PLAN_CHARS = 500_000
 MAX_PLAN_ITEMS = 100
@@ -76,6 +79,15 @@ MANUAL_PREREQUISITE_RESPONSE_SCHEMA: dict[str, Any] = {
         "unblocks": {"type": "string", "minLength": 1},
     },
 }
+
+
+def find_workspace_symbols(
+    queries: list[str], *, worktree_root: Path, limit: int = 50
+) -> dict[str, list[dict[str, Any]]]:
+    """Expose the shared artifact-backed symbol query to issue planning."""
+    return search_workspace_symbols_from_worktree(worktree_root, queries, limit=limit)
+
+
 _SAFE_ID = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._/-]{0,99}$")
 _IMPLEMENTATION_RUNTIMES = re.compile(
     r"\b(?:python|swift|rust|golang|java|javascript|typescript|kotlin|ruby|php|"
@@ -1130,7 +1142,7 @@ def inspect_repository_code(
                 if unique_queries
                 else {}
             )
-        except PowdrrExecutionError as error:
+        except (EvidenceError, PowdrrExecutionError) as error:
             symbols_by_query = {}
             round_results.append({"error": str(error)})
         for query in unique_queries:

@@ -43,6 +43,7 @@ from powdrr_lift.workrr.github_issue_queue import (
     QueueIssue,
     ReviewedExecutionPlan,
 )
+from powdrr_lift.workrr.planning import evidence as planning_evidence
 
 
 @pytest.fixture(autouse=True)
@@ -1779,6 +1780,18 @@ def test_plan_cli_creates_tracking_issue_and_publishes_compiled_artifacts(
     )
     monkeypatch.setattr(
         planning_session,
+        "pinned_code_symbol_artifact_reference",
+        lambda *_args: (
+            {
+                "schema": "https://powdrr.io/schema/structrr-code-symbol-artifact-ref-v1",
+                "artifact_id": "structrr-code-symbols:sha256:test",
+                "content_ref": "artifacts/structrr/code-symbols/test.yaml",
+            },
+            "structrr:sha256:test",
+        ),
+    )
+    monkeypatch.setattr(
+        planning_session,
         "LocalCheckpointStore",
         lambda *_args, **_kwargs: store,
     )
@@ -1839,6 +1852,10 @@ def test_plan_cli_creates_tracking_issue_and_publishes_compiled_artifacts(
     assert not hasattr(issue_client, "create_work_item_issue")
     assert len(machine_values) == 1
     assert machine_values[0][1]["verification_command"] == "scripts/verify-all.sh"
+    assert (
+        machine_values[0][1]["structrr_baseline"]["code_symbol_artifact"]["artifact_id"]
+        == "structrr-code-symbols:sha256:test"
+    )
     assert process_calls[0]["session"].issue.number == 42
     assert compile_calls[0]["plan_id"] == "proposal-v1"
     assert compile_calls[0]["plan_path"] == "docs/plans/proposal-v1-execution-plan.yaml"
@@ -1858,6 +1875,79 @@ def test_plan_cli_creates_tracking_issue_and_publishes_compiled_artifacts(
     assert '"pull_request_url": "https://github.com/example/repo/pull/42"' in response
     assert '"status": "pull_request_opened"' in response
     assert '"published_issues": false' in response
+
+
+def test_issue_code_inspection_uses_shared_revision_artifact(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repository = tmp_path / "repo"
+    (repository / "src").mkdir(parents=True)
+    (repository / "tests").mkdir()
+    for args in (
+        ("init", "-q"),
+        ("config", "user.email", "planning@example.test"),
+        ("config", "user.name", "Planning Test"),
+    ):
+        subprocess.run(["git", "-C", str(repository), *args], check=True)
+    (repository / "src/policy.py").write_text(
+        "def parse_policy(raw: str) -> bool:\n    return bool(raw)\n",
+        encoding="utf-8",
+    )
+    (repository / "tests/test_policy.py").write_text(
+        "def test_parse_policy():\n    assert parse_policy('ok')\n",
+        encoding="utf-8",
+    )
+    subprocess.run(["git", "-C", str(repository), "add", "."], check=True)
+    subprocess.run(
+        ["git", "-C", str(repository), "commit", "-qm", "planning fixture"],
+        check=True,
+    )
+    provider_paths: list[tuple[str, ...]] = []
+
+    def document_symbols(
+        paths: list[str], *, worktree_root: Path
+    ) -> dict[str, list[dict[str, Any]]]:
+        assert worktree_root == repository.resolve()
+        provider_paths.append(tuple(paths))
+        return {
+            "src/policy.py": [
+                {
+                    "name": "parse_policy",
+                    "kind": "function",
+                    "range": {
+                        "start_line": 1,
+                        "start_character": 0,
+                        "end_line": 2,
+                        "end_character": 0,
+                    },
+                }
+            ],
+            "tests/test_policy.py": [
+                {
+                    "name": "test_parse_policy",
+                    "kind": "function",
+                    "range": {
+                        "start_line": 1,
+                        "start_character": 0,
+                        "end_line": 2,
+                        "end_character": 0,
+                    },
+                }
+            ],
+        }
+
+    monkeypatch.setattr(
+        planning_evidence, "find_workspace_document_symbols", document_symbols
+    )
+    client = SequencedPlanningClient([{"queries": ["parse_policy"], "done": True}])
+
+    context = inspect_repository_code(repository, "Add policy validation.", client)
+
+    assert len(provider_paths) == 1
+    assert "parse_policy" in context
+    assert "structrr-code-symbols:sha256:" in context
+    assert "artifact_digest" in context
+    assert "def parse_policy(raw: str) -> bool" in context
 
 
 def test_publish_execution_plan_pull_request_commits_only_generated_files(

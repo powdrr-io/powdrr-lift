@@ -24,6 +24,14 @@ symbol provider. It stores the symbol index as a derived YAML artifact reference
 by Structrr and exposes bounded Structrr queries to the existing planning
 callers.
 
+The content-addressed symbol artifact is a repository file under
+`artifacts/structrr/code-symbols/` and is checked in alongside the source or
+planning change that needs it. Its `source_revision` records the exact source
+snapshot used to build it; its source-tree digest lets a later commit that only
+adds the artifact reuse it without indexing again. The ignored
+`.powdrr/cache/` directory stores only local lookup metadata; it is not the
+artifact's canonical storage.
+
 ## 2. Scope
 
 ### Included
@@ -315,8 +323,10 @@ IDs allow replay and inspection without rerunning the provider.
   with its schema version, owner, source revision, provider inputs, and digest.
 - Store the compact artifact reference in Structrr. Never inline the complete
   index into bootstrap state, planning prompts, or ordinary run summaries.
-- Reuse an artifact only when source revision, component scope, provider
-  version, and configuration fingerprint match exactly.
+- Reuse an artifact only when the indexed source-tree digest, component scope,
+  provider version, and configuration fingerprint match exactly. Keep the
+  artifact's original source revision as provenance and bind each query to its
+  requested Structrr snapshot separately.
 - Treat the source tree as authoritative. Missing or corrupt artifacts are
   rebuilt from source; a failed rebuild is explicit unavailable/failed
   coverage.

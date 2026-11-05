@@ -147,11 +147,23 @@ def test_planning_structrr_baseline_uses_temporary_artifacts(
         )
 
     monkeypatch.setattr(planning_session, "bootstrap_structrr", bootstrap)
+    monkeypatch.setattr(
+        planning_session,
+        "pinned_code_symbol_artifact_reference",
+        lambda *_args: (
+            {"artifact_id": "structrr-code-symbols:sha256:test"},
+            "structrr:sha256:test",
+        ),
+    )
 
-    result = _bootstrap_planning_structrr_baseline(repository, "session-123")
+    result = _bootstrap_planning_structrr_baseline(repository, "session-123", "a" * 40)
 
     output_path = captured["output"]
-    assert result == {"entities": []}
+    assert result["entities"] == []
+    assert result["code_symbol_artifact"]["artifact_id"] == (
+        "structrr-code-symbols:sha256:test"
+    )
+    assert result["structrr_snapshot_id"] == "structrr:sha256:test"
     assert output_path.name == "session-123.yaml"
     assert repository not in output_path.parents
     assert not output_path.exists()

@@ -11,6 +11,8 @@ from powdrr_service.structrr.bootstrap import (
     validate_bootstrap_document,
     validate_bootstrap_sections,
 )
+from powdrr_service.structrr.code_symbols import build_python_symbol_artifact
+from powdrr_service.structrr.entity_taxonomy import load_entity_taxonomy
 from powdrr_service.structrr.rebase import rebase_structrr_snapshot
 from powdrr_service.structrr.snapshot import snapshot_digest
 
@@ -409,6 +411,52 @@ def test_bootstrap_sections_require_validation_inventory() -> None:
         and issue.path == "validation_inventory"
         for issue in issues
     )
+
+
+def test_bootstrap_validates_referenced_python_symbol_artifact(tmp_path: Path) -> None:
+    repo = _fixture_repo(tmp_path)
+    result = bootstrap_structrr(repo)
+    source = (repo / "src/app.py").read_text(encoding="utf-8")
+    content, reference, _ = build_python_symbol_artifact(
+        source_revision="a" * 40,
+        component_id="component:python:example-product",
+        provider_version="1.39.9",
+        configuration_fingerprint="b" * 64,
+        symbols_by_path={
+            "src/app.py": [
+                {
+                    "name": "App",
+                    "kind": "class",
+                    "range": {
+                        "start_line": 1,
+                        "start_character": 0,
+                        "end_line": 3,
+                        "end_character": 0,
+                    },
+                }
+            ]
+        },
+        source_by_path={"src/app.py": source},
+    )
+    artifact_path = repo / reference.content_ref
+    artifact_path.parent.mkdir(parents=True)
+    artifact_path.write_bytes(content)
+    document = {
+        **result.document,
+        "code_symbol_artifact": reference.to_data(),
+        "structrr_snapshot_id": "structrr:sha256:" + "c" * 64,
+    }
+
+    taxonomy = load_entity_taxonomy(repo, "software_development_entity_taxonomy.md")
+    valid = validate_bootstrap_document(document, root=repo, taxonomy=taxonomy)
+
+    assert valid.successful, valid.issues
+    invalid = validate_bootstrap_document(
+        {**document, "structrr_snapshot_id": "not-a-snapshot"},
+        root=repo,
+        taxonomy=taxonomy,
+    )
+    assert any(issue.code == "structrr_snapshot_id_invalid" for issue in invalid.issues)
 
 
 def test_bootstrap_section_validation_reports_missing_and_stale_sections() -> None:

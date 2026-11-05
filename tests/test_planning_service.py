@@ -39,6 +39,7 @@ from powdrr_service.planning.driver import (
     _planned_reference_path_pairs,
 )
 from powdrr_service.planning.questions import (
+    ContextRecord,
     QuestionRequest,
     SourceExcerpt,
     batch_question_requests,
@@ -387,6 +388,58 @@ def test_accepted_question_is_durable_and_not_called_again() -> None:
     assert machine.accepted_input_digests == {
         machine.request.question.question_id: machine.request.question.input_digest
     }
+
+
+def test_requirement_symbol_coverage_is_durable_with_accepted_question() -> None:
+    session_id = "session-symbol-coverage"
+    store = InMemoryCheckpointStore(session_id=session_id)
+    session = PlanningSession(
+        session_id=session_id,
+        plan_id="bounded-plan",
+        repository="powdrr-io/example",
+        base_commit="a" * 40,
+        source_path="docs/plan.md",
+        source_blob_sha="b" * 40,
+        verification_command="make test",
+        issue=QueueIssue(
+            42, "Planning: bounded-plan", "", "open", ("powdrr:planning",), ""
+        ),
+    )
+    machine = _Machine()
+    coverage = {
+        "component_id": "component:python:repo",
+        "status": "partial",
+        "artifact_id": "structrr-code-symbols:sha256:abc",
+        "source_revision": "a" * 40,
+        "indexed_path_count": 1,
+        "unindexed_path_count": 1,
+        "unindexed_paths_sample": ["tests/test_parser.py"],
+    }
+    machine.request = replace(
+        machine.request,
+        question=replace(
+            machine.request.question,
+            context_ref_ids=("block-01", "repository-search"),
+        ),
+        repository_evidence=(
+            ContextRecord("repository-search", {"code_symbol_coverage": coverage}),
+        ),
+    )
+
+    transition = advance_planning_session(
+        session=session,
+        state_machine=machine,
+        checkpoint_store=store,
+        client=_Client(),
+        options=PlanningOptions(model="test-model"),
+        stderr=None,
+    )
+
+    accepted = next(
+        event for event in store.load().events if event.event_type == "answer_accepted"
+    )
+    assert transition.status == "question_accepted"
+    assert accepted.payload["code_symbol_coverage"] == [coverage]
 
 
 @pytest.mark.parametrize(
@@ -1514,9 +1567,17 @@ def test_zero_hit_coverage_requires_complete_pinned_search_metadata() -> None:
     positive_count = RequirementEvidenceSearch(
         (), (), 1, 0, "a" * 40, basedpyright_available=True
     )
+    partial_symbols = RequirementEvidenceSearch(
+        (), (), 0, 0, "a" * 40, code_symbol_coverage={"status": "partial"}
+    )
+    unsearched = RequirementEvidenceSearch(
+        (), (), 0, 0, "a" * 40, rg_search_status="not_run"
+    )
     assert _is_completed_zero_hit_search(complete, pinned_commit="a" * 40)
     assert not _is_completed_zero_hit_search(incomplete, pinned_commit="a" * 40)
     assert not _is_completed_zero_hit_search(positive_count, pinned_commit="a" * 40)
+    assert not _is_completed_zero_hit_search(partial_symbols, pinned_commit="a" * 40)
+    assert not _is_completed_zero_hit_search(unsearched, pinned_commit="a" * 40)
     assert not _is_completed_zero_hit_search(complete, pinned_commit="b" * 40)
 
 

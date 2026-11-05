@@ -44,6 +44,7 @@ from powdrr_lift.workrr.github_issue_queue import (
     ReviewedExecutionPlan,
 )
 from powdrr_lift.workrr.planning import evidence as planning_evidence
+from powdrr_lift.workrr.planning.evidence import EvidenceError
 
 
 @pytest.fixture(autouse=True)
@@ -1877,8 +1878,16 @@ def test_plan_cli_creates_tracking_issue_and_publishes_compiled_artifacts(
     assert '"published_issues": false' in response
 
 
+@pytest.mark.parametrize(
+    ("include_test_symbols", "provider_fails"),
+    ((True, False), (False, False), (False, True)),
+    ids=("complete-index", "partial-index", "failed-index"),
+)
 def test_issue_code_inspection_uses_shared_revision_artifact(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    include_test_symbols: bool,
+    provider_fails: bool,
 ) -> None:
     repository = tmp_path / "repo"
     (repository / "src").mkdir(parents=True)
@@ -1909,6 +1918,8 @@ def test_issue_code_inspection_uses_shared_revision_artifact(
     ) -> dict[str, list[dict[str, Any]]]:
         assert worktree_root == repository.resolve()
         provider_paths.append(tuple(paths))
+        if provider_fails:
+            raise EvidenceError("symbol provider unavailable")
         return {
             "src/policy.py": [
                 {
@@ -1922,18 +1933,24 @@ def test_issue_code_inspection_uses_shared_revision_artifact(
                     },
                 }
             ],
-            "tests/test_policy.py": [
+            **(
                 {
-                    "name": "test_parse_policy",
-                    "kind": "function",
-                    "range": {
-                        "start_line": 1,
-                        "start_character": 0,
-                        "end_line": 2,
-                        "end_character": 0,
-                    },
+                    "tests/test_policy.py": [
+                        {
+                            "name": "test_parse_policy",
+                            "kind": "function",
+                            "range": {
+                                "start_line": 1,
+                                "start_character": 0,
+                                "end_line": 2,
+                                "end_character": 0,
+                            },
+                        }
+                    ]
                 }
-            ],
+                if include_test_symbols
+                else {}
+            ),
         }
 
     monkeypatch.setattr(
@@ -1944,12 +1961,21 @@ def test_issue_code_inspection_uses_shared_revision_artifact(
     context = inspect_repository_code(repository, "Add policy validation.", client)
 
     assert len(provider_paths) == 1
+    if provider_fails:
+        assert '"status": "failed"' in context
+        assert "symbol provider unavailable" in context
+        return
     assert "parse_policy" in context
     assert "structrr-code-symbols:sha256:" in context
     assert "artifact_digest" in context
     assert "query:sha256:" in context
     assert "code_evidence" in context
     assert "def parse_policy(raw: str) -> bool" in context
+    expected_coverage_status = "complete" if include_test_symbols else "partial"
+    assert f'"status": "{expected_coverage_status}"' in context
+    assert "omitted paths are unknown" in context
+    if not include_test_symbols:
+        assert "tests/test_policy.py" in context
 
 
 def test_publish_execution_plan_pull_request_commits_only_generated_files(

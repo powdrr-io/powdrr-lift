@@ -1,0 +1,455 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1375
+title: Surface symbol coverage across planning search paths
+intent:
+  problem: Requirement searches and GitHub issue planning consume the shared code-symbol artifact but
+    can lose its coverage status. A missing match could then be treated as evidence of absent code even
+    when the symbol provider skipped files or failed.
+  goal: Carry complete, partial, and failed symbol-index coverage through both planning search paths,
+    bind requirement assessment to explicit repository-search completion, and retain that coverage in
+    planning checkpoints.
+human-decisions: []
+structured_files: []
+files:
+- path: packages/service/src/powdrr_service/planning/coverage.py
+  type: modified
+  span:
+    start_line: 70
+    end_line: 71
+  summary: Include symbol-index and ripgrep completion status in requirement-search evidence, and prevent
+    empty symbol matches from proving absence on unindexed paths.
+  rationale: Make the confidence and scope of requirement coverage explicit in the exact question input.
+- path: packages/service/src/powdrr_service/planning/coverage.py
+  type: modified
+  span:
+    start_line: 74
+    end_line: 74
+  summary: Include symbol-index and ripgrep completion status in requirement-search evidence, and prevent
+    empty symbol matches from proving absence on unindexed paths.
+  rationale: Make the confidence and scope of requirement coverage explicit in the exact question input.
+- path: packages/service/src/powdrr_service/planning/coverage.py
+  type: modified
+  span:
+    start_line: 85
+    end_line: 85
+  summary: Include symbol-index and ripgrep completion status in requirement-search evidence, and prevent
+    empty symbol matches from proving absence on unindexed paths.
+  rationale: Make the confidence and scope of requirement coverage explicit in the exact question input.
+- path: packages/service/src/powdrr_service/planning/coverage.py
+  type: modified
+  span:
+    start_line: 88
+    end_line: 90
+  summary: Include symbol-index and ripgrep completion status in requirement-search evidence, and prevent
+    empty symbol matches from proving absence on unindexed paths.
+  rationale: Make the confidence and scope of requirement coverage explicit in the exact question input.
+- path: packages/service/src/powdrr_service/planning/coverage.py
+  type: modified
+  span:
+    start_line: 290
+    end_line: 294
+  summary: Include symbol-index and ripgrep completion status in requirement-search evidence, and prevent
+    empty symbol matches from proving absence on unindexed paths.
+  rationale: Make the confidence and scope of requirement coverage explicit in the exact question input.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 608
+    end_line: 608
+  summary: Expose symbol coverage in planning search metrics and require complete index and source-search
+    coverage for deterministic zero-hit answers.
+  rationale: Prevent an incomplete or unrun search from being interpreted as a completed negative result.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 611
+    end_line: 615
+  summary: Expose symbol coverage in planning search metrics and require complete index and source-search
+    coverage for deterministic zero-hit answers.
+  rationale: Prevent an incomplete or unrun search from being interpreted as a completed negative result.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 2881
+    end_line: 2886
+  summary: Expose symbol coverage in planning search metrics and require complete index and source-search
+    coverage for deterministic zero-hit answers.
+  rationale: Prevent an incomplete or unrun search from being interpreted as a completed negative result.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 2891
+    end_line: 2892
+  summary: Expose symbol coverage in planning search metrics and require complete index and source-search
+    coverage for deterministic zero-hit answers.
+  rationale: Prevent an incomplete or unrun search from being interpreted as a completed negative result.
+- path: packages/service/src/powdrr_service/structrr/code_symbols.py
+  type: modified
+  span:
+    start_line: 64
+    end_line: 64
+  summary: Generalize the artifact-backed symbol result description to cover named queries as well as
+    path queries.
+  rationale: Keep the shared result contract clear as both planning entry points consume it.
+- path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 37
+    end_line: 37
+  summary: Include symbol coverage and provider failures in GitHub issue planning context, and tell the
+    planner how to interpret empty results.
+  rationale: Prevent missing declarations from being treated as proof of missing implementation when indexing
+    is incomplete.
+- path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 87
+    end_line: 87
+  summary: Include symbol coverage and provider failures in GitHub issue planning context, and tell the
+    planner how to interpret empty results.
+  rationale: Prevent missing declarations from being treated as proof of missing implementation when indexing
+    is incomplete.
+- path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 1108
+    end_line: 1112
+  summary: Include symbol coverage and provider failures in GitHub issue planning context, and tell the
+    planner how to interpret empty results.
+  rationale: Prevent missing declarations from being treated as proof of missing implementation when indexing
+    is incomplete.
+- path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 1151
+    end_line: 1161
+  summary: Include symbol coverage and provider failures in GitHub issue planning context, and tell the
+    planner how to interpret empty results.
+  rationale: Prevent missing declarations from being treated as proof of missing implementation when indexing
+    is incomplete.
+- path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 1242
+    end_line: 1245
+  summary: Include symbol coverage and provider failures in GitHub issue planning context, and tell the
+    planner how to interpret empty results.
+  rationale: Prevent missing declarations from being treated as proof of missing implementation when indexing
+    is incomplete.
+- path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 1265
+    end_line: 1268
+  summary: Include symbol coverage and provider failures in GitHub issue planning context, and tell the
+    planner how to interpret empty results.
+  rationale: Prevent missing declarations from being treated as proof of missing implementation when indexing
+    is incomplete.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 262
+    end_line: 263
+  summary: Return code-symbol coverage alongside named query matches for pinned and worktree searches,
+    and propagate it through requirement evidence.
+  rationale: Give requirement assessment explicit complete, partial, and failed states while retaining
+    bounded query results.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 273
+    end_line: 273
+  summary: Return code-symbol coverage alongside named query matches for pinned and worktree searches,
+    and propagate it through requirement evidence.
+  rationale: Give requirement assessment explicit complete, partial, and failed states while retaining
+    bounded query results.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 278
+    end_line: 278
+  summary: Return code-symbol coverage alongside named query matches for pinned and worktree searches,
+    and propagate it through requirement evidence.
+  rationale: Give requirement assessment explicit complete, partial, and failed states while retaining
+    bounded query results.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 285
+    end_line: 285
+  summary: Return code-symbol coverage alongside named query matches for pinned and worktree searches,
+    and propagate it through requirement evidence.
+  rationale: Give requirement assessment explicit complete, partial, and failed states while retaining
+    bounded query results.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 469
+    end_line: 470
+  summary: Return code-symbol coverage alongside named query matches for pinned and worktree searches,
+    and propagate it through requirement evidence.
+  rationale: Give requirement assessment explicit complete, partial, and failed states while retaining
+    bounded query results.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 571
+    end_line: 571
+  summary: Return code-symbol coverage alongside named query matches for pinned and worktree searches,
+    and propagate it through requirement evidence.
+  rationale: Give requirement assessment explicit complete, partial, and failed states while retaining
+    bounded query results.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 581
+    end_line: 581
+  summary: Return code-symbol coverage alongside named query matches for pinned and worktree searches,
+    and propagate it through requirement evidence.
+  rationale: Give requirement assessment explicit complete, partial, and failed states while retaining
+    bounded query results.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 1001
+    end_line: 1001
+  summary: Return code-symbol coverage alongside named query matches for pinned and worktree searches,
+    and propagate it through requirement evidence.
+  rationale: Give requirement assessment explicit complete, partial, and failed states while retaining
+    bounded query results.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 1023
+    end_line: 1023
+  summary: Return code-symbol coverage alongside named query matches for pinned and worktree searches,
+    and propagate it through requirement evidence.
+  rationale: Give requirement assessment explicit complete, partial, and failed states while retaining
+    bounded query results.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 1055
+    end_line: 1055
+  summary: Return code-symbol coverage alongside named query matches for pinned and worktree searches,
+    and propagate it through requirement evidence.
+  rationale: Give requirement assessment explicit complete, partial, and failed states while retaining
+    bounded query results.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 1072
+    end_line: 1074
+  summary: Return code-symbol coverage alongside named query matches for pinned and worktree searches,
+    and propagate it through requirement evidence.
+  rationale: Give requirement assessment explicit complete, partial, and failed states while retaining
+    bounded query results.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 47
+    end_line: 47
+  summary: Verify GitHub issue planning exposes complete, partial, and failed symbol coverage to its model
+    context.
+  rationale: Exercise the second planning entry point against the shared artifact contract.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 1881
+    end_line: 1885
+  summary: Verify GitHub issue planning exposes complete, partial, and failed symbol coverage to its model
+    context.
+  rationale: Exercise the second planning entry point against the shared artifact contract.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 1887
+    end_line: 1890
+  summary: Verify GitHub issue planning exposes complete, partial, and failed symbol coverage to its model
+    context.
+  rationale: Exercise the second planning entry point against the shared artifact contract.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 1921
+    end_line: 1922
+  summary: Verify GitHub issue planning exposes complete, partial, and failed symbol coverage to its model
+    context.
+  rationale: Exercise the second planning entry point against the shared artifact contract.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 1936
+    end_line: 1936
+  summary: Verify GitHub issue planning exposes complete, partial, and failed symbol coverage to its model
+    context.
+  rationale: Exercise the second planning entry point against the shared artifact contract.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 1938
+    end_line: 1949
+  summary: Verify GitHub issue planning exposes complete, partial, and failed symbol coverage to its model
+    context.
+  rationale: Exercise the second planning entry point against the shared artifact contract.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 1951
+    end_line: 1953
+  summary: Verify GitHub issue planning exposes complete, partial, and failed symbol coverage to its model
+    context.
+  rationale: Exercise the second planning entry point against the shared artifact contract.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 1964
+    end_line: 1967
+  summary: Verify GitHub issue planning exposes complete, partial, and failed symbol coverage to its model
+    context.
+  rationale: Exercise the second planning entry point against the shared artifact contract.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 1974
+    end_line: 1978
+  summary: Verify GitHub issue planning exposes complete, partial, and failed symbol coverage to its model
+    context.
+  rationale: Exercise the second planning entry point against the shared artifact contract.
+- path: tests/test_planning_evidence.py
+  type: modified
+  span:
+    start_line: 211
+    end_line: 214
+  summary: Cover complete-empty, partial-empty, partial requirement evidence, and failed provider states.
+  rationale: Verify artifact coverage survives named queries and enters requirement assessment context.
+- path: tests/test_planning_evidence.py
+  type: modified
+  span:
+    start_line: 277
+    end_line: 309
+  summary: Cover complete-empty, partial-empty, partial requirement evidence, and failed provider states.
+  rationale: Verify artifact coverage survives named queries and enters requirement assessment context.
+- path: tests/test_planning_evidence.py
+  type: modified
+  span:
+    start_line: 541
+    end_line: 543
+  summary: Cover complete-empty, partial-empty, partial requirement evidence, and failed provider states.
+  rationale: Verify artifact coverage survives named queries and enters requirement assessment context.
+- path: tests/test_planning_evidence.py
+  type: modified
+  span:
+    start_line: 547
+    end_line: 547
+  summary: Cover complete-empty, partial-empty, partial requirement evidence, and failed provider states.
+  rationale: Verify artifact coverage survives named queries and enters requirement assessment context.
+- path: tests/test_planning_evidence.py
+  type: modified
+  span:
+    start_line: 585
+    end_line: 585
+  summary: Cover complete-empty, partial-empty, partial requirement evidence, and failed provider states.
+  rationale: Verify artifact coverage survives named queries and enters requirement assessment context.
+- path: tests/test_planning_evidence.py
+  type: modified
+  span:
+    start_line: 657
+    end_line: 657
+  summary: Cover complete-empty, partial-empty, partial requirement evidence, and failed provider states.
+  rationale: Verify artifact coverage survives named queries and enters requirement assessment context.
+- path: tests/test_planning_evidence.py
+  type: modified
+  span:
+    start_line: 659
+    end_line: 663
+  summary: Cover complete-empty, partial-empty, partial requirement evidence, and failed provider states.
+  rationale: Verify artifact coverage survives named queries and enters requirement assessment context.
+- path: tests/test_planning_evidence.py
+  type: modified
+  span:
+    start_line: 673
+    end_line: 673
+  summary: Cover complete-empty, partial-empty, partial requirement evidence, and failed provider states.
+  rationale: Verify artifact coverage survives named queries and enters requirement assessment context.
+- path: tests/test_planning_evidence.py
+  type: modified
+  span:
+    start_line: 679
+    end_line: 681
+  summary: Cover complete-empty, partial-empty, partial requirement evidence, and failed provider states.
+  rationale: Verify artifact coverage survives named queries and enters requirement assessment context.
+- path: tests/test_planning_evidence.py
+  type: modified
+  span:
+    start_line: 821
+    end_line: 821
+  summary: Cover complete-empty, partial-empty, partial requirement evidence, and failed provider states.
+  rationale: Verify artifact coverage survives named queries and enters requirement assessment context.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 42
+    end_line: 42
+  summary: Verify partial symbol coverage is journaled and incomplete searches cannot produce deterministic
+    zero-hit answers.
+  rationale: Protect durable planning evidence and negative-result classification.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 393
+    end_line: 444
+  summary: Verify partial symbol coverage is journaled and incomplete searches cannot produce deterministic
+    zero-hit answers.
+  rationale: Protect durable planning evidence and negative-result classification.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1570
+    end_line: 1575
+  summary: Verify partial symbol coverage is journaled and incomplete searches cannot produce deterministic
+    zero-hit answers.
+  rationale: Protect durable planning evidence and negative-result classification.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1579
+    end_line: 1580
+  summary: Verify partial symbol coverage is journaled and incomplete searches cannot produce deterministic
+    zero-hit answers.
+  rationale: Protect durable planning evidence and negative-result classification.
+entities:
+- id: named-symbol-coverage-result
+  type: Module
+  action: added
+- id: partial-symbol-search-regression
+  type: Regression test
+  action: added
+- id: issue-planning-coverage-regression
+  type: Regression test
+  action: added
+entity_relationships:
+- id: planner-searches-share-coverage-result
+  type: informs
+  source: named-symbol-coverage-result
+  target: partial-symbol-search-regression
+  action: added
+  description: The symbol search result carries artifact coverage to requirement assessment and issue-plan
+    context.
+- id: issue-plan-test-verifies-coverage-state
+  type: verifies
+  source: issue-planning-coverage-regression
+  target: named-symbol-coverage-result
+  action: added
+  description: The issue planning regression verifies complete, partial, and failed coverage is visible
+    to the planning prompt.
+invariants:
+- id: partial-symbol-search-cannot-prove-absence
+  description: Empty symbol matches on paths omitted by partial or failed indexing do not establish that
+    implementation is absent.
+  action: added
+- id: zero-hit-result-needs-completed-search
+  description: Requirement planning can use a no-match result only when its configured ripgrep source
+    search completed, and deterministic zero-hit classification requires complete symbol coverage.
+  action: added
+guidance: []

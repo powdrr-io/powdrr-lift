@@ -259,7 +259,8 @@ def search_requirements_evidence(
     symbol_queries = tuple(dict.fromkeys(query_by_requirement.values()))[
         :MAX_BASEDPYRIGHT_COVERAGE_QUERIES
     ]
-    symbols_by_query: dict[str, list[dict[str, Any]]] = {}
+    symbols_by_query: Mapping[str, list[dict[str, Any]]] = {}
+    code_symbol_coverage: Mapping[str, Any] | None = None
     basedpyright_available = True
     if symbol_queries:
         try:
@@ -269,16 +270,19 @@ def search_requirements_evidence(
                 list(symbol_queries),
                 limit=20,
             )
+            code_symbol_coverage = symbols_by_query.coverage
         except (EvidenceError, PowdrrExecutionError):
             # Ripgrep still provides local multi-language evidence when the
             # Python language server is unavailable or cannot index this repo.
             basedpyright_available = False
+            code_symbol_coverage = {"status": "failed"}
 
     all_terms = tuple(
         dict.fromkeys(
             term for values in terms_by_requirement.values() for term in values
         )
     )
+    rg_search_status = "complete" if all_terms else "not_run"
     rg_rows: list[tuple[str, int, str]] = []
     for offset in range(0, len(all_terms), MAX_RG_COVERAGE_TERMS_PER_PASS):
         command = [
@@ -462,6 +466,8 @@ def search_requirements_evidence(
             symbol_match_count,
             rg_match_count,
             basedpyright_available,
+            code_symbol_coverage,
+            rg_search_status,
         )
     return output
 
@@ -562,7 +568,7 @@ def _planning_symbol_coverage(
     requested = tuple(sorted(set(requested_paths)))
     unindexed_paths = sorted(unindexed & set(requested))
     new_paths = sorted(set(requested) - indexed - unindexed)
-    unindexed_sample = sorted(unindexed)[:100]
+    unindexed_sample = sorted(unindexed)[:20]
     return {
         "component_id": reference.component_id,
         "status": reference.coverage,
@@ -572,6 +578,7 @@ def _planning_symbol_coverage(
         "indexed_paths": sorted(indexed & set(requested)),
         "unindexed_paths": unindexed_paths,
         "new_paths": new_paths,
+        "indexed_path_count": len(indexed),
         "unindexed_path_count": len(unindexed),
         "unindexed_paths_sample": unindexed_sample,
         "omitted_unindexed_path_count": max(0, len(unindexed) - len(unindexed_sample)),
@@ -991,7 +998,7 @@ def search_pinned_workspace_symbols(
     queries: Sequence[str],
     *,
     limit: int = 50,
-) -> dict[str, list[dict[str, Any]]]:
+) -> CodeSymbolSearchResult:
     """Search the revision-pinned Structrr symbol artifact by deterministic name."""
     root = Path(repository_root).resolve()
     content, reference, document = _load_or_build_pinned_symbol_artifact(
@@ -1013,7 +1020,7 @@ def search_workspace_symbols_from_worktree(
     queries: Sequence[str],
     *,
     limit: int = 50,
-) -> dict[str, list[dict[str, Any]]]:
+) -> CodeSymbolSearchResult:
     """Search the current worktree snapshot, including dirty and untracked files."""
     root = Path(repository_root).resolve()
     revision_result = subprocess.run(
@@ -1045,7 +1052,7 @@ def _query_symbol_artifact(
     snapshot_id: str,
     queries: Sequence[str],
     limit: int,
-) -> dict[str, list[dict[str, Any]]]:
+) -> CodeSymbolSearchResult:
     output: dict[str, list[dict[str, Any]]] = {}
     for query_text in queries:
         query = CodeSymbolQuery(
@@ -1062,7 +1069,9 @@ def _query_symbol_artifact(
             _index_symbol_to_provider_record(row, reference, query_result=result)
             for row in result["records"]
         ]
-    return output
+    coverage = _planning_symbol_coverage(document, reference, ())
+    coverage["query_names"] = list(dict.fromkeys(queries))
+    return CodeSymbolSearchResult(output, coverage)
 
 
 def _source_tree_digest(source_by_path: Mapping[str, str]) -> str:

@@ -61,7 +61,7 @@ class CodeSymbolArtifact:
 
 @dataclass(frozen=True, slots=True)
 class CodeSymbolSearchResult(Mapping[str, list[dict[str, Any]]]):
-    """Path-scoped symbols plus coverage needed to interpret empty results."""
+    """Named symbol results plus artifact coverage for interpreting empty results."""
 
     symbols_by_path: Mapping[str, list[dict[str, Any]]]
     coverage: Mapping[str, Any]

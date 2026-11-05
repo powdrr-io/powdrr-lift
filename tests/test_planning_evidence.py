@@ -208,6 +208,10 @@ def test_pinned_symbol_queries_reuse_revision_artifact_and_keep_provenance(
 
     assert len(provider_calls) == 1
     assert first == second
+    assert first.coverage["status"] == "partial"
+    assert first.coverage["unindexed_paths"] == []
+    assert first.coverage["unindexed_path_count"] == 1
+    assert first.coverage["unindexed_paths_sample"] == ["tests/test_schema.py"]
     symbol = first["parse_payload"][0]
     assert symbol["path"] == "src/schema.py"
     assert symbol["range"]["start_line"] == 1
@@ -268,6 +272,39 @@ def test_structural_symbol_search_distinguishes_unindexed_from_empty(
     assert result.coverage["requested_paths"] == ["src/unindexed.py"]
     assert result.coverage["unindexed_paths"] == ["src/unindexed.py"]
     assert result.coverage["new_paths"] == []
+
+
+def test_named_symbol_search_distinguishes_complete_empty_from_partial_empty(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    complete_repository, complete_commit = _repository(tmp_path / "complete")
+    monkeypatch.setattr(
+        evidence_module,
+        "find_workspace_document_symbols",
+        lambda paths, **_kwargs: {path: [] for path in paths},
+    )
+    complete = search_pinned_workspace_symbols(
+        complete_repository, complete_commit, ["missing_name"]
+    )
+
+    partial_repository, partial_commit = _repository(tmp_path / "partial")
+    monkeypatch.setattr(
+        evidence_module,
+        "find_workspace_document_symbols",
+        lambda paths, **_kwargs: (
+            {"src/schema.py": []} if "src/schema.py" in paths else {}
+        ),
+    )
+    partial = search_pinned_workspace_symbols(
+        partial_repository, partial_commit, ["missing_name"]
+    )
+
+    assert complete["missing_name"] == []
+    assert complete.coverage["status"] == "complete"
+    assert complete.coverage["unindexed_path_count"] == 0
+    assert partial["missing_name"] == []
+    assert partial.coverage["status"] == "partial"
+    assert partial.coverage["unindexed_paths_sample"] == ["tests/test_schema.py"]
 
 
 def test_ambiguous_symbol_name_returns_all_matches_and_path_query_scopes_them(
@@ -501,9 +538,13 @@ def test_pinned_code_file_reads_each_repository_blob_once(
     assert reads == 1
 
 
+@pytest.mark.parametrize(
+    "include_test_symbols", (True, False), ids=("complete-index", "partial-index")
+)
 def test_requirement_search_supplies_pinned_implementation_and_test_evidence(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    include_test_symbols: bool,
 ) -> None:
     repository, commit = _repository(tmp_path)
     requirement, source = _requirement(commit)
@@ -541,6 +582,7 @@ def test_requirement_search_supplies_pinned_implementation_and_test_evidence(
                 ("tests/test_schema.py", "test_parse_payload", 3, 4),
             )
             if path in paths
+            and (include_test_symbols or path != "tests/test_schema.py")
         }
 
     monkeypatch.setattr(
@@ -612,8 +654,13 @@ def test_requirement_search_supplies_pinned_implementation_and_test_evidence(
     assert search.terms
     assert search.matching_line_count >= 2
     assert search.basedpyright_query_count == 1
-    assert search.basedpyright_match_count == 2
+    assert search.basedpyright_match_count == (2 if include_test_symbols else 1)
     assert search.basedpyright_available
+    assert search.code_symbol_coverage is not None
+    assert search.code_symbol_coverage["status"] == (
+        "complete" if include_test_symbols else "partial"
+    )
+    assert search.to_data()["rg_search_status"] == "complete"
     assert search.rg_match_count > 0
     assert {item.kind for item in search.evidence} == {"implementation", "test"}
     assert {item.id for item in search.evidence} == {
@@ -623,11 +670,15 @@ def test_requirement_search_supplies_pinned_implementation_and_test_evidence(
     assert request.repository_evidence[-1].ref_id == "repository-search"
     assert request.accepted_facts[0].ref_id == requirement.id
     assert "repository-search" in messages[1]["content"]
+    assert "Empty symbol matches do not establish absence" in request.exact_question
     assert any(
         "parse_payload" in record.value["source_excerpt"]
         for record in request.repository_evidence
     )
     assert request.repository_evidence[-1].value["matching_path_count"] == 2
+    assert request.repository_evidence[-1].value["code_symbol_coverage"]["status"] == (
+        "complete" if include_test_symbols else "partial"
+    )
     assert any(item.symbol == "parse_payload" for item in search.evidence)
     implementation = next(
         item for item in search.evidence if item.kind == "implementation"
@@ -767,6 +818,7 @@ def test_requirement_search_uses_rg_for_non_python_when_basedpyright_fails(
     assert search.basedpyright_match_count == 0
     assert search.rg_match_count > 0
     assert not search.basedpyright_available
+    assert search.code_symbol_coverage == {"status": "failed"}
     assert any(item.path == "src/telemetry.swift" for item in search.evidence)
 
 

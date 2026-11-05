@@ -1,0 +1,424 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1374
+title: Report partial code-symbol coverage to planning
+intent:
+  problem: The code-symbol builder marked an artifact complete when its provider omitted source paths.
+    Planning then saw empty symbol results without knowing whether a path had no declarations, had not
+    yet been added to the source snapshot, or could not be indexed.
+  goal: Record indexed and unindexed paths in the checked-in artifact, pass scoped coverage into structural
+    planning questions, and persist that coverage with the question checkpoint so incomplete analysis
+    is visible and replay-safe.
+human-decisions: []
+structured_files: []
+files:
+- path: packages/service/src/powdrr_service/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 121
+    end_line: 121
+  summary: Persist code-symbol coverage with accepted and needs-answer checkpoint events.
+  rationale: Retain the analysis state that informed each durable planning question.
+- path: packages/service/src/powdrr_service/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 134
+    end_line: 137
+  summary: Persist code-symbol coverage with accepted and needs-answer checkpoint events.
+  rationale: Retain the analysis state that informed each durable planning question.
+- path: packages/service/src/powdrr_service/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 161
+    end_line: 161
+  summary: Persist code-symbol coverage with accepted and needs-answer checkpoint events.
+  rationale: Retain the analysis state that informed each durable planning question.
+- path: packages/service/src/powdrr_service/planning/checkpoints.py
+  type: modified
+  span:
+    start_line: 175
+    end_line: 178
+  summary: Persist code-symbol coverage with accepted and needs-answer checkpoint events.
+  rationale: Retain the analysis state that informed each durable planning question.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 98
+    end_line: 98
+  summary: Carry symbol coverage from the evidence search into structural subject enumeration requests.
+  rationale: Let the planner interpret symbol availability alongside repository and Structrr facts.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 480
+    end_line: 481
+  summary: Carry symbol coverage from the evidence search into structural subject enumeration requests.
+  rationale: Let the planner interpret symbol availability alongside repository and Structrr facts.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 506
+    end_line: 506
+  summary: Carry symbol coverage from the evidence search into structural subject enumeration requests.
+  rationale: Let the planner interpret symbol availability alongside repository and Structrr facts.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 1841
+    end_line: 1847
+  summary: Carry symbol coverage from the evidence search into structural subject enumeration requests.
+  rationale: Let the planner interpret symbol availability alongside repository and Structrr facts.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 2067
+    end_line: 2067
+  summary: Carry symbol coverage from the evidence search into structural subject enumeration requests.
+  rationale: Let the planner interpret symbol availability alongside repository and Structrr facts.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 2246
+    end_line: 2246
+  summary: Carry symbol coverage from the evidence search into structural subject enumeration requests.
+  rationale: Let the planner interpret symbol availability alongside repository and Structrr facts.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 72
+    end_line: 91
+  summary: Extract and attach deduplicated coverage summaries to their matching question checkpoints.
+  rationale: Keep coverage provenance durable across planning acceptance and resume.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 648
+    end_line: 652
+  summary: Extract and attach deduplicated coverage summaries to their matching question checkpoints.
+  rationale: Keep coverage provenance durable across planning acceptance and resume.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 810
+    end_line: 812
+  summary: Extract and attach deduplicated coverage summaries to their matching question checkpoints.
+  rationale: Keep coverage provenance durable across planning acceptance and resume.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 830
+    end_line: 832
+  summary: Extract and attach deduplicated coverage summaries to their matching question checkpoints.
+  rationale: Keep coverage provenance durable across planning acceptance and resume.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 620
+    end_line: 620
+  summary: Include code-symbol coverage in structural-question facts and input digests, and direct the
+    planner to treat unindexed paths as unknown.
+  rationale: Ensure question generation uses current coverage and cannot treat missing analysis as evidence
+    that a subject is absent.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 697
+    end_line: 706
+  summary: Include code-symbol coverage in structural-question facts and input digests, and direct the
+    planner to treat unindexed paths as unknown.
+  rationale: Ensure question generation uses current coverage and cannot treat missing analysis as evidence
+    that a subject is absent.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 732
+    end_line: 732
+  summary: Include code-symbol coverage in structural-question facts and input digests, and direct the
+    planner to treat unindexed paths as unknown.
+  rationale: Ensure question generation uses current coverage and cannot treat missing analysis as evidence
+    that a subject is absent.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 795
+    end_line: 799
+  summary: Include code-symbol coverage in structural-question facts and input digests, and direct the
+    planner to treat unindexed paths as unknown.
+  rationale: Ensure question generation uses current coverage and cannot treat missing analysis as evidence
+    that a subject is absent.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 811
+    end_line: 815
+  summary: Include code-symbol coverage in structural-question facts and input digests, and direct the
+    planner to treat unindexed paths as unknown.
+  rationale: Ensure question generation uses current coverage and cannot treat missing analysis as evidence
+    that a subject is absent.
+- path: packages/service/src/powdrr_service/structrr/code_symbols.py
+  type: modified
+  span:
+    start_line: 9
+    end_line: 9
+  summary: Mark symbol artifacts partial when source paths are omitted and validate the indexed and unindexed
+    path manifest when loading artifacts.
+  rationale: Preserve the distinction between successfully indexed paths with no declarations and paths
+    the provider did not analyze.
+- path: packages/service/src/powdrr_service/structrr/code_symbols.py
+  type: modified
+  span:
+    start_line: 62
+    end_line: 78
+  summary: Mark symbol artifacts partial when source paths are omitted and validate the indexed and unindexed
+    path manifest when loading artifacts.
+  rationale: Preserve the distinction between successfully indexed paths with no declarations and paths
+    the provider did not analyze.
+- path: packages/service/src/powdrr_service/structrr/code_symbols.py
+  type: modified
+  span:
+    start_line: 115
+    end_line: 119
+  summary: Mark symbol artifacts partial when source paths are omitted and validate the indexed and unindexed
+    path manifest when loading artifacts.
+  rationale: Preserve the distinction between successfully indexed paths with no declarations and paths
+    the provider did not analyze.
+- path: packages/service/src/powdrr_service/structrr/code_symbols.py
+  type: modified
+  span:
+    start_line: 104
+    end_line: 104
+  summary: Mark symbol artifacts partial when source paths are omitted and validate the indexed and unindexed
+    path manifest when loading artifacts.
+  rationale: Preserve the distinction between successfully indexed paths with no declarations and paths
+    the provider did not analyze.
+- path: packages/service/src/powdrr_service/structrr/code_symbols.py
+  type: modified
+  span:
+    start_line: 147
+    end_line: 147
+  summary: Mark symbol artifacts partial when source paths are omitted and validate the indexed and unindexed
+    path manifest when loading artifacts.
+  rationale: Preserve the distinction between successfully indexed paths with no declarations and paths
+    the provider did not analyze.
+- path: packages/service/src/powdrr_service/structrr/code_symbols.py
+  type: modified
+  span:
+    start_line: 158
+    end_line: 159
+  summary: Mark symbol artifacts partial when source paths are omitted and validate the indexed and unindexed
+    path manifest when loading artifacts.
+  rationale: Preserve the distinction between successfully indexed paths with no declarations and paths
+    the provider did not analyze.
+- path: packages/service/src/powdrr_service/structrr/code_symbols.py
+  type: modified
+  span:
+    start_line: 188
+    end_line: 188
+  summary: Mark symbol artifacts partial when source paths are omitted and validate the indexed and unindexed
+    path manifest when loading artifacts.
+  rationale: Preserve the distinction between successfully indexed paths with no declarations and paths
+    the provider did not analyze.
+- path: packages/service/src/powdrr_service/structrr/code_symbols.py
+  type: modified
+  span:
+    start_line: 336
+    end_line: 353
+  summary: Mark symbol artifacts partial when source paths are omitted and validate the indexed and unindexed
+    path manifest when loading artifacts.
+  rationale: Preserve the distinction between successfully indexed paths with no declarations and paths
+    the provider did not analyze.
+- path: packages/service/src/powdrr_service/structrr/code_symbols.py
+  type: modified
+  span:
+    start_line: 355
+    end_line: 359
+  summary: Mark symbol artifacts partial when source paths are omitted and validate the indexed and unindexed
+    path manifest when loading artifacts.
+  rationale: Preserve the distinction between successfully indexed paths with no declarations and paths
+    the provider did not analyze.
+- path: packages/service/src/powdrr_service/structrr/code_symbols.py
+  type: modified
+  span:
+    start_line: 388
+    end_line: 423
+  summary: Mark symbol artifacts partial when source paths are omitted and validate the indexed and unindexed
+    path manifest when loading artifacts.
+  rationale: Preserve the distinction between successfully indexed paths with no declarations and paths
+    the provider did not analyze.
+- path: packages/service/src/powdrr_service/structrr/code_symbols.py
+  type: modified
+  span:
+    start_line: 609
+    end_line: 609
+  summary: Mark symbol artifacts partial when source paths are omitted and validate the indexed and unindexed
+    path manifest when loading artifacts.
+  rationale: Preserve the distinction between successfully indexed paths with no declarations and paths
+    the provider did not analyze.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 58
+    end_line: 58
+  summary: Return scoped symbols together with indexed, unindexed, and new path coverage.
+  rationale: Give planning an explicit interpretation for every requested empty result while preserving
+    the existing mapping behavior for symbol consumers.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 503
+    end_line: 503
+  summary: Return scoped symbols together with indexed, unindexed, and new path coverage.
+  rationale: Give planning an explicit interpretation for every requested empty result while preserving
+    the existing mapping behavior for symbol consumers.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 528
+    end_line: 578
+  summary: Return scoped symbols together with indexed, unindexed, and new path coverage.
+  rationale: Give planning an explicit interpretation for every requested empty result while preserving
+    the existing mapping behavior for symbol consumers.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 1099
+    end_line: 1099
+  summary: Return scoped symbols together with indexed, unindexed, and new path coverage.
+  rationale: Give planning an explicit interpretation for every requested empty result while preserving
+    the existing mapping behavior for symbol consumers.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 1128
+    end_line: 1128
+  summary: Return scoped symbols together with indexed, unindexed, and new path coverage.
+  rationale: Give planning an explicit interpretation for every requested empty result while preserving
+    the existing mapping behavior for symbol consumers.
+- path: src/powdrr_lift/workrr/planning/evidence.py
+  type: modified
+  span:
+    start_line: 1131
+    end_line: 1136
+  summary: Return scoped symbols together with indexed, unindexed, and new path coverage.
+  rationale: Give planning an explicit interpretation for every requested empty result while preserving
+    the existing mapping behavior for symbol consumers.
+- path: tests/test_planning_evidence.py
+  type: modified
+  span:
+    start_line: 240
+    end_line: 272
+  summary: Verify structural search distinguishes an unindexed file from an indexed file with no symbols.
+  rationale: Protect the evidence-layer contract for empty symbol results.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1652
+    end_line: 1658
+  summary: Extend the compiled planning flow test to cover complete, new-path, and partially indexed cases,
+    including persisted coverage.
+  rationale: Demonstrate that the planner records incomplete code analysis end to end.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1661
+    end_line: 1664
+  summary: Extend the compiled planning flow test to cover complete, new-path, and partially indexed cases,
+    including persisted coverage.
+  rationale: Demonstrate that the planner records incomplete code analysis end to end.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1697
+    end_line: 1715
+  summary: Extend the compiled planning flow test to cover complete, new-path, and partially indexed cases,
+    including persisted coverage.
+  rationale: Demonstrate that the planner records incomplete code analysis end to end.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1838
+    end_line: 1838
+  summary: Extend the compiled planning flow test to cover complete, new-path, and partially indexed cases,
+    including persisted coverage.
+  rationale: Demonstrate that the planner records incomplete code analysis end to end.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1869
+    end_line: 1869
+  summary: Extend the compiled planning flow test to cover complete, new-path, and partially indexed cases,
+    including persisted coverage.
+  rationale: Demonstrate that the planner records incomplete code analysis end to end.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1879
+    end_line: 1894
+  summary: Extend the compiled planning flow test to cover complete, new-path, and partially indexed cases,
+    including persisted coverage.
+  rationale: Demonstrate that the planner records incomplete code analysis end to end.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span:
+    start_line: 172
+    end_line: 184
+  summary: Verify coverage reaches the structural question and changes its input digest.
+  rationale: Prevent replay of answers against changed symbol-availability evidence.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span:
+    start_line: 192
+    end_line: 217
+  summary: Verify coverage reaches the structural question and changes its input digest.
+  rationale: Prevent replay of answers against changed symbol-availability evidence.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span:
+    start_line: 284
+    end_line: 284
+  summary: Verify coverage reaches the structural question and changes its input digest.
+  rationale: Prevent replay of answers against changed symbol-availability evidence.
+- path: tests/test_structrr_code_symbols.py
+  type: modified
+  span:
+    start_line: 116
+    end_line: 140
+  summary: Verify an omitted source path makes the artifact partial and appears in its unindexed-path
+    manifest.
+  rationale: Cover artifact coverage classification and round-trip validation.
+entities:
+- id: code-symbol-coverage-manifest
+  type: Module
+  action: added
+- id: structural-question-coverage-context
+  type: Function
+  action: added
+- id: unindexed-symbol-path-regression
+  type: Regression test
+  action: added
+- id: planning-coverage-journal-regression
+  type: Regression test
+  action: added
+entity_relationships:
+- id: coverage-search-feeds-question-context
+  type: informs
+  source: code-symbol-coverage-manifest
+  target: structural-question-coverage-context
+  action: added
+  description: Scoped artifact coverage is supplied as context to structural subject enumeration and included
+    in its input digest.
+- id: coverage-journal-test-verifies-planning-flow
+  type: verifies
+  source: planning-coverage-journal-regression
+  target: structural-question-coverage-context
+  action: added
+  description: The end-to-end test verifies partial coverage is persisted with the planning question checkpoint.
+invariants:
+- id: omitted-source-paths-are-not-empty-symbol-results
+  description: A source path omitted by the symbol provider is reported as unindexed; only paths present
+    in indexed_paths can be interpreted as successfully analyzed.
+  action: added
+- id: planning-question-binds-symbol-coverage
+  description: Structural question input digests include the code-symbol coverage used to construct their
+    context, and checkpoint events retain that coverage summary.
+  action: added
+guidance: []

@@ -237,6 +237,39 @@ def test_pinned_symbol_queries_reuse_revision_artifact_and_keep_provenance(
     assert checked_in_reference["source_revision"] == base_commit
 
 
+def test_structural_symbol_search_distinguishes_unindexed_from_empty(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repository, base_commit = _repository(tmp_path)
+    (repository / "src/unindexed.py").write_text(
+        "def omitted_by_provider() -> None:\n    pass\n", encoding="utf-8"
+    )
+    _git(repository, "add", "src/unindexed.py")
+    _git(repository, "commit", "-qm", "add source omitted by indexer")
+    base_commit = _git(repository, "rev-parse", "HEAD")
+
+    def document_symbols(
+        paths: list[str], *, worktree_root: Path
+    ) -> dict[str, list[dict[str, Any]]]:
+        assert worktree_root.name == "repository"
+        assert "src/unindexed.py" in paths
+        return {path: [] for path in paths if path != "src/unindexed.py"}
+
+    monkeypatch.setattr(
+        evidence_module, "find_workspace_document_symbols", document_symbols
+    )
+
+    result = search_structural_document_symbols(
+        repository, base_commit, ["src/unindexed.py"]
+    )
+
+    assert result["src/unindexed.py"] == []
+    assert result.coverage["status"] == "partial"
+    assert result.coverage["requested_paths"] == ["src/unindexed.py"]
+    assert result.coverage["unindexed_paths"] == ["src/unindexed.py"]
+    assert result.coverage["new_paths"] == []
+
+
 def test_ambiguous_symbol_name_returns_all_matches_and_path_query_scopes_them(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -169,6 +169,19 @@ def test_structural_questions_send_only_relevant_baseline_subjects(
         source_refs=(source_ref,),
         projected_baseline=baseline,
         basedpyright_reference_path_pairs=(("src/relevant.py", "src/projected.py"),),
+        code_symbol_coverage={
+            "component_id": "component:python:repository",
+            "status": "partial",
+            "artifact_id": "structrr-code-symbols:sha256:abc",
+            "source_revision": "a" * 40,
+            "requested_paths": ["src/relevant.py"],
+            "indexed_paths": [],
+            "unindexed_paths": ["src/relevant.py"],
+            "new_paths": [],
+            "unindexed_path_count": 1,
+            "unindexed_paths_sample": ["src/relevant.py"],
+            "omitted_unindexed_path_count": 0,
+        },
     )
     assert "Use action added only when subject_ref is null" in (
         enumeration.exact_question
@@ -176,6 +189,32 @@ def test_structural_questions_send_only_relevant_baseline_subjects(
     assert "never mark an existing subject as added" in enumeration.exact_question
     enumeration_messages = build_question_messages(enumeration)
     enumeration_input = enumeration_messages[1]["content"]
+    assert "unindexed path as evidence" in enumeration.exact_question
+    assert any(
+        fact.value.get("code_symbol_coverage", {}).get("status") == "partial"
+        for fact in enumeration.accepted_facts
+    )
+    coverage_changed = build_subject_enumeration_request(
+        plan_id="plan",
+        item_id="item-0001",
+        units=(unit,),
+        source=source,
+        source_refs=(source_ref,),
+        projected_baseline=baseline,
+        code_symbol_coverage={
+            "component_id": "component:python:repository",
+            "status": "complete",
+            "artifact_id": "structrr-code-symbols:sha256:def",
+            "source_revision": "a" * 40,
+            "requested_paths": ["src/relevant.py"],
+            "indexed_paths": ["src/relevant.py"],
+            "unindexed_paths": [],
+            "new_paths": [],
+            "unindexed_path_count": 0,
+            "unindexed_paths_sample": [],
+            "omitted_unindexed_path_count": 0,
+        },
+    )
     without_projected_file = build_subject_enumeration_request(
         plan_id="plan",
         item_id="item-0001",
@@ -242,6 +281,7 @@ def test_structural_questions_send_only_relevant_baseline_subjects(
         enumeration.question.input_digest
         != without_projected_file.question.input_digest
     )
+    assert enumeration.question.input_digest != coverage_changed.question.input_digest
     assert (
         enumeration.question.input_digest
         != without_reference_evidence.question.input_digest

@@ -55,6 +55,7 @@ from powdrr_service.planning.source import (
 from powdrr_service.structrr.code_symbols import (
     CodeSymbolArtifact,
     CodeSymbolQuery,
+    CodeSymbolSearchResult,
     build_python_symbol_artifact,
     load_code_symbol_artifact,
     query_python_references,
@@ -499,7 +500,7 @@ def search_structural_document_symbols(
     repository_root: str | Path,
     base_commit: str,
     paths: Sequence[str],
-) -> dict[str, list[dict[str, Any]]]:
+) -> CodeSymbolSearchResult:
     """Read BasedPyright symbols from a materialized pinned Git tree."""
     root = Path(repository_root).resolve()
     normalized_paths = tuple(sorted(set(paths)))
@@ -524,7 +525,57 @@ def search_structural_document_symbols(
         selected.extend(
             row for row in query_result["records"] if isinstance(row, Mapping)
         )
-    return _group_index_symbols(selected, reference, query_results=query_results)
+    symbols_by_path = _group_index_symbols(
+        selected, reference, query_results=query_results
+    )
+    for path in normalized_paths:
+        symbols_by_path.setdefault(path, [])
+    return CodeSymbolSearchResult(
+        symbols_by_path,
+        _planning_symbol_coverage(document, reference, normalized_paths),
+    )
+
+
+def _planning_symbol_coverage(
+    document: Mapping[str, Any],
+    reference: CodeSymbolArtifact,
+    requested_paths: Sequence[str],
+) -> dict[str, Any]:
+    coverage = document.get("coverage", [])
+    row = (
+        next(
+            (
+                item
+                for item in coverage
+                if isinstance(item, Mapping)
+                and item.get("component_id") == reference.component_id
+            ),
+            {},
+        )
+        if isinstance(coverage, list)
+        else {}
+    )
+    indexed = {path for path in row.get("indexed_paths", []) if isinstance(path, str)}
+    unindexed = {
+        path for path in row.get("unindexed_paths", []) if isinstance(path, str)
+    }
+    requested = tuple(sorted(set(requested_paths)))
+    unindexed_paths = sorted(unindexed & set(requested))
+    new_paths = sorted(set(requested) - indexed - unindexed)
+    unindexed_sample = sorted(unindexed)[:100]
+    return {
+        "component_id": reference.component_id,
+        "status": reference.coverage,
+        "artifact_id": reference.artifact_id,
+        "source_revision": reference.source_revision,
+        "requested_paths": list(requested),
+        "indexed_paths": sorted(indexed & set(requested)),
+        "unindexed_paths": unindexed_paths,
+        "new_paths": new_paths,
+        "unindexed_path_count": len(unindexed),
+        "unindexed_paths_sample": unindexed_sample,
+        "omitted_unindexed_path_count": max(0, len(unindexed) - len(unindexed_sample)),
+    }
 
 
 def _load_or_build_pinned_symbol_artifact(
@@ -1045,7 +1096,7 @@ def search_structural_document_analysis(
     base_commit: str,
     paths: Sequence[str],
 ) -> tuple[
-    dict[str, list[dict[str, Any]]],
+    CodeSymbolSearchResult,
     dict[str, tuple[str, ...]],
     Literal["complete", "partial", "unavailable"],
 ]:
@@ -1074,8 +1125,14 @@ def search_structural_document_analysis(
         selected_symbols.extend(
             row for row in symbol_query["records"] if isinstance(row, Mapping)
         )
-    symbols = _group_index_symbols(
+    symbols_by_path = _group_index_symbols(
         selected_symbols, reference, query_results=symbol_query_results
+    )
+    for path in normalized_paths:
+        symbols_by_path.setdefault(path, [])
+    symbols = CodeSymbolSearchResult(
+        symbols_by_path,
+        _planning_symbol_coverage(document, reference, normalized_paths),
     )
     try:
         _, references = find_workspace_document_analysis(

@@ -113,6 +113,31 @@ def test_same_named_symbols_in_different_paths_have_distinct_stable_ids() -> Non
     assert {symbol["qualified_name"] for symbol in document["symbols"]} == {"parse"}
 
 
+def test_partial_symbol_artifact_lists_unindexed_source_paths() -> None:
+    content, reference, document = build_python_symbol_artifact(
+        source_revision=REVISION,
+        component_id="component:python:repository",
+        provider_version="1.39.9",
+        configuration_fingerprint=CONFIGURATION_FINGERPRINT,
+        symbols_by_path={"src/indexed.py": []},
+        source_by_path={
+            "src/indexed.py": "# Indexed successfully; no declarations.\n",
+            "src/unindexed.py": "def parse(value: str) -> str:\n    return value\n",
+        },
+    )
+
+    loaded = load_code_symbol_artifact(content, reference.to_data())
+    component = loaded["components"][0]
+    coverage = loaded["coverage"][0]
+
+    assert reference.coverage == "partial"
+    assert component["coverage"] == "partial"
+    assert coverage["status"] == "partial"
+    assert coverage["indexed_paths"] == ["src/indexed.py"]
+    assert coverage["unindexed_paths"] == ["src/unindexed.py"]
+    assert document["coverage"] == loaded["coverage"]
+
+
 def test_symbol_query_is_scoped_stable_and_bounded() -> None:
     content, reference, _ = _build_artifact()
     document = load_code_symbol_artifact(content, reference.to_data())

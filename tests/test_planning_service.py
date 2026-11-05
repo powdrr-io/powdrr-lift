@@ -1649,10 +1649,19 @@ def test_structural_candidates_follow_baseline_symbol_bindings_on_planned_paths(
 
 
 @pytest.mark.parametrize(
-    "planned_path", ("src/behavior.py", "src/new_behavior.py"), ids=("existing", "new")
+    ("planned_path", "index_path"),
+    (
+        ("src/behavior.py", True),
+        ("src/new_behavior.py", True),
+        ("src/behavior.py", False),
+    ),
+    ids=("existing", "new", "existing-unindexed"),
 )
 def test_procedrr_runs_real_planning_machine_through_compiled_artifacts(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, planned_path: str
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    planned_path: str,
+    index_path: bool,
 ) -> None:
     text = "# Plan\n\nImplement the requested behavior.\n\nBackground only.\n"
     repository = tmp_path / "repo"
@@ -1685,21 +1694,25 @@ def test_procedrr_runs_real_planning_machine_through_compiled_artifacts(
     ) -> dict[str, list[dict[str, Any]]]:
         assert worktree_root.name == "repository"
         assert paths == ["src/behavior.py"]
-        return {
-            "src/behavior.py": [
-                {
-                    "name": "parse_payload",
-                    "kind": "function",
-                    "range": {
-                        "start_line": 1,
-                        "start_character": 0,
-                        "end_line": 2,
-                        "end_character": 0,
-                    },
-                    "children": [],
-                }
-            ]
-        }
+        return (
+            {
+                "src/behavior.py": [
+                    {
+                        "name": "parse_payload",
+                        "kind": "function",
+                        "range": {
+                            "start_line": 1,
+                            "start_character": 0,
+                            "end_line": 2,
+                            "end_character": 0,
+                        },
+                        "children": [],
+                    }
+                ]
+            }
+            if index_path
+            else {}
+        )
 
     monkeypatch.setattr(
         planning_evidence, "find_workspace_document_symbols", document_symbols
@@ -1822,7 +1835,7 @@ def test_procedrr_runs_real_planning_machine_through_compiled_artifacts(
     )
     expected_code_evidence: tuple[Mapping[str, Any], ...]
     expected_journal_evidence: tuple[Mapping[str, Any], ...]
-    if planned_path == "src/behavior.py":
+    if planned_path == "src/behavior.py" and index_path:
         evidence = symbol_records[0]["code_evidence"]
         assert evidence["artifact_id"].startswith("structrr-code-symbols:sha256:")
         assert evidence["query_id"].startswith("query:sha256:")
@@ -1853,7 +1866,7 @@ def test_procedrr_runs_real_planning_machine_through_compiled_artifacts(
         "describe_item",
         "enumerate_structural_subjects",
     ]
-    if planned_path == "src/behavior.py":
+    if planned_path == "src/behavior.py" and index_path:
         expected_provider_calls.append("describe_structural_change")
     assert provider.calls == expected_provider_calls
     journal = store.load()
@@ -1863,6 +1876,22 @@ def test_procedrr_runs_real_planning_machine_through_compiled_artifacts(
         for reference in event.payload.get("code_evidence_refs", [])
     )
     assert journal_evidence == expected_journal_evidence
+    journal_coverage = tuple(
+        coverage
+        for event in journal.events
+        for coverage in event.payload.get("code_symbol_coverage", [])
+    )
+    assert len(journal_coverage) == 1
+    if planned_path == "src/behavior.py" and not index_path:
+        assert journal_coverage[0]["status"] == "partial"
+        assert journal_coverage[0]["unindexed_paths"] == ["src/behavior.py"]
+        assert journal_coverage[0]["new_paths"] == []
+    else:
+        assert journal_coverage[0]["status"] == "complete"
+        assert journal_coverage[0]["unindexed_paths"] == []
+        assert journal_coverage[0]["new_paths"] == (
+            ["src/new_behavior.py"] if planned_path == "src/new_behavior.py" else []
+        )
     deterministic_events = [
         event
         for event in journal.events

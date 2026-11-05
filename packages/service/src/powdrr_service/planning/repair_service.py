@@ -431,6 +431,16 @@ def _planned_item(
         allowed_paths=tuple(
             value.get("allowed_paths", current.allowed_paths if current else (".",))
         ),
+        code_evidence=tuple(
+            reference
+            for reference in (current.code_evidence if current else ())
+            if _evidence_path_is_in_scope(
+                reference.get("path"),
+                value.get(
+                    "allowed_paths", current.allowed_paths if current else (".",)
+                ),
+            )
+        ),
         manual_prerequisite=value.get(
             "manual_prerequisite", current.manual_prerequisite if current else None
         ),
@@ -460,6 +470,18 @@ def _planned_item(
             "a refreshed Structrr proposal"
         )
     return replacement
+
+
+def _evidence_path_is_in_scope(path: Any, allowed_paths: Sequence[str]) -> bool:
+    if not isinstance(path, str):
+        return False
+    for allowed_path in allowed_paths:
+        normalized = allowed_path.rstrip("/")
+        if normalized in {"", "."} or path == normalized:
+            return True
+        if path.startswith(f"{normalized}/"):
+            return True
+    return False
 
 
 def _repair_pr_body(

@@ -23,6 +23,7 @@ class PlannedWorkItem:
     manual_prerequisite: Mapping[str, Any] | None = None
     inline_adjustments: tuple[Mapping[str, Any], ...] = ()
     github_issue_number: int | None = None
+    code_evidence: tuple[Mapping[str, Any], ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

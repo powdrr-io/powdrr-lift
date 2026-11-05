@@ -1066,7 +1066,11 @@ def inspect_repository_ci(repo_root: Path) -> str:
 
 
 def inspect_repository_code(
-    repo_root: Path, source_plan: str, client: WorkflowLLMClient
+    repo_root: Path,
+    source_plan: str,
+    client: WorkflowLLMClient,
+    *,
+    evidence_sink: list[dict[str, Any]] | None = None,
 ) -> str:
     """Use the model and Python language server to retrieve relevant code evidence."""
     commit_result = subprocess.run(
@@ -1165,6 +1169,11 @@ def inspect_repository_code(
             for symbol in symbols:
                 if not isinstance(symbol, Mapping):
                     continue
+                code_evidence = symbol.get("code_evidence")
+                if evidence_sink is not None and isinstance(code_evidence, Mapping):
+                    reference = dict(code_evidence)
+                    if reference not in evidence_sink:
+                        evidence_sink.append(reference)
                 relative_path = symbol.get("path")
                 location_range = symbol.get("range")
                 if not isinstance(relative_path, str):
@@ -1893,6 +1902,7 @@ def generate_execution_plan_yaml(
             + "; ".join(remaining_issues)
         )
 
+    draft_code_evidence: list[dict[str, Any]] = []
     if repository_root is not None:
         # The initial code investigation happens before the plan exists. Query
         # the symbols named by the draft as a separate pass so the planner has
@@ -1908,6 +1918,7 @@ def generate_execution_plan_yaml(
             repository_root,
             draft_context,
             client,
+            evidence_sink=draft_code_evidence,
         )
         coverage_audit = complete_json(
             client,
@@ -2252,15 +2263,24 @@ def generate_execution_plan_yaml(
                 "item ids must map to unique workflow ids after slugification"
             )
         workflow_ids.add(workflow_id)
-        items.append(
+        item_record = dict(item)
+        if repository_root is not None:
+            matching_evidence = [
+                reference
+                for reference in draft_code_evidence
+                if _code_evidence_path_matches(reference.get("path"), allowed_paths)
+            ]
+            if matching_evidence:
+                item_record["code_evidence"] = matching_evidence[:50]
+        item_record.update(
             {
-                **dict(item),
                 "workflow_file": (
                     Path("docs") / "workflows" / plan_slug / f"{workflow_id}.yaml"
                 ).as_posix(),
                 "workflow_id": workflow_id,
             }
         )
+        items.append(item_record)
     document: dict[str, Any] = {"schema": QUEUE_SCHEMA, "plan_id": plan_id}
     if source_document is not None:
         document["source_document"] = source_document
@@ -2277,6 +2297,21 @@ def generate_execution_plan_yaml(
         raise PlanGenerationError(f"proposed plan is invalid: {error}") from error
     _require_dependency_order(validated)
     return rendered, validated
+
+
+def _code_evidence_path_matches(path: Any, allowed_paths: list[Any]) -> bool:
+    """Return whether an evidence path is within an item's declared write scope."""
+    if not isinstance(path, str):
+        return False
+    for allowed_path in allowed_paths:
+        if not isinstance(allowed_path, str):
+            continue
+        normalized = allowed_path.rstrip("/")
+        if normalized in {"", "."} or path == normalized:
+            return True
+        if path.startswith(f"{normalized}/"):
+            return True
+    return False
 
 
 def write_execution_plan_artifacts(

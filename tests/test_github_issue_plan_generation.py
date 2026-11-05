@@ -947,8 +947,35 @@ def test_plan_generation_reconciles_draft_with_targeted_repository_evidence(
     client = SequencedPlanningClient([draft, draft, audit, reconciled])
     inspected_contexts: list[str] = []
 
-    def inspect_draft(_repo_root: Path, source_plan: str, _client: Any) -> str:
+    def inspect_draft(
+        _repo_root: Path,
+        source_plan: str,
+        _client: Any,
+        *,
+        evidence_sink: list[dict[str, Any]] | None = None,
+    ) -> str:
         inspected_contexts.append(source_plan)
+        if evidence_sink is not None:
+            evidence_sink.append(
+                {
+                    "snapshot_id": "structrr:sha256:" + "1" * 64,
+                    "source_revision": "a" * 40,
+                    "artifact_id": "structrr-code-symbols:sha256:" + "2" * 64,
+                    "artifact_digest": "sha256:" + "2" * 64,
+                    "query_id": "query:sha256:" + "3" * 64,
+                    "query_filters": {"paths": ["src/verifier.py"]},
+                    "symbol_id": "symbol:python:verifier:parse_policy:function",
+                    "path": "src/verifier.py",
+                    "span": {
+                        "start_line": 1,
+                        "start_column": 0,
+                        "end_line": 3,
+                        "end_column": 1,
+                    },
+                    "truncated": False,
+                    "omitted_count": 0,
+                }
+            )
         return (
             "Current checkout evidence: attestation/verifier/parsers.py implements "
             "strict policy parsing; tests/test_parsers.py covers duplicate keys."
@@ -958,7 +985,7 @@ def test_plan_generation_reconciles_draft_with_targeted_repository_evidence(
         "powdrr_lift.workrr.github_issue_plan_generation.inspect_repository_code",
         inspect_draft,
     )
-    _, plan = generate_execution_plan_yaml(
+    rendered_plan, plan = generate_execution_plan_yaml(
         source_plan="# Plan\nImplement strict parsers and a portable verifier.",
         plan_id="current-state-reconciliation-v1",
         client=client,
@@ -987,6 +1014,9 @@ def test_plan_generation_reconciles_draft_with_targeted_repository_evidence(
         "Add the missing authorization decision API.",
         "Add the missing stable rejection reason API.",
     )
+    assert len(plan.items[0].code_evidence) == 1
+    assert plan.items[0].code_evidence[0]["path"] == "src/verifier.py"
+    assert "code_evidence:" in rendered_plan
 
 
 def test_incomplete_coverage_audit_preserves_unassessed_items(tmp_path: Path) -> None:
@@ -1958,7 +1988,13 @@ def test_issue_code_inspection_uses_shared_revision_artifact(
     )
     client = SequencedPlanningClient([{"queries": ["parse_policy"], "done": True}])
 
-    context = inspect_repository_code(repository, "Add policy validation.", client)
+    evidence_refs: list[dict[str, Any]] = []
+    context = inspect_repository_code(
+        repository,
+        "Add policy validation.",
+        client,
+        evidence_sink=evidence_refs,
+    )
 
     assert len(provider_paths) == 1
     if provider_fails:
@@ -1970,6 +2006,9 @@ def test_issue_code_inspection_uses_shared_revision_artifact(
     assert "artifact_digest" in context
     assert "query:sha256:" in context
     assert "code_evidence" in context
+    assert evidence_refs
+    assert evidence_refs[0]["artifact_id"].startswith("structrr-code-symbols:")
+    assert evidence_refs[0]["query_id"].startswith("query:sha256:")
     assert "def parse_policy(raw: str) -> bool" in context
     expected_coverage_status = "complete" if include_test_symbols else "partial"
     assert f'"status": "{expected_coverage_status}"' in context

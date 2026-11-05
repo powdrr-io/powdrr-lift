@@ -91,6 +91,7 @@ def test_all_supported_workflow_names_have_procedrr_processes() -> None:
         "create-pull-request",
         "dead-code-review",
         "design-interview",
+        "execute-ci-repair",
         "feature-functionality-review",
         "feature-test-coverage-review",
         "finish-pr-prep",
@@ -121,6 +122,21 @@ def test_ci_response_procedure_is_observation_only_and_uses_cli_gate() -> None:
     assert "respond-to-pr-ci" in question
     assert "Do not diagnose the cause" in question
     assert "call a coding agent" in question
+
+
+def test_ci_repair_process_dispatches_only_the_prepared_repair_request() -> None:
+    process = ProcessCatalog.load(bundled_process_directory()).get("execute-ci-repair")
+    operation = process.document["steps"][0]["operation"]
+    parameters = operation["parameters"]["parameters"]
+
+    assert process.document["inputs"] == [
+        {"name": "repair_request", "type": "object", "required": True}
+    ]
+    assert parameters["mode"] == "ci-repair"
+    assert parameters["repair_request"] == {
+        "type": "reference",
+        "value": "repair_request",
+    }
 
 
 def test_specify_feature_interviews_until_structured_spec_has_no_open_assumptions() -> (

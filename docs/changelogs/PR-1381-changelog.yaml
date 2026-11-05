@@ -1,0 +1,188 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1381
+title: Add scoped CI repair policy and research
+intent:
+  problem: The first CI response stage records failures but does not yet give a coding worker an evidence-bound repair request or prevent edits to protected verification paths.
+  goal: Define service-owned single-failure repair contracts and MiniSWE instructions, bound external research to official GitHub Actions documentation, and let the generic coding-agent boundary reject changes to explicitly protected paths.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 3968, end_line: 4015}
+  summary: Assign CI repair policy and research to the service and worker enforcement and dispatch to the agent.
+  rationale: Keep proprietary diagnosis and prompting in the service while the agent enforces scope and executes the prepared repair.
+- path: packages/service/src/powdrr_service/ci_response/__init__.py
+  type: modified
+  span: {start_line: 10, end_line: 14}
+  summary: Import the CI repair contract, prompt compiler, and patch validator.
+  rationale: Expose service policy through the CI response package.
+- path: packages/service/src/powdrr_service/ci_response/__init__.py
+  type: modified
+  span: {start_line: 16, end_line: 19}
+  summary: Import focused GitHub Actions research policy.
+  rationale: Make bounded source selection available beside CI response policy.
+- path: packages/service/src/powdrr_service/ci_response/__init__.py
+  type: modified
+  span: {start_line: 27, end_line: 27}
+  summary: Export the repair contract.
+  rationale: Give service callers the typed repair boundary.
+- path: packages/service/src/powdrr_service/ci_response/__init__.py
+  type: modified
+  span: {start_line: 29, end_line: 32}
+  summary: Export CI repair prompt, patch gate, and bounded research functions.
+  rationale: Keep consumers on the public service package interface.
+- path: packages/service/src/powdrr_service/ci_response/repair.py
+  type: added
+  span: {start_line: 1, end_line: 187}
+  summary: Pin each repair to one failure and exact PR head, compile reproduction-aware MiniSWE guidance, and reject obvious test or verification weakening.
+  rationale: Prevent broad or stale repair requests and deterministic ways of making CI green without fixing the failure.
+- path: packages/service/src/powdrr_service/ci_response/research.py
+  type: added
+  span: {start_line: 1, end_line: 114}
+  summary: Generate at most two focused GitHub Actions searches and select at most three HTTPS sources from docs.github.com.
+  rationale: Ground workflow and runner guidance in bounded, official sources without guessing replacement configuration.
+- path: packages/service/src/powdrr_service/resources/processes/execute-ci-repair.yaml
+  type: added
+  span: {start_line: 1, end_line: 31}
+  summary: Add a typed Procedrr process that sends one prepared repair request through the coding-agent capability.
+  rationale: Keep repair work in the existing agent execution boundary and make one dispatch explicit.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 449, end_line: 513}
+  summary: Validate CI repair request identity, exact head, path scope, protected paths, and acceptance command before worker dispatch.
+  rationale: Reject stale or path-escaping requests before starting MiniSWE.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 2939, end_line: 2940}
+  summary: Route the Procedrr ci-repair mode to the dedicated MiniSWE adapter.
+  rationale: Add a narrow dispatch path without reusing the broader plan implementation workflow.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 3659, end_line: 3715}
+  summary: Run one protected MiniSWE attempt and return its exact head, failure ID, changed paths, and attempt receipt.
+  rationale: Reuse the existing inference bridge and coding-agent runner while preserving a bounded repair record.
+- path: tests/test_procedrr_chat.py
+  type: modified
+  span: {start_line: 94, end_line: 94}
+  summary: Register the repair process in supported Procedrr process expectations.
+  rationale: Ensure the packaged process catalog includes CI repair execution.
+- path: tests/test_procedrr_chat.py
+  type: modified
+  span: {start_line: 127, end_line: 141}
+  summary: Verify the CI repair process forwards only the prepared repair request to the dedicated coding-agent mode.
+  rationale: Keep process dispatch declarative and narrow.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span: {start_line: 4021, end_line: 4149}
+  summary: Verify stale-head and path-escape rejection plus MiniSWE dispatch of a valid scoped request.
+  rationale: Exercise the worker boundary using a real temporary Git head and a mocked runner.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span: {start_line: 108, end_line: 108}
+  summary: Add protected paths to the worker request model.
+  rationale: Carry protection declarations across the generic worker boundary.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span: {start_line: 130, end_line: 130}
+  summary: Serialize protected paths in worker requests.
+  rationale: Persist the enforcement contract for worker execution.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span: {start_line: 208, end_line: 208}
+  summary: Deserialize protected paths with backward-compatible empty defaults.
+  rationale: Continue loading older worker request artifacts safely.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span: {start_line: 1301, end_line: 1305}
+  summary: Detect changed paths covered by a protected-path declaration.
+  rationale: Compare observed worktree changes against explicit protection.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span: {start_line: 1310, end_line: 1310}
+  summary: Deny worker attempts that changed protected paths.
+  rationale: Apply protected-path policy to final coding-agent status.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span: {start_line: 1315, end_line: 1316}
+  summary: Report a protected-path denial distinctly.
+  rationale: Preserve a useful reason when a worker violates declared protection.
+- path: tests/test_ci_response_policy.py
+  type: modified
+  span: {start_line: 13, end_line: 13}
+  summary: Import CI repair contract test subject.
+  rationale: Add focused service-policy coverage.
+- path: tests/test_ci_response_policy.py
+  type: modified
+  span: {start_line: 16, end_line: 17}
+  summary: Import prompt and query compiler test subjects.
+  rationale: Exercise scoped instruction and research construction.
+- path: tests/test_ci_response_policy.py
+  type: modified
+  span: {start_line: 20, end_line: 21}
+  summary: Import source selection and patch validation test subjects.
+  rationale: Exercise bounded official research and verification protection.
+- path: tests/test_ci_response_policy.py
+  type: modified
+  span: {start_line: 23, end_line: 23}
+  summary: Import the typed failure unit used by repair fixtures.
+  rationale: Keep test fixture types aligned with production contracts.
+- path: tests/test_ci_response_policy.py
+  type: modified
+  span: {start_line: 141, end_line: 288}
+  summary: Cover pinned repair prompting, non-reproduction guidance, official-source caps, and forbidden verification weakening.
+  rationale: Exercise service behavior with concrete failures and malicious patch examples.
+- path: tests/test_coding_agent.py
+  type: modified
+  span: {start_line: 803, end_line: 844}
+  summary: Verify protected-path edits are policy-denied and protected paths round-trip in worker requests.
+  rationale: Ensure the generic worker enforcement survives serialization and observes actual filesystem changes.
+entities:
+- id: ci-repair-contract
+  type: Module
+  action: added
+- id: ci-repair-prompt-compiler
+  type: Function
+  action: added
+- id: github-actions-research-policy
+  type: Module
+  action: added
+- id: protected-path-worker-gate
+  type: Function
+  action: added
+- id: ci-repair-policy-regression-tests
+  type: Regression test
+  action: added
+entity_relationships:
+- id: prompt-uses-pinned-repair-contract
+  type: depends on
+  source: ci-repair-prompt-compiler
+  target: ci-repair-contract
+  action: added
+  description: The MiniSWE prompt compiler refuses evidence from a different failure ID or PR head and renders reproduction-aware instructions from the contract.
+- id: agent-enforces-service-protected-paths
+  type: enforces
+  source: protected-path-worker-gate
+  target: ci-repair-contract
+  action: added
+  description: The shared worker request carries protected paths, and the agent denies attempts whose observed diff changes one.
+- id: policy-tests-cover-ci-repairs
+  type: verifies
+  source: ci-repair-policy-regression-tests
+  target: ci-repair-contract
+  action: added
+  description: Mocked inputs verify bounded research, explicit non-reproduction guidance, and rejection of verification weakening.
+invariants:
+- id: ci-repair-is-pinned-to-one-head-and-failure
+  description: A repair prompt is emitted only when the failure ID and exact head match the service contract.
+  action: added
+- id: comparable-local-green-means-actions-specific-guidance
+  description: A comparable local non-reproduction explicitly tells MiniSWE to treat the issue as GitHub Actions specific; an incomparable run is not described as a non-reproduction.
+  action: added
+- id: ci-research-is-bounded-and-official
+  description: CI research creates no more than two focused searches, selects no more than three HTTPS documentation sources, and accepts only docs.github.com as the source host.
+  action: added
+- id: protected-worker-paths-are-enforced
+  description: Changes to declared protected paths result in a policy-denied coding-agent attempt even when the path is within the broader allowed path scope.
+  action: added
+guidance: []

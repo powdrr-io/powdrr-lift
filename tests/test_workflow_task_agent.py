@@ -4018,3 +4018,132 @@ def test_process_workflow_task_blocks_with_human_handoff_and_follow_up(
     assert [task.task_id for task in blocked_workflow.ready_tasks()] == [
         "human-input-1-follow-up"
     ]
+
+
+def test_ci_repair_request_is_pinned_and_scoped() -> None:
+    base = "a" * 40
+    request = task_agent._ci_repair_implementation_request(
+        {
+            "head_sha": base,
+            "failure_id": "ci-failure-01",
+            "prompt": "Fix the one observed Actions runner failure.",
+            "contract_fingerprint": "b" * 64,
+            "allowed_paths": [".github/workflows/ci.yml"],
+            "protected_paths": ["tests"],
+            "acceptance_command": ["pytest", "tests/test_ci.py"],
+        },
+        base_commit=base,
+    )
+
+    assert request.request_id.startswith("ci-repair-")
+    assert request.base_commit == base
+    assert request.plan_fingerprint == "b" * 64
+    assert request.allowed_paths == (".github/workflows/ci.yml",)
+    assert request.protected_paths == ("tests",)
+    assert request.allowed_commands == ("pytest tests/test_ci.py",)
+
+
+def test_ci_repair_request_rejects_stale_head_and_path_escape() -> None:
+    base = "a" * 40
+    request = {
+        "head_sha": "c" * 40,
+        "failure_id": "ci-failure-01",
+        "prompt": "Fix one failure.",
+        "contract_fingerprint": "b" * 64,
+        "allowed_paths": ["../outside"],
+        "protected_paths": [],
+        "acceptance_command": ["pytest"],
+    }
+
+    with pytest.raises(task_agent.PowdrrExecutionError, match="head"):
+        task_agent._ci_repair_implementation_request(request, base_commit=base)
+    request["head_sha"] = base
+    with pytest.raises(task_agent.PowdrrExecutionError, match="repository-relative"):
+        task_agent._ci_repair_implementation_request(request, base_commit=base)
+
+
+def test_ci_repair_dispatch_uses_miniswe_with_service_compiled_request(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    (tmp_path / "README.md").write_text("base\n", encoding="utf-8")
+    subprocess.run(["git", "add", "README.md"], cwd=tmp_path, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "-m",
+            "base",
+        ],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+    )
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    received: dict[str, Any] = {}
+
+    class FakeRunner:
+        def __init__(self, *, provider: Any, store: Any) -> None:
+            received["provider"] = provider
+            received["store"] = store
+
+        def run(self, request: Any, *, worktree_root: Path, attempt_id: str) -> Any:
+            received["request"] = request
+            received["worktree"] = worktree_root
+            received["attempt_id"] = attempt_id
+            return SimpleNamespace(
+                status=SimpleNamespace(value="completed"),
+                attempt_id=attempt_id,
+                changed_paths=(".github/workflows/ci.yml",),
+                error=None,
+                diff_fingerprint="d" * 64,
+                worker_committed=True,
+            )
+
+    monkeypatch.setattr(task_agent, "CodingAgentRunner", FakeRunner)
+    monkeypatch.setattr(
+        task_agent,
+        "create_miniswe_inference_handler",
+        lambda _timeout: lambda _request: None,
+    )
+    strategy = SimpleNamespace(
+        repo_root=tmp_path,
+        config=SimpleNamespace(
+            coding_agent_timeout_seconds=60,
+            minisweagent_executable="mini",
+            minisweagent_model="test/model",
+        ),
+        events=[],
+    )
+    result = task_agent._TaskWorkflowExecutionStrategy._run_ci_repair_agent(
+        cast(Any, strategy),
+        {
+            "repair_request": {
+                "head_sha": head,
+                "failure_id": "ci-failure-02",
+                "prompt": "Fix only this observed Actions failure.",
+                "contract_fingerprint": "b" * 64,
+                "allowed_paths": [".github/workflows/ci.yml"],
+                "protected_paths": ["tests"],
+                "acceptance_command": ["pytest", "tests/test_ci.py"],
+            }
+        },
+    )
+
+    assert result["passed"] is True
+    assert result["head_sha"] == head
+    assert result["failure_id"] == "ci-failure-02"
+    assert received["request"].prompt == "Fix only this observed Actions failure."
+    assert received["request"].protected_paths == ("tests",)
+    assert received["worktree"] == tmp_path
+    assert strategy.events[0]["kind"] == "ci_repair_coding_agent"

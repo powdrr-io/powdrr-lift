@@ -1,0 +1,31 @@
+version: 1
+name: execute-ci-repair
+description: Dispatch one exact-head, service-compiled CI repair to MiniSWE.
+inputs:
+  - {name: repair_request, type: object, required: true}
+outputs:
+  repair_attempt:
+    type: object
+    required: [passed, attempt_id, status, head_sha, failure_id, changed_paths]
+    properties:
+      passed: {type: boolean}
+      attempt_id: {type: string, minLength: 1}
+      status: {type: string}
+      head_sha: {type: string, minLength: 40}
+      failure_id: {type: string, minLength: 1}
+      changed_paths: {type: array, items: {type: string}}
+      protected_paths: {type: array, items: {type: string}}
+      error: {type: [string, "null"]}
+      diff_fingerprint: {type: [string, "null"]}
+      worker_committed: {type: boolean}
+limits: {max_epochs: 1, context_chars: 12000, context_value_chars: 4000}
+steps:
+  - operation:
+      tool: invoke_tool
+      parameters:
+        tool: coding-agent
+        parameters:
+          mode: ci-repair
+          repair_request: {type: reference, value: repair_request}
+      bind: repair_attempt
+  - terminal: succeeded

@@ -237,6 +237,61 @@ def test_pinned_symbol_queries_reuse_revision_artifact_and_keep_provenance(
     assert checked_in_reference["source_revision"] == base_commit
 
 
+def test_ambiguous_symbol_name_returns_all_matches_and_path_query_scopes_them(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repository, _ = _repository(tmp_path)
+    (repository / "src/alternate.py").write_text(
+        "def parse_payload(raw: bytes) -> bytes:\n    return raw.strip()\n",
+        encoding="utf-8",
+    )
+    _git(repository, "add", "src/alternate.py")
+    _git(repository, "commit", "-qm", "add second parser")
+    base_commit = _git(repository, "rev-parse", "HEAD")
+
+    def document_symbols(
+        paths: list[str], *, worktree_root: Path
+    ) -> dict[str, list[dict[str, Any]]]:
+        assert worktree_root.name == "repository"
+        return {
+            path: [
+                {
+                    "name": "parse_payload",
+                    "kind": "function",
+                    "range": {
+                        "start_line": 1,
+                        "start_character": 0,
+                        "end_line": 2,
+                        "end_character": 0,
+                    },
+                }
+            ]
+            for path in paths
+            if path in {"src/schema.py", "src/alternate.py"}
+        }
+
+    monkeypatch.setattr(
+        evidence_module, "find_workspace_document_symbols", document_symbols
+    )
+
+    matches = search_pinned_workspace_symbols(
+        repository, base_commit, ["parse_payload"]
+    )["parse_payload"]
+    scoped = search_structural_document_symbols(
+        repository, base_commit, ["src/schema.py"]
+    )["src/schema.py"]
+
+    assert sorted(record["path"] for record in matches) == [
+        "src/alternate.py",
+        "src/schema.py",
+    ]
+    assert len({record["symbol_id"] for record in matches}) == 2
+    assert len({record["code_evidence"]["query_id"] for record in matches}) == 1
+    assert [record["path"] for record in scoped] == ["src/schema.py"]
+    assert scoped[0]["artifact_id"] == matches[0]["artifact_id"]
+    assert scoped[0]["code_evidence"]["query_filters"]["paths"] == ["src/schema.py"]
+
+
 def test_worktree_symbol_artifact_invalidates_when_dirty_python_source_changes(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -287,6 +342,65 @@ def test_worktree_symbol_artifact_invalidates_when_dirty_python_source_changes(
         first["parse_payload"][0]["artifact_digest"]
         != second["parse_payload"][0]["artifact_digest"]
     )
+
+
+@pytest.mark.parametrize("changed_input", ("provider", "configuration"))
+def test_worktree_symbol_artifact_invalidates_when_provider_inputs_change(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, changed_input: str
+) -> None:
+    repository, _ = _repository(tmp_path)
+    provider_version = ["1.0.0"]
+    provider_calls = 0
+
+    def document_symbols(
+        paths: list[str], *, worktree_root: Path
+    ) -> dict[str, list[dict[str, Any]]]:
+        nonlocal provider_calls
+        provider_calls += 1
+        return {
+            "src/schema.py": [
+                {
+                    "name": "parse_payload",
+                    "kind": "function",
+                    "range": {
+                        "start_line": 1,
+                        "start_character": 0,
+                        "end_line": 2,
+                        "end_character": 0,
+                    },
+                }
+            ]
+        }
+
+    monkeypatch.setattr(
+        evidence_module, "find_workspace_document_symbols", document_symbols
+    )
+    monkeypatch.setattr(
+        evidence_module,
+        "version",
+        lambda package: (
+            provider_version[0]
+            if package == "basedpyright"
+            else pytest.fail(f"unexpected package version request: {package}")
+        ),
+    )
+
+    first = search_workspace_symbols_from_worktree(
+        repository, ["parse_payload"], limit=10
+    )["parse_payload"][0]
+    if changed_input == "provider":
+        provider_version[0] = "1.0.1"
+    else:
+        (repository / "pyproject.toml").write_text(
+            "[tool.example]\ninclude = ['src']\n", encoding="utf-8"
+        )
+    second = search_workspace_symbols_from_worktree(
+        repository, ["parse_payload"], limit=10
+    )["parse_payload"][0]
+
+    assert provider_calls == 2
+    assert first["artifact_id"] != second["artifact_id"]
+    assert first["artifact_digest"] != second["artifact_digest"]
 
 
 def test_unavailable_reference_lookup_keeps_indexed_symbol_evidence(

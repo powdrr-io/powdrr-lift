@@ -2311,6 +2311,7 @@ class SourceLedgerQuestionMachine:
                     )
                     operation = bind_structural_operation(change)
                     if operation is not None:
+                        operations.append(operation)
                         item_operations.append(operation)
                     continue
                 request = build_structural_change_request(

@@ -1,0 +1,191 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1372
+title: Preserve ambiguous symbols and new planned paths
+intent:
+  problem: Same-named declarations in different files can collide in the symbol artifact,
+    and a newly planned file path can be omitted from the compiled Structrr proposal.
+  goal: Give each source declaration a path-disambiguated stable identity, retain
+    new planned file operations in the proposal, and prove these behaviors through
+    end-to-end and artifact-freshness tests.
+human-decisions: []
+structured_files: []
+files:
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 2314
+    end_line: 2314
+  summary: Include deterministic planned-file operations in the compiled proposal
+    operation list.
+  rationale: Ensure newly planned source paths are present in the persisted Structrr
+    projection.
+- path: packages/service/src/powdrr_service/structrr/code_symbols.py
+  type: modified
+  span:
+    start_line: 398
+    end_line: 398
+  summary: Disambiguate symbol IDs using their repository-relative path.
+  rationale: Allow distinct same-named declarations in different files to coexist
+    in one validated artifact.
+- path: tests/test_planning_evidence.py
+  type: modified
+  span:
+    start_line: 240
+    end_line: 294
+  summary: Cover ambiguous symbol lookup and artifact invalidation when provider or
+    configuration inputs change.
+  rationale: Prove queries preserve all same-name matches, path filters narrow results,
+    and stale index inputs rebuild the artifact.
+- path: tests/test_planning_evidence.py
+  type: modified
+  span:
+    start_line: 347
+    end_line: 405
+  summary: Cover ambiguous symbol lookup and artifact invalidation when provider or
+    configuration inputs change.
+  rationale: Prove queries preserve all same-name matches, path filters narrow results,
+    and stale index inputs rebuild the artifact.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1651
+    end_line: 1653
+  summary: Run the planning machine end to end for both an existing implementation
+    path and a newly planned path.
+  rationale: Verify the final proposal retains the planned source subject and carries
+    symbol evidence only when a matching existing declaration is available.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1655
+    end_line: 1655
+  summary: Run the planning machine end to end for both an existing implementation
+    path and a newly planned path.
+  rationale: Verify the final proposal retains the planned source subject and carries
+    symbol evidence only when a matching existing declaration is available.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1721
+    end_line: 1725
+  summary: Run the planning machine end to end for both an existing implementation
+    path and a newly planned path.
+  rationale: Verify the final proposal retains the planned source subject and carries
+    symbol evidence only when a matching existing declaration is available.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1785
+    end_line: 1785
+  summary: Run the planning machine end to end for both an existing implementation
+    path and a newly planned path.
+  rationale: Verify the final proposal retains the planned source subject and carries
+    symbol evidence only when a matching existing declaration is available.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1817
+    end_line: 1818
+  summary: Run the planning machine end to end for both an existing implementation
+    path and a newly planned path.
+  rationale: Verify the final proposal retains the planned source subject and carries
+    symbol evidence only when a matching existing declaration is available.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1820
+    end_line: 1847
+  summary: Run the planning machine end to end for both an existing implementation
+    path and a newly planned path.
+  rationale: Verify the final proposal retains the planned source subject and carries
+    symbol evidence only when a matching existing declaration is available.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1824
+    end_line: 1824
+  summary: Run the planning machine end to end for both an existing implementation
+    path and a newly planned path.
+  rationale: Verify the final proposal retains the planned source subject and carries
+    symbol evidence only when a matching existing declaration is available.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1853
+    end_line: 1855
+  summary: Run the planning machine end to end for both an existing implementation
+    path and a newly planned path.
+  rationale: Verify the final proposal retains the planned source subject and carries
+    symbol evidence only when a matching existing declaration is available.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1894
+    end_line: 1897
+  summary: Run the planning machine end to end for both an existing implementation
+    path and a newly planned path.
+  rationale: Verify the final proposal retains the planned source subject and carries
+    symbol evidence only when a matching existing declaration is available.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1902
+    end_line: 1902
+  summary: Run the planning machine end to end for both an existing implementation
+    path and a newly planned path.
+  rationale: Verify the final proposal retains the planned source subject and carries
+    symbol evidence only when a matching existing declaration is available.
+- path: tests/test_structrr_code_symbols.py
+  type: modified
+  span:
+    start_line: 78
+    end_line: 115
+  summary: Verify same-named symbols from different paths receive distinct stable
+    IDs and load successfully.
+  rationale: Prevent duplicate symbol IDs from corrupting or invalidating an otherwise
+    complete artifact.
+entities:
+- id: planned-file-proposal-operation
+  type: Function
+  action: added
+- id: path-qualified-symbol-identity
+  type: Function
+  action: added
+- id: planning-new-path-e2e-regression
+  type: Regression test
+  action: added
+- id: ambiguous-symbol-query-regression
+  type: Regression test
+  action: added
+- id: symbol-provider-input-invalidation-regression
+  type: Regression test
+  action: added
+entity_relationships:
+- id: new-path-e2e-verifies-proposal-operation
+  type: verifies
+  source: planning-new-path-e2e-regression
+  target: planned-file-proposal-operation
+  action: added
+  description: The full planning run proves a new path reaches the final proposal
+    snapshot.
+- id: ambiguous-query-verifies-symbol-identity
+  type: verifies
+  source: ambiguous-symbol-query-regression
+  target: path-qualified-symbol-identity
+  action: added
+  description: The query keeps declarations from both files distinct and applies path
+    scope without collapsing them.
+invariants:
+- id: symbol-id-is-unique-across-paths
+  description: Distinct source declarations in different repository paths have distinct
+    stable symbol IDs, even when their qualified names and kinds match.
+  action: added
+- id: provider-input-change-rebuilds-artifact
+  description: A provider version or Python configuration change invalidates the reusable
+    symbol artifact and triggers re-indexing.
+  action: added
+- id: planned-new-path-in-final-proposal
+  description: A newly planned source path is represented in the compiled Structrr
+    proposal snapshot.
+  action: added
+guidance: []

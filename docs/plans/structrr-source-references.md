@@ -614,9 +614,24 @@ duplicate serialization and stale spans are mechanical findings. Unresolvable
 endpoints block an existence question until the endpoint can be identified.
 Previously accepted decisions may be reused only when their full input fingerprint
 and policy/provider revisions match. Do not repeatedly ask until a desired answer
-appears. A configured alternate can handle an explicitly recorded unresolved
-case, but it receives the same question and cannot silently override a conflicting
-accepted decision.
+appears. If Jev or the configured primary provider returns unresolved,
+orchestration must ask the configured LLM once before reporting a final unresolved
+link. The LLM receives the same exact edge-existence question, the full bounded
+evidence packet and the primary provider's unresolved reason. Deterministically
+assemble any additional available evidence requested by that reason and record
+the resulting input fingerprint. The LLM has the same `exists`, `absent` or
+unresolved response contract and no artifact-editing tools.
+
+An `exists` or `absent` LLM answer drives the same deterministic correction table.
+If the LLM also returns unresolved, report the case with both attempts, evidence
+references and the remaining reason. Preserve provider/model revisions and input
+fingerprints for both stages; reuse a result only with matching stage inputs.
+If the primary provider is itself an LLM and returns unresolved, still run this
+explicit fallback pass once with its unresolved reason; never recurse through
+additional fallback passes. An unavailable LLM or invalid response is recorded
+as a failed fallback attempt and reported unresolved, never treated as a decision.
+An enforce-mode run must configure this LLM fallback before starting. Fallback
+addresses an unresolved result and cannot override a resolved accepted decision.
 
 ### 12.3. Deterministic correction table
 
@@ -626,7 +641,8 @@ For a valid, current decision, compile these operations mechanically:
 | --- | --- | --- |
 | `exists` | Ensure exactly one eligible binding for the edge; refresh derived owner/span metadata | Ensure exactly one correctly scoped annotation on the owner |
 | `absent` | Remove the edge's applicability binding, retaining the decision in audit history | Remove only the annotation representing this edge |
-| unresolved | Record the unresolved case | Preserve the artifacts and block completion of affected required links |
+| primary unresolved | Record the primary attempt and ask the LLM fallback | Preserve artifacts pending the fallback decision |
+| fallback unresolved or failed | Report the unresolved case with both attempts | Preserve the artifacts and block completion of affected required links |
 
 Remove neither the canonical decision/invariant nor the implementation when a
 link is absent. If the result conflicts with a mandatory accepted placement,
@@ -726,7 +742,10 @@ providers before an opt-in live Jev test.
 
 Required cases: Structrr-only and source-only links for both `exists` and
 `absent`; duplicate links; missing endpoints; unsupported binding kinds;
-unresolved/conflicting evidence; stale decision fingerprints; same-input reuse;
+unresolved/conflicting evidence; primary-unresolved to LLM-`exists` and
+LLM-`absent`; both stages unresolved; unavailable/invalid LLM; exactly one fallback
+pass even when the primary is an LLM; retained provenance for both stages;
+stage-specific stale decision fingerprints; same-input reuse;
 shared annotation retention; mandatory-obligation conflict; relocation candidates;
 decorated/nested owners; token-preserving removal; interrupted application;
 repeat-run idempotence; final reciprocal scan; regenerated spans; rejected-edge

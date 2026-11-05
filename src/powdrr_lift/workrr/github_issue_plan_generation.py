@@ -1412,23 +1412,35 @@ def publish_execution_plan_pull_request(
         source_plan_path=source_plan_path,
         plan_path=relative_paths[0],
     )
-    output = _run_publication_command(
-        runner,
-        repo_root,
-        [
-            "gh",
-            "pr",
-            "create",
-            "--base",
-            selected_base,
-            "--head",
-            branch_name,
-            "--title",
-            title,
-            "--body",
-            body,
-        ],
-    )
+    try:
+        output = _run_publication_command(
+            runner,
+            repo_root,
+            [
+                "gh",
+                "pr",
+                "create",
+                "--base",
+                selected_base,
+                "--head",
+                branch_name,
+                "--title",
+                title,
+                "--body",
+                body,
+            ],
+        )
+    except PlanGenerationError as error:
+        try:
+            _run_publication_command(
+                runner, repo_root, ["git", "switch", selected_base]
+            )
+        except PlanGenerationError as cleanup_error:
+            raise PlanGenerationError(
+                f"{error}; could not restore checkout to {selected_base}: "
+                f"{cleanup_error}"
+            ) from error
+        raise
     pull_request_url = next(
         (
             line.strip()
@@ -1480,12 +1492,23 @@ def _plan_pull_request_title(
 def _render_plan_pull_request_body(
     plan: ReviewedExecutionPlan, *, source_plan_path: str, plan_path: str
 ) -> str:
-    item_lines = []
-    for item in plan.items:
-        dependencies = (
-            f"; depends on {', '.join(item.dependencies)}" if item.dependencies else ""
+    preview_limit = 12
+    item_lines = [
+        f"- **{item.item_id}: {item.title}** — "
+        + (
+            "ready"
+            if not item.dependencies
+            else f"depends on {len(item.dependencies)} items"
         )
-        item_lines.append(f"- **{item.item_id}: {item.title}**{dependencies}")
+        for item in plan.items[:preview_limit]
+    ]
+    remaining_count = len(plan.items) - len(item_lines)
+    if remaining_count:
+        item_lines.append(
+            f"- {remaining_count} more items; see the implementation plan for details."
+        )
+    dependency_count = sum(len(item.dependencies) for item in plan.items)
+    ready_count = sum(not item.dependencies for item in plan.items)
     return "\n".join(
         [
             "## Review this execution plan",
@@ -1498,7 +1521,13 @@ def _render_plan_pull_request_body(
             "Review and revise these files together. After this PR merges, publish "
             "the reviewed plan items as GitHub issues.",
             "",
-            "### Proposed items",
+            "### Plan summary",
+            f"- Proposed items: {len(plan.items)}",
+            f"- Dependency links: {dependency_count}",
+            f"- Ready to execute first: {ready_count}",
+            "- Dependency details are recorded in the plan YAML and workflow files.",
+            "",
+            f"### Item preview (first {min(preview_limit, len(plan.items))})",
             *item_lines,
             "",
             "GitHub issues have not been created and no workflow tasks have run.",

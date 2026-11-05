@@ -336,17 +336,90 @@ def test_large_structural_subject_context_is_partitioned_into_bounded_scopes(
     )
 
     assert len(scopes) == 2
-    assert all(len(scope_units) == 1 for _, scope_units in scopes)
-    assert all(len(scope_units[0].planned_writes) == 1 for _, scope_units in scopes)
-    for scope_id, scope_units in scopes:
+    assert all(len(scope.units) == 1 for scope in scopes)
+    assert all(len(scope.units[0].planned_writes) == 1 for scope in scopes)
+    for scope in scopes:
         request = build_subject_enumeration_request(
             plan_id="plan-01",
             item_id="item-0001",
-            units=scope_units,
+            units=scope.units,
             source=source,
-            source_refs=(source_ref,),
+            source_refs=scope.source_refs,
             projected_baseline=baseline,
-            scope_id=scope_id,
+            scope_id=scope.scope_id,
+            baseline_subject_index=scope.baseline_subject_index,
+        )
+        assert len(build_question_messages(request)[1]["content"]) < 24_000
+
+
+def test_large_structural_subject_index_is_chunked_without_dropping_records(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    text = "# Plan\n\nUpdate a large module.\n"
+    source = segment_markdown_source(
+        PinnedSourceDocument(
+            repository="owner/repo",
+            commit_sha="a" * 40,
+            path="docs/plan.md",
+            blob_sha="b" * 40,
+            content_sha256=hashlib.sha256(text.encode()).hexdigest(),
+            text=text,
+        )
+    )
+    source_ref = source.anchors[0].id
+    unit = _unit(
+        "unit-large",
+        ("req-large",),
+        writes=(
+            PlannedWrite("src/large.py", "implementation", "python", (source_ref,), ()),
+        ),
+    )
+    source_subjects = [
+        {
+            "stable_key": f"python::large_{index}",
+            "path": "src/large.py",
+            "kind": "function",
+            "qualified_name": f"large_{index}_" + ("x" * 380),
+            "language": "python",
+        }
+        for index in range(80)
+    ]
+    baseline = {
+        "entities": [],
+        "entity_relationships": [],
+        "source_subjects": source_subjects,
+        "files": [],
+    }
+    monkeypatch.setattr(
+        structrr_module, "snapshot_digest", lambda _snapshot: "sha256:constant"
+    )
+
+    scopes = partition_subject_enumeration_units(
+        plan_id="plan-01",
+        item_id="item-large",
+        units=(unit,),
+        requirement_source_refs={"req-large": (source_ref,)},
+        source=source,
+        projected_baseline=baseline,
+    )
+
+    assert len(scopes) > 1
+    indexed_keys = [
+        record["stable_key"]
+        for scope in scopes
+        for record in scope.baseline_subject_index["source_subjects"]
+    ]
+    assert indexed_keys == [record["stable_key"] for record in source_subjects]
+    for scope in scopes:
+        request = build_subject_enumeration_request(
+            plan_id="plan-01",
+            item_id="item-large",
+            units=scope.units,
+            source=source,
+            source_refs=scope.source_refs,
+            projected_baseline=baseline,
+            scope_id=scope.scope_id,
+            baseline_subject_index=scope.baseline_subject_index,
         )
         assert len(build_question_messages(request)[1]["content"]) < 24_000
 

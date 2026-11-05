@@ -80,6 +80,7 @@ from powdrr_service.planning.structrr import (
     BoundStructuralSubject,
     StructuralBaselineIndex,
     StructuralChange,
+    StructuralSubjectEnumerationScope,
     StructuralSubjectPage,
     bind_structural_operation,
     build_structural_candidate_review_request,
@@ -514,7 +515,7 @@ class SourceLedgerQuestionMachine:
             tuple[tuple[str, ...], str], QuestionRequest[Any]
         ] = {}
         self._structural_subject_scope_cache: dict[
-            str, tuple[tuple[str, tuple[WorkUnit, ...]], ...]
+            str, tuple[StructuralSubjectEnumerationScope, ...]
         ] = {}
         self._structural_subject_context_cache: dict[
             str,
@@ -2001,23 +2002,10 @@ class SourceLedgerQuestionMachine:
                 completed_item_subjects: list[BoundStructuralSubject] = list(
                     item_subjects
                 )
-                for scope_id, scope_units in scopes:
-                    scope_requirement_ids = tuple(
-                        dict.fromkeys(
-                            requirement_id
-                            for unit in scope_units
-                            for requirement_id in unit.requirement_ids
-                        )
-                    )
-                    scope_source_refs = tuple(
-                        dict.fromkeys(
-                            source_ref
-                            for requirement_id in scope_requirement_ids
-                            for source_ref in requirement_by_id[
-                                requirement_id
-                            ].source_refs
-                        )
-                    )
+                for scope in scopes:
+                    scope_id = scope.scope_id
+                    scope_units = scope.units
+                    scope_source_refs = scope.source_refs
                     scope_paths = {
                         write.path
                         for unit in scope_units
@@ -2045,6 +2033,7 @@ class SourceLedgerQuestionMachine:
                             page_ordinal=page_ordinal,
                             baseline_digest=baseline_digest,
                             scope_id=scope_id,
+                            baseline_subject_index=scope.baseline_subject_index,
                         )
                         question_id = enumeration_request.question.question_id
                         answer = accepted_answers.get(question_id)
@@ -2194,21 +2183,10 @@ class SourceLedgerQuestionMachine:
                 excluded_subject_ids=excluded_subject_ids,
                 basedpyright_reference_path_pairs=reference_path_pairs,
             )
-        for scope_id, scope_units in scopes:
-            requirement_ids = tuple(
-                dict.fromkeys(
-                    requirement_id
-                    for unit in scope_units
-                    for requirement_id in unit.requirement_ids
-                )
-            )
-            source_refs = tuple(
-                dict.fromkeys(
-                    source_ref
-                    for requirement_id in requirement_ids
-                    for source_ref in requirement_source_refs.get(requirement_id, ())
-                )
-            )
+        for scope in scopes:
+            scope_id = scope.scope_id
+            scope_units = scope.units
+            source_refs = scope.source_refs
             scope_paths = {
                 write.path for unit in scope_units for write in unit.planned_writes
             }
@@ -2233,6 +2211,7 @@ class SourceLedgerQuestionMachine:
                     basedpyright_reference_path_pairs=scope_reference_pairs,
                     page_ordinal=page_ordinal,
                     scope_id=scope_id,
+                    baseline_subject_index=scope.baseline_subject_index,
                 )
                 answer = accepted_answers.get(request.question.question_id)
                 if answer is None:

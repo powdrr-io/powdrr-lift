@@ -591,6 +591,7 @@ def build_subject_enumeration_request(
     page_ordinal: int = 1,
     baseline_digest: str | None = None,
     scope_id: str | None = None,
+    baseline_subject_index: Mapping[str, Any] | None = None,
 ) -> QuestionRequest[StructuralSubjectPage]:
     unit_ids = {unit.id for unit in units}
     requirement_ids = {req for unit in units for req in unit.requirement_ids}
@@ -623,8 +624,15 @@ def build_subject_enumeration_request(
         for unit in units
     )
     baseline_digest = baseline_digest or snapshot_digest(projected_baseline)
-    subject_index = _structural_subject_index(
-        projected_baseline, units, fingerprint=baseline_digest
+    subject_index = (
+        _structural_subject_index(
+            projected_baseline, units, fingerprint=baseline_digest
+        )
+        if baseline_subject_index is None
+        else {
+            key: list(value) if isinstance(value, list) else value
+            for key, value in baseline_subject_index.items()
+        }
     )
     prior_subject_ids = {
         (subject.section, subject.subject_id) for subject in prior_subjects
@@ -1097,6 +1105,14 @@ def build_structural_change_request(
     )
 
 
+@dataclass(frozen=True, slots=True)
+class StructuralSubjectEnumerationScope:
+    scope_id: str
+    units: tuple[WorkUnit, ...]
+    source_refs: tuple[str, ...]
+    baseline_subject_index: Mapping[str, Any]
+
+
 def partition_subject_enumeration_units(
     *,
     plan_id: str,
@@ -1109,12 +1125,17 @@ def partition_subject_enumeration_units(
     excluded_subject_ids: Sequence[tuple[str, str]] = (),
     basedpyright_reference_path_pairs: Sequence[tuple[str, str]] = (),
     baseline_digest: str | None = None,
-) -> tuple[tuple[str, tuple[WorkUnit, ...]], ...]:
+) -> tuple[StructuralSubjectEnumerationScope, ...]:
     """Greedily bound per-item subject queries to the planner input limit."""
-    scopes: list[tuple[str, tuple[WorkUnit, ...]]] = []
+    scopes: list[StructuralSubjectEnumerationScope] = []
     current: list[WorkUnit] = []
 
-    def scope_id(group: Sequence[WorkUnit]) -> str:
+    def index_for(group: Sequence[WorkUnit]) -> dict[str, Any]:
+        return _structural_subject_index(
+            projected_baseline, group, fingerprint=baseline_digest
+        )
+
+    def scope_id(group: Sequence[WorkUnit], subject_index: Mapping[str, Any]) -> str:
         return _digest(
             {
                 "unit_ids": [unit.id for unit in group],
@@ -1123,12 +1144,90 @@ def partition_subject_enumeration_units(
                     for unit in group
                     for write in unit.planned_writes
                 ],
+                "baseline_subject_index": subject_index,
             }
         )[7:19]
 
+    def split_subject_index(
+        subject_index: Mapping[str, Any], *, target_chars: int = 6_000
+    ) -> tuple[dict[str, Any], ...]:
+        list_keys = ("entities", "entity_relationships", "source_subjects")
+        chunks_by_key: dict[str, list[list[Mapping[str, Any]]]] = {}
+        for key in list_keys:
+            records = [
+                record
+                for record in subject_index.get(key, ())
+                if isinstance(record, Mapping)
+            ]
+            chunks: list[list[Mapping[str, Any]]] = []
+            current_records: list[Mapping[str, Any]] = []
+            current_chars = 2
+            for record in records:
+                record_chars = len(
+                    json.dumps(record, ensure_ascii=False, separators=(",", ":"))
+                )
+                if current_records and current_chars + record_chars + 1 > target_chars:
+                    chunks.append(current_records)
+                    current_records = []
+                    current_chars = 2
+                current_records.append(record)
+                current_chars += record_chars + 1
+            if current_records:
+                chunks.append(current_records)
+            chunks_by_key[key] = chunks
+
+        chunk_count = max((len(chunks) for chunks in chunks_by_key.values()), default=0)
+        if chunk_count <= 1:
+            return ()
+        return tuple(
+            {
+                key: (
+                    chunks_by_key[key][index] if index < len(chunks_by_key[key]) else []
+                )
+                if key in list_keys
+                else value
+                for key, value in subject_index.items()
+            }
+            for index in range(chunk_count)
+        )
+
     def request_for(
         group: Sequence[WorkUnit],
+        subject_index: Mapping[str, Any],
     ) -> QuestionRequest[StructuralSubjectPage]:
+        source_refs = source_refs_for(group)
+        paths = {write.path for unit in group for write in unit.planned_writes}
+        reference_pairs = tuple(
+            pair
+            for pair in basedpyright_reference_path_pairs
+            if pair[0] in paths and pair[1] in paths
+        )
+        return build_subject_enumeration_request(
+            plan_id=plan_id,
+            item_id=item_id,
+            units=group,
+            source=source,
+            source_refs=source_refs,
+            projected_baseline=projected_baseline,
+            prior_subjects=prior_subjects,
+            excluded_subject_ids=excluded_subject_ids,
+            basedpyright_reference_path_pairs=reference_pairs,
+            page_ordinal=1,
+            baseline_digest=baseline_digest,
+            scope_id=scope_id(group, subject_index),
+            baseline_subject_index=subject_index,
+        )
+
+    def ensure_bounded(
+        group: Sequence[WorkUnit], subject_index: Mapping[str, Any]
+    ) -> None:
+        request = request_for(group, subject_index)
+        try:
+            build_question_messages(request)
+        except QuestionInputTooLarge:
+            raise
+
+    def source_refs_for(group: Sequence[WorkUnit]) -> tuple[str, ...]:
         requirement_ids = tuple(
             dict.fromkeys(
                 requirement_id
@@ -1149,49 +1248,36 @@ def partition_subject_enumeration_units(
                 for source_ref in requirement_source_refs.get(requirement_id, ())
             )
         )
-        source_refs = (
+        return (
             tuple(
                 ref for ref in requirement_source_ref_values if ref in write_source_refs
             )
             if write_source_refs
             else requirement_source_ref_values
         )
-        paths = {write.path for unit in group for write in unit.planned_writes}
-        reference_pairs = tuple(
-            pair
-            for pair in basedpyright_reference_path_pairs
-            if pair[0] in paths and pair[1] in paths
-        )
-        return build_subject_enumeration_request(
-            plan_id=plan_id,
-            item_id=item_id,
-            units=group,
-            source=source,
-            source_refs=source_refs,
-            projected_baseline=projected_baseline,
-            prior_subjects=prior_subjects,
-            excluded_subject_ids=excluded_subject_ids,
-            basedpyright_reference_path_pairs=reference_pairs,
-            page_ordinal=1,
-            baseline_digest=baseline_digest,
-            scope_id=scope_id(group),
-        )
 
-    def ensure_bounded(group: Sequence[WorkUnit]) -> None:
-        request = request_for(group)
-        try:
-            build_question_messages(request)
-        except QuestionInputTooLarge:
-            raise
+    def append_scope(
+        group: Sequence[WorkUnit], subject_index: Mapping[str, Any]
+    ) -> None:
+        ensure_bounded(group, subject_index)
+        scopes.append(
+            StructuralSubjectEnumerationScope(
+                scope_id=scope_id(group, subject_index),
+                units=tuple(group),
+                source_refs=source_refs_for(group),
+                baseline_subject_index=subject_index,
+            )
+        )
 
     def append_bounded(unit: WorkUnit) -> None:
         nonlocal current
         candidate = (*current, unit)
+        candidate_index = index_for(candidate)
         try:
-            ensure_bounded(candidate)
+            ensure_bounded(candidate, candidate_index)
         except QuestionInputTooLarge:
             if current:
-                scopes.append((scope_id(current), tuple(current)))
+                append_scope(current, index_for(current))
                 current = []
                 append_bounded(unit)
                 return
@@ -1199,14 +1285,18 @@ def partition_subject_enumeration_units(
                 for write in unit.planned_writes:
                     append_bounded(replace(unit, planned_writes=(write,)))
                 return
-            raise
+            index_chunks = split_subject_index(candidate_index)
+            if not index_chunks:
+                raise
+            for index_chunk in index_chunks:
+                append_scope(candidate, index_chunk)
         else:
             current = [*current, unit]
 
     for unit in units:
         append_bounded(unit)
     if current:
-        scopes.append((scope_id(current), tuple(current)))
+        append_scope(current, index_for(current))
     return tuple(scopes)
 
 

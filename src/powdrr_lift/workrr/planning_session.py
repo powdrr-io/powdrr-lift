@@ -739,6 +739,7 @@ def _git_head(repo_root: Path) -> str:
 
 
 def _require_clean_planning_checkout(repo_root: Path, base_commit: str) -> None:
+    _restore_failed_plan_checkout(repo_root, base_commit)
     if _git_head(repo_root) != base_commit:
         raise PlanningServiceError(
             "resume requires a checkout at the session's pinned base commit"
@@ -754,6 +755,57 @@ def _require_clean_planning_checkout(repo_root: Path, base_commit: str) -> None:
         raise PlanningServiceError(
             "planning requires a clean checkout at the pinned base commit"
         )
+
+
+def _restore_failed_plan_checkout(repo_root: Path, base_commit: str) -> None:
+    branch = subprocess.run(
+        ["git", "branch", "--show-current"],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    branch_name = branch.stdout.strip() if branch.returncode == 0 else ""
+    if not branch_name.startswith("powdrr/plan-"):
+        return
+    status = subprocess.run(
+        ["git", "status", "--porcelain=v1", "-z", "--untracked-files=all"],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if status.returncode != 0 or status.stdout:
+        raise PlanningServiceError(
+            "cannot resume from a generated plan branch with local changes"
+        )
+    for base_branch in ("main", "master"):
+        base = subprocess.run(
+            ["git", "rev-parse", "--verify", f"{base_branch}^{{commit}}"],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if base.returncode != 0 or base.stdout.strip() != base_commit:
+            continue
+        switched = subprocess.run(
+            ["git", "switch", base_branch],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if switched.returncode == 0:
+            return
+        detail = switched.stderr.strip() or switched.stdout.strip()
+        raise PlanningServiceError(
+            f"could not return from generated plan branch to {base_branch}: {detail}"
+        )
+    raise PlanningServiceError(
+        "cannot resume from a generated plan branch because the session's pinned "
+        "base commit is not the current main or master branch"
+    )
 
 
 def _planning_repository_paths(

@@ -27,6 +27,7 @@ from powdrr_lift.workrr.github_issue_plan_generation import (
     _apply_plan_coverage_assessments,
     _ensure_ci_bootstrap,
     _plan_item_refinement_issues,
+    _render_plan_pull_request_body,
     _validated_plan_coverage_assessments,
     _validated_plan_coverage_assessments_with_repair,
     generate_execution_plan_yaml,
@@ -1927,6 +1928,114 @@ def test_publish_execution_plan_pull_request_commits_only_generated_files(
         pr_body
     )
     assert "docs/plans/proposal.md" in pr_body
+
+
+def test_plan_pull_request_body_stays_bounded_for_large_dependency_graph() -> None:
+    items = tuple(
+        PlannedWorkItem(
+            item_id=f"item-{index:04}",
+            title=f"Implement planning component {index:04}",
+            objective="Implement the scoped component.",
+            scope=(),
+            acceptance_criteria=(),
+            dependencies=tuple(f"item-{dependency:04}" for dependency in range(index)),
+            workflow_directory=None,
+            workflow_id=f"plan-workflow-{index:04}",
+        )
+        for index in range(164)
+    )
+    plan = ReviewedExecutionPlan(plan_id="large-plan", items=items)
+
+    body = _render_plan_pull_request_body(
+        plan,
+        source_plan_path="docs/plans/source.md",
+        plan_path="docs/plans/large-plan.yaml",
+    )
+
+    assert len(body) < 10_000
+    assert "Proposed items: 164" in body
+    assert "Dependency links: 13366" in body
+    assert "Ready to execute first: 1" in body
+    assert "item-0011: Implement planning component 0011" in body
+    assert "152 more items" in body
+    assert "item-0163" not in body
+
+
+def test_failed_plan_pull_request_creation_restores_base_branch(tmp_path: Any) -> None:
+    _, plan = generate_execution_plan_yaml(
+        source_plan="# Plan\nDo the work.",
+        plan_id="proposal-v1",
+        client=FakePlanningClient({"items": [_item("foundation")]}),
+    )
+    generated_file = tmp_path / "plan.yaml"
+    generated_file.write_text("generated", encoding="utf-8")
+    commands: list[list[str]] = []
+
+    def runner(
+        command: list[str],
+        *,
+        cwd: Path,
+        capture_output: bool,
+        text: bool,
+        check: bool,
+    ) -> Any:
+        del cwd, capture_output, text, check
+        commands.append(command)
+        if command == ["git", "branch", "--show-current"]:
+            stdout = "main\n"
+        elif command[:3] == ["git", "rev-parse", "--verify"]:
+            stdout = "abc123\n"
+        elif command[:3] == ["gh", "pr", "create"]:
+            return SimpleNamespace(
+                returncode=1, stdout="", stderr="GraphQL: Body is too long"
+            )
+        else:
+            stdout = ""
+        return SimpleNamespace(returncode=0, stdout=stdout, stderr="")
+
+    with pytest.raises(PlanGenerationError, match="Body is too long"):
+        publish_execution_plan_pull_request(
+            repo_root=tmp_path,
+            plan=plan,
+            generated_files=(generated_file,),
+            source_plan_path="docs/plans/proposal.md",
+            runner=runner,
+        )
+
+    assert commands[-1] == ["git", "switch", "main"]
+
+
+def test_resume_returns_from_failed_generated_plan_branch_to_pinned_main(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Any
+) -> None:
+    base_commit = "a" * 40
+    commands: list[list[str]] = []
+
+    def runner(
+        command: list[str],
+        *,
+        cwd: Path,
+        capture_output: bool,
+        text: bool,
+        check: bool,
+    ) -> Any:
+        del cwd, capture_output, text, check
+        commands.append(command)
+        if command == ["git", "branch", "--show-current"]:
+            stdout = "powdrr/plan-large-plan-deadbeef\n"
+        elif command[:3] == ["git", "status", "--porcelain=v1"]:
+            stdout = ""
+        elif command[:3] == ["git", "rev-parse", "--verify"]:
+            stdout = f"{base_commit}\n" if command[3] == "main^{commit}" else ""
+        else:
+            stdout = ""
+        return SimpleNamespace(returncode=0, stdout=stdout, stderr="")
+
+    monkeypatch.setattr(planning_session.subprocess, "run", runner)
+
+    planning_session._restore_failed_plan_checkout(tmp_path, base_commit)
+
+    assert commands[-1] == ["git", "switch", "main"]
 
 
 def test_publish_execution_plan_pull_request_rejects_detached_head(

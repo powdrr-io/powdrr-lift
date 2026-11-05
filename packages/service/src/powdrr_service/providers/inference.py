@@ -11,6 +11,7 @@ from urllib.request import Request, urlopen
 
 from powdrr_contracts.models import ChatCompletionRequest, ChatCompletionResponse
 
+from powdrr_service.providers.config import ISOQUANT_MODEL, provider_definition
 from powdrr_service.providers.errors import (
     ProviderClientError,
     ProviderHTTPError,
@@ -28,8 +29,10 @@ class InferenceClient(Protocol):
     def complete(self, request: ChatCompletionRequest) -> ChatCompletionResponse: ...
 
 
-class DeepInfraInferenceClient:
-    """Forward chat completions to DeepInfra without exposing its key to agents."""
+class OpenAIInferenceClient:
+    """Forward compatible chat completions using service-held credentials."""
+
+    provider = "deepinfra"
 
     def __init__(
         self,
@@ -38,26 +41,40 @@ class DeepInfraInferenceClient:
         endpoint: str | None = None,
         timeout: float = 300.0,
     ) -> None:
-        self._api_key = (
-            api_key
-            or os.environ.get("DEEPINFRA_API_TOKEN")
-            or os.environ.get("DEEPINFRA_API_KEY")
+        definition = provider_definition(self.provider)
+        self._display_name = definition.display_name
+        self._api_key = api_key or next(
+            (
+                os.environ[name]
+                for name in definition.api_key_env_names
+                if os.environ.get(name)
+            ),
+            None,
         )
-        configured_endpoint = endpoint or os.environ.get(
-            "DEEPINFRA_CHAT_COMPLETIONS_URL"
+        configured_endpoint = endpoint or (
+            os.environ.get("DEEPINFRA_CHAT_COMPLETIONS_URL")
+            if self.provider == "deepinfra"
+            else None
         )
         if configured_endpoint:
             self._endpoint = configured_endpoint
         else:
-            base_url = (
-                os.environ.get("DEEPINFRA_BASE_URL") or DEFAULT_DEEPINFRA_BASE_URL
+            base_url = next(
+                (
+                    os.environ[name]
+                    for name in definition.base_url_env_names
+                    if os.environ.get(name)
+                ),
+                definition.default_base_url,
             )
             self._endpoint = f"{base_url.rstrip('/')}/chat/completions"
         self._timeout = timeout
 
     def complete(self, request: ChatCompletionRequest) -> ChatCompletionResponse:
         if not self._api_key:
-            raise ProviderClientError("DeepInfra inference requires an API key.")
+            raise ProviderClientError(
+                f"{self._display_name} inference requires an API key."
+            )
         overrides = _RESERVED_OPTIONS.intersection(request.options)
         if overrides:
             names = ", ".join(sorted(overrides))
@@ -66,10 +83,16 @@ class DeepInfraInferenceClient:
                 error_code="invalid_inference_request",
             )
         payload = dict(request.options)
-        # MiniSWE's LiteLLM configuration uses "deepinfra/" to select a
-        # provider. This client already targets DeepInfra directly, whose API
-        # expects only the provider's model ID.
-        payload["model"] = request.model.removeprefix("deepinfra/")
+        # IPC keeps the routing prefix out of the upstream API's model ID.
+        payload["model"] = request.model.removeprefix(f"{self.provider}/")
+        if self.provider == "isoquant":
+            payload["model"] = ISOQUANT_MODEL
+            payload.setdefault("reasoning_effort", "low")
+            if not any(
+                key in payload
+                for key in ("max_tokens", "max_completion_tokens", "max_output_tokens")
+            ):
+                payload["max_tokens"] = 4096
         payload["messages"] = list(request.messages)
         if request.tools:
             payload["tools"] = list(request.tools)
@@ -88,45 +111,70 @@ class DeepInfraInferenceClient:
                 raw = response.read()
         except HTTPError as error:
             detail = error.read().decode("utf-8", errors="replace")
-            raise ProviderHTTPError("DeepInfra", error.code, detail) from error
+            raise ProviderHTTPError(self._display_name, error.code, detail) from error
         except (URLError, TimeoutError, ConnectionError) as error:
             raise ProviderClientError(
-                f"DeepInfra inference request failed: {error}"
+                f"{self._display_name} inference request failed: {error}"
             ) from error
 
         try:
             data = json.loads(raw)
         except (UnicodeDecodeError, json.JSONDecodeError) as error:
             raise ProviderResponseError(
-                "DeepInfra returned invalid JSON.",
+                f"{self._display_name} returned invalid JSON.",
                 error_code="invalid_inference_response",
             ) from error
-        return _response(data)
+        return _response(data, self._display_name)
 
 
-def _response(data: object) -> ChatCompletionResponse:
+class DeepInfraInferenceClient(OpenAIInferenceClient):
+    """Forward chat completions to DeepInfra with service-held credentials."""
+
+
+class IsoquantInferenceClient(OpenAIInferenceClient):
+    """Use Isoquant's pinned Flash model for coding inference."""
+
+    provider = "isoquant"
+
+
+class RoutedInferenceClient:
+    """Route coding models without sharing provider credentials with workers."""
+
+    def __init__(
+        self, *, timeout: float = 300.0, default_client: InferenceClient | None = None
+    ) -> None:
+        self._deepinfra = default_client or DeepInfraInferenceClient(timeout=timeout)
+        self._isoquant = IsoquantInferenceClient(timeout=timeout)
+
+    def complete(self, request: ChatCompletionRequest) -> ChatCompletionResponse:
+        if request.model.startswith("isoquant/") or request.model == ISOQUANT_MODEL:
+            return self._isoquant.complete(request)
+        return self._deepinfra.complete(request)
+
+
+def _response(data: object, provider: str = "DeepInfra") -> ChatCompletionResponse:
     if not isinstance(data, dict):
         raise ProviderResponseError(
-            "DeepInfra response must be a JSON object.",
+            f"{provider} response must be a JSON object.",
             error_code="invalid_inference_response",
         )
     choices = data.get("choices")
     if not isinstance(choices, list) or not choices or not isinstance(choices[0], dict):
         raise ProviderResponseError(
-            "DeepInfra response did not include a chat completion choice.",
+            f"{provider} response did not include a chat completion choice.",
             error_code="invalid_inference_response",
         )
     choice = choices[0]
     message = choice.get("message")
     if not isinstance(message, dict):
         raise ProviderResponseError(
-            "DeepInfra response choice did not include an assistant message.",
+            f"{provider} response choice did not include an assistant message.",
             error_code="invalid_inference_response",
         )
     content = message.get("content")
     if content is not None and not isinstance(content, str):
         raise ProviderResponseError(
-            "DeepInfra assistant content must be a string or null.",
+            f"{provider} assistant content must be a string or null.",
             error_code="invalid_inference_response",
         )
     tool_calls = message.get("tool_calls") or []
@@ -134,19 +182,19 @@ def _response(data: object) -> ChatCompletionResponse:
         isinstance(call, dict) for call in tool_calls
     ):
         raise ProviderResponseError(
-            "DeepInfra tool_calls must be an array of objects.",
+            f"{provider} tool_calls must be an array of objects.",
             error_code="invalid_inference_response",
         )
     finish_reason = choice.get("finish_reason")
     if finish_reason is not None and not isinstance(finish_reason, str):
         raise ProviderResponseError(
-            "DeepInfra finish_reason must be a string or null.",
+            f"{provider} finish_reason must be a string or null.",
             error_code="invalid_inference_response",
         )
     usage = data.get("usage") or {}
     if not isinstance(usage, Mapping):
         raise ProviderResponseError(
-            "DeepInfra usage must be a JSON object.",
+            f"{provider} usage must be a JSON object.",
             error_code="invalid_inference_response",
         )
     return ChatCompletionResponse(

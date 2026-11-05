@@ -22,6 +22,13 @@ class IPCModel(LitellmModel):
     """Keep MiniSWE's normal parsing and accounting, replacing network calls."""
 
     def __init__(self, *, inference_fd: int | str | None = None, **kwargs: Any) -> None:
+        model_name = kwargs.get("model_name", "")
+        if model_name.startswith("isoquant/") or model_name == (
+            "deepseek-v4.1-flash-1017-fast"
+        ):
+            # LiteLLM may not yet have pricing for this service-routed model.
+            # Preserve usage without failing otherwise successful inference.
+            kwargs.setdefault("cost_tracking", "ignore_errors")
         super().__init__(**kwargs)
         configured_fd = inference_fd or os.environ.get(_INFERENCE_FD_ENV)
         if configured_fd is None:

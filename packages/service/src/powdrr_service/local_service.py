@@ -22,8 +22,8 @@ from powdrr_contracts.models import (
 )
 
 from powdrr_service.providers.inference import (
-    DeepInfraInferenceClient,
     InferenceClient,
+    RoutedInferenceClient,
 )
 
 
@@ -39,7 +39,7 @@ class LocalPowdrrService:
         probe_repair_clients: tuple[Any, Any] | None = None,
     ) -> None:
         self._planning_issue_store = planning_issue_store
-        self._inference_client = inference_client or DeepInfraInferenceClient()
+        self._inference_client = inference_client or RoutedInferenceClient()
         self._quality_review_clients = quality_review_clients
         self._probe_repair_clients = probe_repair_clients
 

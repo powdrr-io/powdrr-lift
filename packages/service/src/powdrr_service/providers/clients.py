@@ -683,6 +683,11 @@ def _serialize_openai_payload(
         + json.dumps(payload["response_format"], separators=(",", ":"))
         + ',"stream":'
         + json.dumps(payload["stream"])
+        + (
+            ',"reasoning_effort":' + json.dumps(payload["reasoning_effort"])
+            if "reasoning_effort" in payload
+            else ""
+        )
         + "}"
     )
 
@@ -789,6 +794,9 @@ def build_provider_client(
     timeout: float = 120.0,
 ) -> ProviderClient:
     definition = provider_definition(provider)
+    if provider == "isoquant":
+        assert definition.forced_model is not None
+        model = definition.forced_model
     if definition.client_kind == "local":
         if local_model_path is None:
             raise ProviderResponseError("A local model path is required.")
@@ -815,7 +823,13 @@ def build_provider_client(
         base_url=base_url,
         limits=limits,
         progress_stream=progress_stream,
-        reasoning_effort="none" if provider.startswith("deepinfra") else None,
+        reasoning_effort=(
+            "low"
+            if provider == "isoquant"
+            else "none"
+            if provider.startswith("deepinfra")
+            else None
+        ),
         unsupported_schema_keywords=(
             frozenset({"uniqueItems"})
             if provider.startswith("deepinfra")

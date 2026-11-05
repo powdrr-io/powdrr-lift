@@ -8,13 +8,22 @@ import threading
 from pathlib import Path
 from typing import Any
 
+import pytest
 from powdrr_agent.execution.inference_ipc import receive_frame, send_frame
 from powdrr_agent.execution.minisweagent_monitor import run_minisweagent
 from powdrr_contracts.models import ChatCompletionRequest, ChatCompletionResponse
 
 
+@pytest.mark.parametrize(
+    "model",
+    [
+        "deepinfra/test-model",
+        "isoquant/deepseek-v4.1-flash-1017-fast",
+    ],
+)
 def test_miniswe_model_subprocess_calls_service_while_parent_keeps_progressing(
     tmp_path: Path,
+    model: str,
 ) -> None:
     parent, child = socket.socketpair()
     progress_observed = threading.Event()
@@ -72,7 +81,7 @@ def test_miniswe_model_subprocess_calls_service_while_parent_keeps_progressing(
         "--task",
         "Run the provided test commands and submit the task.",
         "--model",
-        "deepinfra/test-model",
+        model,
         "--output",
         str(trajectory_path),
     ]
@@ -90,6 +99,8 @@ def test_miniswe_model_subprocess_calls_service_while_parent_keeps_progressing(
     )
     child_environment["MSWEA_CONFIGURED"] = "true"
     child_environment["MSWEA_COST_TRACKING"] = "ignore_errors"
+    if model.startswith("isoquant/"):
+        child_environment.pop("MSWEA_COST_TRACKING", None)
     child_environment["MSWEA_SILENT_STARTUP"] = "true"
     child_environment["MSWEA_GLOBAL_CONFIG_DIR"] = str(tmp_path / "mini-config")
     child_environment["POWDRR_MINISWE_INFERENCE_FD"] = str(child.fileno())
@@ -121,7 +132,7 @@ def test_miniswe_model_subprocess_calls_service_while_parent_keeps_progressing(
     )
     assert (tmp_path / "ipc-output.txt").read_text().strip() == "ipc-ok"
     assert len(requests) == 2
-    assert requests[0].model == "deepinfra/test-model"
+    assert requests[0].model == model
     assert any(
         message.get("role") == "user"
         and "Run the provided test commands" in str(message.get("content"))

@@ -88,6 +88,7 @@ def test_deepinfra_request_omits_unique_items_keyword(
         )
 
     response_format = captured["response_format"]
+    assert captured["reasoning_effort"] == "none"
     assert isinstance(response_format, dict)
     json_schema = response_format["json_schema"]
     assert isinstance(json_schema, dict)

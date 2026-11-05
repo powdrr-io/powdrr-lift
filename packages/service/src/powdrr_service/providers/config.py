@@ -60,6 +60,7 @@ QWEN_2_5_CODER_MODEL = "Qwen/Qwen2.5-Coder-14B-Instruct"
 DEEPINFRA_CHEAP_MODEL = "deepseek-ai/DeepSeek-V4-Flash-0731"
 DEEPINFRA_CHEAP_BACKUP_MODEL = "deepseek-ai/DeepSeek-V4-Flash"
 OPENROUTER_MODEL = "stealth/ox-alpha"
+ISOQUANT_MODEL = "deepseek-v4.1-flash-1017-fast"
 
 ALL_LLM_TYPES = (
     "high_reasoning",
@@ -162,7 +163,27 @@ OPENROUTER_LLM_MAPPINGS: Mapping[str, LLMModelMapping] = {
     for llm_type in ALL_LLM_TYPES
 }
 
+ISOQUANT_LLM_MAPPINGS: Mapping[str, LLMModelMapping] = {
+    llm_type: LLMModelMapping(ISOQUANT_MODEL, provider="isoquant")
+    for llm_type in ALL_LLM_TYPES
+}
+
 LLM_PROVIDERS: Mapping[str, LLMProviderDefinition] = {
+    "isoquant": LLMProviderDefinition(
+        name="isoquant",
+        display_name="Isoquant",
+        llm_mappings=ISOQUANT_LLM_MAPPINGS,
+        model_limits={
+            ISOQUANT_MODEL: LLMModelLimits(
+                context_window=1_048_576, max_output_tokens=943_718
+            )
+        },
+        api_key_env_names=("ISOQUANT_API_KEY",),
+        base_url_env_names=("ISOQUANT_BASE_URL",),
+        default_base_url="https://api.isoquant.ai/v1",
+        forced_model=ISOQUANT_MODEL,
+        auto_priority=-10,
+    ),
     "openai": LLMProviderDefinition(
         name="openai",
         display_name="OpenAI",

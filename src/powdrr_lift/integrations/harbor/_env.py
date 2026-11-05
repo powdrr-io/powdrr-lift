@@ -9,6 +9,8 @@ PROVIDER_ENVIRONMENT_KEYS = (
     "DEEPINFRA_API_KEY",
     "DEEPINFRA_API_TOKEN",
     "DEEPINFRA_BASE_URL",
+    "ISOQUANT_API_KEY",
+    "ISOQUANT_BASE_URL",
     "SYSTEM_ONE_API_KEY",
     "SYSTEM_ONE_BASE_URL",
     "SUBQ_API_KEY",
@@ -52,6 +54,7 @@ def network_allowlist_domains(
     """Return hosts required by package installation and configured providers."""
     domains = {
         "api.deepinfra.com",
+        "api.isoquant.ai",
         "api.typesafe.ai",
         "api.subq.ai",
         "files.pythonhosted.org",

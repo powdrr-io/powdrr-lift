@@ -391,11 +391,23 @@ continue to handle Command shortcuts itself; use `Ctrl+C`, `Ctrl+X`, and
   `~/.codex/auth.json` or `$CODEX_HOME/auth.json`.
 - Use `--provider anthropic` with `ANTHROPIC_API_KEY` for Claude models.
 - Use `--provider zai` with `ZAI_API_KEY` for `glm-5.2` and other GLM models.
+- Use `--provider isoquant` with `ISOQUANT_API_KEY` to use DeepSeek V4.1 Flash
+  1017 Fast (`deepseek-v4.1-flash-1017-fast`) for every workflow capability,
+  with `reasoning_effort=low`. Requests use `https://api.isoquant.ai/v1`;
+  `ISOQUANT_BASE_URL` optionally overrides it. `auto` prefers Isoquant when
+  its key is available. Existing `deepinfra` and `deepinfra-cheap` providers
+  retain their DeepInfra endpoints and model IDs.
+  For MiniSWE coding, set
+  `--minisweagent-model isoquant/deepseek-v4.1-flash-1017-fast` alongside
+  `--provider isoquant` (or `--planning-provider isoquant` on feature commands).
+  Coding requests are routed through the service; the worker receives no API key.
+  Isoquant's pinned model accepts text only; the `vision` task mapping does not
+  enable image input. See the [Isoquant API reference](https://isoquant.ai/docs?model=deepseek-v4.1-flash-1017-fast).
 - Use `--provider openrouter` with `OPENROUTER_API_KEY` to use
   `stealth/ox-alpha` for every workflow capability. OpenRouter uses
   `https://openrouter.ai/api/v1` by default; override it with
   `OPENROUTER_BASE_URL` when needed. In `auto` mode, OpenRouter is preferred
-  whenever `OPENROUTER_API_KEY` is available.
+  when `OPENROUTER_API_KEY` is available and no Isoquant key is configured.
 - Use `--provider deepinfra-cheap` with `DEEPINFRA_API_TOKEN` to use
   `deepseek-ai/DeepSeek-V4-Flash` for every workflow capability. In `auto`
   mode, this provider is selected for non-Claude models whenever DeepInfra

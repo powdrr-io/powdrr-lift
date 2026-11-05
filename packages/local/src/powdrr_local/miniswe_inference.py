@@ -9,6 +9,7 @@ from powdrr_service.local_service import LocalPowdrrService
 from powdrr_service.providers.inference import (
     DeepInfraInferenceClient,
     InferenceClient,
+    RoutedInferenceClient,
 )
 
 from powdrr_local.bridge import JsonServiceBridge
@@ -23,7 +24,10 @@ def create_miniswe_inference_handler(
     request_timeout = max(0.1, min(120.0, worker_timeout_seconds * 0.8))
     service = LocalPowdrrService(
         inference_client=inference_client
-        or DeepInfraInferenceClient(timeout=request_timeout)
+        or RoutedInferenceClient(
+            timeout=request_timeout,
+            default_client=DeepInfraInferenceClient(timeout=request_timeout),
+        )
     )
     return JsonServiceBridge(service).infer
 

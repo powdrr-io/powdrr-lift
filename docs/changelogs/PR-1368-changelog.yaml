@@ -1,5 +1,5 @@
 schema: https://powdrr.io/schema/changelog-v2
-change_id: 1367
+change_id: 1368
 title: Persist revision-pinned code symbols for planning
 intent:
   problem: Planning callers receive transient BasedPyright results, so the code evidence

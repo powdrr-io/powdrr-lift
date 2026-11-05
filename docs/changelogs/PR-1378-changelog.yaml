@@ -1,0 +1,234 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1378
+title: Preserve code-symbol evidence in generated issue plans
+intent:
+  problem: GitHub issue planning uses revision-pinned symbol evidence to select and reconcile work, but discarded artifact and query references before serializing the execution plan.
+  goal: Attach bounded, validated symbol evidence references to plan items whose allowed paths include the evidence, and retain those references through YAML round trips and plan repairs.
+human-decisions: []
+structured_files: []
+files:
+  - path: packages/service/src/powdrr_service/planning/plan_models.py
+    type: modified
+    span:
+      start_line: 26
+      end_line: 26
+    summary: Add a typed collection of code-evidence references to each planned work item.
+    rationale: Keep artifact-backed provenance in the service-owned plan model.
+  - path: packages/service/src/powdrr_service/planning/plan_document.py
+    type: modified
+    span:
+      start_line: 19
+      end_line: 33
+    summary: Define exact fields and digest formats for code-evidence references.
+    rationale: Identify the source revision, Structrr snapshot, artifact, query, symbol, location, and coverage state.
+  - path: packages/service/src/powdrr_service/planning/plan_document.py
+    type: modified
+    span:
+      start_line: 88
+      end_line: 93
+    summary: Permit code-evidence references as an optional execution-plan item field.
+    rationale: Keep older plans valid while adding provenance to newly generated plans.
+  - path: packages/service/src/powdrr_service/planning/plan_document.py
+    type: modified
+    span:
+      start_line: 141
+      end_line: 145
+    summary: Parse validated code-evidence references into planned work items.
+    rationale: Retain evidence in the typed plan after loading YAML.
+  - path: packages/service/src/powdrr_service/planning/plan_document.py
+    type: modified
+    span:
+      start_line: 151
+      end_line: 157
+    summary: Require evidence paths to remain inside each item's allowed paths.
+    rationale: Prevent references from being attached to work items outside their scope.
+  - path: packages/service/src/powdrr_service/planning/plan_document.py
+    type: modified
+    span:
+      start_line: 218
+      end_line: 221
+    summary: Serialize code-evidence references in execution-plan YAML.
+    rationale: Preserve query provenance in checked-in plans.
+  - path: packages/service/src/powdrr_service/planning/plan_document.py
+    type: modified
+    span:
+      start_line: 233
+      end_line: 327
+    summary: Validate reference bounds, uniqueness, artifact digests, revisions, and repository-relative locations.
+    rationale: Ensure persisted references are complete, bounded, and safe to resolve.
+  - path: packages/service/src/powdrr_service/planning/repair_service.py
+    type: modified
+    span:
+      start_line: 434
+      end_line: 443
+    summary: Carry existing evidence references through plan-item repairs when paths remain in scope.
+    rationale: Keep provenance when item descriptions are repaired.
+  - path: packages/service/src/powdrr_service/planning/repair_service.py
+    type: modified
+    span:
+      start_line: 475
+      end_line: 486
+    summary: Check evidence paths against allowed paths during repair.
+    rationale: Avoid retaining references outside the repaired item's scope.
+  - path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+    type: modified
+    span:
+      start_line: 1069
+      end_line: 1073
+    summary: Allow repository code inspection to collect artifact-backed evidence alongside model context.
+    rationale: Reuse provenance returned by the shared Structrr query path.
+  - path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+    type: modified
+    span:
+      start_line: 1172
+      end_line: 1176
+    summary: Collect each distinct symbol evidence reference from bounded query results.
+    rationale: Retain stable provenance without asking the model to format identifiers.
+  - path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+    type: modified
+    span:
+      start_line: 1905
+      end_line: 1905
+    summary: Initialize the references collected for the draft plan.
+    rationale: Keep evidence collection local to one plan generation.
+  - path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+    type: modified
+    span:
+      start_line: 1921
+      end_line: 1921
+    summary: Collect evidence during draft-item symbol inspection.
+    rationale: Associate final items with evidence used to inspect their paths.
+  - path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+    type: modified
+    span:
+      start_line: 2257
+      end_line: 2257
+    summary: Replace direct plan-item serialization with an intermediate mapping for provenance attachment.
+    rationale: Add evidence before the final execution-plan item is emitted.
+  - path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+    type: modified
+    span:
+      start_line: 2266
+      end_line: 2275
+    summary: Attach up to 50 references to each item when evidence paths match its allowed paths.
+    rationale: Make provenance inspectable and deterministically scoped to the item.
+  - path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+    type: modified
+    span:
+      start_line: 2283
+      end_line: 2283
+    summary: Append each item after attaching its matching evidence.
+    rationale: Include provenance in the validated execution-plan document.
+  - path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+    type: modified
+    span:
+      start_line: 2302
+      end_line: 2316
+    summary: Match evidence paths against allowed files and directories.
+    rationale: Assign references to items through deterministic path scope.
+  - path: tests/test_github_issue_plan_generation.py
+    type: modified
+    span:
+      start_line: 950
+      end_line: 956
+    summary: Allow the repository-inspection test double to return evidence references.
+    rationale: Exercise the evidence collection seam used by plan generation.
+  - path: tests/test_github_issue_plan_generation.py
+    type: modified
+    span:
+      start_line: 958
+      end_line: 978
+    summary: Supply a revision-pinned evidence reference to the issue-plan generation test.
+    rationale: Verify that plan generation receives a complete artifact and query reference.
+  - path: tests/test_github_issue_plan_generation.py
+    type: modified
+    span:
+      start_line: 988
+      end_line: 988
+    summary: Capture the rendered plan in the evidence-retention test.
+    rationale: Assert references reach the serialized plan document.
+  - path: tests/test_github_issue_plan_generation.py
+    type: modified
+    span:
+      start_line: 1017
+      end_line: 1019
+    summary: Assert in-scope evidence is present on the typed item and in its YAML.
+    rationale: Verify end-to-end retention through issue-plan generation.
+  - path: tests/test_github_issue_plan_generation.py
+    type: modified
+    span:
+      start_line: 1991
+      end_line: 1997
+    summary: Collect evidence references from the artifact-backed inspection fixture.
+    rationale: Verify the origin of the references retained on plan items.
+  - path: tests/test_github_issue_plan_generation.py
+    type: modified
+    span:
+      start_line: 2009
+      end_line: 2011
+    summary: Assert evidence references contain artifact and query identifiers.
+    rationale: Verify durable lookup provenance is retained.
+  - path: tests/test_plan_repair_service.py
+    type: modified
+    span:
+      start_line: 134
+      end_line: 161
+    summary: Add a pinned symbol reference to the plan-repair fixture.
+    rationale: Exercise evidence preservation when item descriptions change.
+  - path: tests/test_plan_repair_service.py
+    type: modified
+    span:
+      start_line: 167
+      end_line: 167
+    summary: Assert repaired items retain their evidence references.
+    rationale: Guard against provenance loss during plan repair.
+  - path: tests/test_planning_compiler.py
+    type: modified
+    span:
+      start_line: 394
+      end_line: 448
+    summary: Verify evidence references survive stable YAML round trips and reject repository traversal.
+    rationale: Protect the persisted plan contract and repository boundary.
+entities:
+  - id: planned-work-item-code-evidence
+    type: Module
+    action: added
+  - id: issue-plan-evidence-retention-test
+    type: Regression test
+    action: added
+  - id: plan-evidence-yaml-round-trip-test
+    type: Regression test
+    action: added
+  - id: repaired-plan-evidence-retention-test
+    type: Regression test
+    action: added
+entity_relationships:
+  - id: issue-plan-persists-symbol-provenance
+    type: verifies
+    source: issue-plan-evidence-retention-test
+    target: planned-work-item-code-evidence
+    action: added
+    description: The issue-plan test verifies artifact-backed symbol references are retained on the generated work item.
+  - id: plan-yaml-preserves-symbol-provenance
+    type: verifies
+    source: plan-evidence-yaml-round-trip-test
+    target: planned-work-item-code-evidence
+    action: added
+    description: The round-trip test verifies references survive serialization and parsing with stable output.
+  - id: plan-repair-preserves-symbol-provenance
+    type: verifies
+    source: repaired-plan-evidence-retention-test
+    target: planned-work-item-code-evidence
+    action: added
+    description: The repair test verifies descriptive updates do not drop in-scope evidence.
+invariants:
+  - id: plan-evidence-is-path-scoped
+    description: A work item may retain only symbol evidence whose repository path is inside its allowed_paths.
+    action: added
+  - id: plan-evidence-is-revision-pinned
+    description: Each reference identifies its source revision, Structrr snapshot, artifact digest, query, symbol, path, span, and query coverage state.
+    action: added
+  - id: plan-evidence-is-bounded
+    description: Each work item accepts no more than 50 unique query-symbol evidence references.
+    action: added
+guidance: []

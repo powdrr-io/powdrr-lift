@@ -19,7 +19,8 @@ not silently leave an accepted implementation obligation without an owner.
 
 The initial implementation supports Python source. Other languages require
 language-specific comment and scope adapters; do not apply Python token rules to
-them. No repository-wide annotation backfill is required.
+them. Bootstrap can backfill references using the reconciliation phase in
+section 12; the same phase can run independently on an existing Structrr document.
 
 ## 2. Boundaries and existing implementation
 
@@ -524,6 +525,211 @@ annotations; independent validation rejects misplaced or missing references;
 behavioral verification remains mandatory; and artifacts distinguish mechanical
 coverage, semantic review, evidence and read-context completeness.
 
+Bootstrap annotation and subsequent validation must also reconcile Structrr's
+source bindings with code annotations using section 12. Link correction decisions
+are narrowly scoped and their artifact edits are deterministic.
+
 Do not claim universal interception of arbitrary shell reads, support for
 unimplemented languages, or semantic correctness established by ID presence.
 Those claims are outside this implementation's guarantees.
+
+## 12. Bootstrap annotation and bidirectional link reconciliation
+
+### 12.1. One logical relationship, two artifact representations
+
+Structrr source bindings and source comments represent the same applicability
+relationship. Validation must check both directions. Neither representation wins
+merely because it exists, and an inconsistent pair must not be resolved by
+silently copying one side to the other.
+
+Normalize a logical edge to `(canonical_reference_id, source_owner, relationship)`.
+The owner includes repository-relative path, language, owner kind, qualified name
+and a disambiguator when necessary. Resolve it against current parsed source;
+line ranges are derived navigation data. The relationship comes from the accepted
+placement obligation or the registered kind/owner mapping in section 7. If that
+mapping is ambiguous, report an unresolved relationship rather than infer one
+from the ID's spelling. Comments need not duplicate the relationship field.
+
+Distinguish these records:
+
+- Semantic Structrr bindings asserting applicability of a canonical feature,
+  decision, invariant or assumption: these require reciprocal source annotations.
+- Structural bindings such as file membership and other generated inventory:
+  these do not automatically require comments.
+
+Define a versioned eligibility mapping for existing binding kinds. Unknown kinds
+are reported as unsupported; do not annotate every bootstrap binding indiscriminately.
+Current bootstrap name matches are candidate evidence, even when labeled high
+confidence. They are not proof that the semantic link should exist.
+
+Let `S` be eligible normalized Structrr edges and `C` the normalized source edges.
+The mechanical validator reports `S - C`, `C - S`, invalid endpoints, duplicates,
+stale owner locations, lifecycle problems, and relationship ambiguity. Required
+coverage is checked separately against the frozen placement obligations: equality
+of two empty sets does not establish coverage.
+
+### 12.2. One narrow semantic question per candidate edge
+
+For a mismatch or a newly inferred bootstrap binding, prepare one bounded
+provider-neutral decision. Jev is the preferred configured provider; an alternate
+implements the same decision contract. Reuse
+`packages/service/src/powdrr_service/planning/semantic_decision.py` for identity, input fingerprints,
+provenance and evidence binding. Register a new decision kind
+`source_link_existence` with values `exists` and `absent`; use the existing
+unresolved-result mechanism for insufficient or conflicting evidence. Update
+all decision schema/provider validators and fixtures that enumerate decision kinds.
+Do not overload a broader candidate-search or implementation-review decision.
+
+The entire question is:
+
+> Under the supplied accepted intent and source context, should this exact
+> relationship exist between this Structrr reference and this code owner?
+
+The input packet contains:
+
+- The exact edge identity and relationship definition.
+- The canonical statement, relevant rationale, provenance, authority, version,
+  lifecycle and accepted amendments.
+- The exact owner's source, signature, containing scopes and source fingerprint.
+- Relevant caller/test excerpts or other evidence needed to decide ownership.
+- Both observed artifact representations, marking which side is missing or
+  inconsistent, and whether the proposed edge came from name matching.
+- Applicable mandatory placement/preservation obligations.
+
+Context assembly is deterministic and records every included excerpt and digest.
+If bounded context is insufficient, the provider abstains; orchestration may
+assemble additional evidence and issue a new fingerprinted decision. Never turn
+context truncation into an unsupported yes/no answer. Do not treat existing
+comments and generated bindings as independent evidence confirming each other.
+
+The provider returns only the allowed value or a structured unresolved reason.
+Powdrr records evidence references and provenance. The provider does not return
+patches, rewritten statements, replacement IDs, alternative owners, code changes
+or instructions for repairing artifacts. A relocation is two independently
+identified candidate edges; it cannot be invented inside the answer for one edge.
+Candidate discovery supplies those targets before existence decisions are asked.
+
+Deterministic facts need no provider call: missing IDs, unparseable source,
+duplicate serialization and stale spans are mechanical findings. Unresolvable
+endpoints block an existence question until the endpoint can be identified.
+Previously accepted decisions may be reused only when their full input fingerprint
+and policy/provider revisions match. Do not repeatedly ask until a desired answer
+appears. A configured alternate can handle an explicitly recorded unresolved
+case, but it receives the same question and cannot silently override a conflicting
+accepted decision.
+
+### 12.3. Deterministic correction table
+
+For a valid, current decision, compile these operations mechanically:
+
+| Decision | Structrr operation | Source operation |
+| --- | --- | --- |
+| `exists` | Ensure exactly one eligible binding for the edge; refresh derived owner/span metadata | Ensure exactly one correctly scoped annotation on the owner |
+| `absent` | Remove the edge's applicability binding, retaining the decision in audit history | Remove only the annotation representing this edge |
+| unresolved | Record the unresolved case | Preserve the artifacts and block completion of affected required links |
+
+Remove neither the canonical decision/invariant nor the implementation when a
+link is absent. If the result conflicts with a mandatory accepted placement,
+record the result and reconcile the link as specified, but keep the obligation
+unsatisfied and the run blocked. A separate design amendment or implementation
+change must resolve that conflict. An existence decision cannot waive an accepted
+requirement or certify behavioral compliance.
+
+An absent edge may share a physical comment with another valid normalized edge.
+Remove the comment only when no retained edge needs it. Treat ambiguous comment
+projection as unresolved. Existing correct reciprocal links require no existence
+call unless their ownership/intent context changed or they were explicitly
+flagged for semantic reassessment. Mechanical consistency is not evidence of
+semantic correctness; changed owners still receive the checks in section 8.
+
+Implement comment insertion/removal through tokens and syntax-tree ownership,
+not an LLM editor. Insert above decorators using the section 3 grammar. Preserve
+unrelated comments, indentation, encoding and newline conventions. Compare Python
+ASTs before/after, excluding location attributes, to prove product code did not
+change. Existing correct annotations are no-ops; a second run produces no diff.
+
+### 12.4. Apply as a checked artifact transaction
+
+Add **new** `packages/service/src/powdrr_service/structrr/reference_reconciliation.py` for edge
+normalization, mismatch detection, decision preparation and operation compilation.
+Add **new** `packages/service/src/powdrr_service/structrr/reference_editing.py` for deterministic source
+edits and staged artifact application. Keep provider invocation in orchestration.
+These paths reflect the current service package layout; earlier sections' legacy
+`src/powdrr_lift/structrr/` paths refer to the same responsibilities now owned by
+`packages/service/src/powdrr_service/structrr/`.
+
+Persist `structrr-link-reconciliation-v1` with source/document/base digests,
+eligibility-policy version, candidate edges, decisions and their fingerprints,
+compiled operations, unresolved cases, before/after digests and validation receipt.
+Operation types are `ensure_binding`, `remove_binding`, `ensure_annotation` and
+`remove_annotation`; operations name one exact edge and expected input digests.
+
+Before writing, recheck every source and Structrr digest. A stale input invalidates
+the affected decision and operation plan; do not apply its old line offsets to
+new source. Stage the entire linked change set in an isolated worktree, validate
+all candidate artifacts, then publish the document and code together in one PR.
+Use temporary files and atomic replacement per file; multi-file replacement is
+not globally atomic. Retain a transaction receipt and recoverable preimages so
+interruption cannot be reported as successful partial application.
+
+Reparse annotated files and regenerate source spans/fingerprints after edits.
+Regeneration must retain reconciled bindings rather than rerun name heuristics
+that resurrect rejected edges. Comments inserted by this phase are projections,
+not new independent evidence for a later bootstrap. Preserve negative decisions
+for the same fingerprint so the pipeline does not repeatedly propose rejected
+links. Re-evaluate when relevant intent, source or policy changes.
+
+Completion requires zero unresolved affected mismatches, no duplicate eligible
+edges, reciprocal representations, unchanged Python ASTs and satisfied independent
+placement/behavior obligations. Finish with a fresh read-only consistency scan;
+do not recursively trigger more semantic decisions during that scan.
+
+### 12.5. Bootstrap and later validation entry points
+
+Proposed CLI surface:
+
+```text
+structrr bootstrap --annotate-source
+structrr references reconcile --plan
+structrr references reconcile --apply PLAN
+structrr references check
+```
+
+Bootstrap first discovers source subjects and validates/stabilizes canonical IDs,
+then plans candidate links, asks narrow existence decisions, applies deterministic
+edits, re-indexes and validates the result. The standalone command runs exactly
+the same phase on an existing document. `check` reports findings without mutations
+or provider calls. Reconciliation is explicit, auditable and repeatable.
+
+During later implementation validation, detect inconsistencies and prepare the
+same narrow decisions. Apply accepted corrections through Workrr after miniSWE
+returns, without another coding-agent invocation or repair prompt. This is a
+controlled annotation/binding correction stage, with a separately attributable
+diff. Preserve the original worker diff; rerun affected structural checks after
+correction and verify product-code ASTs remain unchanged. Resolve canonical input
+documents into a new candidate artifact revision rather than mutating the frozen
+worker catalog or private validation manifest. Final reports name both the frozen
+implementation inputs and reconciled output revision.
+
+Apply the section 9 modes: `observe` may propose decisions and operations but
+does not mutate artifacts; `enforce` may apply validated annotation/binding
+corrections and blocks on unresolved required inconsistencies. Correction is
+limited to applicability metadata; canonical intent amendments remain separate.
+
+### 12.6. Implementation order and acceptance cases
+
+After the section 9 parser/catalog work, implement edge normalization and a
+read-only consistency checker. Next add the narrow semantic-decision adapter,
+then deterministic operation compilation and token editing. Finally integrate
+bootstrap, existing-document backfill and post-worker validation. Test with fake
+providers before an opt-in live Jev test.
+
+Required cases: Structrr-only and source-only links for both `exists` and
+`absent`; duplicate links; missing endpoints; unsupported binding kinds;
+unresolved/conflicting evidence; stale decision fingerprints; same-input reuse;
+shared annotation retention; mandatory-obligation conflict; relocation candidates;
+decorated/nested owners; token-preserving removal; interrupted application;
+repeat-run idempotence; final reciprocal scan; regenerated spans; rejected-edge
+non-resurrection; and a post-worker correction that leaves the frozen manifest
+and product-code AST unchanged. Include a consistently linked but semantically
+wrong edge to prove reciprocal presence alone cannot certify correctness.

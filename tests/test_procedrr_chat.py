@@ -117,6 +117,7 @@ def test_all_supported_workflow_names_have_procedrr_processes() -> None:
 
 def test_ci_response_procedure_runs_declared_verification_at_pinned_head() -> None:
     process = ProcessCatalog.load(bundled_process_directory()).get("respond-to-pr-ci")
+    assert process.document["limits"]["tool_calls"] >= 32
     operation = process.document["steps"][0]["operation"]
     assert operation["tool"] == "ci_observe"
     assert operation["parameters"]["verification_command"] == {
@@ -144,6 +145,7 @@ def test_ci_repair_preparation_uses_service_operations_and_one_targeted_question
     None
 ):
     process = ProcessCatalog.load(bundled_process_directory()).get("prepare-ci-repair")
+    assert process.document["limits"]["tool_calls"] >= 32
     steps = process.document["steps"]
 
     assert steps[0]["operation"]["tool"] == "ci_repair_research"

@@ -14,7 +14,7 @@ outputs:
   repair_preparation:
     type: object
     additionalProperties: true
-limits: {llm_activations: 1, tool_calls: 3, context_chars: 12000, context_value_chars: 5000}
+limits: {llm_activations: 1, tool_calls: 32, context_chars: 12000, context_value_chars: 5000}
 steps:
   - operation:
       tool: ci_observe

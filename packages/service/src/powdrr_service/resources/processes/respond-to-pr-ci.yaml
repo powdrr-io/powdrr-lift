@@ -1,74 +1,37 @@
 version: 1
 name: respond-to-pr-ci
-description: Observe CI for a specific pull request, classify runner provisioning failures deterministically, and checkpoint current-head evidence on its tracking issue.
+description: Observe the current PR head, reproduce failures, checkpoint evidence, and prepare one scoped repair request from service-owned policy.
 inputs:
-- name: repository
-  type: string
-  required: true
-- name: issue_number
-  type: integer
-  required: true
-- name: pull_request_url
-  type: string
-  required: true
-- name: verification_command
-  type: string
-  required: true
+  - {name: repository, type: string, required: true}
+  - {name: issue_number, type: integer, required: true}
+  - {name: pull_request_url, type: string, required: true}
+  - {name: verification_command, type: string, required: true}
+  - {name: implementation_context, type: object, required: true}
 outputs:
   ci_observation_result:
     type: object
     additionalProperties: true
-limits:
-  llm_activations: 20
-  tool_calls: 20
-  context_chars: 16000
-  context_value_chars: 6000
+  repair_preparation:
+    type: object
+    additionalProperties: true
+limits: {llm_activations: 1, tool_calls: 3, context_chars: 12000, context_value_chars: 5000}
 steps:
-- specialize:
-    process: generate-fragment
-    max_steps: 8
-    context: [repository, issue_number, pull_request_url, verification_command]
-    bind: observation_workflow
-    question: >-
-      Use only the supplied repository, pull request URL, tracking issue number, and
-      verification command.
-      Pass all values literally to the embedded procedure. Do not infer any identifier.
-      Execute the embedded procedure exactly. Do not diagnose the cause, edit files,
-      or call a coding agent. Pass all identifiers and the verification command
-      literally to the declared CLI command. The CLI runs that declared command at
-      the exact observed PR head in an isolated worktree and only declares a failure
-      reproduced when the normalized signature matches. A missing match is not
-      evidence of a GitHub-only failure when environments or phases differ. Preserve
-      the command result and stop if the issue is not associated with the pull request.
-
-      Embedded procedure:
-      ---
-      name: respond-to-pr-ci-observation
-      steps:
-      - id: capture-current-head
-        description: Fetch current PR checks and append a deduplicated issue checkpoint.
-        step_type: invoke_tool
-        llm_type: simple_task
-        tool_invocations:
-        - tool: shell
-          command:
-          - powdrr-lift
-          - respond-to-pr-ci
-          - --repository
-          - <repository>
-          - --pr-url
-          - <pull_request_url>
-          - --issue
-          - <issue_number>
-          - --verification-command
-          - <verification_command>
-        outputs:
-        - name: ci_observation_result
-          type: object
-          required_for_next_step: true
-          schema: {type: object, additionalProperties: true}
-      allowed_tools: [invoke_tool]
-- call:
-    fragment: ${observation_workflow}
-    max_steps: 8
-- terminal: succeeded
+  - operation:
+      tool: ci_observe
+      parameters:
+        repository: {type: reference, value: repository}
+        issue_number: {type: reference, value: issue_number}
+        pull_request_url: {type: reference, value: pull_request_url}
+        verification_command: {type: reference, value: verification_command}
+      returns: {type: object, additionalProperties: true}
+      bind: ci_observation_result
+  - call:
+      process: prepare-ci-repair
+      inputs:
+        ci_observation_result: {type: reference, value: ci_observation_result}
+        pull_request_url: {type: reference, value: pull_request_url}
+        implementation_context: {type: reference, value: implementation_context}
+        verification_command: {type: reference, value: verification_command}
+      outputs:
+        repair_preparation: repair_preparation
+  - terminal: succeeded

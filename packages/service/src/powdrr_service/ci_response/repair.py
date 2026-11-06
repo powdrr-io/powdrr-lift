@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import PurePosixPath
 from typing import Literal
@@ -292,9 +293,100 @@ def validate_repair_patch(
     return tuple(findings)
 
 
+def repair_contract_from_data(value: Mapping[str, object]) -> RepairContract:
+    """Reconstruct a service contract from its serialized worker request."""
+    reproduction_data = value.get("reproduction")
+    if not isinstance(reproduction_data, Mapping):
+        raise ValueError("repair contract is missing its reproduction receipt")
+    sequence_fields = (
+        "allowed_paths",
+        "protected_paths",
+        "acceptance_command",
+        "research_refs",
+    )
+    sequences: dict[str, tuple[str, ...]] = {}
+    for name in sequence_fields:
+        raw = value.get(name, [])
+        if not isinstance(raw, list) or not all(isinstance(item, str) for item in raw):
+            raise ValueError(f"repair contract field {name} must be a string list")
+        sequences[name] = tuple(raw)
+    disposition = value.get("disposition", "repository_change")
+    if disposition not in {"repository_change", "human_prerequisite", "unresolved"}:
+        raise ValueError("repair contract has an unsupported disposition")
+    repository = value.get("repository")
+    pull_request = value.get("pull_request")
+    if not isinstance(repository, str) or not isinstance(pull_request, int):
+        raise ValueError("repair contract repository identity is malformed")
+    scalar_fields = ("head_sha", "failure_id", "failure_signature", "required_behavior")
+    if not all(isinstance(value.get(name), str) for name in scalar_fields):
+        raise ValueError("repair contract contains malformed text fields")
+    return RepairContract(
+        repository=repository,
+        pull_request=pull_request,
+        head_sha=str(value["head_sha"]),
+        failure_id=str(value["failure_id"]),
+        failure_signature=str(value["failure_signature"]),
+        reproduction=LocalReproduction.from_dict(reproduction_data),
+        allowed_paths=sequences["allowed_paths"],
+        protected_paths=sequences["protected_paths"],
+        required_behavior=str(value["required_behavior"]),
+        acceptance_command=sequences["acceptance_command"],
+        disposition=disposition,
+        research_refs=sequences["research_refs"],
+    )
+
+
+def validate_ci_repair_attempt(
+    *,
+    repair_request: Mapping[str, object],
+    attempt: Mapping[str, object],
+    changed_files: Mapping[str, str],
+) -> dict[str, object]:
+    """Check the worker receipt and changed source against its service contract."""
+    raw_contract = repair_request.get("contract")
+    if not isinstance(raw_contract, Mapping):
+        raise ValueError("repair request omitted its serialized contract")
+    contract = repair_contract_from_data(raw_contract)
+    findings: list[str] = []
+    if repair_request.get("contract_fingerprint") != contract.fingerprint:
+        findings.append("repair contract fingerprint does not match its contents")
+    if repair_request.get("head_sha") != contract.head_sha:
+        findings.append("repair request head does not match its contract")
+    if repair_request.get("failure_id") != contract.failure_id:
+        findings.append("repair request failure ID does not match its contract")
+    if attempt.get("head_sha") != contract.head_sha:
+        findings.append("worker attempt ran at a different PR head")
+    if attempt.get("failure_id") != contract.failure_id:
+        findings.append("worker attempt addressed a different CI failure")
+    if attempt.get("passed") is not True:
+        findings.append("MiniSWE did not complete the scoped repair attempt")
+    attempt_paths = attempt.get("changed_paths")
+    if not isinstance(attempt_paths, list) or not all(
+        isinstance(path, str) for path in attempt_paths
+    ):
+        findings.append("worker attempt omitted a valid changed-path list")
+    elif set(attempt_paths) != set(changed_files):
+        findings.append(
+            "worker changed paths do not match the files read for validation"
+        )
+    findings.extend(
+        validate_repair_patch(contract=contract, changed_files=dict(changed_files))
+    )
+    return {
+        "passed": not findings,
+        "findings": list(dict.fromkeys(findings)),
+        "head_sha": contract.head_sha,
+        "failure_id": contract.failure_id,
+        "changed_paths": sorted(changed_files),
+        "contract_fingerprint": contract.fingerprint,
+    }
+
+
 __all__ = [
     "RepairContract",
     "RepairDisposition",
     "compile_miniswe_repair_prompt",
+    "repair_contract_from_data",
+    "validate_ci_repair_attempt",
     "validate_repair_patch",
 ]

@@ -28,7 +28,14 @@ def test_response_command_writes_idempotent_runner_failure_checkpoint(
                     "html_url": "https://github.com/example/project/pull/270",
                     "head": {"sha": head_sha},
                 },
-                runs=({"id": 9, "run_attempt": 1, "head_sha": head_sha},),
+                runs=(
+                    {
+                        "id": 9,
+                        "run_attempt": 1,
+                        "head_sha": head_sha,
+                        "path": ".github/workflows/ci.yml",
+                    },
+                ),
                 jobs_by_run={
                     "9": (
                         {
@@ -37,6 +44,7 @@ def test_response_command_writes_idempotent_runner_failure_checkpoint(
                             "status": "completed",
                             "conclusion": "failure",
                             "runner_id": 0,
+                            "labels": ["macos-14-arm64"],
                             "steps": [],
                         },
                     )
@@ -46,6 +54,11 @@ def test_response_command_writes_idempotent_runner_failure_checkpoint(
                         {"message": "The configuration 'macos-14' is not supported"},
                     )
                 },
+                changed_paths=(
+                    ".github/workflows/ci.yml",
+                    "src/behavior.py",
+                    "tests/test_behavior.py",
+                ),
             )
 
         def get_issue(self, _number: int) -> dict[str, str]:
@@ -64,7 +77,16 @@ def test_response_command_writes_idempotent_runner_failure_checkpoint(
     first = json.loads(capsys.readouterr().out)
     assert first["checkpoint_written"] is True
     assert first["failures"][0]["phase"] == "runner_provisioning"
-    assert first["failures"][0]["local_reproduction"] == "not_executable_locally"
+    assert (
+        first["failures"][0]["local_reproduction"]["status"] == "not_executable_locally"
+    )
+    assert first["changed_paths"] == [
+        ".github/workflows/ci.yml",
+        "src/behavior.py",
+        "tests/test_behavior.py",
+    ]
+    assert first["failures"][0]["workflow_path"] == ".github/workflows/ci.yml"
+    assert first["failures"][0]["runner_labels"] == ["macos-14-arm64"]
 
     assert cli._run_respond_to_pr_ci(args) == 0
     second = json.loads(capsys.readouterr().out)
@@ -169,8 +191,8 @@ def test_response_command_reproduces_matching_failure_at_exact_pr_head(
     assert cli._run_respond_to_pr_ci(args) == 0
     result = json.loads(capsys.readouterr().out)
     (failure,) = result["failures"]
-    assert failure["local_reproduction"] == "reproduced"
-    assert failure["local_reproduction_reason"].startswith(
+    assert failure["local_reproduction"]["status"] == "reproduced"
+    assert failure["local_reproduction"]["reason"].startswith(
         "The normalized CI failure signature appears"
     )
     assert len(executed) == 1

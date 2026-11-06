@@ -250,9 +250,11 @@ from powdrr_lift.workrr.git import (
     synchronize_workflow_initialization,
 )
 from powdrr_lift.workrr.github_issue_queue import (
+    QUEUE_LABELS,
     GitHubIssueClient,
     GitHubIssueQueueError,
     TaskCheckpointCallback,
+    continue_awaiting_ci_issue,
     continue_manual_prerequisite_issue,
     find_plan_issues,
     fulfill_issue_without_pr,
@@ -364,7 +366,8 @@ def build_parser() -> argparse.ArgumentParser:
         help="Record and deterministically classify CI failures for a pull request.",
     )
     ci_response_parser.add_argument("--repository", required=True)
-    ci_response_parser.add_argument("--pr", type=int, required=True)
+    ci_response_parser.add_argument("--pr", type=int)
+    ci_response_parser.add_argument("--pr-url")
     ci_response_parser.add_argument("--issue", type=int, required=True)
     ci_response_parser.set_defaults(func=_run_respond_to_pr_ci)
 
@@ -519,8 +522,8 @@ def build_parser() -> argparse.ArgumentParser:
     continue_issue_worker_parser = subparsers.add_parser(
         "github-issue-worker-continue",
         help=(
-            "Retry CI for a staged manual prerequisite PR and resume its issue "
-            "workflow."
+            "Recheck pending required CI or retry CI for a staged human prerequisite, "
+            "then resume the issue workflow when appropriate."
         ),
     )
     continue_issue_worker_parser.add_argument("--repository", required=True)
@@ -2961,8 +2964,24 @@ def _run_publish_plan_issues(args: argparse.Namespace) -> int:
 def _run_respond_to_pr_ci(args: argparse.Namespace) -> int:
     """Capture current-head Actions evidence and checkpoint deterministic triage."""
     try:
+        pr_number = args.pr
+        if getattr(args, "pr_url", None) is not None:
+            match = re.fullmatch(
+                rf"https://github\.com/{re.escape(args.repository)}/pull/([1-9][0-9]*)",
+                args.pr_url,
+            )
+            if match is None:
+                raise GitHubActionsError(
+                    "pull request URL must identify a PR in the requested repository"
+                )
+            url_number = int(match.group(1))
+            if pr_number is not None and pr_number != url_number:
+                raise GitHubActionsError("--pr and --pr-url identify different PRs")
+            pr_number = url_number
+        if pr_number is None or pr_number < 1:
+            raise GitHubActionsError("provide a positive --pr or a valid --pr-url")
         client = GitHubActionsClient(args.repository)
-        snapshot = client.observe_pull_request(args.pr)
+        snapshot = client.observe_pull_request(pr_number)
         issue = client.get_issue(args.issue)
         prior = client.list_issue_comments(args.issue)
         issue_body = issue.get("body")
@@ -2977,12 +2996,12 @@ def _run_respond_to_pr_ci(args: argparse.Namespace) -> int:
         ]
         associated = any(
             (isinstance(pr_url, str) and pr_url in text)
-            or re.search(rf"(?<![\w#])#{args.pr}(?!\d)", text) is not None
+            or re.search(rf"(?<![\w#])#{pr_number}(?!\d)", text) is not None
             for text in related_text
         )
         if not associated:
             raise GitHubActionsError(
-                f"issue #{args.issue} does not identify PR #{args.pr}; "
+                f"issue #{args.issue} does not identify PR #{pr_number}; "
                 "refusing to checkpoint unrelated work"
             )
         jobs = normalize_github_snapshot(
@@ -3000,7 +3019,7 @@ def _run_respond_to_pr_ci(args: argparse.Namespace) -> int:
             raise GitHubActionsError("GitHub did not return the current PR head SHA")
         observation_id, comment = render_ci_observation_checkpoint(
             repository=args.repository,
-            pull_request_number=args.pr,
+            pull_request_number=pr_number,
             issue_number=args.issue,
             head_sha=head_sha,
             jobs=jobs,
@@ -3015,7 +3034,7 @@ def _run_respond_to_pr_ci(args: argparse.Namespace) -> int:
             client.add_issue_comment(args.issue, comment)
         result = {
             "repository": args.repository,
-            "pull_request": args.pr,
+            "pull_request": pr_number,
             "issue": args.issue,
             "head_sha": head_sha,
             "observation_id": observation_id,
@@ -3156,13 +3175,15 @@ def _run_github_issue_worker(args: argparse.Namespace) -> int:
                 "issue_number": report.issue_number,
                 "item_id": report.item_id,
                 "detail": report.detail,
+                "ci_outcome": getattr(report, "ci_outcome", None),
             },
             indent=2,
         )
     )
     return (
         0
-        if report.outcome in {"no_eligible_work", "awaiting_review", "awaiting_human"}
+        if report.outcome
+        in {"no_eligible_work", "awaiting_review", "awaiting_ci", "awaiting_human"}
         else 1
     )
 
@@ -3170,6 +3191,27 @@ def _run_github_issue_worker(args: argparse.Namespace) -> int:
 def _run_github_issue_worker_continue(args: argparse.Namespace) -> int:
     repo_root = resolve_repo_root(args.repo_root)
     client = GitHubIssueClient(args.repository)
+    issue = client.get_issue(args.issue_number)
+    if QUEUE_LABELS["awaiting_ci"] in issue.labels:
+        try:
+            report = continue_awaiting_ci_issue(
+                client=client, issue_number=args.issue_number
+            )
+        except GitHubIssueQueueError as error:
+            print(str(error), file=sys.stderr)
+            return 2
+        print(
+            json.dumps(
+                {
+                    "outcome": report.outcome,
+                    "issue_number": report.issue_number,
+                    "ci_outcome": report.ci_outcome,
+                    "detail": report.detail,
+                },
+                indent=2,
+            )
+        )
+        return 0 if report.outcome in {"awaiting_review", "awaiting_ci"} else 1
 
     def resume_workflow(
         checkpoint: Mapping[str, Any], checkpoint_callback: TaskCheckpointCallback
@@ -3254,7 +3296,11 @@ def _run_github_issue_worker_continue(args: argparse.Namespace) -> int:
             indent=2,
         )
     )
-    return 0 if report.outcome in {"awaiting_review", "awaiting_human"} else 1
+    return (
+        0
+        if report.outcome in {"awaiting_review", "awaiting_ci", "awaiting_human"}
+        else 1
+    )
 
 
 def _run_pull_request_description(args: argparse.Namespace) -> int:

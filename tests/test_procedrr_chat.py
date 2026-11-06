@@ -122,6 +122,13 @@ def test_ci_response_procedure_is_observation_only_and_uses_cli_gate() -> None:
     assert "respond-to-pr-ci" in question
     assert "Do not diagnose the cause" in question
     assert "call a coding agent" in question
+    assert "pull_request_url" in question
+    execute = ProcessCatalog.load(bundled_process_directory()).get(
+        "execute-proposed-pr-workflow"
+    )
+    import yaml
+
+    assert "process: respond-to-pr-ci" in yaml.safe_dump(execute.document)
 
 
 def test_ci_repair_process_dispatches_only_the_prepared_repair_request() -> None:

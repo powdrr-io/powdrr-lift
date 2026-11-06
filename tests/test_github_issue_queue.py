@@ -27,6 +27,7 @@ from powdrr_lift.workrr.github_issue_queue import (
     TaskCheckpointCallback,
     _parse_plan,
     _plan_label,
+    continue_awaiting_ci_issue,
     continue_manual_prerequisite_issue,
     find_plan_issues,
     fulfill_issue_without_pr,
@@ -39,6 +40,21 @@ from powdrr_lift.workrr.github_issue_queue import (
 )
 
 PLAN_COMMIT = "a" * 40
+
+
+def _checkpoint_completed_pr(
+    checkpoint: TaskCheckpointCallback,
+    item: PlannedWorkItem,
+    *,
+    pull_request_number: int | None = None,
+) -> None:
+    number = pull_request_number or (item.github_issue_number or 100)
+    checkpoint(
+        "implementation-task",
+        "execute-proposed-pr-workflow-result-state",
+        {"pull_request_url": f"https://github.com/example/project/pull/{number}"},
+        "b" * 40,
+    )
 
 
 def _legacy_checkpoint_comment(checkpoint: TaskCheckpoint) -> str:
@@ -117,6 +133,8 @@ class FakeIssueClient:
         self.labels_ensured = False
         self.fulfillment_label_ensured = False
         self.merged_commit: str | None = None
+        self.required_checks = [{"name": "test", "state": "pass", "workflow": "ci"}]
+        self.pr_head = "c" * 40
         self._next_number = 100
 
     def ensure_queue_labels(self) -> None:
@@ -199,7 +217,21 @@ class FakeIssueClient:
         )
 
     def pull_request(self, number: int) -> dict[str, object]:
-        return self.pull_requests[number]
+        return self.pull_requests.get(number, {})
+
+    def _invoke(
+        self, arguments: list[str] | tuple[str, ...], *, check: bool = True
+    ) -> subprocess.CompletedProcess[str]:
+        del check
+        if arguments[:2] == ["pr", "view"]:
+            return subprocess.CompletedProcess(
+                ["gh", *arguments], 0, json.dumps({"headRefOid": self.pr_head}), ""
+            )
+        if arguments[:2] == ["pr", "checks"]:
+            return subprocess.CompletedProcess(
+                ["gh", *arguments], 0, json.dumps(self.required_checks), ""
+            )
+        return subprocess.CompletedProcess(["gh", *arguments], 1, "", "unexpected")
 
 
 def plan() -> ReviewedExecutionPlan:
@@ -910,12 +942,13 @@ def test_worker_skips_unmet_dependency_then_executes_ready_item(
         _directory: Path,
         workflow_id: str,
         _worker_id: str,
-        _item: PlannedWorkItem,
+        item: PlannedWorkItem,
         _plan: ReviewedExecutionPlan,
         _fulfilled_without_pr_dependencies: tuple[str, ...],
         _checkpoint: TaskCheckpointCallback,
     ) -> int:
         executed.append(workflow_id)
+        _checkpoint_completed_pr(_checkpoint, item)
         return 0
 
     first = run_worker_once(
@@ -1088,9 +1121,10 @@ def test_worker_applies_inline_issue_adjustment_to_effective_item(
         item: PlannedWorkItem,
         _plan: ReviewedExecutionPlan,
         _fulfilled_without_pr_dependencies: tuple[str, ...],
-        _checkpoint: TaskCheckpointCallback,
+        checkpoint: TaskCheckpointCallback,
     ) -> int:
         received.append(item)
+        _checkpoint_completed_pr(checkpoint, item)
         return 0
 
     report = run_worker_once(
@@ -1208,12 +1242,13 @@ def test_worker_accepts_one_file_workflow_definition(tmp_path: Path) -> None:
         path: Path,
         _workflow_id: str,
         _worker_id: str,
-        _item: PlannedWorkItem,
+        item: PlannedWorkItem,
         _plan: ReviewedExecutionPlan,
         _fulfilled_without_pr_dependencies: tuple[str, ...],
-        _checkpoint: TaskCheckpointCallback,
+        checkpoint: TaskCheckpointCallback,
     ) -> int:
         observed.append(path)
+        _checkpoint_completed_pr(checkpoint, item)
         return 0
 
     report = run_worker_once(
@@ -1395,7 +1430,7 @@ def test_worker_updates_issue_after_task_retries_are_exhausted(tmp_path: Path) -
     )
 
 
-def test_worker_persists_task_checkpoint_locally_without_issue_comment(
+def test_worker_persists_task_checkpoint_locally_and_on_issue(
     tmp_path: Path,
 ) -> None:
     (tmp_path / "docs/workflows/base").mkdir(parents=True)
@@ -1425,7 +1460,10 @@ def test_worker_persists_task_checkpoint_locally_without_issue_comment(
         checkpoint(
             "base-task-02",
             "implementation-state",
-            {"files": ["a.py"]},
+            {
+                "files": ["a.py"],
+                "pull_request_url": "https://github.com/example/project/pull/100",
+            },
             "b" * 40,
         )
         return 0
@@ -1442,7 +1480,10 @@ def test_worker_persists_task_checkpoint_locally_without_issue_comment(
     record = github_issue_queue._read_local_task_checkpoint(tmp_path, 100)
     assert record is not None
     assert record["task_id"] == "base-task-02"
-    assert record["output_state"] == {"files": ["a.py"]}
+    assert record["output_state"] == {
+        "files": ["a.py"],
+        "pull_request_url": "https://github.com/example/project/pull/100",
+    }
     assert record["commit_sha"] == "b" * 40
     assert (
         github_issue_queue._issue_checkpoint_path(tmp_path, 100).stat().st_mode & 0o777
@@ -1451,7 +1492,8 @@ def test_worker_persists_task_checkpoint_locally_without_issue_comment(
     issue_comments = [
         body for issue_number, body in client.comments if issue_number == 100
     ]
-    assert not any("powdrr-task-checkpoint" in body for body in issue_comments)
+    assert any("powdrr-task-checkpoint" in body for body in issue_comments)
+    assert any("pull/100" in body for body in issue_comments)
 
 
 def test_worker_marks_manual_prerequisite_as_awaiting_human(tmp_path: Path) -> None:
@@ -1507,7 +1549,7 @@ def test_worker_marks_manual_prerequisite_as_awaiting_human(tmp_path: Path) -> N
     )
     assert local_checkpoint is not None
     assert local_checkpoint["human_task_id"] == "base-task-04"
-    assert not any(
+    assert any(
         "powdrr-task-checkpoint" in body
         for number, body in client.comments
         if number == 100
@@ -1519,10 +1561,10 @@ def test_continue_manual_prerequisite_retries_ci_then_resumes(tmp_path: Path) ->
 
     class FakeCIClient(FakeIssueClient):
         def _invoke(
-            self, arguments: list[str], *, check: bool = True
+            self, arguments: list[str] | tuple[str, ...], *, check: bool = True
         ) -> subprocess.CompletedProcess[str]:
             _ = check
-            commands.append(arguments)
+            commands.append(list(arguments))
             if arguments[:2] == ["run", "list"]:
                 return subprocess.CompletedProcess(
                     arguments,
@@ -1537,6 +1579,17 @@ def test_continue_manual_prerequisite_retries_ci_then_resumes(tmp_path: Path) ->
                             }
                         ]
                     ),
+                    "",
+                )
+            if arguments[:2] == ["pr", "view"]:
+                return subprocess.CompletedProcess(
+                    arguments, 0, json.dumps({"headRefOid": "c" * 40}), ""
+                )
+            if arguments[:2] == ["pr", "checks"]:
+                return subprocess.CompletedProcess(
+                    arguments,
+                    0,
+                    json.dumps([{"name": "test", "state": "pass", "workflow": "ci"}]),
                     "",
                 )
             return subprocess.CompletedProcess(arguments, 0, "", "")
@@ -1598,15 +1651,20 @@ def test_continue_manual_prerequisite_retries_ci_then_resumes(tmp_path: Path) ->
 
     assert report.outcome == "awaiting_review"
     assert resumed == [checkpoint]
-    assert [command[1:4] for command in commands] == [
+    assert [command[1:4] for command in commands[:4]] == [
         ["list", "--branch", "powdrr/base-attempt-abc"],
         ["rerun", "77", "--failed"],
         ["watch", "77", "--exit-status"],
         ["checks", "https://github.com/example/project/pull/123", "--watch"],
     ]
+    assert [command[1:3] for command in commands[4:]] == [
+        ["view", "123"],
+        ["checks", "123"],
+        ["view", "123"],
+    ]
     assert QUEUE_LABELS["awaiting_review"] in client.get_issue(100).labels
     assert latest_manual_prerequisite_checkpoint(client.list_comments(100)) is None
-    assert not any(
+    assert any(
         "powdrr-task-checkpoint" in body
         for number, body in client.comments
         if number == 100
@@ -2060,7 +2118,7 @@ def test_repair_pr_checkpoint_blocks_impact_before_checkpoint_is_written(
     checkpoint_record = github_issue_queue._read_local_task_checkpoint(tmp_path, 100)
     assert checkpoint_record is not None
     assert checkpoint_record["task_id"] == "repair-pr-task"
-    assert not any(
+    assert any(
         "powdrr-task-checkpoint" in body
         for number, body in client.comments
         if number == issue.number
@@ -2083,3 +2141,108 @@ def test_task_checkpoint_comment_is_readable_and_structured() -> None:
     assert body.startswith("### Powdrr task checkpoint\n")
     assert "<!-- powdrr-task-checkpoint:v1 -->" in body
     assert '"task_id": "plan-pr-02-task-03"' in body
+
+
+def test_worker_keeps_pending_required_checks_out_of_review_queue(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "docs/workflows/base").mkdir(parents=True)
+    client = FakeIssueClient()
+    client.required_checks = [{"name": "test", "state": "pending", "workflow": "ci"}]
+    publish_plan_issues(
+        plan=plan(),
+        plan_path="docs/plans/feature.yaml",
+        plan_commit=PLAN_COMMIT,
+        client=client,  # type: ignore[arg-type]
+    )
+
+    def run_task(*args: Any) -> int:
+        _checkpoint_completed_pr(args[-1], args[3])
+        return 0
+
+    report = run_worker_once(
+        client=client,  # type: ignore[arg-type]
+        repo_root=tmp_path,
+        worker_id="worker-pending-ci",
+        run_task=run_task,
+        plan_loader=lambda *_args, **_kwargs: plan(),
+    )
+
+    assert report.outcome == "awaiting_ci"
+    assert report.ci_outcome == "awaiting_ci"
+    assert QUEUE_LABELS["awaiting_ci"] in client.issues[0].labels
+    assert QUEUE_LABELS["awaiting_review"] not in client.issues[0].labels
+    assert any(
+        "powdrr-ci-outcome:v1" in body
+        for number, body in client.comments
+        if number == 100
+    )
+
+
+def test_continue_awaiting_ci_rechecks_current_head_and_records_result() -> None:
+    client = FakeIssueClient()
+    client.issues.append(
+        QueueIssue(
+            100,
+            "Implement base",
+            "",
+            "open",
+            (QUEUE_LABELS["awaiting_ci"],),
+            "https://github.com/example/project/issues/100",
+        )
+    )
+    client.comments.append(
+        (
+            100,
+            _legacy_checkpoint_comment(
+                TaskCheckpoint(
+                    plan_id="feature-v1",
+                    item_id="base",
+                    workflow_id="base",
+                    task_id="finished",
+                    output_state_type="execute-proposed-pr-workflow-result-state",
+                    output_state={
+                        "pull_request_url": "https://github.com/example/project/pull/123"
+                    },
+                    commit_sha="b" * 40,
+                )
+            ),
+        )
+    )
+
+    report = continue_awaiting_ci_issue(
+        client=client,  # type: ignore[arg-type]
+        issue_number=100,
+    )
+
+    assert report.outcome == "awaiting_review"
+    assert QUEUE_LABELS["awaiting_review"] in client.get_issue(100).labels
+    assert QUEUE_LABELS["awaiting_ci"] not in client.get_issue(100).labels
+
+
+def test_required_ci_observation_rejects_head_change_during_check_read() -> None:
+    class ChangingHeadClient(FakeIssueClient):
+        view_count = 0
+
+        def _invoke(
+            self, arguments: list[str] | tuple[str, ...], *, check: bool = True
+        ) -> subprocess.CompletedProcess[str]:
+            if arguments[:2] == ["pr", "view"]:
+                self.view_count += 1
+                head = "c" * 40 if self.view_count == 1 else "d" * 40
+                return subprocess.CompletedProcess(
+                    ["gh", *arguments],
+                    0,
+                    json.dumps({"headRefOid": head}),
+                    "",
+                )
+            return super()._invoke(arguments, check=check)
+
+    client = ChangingHeadClient()
+    observation = github_issue_queue._observe_required_ci_outcome(
+        client,  # type: ignore[arg-type]
+        "https://github.com/example/project/pull/123",
+    )
+
+    assert observation["outcome"] == "blocked"
+    assert "head changed" in observation["reason"]

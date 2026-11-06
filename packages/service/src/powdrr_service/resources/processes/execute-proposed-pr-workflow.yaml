@@ -27,6 +27,14 @@ steps:
                 implementation_result: {type: reference, value: implementation_result}
               outputs:
                 pull_request_url: pull_request_url
+          - call:
+              process: respond-to-pr-ci
+              inputs:
+                repository: {type: reference, value: task_context.proposed_pr_context.github_repository}
+                issue_number: {type: reference, value: task_context.proposed_pr_context.github_issue_number}
+                pull_request_url: {type: reference, value: pull_request_url}
+              outputs:
+                ci_observation_result: ci_observation_result
       default:
         - judge:
             kind: construct_one
@@ -64,6 +72,14 @@ steps:
                       failure_review: {type: reference, value: failure_review}
                     outputs:
                       pull_request_url: pull_request_url
+                - call:
+                    process: respond-to-pr-ci
+                    inputs:
+                      repository: {type: reference, value: task_context.proposed_pr_context.github_repository}
+                      issue_number: {type: reference, value: task_context.proposed_pr_context.github_issue_number}
+                      pull_request_url: {type: reference, value: pull_request_url}
+                    outputs:
+                      ci_observation_result: ci_observation_result
               implementation_defect:
                 - terminal: failed
               unclear:

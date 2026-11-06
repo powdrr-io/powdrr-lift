@@ -4769,9 +4769,10 @@ def run_workflow_task(
         if locked_task is not None:
             workflow.update_task(replace(locked_task, status=TaskStatus.OPEN))
     client_was_provided = client is not None
-    dump_root = resolve_project_root(
-        configured_repo_root,
-        repo_root,
+    dump_root = (
+        configured_repo_root
+        if config.allow_unmanaged_git
+        else resolve_project_root(configured_repo_root, repo_root)
     )
     workflow_git_state = load_workflow_git_state(
         workflow_dir,

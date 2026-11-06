@@ -3271,12 +3271,43 @@ def _launch_ci_repair_workflow(
         if isinstance(comment, Mapping)
     ]
     run_prefix = f"<!-- powdrr-ci-response-run:{workflow_id}:"
-    attempt_numbers = {
-        int(match.group(1))
-        for body in prior_bodies
-        if (match := re.search(re.escape(run_prefix) + r"([0-9]+) -->", body))
-    }
-    attempt_number = max(attempt_numbers, default=0) + 1
+    attempt_statuses: dict[int, str] = {}
+    for body in prior_bodies:
+        match = re.search(re.escape(run_prefix) + r"([0-9]+) -->", body)
+        if match is None:
+            continue
+        try:
+            payload_text = body.split("```json\n", 1)[1].split("\n```", 1)[0]
+            prior_payload = json.loads(payload_text)
+        except (IndexError, json.JSONDecodeError):
+            continue
+        status = (
+            prior_payload.get("status") if isinstance(prior_payload, Mapping) else None
+        )
+        if isinstance(status, str):
+            attempt_statuses[int(match.group(1))] = status
+    for previous_attempt, status in attempt_statuses.items():
+        if status == "running":
+            interrupted_marker = f"{run_prefix}{previous_attempt} -->"
+            interrupted_payload = {
+                "workflow_id": workflow_id,
+                "task_id": task.task_id,
+                "process_id": "run-ci-repair-from-observation",
+                "attempt": previous_attempt,
+                "status": "interrupted",
+                "head_sha": head_sha,
+                "detail": (
+                    "The previous CLI invocation ended without a terminal checkpoint."
+                ),
+            }
+            client.add_issue_comment(
+                args.issue,
+                interrupted_marker
+                + "\n```json\n"
+                + json.dumps(interrupted_payload, indent=2, sort_keys=True)
+                + "\n```",
+            )
+    attempt_number = max(attempt_statuses, default=0) + 1
     run_marker = f"{run_prefix}{attempt_number} -->"
     run_payload = {
         "workflow_id": workflow_id,
@@ -3321,52 +3352,47 @@ def _launch_ci_repair_workflow(
 
     from powdrr_lift.workrr.task_agent import WorkflowTaskAgentConfig, run_workflow_task
 
-    exit_code = run_workflow_task(
-        WorkflowTaskAgentConfig(
-            workflow_dir=workflow_dir,
-            repo_root=worker_root,
-            provider=getattr(args, "provider", "deepinfra-cheap"),
-            workflow_id=workflow_id,
-            task_id=task.task_id,
-            api_key=getattr(args, "api_key", None),
-            base_url=getattr(args, "base_url", None),
-            max_roundtrips=getattr(args, "max_roundtrips", 128),
-            context_compaction_threshold=getattr(
-                args, "context_compaction_threshold", 0.75
-            ),
-            verbose=getattr(args, "verbose", False),
-            minisweagent_executable=getattr(args, "minisweagent_executable", "mini"),
-            minisweagent_model=getattr(
-                args,
-                "minisweagent_model",
-                "deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731",
-            ),
-            coding_agent_timeout_seconds=getattr(
-                args, "coding_agent_timeout_seconds", 1800.0
-            ),
-            allow_unmanaged_git=True,
-            publish_workflow_progress=False,
-            resume_locked_task=True,
-            task_checkpoint_callback=checkpoint_callback,
-            github_issue_number=args.issue,
-            github_repository=args.repository,
-        ),
-        stdout=sys.stdout,
-        stderr=sys.stderr,
-    )
-    manifest_path = worker_root / ".powdrr" / "procedrr-runs" / f"{task.task_id}.json"
     try:
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        manifest = {}
-    terminal_status = manifest.get("status") if isinstance(manifest, Mapping) else None
-    if exit_code != 0:
-        failure = manifest.get("failure") if isinstance(manifest, Mapping) else None
+        exit_code = run_workflow_task(
+            WorkflowTaskAgentConfig(
+                workflow_dir=workflow_dir,
+                repo_root=worker_root,
+                provider=getattr(args, "provider", "deepinfra-cheap"),
+                workflow_id=workflow_id,
+                task_id=task.task_id,
+                api_key=getattr(args, "api_key", None),
+                base_url=getattr(args, "base_url", None),
+                max_roundtrips=getattr(args, "max_roundtrips", 128),
+                context_compaction_threshold=getattr(
+                    args, "context_compaction_threshold", 0.75
+                ),
+                verbose=getattr(args, "verbose", False),
+                minisweagent_executable=getattr(
+                    args, "minisweagent_executable", "mini"
+                ),
+                minisweagent_model=getattr(
+                    args,
+                    "minisweagent_model",
+                    "deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731",
+                ),
+                coding_agent_timeout_seconds=getattr(
+                    args, "coding_agent_timeout_seconds", 1800.0
+                ),
+                allow_unmanaged_git=True,
+                publish_workflow_progress=False,
+                resume_locked_task=True,
+                task_checkpoint_callback=checkpoint_callback,
+                github_issue_number=args.issue,
+                github_repository=args.repository,
+            ),
+            stdout=sys.stdout,
+            stderr=sys.stderr,
+        )
+    except Exception as error:
         failure_payload = {
             **run_payload,
             "status": "failed",
-            "exit_code": exit_code,
-            "failure": failure if isinstance(failure, str) else None,
+            "failure": f"{type(error).__name__}: {error}",
         }
         client.add_issue_comment(
             args.issue,
@@ -3375,17 +3401,40 @@ def _launch_ci_repair_workflow(
             + json.dumps(failure_payload, indent=2, sort_keys=True)
             + "\n```",
         )
+        raise
+    manifest_path = worker_root / ".powdrr" / "procedrr-runs" / f"{task.task_id}.json"
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        manifest = {}
+    terminal_status = manifest.get("status") if isinstance(manifest, Mapping) else None
+    final_status = (
+        terminal_status
+        if isinstance(terminal_status, str)
+        else ("completed" if exit_code == 0 else "failed")
+    )
+    final_payload = {
+        **run_payload,
+        "status": final_status,
+        "exit_code": exit_code,
+    }
+    failure = manifest.get("failure") if isinstance(manifest, Mapping) else None
+    if isinstance(failure, str):
+        final_payload["failure"] = failure
+    client.add_issue_comment(
+        args.issue,
+        run_marker
+        + "\n```json\n"
+        + json.dumps(final_payload, indent=2, sort_keys=True)
+        + "\n```",
+    )
     return {
         "workflow_id": workflow_id,
         "task_id": task.task_id,
         "workflow_directory": str(workflow_dir),
         "worktree": str(worker_root),
         "exit_code": exit_code,
-        "status": (
-            terminal_status
-            if isinstance(terminal_status, str)
-            else ("completed" if exit_code == 0 else "failed")
-        ),
+        "status": final_status,
     }
 
 

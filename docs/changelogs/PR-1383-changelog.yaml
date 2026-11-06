@@ -1,0 +1,341 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1383
+title: Reproduce CI failures at the pinned PR head
+intent:
+  problem: The CI response workflow recorded failures but did not run the task's declared verification command against
+    the exact PR commit.
+  goal: Run that command once in an isolated pinned worktree, record conservative per-failure comparisons durably,
+    and avoid treating unmatched or generic step labels as proof that CI-only behavior occurred.
+human-decisions: []
+structured_files: []
+files:
+- path: packages/service/src/powdrr_service/ci_response/checkpoint.py
+  type: modified
+  span:
+    start_line: 36
+    end_line: 39
+  summary: Bind reproduction receipts into checkpoint identity and record outcome reasons and output hashes.
+  rationale: A reproduction update must create a distinct durable issue checkpoint without exposing raw command
+    output.
+- path: packages/service/src/powdrr_service/ci_response/checkpoint.py
+  type: modified
+  span:
+    start_line: 77
+    end_line: 86
+  summary: Bind reproduction receipts into checkpoint identity and record outcome reasons and output hashes.
+  rationale: A reproduction update must create a distinct durable issue checkpoint without exposing raw command
+    output.
+- path: packages/service/src/powdrr_service/ci_response/checkpoint.py
+  type: modified
+  span:
+    start_line: 89
+    end_line: 90
+  summary: Bind reproduction receipts into checkpoint identity and record outcome reasons and output hashes.
+  rationale: A reproduction update must create a distinct durable issue checkpoint without exposing raw command
+    output.
+- path: packages/service/src/powdrr_service/ci_response/evidence.py
+  type: modified
+  span:
+    start_line: 95
+    end_line: 98
+  summary: Distinguish a failed step label from an actual failure signature.
+  rationale: Avoid false reproduction matches on generic labels such as pytest.
+- path: packages/service/src/powdrr_service/ci_response/reproduction.py
+  type: modified
+  span:
+    start_line: 26
+    end_line: 32
+  summary: Treat a matching normalized failure as reproduction even when surrounding environments differ.
+  rationale: An exact failure match is direct evidence; environment differences only invalidate a missing-match
+    conclusion.
+- path: packages/service/src/powdrr_service/ci_response/reproduction.py
+  type: modified
+  span:
+    start_line: 45
+    end_line: 55
+  summary: Treat a matching normalized failure as reproduction even when surrounding environments differ.
+  rationale: An exact failure match is direct evidence; environment differences only invalidate a missing-match
+    conclusion.
+- path: packages/service/src/powdrr_service/resources/processes/execute-proposed-pr-workflow.yaml
+  type: modified
+  span:
+    start_line: 36
+    end_line: 36
+  summary: Forward the plan task's verification command after implementation and plan amendment publication.
+  rationale: Preserve the same validation contract on both PR publication paths.
+- path: packages/service/src/powdrr_service/resources/processes/execute-proposed-pr-workflow.yaml
+  type: modified
+  span:
+    start_line: 82
+    end_line: 82
+  summary: Forward the plan task's verification command after implementation and plan amendment publication.
+  rationale: Preserve the same validation contract on both PR publication paths.
+- path: packages/service/src/powdrr_service/resources/processes/respond-to-pr-ci.yaml
+  type: modified
+  span:
+    start_line: 14
+    end_line: 16
+  summary: Pass the task verification command to the pinned local reproduction operation.
+  rationale: Keep CI workflow inputs explicit and ensure the procedural command uses the reviewed value.
+- path: packages/service/src/powdrr_service/resources/processes/respond-to-pr-ci.yaml
+  type: modified
+  span:
+    start_line: 30
+    end_line: 30
+  summary: Pass the task verification command to the pinned local reproduction operation.
+  rationale: Keep CI workflow inputs explicit and ensure the procedural command uses the reviewed value.
+- path: packages/service/src/powdrr_service/resources/processes/respond-to-pr-ci.yaml
+  type: modified
+  span:
+    start_line: 33
+    end_line: 34
+  summary: Pass the task verification command to the pinned local reproduction operation.
+  rationale: Keep CI workflow inputs explicit and ensure the procedural command uses the reviewed value.
+- path: packages/service/src/powdrr_service/resources/processes/respond-to-pr-ci.yaml
+  type: modified
+  span:
+    start_line: 36
+    end_line: 42
+  summary: Pass the task verification command to the pinned local reproduction operation.
+  rationale: Keep CI workflow inputs explicit and ensure the procedural command uses the reviewed value.
+- path: packages/service/src/powdrr_service/resources/processes/respond-to-pr-ci.yaml
+  type: modified
+  span:
+    start_line: 63
+    end_line: 64
+  summary: Pass the task verification command to the pinned local reproduction operation.
+  rationale: Keep CI workflow inputs explicit and ensure the procedural command uses the reviewed value.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 28
+    end_line: 28
+  summary: Run one declared command at the observed PR head and persist per-failure reproduction outcomes.
+  rationale: Keep local execution tied to the exact candidate commit and distinguish a match from inconclusive evidence.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 30
+    end_line: 30
+  summary: Run one declared command at the observed PR head and persist per-failure reproduction outcomes.
+  rationale: Keep local execution tied to the exact candidate commit and distinguish a match from inconclusive evidence.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 44
+    end_line: 44
+  summary: Run one declared command at the observed PR head and persist per-failure reproduction outcomes.
+  rationale: Keep local execution tied to the exact candidate commit and distinguish a match from inconclusive evidence.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 369
+    end_line: 369
+  summary: Run one declared command at the observed PR head and persist per-failure reproduction outcomes.
+  rationale: Keep local execution tied to the exact candidate commit and distinguish a match from inconclusive evidence.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 375
+    end_line: 378
+  summary: Run one declared command at the observed PR head and persist per-failure reproduction outcomes.
+  rationale: Keep local execution tied to the exact candidate commit and distinguish a match from inconclusive evidence.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 3027
+    end_line: 3032
+  summary: Run one declared command at the observed PR head and persist per-failure reproduction outcomes.
+  rationale: Keep local execution tied to the exact candidate commit and distinguish a match from inconclusive evidence.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 3040
+    end_line: 3040
+  summary: Run one declared command at the observed PR head and persist per-failure reproduction outcomes.
+  rationale: Keep local execution tied to the exact candidate commit and distinguish a match from inconclusive evidence.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 3066
+    end_line: 3067
+  summary: Run one declared command at the observed PR head and persist per-failure reproduction outcomes.
+  rationale: Keep local execution tied to the exact candidate commit and distinguish a match from inconclusive evidence.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 3070
+    end_line: 3074
+  summary: Run one declared command at the observed PR head and persist per-failure reproduction outcomes.
+  rationale: Keep local execution tied to the exact candidate commit and distinguish a match from inconclusive evidence.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 3086
+    end_line: 3157
+  summary: Run one declared command at the observed PR head and persist per-failure reproduction outcomes.
+  rationale: Keep local execution tied to the exact candidate commit and distinguish a match from inconclusive evidence.
+- path: tests/test_ci_response_cli.py
+  type: modified
+  span:
+    start_line: 5
+    end_line: 6
+  summary: Exercise mocked GitHub evidence and a nontrivial exact-head reproduction result.
+  rationale: Verify command pinning, signature comparison, and durable issue checkpoint output together.
+- path: tests/test_ci_response_cli.py
+  type: modified
+  span:
+    start_line: 96
+    end_line: 182
+  summary: Exercise mocked GitHub evidence and a nontrivial exact-head reproduction result.
+  rationale: Verify command pinning, signature comparison, and durable issue checkpoint output together.
+- path: tests/test_ci_response_policy.py
+  type: modified
+  span:
+    start_line: 68
+    end_line: 94
+  summary: Cover exact-match reproduction, environment mismatch, and protection from generic step-label matches.
+  rationale: Keep the reproduction classifier conservative and deterministic.
+- path: tests/test_ci_response_policy.py
+  type: modified
+  span:
+    start_line: 137
+    end_line: 150
+  summary: Cover exact-match reproduction, environment mismatch, and protection from generic step-label matches.
+  rationale: Keep the reproduction classifier conservative and deterministic.
+- path: tests/test_ci_response_policy.py
+  type: modified
+  span:
+    start_line: 381
+    end_line: 394
+  summary: Cover exact-match reproduction, environment mismatch, and protection from generic step-label matches.
+  rationale: Keep the reproduction classifier conservative and deterministic.
+- path: tests/test_ci_response_policy.py
+  type: modified
+  span:
+    start_line: 402
+    end_line: 403
+  summary: Cover exact-match reproduction, environment mismatch, and protection from generic step-label matches.
+  rationale: Keep the reproduction classifier conservative and deterministic.
+- path: tests/test_procedrr_chat.py
+  type: modified
+  span:
+    start_line: 117
+    end_line: 117
+  summary: Verify the CI response process declares and forwards the verification command.
+  rationale: Ensure both PR response call sites provide the typed input.
+- path: tests/test_procedrr_chat.py
+  type: modified
+  span:
+    start_line: 123
+    end_line: 125
+  summary: Verify the CI response process declares and forwards the verification command.
+  rationale: Ensure both PR response call sites provide the typed input.
+- path: tests/test_procedrr_chat.py
+  type: modified
+  span:
+    start_line: 127
+    end_line: 127
+  summary: Verify the CI response process declares and forwards the verification command.
+  rationale: Ensure both PR response call sites provide the typed input.
+- path: tests/test_procedrr_chat.py
+  type: modified
+  span:
+    start_line: 134
+    end_line: 139
+  summary: Verify the CI response process declares and forwards the verification command.
+  rationale: Ensure both PR response call sites provide the typed input.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span:
+    start_line: 489
+    end_line: 489
+  summary: Exercise nested PR response with the required typed verification command.
+  rationale: Validate the updated process input contract through Procedrr evaluation.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span:
+    start_line: 499
+    end_line: 499
+  summary: Exercise nested PR response with the required typed verification command.
+  rationale: Validate the updated process input contract through Procedrr evaluation.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span:
+    start_line: 679
+    end_line: 679
+  summary: Exercise nested PR response with the required typed verification command.
+  rationale: Validate the updated process input contract through Procedrr evaluation.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span:
+    start_line: 700
+    end_line: 700
+  summary: Exercise nested PR response with the required typed verification command.
+  rationale: Validate the updated process input contract through Procedrr evaluation.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span:
+    start_line: 715
+    end_line: 715
+  summary: Exercise nested PR response with the required typed verification command.
+  rationale: Validate the updated process input contract through Procedrr evaluation.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span:
+    start_line: 748
+    end_line: 748
+  summary: Exercise nested PR response with the required typed verification command.
+  rationale: Validate the updated process input contract through Procedrr evaluation.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span:
+    start_line: 767
+    end_line: 767
+  summary: Exercise nested PR response with the required typed verification command.
+  rationale: Validate the updated process input contract through Procedrr evaluation.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span:
+    start_line: 783
+    end_line: 783
+  summary: Exercise nested PR response with the required typed verification command.
+  rationale: Validate the updated process input contract through Procedrr evaluation.
+entities:
+- id: pinned-ci-reproduction
+  type: Function
+  action: added
+- id: ci-response-process
+  type: Workflow
+  action: added
+- id: ci-reproduction-regression-tests
+  type: Regression test
+  action: added
+entity_relationships:
+- id: ci-process-calls-pinned-reproduction
+  type: invokes
+  source: ci-response-process
+  target: pinned-ci-reproduction
+  action: added
+  description: The CI response process passes its declared verification command to an isolated run at the observed
+    PR head.
+- id: reproduction-tests-protect-signature-comparison
+  type: verifies
+  source: ci-reproduction-regression-tests
+  target: pinned-ci-reproduction
+  action: added
+  description: Regression tests verify exact signature matching and reject generic failed-step labels as reproduction
+    evidence.
+invariants:
+- id: local-reproduction-is-pinned
+  description: Local verification executes only at the full PR head SHA observed from GitHub.
+  action: added
+- id: no-unproven-ci-only-conclusion
+  description: A missing local signature is not classified as non-reproduced when phase or environment comparability
+    is unknown.
+  action: added
+- id: reproduction-checkpoints-are-distinct
+  description: Reproduction receipts contribute to checkpoint identity, so updated local evidence is not deduplicated
+    against an observation-only comment.
+  action: added
+guidance: []

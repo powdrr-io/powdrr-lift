@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 from argparse import Namespace
+from hashlib import sha256
+from types import SimpleNamespace
 from typing import Any
 
 from powdrr_agent.execution.github_actions import GitHubActionsSnapshot
@@ -91,3 +93,90 @@ def test_response_command_rejects_pull_request_url_from_another_repository(
 
     assert cli._run_respond_to_pr_ci(args) == 2
     assert "must identify a PR in the requested repository" in capsys.readouterr().err
+
+
+def test_response_command_reproduces_matching_failure_at_exact_pr_head(
+    monkeypatch: Any, capsys: Any
+) -> None:
+    head_sha = "6c85b1e5c334a113b3db274b2c1b7a8f350b9707"
+    message = "AssertionError: expected 3, got 2"
+    comment_bodies: list[str] = []
+    executed: list[tuple[Any, ...]] = []
+
+    class FakeClient:
+        def __init__(self, _repository: str) -> None:
+            pass
+
+        def observe_pull_request(self, _number: int) -> GitHubActionsSnapshot:
+            return GitHubActionsSnapshot(
+                repository="example/project",
+                pull_request={
+                    "html_url": "https://github.com/example/project/pull/270",
+                    "head": {"sha": head_sha},
+                },
+                runs=({"id": 9, "run_attempt": 1, "head_sha": head_sha},),
+                jobs_by_run={
+                    "9": (
+                        {
+                            "id": 10,
+                            "check_run_url": "https://api.github.test/check-runs/11",
+                            "status": "completed",
+                            "conclusion": "failure",
+                            "runner_id": 12,
+                            "steps": [],
+                        },
+                    )
+                },
+                annotations_by_check_run={
+                    "11": (
+                        {
+                            "message": message,
+                            "annotation_level": "failure",
+                        },
+                    )
+                },
+            )
+
+        def get_issue(self, _number: int) -> dict[str, str]:
+            return {"body": "Tracking https://github.com/example/project/pull/270"}
+
+        def list_issue_comments(self, _number: int) -> tuple[dict[str, str], ...]:
+            return tuple({"body": body} for body in comment_bodies)
+
+        def add_issue_comment(self, _number: int, body: str) -> None:
+            comment_bodies.append(body)
+
+    def run_pinned(root: Any, commit: str, command: tuple[str, ...]) -> Any:
+        executed.append((root, commit, command))
+        return SimpleNamespace(
+            stdout="",
+            stderr=f"E {message}\n",
+            exit_code=1,
+            stdout_sha256=sha256(b"").hexdigest(),
+            stderr_sha256=sha256(f"E {message}\n".encode()).hexdigest(),
+        )
+
+    monkeypatch.setattr(cli, "GitHubActionsClient", FakeClient)
+    monkeypatch.setattr(cli, "execute_pinned_local_command", run_pinned)
+    args = Namespace(
+        repository="example/project",
+        pr=270,
+        pr_url=None,
+        issue=107,
+        verification_command="pytest tests/test_behavior.py -q",
+    )
+
+    assert cli._run_respond_to_pr_ci(args) == 0
+    result = json.loads(capsys.readouterr().out)
+    (failure,) = result["failures"]
+    assert failure["local_reproduction"] == "reproduced"
+    assert failure["local_reproduction_reason"].startswith(
+        "The normalized CI failure signature appears"
+    )
+    assert len(executed) == 1
+    assert executed[0][1:] == (
+        head_sha,
+        ("pytest", "tests/test_behavior.py", "-q"),
+    )
+    assert "local reproduction `reproduced`" in comment_bodies[0]
+    assert message.lower() in comment_bodies[0]

@@ -486,6 +486,7 @@ inputs:
   - {name: repository, type: string, required: true}
   - {name: issue_number, type: integer, required: true}
   - {name: pull_request_url, type: string, required: true}
+  - {name: verification_command, type: string, required: true}
 outputs: {ci_observation_result: {type: object}}
 steps:
   - operation:
@@ -495,6 +496,7 @@ steps:
         repository: "${repository}"
         issue_number: "${issue_number}"
         pull_request_url: "${pull_request_url}"
+        verification_command: "${verification_command}"
       bind: ci_observation_result
   - terminal: succeeded
 """,
@@ -674,6 +676,7 @@ steps:
                     "proposed_pr_context": {
                         "github_repository": "example/repo",
                         "github_issue_number": 42,
+                        "verification_command": "pytest -q",
                     },
                 }
             },
@@ -694,6 +697,7 @@ steps:
                                 "proposed_pr_context": {
                                     "github_repository": "example/repo",
                                     "github_issue_number": 42,
+                                    "verification_command": "pytest -q",
                                 },
                             }
                         },
@@ -708,6 +712,7 @@ steps:
                         "proposed_pr_context": {
                             "github_repository": "example/repo",
                             "github_issue_number": 42,
+                            "verification_command": "pytest -q",
                         },
                     }
                 },
@@ -740,6 +745,7 @@ steps:
                     "proposed_pr_context": {
                         "github_repository": "example/repo",
                         "github_issue_number": 42,
+                        "verification_command": "pytest -q",
                     },
                 }
             },
@@ -758,6 +764,7 @@ steps:
                         "proposed_pr_context": {
                             "github_repository": "example/repo",
                             "github_issue_number": 42,
+                            "verification_command": "pytest -q",
                         },
                     }
                 },
@@ -773,6 +780,7 @@ steps:
                 "proposed_pr_context": {
                     "github_repository": "example/repo",
                     "github_issue_number": 42,
+                    "verification_command": "pytest -q",
                 },
             }
         },

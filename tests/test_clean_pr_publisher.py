@@ -153,3 +153,77 @@ def test_clean_publication_branch_excludes_checkpoint_commits(
         "pr create --draft --base main --head powdrr/attestation-pr-01-implementation"
         in calls
     )
+
+
+def test_clean_publisher_updates_existing_pr_branch_with_only_repair_commit_paths(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    remote = tmp_path / "repo.git"
+    source = tmp_path / "source"
+    _git("init", "--bare", str(remote), cwd=tmp_path)
+    _git("init", "-b", "main", str(source), cwd=tmp_path)
+    _git("config", "user.name", "Powdrr Test", cwd=source)
+    _git("config", "user.email", "powdrr-test@example.invalid", cwd=source)
+    (source / "README.md").write_text("base\n", encoding="utf-8")
+    workflow = source / ".github/workflows/ci.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text("runs-on: unsupported\n", encoding="utf-8")
+    _git("add", "README.md", ".github/workflows/ci.yml", cwd=source)
+    _git("commit", "-m", "base", cwd=source)
+    _git("remote", "add", "origin", str(remote), cwd=source)
+    _git("push", "-u", "origin", "main", cwd=source)
+
+    pr_branch = "powdrr/existing-pr"
+    _git("switch", "-c", pr_branch, cwd=source)
+    (source / "src/existing.py").parent.mkdir(parents=True)
+    (source / "src/existing.py").write_text(
+        "existing PR implementation\n", encoding="utf-8"
+    )
+    _git("add", "src/existing.py", cwd=source)
+    _git("commit", "-m", "existing PR implementation", cwd=source)
+    _git("push", "-u", "origin", pr_branch, cwd=source)
+
+    _git("switch", "-c", "powdrr/ci-response", cwd=source)
+    workflow.write_text("runs-on: macos-14\n", encoding="utf-8")
+    _git("add", ".github/workflows/ci.yml", cwd=source)
+    _git("commit", "-m", "repair workflow runner", cwd=source)
+
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    fake_gh = fake_bin / "gh"
+    fake_gh.write_text(
+        "#!/bin/sh\n"
+        'if [ "$1" = "pr" ] && [ "$2" = "view" ]; then\n'
+        '  printf \'%s\\n\' \'{"url":"https://github.com/example/repo/pull/7","state":"OPEN"}\'\n'
+        "  exit 0\n"
+        "fi\n"
+        "exit 0\n",
+        encoding="utf-8",
+    )
+    fake_gh.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{fake_bin}{os.pathsep}{os.environ['PATH']}")
+
+    result = publish_clean_pull_request(
+        {
+            "files_to_publish": [".github/workflows/ci.yml"],
+            "base": "main",
+            "publication_branch": pr_branch,
+            "title": "Repair CI runner configuration",
+            "body": "Update the unsupported runner label.",
+            "commit_message": "Repair CI runner configuration",
+        },
+        worktree_root=source,
+    )
+
+    assert result == "https://github.com/example/repo/pull/7"
+    remote_changes = set(
+        _git(
+            "--git-dir",
+            str(remote),
+            "diff",
+            "--name-only",
+            "refs/heads/main...refs/heads/powdrr/existing-pr",
+            cwd=tmp_path,
+        ).splitlines()
+    )
+    assert remote_changes == {"src/existing.py", ".github/workflows/ci.yml"}

@@ -10,7 +10,7 @@ outputs:
   repair_preparation:
     type: object
     additionalProperties: true
-limits: {llm_activations: 1, tool_calls: 10, context_chars: 12000, context_value_chars: 5000}
+limits: {llm_activations: 1, tool_calls: 16, context_chars: 12000, context_value_chars: 5000}
 steps:
   - operation:
       tool: ci_repair_research
@@ -42,6 +42,7 @@ steps:
                 - Choose one to three changed non-test paths that directly address the observed failure. Do not add paths that are absent from the PR diff.
                 - State the required behavior from the implementation context and the correction needed to satisfy it. Do not delete, weaken, skip, or make tests tautological.
                 - Choose human_prerequisite when repository code cannot provide a missing permission, credential, organization setting, or external setup requirement.
+                - For human_prerequisite, provide manual_prerequisite with title, actionable instructions that do not expose secret values, a verification step, trigger exactly after_implementation_before_validation, and the condition it unblocks. For repository_change or unresolved, set manual_prerequisite to null.
                 - Choose unresolved when the evidence does not justify a scoped repository correction. Do not guess.
                 - Cite the failure evidence or captured source references in the explanation.
               context: [research_result.failure, research_result.evidence, implementation_context, ci_observation_result.changed_paths]
@@ -49,13 +50,25 @@ steps:
                 name: repair_target_decision
                 schema:
                   type: object
-                  required: [disposition, target_paths, required_behavior, explanation]
+                  required: [disposition, target_paths, required_behavior, explanation, manual_prerequisite]
                   additionalProperties: false
                   properties:
                     disposition: {type: string, enum: [repository_change, human_prerequisite, unresolved]}
                     target_paths: {type: array, maxItems: 3, items: {type: string, minLength: 1}}
                     required_behavior: {type: string, minLength: 1}
                     explanation: {type: string, minLength: 1}
+                    manual_prerequisite:
+                      oneOf:
+                        - type: "null"
+                        - type: object
+                          required: [title, instructions, verification, trigger, unblocks]
+                          additionalProperties: false
+                          properties:
+                            title: {type: string, minLength: 1, maxLength: 160}
+                            instructions: {type: array, minItems: 1, items: {type: string, minLength: 1}}
+                            verification: {type: string, minLength: 1}
+                            trigger: {type: string, const: after_implementation_before_validation}
+                            unblocks: {type: string, minLength: 1}
               validation: {kind: json_schema}
           - operation:
               tool: ci_repair_compile
@@ -79,20 +92,56 @@ steps:
   - branch:
       subject: repair_preparation.status
       cases:
-        repository_change:
-          - call:
-              process: execute-ci-repair
-              inputs:
-                repair_request: {type: reference, value: repair_preparation.repair_request}
-              outputs:
-                repair_attempt: repair_attempt
+        human_prerequisite:
           - operation:
-              tool: ci_repair_validate
+              tool: task_handoff
+              parameters:
+                question: {type: reference, value: repair_preparation.explanation}
+                continuation_instructions:
+                  type: literal
+                  value: >-
+                    After completing the external setup, run
+                    `powdrr-lift github-issue-worker-continue` for this issue.
+                    Powdrr will verify the staged PR checks and resume this
+                    workflow from the same checkpoint.
+                manual_prerequisite:
+                  {type: reference, value: repair_preparation.manual_prerequisite}
+              returns: {type: object, additionalProperties: true}
+              bind: ci_human_handoff
+          - terminal: succeeded
+        repository_change:
+          - operation:
+              tool: ci_repair_retry_start
               parameters:
                 repair_request: {type: reference, value: repair_preparation.repair_request}
-                attempt: {type: reference, value: repair_attempt}
               returns: {type: object, additionalProperties: true}
-              bind: repair_validation
+              bind: repair_loop
+          - repeat:
+              max_iterations: 2
+              until: {subject: repair_loop.done, equals: true}
+              body:
+                - call:
+                    process: execute-ci-repair
+                    inputs:
+                      repair_request: {type: reference, value: repair_loop.repair_request}
+                    outputs:
+                      repair_attempt: repair_attempt
+                - operation:
+                    tool: ci_repair_validate
+                    parameters:
+                      repair_request: {type: reference, value: repair_loop.repair_request}
+                      attempt: {type: reference, value: repair_attempt}
+                    returns: {type: object, additionalProperties: true}
+                    bind: repair_validation
+                - operation:
+                    tool: ci_repair_retry
+                    parameters:
+                      repair_request: {type: reference, value: repair_loop.repair_request}
+                      attempt: {type: reference, value: repair_attempt}
+                      validation: {type: reference, value: repair_validation}
+                      max_attempts: {type: literal, value: 2}
+                    returns: {type: object, additionalProperties: true}
+                    bind: repair_loop
           - branch:
               subject: repair_validation.passed
               cases:

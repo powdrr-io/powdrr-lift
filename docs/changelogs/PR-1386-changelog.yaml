@@ -1,0 +1,395 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1386
+title: Checkpoint CI prerequisites and retry scoped repairs
+intent:
+  problem: The CI repair process stopped at human prerequisites without using Powdrr's
+    durable continuation checkpoint, and it rejected repair attempts without a bounded
+    correction cycle.
+  goal: Route manual CI setup through the existing durable handoff and continue only
+    after the prerequisite is completed; retry one scoped repair using deterministic
+    validation findings and publish only a validated result.
+human-decisions: []
+structured_files: []
+files:
+- path: packages/service/src/powdrr_service/ci_response/__init__.py
+  type: modified
+  span:
+    start_line: 6
+    end_line: 6
+  summary: Implement durable CI repair retry and human handoff.
+  rationale: Let Powdrr correct scoped CI failures or checkpoint required human setup
+    before resuming.
+- path: packages/service/src/powdrr_service/ci_response/__init__.py
+  type: modified
+  span:
+    start_line: 8
+    end_line: 8
+  summary: Implement durable CI repair retry and human handoff.
+  rationale: Let Powdrr correct scoped CI failures or checkpoint required human setup
+    before resuming.
+- path: packages/service/src/powdrr_service/ci_response/__init__.py
+  type: modified
+  span:
+    start_line: 36
+    end_line: 36
+  summary: Implement durable CI repair retry and human handoff.
+  rationale: Let Powdrr correct scoped CI failures or checkpoint required human setup
+    before resuming.
+- path: packages/service/src/powdrr_service/ci_response/__init__.py
+  type: modified
+  span:
+    start_line: 47
+    end_line: 47
+  summary: Implement durable CI repair retry and human handoff.
+  rationale: Let Powdrr correct scoped CI failures or checkpoint required human setup
+    before resuming.
+- path: packages/service/src/powdrr_service/ci_response/bridge.py
+  type: modified
+  span:
+    start_line: 93
+    end_line: 93
+  summary: Implement durable CI repair retry and human handoff.
+  rationale: Let Powdrr correct scoped CI failures or checkpoint required human setup
+    before resuming.
+- path: packages/service/src/powdrr_service/ci_response/bridge.py
+  type: modified
+  span:
+    start_line: 98
+    end_line: 102
+  summary: Implement durable CI repair retry and human handoff.
+  rationale: Let Powdrr correct scoped CI failures or checkpoint required human setup
+    before resuming.
+- path: packages/service/src/powdrr_service/ci_response/bridge.py
+  type: modified
+  span:
+    start_line: 210
+    end_line: 314
+  summary: Implement durable CI repair retry and human handoff.
+  rationale: Let Powdrr correct scoped CI failures or checkpoint required human setup
+    before resuming.
+- path: packages/service/src/powdrr_service/procedrr/parser.py
+  type: modified
+  span:
+    start_line: 39
+    end_line: 40
+  summary: Implement durable CI repair retry and human handoff.
+  rationale: Let Powdrr correct scoped CI failures or checkpoint required human setup
+    before resuming.
+- path: packages/service/src/powdrr_service/resources/processes/prepare-ci-repair.yaml
+  type: modified
+  span:
+    start_line: 13
+    end_line: 13
+  summary: Implement durable CI repair retry and human handoff.
+  rationale: Let Powdrr correct scoped CI failures or checkpoint required human setup
+    before resuming.
+- path: packages/service/src/powdrr_service/resources/processes/prepare-ci-repair.yaml
+  type: modified
+  span:
+    start_line: 45
+    end_line: 45
+  summary: Implement durable CI repair retry and human handoff.
+  rationale: Let Powdrr correct scoped CI failures or checkpoint required human setup
+    before resuming.
+- path: packages/service/src/powdrr_service/resources/processes/prepare-ci-repair.yaml
+  type: modified
+  span:
+    start_line: 53
+    end_line: 53
+  summary: Implement durable CI repair retry and human handoff.
+  rationale: Let Powdrr correct scoped CI failures or checkpoint required human setup
+    before resuming.
+- path: packages/service/src/powdrr_service/resources/processes/prepare-ci-repair.yaml
+  type: modified
+  span:
+    start_line: 60
+    end_line: 71
+  summary: Implement durable CI repair retry and human handoff.
+  rationale: Let Powdrr correct scoped CI failures or checkpoint required human setup
+    before resuming.
+- path: packages/service/src/powdrr_service/resources/processes/prepare-ci-repair.yaml
+  type: modified
+  span:
+    start_line: 83
+    end_line: 88
+  summary: Replace single-shot execution with a bounded validated retry cycle.
+  rationale: Give MiniSWE one chance to correct a failed scoped repair before the workflow stops.
+- path: packages/service/src/powdrr_service/resources/processes/prepare-ci-repair.yaml
+  type: modified
+  span:
+    start_line: 95
+    end_line: 111
+  summary: Implement durable CI repair retry and human handoff.
+  rationale: Let Powdrr correct scoped CI failures or checkpoint required human setup
+    before resuming.
+- path: packages/service/src/powdrr_service/resources/processes/prepare-ci-repair.yaml
+  type: modified
+  span:
+    start_line: 93
+    end_line: 93
+  summary: Replace the former single validation path with the retry state initializer.
+  rationale: Start the repair iteration state before dispatching the bounded worker attempts.
+- path: packages/service/src/powdrr_service/resources/processes/prepare-ci-repair.yaml
+  type: modified
+  span:
+    start_line: 114
+    end_line: 114
+  summary: Implement durable CI repair retry and human handoff.
+  rationale: Let Powdrr correct scoped CI failures or checkpoint required human setup
+    before resuming.
+- path: packages/service/src/powdrr_service/resources/processes/prepare-ci-repair.yaml
+  type: modified
+  span:
+    start_line: 118
+    end_line: 144
+  summary: Implement durable CI repair retry and human handoff.
+  rationale: Let Powdrr correct scoped CI failures or checkpoint required human setup
+    before resuming.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 2003
+    end_line: 2003
+  summary: Implement durable CI repair retry and human handoff.
+  rationale: Let Powdrr correct scoped CI failures or checkpoint required human setup
+    before resuming.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 3661
+    end_line: 3661
+  summary: Implement durable CI repair retry and human handoff.
+  rationale: Let Powdrr correct scoped CI failures or checkpoint required human setup
+    before resuming.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 3674
+    end_line: 3705
+  summary: Implement durable CI repair retry and human handoff.
+  rationale: Let Powdrr correct scoped CI failures or checkpoint required human setup
+    before resuming.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 3714
+    end_line: 3714
+  summary: Implement durable CI repair retry and human handoff.
+  rationale: Let Powdrr correct scoped CI failures or checkpoint required human setup
+    before resuming.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 3733
+    end_line: 3733
+  summary: Implement durable CI repair retry and human handoff.
+  rationale: Let Powdrr correct scoped CI failures or checkpoint required human setup
+    before resuming.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 3740
+    end_line: 3740
+  summary: Implement durable CI repair retry and human handoff.
+  rationale: Let Powdrr correct scoped CI failures or checkpoint required human setup
+    before resuming.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 3745
+    end_line: 3745
+  summary: Implement durable CI repair retry and human handoff.
+  rationale: Let Powdrr correct scoped CI failures or checkpoint required human setup
+    before resuming.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 4197
+    end_line: 4230
+  summary: Implement durable CI repair retry and human handoff.
+  rationale: Let Powdrr correct scoped CI failures or checkpoint required human setup
+    before resuming.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 4971
+    end_line: 4972
+  summary: Implement durable CI repair retry and human handoff.
+  rationale: Let Powdrr correct scoped CI failures or checkpoint required human setup
+    before resuming.
+- path: tests/test_ci_response_policy.py
+  type: modified
+  span:
+    start_line: 4
+    end_line: 4
+  summary: Implement durable CI repair retry and human handoff.
+  rationale: Let Powdrr correct scoped CI failures or checkpoint required human setup
+    before resuming.
+- path: tests/test_ci_response_policy.py
+  type: modified
+  span:
+    start_line: 395
+    end_line: 404
+  summary: Implement durable CI repair retry and human handoff.
+  rationale: Let Powdrr correct scoped CI failures or checkpoint required human setup
+    before resuming.
+- path: tests/test_ci_response_policy.py
+  type: modified
+  span:
+    start_line: 412
+    end_line: 412
+  summary: Implement durable CI repair retry and human handoff.
+  rationale: Let Powdrr correct scoped CI failures or checkpoint required human setup
+    before resuming.
+- path: tests/test_ci_response_policy.py
+  type: modified
+  span:
+    start_line: 419
+    end_line: 419
+  summary: Implement durable CI repair retry and human handoff.
+  rationale: Let Powdrr correct scoped CI failures or checkpoint required human setup
+    before resuming.
+- path: tests/test_ci_response_policy.py
+  type: modified
+  span:
+    start_line: 422
+    end_line: 467
+  summary: Implement durable CI repair retry and human handoff.
+  rationale: Let Powdrr correct scoped CI failures or checkpoint required human setup
+    before resuming.
+- path: tests/test_ci_response_policy.py
+  type: modified
+  span:
+    start_line: 469
+    end_line: 694
+  summary: Implement durable CI repair retry and human handoff.
+  rationale: Let Powdrr correct scoped CI failures or checkpoint required human setup
+    before resuming.
+- path: tests/test_ci_response_policy.py
+  type: modified
+  span:
+    start_line: 730
+    end_line: 731
+  summary: Implement durable CI repair retry and human handoff.
+  rationale: Let Powdrr correct scoped CI failures or checkpoint required human setup
+    before resuming.
+- path: tests/test_ci_response_policy.py
+  type: modified
+  span:
+    start_line: 767
+    end_line: 781
+  summary: Implement durable CI repair retry and human handoff.
+  rationale: Let Powdrr correct scoped CI failures or checkpoint required human setup
+    before resuming.
+- path: tests/test_ci_response_policy.py
+  type: modified
+  span:
+    start_line: 786
+    end_line: 793
+  summary: Implement durable CI repair retry and human handoff.
+  rationale: Let Powdrr correct scoped CI failures or checkpoint required human setup
+    before resuming.
+- path: tests/test_ci_response_policy.py
+  type: modified
+  span:
+    start_line: 803
+    end_line: 823
+  summary: Implement durable CI repair retry and human handoff.
+  rationale: Let Powdrr correct scoped CI failures or checkpoint required human setup
+    before resuming.
+- path: tests/test_ci_response_policy.py
+  type: modified
+  span:
+    start_line: 859
+    end_line: 859
+  summary: Implement durable CI repair retry and human handoff.
+  rationale: Let Powdrr correct scoped CI failures or checkpoint required human setup
+    before resuming.
+- path: tests/test_ci_response_policy.py
+  type: modified
+  span:
+    start_line: 879
+    end_line: 879
+  summary: Implement durable CI repair retry and human handoff.
+  rationale: Let Powdrr correct scoped CI failures or checkpoint required human setup
+    before resuming.
+- path: tests/test_ci_response_policy.py
+  type: modified
+  span:
+    start_line: 882
+    end_line: 882
+  summary: Implement durable CI repair retry and human handoff.
+  rationale: Let Powdrr correct scoped CI failures or checkpoint required human setup
+    before resuming.
+- path: tests/test_ci_response_policy.py
+  type: modified
+  span:
+    start_line: 885
+    end_line: 888
+  summary: Implement durable CI repair retry and human handoff.
+  rationale: Let Powdrr correct scoped CI failures or checkpoint required human setup
+    before resuming.
+- path: tests/test_ci_response_policy.py
+  type: modified
+  span:
+    start_line: 891
+    end_line: 893
+  summary: Implement durable CI repair retry and human handoff.
+  rationale: Let Powdrr correct scoped CI failures or checkpoint required human setup
+    before resuming.
+- path: tests/test_ci_response_policy.py
+  type: modified
+  span:
+    start_line: 895
+    end_line: 896
+  summary: Implement durable CI repair retry and human handoff.
+  rationale: Let Powdrr correct scoped CI failures or checkpoint required human setup
+    before resuming.
+- path: tests/test_ci_response_policy.py
+  type: modified
+  span:
+    start_line: 898
+    end_line: 907
+  summary: Implement durable CI repair retry and human handoff.
+  rationale: Let Powdrr correct scoped CI failures or checkpoint required human setup
+    before resuming.
+- path: tests/test_ci_response_policy.py
+  type: modified
+  span:
+    start_line: 911
+    end_line: 1014
+  summary: Implement durable CI repair retry and human handoff.
+  rationale: Let Powdrr correct scoped CI failures or checkpoint required human setup
+    before resuming.
+- path: tests/test_procedrr_chat.py
+  type: modified
+  span:
+    start_line: 153
+    end_line: 153
+  summary: Implement durable CI repair retry and human handoff.
+  rationale: Let Powdrr correct scoped CI failures or checkpoint required human setup
+    before resuming.
+- path: tests/test_procedrr_chat.py
+  type: modified
+  span:
+    start_line: 156
+    end_line: 162
+  summary: Implement durable CI repair retry and human handoff.
+  rationale: Let Powdrr correct scoped CI failures or checkpoint required human setup
+    before resuming.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 2221
+    end_line: 2297
+  summary: Implement durable CI repair retry and human handoff.
+  rationale: Let Powdrr correct scoped CI failures or checkpoint required human setup
+    before resuming.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 4204
+    end_line: 4204
+  summary: Implement durable CI repair retry and human handoff.
+  rationale: Let Powdrr correct scoped CI failures or checkpoint required human setup
+    before resuming.

@@ -150,8 +150,16 @@ def test_ci_repair_preparation_uses_service_operations_and_one_targeted_question
     failure_steps = steps[1]["branch"]["cases"]["failure_selected"]
     decision = failure_steps[0]["judge"]
     assert decision["output"]["schema"]["properties"]["target_paths"]["maxItems"] == 3
+    assert "manual_prerequisite" in decision["output"]["schema"]["required"]
     assert "failure_id" not in decision["output"]["schema"]["properties"]
     assert failure_steps[1]["operation"]["tool"] == "ci_repair_compile"
+    disposition_branch = steps[2]["branch"]
+    assert (
+        disposition_branch["cases"]["human_prerequisite"][0]["operation"]["tool"]
+        == "task_handoff"
+    )
+    repair_branch = disposition_branch["cases"]["repository_change"]
+    assert repair_branch[1]["repeat"]["max_iterations"] == 2
 
 
 def test_ci_repair_process_dispatches_only_the_prepared_repair_request() -> None:

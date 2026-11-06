@@ -316,7 +316,7 @@ def test_ci_repair_cli_builds_and_runs_issue_backed_procedrr_task(
     )
 
     assert result["exit_code"] == 0
-    assert generated["process_id"] == "prepare-ci-repair"
+    assert generated["process_id"] == "run-ci-repair-from-observation"
     assert generated["input_state"]["pull_request_url"].endswith("/pull/270")
     assert generated["input_state"]["implementation_context"]["item_id"] == "ci-config"
     config = observed["config"]

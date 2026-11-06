@@ -3246,13 +3246,13 @@ def _launch_ci_repair_workflow(
     workflow_dir = workflow_output / slugify_workflow_id(workflow_id)
     if workflow_dir.is_dir() and any(workflow_dir.glob("*.yaml")):
         tasks = WorkflowInstance.from_directory(workflow_dir).tasks
-        if len(tasks) != 1 or tasks[0].process_id != "prepare-ci-repair":
+        if len(tasks) != 1 or tasks[0].process_id != "run-ci-repair-from-observation":
             raise GitHubActionsError(
                 f"existing CI response workflow is malformed: {workflow_dir}"
             )
     else:
         workflow_dir, tasks = instantiate_procedrr_process_workflow(
-            process_id="prepare-ci-repair",
+            process_id="run-ci-repair-from-observation",
             process_directory=bundled_process_directory(),
             input_state={
                 "ci_observation_result": dict(observation),
@@ -3281,7 +3281,7 @@ def _launch_ci_repair_workflow(
     run_payload = {
         "workflow_id": workflow_id,
         "task_id": task.task_id,
-        "process_id": "prepare-ci-repair",
+        "process_id": "run-ci-repair-from-observation",
         "attempt": attempt_number,
         "status": "running",
         "head_sha": head_sha,

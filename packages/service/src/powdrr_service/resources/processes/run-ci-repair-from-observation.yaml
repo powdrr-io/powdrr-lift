@@ -1,0 +1,25 @@
+version: 1
+name: run-ci-repair-from-observation
+description: Run the service-owned CI repair flow from a durable issue task context.
+inputs:
+  - {name: task_context, type: object, required: true}
+outputs:
+  repair_preparation:
+    type: object
+    additionalProperties: true
+limits: {llm_activations: 1, tool_calls: 32, context_chars: 12000, context_value_chars: 5000}
+steps:
+  - call:
+      process: prepare-ci-repair
+      inputs:
+        ci_observation_result:
+          {type: reference, value: task_context.input_state.ci_observation_result}
+        pull_request_url:
+          {type: reference, value: task_context.input_state.pull_request_url}
+        implementation_context:
+          {type: reference, value: task_context.input_state.implementation_context}
+        verification_command:
+          {type: reference, value: task_context.input_state.verification_command}
+      outputs:
+        repair_preparation: repair_preparation
+  - terminal: succeeded

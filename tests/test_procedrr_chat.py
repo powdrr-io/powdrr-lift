@@ -104,6 +104,7 @@ def test_all_supported_workflow_names_have_procedrr_processes() -> None:
         "review-skill-workflow",
         "review-system",
         "run-tests-and-fix",
+        "run-ci-repair-from-observation",
         "respond-to-pr-ci",
         "security-review",
         "spec-v1-design-review",
@@ -139,6 +140,36 @@ def test_ci_response_procedure_runs_declared_verification_at_pinned_head() -> No
         "type": "reference",
         "value": "task_context.proposed_pr_context.verification_command",
     }
+
+
+def test_ci_repair_task_wrapper_adapts_task_context_to_service_process(
+    tmp_path: Path,
+) -> None:
+    from powdrr_lift.process.templates import instantiate_procedrr_process_workflow
+
+    workflow_dir, (task,) = instantiate_procedrr_process_workflow(
+        process_id="run-ci-repair-from-observation",
+        process_directory=bundled_process_directory(),
+        input_state={
+            "ci_observation_result": {"head_sha": "a" * 40},
+            "pull_request_url": "https://github.com/example/repo/pull/7",
+            "implementation_context": {"objective": "repair CI"},
+            "verification_command": "pytest -q",
+        },
+        work_item_name="ci-response-pr-7",
+        output_root=tmp_path / "workflow",
+    )
+
+    wrapper = ProcessCatalog.load(bundled_process_directory()).get(
+        "run-ci-repair-from-observation"
+    )
+    call = wrapper.document["steps"][0]["call"]
+    assert task.process_id == "run-ci-repair-from-observation"
+    assert workflow_dir.is_dir()
+    assert call["inputs"]["ci_observation_result"]["value"] == (
+        "task_context.input_state.ci_observation_result"
+    )
+    assert call["outputs"]["repair_preparation"] == "repair_preparation"
 
 
 def test_ci_repair_preparation_uses_service_operations_and_one_targeted_question() -> (

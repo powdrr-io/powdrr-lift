@@ -11,6 +11,7 @@ import re
 import shlex
 import subprocess
 import sys
+import tempfile
 import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import replace
@@ -187,6 +188,7 @@ from powdrr_lift.openai_proxy import (
 )
 from powdrr_lift.process.tasks import (
     HumanRole,
+    WorkflowInstance,
     validate_workflow_task_directory,
 )
 from powdrr_lift.process.templates import (
@@ -366,12 +368,35 @@ def build_parser() -> argparse.ArgumentParser:
 
     ci_response_parser = subparsers.add_parser(
         "respond-to-pr-ci",
-        help="Observe PR CI and reproduce matching failures at its exact head.",
+        help="Observe PR CI, reproduce failures, and run the scoped repair workflow.",
     )
     ci_response_parser.add_argument("--repository", required=True)
     ci_response_parser.add_argument("--pr", type=int)
     ci_response_parser.add_argument("--pr-url")
     ci_response_parser.add_argument("--issue", type=int, required=True)
+    ci_response_parser.add_argument(
+        "--provider", choices=["auto", *ALL_PROVIDERS], default="deepinfra-cheap"
+    )
+    ci_response_parser.add_argument("--api-key")
+    ci_response_parser.add_argument("--base-url")
+    ci_response_parser.add_argument("--max-roundtrips", type=int, default=128)
+    ci_response_parser.add_argument(
+        "--context-compaction-threshold", type=float, default=0.75
+    )
+    ci_response_parser.add_argument("--minisweagent-executable", default="mini")
+    ci_response_parser.add_argument(
+        "--minisweagent-model",
+        default="deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731",
+    )
+    ci_response_parser.add_argument(
+        "--coding-agent-timeout-seconds", type=float, default=1800.0
+    )
+    ci_response_parser.add_argument("--verbose", action="store_true")
+    ci_response_parser.add_argument(
+        "--observe-only",
+        action="store_true",
+        help="Record CI evidence without launching the repair workflow.",
+    )
     ci_response_parser.add_argument(
         "--verification-command",
         help="Run the task's declared verification command at the exact PR head.",
@@ -3024,6 +3049,10 @@ def _run_respond_to_pr_ci(args: argparse.Namespace) -> int:
         head_sha = head.get("sha") if isinstance(head, Mapping) else None
         if not isinstance(head_sha, str):
             raise GitHubActionsError("GitHub did not return the current PR head SHA")
+        head_ref = head.get("ref") if isinstance(head, Mapping) else None
+        clone_root, worker_root = _prepare_ci_response_worktree(
+            args.repository, pr_number, head_sha, head_ref=head_ref
+        )
         base = snapshot.pull_request.get("base")
         head_ref = head.get("ref") if isinstance(head, Mapping) else None
         base_ref = base.get("ref") if isinstance(base, Mapping) else None
@@ -3031,7 +3060,7 @@ def _run_respond_to_pr_ci(args: argparse.Namespace) -> int:
         body = snapshot.pull_request.get("body")
         reproductions = _reproduce_ci_failures(
             failures,
-            repository_root=resolve_repo_root(None),
+            repository_root=clone_root,
             head_sha=head_sha,
             verification_command=getattr(args, "verification_command", None),
         )
@@ -3101,11 +3130,361 @@ def _run_respond_to_pr_ci(args: argparse.Namespace) -> int:
                 for item in failures
             ],
         }
-    except (GitHubActionsError, ValueError) as error:
+        if not getattr(args, "observe_only", False):
+            result["repair_workflow"] = _launch_ci_repair_workflow(
+                args=args,
+                client=client,
+                issue=issue,
+                prior_comments=prior,
+                observation=result,
+                head_sha=head_sha,
+                clone_root=clone_root,
+                worker_root=worker_root,
+            )
+    except (
+        GitHubActionsError,
+        GitHubIssueQueueError,
+        PowdrrExecutionError,
+        ProviderConfigurationError,
+        OSError,
+        ValueError,
+    ) as error:
         print(str(error), file=sys.stderr)
         return 2
     print(json.dumps(result, indent=2))
     return 0
+
+
+def _launch_ci_repair_workflow(
+    *,
+    args: argparse.Namespace,
+    client: Any,
+    issue: Mapping[str, Any],
+    prior_comments: Sequence[Mapping[str, Any]],
+    observation: Mapping[str, Any],
+    head_sha: str,
+    clone_root: Path,
+    worker_root: Path,
+) -> dict[str, Any]:
+    """Create and run a durable Procedrr CI repair task from this CLI command."""
+    from powdrr_lift.workrr.github_issue_queue import (
+        load_reviewed_plan_at_commit,
+        parse_issue_pointer,
+    )
+
+    issue_body = issue.get("body")
+    pointer = parse_issue_pointer(issue_body) if isinstance(issue_body, str) else None
+    if pointer is None:
+        raise GitHubActionsError(
+            f"issue #{args.issue} does not contain a Powdrr plan pointer; "
+            "cannot derive the implementation context for CI repair"
+        )
+
+    root = clone_root.parent
+
+    plan = load_reviewed_plan_at_commit(
+        pointer["plan_path"], pointer["plan_commit"], repo_root=worker_root
+    )
+    item = next(
+        (
+            candidate
+            for candidate in plan.items
+            if candidate.item_id == pointer["item_id"]
+        ),
+        None,
+    )
+    if item is None:
+        raise GitHubActionsError(
+            f"pinned plan {plan.plan_id!r} has no item {pointer['item_id']!r}"
+        )
+    implementation_context = {
+        "plan_id": plan.plan_id,
+        "item_id": item.item_id,
+        "title": item.title,
+        "objective": item.objective,
+        "scope": list(item.scope),
+        "allowed_paths": list(item.allowed_paths),
+        "implementation_steps": list(item.implementation_steps),
+        "acceptance_criteria": list(item.acceptance_criteria),
+        "dependencies": list(item.dependencies),
+    }
+    verification_command = getattr(args, "verification_command", None)
+    if not isinstance(verification_command, str) or not verification_command.strip():
+        verification_command = ""
+        workflow_path = item.workflow_file
+        if workflow_path:
+            workflow_file = worker_root / workflow_path
+            try:
+                workflow_definition = yaml.safe_load(
+                    workflow_file.read_text(encoding="utf-8")
+                )
+            except (OSError, yaml.YAMLError):
+                workflow_definition = None
+            inputs = (
+                workflow_definition.get("inputs")
+                if isinstance(workflow_definition, Mapping)
+                else None
+            )
+            context = (
+                inputs.get("proposed_pr_context")
+                if isinstance(inputs, Mapping)
+                else None
+            )
+            if isinstance(context, Mapping) and isinstance(
+                context.get("verification_command"), str
+            ):
+                verification_command = context["verification_command"]
+    if not verification_command:
+        raise GitHubActionsError(
+            "the pinned plan workflow does not declare a verification command; "
+            "provide --verification-command"
+        )
+
+    workflow_id = f"ci-response-pr-{observation['pull_request']}-{head_sha[:12]}"
+    pr_url = f"https://github.com/{args.repository}/pull/{observation['pull_request']}"
+    workflow_output = root / "workflow"
+    workflow_dir = workflow_output / slugify_workflow_id(workflow_id)
+    if workflow_dir.is_dir() and any(workflow_dir.glob("*.yaml")):
+        tasks = WorkflowInstance.from_directory(workflow_dir).tasks
+        if len(tasks) != 1 or tasks[0].process_id != "prepare-ci-repair":
+            raise GitHubActionsError(
+                f"existing CI response workflow is malformed: {workflow_dir}"
+            )
+    else:
+        workflow_dir, tasks = instantiate_procedrr_process_workflow(
+            process_id="prepare-ci-repair",
+            process_directory=bundled_process_directory(),
+            input_state={
+                "ci_observation_result": dict(observation),
+                "pull_request_url": pr_url,
+                "implementation_context": implementation_context,
+                "verification_command": verification_command,
+            },
+            work_item_name=workflow_id,
+            workflow_instance_name=workflow_id,
+            output_root=workflow_output,
+        )
+    task = tasks[0]
+    prior_bodies = [
+        str(comment.get("body", ""))
+        for comment in prior_comments
+        if isinstance(comment, Mapping)
+    ]
+    run_prefix = f"<!-- powdrr-ci-response-run:{workflow_id}:"
+    attempt_numbers = {
+        int(match.group(1))
+        for body in prior_bodies
+        if (match := re.search(re.escape(run_prefix) + r"([0-9]+) -->", body))
+    }
+    attempt_number = max(attempt_numbers, default=0) + 1
+    run_marker = f"{run_prefix}{attempt_number} -->"
+    run_payload = {
+        "workflow_id": workflow_id,
+        "task_id": task.task_id,
+        "process_id": "prepare-ci-repair",
+        "attempt": attempt_number,
+        "status": "running",
+        "head_sha": head_sha,
+    }
+    run_comment = (
+        run_marker
+        + "\n```json\n"
+        + json.dumps(run_payload, indent=2, sort_keys=True)
+        + "\n```"
+    )
+    client.add_issue_comment(args.issue, run_comment)
+
+    def checkpoint_callback(
+        task_id: str, output_state_type: str, output_state: Any, commit_sha: str | None
+    ) -> None:
+        marker = (
+            f"<!-- powdrr-ci-response-checkpoint:{workflow_id}:"
+            f"{attempt_number}:{task_id} -->"
+        )
+        payload = {
+            "workflow_id": workflow_id,
+            "task_id": task_id,
+            "attempt": attempt_number,
+            "status": output_state_type,
+            "output_state": output_state,
+            "commit_sha": commit_sha,
+            "head_sha": head_sha,
+        }
+        body = (
+            marker
+            + "\n```json\n"
+            + json.dumps(payload, indent=2, sort_keys=True)
+            + "\n```"
+        )
+        if not any(str(comment.get("body", "")) == body for comment in prior_comments):
+            client.add_issue_comment(args.issue, body)
+
+    from powdrr_lift.workrr.task_agent import WorkflowTaskAgentConfig, run_workflow_task
+
+    exit_code = run_workflow_task(
+        WorkflowTaskAgentConfig(
+            workflow_dir=workflow_dir,
+            repo_root=worker_root,
+            provider=getattr(args, "provider", "deepinfra-cheap"),
+            workflow_id=workflow_id,
+            task_id=task.task_id,
+            api_key=getattr(args, "api_key", None),
+            base_url=getattr(args, "base_url", None),
+            max_roundtrips=getattr(args, "max_roundtrips", 128),
+            context_compaction_threshold=getattr(
+                args, "context_compaction_threshold", 0.75
+            ),
+            verbose=getattr(args, "verbose", False),
+            minisweagent_executable=getattr(args, "minisweagent_executable", "mini"),
+            minisweagent_model=getattr(
+                args,
+                "minisweagent_model",
+                "deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731",
+            ),
+            coding_agent_timeout_seconds=getattr(
+                args, "coding_agent_timeout_seconds", 1800.0
+            ),
+            allow_unmanaged_git=True,
+            publish_workflow_progress=False,
+            resume_locked_task=True,
+            task_checkpoint_callback=checkpoint_callback,
+            github_issue_number=args.issue,
+            github_repository=args.repository,
+        ),
+        stdout=sys.stdout,
+        stderr=sys.stderr,
+    )
+    manifest_path = worker_root / ".powdrr" / "procedrr-runs" / f"{task.task_id}.json"
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        manifest = {}
+    terminal_status = manifest.get("status") if isinstance(manifest, Mapping) else None
+    if exit_code != 0:
+        failure = manifest.get("failure") if isinstance(manifest, Mapping) else None
+        failure_payload = {
+            **run_payload,
+            "status": "failed",
+            "exit_code": exit_code,
+            "failure": failure if isinstance(failure, str) else None,
+        }
+        client.add_issue_comment(
+            args.issue,
+            run_marker
+            + "\n```json\n"
+            + json.dumps(failure_payload, indent=2, sort_keys=True)
+            + "\n```",
+        )
+    return {
+        "workflow_id": workflow_id,
+        "task_id": task.task_id,
+        "workflow_directory": str(workflow_dir),
+        "worktree": str(worker_root),
+        "exit_code": exit_code,
+        "status": (
+            terminal_status
+            if isinstance(terminal_status, str)
+            else ("completed" if exit_code == 0 else "failed")
+        ),
+    }
+
+
+def _prepare_ci_response_worktree(
+    repository: str,
+    pull_request_number: int,
+    head_sha: str,
+    *,
+    head_ref: str | None,
+) -> tuple[Path, Path]:
+    """Create or reuse the CLI-owned target-repository clone and exact-head worktree."""
+    root = (
+        Path(tempfile.gettempdir())
+        / "powdrr-lift-ci-response"
+        / (f"{repository.replace('/', '--')}-pr-{pull_request_number}-{head_sha[:12]}")
+    )
+    clone_root = root / "repository"
+    worker_root = root / "worktree"
+    if not (clone_root / ".git").exists():
+        clone_root.parent.mkdir(parents=True, exist_ok=True)
+        clone = subprocess.run(
+            ["gh", "repo", "clone", repository, str(clone_root), "--", "--no-checkout"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if clone.returncode:
+            raise GitHubActionsError(
+                "could not create the isolated CI repair repository: "
+                + (clone.stderr.strip() or clone.stdout.strip())[-2000:]
+            )
+    fetch = subprocess.run(
+        ["git", "-C", str(clone_root), "fetch", "origin", head_sha],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if fetch.returncode:
+        raise GitHubActionsError(
+            f"could not fetch observed PR head {head_sha}: {fetch.stderr.strip()}"
+        )
+    if (
+        not isinstance(head_ref, str)
+        or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._/-]*", head_ref)
+        or ".." in head_ref.split("/")
+    ):
+        raise GitHubActionsError("GitHub returned an unsafe PR head branch name")
+    branch_fetch = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(clone_root),
+            "fetch",
+            "origin",
+            f"+refs/heads/{head_ref}:refs/heads/{head_ref}",
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if branch_fetch.returncode:
+        raise GitHubActionsError(
+            f"could not fetch PR head branch {head_ref!r}: "
+            f"{branch_fetch.stderr.strip()}"
+        )
+    if not worker_root.exists():
+        worker_branch = f"powdrr/ci-response-pr-{pull_request_number}-{head_sha[:12]}"
+        add_worktree = subprocess.run(
+            [
+                "git",
+                "-C",
+                str(clone_root),
+                "worktree",
+                "add",
+                "-b",
+                worker_branch,
+                str(worker_root),
+                head_sha,
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if add_worktree.returncode:
+            raise GitHubActionsError(
+                "could not create a clean worktree at the observed PR head: "
+                + add_worktree.stderr.strip()
+            )
+    actual_head = subprocess.run(
+        ["git", "-C", str(worker_root), "rev-parse", "HEAD"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if actual_head.returncode or actual_head.stdout.strip() != head_sha:
+        raise GitHubActionsError(
+            f"existing CI repair worktree is not pinned to observed head {head_sha}"
+        )
+    return clone_root, worker_root
 
 
 def _reproduce_ci_failures(

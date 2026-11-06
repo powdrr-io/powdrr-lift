@@ -74,6 +74,9 @@ def publish_clean_pull_request(
             source_root, publication_root, base_ref=base_ref, branch=branch
         )
         try:
+            publication_start = _run(
+                ["git", "rev-parse", "HEAD"], cwd=publication_root
+            ).strip()
             _copy_publication_files(source_root, publication_root, files)
             _run(["git", "add", "--", *files], cwd=publication_root)
             staged = _run(
@@ -88,13 +91,13 @@ def publish_clean_pull_request(
                 _run(["git", "commit", "-m", commit_message], cwd=publication_root)
             committed = set(
                 _run(
-                    ["git", "diff", "--name-only", f"{base_ref}...HEAD"],
+                    ["git", "diff", "--name-only", f"{publication_start}..HEAD"],
                     cwd=publication_root,
                 ).splitlines()
             )
             if committed != set(files):
                 raise PowdrrExecutionError(
-                    "Clean publication branch contains paths outside the approved "
+                    "Clean publication commit contains paths outside the approved "
                     f"file set: {sorted(committed ^ set(files))!r}."
                 )
             _run(

@@ -333,6 +333,8 @@ class WorkflowTaskAgentConfig:
         DEFAULT_CODING_AGENT_VALIDATION_TIMEOUT_SECONDS
     )
     allow_unmanaged_git: bool = False
+    publish_workflow_progress: bool = True
+    resume_locked_task: bool = False
     run_deterministic_invoke_tool_pre_steps: bool = False
     guidance: tuple[str, ...] = ()
     task_checkpoint_callback: Callable[[str, str, Any, str | None], None] | None = None
@@ -2412,15 +2414,19 @@ class _TaskWorkflowExecutionStrategy:
                     "output_state": output_state,
                 }
             )
-            commit_sha = _publish_workflow_progress(
-                self.repo_root,
-                self.workflow,
-                workflow_id=workflow_id_from_task_id(self.task.task_id),
-                reason=f"next_step {completed.task_id}",
-                stdout=self.stdout,
-                open_pull_request=False,
-                events=self.events,
-                runtime=self.runtime,
+            commit_sha = (
+                _publish_workflow_progress(
+                    self.repo_root,
+                    self.workflow,
+                    workflow_id=workflow_id_from_task_id(self.task.task_id),
+                    reason=f"next_step {completed.task_id}",
+                    stdout=self.stdout,
+                    open_pull_request=False,
+                    events=self.events,
+                    runtime=self.runtime,
+                )
+                if self.config.publish_workflow_progress
+                else None
             )
             if self.config.task_checkpoint_callback is not None:
                 self.config.task_checkpoint_callback(
@@ -2587,15 +2593,19 @@ class _TaskWorkflowExecutionStrategy:
                 self.task.task_id,
                 action.output_state,
             )
-            commit_sha = _publish_workflow_progress(
-                self.repo_root,
-                self.workflow,
-                workflow_id=workflow_id_from_task_id(self.task.task_id),
-                reason=f"terminate {completed.task_id}",
-                stdout=self.stdout,
-                open_pull_request=False,
-                events=self.events,
-                runtime=self.runtime,
+            commit_sha = (
+                _publish_workflow_progress(
+                    self.repo_root,
+                    self.workflow,
+                    workflow_id=workflow_id_from_task_id(self.task.task_id),
+                    reason=f"terminate {completed.task_id}",
+                    stdout=self.stdout,
+                    open_pull_request=False,
+                    events=self.events,
+                    runtime=self.runtime,
+                )
+                if self.config.publish_workflow_progress
+                else None
             )
             if self.config.task_checkpoint_callback is not None:
                 self.config.task_checkpoint_callback(
@@ -2699,16 +2709,17 @@ class _TaskWorkflowExecutionStrategy:
                 f"Inserted follow-up task: {follow_up_task.task_id}",
                 file=self.stdout,
             )
-        _publish_workflow_progress(
-            self.repo_root,
-            self.workflow,
-            workflow_id=workflow_id_from_task_id(self.task.task_id),
-            reason=f"{reason_prefix} {self.task.task_id}",
-            stdout=self.stdout,
-            open_pull_request=False,
-            events=self.events,
-            runtime=self.runtime,
-        )
+        if self.config.publish_workflow_progress:
+            _publish_workflow_progress(
+                self.repo_root,
+                self.workflow,
+                workflow_id=workflow_id_from_task_id(self.task.task_id),
+                reason=f"{reason_prefix} {self.task.task_id}",
+                stdout=self.stdout,
+                open_pull_request=False,
+                events=self.events,
+                runtime=self.runtime,
+            )
         return WorkflowActionOutcome(continue_running=False)
 
     def _execute_tool(self, action: WorkflowAction) -> None:
@@ -3906,16 +3917,17 @@ class _TaskWorkflowExecutionStrategy:
             "roundtrip limit.",
             file=self.stderr,
         )
-        _publish_workflow_progress(
-            self.repo_root,
-            self.workflow,
-            workflow_id=workflow_id_from_task_id(self.task.task_id),
-            reason=f"roundtrip limit for {self.task.task_id}",
-            stdout=self.stdout,
-            open_pull_request=False,
-            events=self.events,
-            runtime=self.runtime,
-        )
+        if self.config.publish_workflow_progress:
+            _publish_workflow_progress(
+                self.repo_root,
+                self.workflow,
+                workflow_id=workflow_id_from_task_id(self.task.task_id),
+                reason=f"roundtrip limit for {self.task.task_id}",
+                stdout=self.stdout,
+                open_pull_request=False,
+                events=self.events,
+                runtime=self.runtime,
+            )
         return 2
 
     def coding_loop_exhausted(self, limit: int) -> int:
@@ -3931,16 +3943,17 @@ class _TaskWorkflowExecutionStrategy:
                 "message": message,
             }
         )
-        _publish_workflow_progress(
-            self.repo_root,
-            self.workflow,
-            workflow_id=workflow_id_from_task_id(self.task.task_id),
-            reason=f"coding loop limit for {self.task.task_id}",
-            stdout=self.stdout,
-            open_pull_request=False,
-            events=self.events,
-            runtime=self.runtime,
-        )
+        if self.config.publish_workflow_progress:
+            _publish_workflow_progress(
+                self.repo_root,
+                self.workflow,
+                workflow_id=workflow_id_from_task_id(self.task.task_id),
+                reason=f"coding loop limit for {self.task.task_id}",
+                stdout=self.stdout,
+                open_pull_request=False,
+                events=self.events,
+                runtime=self.runtime,
+            )
         print(message, file=self.stderr, flush=True)
         return 2
 
@@ -4062,6 +4075,7 @@ class _TaskProcedrrOperations:
                     str(values["pull_request_url"]),
                     "--issue",
                     str(values["issue_number"]),
+                    "--observe-only",
                     "--verification-command",
                     str(values["verification_command"]),
                 ],
@@ -4579,21 +4593,25 @@ class _TaskProcedrrOperations:
                 issue_number=self.strategy.config.github_issue_number,
                 repository=self.strategy.config.github_repository,
             )
-        commit_sha = _publish_workflow_progress(
-            self.strategy.repo_root,
-            self.workflow,
-            workflow_id=workflow_id_from_task_id(self.task.task_id),
-            reason=f"Procedrr task handoff {self.task.task_id}",
-            stdout=self.strategy.stdout,
-            open_pull_request=manual_prerequisite is not None,
-            pull_request_body=pull_request_body,
-            pull_request_title=(
-                f"Manual prerequisite: {manual_prerequisite['title']}"
-                if manual_prerequisite is not None
-                else None
-            ),
-            events=self.strategy.events,
-            runtime=self.strategy.runtime,
+        commit_sha = (
+            _publish_workflow_progress(
+                self.strategy.repo_root,
+                self.workflow,
+                workflow_id=workflow_id_from_task_id(self.task.task_id),
+                reason=f"Procedrr task handoff {self.task.task_id}",
+                stdout=self.strategy.stdout,
+                open_pull_request=manual_prerequisite is not None,
+                pull_request_body=pull_request_body,
+                pull_request_title=(
+                    f"Manual prerequisite: {manual_prerequisite['title']}"
+                    if manual_prerequisite is not None
+                    else None
+                ),
+                events=self.strategy.events,
+                runtime=self.strategy.runtime,
+            )
+            if self.strategy.config.publish_workflow_progress
+            else None
         )
         if manual_prerequisite is not None:
             branch = _git_output(
@@ -4738,6 +4756,18 @@ def run_workflow_task(
         configured_workflow_id,
     )
     requested_task_id = config.task_id
+    if config.resume_locked_task and requested_task_id is not None:
+        locked_task = next(
+            (
+                item
+                for item in workflow.tasks
+                if item.task_id == requested_task_id
+                and item.status is TaskStatus.LOCKED
+            ),
+            None,
+        )
+        if locked_task is not None:
+            workflow.update_task(replace(locked_task, status=TaskStatus.OPEN))
     client_was_provided = client is not None
     dump_root = resolve_project_root(
         configured_repo_root,
@@ -4882,16 +4912,17 @@ def run_workflow_task(
             print(str(exc), file=stderr)
             return 2
         print(f"Claimed workflow task: {task.task_id}", file=stdout)
-        print("Publishing claimed task state to GitHub...", file=stdout, flush=True)
-        _publish_workflow_progress(
-            repo_root,
-            workflow,
-            workflow_id=workflow_id_from_task_id(task.task_id),
-            reason=f"claim {task.task_id}",
-            stdout=stdout,
-            open_pull_request=False,
-            runtime=runtime,
-        )
+        if config.publish_workflow_progress:
+            print("Publishing claimed task state to GitHub...", file=stdout, flush=True)
+            _publish_workflow_progress(
+                repo_root,
+                workflow,
+                workflow_id=workflow_id_from_task_id(task.task_id),
+                reason=f"claim {task.task_id}",
+                stdout=stdout,
+                open_pull_request=False,
+                runtime=runtime,
+            )
         runtime.set_action_contract(
             frozenset(task.actions),
             enforce_empty=task.actions_declared,
@@ -5151,16 +5182,17 @@ def run_workflow_task(
                     process_checkpoint=result.checkpoint.to_data(),
                 )
             )
-            _publish_workflow_progress(
-                repo_root,
-                workflow,
-                workflow_id=workflow_id_from_task_id(task.task_id),
-                reason=f"Persist Procedrr checkpoint for {follow_up.task_id}",
-                stdout=stdout,
-                open_pull_request=False,
-                events=driver_events,
-                runtime=runtime,
-            )
+            if config.publish_workflow_progress:
+                _publish_workflow_progress(
+                    repo_root,
+                    workflow,
+                    workflow_id=workflow_id_from_task_id(task.task_id),
+                    reason=f"Persist Procedrr checkpoint for {follow_up.task_id}",
+                    stdout=stdout,
+                    open_pull_request=False,
+                    events=driver_events,
+                    runtime=runtime,
+                )
         elif result.terminal_status is ProcessTerminalStatus.SUCCEEDED:
             completed = next(
                 (item for item in workflow.tasks if item.task_id == task.task_id),
@@ -5251,7 +5283,8 @@ def _load_task_process_catalog(repo_root: Path) -> ProcessCatalog:
         and repository_directory.resolve() != bundled_directory.resolve()
     ):
         repository = ProcessCatalog.load(repository_directory)
-        processes.update({process.name: process for process in repository.list()})
+        for process in repository.list():
+            processes.setdefault(process.name, process)
     return ProcessCatalog(processes)
 
 

@@ -8,6 +8,7 @@ import re
 from dataclasses import dataclass
 from pathlib import PurePosixPath
 from typing import Literal
+from urllib.parse import urlparse
 
 from powdrr_contracts.ci import LocalReproduction
 
@@ -31,6 +32,7 @@ class RepairContract:
     required_behavior: str
     acceptance_command: tuple[str, ...]
     disposition: RepairDisposition = "repository_change"
+    research_refs: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if not self.repository.strip() or self.pull_request < 1:
@@ -71,6 +73,7 @@ class RepairContract:
             "required_behavior": self.required_behavior,
             "acceptance_command": list(self.acceptance_command),
             "disposition": self.disposition,
+            "research_refs": list(self.research_refs),
         }
 
 
@@ -142,6 +145,116 @@ def compile_miniswe_repair_prompt(
             "If evidence points to a human or repository-admin prerequisite, do not "
             "fake a code fix. Report the exact prerequisite and stop.",
         )
+    )
+
+
+def compile_ci_repair_request(
+    *,
+    repository: str,
+    pull_request: int,
+    failure: CIFailureUnit,
+    reproduction: LocalReproduction,
+    changed_paths: tuple[str, ...],
+    proposed_paths: tuple[str, ...],
+    required_behavior: str,
+    acceptance_command: tuple[str, ...],
+    research_evidence: tuple[dict[str, str], ...] = (),
+) -> dict[str, object]:
+    """Compile a model-proposed target into a bounded worker request.
+
+    The model may choose paths and describe the desired correction, but this
+    compiler requires paths to belong to the observed PR diff and rejects test
+    files. The worker receives only the compiled exact-head contract.
+    """
+    changed = set(changed_paths)
+    paths = tuple(dict.fromkeys(proposed_paths))
+    if not paths or len(paths) > 3:
+        raise ValueError("CI repair must target one to three changed paths")
+    if any(path not in changed for path in paths):
+        raise ValueError("CI repair paths must belong to the observed PR diff")
+    if any(
+        part.casefold() in {"test", "tests", "testing"}
+        for path in paths
+        for part in PurePosixPath(path).parts[:-1]
+    ):
+        raise ValueError("CI repair cannot target test files")
+    if any(
+        PurePosixPath(path).is_absolute()
+        or ".." in PurePosixPath(path).parts
+        or not PurePosixPath(path).parts
+        for path in (*changed_paths, *paths)
+    ):
+        raise ValueError("CI repair paths must be safe repository-relative paths")
+    if any(_is_test_path(path) for path in paths):
+        raise ValueError("CI repair cannot target test files")
+    if len(research_evidence) > 3:
+        raise ValueError("CI repair accepts at most three research excerpts")
+    for item in research_evidence:
+        source_ref, url, excerpt = (
+            item.get("source_ref", ""),
+            item.get("url", ""),
+            item.get("excerpt", ""),
+        )
+        parsed = urlparse(url)
+        if (
+            not source_ref.strip()
+            or parsed.scheme != "https"
+            or parsed.hostname != "docs.github.com"
+            or not excerpt.strip()
+            or len(excerpt) > 1200
+        ):
+            raise ValueError(
+                "CI repair research evidence must be a captured official GitHub excerpt"
+            )
+        sha256 = item.get("sha256", "")
+        if not re.fullmatch(r"[0-9a-f]{64}", sha256):
+            raise ValueError("CI repair evidence has an invalid content hash")
+    refs = tuple(dict.fromkeys(item["source_ref"] for item in research_evidence))
+    evidence_lines = tuple(
+        f"{item['source_ref']} ({item['url']}; "
+        f"sha256 {item['sha256']}): "
+        f"{item['excerpt']}"
+        for item in research_evidence
+    )
+    protected = tuple(path for path in changed_paths if _is_test_path(path))
+    contract = RepairContract(
+        repository=repository,
+        pull_request=pull_request,
+        head_sha=failure.head_sha,
+        failure_id=failure.failure_id,
+        failure_signature=failure.signature,
+        reproduction=reproduction,
+        allowed_paths=paths,
+        protected_paths=protected,
+        required_behavior=required_behavior,
+        acceptance_command=acceptance_command,
+        research_refs=refs,
+    )
+    prompt = compile_miniswe_repair_prompt(
+        contract, failure, research_evidence=evidence_lines
+    )
+    return {
+        "schema_version": "ci-repair-request-v1",
+        "head_sha": failure.head_sha,
+        "failure_id": failure.failure_id,
+        "contract_fingerprint": contract.fingerprint,
+        "contract": contract.to_data(),
+        "prompt": prompt,
+        "allowed_paths": list(contract.allowed_paths),
+        "protected_paths": list(contract.protected_paths),
+        "acceptance_command": list(contract.acceptance_command),
+    }
+
+
+def _is_test_path(path: str) -> bool:
+    name = PurePosixPath(path).name.casefold()
+    return (
+        name.startswith(("test_", "tests_"))
+        or name in {"test", "tests"}
+        or name.startswith(("test.", "tests."))
+        or name.endswith(("_test.py", "_tests.py", ".test.js", ".spec.js"))
+        or ".test." in name
+        or ".spec." in name
     )
 
 

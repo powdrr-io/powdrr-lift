@@ -1,0 +1,99 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1384
+title: Compile scoped CI repair requests with platform evidence
+intent:
+  problem: CI repair policy and GitHub Actions research existed as separate helpers without a service compiler joining one failure, its local reproduction, the PR diff, and captured platform evidence into a worker request.
+  goal: Compile a fingerprinted MiniSWE request restricted to a small set of non-test files in the observed PR diff, and provide bounded, mockable official-document research for one GitHub Actions failure.
+human-decisions: []
+structured_files: []
+files:
+- path: packages/service/src/powdrr_service/ci_response/repair.py
+  type: modified
+  span: {start_line: 11, end_line: 11}
+  summary: Import URL validation for captured research references.
+  rationale: Ensure external guidance is verified against an official HTTPS source.
+- path: packages/service/src/powdrr_service/ci_response/repair.py
+  type: modified
+  span: {start_line: 35, end_line: 35}
+  summary: Add research references to the fingerprinted repair contract.
+  rationale: Bind source provenance to the exact worker authorization.
+- path: packages/service/src/powdrr_service/ci_response/repair.py
+  type: modified
+  span: {start_line: 76, end_line: 76}
+  summary: Serialize research references into the repair contract.
+  rationale: Preserve source provenance when the typed contract is passed to the worker.
+- path: packages/service/src/powdrr_service/ci_response/repair.py
+  type: modified
+  span: {start_line: 151, end_line: 260}
+  summary: Compile one exact-head repair request with diff-scoped paths, protected tests, and verified official-source excerpts.
+  rationale: Keep diagnosis output constrained by service-owned identity, path, evidence, and prompt rules before MiniSWE receives it.
+- path: packages/service/src/powdrr_service/ci_response/research.py
+  type: modified
+  span: {start_line: 5, end_line: 6}
+  summary: Import typed dependencies for bounded official-source research.
+  rationale: Reuse the existing capture and evidence extraction implementation.
+- path: packages/service/src/powdrr_service/ci_response/research.py
+  type: modified
+  span: {start_line: 9, end_line: 14}
+  summary: Import the bounded source capture and evidence primitives.
+  rationale: Keep CI research on the shared source-provenance path.
+- path: packages/service/src/powdrr_service/ci_response/research.py
+  type: modified
+  span: {start_line: 17, end_line: 17}
+  summary: Set the maximum number of research excerpts to three.
+  rationale: Bound external material supplied for one CI failure.
+- path: packages/service/src/powdrr_service/ci_response/research.py
+  type: modified
+  span: {start_line: 117, end_line: 188}
+  summary: Search, capture, and extract a bounded set of official GitHub Actions documentation for an observed failure.
+  rationale: Give repair guidance source-backed platform context while treating unavailable research as inconclusive.
+- path: packages/service/src/powdrr_service/ci_response/research.py
+  type: modified
+  span: {start_line: 192, end_line: 192}
+  summary: Export the excerpt limit.
+  rationale: Make the service research bound visible to callers and tests.
+- path: packages/service/src/powdrr_service/ci_response/research.py
+  type: modified
+  span: {start_line: 195, end_line: 195}
+  summary: Export the bounded research entry point.
+  rationale: Expose the shared service research implementation.
+- path: packages/service/src/powdrr_service/ci_response/__init__.py
+  type: modified
+  span: {start_line: 12, end_line: 12}
+  summary: Export the CI repair request compiler.
+  rationale: Expose request construction through the stable service package interface.
+- path: packages/service/src/powdrr_service/ci_response/__init__.py
+  type: modified
+  span: {start_line: 19, end_line: 19}
+  summary: Export the bounded GitHub Actions research function.
+  rationale: Keep callers on the service-owned research API.
+- path: packages/service/src/powdrr_service/ci_response/__init__.py
+  type: modified
+  span: {start_line: 31, end_line: 31}
+  summary: Add the compiler to the public export list.
+  rationale: Make scoped repair request compilation discoverable to service callers.
+- path: packages/service/src/powdrr_service/ci_response/__init__.py
+  type: modified
+  span: {start_line: 34, end_line: 34}
+  summary: Add the research function to the public export list.
+  rationale: Make bounded research discoverable to service callers.
+- path: tests/test_ci_response_policy.py
+  type: modified
+  span: {start_line: 4, end_line: 4}
+  summary: Import path typing for the temporary research artifact root.
+  rationale: Keep the mocked research test fully typed.
+- path: tests/test_ci_response_policy.py
+  type: modified
+  span: {start_line: 17, end_line: 17}
+  summary: Import the repair request compiler for policy tests.
+  rationale: Exercise the public service entry point.
+- path: tests/test_ci_response_policy.py
+  type: modified
+  span: {start_line: 22, end_line: 22}
+  summary: Import the bounded research helper for mocked-source coverage.
+  rationale: Verify the full research sequence without network access.
+- path: tests/test_ci_response_policy.py
+  type: modified
+  span: {start_line: 250, end_line: 381}
+  summary: Test request scoping and bounded research using mocked search and fetch responses.
+  rationale: Prevent untrusted context from reaching MiniSWE and verify research evidence is retained.

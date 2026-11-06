@@ -467,11 +467,39 @@ steps:
     for name, source in processes.items():
         (tmp_path / f"{name}.yaml").write_text(source, encoding="utf-8")
     repository_processes = bundled_process_directory()
+    (tmp_path / "execute-proposed-pr-workflow.yaml").write_text(
+        (repository_processes / "execute-proposed-pr-workflow.yaml").read_text(
+            encoding="utf-8"
+        ),
+        encoding="utf-8",
+    )
     for name in ("finish-implementation-pr", "amend-plan-and-open-pr"):
         (tmp_path / f"{name}.yaml").write_text(
             (repository_processes / f"{name}.yaml").read_text(encoding="utf-8"),
             encoding="utf-8",
         )
+    (tmp_path / "respond-to-pr-ci.yaml").write_text(
+        """\
+version: 1
+name: respond-to-pr-ci
+inputs:
+  - {name: repository, type: string, required: true}
+  - {name: issue_number, type: integer, required: true}
+  - {name: pull_request_url, type: string, required: true}
+outputs: {ci_observation_result: {type: object}}
+steps:
+  - operation:
+      tool: internal
+      parameters:
+        command: [observe]
+        repository: "${repository}"
+        issue_number: "${issue_number}"
+        pull_request_url: "${pull_request_url}"
+      bind: ci_observation_result
+  - terminal: succeeded
+""",
+        encoding="utf-8",
+    )
 
     class WorkflowLLM:
         def complete_json(
@@ -626,9 +654,11 @@ steps:
                 if pull_request_url_valid
                 else "not-a-pull-request-url"
             )
+        if command == "observe":
+            return {"outcome": "observed"}
         raise AssertionError(f"Unexpected operation: {command}")
 
-    process_directory = repository_processes
+    process_directory = tmp_path
     workflow = parse_and_validate(
         (process_directory / "execute-proposed-pr-workflow.yaml").read_text(
             encoding="utf-8"
@@ -637,7 +667,16 @@ steps:
     evaluator = Evaluator(WorkflowLLM(), execute, process_directory=tmp_path)
     if unshaped_execution_error:
         failed = evaluator.evaluate(
-            workflow, {"task_context": {"objective": "Implement a feature"}}
+            workflow,
+            {
+                "task_context": {
+                    "objective": "Implement a feature",
+                    "proposed_pr_context": {
+                        "github_repository": "example/repo",
+                        "github_issue_number": 42,
+                    },
+                }
+            },
         )
         assert calls == ["implement"]
         assert failed.events[-1].data["status"] == "failed"
@@ -649,12 +688,29 @@ steps:
                 with pytest.raises(EvaluationError):
                     evaluator.evaluate(
                         workflow,
-                        {"task_context": {"objective": "Implement a feature"}},
+                        {
+                            "task_context": {
+                                "objective": "Implement a feature",
+                                "proposed_pr_context": {
+                                    "github_repository": "example/repo",
+                                    "github_issue_number": 42,
+                                },
+                            }
+                        },
                     )
                 assert calls == ["implement", "amend", "finish", "publish"]
                 return
             result = evaluator.evaluate(
-                workflow, {"task_context": {"objective": "Implement a feature"}}
+                workflow,
+                {
+                    "task_context": {
+                        "objective": "Implement a feature",
+                        "proposed_pr_context": {
+                            "github_repository": "example/repo",
+                            "github_issue_number": 42,
+                        },
+                    }
+                },
             )
             process_calls = [
                 event.data["name"] for event in result.events if event.kind == "process"
@@ -664,19 +720,29 @@ steps:
                 "finish-pr-prep",
                 "create-pull-request",
                 "amend-plan-and-open-pr",
+                "respond-to-pr-ci",
             ]
-            assert calls == ["implement", "amend", "finish", "publish"]
+            assert calls == ["implement", "amend", "finish", "publish", "observe"]
             assert result.bindings["pull_request_url"] == (
                 "https://github.com/example/repo/pull/123"
             )
-            assert call_parameters[-1]["files_to_publish"] == [
+            assert call_parameters[-2]["files_to_publish"] == [
                 "docs/plans/feature-v1-execution-plan.yaml",
                 "docs/plans/feature-v1-structrr-proposal.json",
                 "docs/workflows/feature-v1/feature-v1-pr-01.yaml",
             ]
             return
         failed = evaluator.evaluate(
-            workflow, {"task_context": {"objective": "Implement a feature"}}
+            workflow,
+            {
+                "task_context": {
+                    "objective": "Implement a feature",
+                    "proposed_pr_context": {
+                        "github_repository": "example/repo",
+                        "github_issue_number": 42,
+                    },
+                }
+            },
         )
         assert calls == ["implement"]
         assert failed.events[-1].data["status"] == "failed"
@@ -685,13 +751,31 @@ steps:
     if not pull_request_url_valid:
         with pytest.raises(EvaluationError):
             evaluator.evaluate(
-                workflow, {"task_context": {"objective": "Implement a feature"}}
+                workflow,
+                {
+                    "task_context": {
+                        "objective": "Implement a feature",
+                        "proposed_pr_context": {
+                            "github_repository": "example/repo",
+                            "github_issue_number": 42,
+                        },
+                    }
+                },
             )
         assert calls == ["implement", "finish", "publish"]
         return
 
     result = evaluator.evaluate(
-        workflow, {"task_context": {"objective": "Implement a feature"}}
+        workflow,
+        {
+            "task_context": {
+                "objective": "Implement a feature",
+                "proposed_pr_context": {
+                    "github_repository": "example/repo",
+                    "github_issue_number": 42,
+                },
+            }
+        },
     )
     process_calls = [
         event.data["name"] for event in result.events if event.kind == "process"
@@ -701,13 +785,14 @@ steps:
         "finish-pr-prep",
         "create-pull-request",
         "finish-implementation-pr",
+        "respond-to-pr-ci",
     ]
-    assert calls == ["implement", "finish", "publish"]
+    assert calls == ["implement", "finish", "publish", "observe"]
     assert result.bindings["pull_request_url"] == (
         "https://github.com/example/repo/pull/123"
     )
     assert call_parameters[1]["files_to_publish"] == implementation_paths
-    assert call_parameters[-1]["files_to_publish"] == implementation_paths
+    assert call_parameters[-2]["files_to_publish"] == implementation_paths
 
 
 def test_called_process_uses_its_own_recovery_declarations(tmp_path: Path) -> None:

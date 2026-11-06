@@ -50,6 +50,7 @@ QUEUE_LABELS = {
     "claimed": "powdrr:claimed",
     "awaiting_review": "powdrr:awaiting-review",
     "awaiting_human": "powdrr:awaiting-human",
+    "awaiting_ci": "powdrr:awaiting-ci",
     "blocked_on_dependency": "powdrr:blocked-on-dependency",
     "blocked": "powdrr:blocked",
 }
@@ -113,6 +114,7 @@ class WorkerReport:
     issue_number: int | None = None
     item_id: str | None = None
     detail: str | None = None
+    ci_outcome: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -973,6 +975,7 @@ def run_worker_once(
             except Exception as error:
                 return_code = 1
                 detail = f"{type(error).__name__}: {error}"
+            ci_outcome: str | None = None
             if return_code == 0:
                 if prerequisite is not None:
                     status = "awaiting_human"
@@ -984,9 +987,23 @@ def run_worker_once(
                         f"{client.repository} --issue-number {issue.number}`."
                     )
                 else:
-                    status = "awaiting_review"
-                    outcome = "awaiting_review"
-                    note = "Powdrr execution finished. Human review is still required."
+                    comments = client.list_comments(issue.number)
+                    pull_request_url = _pull_request_url_from_task_record(
+                        _read_local_task_checkpoint(root, issue.number)
+                    ) or _latest_checkpoint_pull_request_url(comments)
+                    observation = _observe_required_ci_outcome(client, pull_request_url)
+                    ci_outcome = str(observation["outcome"])
+                    _append_ci_outcome_checkpoint(
+                        client=client,
+                        issue=issue,
+                        pull_request_url=pull_request_url,
+                        observation=observation,
+                    )
+                    status = _queue_status_for_ci_outcome(ci_outcome)
+                    outcome = ci_outcome
+                    note = _ci_outcome_note(
+                        client.repository, issue.number, observation
+                    )
             else:
                 status = "blocked"
                 outcome = "blocked"
@@ -1007,7 +1024,13 @@ def run_worker_once(
                 repo_root=root,
                 plan_loader=plan_loader,
             )
-            return WorkerReport(outcome, issue.number, item.item_id, detail)
+            return WorkerReport(
+                outcome,
+                issue.number,
+                item.item_id,
+                detail,
+                ci_outcome=ci_outcome,
+            )
     return WorkerReport("no_eligible_work")
 
 
@@ -1199,6 +1222,37 @@ def continue_manual_prerequisite_issue(
         )
 
 
+def continue_awaiting_ci_issue(
+    *, client: GitHubIssueClient, issue_number: int
+) -> WorkerReport:
+    """Refresh the required-check outcome for a published implementation PR."""
+    issue = client.get_issue(issue_number)
+    if issue.state != "open" or QUEUE_LABELS["awaiting_ci"] not in issue.labels:
+        raise GitHubIssueQueueError(
+            f"issue #{issue_number} is not open and awaiting CI"
+        )
+    comments = client.list_comments(issue_number)
+    pull_request_url = _latest_checkpoint_pull_request_url(comments)
+    if pull_request_url is None:
+        raise GitHubIssueQueueError(
+            f"issue #{issue_number} has no published PR checkpoint to observe"
+        )
+    observation = _observe_required_ci_outcome(client, pull_request_url)
+    _append_ci_outcome_checkpoint(
+        client=client,
+        issue=issue,
+        pull_request_url=pull_request_url,
+        observation=observation,
+    )
+    outcome = str(observation["outcome"])
+    status = _queue_status_for_ci_outcome(outcome)
+    issue = client.get_issue(issue_number)
+    client.update_issue(issue, labels=_replace_queue_status(issue.labels, status))
+    note = _ci_outcome_note(client.repository, issue_number, observation)
+    client.add_comment(client.get_issue(issue_number), note)
+    return WorkerReport(outcome, issue_number, detail=note, ci_outcome=outcome)
+
+
 def _continue_manual_prerequisite_issue_locked(
     *,
     client: GitHubIssueClient,
@@ -1265,24 +1319,31 @@ def _continue_manual_prerequisite_issue_locked(
             output_state=output_state,
             plan_id=pointer["plan_id"],
         )
+        resumed_checkpoint = TaskCheckpoint(
+            plan_id=pointer["plan_id"],
+            item_id=pointer["item_id"],
+            workflow_id=str(checkpoint["workflow_id"]),
+            task_id=task_id,
+            output_state_type=output_state_type,
+            output_state=output_state,
+            commit_sha=commit_sha,
+            input_contract_digest=(
+                checkpoint.get("input_contract_digest")
+                if isinstance(checkpoint.get("input_contract_digest"), str)
+                else None
+            ),
+        )
         _write_local_task_checkpoint(
             repo_root=repo_root,
             issue_number=issue_number,
-            checkpoint=TaskCheckpoint(
-                plan_id=pointer["plan_id"],
-                item_id=pointer["item_id"],
-                workflow_id=str(checkpoint["workflow_id"]),
-                task_id=task_id,
-                output_state_type=output_state_type,
-                output_state=output_state,
-                commit_sha=commit_sha,
-                input_contract_digest=(
-                    checkpoint.get("input_contract_digest")
-                    if isinstance(checkpoint.get("input_contract_digest"), str)
-                    else None
-                ),
-            ),
+            checkpoint=resumed_checkpoint,
         )
+        checkpoint_comment = render_task_checkpoint_comment(resumed_checkpoint)
+        if not any(
+            item.get("body") == checkpoint_comment
+            for item in client.list_comments(issue_number)
+        ):
+            client.add_comment(client.get_issue(issue_number), checkpoint_comment)
         _requeue_merged_plan_amendments(
             client=client,
             repo_root=repo_root,
@@ -1320,9 +1381,21 @@ def _continue_manual_prerequisite_issue_locked(
             f"{client.repository} --issue-number {issue.number}`."
         )
     elif return_code == 0:
-        status = "awaiting_review"
-        outcome = "awaiting_review"
-        note = "Powdrr execution finished. Human review is still required."
+        pull_request_url = (
+            _pull_request_url_from_task_record(latest_local_checkpoint)
+            or _latest_checkpoint_pull_request_url(comments)
+            or str(checkpoint["pull_request_url"])
+        )
+        observation = _observe_required_ci_outcome(client, pull_request_url)
+        _append_ci_outcome_checkpoint(
+            client=client,
+            issue=issue,
+            pull_request_url=pull_request_url,
+            observation=observation,
+        )
+        outcome = str(observation["outcome"])
+        status = _queue_status_for_ci_outcome(outcome)
+        note = _ci_outcome_note(client.repository, issue_number, observation)
     else:
         status = "blocked"
         outcome = "blocked"
@@ -1341,7 +1414,14 @@ def _continue_manual_prerequisite_issue_locked(
         repo_root=repo_root,
         plan_loader=load_reviewed_plan_at_commit,
     )
-    return WorkerReport(outcome, issue_number, detail=detail)
+    return WorkerReport(
+        outcome,
+        issue_number,
+        detail=detail,
+        ci_outcome=outcome
+        if return_code == 0 and pending_prerequisite is None
+        else None,
+    )
 
 
 def _retry_manual_prerequisite_ci(
@@ -1682,23 +1762,30 @@ def _task_checkpoint_callback(
         )
         from powdrr_service.planning.repair import item_input_contract_digest
 
+        checkpoint = TaskCheckpoint(
+            plan_id=target_plan.plan_id,
+            item_id=target_item.item_id,
+            workflow_id=target_item.workflow_id,
+            task_id=task_id,
+            output_state_type=output_state_type,
+            output_state=output_state,
+            commit_sha=commit_sha,
+            input_contract_digest=item_input_contract_digest(
+                target_item, target_plan.planning
+            ),
+        )
         if repo_root is not None:
             _write_local_task_checkpoint(
                 repo_root=repo_root,
                 issue_number=target_issue.number,
-                checkpoint=TaskCheckpoint(
-                    plan_id=target_plan.plan_id,
-                    item_id=target_item.item_id,
-                    workflow_id=target_item.workflow_id,
-                    task_id=task_id,
-                    output_state_type=output_state_type,
-                    output_state=output_state,
-                    commit_sha=commit_sha,
-                    input_contract_digest=item_input_contract_digest(
-                        target_item, target_plan.planning
-                    ),
-                ),
+                checkpoint=checkpoint,
             )
+        comment = render_task_checkpoint_comment(checkpoint)
+        if not any(
+            item.get("body") == comment
+            for item in client.list_comments(target_issue.number)
+        ):
+            client.add_comment(target_issue, comment)
         if repo_root is not None:
             # A repair PR must block its full impact set before another durable
             # checkpoint can be reached.
@@ -2419,6 +2506,221 @@ def _latest_checkpoint_pull_request_url(
     return None
 
 
+def _pull_request_url_from_task_record(
+    record: Mapping[str, Any] | None,
+) -> str | None:
+    if record is None or record.get("status") != "completed":
+        return None
+    state = record.get("output_state")
+    value = state.get("pull_request_url") if isinstance(state, Mapping) else None
+    return value if isinstance(value, str) else None
+
+
+_CI_OUTCOME_MARKER = "<!-- powdrr-ci-outcome:v1 -->"
+
+
+def _observe_required_ci_outcome(
+    client: GitHubIssueClient, pull_request_url: str | None
+) -> dict[str, Any]:
+    """Classify only current-PR required checks reported by GitHub CLI."""
+    if pull_request_url is None:
+        return {
+            "outcome": "blocked",
+            "head_sha": None,
+            "checks": [],
+            "reason": "the completed workflow did not checkpoint a pull request URL",
+        }
+    number = _same_repository_pull_request_number(pull_request_url, client.repository)
+    if number is None:
+        return {
+            "outcome": "blocked",
+            "head_sha": None,
+            "checks": [],
+            "reason": "the checkpointed PR URL does not belong to this repository",
+        }
+    head_result = client._invoke(
+        ["pr", "view", str(number), "--json", "headRefOid"], check=False
+    )
+    if head_result.returncode != 0:
+        return {
+            "outcome": "blocked",
+            "head_sha": None,
+            "checks": [],
+            "reason": "GitHub could not report the current PR head",
+        }
+    try:
+        head_value = json.loads(head_result.stdout)
+    except json.JSONDecodeError:
+        head_value = None
+    head_sha = head_value.get("headRefOid") if isinstance(head_value, Mapping) else None
+    if (
+        not isinstance(head_sha, str)
+        or re.fullmatch(r"[0-9a-f]{40,64}", head_sha) is None
+    ):
+        return {
+            "outcome": "blocked",
+            "head_sha": None,
+            "checks": [],
+            "reason": "GitHub returned no valid current PR head SHA",
+        }
+    checks_result = client._invoke(
+        [
+            "pr",
+            "checks",
+            str(number),
+            "--required",
+            "--json",
+            "name,state,workflow",
+        ],
+        check=False,
+    )
+    if checks_result.returncode != 0:
+        return {
+            "outcome": "blocked",
+            "head_sha": head_sha,
+            "checks": [],
+            "reason": "GitHub could not report required check states: "
+            + checks_result.stderr.strip()[:500],
+        }
+    try:
+        raw_checks = json.loads(checks_result.stdout)
+    except json.JSONDecodeError:
+        raw_checks = None
+    if not isinstance(raw_checks, list) or not raw_checks:
+        return {
+            "outcome": "blocked",
+            "head_sha": head_sha,
+            "checks": [],
+            "reason": "GitHub reported no required checks; review readiness is unknown",
+        }
+    checks = [
+        {
+            "name": str(value.get("name", "")),
+            "state": str(value.get("state", "unknown")).casefold(),
+            "workflow": (
+                str(value["workflow"]) if value.get("workflow") is not None else None
+            ),
+        }
+        for value in raw_checks
+        if isinstance(value, Mapping)
+    ]
+    confirmed_result = client._invoke(
+        ["pr", "view", str(number), "--json", "headRefOid"], check=False
+    )
+    try:
+        confirmed_value = json.loads(confirmed_result.stdout)
+    except json.JSONDecodeError:
+        confirmed_value = None
+    confirmed_sha = (
+        confirmed_value.get("headRefOid")
+        if isinstance(confirmed_value, Mapping)
+        else None
+    )
+    if confirmed_result.returncode != 0 or confirmed_sha != head_sha:
+        return {
+            "outcome": "blocked",
+            "head_sha": head_sha,
+            "checks": checks,
+            "reason": "the PR head changed while required checks were being observed",
+        }
+    if not checks or any(not item["name"] for item in checks):
+        outcome = "blocked"
+        reason = "GitHub returned incomplete required-check data"
+    elif any(
+        item["state"] in {"fail", "failure", "cancel", "skipping"} for item in checks
+    ):
+        outcome = "blocked"
+        reason = "one or more required checks failed, were canceled, or were skipped"
+    elif all(item["state"] in {"pass", "success"} for item in checks):
+        outcome = "awaiting_review"
+        reason = "all required checks passed for the current PR head"
+    elif any(item["state"] in {"pending", "queued", "in_progress"} for item in checks):
+        outcome = "awaiting_ci"
+        reason = "one or more required checks are still pending for the current PR head"
+    else:
+        outcome = "blocked"
+        reason = "GitHub returned an unrecognized required-check state"
+    return {
+        "outcome": outcome,
+        "head_sha": head_sha,
+        "checks": checks,
+        "reason": reason,
+    }
+
+
+def _queue_status_for_ci_outcome(outcome: str) -> str:
+    if outcome == "awaiting_review":
+        return "awaiting_review"
+    if outcome == "awaiting_ci":
+        return "awaiting_ci"
+    return "blocked"
+
+
+def _render_ci_outcome_checkpoint(
+    *, pull_request_url: str | None, observation: Mapping[str, Any]
+) -> str:
+    payload = {
+        "schema": "https://powdrr.io/schemas/ci-outcome-checkpoint-v1",
+        "pull_request_url": pull_request_url,
+        "head_sha": observation.get("head_sha"),
+        "outcome": observation.get("outcome"),
+        "required_checks": observation.get("checks", []),
+        "reason": observation.get("reason", ""),
+    }
+    fingerprint = hashlib.sha256(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()[:16]
+    return (
+        "### Powdrr required CI outcome\n\n"
+        f"{_CI_OUTCOME_MARKER}\n"
+        f"Observation `{fingerprint}` for "
+        f"{pull_request_url or 'an unlinked PR'} at head "
+        f"`{observation.get('head_sha') or 'unknown'}`: "
+        f"**{observation.get('outcome', 'blocked')}**.\n\n"
+        "```json\n"
+        f"{json.dumps(payload, indent=2, sort_keys=True)}\n"
+        "```"
+    )
+
+
+def _append_ci_outcome_checkpoint(
+    *,
+    client: GitHubIssueClient,
+    issue: QueueIssue,
+    pull_request_url: str | None,
+    observation: Mapping[str, Any],
+) -> None:
+    comment = _render_ci_outcome_checkpoint(
+        pull_request_url=pull_request_url, observation=observation
+    )
+    fingerprint = re.search(r"Observation `([0-9a-f]{16})`", comment)
+    if fingerprint is not None and any(
+        isinstance(item.get("body"), str)
+        and f"Observation `{fingerprint.group(1)}`" in str(item["body"])
+        for item in client.list_comments(issue.number)
+    ):
+        return
+    client.add_comment(issue, comment)
+
+
+def _ci_outcome_note(
+    repository: str, issue_number: int, observation: Mapping[str, Any]
+) -> str:
+    outcome = observation.get("outcome")
+    reason = str(observation.get("reason", "Required CI state is unknown."))
+    if outcome == "awaiting_review":
+        return "All current required PR checks passed. Human review is still required."
+    if outcome == "awaiting_ci":
+        return (
+            f"{reason}. Recheck with `powdrr-lift github-issue-worker-continue "
+            f"--repository {repository} --issue-number {issue_number}`."
+        )
+    return (
+        f"Powdrr cannot mark this item ready for review: {reason}. "
+        "Inspect the CI outcome checkpoint and resolve the reported state."
+    )
+
+
 def _same_repository_pull_request_number(
     url: str | None, repository: str
 ) -> int | None:
@@ -2554,6 +2856,7 @@ def _label_color(status: str) -> str:
         "claimed": "1D76DB",
         "awaiting_review": "FBCA04",
         "awaiting_human": "C5DEF5",
+        "awaiting_ci": "D4C5F9",
         "blocked_on_dependency": "D4C5F9",
         "blocked": "D93F0B",
     }[status]

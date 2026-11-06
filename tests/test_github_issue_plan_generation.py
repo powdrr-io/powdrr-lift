@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import subprocess
 from argparse import Namespace
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -1523,6 +1524,17 @@ def test_issue_worker_runs_plan_task_from_durable_runtime_directory(
             kwargs["branch_name"],
         ),
     )
+    instantiate = planned_workflow_task.instantiate_procedrr_process_workflow
+
+    def capture_instantiation(**kwargs: Any) -> Any:
+        captured["workflow_inputs"] = kwargs["input_state"]
+        return instantiate(**kwargs)
+
+    monkeypatch.setattr(
+        planned_workflow_task,
+        "instantiate_procedrr_process_workflow",
+        capture_instantiation,
+    )
 
     def run_workflow_task(config: Any, **_kwargs: Any) -> int:
         captured["workflow_dir"] = config.workflow_dir
@@ -1533,7 +1545,7 @@ def test_issue_worker_runs_plan_task_from_durable_runtime_directory(
             workflow_file,
             plan.items[0].workflow_id,
             "worker",
-            plan.items[0],
+            replace(plan.items[0], github_issue_number=23),
             plan,
             (),
             lambda *_args: None,
@@ -1567,16 +1579,24 @@ def test_issue_worker_runs_plan_task_from_durable_runtime_directory(
     assert runtime_directory.is_relative_to(integration_worktree)
     assert runtime_directory != workflow_file.parent
     workflow_instance = load_plan_workflow_instance(workflow_file)
+    assert captured["workflow_inputs"] != workflow_instance.inputs
     state = load_workflow_git_state(runtime_directory, plan.items[0].workflow_id)
     assert state is not None
     attempt_id = state.integration_branch.rsplit("-attempt-", maxsplit=1)[1]
     instance_id = planned_workflow_task._plan_workflow_instance_id(
         plan.items[0].workflow_id,
-        workflow_instance.inputs,
+        captured["workflow_inputs"],
         "worker",
         attempt_id=attempt_id,
     )
     assert runtime_directory.name == cli.slugify_workflow_id(instance_id)
+    assert (
+        captured["workflow_inputs"]["proposed_pr_context"]["github_issue_number"] == 23
+    )
+    assert (
+        captured["workflow_inputs"]["proposed_pr_context"]["github_repository"]
+        == "owner/repo"
+    )
     task_files = sorted(runtime_directory.glob("*.yaml"))
     assert len(task_files) == 2
     assert task_files[0].stem.startswith(

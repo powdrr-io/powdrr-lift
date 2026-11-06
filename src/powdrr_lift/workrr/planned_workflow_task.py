@@ -85,6 +85,8 @@ def run_planned_workflow_task(
                 "scope": list(item.scope),
                 "acceptance_criteria": list(item.acceptance_criteria),
                 "allowed_paths": list(item.allowed_paths),
+                "github_issue_number": item.github_issue_number,
+                "github_repository": options.repository,
             }
         )
         workflow_inputs["feature_description"] = item.objective

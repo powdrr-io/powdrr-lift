@@ -171,6 +171,8 @@ def test_plan_item_preparation_uses_unique_worktree_and_pinned_context(
     assert context["inline_plan_adjustments"] == [
         {"path": "src/search.py", "note": "Keep it small."}
     ]
+    assert context["github_issue_number"] == 42
+    assert context["github_repository"] == "powdrr-io/example"
     assert captured["git_state"].fulfilled_without_pr_dependencies == (
         "legacy-dependency",
     )

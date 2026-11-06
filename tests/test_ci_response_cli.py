@@ -56,7 +56,7 @@ def test_response_command_writes_idempotent_runner_failure_checkpoint(
             comment_bodies.append(body)
 
     monkeypatch.setattr(cli, "GitHubActionsClient", FakeClient)
-    args = Namespace(repository="example/project", pr=270, issue=107)
+    args = Namespace(repository="example/project", pr=270, pr_url=None, issue=107)
 
     assert cli._run_respond_to_pr_ci(args) == 0
     first = json.loads(capsys.readouterr().out)
@@ -68,3 +68,26 @@ def test_response_command_writes_idempotent_runner_failure_checkpoint(
     second = json.loads(capsys.readouterr().out)
     assert second["checkpoint_written"] is False
     assert len(comment_bodies) == 1
+
+    url_args = Namespace(
+        repository="example/project",
+        pr=None,
+        pr_url="https://github.com/example/project/pull/270",
+        issue=107,
+    )
+    assert cli._run_respond_to_pr_ci(url_args) == 0
+    assert json.loads(capsys.readouterr().out)["pull_request"] == 270
+
+
+def test_response_command_rejects_pull_request_url_from_another_repository(
+    monkeypatch: Any, capsys: Any
+) -> None:
+    args = Namespace(
+        repository="example/project",
+        pr=None,
+        pr_url="https://github.com/other/repository/pull/270",
+        issue=107,
+    )
+
+    assert cli._run_respond_to_pr_ci(args) == 2
+    assert "must identify a PR in the requested repository" in capsys.readouterr().err

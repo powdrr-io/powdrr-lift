@@ -2,12 +2,19 @@ version: 1
 name: respond-to-pr-ci
 description: Observe CI for a specific pull request, classify runner provisioning failures deterministically, and checkpoint current-head evidence on its tracking issue.
 inputs:
-- name: user_request
+- name: repository
   type: string
   required: true
-- name: workflow_context
-  type: object
+- name: issue_number
+  type: integer
   required: true
+- name: pull_request_url
+  type: string
+  required: true
+outputs:
+  ci_observation_result:
+    type: object
+    additionalProperties: true
 limits:
   llm_activations: 20
   tool_calls: 20
@@ -17,12 +24,12 @@ steps:
 - specialize:
     process: generate-fragment
     max_steps: 8
-    context: [user_request, workflow_context]
+    context: [repository, issue_number, pull_request_url]
     bind: observation_workflow
     question: >-
-      Resolve only the repository, pull request number, and associated tracking issue
-      number from the supplied context. Require explicit values; ask the user if any
-      are missing. Execute the embedded procedure exactly. Do not diagnose the cause,
+      Use only the supplied repository, pull request URL, and tracking issue number.
+      Pass all values literally to the embedded procedure. Do not infer any identifier.
+      Execute the embedded procedure exactly. Do not diagnose the cause,
       edit files, rerun checks, or call a coding agent in this observation-only
       procedure. Pass all identifiers literally to the declared CLI command. Do not
       claim a CI failure reproduced locally; this version only recognizes failures
@@ -44,8 +51,8 @@ steps:
           - respond-to-pr-ci
           - --repository
           - <repository>
-          - --pr
-          - <pull_request_number>
+          - --pr-url
+          - <pull_request_url>
           - --issue
           - <issue_number>
         outputs:

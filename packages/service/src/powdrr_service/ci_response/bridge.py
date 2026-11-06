@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+import re
 import shlex
 import tempfile
 from collections.abc import Callable, Mapping
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 from powdrr_contracts.ci import LocalReproduction
@@ -89,6 +90,25 @@ def compile_observed_ci_repair_request(
     disposition = decision.get("disposition")
     if disposition not in {"repository_change", "human_prerequisite", "unresolved"}:
         raise ValueError("repair targeting decision has an unsupported disposition")
+    runner_workflow_path = _unsupported_runner_workflow_path(failure_data)
+    repair_explanation = str(decision.get("explanation", ""))[:1200]
+    if runner_workflow_path is not None:
+        # GitHub has identified a rejected runner configuration in a checked-in
+        # workflow. That is a repository repair even when the workflow was not
+        # part of the implementation PR's original diff.
+        disposition = "repository_change"
+        evidence = failure_data.get("evidence", [])
+        evidence_refs = (
+            ", ".join(str(item)[:160] for item in evidence[:3])
+            if isinstance(evidence, list)
+            else ""
+        )
+        repair_explanation = (
+            f"GitHub reported unsupported runner configuration for failure "
+            f"{selected_failure_id}; evidence: {evidence_refs or 'runner annotation'}. "
+            f"Workflow {runner_workflow_path} is checked-in repository configuration, "
+            "so the repair is scoped to that file rather than a human setting."
+        )
     if disposition != "repository_change":
         result = {
             "status": disposition,
@@ -126,8 +146,19 @@ def compile_observed_ci_repair_request(
     repository = observation.get("repository")
     pull_request = observation.get("pull_request")
     changed_paths = observation.get("changed_paths")
-    proposed_paths = decision.get("target_paths")
-    required_behavior = decision.get("required_behavior")
+    proposed_paths = (
+        [runner_workflow_path]
+        if runner_workflow_path is not None
+        else decision.get("target_paths")
+    )
+    required_behavior = (
+        "Replace the unsupported runner configuration in the observed workflow "
+        f"{runner_workflow_path} with a documented supported configuration that "
+        "preserves the job's required operating system, architecture, commands, "
+        "and verification coverage."
+        if runner_workflow_path is not None
+        else decision.get("required_behavior")
+    )
     if not isinstance(repository, str) or not isinstance(pull_request, int):
         raise ValueError("CI observation is missing repository or PR identity")
     if not isinstance(changed_paths, list) or not all(
@@ -160,6 +191,9 @@ def compile_observed_ci_repair_request(
         failure=failure,
         reproduction=reproduction,
         changed_paths=tuple(changed_paths),
+        authorized_paths=(
+            (runner_workflow_path,) if runner_workflow_path is not None else ()
+        ),
         proposed_paths=tuple(proposed_paths),
         required_behavior=required_behavior,
         acceptance_command=acceptance,
@@ -168,9 +202,37 @@ def compile_observed_ci_repair_request(
     return {
         "status": "repository_change",
         "failure_id": failure.failure_id,
-        "explanation": str(decision.get("explanation", ""))[:1200],
+        "explanation": repair_explanation,
         "repair_request": request,
     }
+
+
+_UNSUPPORTED_RUNNER_CONFIGURATION = re.compile(
+    r"\bconfiguration\s+['\"][^'\"]+['\"]\s+is not supported\b", re.IGNORECASE
+)
+
+
+def _unsupported_runner_workflow_path(failure: Mapping[str, Any]) -> str | None:
+    """Authorize only the observed workflow for a deterministic runner rejection."""
+    if failure.get("phase") != "runner_provisioning":
+        return None
+    signature = failure.get("signature")
+    workflow_path = failure.get("workflow_path")
+    if not isinstance(signature, str) or not _UNSUPPORTED_RUNNER_CONFIGURATION.search(
+        signature
+    ):
+        return None
+    if not isinstance(workflow_path, str):
+        return None
+    path = PurePosixPath(workflow_path)
+    if (
+        path.is_absolute()
+        or ".." in path.parts
+        or path.parts[:2] != (".github", "workflows")
+        or path.suffix.casefold() not in {".yml", ".yaml"}
+    ):
+        return None
+    return path.as_posix()
 
 
 def finalize_ci_repair_result(

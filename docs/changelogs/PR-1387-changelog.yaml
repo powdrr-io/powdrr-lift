@@ -1,0 +1,137 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1387
+title: Repair unsupported runner configuration in the observed workflow
+intent:
+  problem: The CI response flow treated an unsupported runner label in a checked-in
+    GitHub Actions workflow as a human prerequisite and restricted repair targets to
+    files already changed by the implementation PR.
+  goal: Deterministically route that failure to a narrowly scoped repair of the
+    workflow reported by GitHub, even when it is outside the implementation PR's
+    original diff, while keeping other repair paths constrained.
+human-decisions: []
+structured_files: []
+files:
+- path: packages/service/src/powdrr_service/ci_response/bridge.py
+  type: modified
+  span:
+    start_line: 5
+    end_line: 5
+  summary: Import path validation for observed workflow targets.
+  rationale: Safely bind the failing Actions workflow to a repository-relative path.
+- path: packages/service/src/powdrr_service/ci_response/bridge.py
+  type: modified
+  span:
+    start_line: 9
+    end_line: 9
+  summary: Import path validation for observed workflow targets.
+  rationale: Safely bind the failing Actions workflow to a repository-relative path.
+- path: packages/service/src/powdrr_service/ci_response/bridge.py
+  type: modified
+  span:
+    start_line: 93
+    end_line: 111
+  summary: Route unsupported runner labels to the observed checked-in workflow.
+  rationale: Treat GitHub's pre-job rejection as a repository workflow correction.
+- path: packages/service/src/powdrr_service/ci_response/bridge.py
+  type: modified
+  span:
+    start_line: 149
+    end_line: 161
+  summary: Build deterministic workflow repair scope and required behavior.
+  rationale: Keep correction anchored to the observed failing workflow and PR head.
+- path: packages/service/src/powdrr_service/ci_response/bridge.py
+  type: modified
+  span:
+    start_line: 194
+    end_line: 196
+  summary: Pass the observed workflow as an explicitly authorized repair path.
+  rationale: Allow repair of checked-in CI configuration outside the original PR diff.
+- path: packages/service/src/powdrr_service/ci_response/bridge.py
+  type: modified
+  span:
+    start_line: 205
+    end_line: 205
+  summary: Report the service-selected repair explanation.
+  rationale: Explain why the failure is handled as a repository change.
+- path: packages/service/src/powdrr_service/ci_response/bridge.py
+  type: modified
+  span:
+    start_line: 210
+    end_line: 237
+  summary: Validate the failing workflow path for deterministic runner rejections.
+  rationale: Authorize only safe GitHub Actions workflow YAML paths.
+- path: packages/service/src/powdrr_service/ci_response/repair.py
+  type: modified
+  span:
+    start_line: 159
+    end_line: 159
+  summary: Accept service-authorized paths in repair contracts.
+  rationale: Permit only explicitly authorized repository configuration targets.
+- path: packages/service/src/powdrr_service/ci_response/repair.py
+  type: modified
+  span:
+    start_line: 167
+    end_line: 170
+  summary: Document PR diff and service-authorized repair path rules.
+  rationale: Keep the extra path authorization explicit and limited to CI configuration.
+- path: packages/service/src/powdrr_service/ci_response/repair.py
+  type: modified
+  span:
+    start_line: 175
+    end_line: 181
+  summary: Accept service-authorized paths in repair contracts.
+  rationale: Keep normal targets within the PR diff while allowing a scoped CI path.
+- path: packages/service/src/powdrr_service/ci_response/repair.py
+  type: modified
+  span:
+    start_line: 192
+    end_line: 192
+  summary: Validate authorized CI paths with all other repair paths.
+  rationale: Preserve repository-relative path safety for the narrow exception.
+- path: packages/service/src/powdrr_service/resources/processes/prepare-ci-repair.yaml
+  type: modified
+  span:
+    start_line: 43
+    end_line: 52
+  summary: Direct the CI repair decision toward repository-owned runner corrections.
+  rationale: Distinguish checked-in workflow configuration from human setup.
+- path: packages/service/src/powdrr_service/resources/processes/prepare-ci-repair.yaml
+  type: modified
+  span:
+    start_line: 54
+    end_line: 54
+  summary: Reserve human prerequisites for external setup requirements.
+  rationale: Keep unsupported workflow labels on the repository repair path.
+- path: tests/test_ci_response_policy.py
+  type: modified
+  span:
+    start_line: 287
+    end_line: 303
+  summary: Cover explicitly authorized CI workflow targets.
+  rationale: Verify workflow repair paths can be compiled without broadening scope.
+- path: tests/test_ci_response_policy.py
+  type: modified
+  span:
+    start_line: 439
+    end_line: 500
+  summary: Cover unsupported runner repair even when the workflow is outside the PR diff.
+  rationale: Ensure a mistaken human disposition becomes a bounded workflow repair.
+entities:
+- id: unsupported-runner-workflow-path
+  type: Function
+  action: added
+- id: ci-repair-scope-regression
+  type: Regression test
+  action: added
+entity_relationships: []
+invariants:
+- id: unsupported-runner-label-repairs-observed-workflow
+  description: A runner_provisioning failure whose signature reports an unsupported
+    configuration may authorize only its safe .github/workflows YAML path, even when
+    that path is absent from the implementation PR's original diff.
+  action: added
+- id: other-ci-repair-paths-remain-scoped
+  description: All other CI repair targets must remain in the observed PR diff, and
+    tests remain prohibited repair targets.
+  action: altered
+guidance: []

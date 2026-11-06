@@ -156,6 +156,7 @@ def compile_ci_repair_request(
     failure: CIFailureUnit,
     reproduction: LocalReproduction,
     changed_paths: tuple[str, ...],
+    authorized_paths: tuple[str, ...] = (),
     proposed_paths: tuple[str, ...],
     required_behavior: str,
     acceptance_command: tuple[str, ...],
@@ -163,16 +164,21 @@ def compile_ci_repair_request(
 ) -> dict[str, object]:
     """Compile a model-proposed target into a bounded worker request.
 
-    The model may choose paths and describe the desired correction, but this
-    compiler requires paths to belong to the observed PR diff and rejects test
-    files. The worker receives only the compiled exact-head contract.
+    The model may choose paths and describe the desired correction. Targets must
+    belong to the observed PR diff or an explicitly authorized path derived from
+    the failing GitHub Actions run. Test files remain prohibited. The worker
+    receives only the compiled exact-head contract.
     """
     changed = set(changed_paths)
     paths = tuple(dict.fromkeys(proposed_paths))
     if not paths or len(paths) > 3:
-        raise ValueError("CI repair must target one to three changed paths")
-    if any(path not in changed for path in paths):
-        raise ValueError("CI repair paths must belong to the observed PR diff")
+        raise ValueError("CI repair must target one to three repair paths")
+    authorized = set(authorized_paths)
+    if any(path not in changed | authorized for path in paths):
+        raise ValueError(
+            "CI repair paths must belong to the observed PR diff or an "
+            "explicitly authorized CI configuration path"
+        )
     if any(
         part.casefold() in {"test", "tests", "testing"}
         for path in paths
@@ -183,7 +189,7 @@ def compile_ci_repair_request(
         PurePosixPath(path).is_absolute()
         or ".." in PurePosixPath(path).parts
         or not PurePosixPath(path).parts
-        for path in (*changed_paths, *paths)
+        for path in (*changed_paths, *authorized_paths, *paths)
     ):
         raise ValueError("CI repair paths must be safe repository-relative paths")
     if any(_is_test_path(path) for path in paths):

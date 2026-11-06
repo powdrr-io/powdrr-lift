@@ -11,6 +11,9 @@ inputs:
 - name: pull_request_url
   type: string
   required: true
+- name: verification_command
+  type: string
+  required: true
 outputs:
   ci_observation_result:
     type: object
@@ -24,17 +27,19 @@ steps:
 - specialize:
     process: generate-fragment
     max_steps: 8
-    context: [repository, issue_number, pull_request_url]
+    context: [repository, issue_number, pull_request_url, verification_command]
     bind: observation_workflow
     question: >-
-      Use only the supplied repository, pull request URL, and tracking issue number.
+      Use only the supplied repository, pull request URL, tracking issue number, and
+      verification command.
       Pass all values literally to the embedded procedure. Do not infer any identifier.
-      Execute the embedded procedure exactly. Do not diagnose the cause,
-      edit files, rerun checks, or call a coding agent in this observation-only
-      procedure. Pass all identifiers literally to the declared CLI command. Do not
-      claim a CI failure reproduced locally; this version only recognizes failures
-      that occurred before a runner or command started. Preserve the command result
-      and stop if the issue is not associated with the pull request.
+      Execute the embedded procedure exactly. Do not diagnose the cause, edit files,
+      or call a coding agent. Pass all identifiers and the verification command
+      literally to the declared CLI command. The CLI runs that declared command at
+      the exact observed PR head in an isolated worktree and only declares a failure
+      reproduced when the normalized signature matches. A missing match is not
+      evidence of a GitHub-only failure when environments or phases differ. Preserve
+      the command result and stop if the issue is not associated with the pull request.
 
       Embedded procedure:
       ---
@@ -55,6 +60,8 @@ steps:
           - <pull_request_url>
           - --issue
           - <issue_number>
+          - --verification-command
+          - <verification_command>
         outputs:
         - name: ci_observation_result
           type: object

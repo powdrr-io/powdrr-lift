@@ -23,13 +23,6 @@ def compare_local_reproduction(
             "not_executable_locally",
             "The observed CI failure occurs before a local command can run.",
         )
-    if not environment_comparable:
-        return LocalReproduction(
-            "not_comparable",
-            "Local and CI execution environments differ in a relevant capability.",
-            command=command,
-            exit_code=exit_code,
-        )
     if local_output is None or exit_code is None:
         return LocalReproduction(
             "execution_error" if local_output is None else "not_comparable",
@@ -48,6 +41,17 @@ def compare_local_reproduction(
             command=command,
             exit_code=exit_code,
             matching_failure=True,
+        )
+    # A byte-for-byte normalized match is direct reproduction evidence even
+    # when the surrounding environments differ. Environment differences only
+    # prevent us from treating an absent match as evidence of non-reproduction.
+    if not environment_comparable:
+        return LocalReproduction(
+            "not_comparable",
+            "No matching failure was observed, and local and CI execution "
+            "environments differ in a relevant capability.",
+            command=command,
+            exit_code=exit_code,
         )
     if matching_line:
         return LocalReproduction(

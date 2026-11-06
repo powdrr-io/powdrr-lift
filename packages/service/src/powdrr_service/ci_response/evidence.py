@@ -92,7 +92,10 @@ def build_failure_units(
         ]
         for step in step_failures:
             name = str(step.get("name") or "unnamed step")
-            signature = normalize_failure_signature(name)
+            # The Actions job API exposes the failed step label but not its
+            # failure text. Mark it as a label so local output cannot
+            # accidentally match a generic word such as "pytest".
+            signature = f"failed step: {normalize_failure_signature(name)}"
             units.append(
                 _failure_unit(job, "step_failure", signature, (f"step:{name}",), True)
             )

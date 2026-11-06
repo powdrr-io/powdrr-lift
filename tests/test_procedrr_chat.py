@@ -114,21 +114,29 @@ def test_all_supported_workflow_names_have_procedrr_processes() -> None:
     } <= names
 
 
-def test_ci_response_procedure_is_observation_only_and_uses_cli_gate() -> None:
+def test_ci_response_procedure_runs_declared_verification_at_pinned_head() -> None:
     process = ProcessCatalog.load(bundled_process_directory()).get("respond-to-pr-ci")
     question = process.document["steps"][0]["specialize"]["question"]
 
     assert "powdrr-lift" in question
     assert "respond-to-pr-ci" in question
-    assert "Do not diagnose the cause" in question
-    assert "call a coding agent" in question
+    assert "call a coding agent" in question.lower()
+    assert "exact observed PR head" in question
+    assert "--verification-command" in question
     assert "pull_request_url" in question
+    assert "verification_command" in question
     execute = ProcessCatalog.load(bundled_process_directory()).get(
         "execute-proposed-pr-workflow"
     )
     import yaml
 
     assert "process: respond-to-pr-ci" in yaml.safe_dump(execute.document)
+    assert execute.document["steps"][1]["branch"]["cases"][True][1]["call"]["inputs"][
+        "verification_command"
+    ] == {
+        "type": "reference",
+        "value": "task_context.proposed_pr_context.verification_command",
+    }
 
 
 def test_ci_repair_process_dispatches_only_the_prepared_repair_request() -> None:

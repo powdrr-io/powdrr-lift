@@ -65,6 +65,33 @@ def test_runner_rejection_without_steps_is_not_locally_executable() -> None:
     assert "before a local command" in result.reason
 
 
+def test_failed_step_label_is_not_misused_as_a_failure_signature() -> None:
+    (failure,) = build_failure_units(
+        (
+            CIJobObservation(
+                job_id=21,
+                run_id=22,
+                run_attempt=1,
+                head_sha=HEAD,
+                status="completed",
+                conclusion="failure",
+                steps=({"name": "pytest", "conclusion": "failure"},),
+            ),
+        )
+    )
+    result = compare_local_reproduction(
+        ci_signature=failure.signature,
+        local_output="pytest: 12 failed in 3.2s",
+        command=("pytest", "-q"),
+        exit_code=1,
+        phase_exercised=False,
+        environment_comparable=False,
+    )
+
+    assert failure.signature == "failed step: pytest"
+    assert result.status == "not_comparable"
+
+
 def test_different_earlier_local_setup_error_is_not_a_non_reproduction() -> None:
     result = compare_local_reproduction(
         ci_signature="test_failure: expected 2, got 3",
@@ -105,6 +132,20 @@ def test_similar_but_nonmatching_local_error_is_not_called_reproduced() -> None:
 
     assert result.status == "not_reproduced"
     assert result.matching_failure is False
+
+
+def test_exact_failure_match_is_reproduction_even_when_environment_differs() -> None:
+    result = compare_local_reproduction(
+        ci_signature="AssertionError: expected 2, got 3",
+        local_output="E AssertionError: expected 2, got 3",
+        command=("pytest", "tests/test_behavior.py"),
+        exit_code=1,
+        phase_exercised=True,
+        environment_comparable=False,
+    )
+
+    assert result.status == "reproduced"
+    assert result.matching_failure is True
 
 
 def test_signature_normalization_redacts_tokens_and_credentials() -> None:
@@ -337,6 +378,20 @@ def test_normalized_checkpoint_is_small_repeatable_and_records_exact_head() -> N
         jobs=jobs,
         failures=failures,
     )
+    repro_id, repro_body = render_ci_observation_checkpoint(
+        repository="example/project",
+        pull_request_number=270,
+        issue_number=107,
+        head_sha=HEAD,
+        jobs=jobs,
+        failures=failures,
+        reproductions={
+            failures[0].failure_id: LocalReproduction(
+                "not_executable_locally",
+                "Runner provisioning failed before a command could start.",
+            )
+        },
+    )
 
     assert first_id == second_id
     assert first_body == second_body
@@ -344,3 +399,5 @@ def test_normalized_checkpoint_is_small_repeatable_and_records_exact_head() -> N
     assert HEAD in first_body
     assert "runner_provisioning" in first_body
     assert "raw_sha256" not in first_body
+    assert repro_id != first_id
+    assert "local reproduction `not_executable_locally`" in repro_body

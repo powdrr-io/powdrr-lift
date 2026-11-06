@@ -33,6 +33,7 @@ steps:
                 repository: {type: reference, value: task_context.proposed_pr_context.github_repository}
                 issue_number: {type: reference, value: task_context.proposed_pr_context.github_issue_number}
                 pull_request_url: {type: reference, value: pull_request_url}
+                verification_command: {type: reference, value: task_context.proposed_pr_context.verification_command}
               outputs:
                 ci_observation_result: ci_observation_result
       default:
@@ -78,6 +79,7 @@ steps:
                       repository: {type: reference, value: task_context.proposed_pr_context.github_repository}
                       issue_number: {type: reference, value: task_context.proposed_pr_context.github_issue_number}
                       pull_request_url: {type: reference, value: pull_request_url}
+                      verification_command: {type: reference, value: task_context.proposed_pr_context.verification_command}
                     outputs:
                       ci_observation_result: ci_observation_result
               implementation_defect:

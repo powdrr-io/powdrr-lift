@@ -33,6 +33,10 @@ def render_ci_observation_checkpoint(
         "issue": issue_number,
         "head_sha": head_sha,
         "jobs": [job.to_dict() for job in jobs],
+        "reproductions": {
+            failure_id: result.to_dict()
+            for failure_id, result in sorted((reproductions or {}).items())
+        },
     }
     observation_id = hashlib.sha256(
         json.dumps(identity, sort_keys=True, separators=(",", ":")).encode("utf-8")
@@ -70,9 +74,20 @@ def render_ci_observation_checkpoint(
 
 def _render_failure(unit: CIFailureUnit, reproduction: LocalReproduction | None) -> str:
     repro = reproduction.status if reproduction is not None else "not_run"
+    reason = f" ({reproduction.reason[:240]})" if reproduction is not None else ""
+    output_fingerprint = ""
+    if reproduction is not None and (
+        reproduction.stdout_sha256 or reproduction.stderr_sha256
+    ):
+        output_fingerprint = (
+            "; output sha256 "
+            f"{reproduction.stdout_sha256 or 'none'}/"
+            f"{reproduction.stderr_sha256 or 'none'}"
+        )
     return (
         f"- `{unit.failure_id}`: **{unit.phase}**; {unit.signature[:500]}; "
-        f"evidence `{', '.join(unit.evidence)}`; local reproduction `{repro}`."
+        f"evidence `{', '.join(unit.evidence)}`; local reproduction `{repro}`"
+        f"{output_fingerprint}{reason}."
     )
 
 

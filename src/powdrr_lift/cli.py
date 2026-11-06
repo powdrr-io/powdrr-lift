@@ -25,7 +25,9 @@ from powdrr_agent.artifact_state import (
 from powdrr_agent.execution.github_actions import (
     GitHubActionsClient,
     GitHubActionsError,
+    execute_pinned_local_command,
 )
+from powdrr_contracts.ci import LocalReproduction
 from powdrr_contracts.models import (
     Artifact,
     OperationRequest,
@@ -39,6 +41,7 @@ from powdrr_local.planning.repair_publication import (
 )
 from powdrr_service.ci_response import (
     build_failure_units,
+    compare_local_reproduction,
     normalize_github_snapshot,
     render_ci_observation_checkpoint,
 )
@@ -363,12 +366,16 @@ def build_parser() -> argparse.ArgumentParser:
 
     ci_response_parser = subparsers.add_parser(
         "respond-to-pr-ci",
-        help="Record and deterministically classify CI failures for a pull request.",
+        help="Observe PR CI and reproduce matching failures at its exact head.",
     )
     ci_response_parser.add_argument("--repository", required=True)
     ci_response_parser.add_argument("--pr", type=int)
     ci_response_parser.add_argument("--pr-url")
     ci_response_parser.add_argument("--issue", type=int, required=True)
+    ci_response_parser.add_argument(
+        "--verification-command",
+        help="Run the task's declared verification command at the exact PR head.",
+    )
     ci_response_parser.set_defaults(func=_run_respond_to_pr_ci)
 
     publish_plan_issues_parser = subparsers.add_parser(
@@ -3017,6 +3024,12 @@ def _run_respond_to_pr_ci(args: argparse.Namespace) -> int:
         head_sha = head.get("sha") if isinstance(head, Mapping) else None
         if not isinstance(head_sha, str):
             raise GitHubActionsError("GitHub did not return the current PR head SHA")
+        reproductions = _reproduce_ci_failures(
+            failures,
+            repository_root=resolve_repo_root(None),
+            head_sha=head_sha,
+            verification_command=getattr(args, "verification_command", None),
+        )
         observation_id, comment = render_ci_observation_checkpoint(
             repository=args.repository,
             pull_request_number=pr_number,
@@ -3024,6 +3037,7 @@ def _run_respond_to_pr_ci(args: argparse.Namespace) -> int:
             head_sha=head_sha,
             jobs=jobs,
             failures=failures,
+            reproductions=reproductions,
         )
         duplicate = any(
             isinstance(item.get("body"), str)
@@ -3049,9 +3063,14 @@ def _run_respond_to_pr_ci(args: argparse.Namespace) -> int:
                     "signature": item.signature,
                     "evidence": list(item.evidence),
                     "local_reproduction": (
-                        "not_executable_locally"
-                        if not item.locally_executable
+                        reproductions[item.failure_id].status
+                        if item.failure_id in reproductions
                         else "not_started"
+                    ),
+                    "local_reproduction_reason": (
+                        reproductions[item.failure_id].reason
+                        if item.failure_id in reproductions
+                        else None
                     ),
                 }
                 for item in failures
@@ -3062,6 +3081,78 @@ def _run_respond_to_pr_ci(args: argparse.Namespace) -> int:
         return 2
     print(json.dumps(result, indent=2))
     return 0
+
+
+def _reproduce_ci_failures(
+    failures: Sequence[Any],
+    *,
+    repository_root: Path,
+    head_sha: str,
+    verification_command: str | None,
+) -> dict[str, Any]:
+    """Run one declared command at the observed head and compare conservatively."""
+    eligible = [item for item in failures if item.locally_executable]
+    command: tuple[str, ...] = ()
+    run_result = None
+    execution_error: str | None = None
+    if eligible and verification_command:
+        try:
+            command = tuple(shlex.split(verification_command))
+        except ValueError as error:
+            raise GitHubActionsError(
+                f"verification command is malformed: {error}"
+            ) from error
+        if not command:
+            raise GitHubActionsError("verification command must not be empty")
+        try:
+            run_result = execute_pinned_local_command(
+                repository_root, head_sha, command
+            )
+        except (GitHubActionsError, OSError) as error:
+            # A missing local commit or unavailable worktree is evidence that
+            # reproduction could not be performed, not evidence about the CI bug.
+            execution_error = str(error)
+    results: dict[str, Any] = {}
+    for failure in failures:
+        if not failure.locally_executable:
+            results[failure.failure_id] = compare_local_reproduction(
+                ci_signature=failure.signature,
+                local_output=None,
+                command=(),
+                exit_code=None,
+                phase_exercised=False,
+                environment_comparable=False,
+                locally_executable=False,
+            )
+            continue
+        if not verification_command or run_result is None:
+            reason = (
+                "No task verification command was supplied."
+                if not verification_command
+                else execution_error
+                or "The exact PR head was unavailable for isolated local execution."
+            )
+            results[failure.failure_id] = LocalReproduction(
+                "not_comparable" if not verification_command else "execution_error",
+                reason,
+                command=command,
+            )
+            continue
+        output = run_result.stdout + "\n" + run_result.stderr
+        comparison = compare_local_reproduction(
+            ci_signature=failure.signature,
+            local_output=output,
+            command=command,
+            exit_code=run_result.exit_code,
+            phase_exercised=False,
+            environment_comparable=False,
+        )
+        results[failure.failure_id] = replace(
+            comparison,
+            stdout_sha256=run_result.stdout_sha256,
+            stderr_sha256=run_result.stderr_sha256,
+        )
+    return results
 
 
 def _run_list_plan_issues(args: argparse.Namespace) -> int:

@@ -1,0 +1,91 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1388
+title: Let CI repair workers run past task checkpoints
+intent:
+  problem: The CI repair worker rejected the repository as dirty when the running
+    Procedrr task had durably updated its own checkpoint files, and the parent
+    process tool-call budgets were too small for the nested repair process.
+  goal: Allow only the active task's checkpoint files during a CI repair attempt,
+    continue rejecting unrelated dirty changes, and give the nested CI processes
+    enough tool calls to complete their bounded work.
+human-decisions: []
+structured_files: []
+files:
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 514
+    end_line: 559
+  summary: Allow the active task's durable Procedrr files during CI repair.
+  rationale: Prevent the task's own checkpoint updates from blocking its worker while rejecting other dirty files.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 3755
+    end_line: 3759
+  summary: Apply the narrow checkpoint exception before starting the repair worker.
+  rationale: Scope the exception to the currently executing task's run files.
+- path: packages/service/src/powdrr_service/resources/processes/respond-to-pr-ci.yaml
+  type: modified
+  span:
+    start_line: 17
+    end_line: 17
+  summary: Raise the outer CI response process tool-call budget.
+  rationale: Give the nested research and repair process room to complete.
+- path: packages/service/src/powdrr_service/resources/processes/prepare-ci-repair.yaml
+  type: modified
+  span:
+    start_line: 13
+    end_line: 13
+  summary: Raise the repair preparation process tool-call budget.
+  rationale: Allow its bounded research, decision, and retry operations to complete.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 50
+    end_line: 50
+  summary: Import the CI repair request type for focused runtime-state tests.
+  rationale: Reuse the production request model in helper tests.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 4143
+    end_line: 4217
+  summary: Cover task checkpoint allowance and rejection of unrelated changes.
+  rationale: Ensure the worker can start with only its own durable files dirty.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 4274
+    end_line: 4274
+  summary: Give the dispatch test the active task identifier.
+  rationale: Verify CI repair applies the runtime-state rule to the active task.
+- path: tests/test_procedrr_chat.py
+  type: modified
+  span:
+    start_line: 120
+    end_line: 120
+  summary: Require a larger budget for the outer CI response process.
+  rationale: Prevent regression to the insufficient nested process budget.
+- path: tests/test_procedrr_chat.py
+  type: modified
+  span:
+    start_line: 148
+    end_line: 148
+  summary: Require a larger budget for repair preparation.
+  rationale: Prevent regression to the insufficient nested process budget.
+entities:
+- id: ci-repair-task-checkpoint-allowance
+  type: Function
+  action: added
+- id: ci-repair-task-checkpoint-regression
+  type: Regression test
+  action: added
+invariants:
+- id: ci-repair-allows-only-current-task-checkpoints
+  description: A CI repair attempt may start with only its current task's two durable Procedrr run files dirty; unrelated tracked, staged, or untracked changes remain a policy denial.
+  action: added
+- id: ci-repair-process-tool-budgets
+  description: The outer CI response and repair preparation processes allow at least 32 tool calls.
+  action: added
+guidance: []

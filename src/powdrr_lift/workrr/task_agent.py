@@ -511,6 +511,52 @@ def _ci_repair_implementation_request(
     )
 
 
+def _ci_repair_request_with_runtime_state(
+    request: ImplementationRequest,
+    *,
+    repo_root: Path,
+    task_id: str,
+) -> ImplementationRequest:
+    """Allow only this task's durable Procedrr files beside the worker attempt."""
+    if not task_id or Path(task_id).name != task_id:
+        raise PowdrrExecutionError("CI repair task ID is not a safe file name")
+    runtime_paths = {
+        f".powdrr/procedrr-runs/{task_id}.json",
+        f".powdrr/procedrr-runs/{task_id}.events.jsonl",
+    }
+    dirty_paths: set[str] = set()
+    for arguments in (
+        ("diff", "--name-only"),
+        ("diff", "--cached", "--name-only"),
+        ("ls-files", "--others", "--exclude-standard"),
+    ):
+        result = subprocess.run(
+            ["git", *arguments],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if result.returncode != 0:
+            raise PowdrrExecutionError(
+                "could not inspect CI repair worker checkout status"
+            )
+        dirty_paths.update(line for line in result.stdout.splitlines() if line)
+    unexpected = dirty_paths - runtime_paths
+    if unexpected:
+        raise PowdrrExecutionError(
+            "CI repair worker checkout has unrelated changes: "
+            + ", ".join(sorted(unexpected)[:8])
+        )
+    if not dirty_paths:
+        return request
+    return replace(
+        request,
+        allow_existing_changes=True,
+        ephemeral_paths=tuple(sorted(set(request.ephemeral_paths) | dirty_paths)),
+    )
+
+
 def _issue_worker_plan_amendment_paths(
     repo_root: Path, proposed: Mapping[str, Any], *, workflow_id: str
 ) -> tuple[str, ...]:
@@ -3705,6 +3751,11 @@ class _TaskWorkflowExecutionStrategy:
             )
         request = _ci_repair_implementation_request(
             repair_request, base_commit=base_commit
+        )
+        request = _ci_repair_request_with_runtime_state(
+            request,
+            repo_root=self.repo_root,
+            task_id=self.task.task_id,
         )
         request_store = (
             Path(tempfile.gettempdir())

@@ -284,6 +284,23 @@ def test_ci_repair_compiler_binds_paths_evidence_and_exact_failure() -> None:
     assert "sha256 " + "a" * 64 in str(request["prompt"])
 
 
+def test_ci_repair_compiler_allows_only_explicitly_authorized_workflow_paths() -> None:
+    contract, failure = _repair_fixture()
+    request = compile_ci_repair_request(
+        repository=contract.repository,
+        pull_request=contract.pull_request,
+        failure=failure,
+        reproduction=contract.reproduction,
+        changed_paths=("src/feature.py",),
+        authorized_paths=(".github/workflows/ci.yml",),
+        proposed_paths=(".github/workflows/ci.yml",),
+        required_behavior="Use a supported runner in the observed workflow.",
+        acceptance_command=contract.acceptance_command,
+    )
+
+    assert request["allowed_paths"] == [".github/workflows/ci.yml"]
+
+
 @pytest.mark.parametrize(
     "proposed_paths,changed_paths",
     [
@@ -417,6 +434,68 @@ def test_ci_repair_bridge_routes_human_prerequisite_without_worker_request() -> 
     assert result["status"] == "human_prerequisite"
     assert "repair_request" not in result
     assert result["manual_prerequisite"] == prerequisite
+
+
+def test_unsupported_runner_in_observed_workflow_is_forced_to_repository_repair() -> (
+    None
+):
+    contract, failure = _repair_fixture()
+    failure_data = {
+        "failure_id": failure.failure_id,
+        "job_id": failure.job_id,
+        "run_id": failure.run_id,
+        "run_attempt": failure.run_attempt,
+        "phase": "runner_provisioning",
+        "signature": "the configuration 'macos-14-arm64-us-default' is not supported",
+        "evidence": ["annotation:127527360223"],
+        "locally_executable": False,
+        "workflow_path": ".github/workflows/ci.yml",
+        "runner_labels": ["macos-14-arm64-us-default"],
+        "local_reproduction": LocalReproduction(
+            "not_executable_locally",
+            "The rejected runner is provisioned by GitHub Actions.",
+        ).to_dict(),
+    }
+    observation = {
+        "repository": contract.repository,
+        "pull_request": contract.pull_request,
+        "head_sha": HEAD,
+        "changed_paths": ["src/feature.py"],
+        "pull_request_metadata": {
+            "head_ref": "powdrr/plan/item-01",
+            "base_ref": "main",
+            "title": "Add behavior",
+            "body": "Implementation PR.",
+        },
+    }
+    result = compile_observed_ci_repair_request(
+        observation=observation,
+        research_result={
+            "status": "failure_selected",
+            "head_sha": HEAD,
+            "failure": failure_data,
+            "evidence": [],
+        },
+        decision={
+            "disposition": "human_prerequisite",
+            "target_paths": [],
+            "required_behavior": "",
+            "explanation": "Ask a human to change the repository runner setting.",
+            "manual_prerequisite": {
+                "title": "Change the runner setting",
+                "instructions": ["Change the runner setting in GitHub."],
+                "verification": "Rerun CI.",
+                "trigger": "after_implementation_before_validation",
+                "unblocks": "The failed CI check.",
+            },
+        },
+        verification_command="bash scripts/verify.sh",
+    )
+
+    assert result["status"] == "repository_change"
+    assert "checked-in repository configuration" in result["explanation"]
+    assert result["repair_request"]["allowed_paths"] == [".github/workflows/ci.yml"]
+    assert "documented supported configuration" in result["repair_request"]["prompt"]
 
 
 def test_ci_repair_retry_is_bounded_and_carries_validation_findings() -> None:

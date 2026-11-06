@@ -26,6 +26,13 @@ def test_observation_fetches_annotations_even_when_runner_never_started() -> Non
         payload: Any
         if endpoint == "repos/example/project/pulls/270":
             payload = {"head": {"sha": HEAD}}
+        elif endpoint == "repos/example/project/pulls/270/files?per_page=100":
+            payload = [
+                [
+                    {"filename": ".github/workflows/ci.yml"},
+                    {"filename": "src/behavior.py"},
+                ]
+            ]
         elif "actions/runs?" in endpoint:
             payload = [
                 {
@@ -65,6 +72,10 @@ def test_observation_fetches_annotations_even_when_runner_never_started() -> Non
     snapshot = client.observe_pull_request(270)
 
     assert snapshot.pull_request["head"]["sha"] == HEAD
+    assert snapshot.changed_paths == (
+        ".github/workflows/ci.yml",
+        "src/behavior.py",
+    )
     assert len(snapshot.runs) == 1
     assert snapshot.jobs_by_run["42107708170"][0]["steps"] == []
     assert snapshot.annotations_by_check_run["127527360223"][0]["message"].startswith(

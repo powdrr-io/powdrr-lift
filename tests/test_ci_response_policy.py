@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import hashlib
+from collections.abc import Mapping
 from pathlib import Path
+from typing import Any
 
 import pytest
 from powdrr_contracts.ci import (
@@ -16,10 +18,13 @@ from powdrr_service.ci_response import (
     compare_local_reproduction,
     compile_ci_repair_request,
     compile_miniswe_repair_prompt,
+    compile_observed_ci_repair_request,
+    finalize_ci_repair_result,
     github_actions_research_queries,
     normalize_github_snapshot,
     render_ci_observation_checkpoint,
     research_github_actions_failure,
+    research_observed_ci_failure,
     select_github_actions_sources,
     validate_repair_patch,
 )
@@ -324,6 +329,243 @@ def test_ci_repair_compiler_rejects_untrusted_research_source() -> None:
                 },
             ),
         )
+
+
+def test_ci_repair_bridge_selects_one_failure_and_compiles_typed_request(
+    tmp_path: Path,
+) -> None:
+    contract, failure = _repair_fixture()
+    failure_data = {
+        "failure_id": failure.failure_id,
+        "job_id": failure.job_id,
+        "run_id": failure.run_id,
+        "run_attempt": failure.run_attempt,
+        "phase": failure.phase,
+        "signature": failure.signature,
+        "evidence": list(failure.evidence),
+        "locally_executable": failure.locally_executable,
+        "workflow_path": ".github/workflows/ci.yml",
+        "runner_labels": ["ubuntu-latest"],
+        "local_reproduction": contract.reproduction.to_dict(),
+    }
+    observation = {
+        "repository": contract.repository,
+        "pull_request": contract.pull_request,
+        "issue": contract.pull_request,
+        "head_sha": HEAD,
+        "pull_request_metadata": {
+            "head_ref": "powdrr/plan/item-01",
+            "base_ref": "main",
+            "title": "Add behavior",
+            "body": "Implementation PR.",
+        },
+        "changed_paths": [".github/workflows/ci.yml", "tests/test_behavior.py"],
+        "failures": [failure_data],
+    }
+    research = research_observed_ci_failure(
+        observation,
+        api_key=None,
+        artifact_root=tmp_path,
+    )
+
+    assert research["status"] == "failure_selected"
+    assert research["failure"]["failure_id"] == failure.failure_id
+    assert research["evidence"] == []
+    result = compile_observed_ci_repair_request(
+        observation=observation,
+        research_result=research,
+        decision={
+            "failure_id": failure.failure_id,
+            "disposition": "repository_change",
+            "target_paths": [".github/workflows/ci.yml"],
+            "required_behavior": "Run the test suite on the declared hosted runner.",
+        },
+        verification_command="pytest tests/test_behavior.py -q",
+    )
+
+    assert result["status"] == "repository_change"
+    request = result["repair_request"]
+    assert request["head_sha"] == HEAD
+    assert request["failure_id"] == failure.failure_id
+    assert request["allowed_paths"] == [".github/workflows/ci.yml"]
+
+
+def test_ci_repair_bridge_routes_human_prerequisite_without_worker_request() -> None:
+    result = compile_observed_ci_repair_request(
+        observation={},
+        research_result={"failure": {"failure_id": "ci-123"}},
+        decision={
+            "failure_id": "ci-123",
+            "disposition": "human_prerequisite",
+            "explanation": "The required organization secret is unavailable.",
+        },
+        verification_command="pytest",
+    )
+
+    assert result["status"] == "human_prerequisite"
+    assert "repair_request" not in result
+
+
+def test_prepare_ci_repair_process_executes_validates_publishes_and_reobserves(
+    tmp_path: Path,
+) -> None:
+    from powdrr_service.procedrr import ProcessCatalog
+    from powdrr_service.procedrr_evaluator import Evaluator
+    from powdrr_service.resources import bundled_process_directory
+
+    contract, failure = _repair_fixture()
+    observation = {
+        "repository": contract.repository,
+        "pull_request": contract.pull_request,
+        "issue": contract.pull_request,
+        "head_sha": HEAD,
+        "pull_request_metadata": {
+            "head_ref": "powdrr/plan/item-01",
+            "base_ref": "main",
+            "title": "Add behavior",
+            "body": "Implementation PR.",
+        },
+        "changed_paths": [".github/workflows/ci.yml", "tests/test_behavior.py"],
+        "failures": [
+            {
+                "failure_id": failure.failure_id,
+                "job_id": failure.job_id,
+                "run_id": failure.run_id,
+                "run_attempt": failure.run_attempt,
+                "phase": failure.phase,
+                "signature": failure.signature,
+                "evidence": list(failure.evidence),
+                "locally_executable": failure.locally_executable,
+                "workflow_path": ".github/workflows/ci.yml",
+                "runner_labels": ["ubuntu-latest"],
+                "local_reproduction": contract.reproduction.to_dict(),
+            }
+        ],
+    }
+    calls: list[str] = []
+    repair_attempt = {
+        "passed": True,
+        "attempt_id": "attempt-01",
+        "status": "completed",
+        "head_sha": HEAD,
+        "failure_id": failure.failure_id,
+        "changed_paths": [".github/workflows/ci.yml"],
+        "protected_paths": ["tests/test_behavior.py"],
+        "error": None,
+        "diff_fingerprint": "b" * 64,
+        "worker_committed": True,
+    }
+
+    def research(parameters: Mapping[str, Any]) -> dict[str, Any]:
+        calls.append("research")
+        return research_observed_ci_failure(
+            parameters["observation"],
+            api_key=None,
+            artifact_root=tmp_path,
+        )
+
+    def compile_request(parameters: Mapping[str, Any]) -> dict[str, Any]:
+        calls.append("compile")
+        return compile_observed_ci_repair_request(
+            observation=parameters["observation"],
+            research_result=parameters["research_result"],
+            decision=parameters["decision"],
+            verification_command=parameters["verification_command"],
+        )
+
+    def execute(operation: str, parameters: Mapping[str, Any]) -> Any:
+        if operation == "ci_repair_research":
+            return research(parameters)
+        if operation == "ci_repair_compile":
+            return compile_request(parameters)
+        if operation == "invoke_tool":
+            tool_parameters = parameters.get("parameters", {})
+            if parameters.get("tool") == "coding-agent":
+                calls.append("worker")
+                assert tool_parameters["repair_request"]["head_sha"] == HEAD
+                return repair_attempt
+            if parameters.get("tool") == "gh":
+                calls.append("publish")
+                assert tool_parameters["operation"] == "pr_publish_clean"
+                assert tool_parameters["files_to_publish"] == [
+                    ".github/workflows/ci.yml"
+                ]
+                return "https://github.com/example/project/pull/42"
+        if operation == "ci_repair_validate":
+            calls.append("validate")
+            return {
+                "passed": True,
+                "findings": [],
+                "head_sha": HEAD,
+                "failure_id": failure.failure_id,
+                "changed_paths": [".github/workflows/ci.yml"],
+                "contract_fingerprint": "c" * 64,
+                "acceptance": {"exit_code": 0},
+            }
+        if operation == "ci_observe":
+            calls.append("reobserve")
+            return {"head_sha": "d" * 40, "failures": []}
+        if operation == "ci_repair_finalize":
+            calls.append("finalize")
+            return finalize_ci_repair_result(
+                preparation=parameters["preparation"],
+                attempt=parameters["attempt"],
+                validation=parameters["validation"],
+                publication_url=parameters.get("publication_url"),
+                follow_up_observation=parameters.get("follow_up_observation"),
+            )
+        raise AssertionError(f"unexpected Procedrr operation: {operation}")
+
+    class TargetingModel:
+        def complete_json(
+            self, messages: list[dict[str, str]], **_: Any
+        ) -> dict[str, Any]:
+            assert failure.failure_id in messages[1]["content"]
+            return {
+                "disposition": "repository_change",
+                "target_paths": [".github/workflows/ci.yml"],
+                "required_behavior": "Run this suite on the declared hosted runner.",
+                "explanation": (
+                    "The observed runner configuration is rejected before a job starts."
+                ),
+            }
+
+    process = ProcessCatalog.load(bundled_process_directory()).get("prepare-ci-repair")
+    result = Evaluator(
+        TargetingModel(),
+        execute,
+        process_directory=bundled_process_directory(),
+    ).evaluate(
+        process.document,
+        {
+            "ci_observation_result": observation,
+            "pull_request_url": "https://github.com/example/project/pull/42",
+            "implementation_context": {
+                "acceptance_criteria": ["Tests pass on supported CI."]
+            },
+            "verification_command": "pytest tests/test_behavior.py -q",
+        },
+    )
+
+    assert calls == [
+        "research",
+        "compile",
+        "worker",
+        "validate",
+        "publish",
+        "reobserve",
+        "finalize",
+    ]
+    preparation = result.bindings["repair_preparation"]
+    assert preparation["status"] == "published"
+    assert preparation["attempt"]["attempt_id"] == "attempt-01"
+    assert (
+        preparation["pull_request_url"] == "https://github.com/example/project/pull/42"
+    )
+    assert preparation["follow_up_observation"]["head_sha"] == "d" * 40
+    assert preparation["repair_request"]["allowed_paths"] == [
+        ".github/workflows/ci.yml"
+    ]
 
 
 def test_ci_research_is_bounded_captured_and_mockable(tmp_path: Path) -> None:

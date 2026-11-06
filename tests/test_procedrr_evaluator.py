@@ -487,7 +487,10 @@ inputs:
   - {name: issue_number, type: integer, required: true}
   - {name: pull_request_url, type: string, required: true}
   - {name: verification_command, type: string, required: true}
-outputs: {ci_observation_result: {type: object}}
+  - {name: implementation_context, type: object, required: true}
+outputs:
+  ci_observation_result: {type: object}
+  repair_preparation: {type: object}
 steps:
   - operation:
       tool: internal
@@ -498,6 +501,12 @@ steps:
         pull_request_url: "${pull_request_url}"
         verification_command: "${verification_command}"
       bind: ci_observation_result
+  - operation:
+      tool: internal
+      parameters:
+        command: [prepare]
+        implementation_context: "${implementation_context}"
+      bind: repair_preparation
   - terminal: succeeded
 """,
         encoding="utf-8",
@@ -658,6 +667,8 @@ steps:
             )
         if command == "observe":
             return {"outcome": "observed"}
+        if command == "prepare":
+            return {"status": "unresolved"}
         raise AssertionError(f"Unexpected operation: {command}")
 
     process_directory = tmp_path
@@ -727,11 +738,18 @@ steps:
                 "amend-plan-and-open-pr",
                 "respond-to-pr-ci",
             ]
-            assert calls == ["implement", "amend", "finish", "publish", "observe"]
+            assert calls == [
+                "implement",
+                "amend",
+                "finish",
+                "publish",
+                "observe",
+                "prepare",
+            ]
             assert result.bindings["pull_request_url"] == (
                 "https://github.com/example/repo/pull/123"
             )
-            assert call_parameters[-2]["files_to_publish"] == [
+            assert call_parameters[-3]["files_to_publish"] == [
                 "docs/plans/feature-v1-execution-plan.yaml",
                 "docs/plans/feature-v1-structrr-proposal.json",
                 "docs/workflows/feature-v1/feature-v1-pr-01.yaml",
@@ -795,12 +813,12 @@ steps:
         "finish-implementation-pr",
         "respond-to-pr-ci",
     ]
-    assert calls == ["implement", "finish", "publish", "observe"]
+    assert calls == ["implement", "finish", "publish", "observe", "prepare"]
     assert result.bindings["pull_request_url"] == (
         "https://github.com/example/repo/pull/123"
     )
     assert call_parameters[1]["files_to_publish"] == implementation_paths
-    assert call_parameters[-2]["files_to_publish"] == implementation_paths
+    assert call_parameters[-3]["files_to_publish"] == implementation_paths
 
 
 def test_called_process_uses_its_own_recovery_declarations(tmp_path: Path) -> None:

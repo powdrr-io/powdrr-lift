@@ -31,6 +31,11 @@ KNOWN_TOOLS = frozenset(
         "task_complete",
         "task_handoff",
         "task_run_process",
+        "ci_observe",
+        "ci_repair_research",
+        "ci_repair_compile",
+        "ci_repair_validate",
+        "ci_repair_finalize",
     }
 )
 KNOWN_VALIDATORS = frozenset({"json_schema"})

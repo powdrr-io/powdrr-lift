@@ -23,6 +23,7 @@ class GitHubActionsSnapshot:
     runs: tuple[Mapping[str, Any], ...]
     jobs_by_run: Mapping[str, tuple[Mapping[str, Any], ...]]
     annotations_by_check_run: Mapping[str, tuple[Mapping[str, Any], ...]]
+    changed_paths: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -60,6 +61,20 @@ class GitHubActionsClient:
             raise GitHubActionsError("pull request number must be positive")
         pr = self._object(
             f"repos/{self.repository}/pulls/{pull_request_number}", "pull request"
+        )
+        file_data = self._get(
+            f"repos/{self.repository}/pulls/{pull_request_number}/files?per_page=100",
+            paginated=True,
+        )
+        if not isinstance(file_data, list) or not all(
+            isinstance(item, Mapping) and isinstance(item.get("filename"), str)
+            for item in file_data
+        ):
+            raise GitHubActionsError("GitHub returned malformed pull request files")
+        changed_paths = tuple(
+            dict.fromkeys(
+                item["filename"] for item in file_data if isinstance(item, Mapping)
+            )
         )
         head = pr.get("head")
         head_sha = head.get("sha") if isinstance(head, Mapping) else None
@@ -124,6 +139,7 @@ class GitHubActionsClient:
             runs=runs,
             jobs_by_run=jobs_by_run,
             annotations_by_check_run=annotations,
+            changed_paths=changed_paths,
         )
 
     def get_issue(self, issue_number: int) -> Mapping[str, Any]:

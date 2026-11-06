@@ -3024,12 +3024,23 @@ def _run_respond_to_pr_ci(args: argparse.Namespace) -> int:
         head_sha = head.get("sha") if isinstance(head, Mapping) else None
         if not isinstance(head_sha, str):
             raise GitHubActionsError("GitHub did not return the current PR head SHA")
+        base = snapshot.pull_request.get("base")
+        head_ref = head.get("ref") if isinstance(head, Mapping) else None
+        base_ref = base.get("ref") if isinstance(base, Mapping) else None
+        title = snapshot.pull_request.get("title")
+        body = snapshot.pull_request.get("body")
         reproductions = _reproduce_ci_failures(
             failures,
             repository_root=resolve_repo_root(None),
             head_sha=head_sha,
             verification_command=getattr(args, "verification_command", None),
         )
+        jobs_by_id = {item.job_id: item for item in jobs}
+        runs_by_id = {
+            item.get("id"): item
+            for item in snapshot.runs
+            if isinstance(item.get("id"), int)
+        }
         observation_id, comment = render_ci_observation_checkpoint(
             repository=args.repository,
             pull_request_number=pr_number,
@@ -3051,24 +3062,38 @@ def _run_respond_to_pr_ci(args: argparse.Namespace) -> int:
             "pull_request": pr_number,
             "issue": args.issue,
             "head_sha": head_sha,
+            "pull_request_metadata": {
+                "head_ref": head_ref if isinstance(head_ref, str) else None,
+                "base_ref": base_ref if isinstance(base_ref, str) else None,
+                "title": title if isinstance(title, str) else "",
+                "body": body if isinstance(body, str) else "",
+            },
             "observation_id": observation_id,
             "checkpoint_written": not duplicate,
             "jobs_observed": len(jobs),
+            "changed_paths": list(snapshot.changed_paths),
             "failures": [
                 {
                     "failure_id": item.failure_id,
                     "job_id": item.job_id,
                     "run_id": item.run_id,
+                    "run_attempt": item.run_attempt,
                     "phase": item.phase,
                     "signature": item.signature,
                     "evidence": list(item.evidence),
-                    "local_reproduction": (
-                        reproductions[item.failure_id].status
-                        if item.failure_id in reproductions
-                        else "not_started"
+                    "locally_executable": item.locally_executable,
+                    "workflow_path": (
+                        runs_by_id.get(item.run_id, {}).get("path")
+                        if isinstance(runs_by_id.get(item.run_id, {}).get("path"), str)
+                        else None
                     ),
-                    "local_reproduction_reason": (
-                        reproductions[item.failure_id].reason
+                    "runner_labels": list(
+                        jobs_by_id[item.job_id].runner_labels
+                        if item.job_id in jobs_by_id
+                        else ()
+                    ),
+                    "local_reproduction": (
+                        reproductions[item.failure_id].to_dict()
                         if item.failure_id in reproductions
                         else None
                     ),

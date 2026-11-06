@@ -1,0 +1,399 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1385
+title: Run scoped CI repairs through Procedrr
+intent:
+  problem: 'CI observations and the repair workflow were not connected end to end:
+    the observation omitted exact PR scope and typed reproduction context, and no
+    executable service-owned path carried a scoped repair through validation and follow-up.'
+  goal: Preserve deterministic PR evidence, research one selected failure, compile
+    a narrow service-owned repair request, execute and validate it, publish only accepted
+    changes to the existing Powdrr PR, and observe the updated CI state.
+human-decisions: []
+structured_files: []
+files:
+- path: packages/agent/src/powdrr_agent/execution/github_actions.py
+  type: modified
+  span:
+    start_line: 26
+    end_line: 26
+  summary: Carry PR changed paths through the GitHub Actions snapshot.
+  rationale: Keep repair scope anchored to the observed PR diff.
+- path: packages/agent/src/powdrr_agent/execution/github_actions.py
+  type: modified
+  span:
+    start_line: 65
+    end_line: 78
+  summary: Carry PR changed paths through the GitHub Actions snapshot.
+  rationale: Keep repair scope anchored to the observed PR diff.
+- path: packages/agent/src/powdrr_agent/execution/github_actions.py
+  type: modified
+  span:
+    start_line: 142
+    end_line: 142
+  summary: Carry PR changed paths through the GitHub Actions snapshot.
+  rationale: Keep repair scope anchored to the observed PR diff.
+- path: packages/service/src/powdrr_service/ci_response/__init__.py
+  type: modified
+  span:
+    start_line: 3
+    end_line: 7
+  summary: Update the CI response implementation and its contract.
+  rationale: Keep the change aligned with scoped CI repair execution.
+- path: packages/service/src/powdrr_service/ci_response/__init__.py
+  type: modified
+  span:
+    start_line: 19
+    end_line: 19
+  summary: Update the CI response implementation and its contract.
+  rationale: Keep the change aligned with scoped CI repair execution.
+- path: packages/service/src/powdrr_service/ci_response/__init__.py
+  type: modified
+  span:
+    start_line: 32
+    end_line: 33
+  summary: Update the CI response implementation and its contract.
+  rationale: Keep the change aligned with scoped CI repair execution.
+- path: packages/service/src/powdrr_service/ci_response/__init__.py
+  type: modified
+  span:
+    start_line: 43
+    end_line: 43
+  summary: Update the CI response implementation and its contract.
+  rationale: Keep the change aligned with scoped CI repair execution.
+- path: packages/service/src/powdrr_service/ci_response/__init__.py
+  type: modified
+  span:
+    start_line: 46
+    end_line: 46
+  summary: Update the CI response implementation and its contract.
+  rationale: Keep the change aligned with scoped CI repair execution.
+- path: packages/service/src/powdrr_service/ci_response/bridge.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 233
+  summary: Orchestrate failure research, request compilation, and repair finalization.
+  rationale: Keep CI diagnosis and repair policy in the service layer.
+- path: packages/service/src/powdrr_service/ci_response/repair.py
+  type: modified
+  span:
+    start_line: 8
+    end_line: 8
+  summary: Validate repair receipts and constrain worker changes.
+  rationale: Prevent mismatched or out-of-scope CI repair attempts from being published.
+- path: packages/service/src/powdrr_service/ci_response/repair.py
+  type: modified
+  span:
+    start_line: 296
+    end_line: 384
+  summary: Validate repair receipts and constrain worker changes.
+  rationale: Prevent mismatched or out-of-scope CI repair attempts from being published.
+- path: packages/service/src/powdrr_service/ci_response/repair.py
+  type: modified
+  span:
+    start_line: 389
+    end_line: 390
+  summary: Validate repair receipts and constrain worker changes.
+  rationale: Prevent mismatched or out-of-scope CI repair attempts from being published.
+- path: packages/service/src/powdrr_service/procedrr/parser.py
+  type: modified
+  span:
+    start_line: 34
+    end_line: 38
+  summary: Register CI repair operations in the Procedrr validator.
+  rationale: Validate the CI repair process against the service operation catalog.
+- path: packages/service/src/powdrr_service/resources/processes/execute-proposed-pr-workflow.yaml
+  type: modified
+  span:
+    start_line: 11
+    end_line: 13
+  summary: Invoke CI response after preparing an implementation PR.
+  rationale: Run the same CI response path for implementation and plan-amendment PRs.
+- path: packages/service/src/powdrr_service/resources/processes/execute-proposed-pr-workflow.yaml
+  type: modified
+  span:
+    start_line: 40
+    end_line: 40
+  summary: Invoke CI response after preparing an implementation PR.
+  rationale: Run the same CI response path for implementation and plan-amendment PRs.
+- path: packages/service/src/powdrr_service/resources/processes/execute-proposed-pr-workflow.yaml
+  type: modified
+  span:
+    start_line: 43
+    end_line: 43
+  summary: Invoke CI response after preparing an implementation PR.
+  rationale: Run the same CI response path for implementation and plan-amendment PRs.
+- path: packages/service/src/powdrr_service/resources/processes/execute-proposed-pr-workflow.yaml
+  type: modified
+  span:
+    start_line: 88
+    end_line: 88
+  summary: Invoke CI response after preparing an implementation PR.
+  rationale: Run the same CI response path for implementation and plan-amendment PRs.
+- path: packages/service/src/powdrr_service/resources/processes/execute-proposed-pr-workflow.yaml
+  type: modified
+  span:
+    start_line: 91
+    end_line: 91
+  summary: Invoke CI response after preparing an implementation PR.
+  rationale: Run the same CI response path for implementation and plan-amendment PRs.
+- path: packages/service/src/powdrr_service/resources/processes/prepare-ci-repair.yaml
+  type: added
+  span:
+    start_line: 1
+    end_line: 144
+  summary: Define the scoped CI repair sequence from evidence through publication.
+  rationale: Make research, a focused decision, code repair, validation, and follow-up
+    explicit.
+- path: packages/service/src/powdrr_service/resources/processes/respond-to-pr-ci.yaml
+  type: modified
+  span:
+    start_line: 3
+    end_line: 3
+  summary: Connect CI observation to the scoped repair process.
+  rationale: Keep PR CI response as a reusable Procedrr process.
+- path: packages/service/src/powdrr_service/resources/processes/respond-to-pr-ci.yaml
+  type: modified
+  span:
+    start_line: 5
+    end_line: 9
+  summary: Connect CI observation to the scoped repair process.
+  rationale: Keep PR CI response as a reusable Procedrr process.
+- path: packages/service/src/powdrr_service/resources/processes/respond-to-pr-ci.yaml
+  type: modified
+  span:
+    start_line: 14
+    end_line: 17
+  summary: Connect CI observation to the scoped repair process.
+  rationale: Keep PR CI response as a reusable Procedrr process.
+- path: packages/service/src/powdrr_service/resources/processes/respond-to-pr-ci.yaml
+  type: modified
+  span:
+    start_line: 19
+    end_line: 37
+  summary: Connect CI observation to the scoped repair process.
+  rationale: Keep PR CI response as a reusable Procedrr process.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 3027
+    end_line: 3031
+  summary: Include PR scope and detailed reproduction evidence in CI observations.
+  rationale: Give service-side repair decisions the exact observed repository context.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 3038
+    end_line: 3043
+  summary: Include PR scope and detailed reproduction evidence in CI observations.
+  rationale: Give service-side repair decisions the exact observed repository context.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 3065
+    end_line: 3070
+  summary: Include PR scope and detailed reproduction evidence in CI observations.
+  rationale: Give service-side repair decisions the exact observed repository context.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 3074
+    end_line: 3074
+  summary: Include PR scope and detailed reproduction evidence in CI observations.
+  rationale: Give service-side repair decisions the exact observed repository context.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 3080
+    end_line: 3080
+  summary: Include PR scope and detailed reproduction evidence in CI observations.
+  rationale: Give service-side repair decisions the exact observed repository context.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 3084
+    end_line: 3093
+  summary: Include PR scope and detailed reproduction evidence in CI observations.
+  rationale: Give service-side repair decisions the exact observed repository context.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 3095
+    end_line: 3096
+  summary: Include PR scope and detailed reproduction evidence in CI observations.
+  rationale: Give service-side repair decisions the exact observed repository context.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 3953
+    end_line: 4162
+  summary: Execute service-owned CI operations through the workflow runtime.
+  rationale: Connect Procedrr decisions to observation, worker execution, validation,
+    and publication.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 4898
+    end_line: 4902
+  summary: Execute service-owned CI operations through the workflow runtime.
+  rationale: Connect Procedrr decisions to observation, worker execution, validation,
+    and publication.
+- path: tests/test_ci_response_cli.py
+  type: modified
+  span:
+    start_line: 31
+    end_line: 38
+  summary: Cover the CI observation evidence returned by the CLI.
+  rationale: Protect the fields consumed by the repair flow.
+- path: tests/test_ci_response_cli.py
+  type: modified
+  span:
+    start_line: 47
+    end_line: 47
+  summary: Cover the CI observation evidence returned by the CLI.
+  rationale: Protect the fields consumed by the repair flow.
+- path: tests/test_ci_response_cli.py
+  type: modified
+  span:
+    start_line: 57
+    end_line: 61
+  summary: Cover the CI observation evidence returned by the CLI.
+  rationale: Protect the fields consumed by the repair flow.
+- path: tests/test_ci_response_cli.py
+  type: modified
+  span:
+    start_line: 80
+    end_line: 89
+  summary: Cover the CI observation evidence returned by the CLI.
+  rationale: Protect the fields consumed by the repair flow.
+- path: tests/test_ci_response_cli.py
+  type: modified
+  span:
+    start_line: 194
+    end_line: 195
+  summary: Cover the CI observation evidence returned by the CLI.
+  rationale: Protect the fields consumed by the repair flow.
+- path: tests/test_ci_response_policy.py
+  type: modified
+  span:
+    start_line: 4
+    end_line: 4
+  summary: Exercise CI repair contracts and the complete mocked repair path.
+  rationale: Verify scoped selection, validation, publication, and re-observation
+    together.
+- path: tests/test_ci_response_policy.py
+  type: modified
+  span:
+    start_line: 6
+    end_line: 6
+  summary: Exercise CI repair contracts and the complete mocked repair path.
+  rationale: Verify scoped selection, validation, publication, and re-observation
+    together.
+- path: tests/test_ci_response_policy.py
+  type: modified
+  span:
+    start_line: 21
+    end_line: 22
+  summary: Exercise CI repair contracts and the complete mocked repair path.
+  rationale: Verify scoped selection, validation, publication, and re-observation
+    together.
+- path: tests/test_ci_response_policy.py
+  type: modified
+  span:
+    start_line: 27
+    end_line: 27
+  summary: Exercise CI repair contracts and the complete mocked repair path.
+  rationale: Verify scoped selection, validation, publication, and re-observation
+    together.
+- path: tests/test_ci_response_policy.py
+  type: modified
+  span:
+    start_line: 334
+    end_line: 570
+  summary: Exercise CI repair contracts and the complete mocked repair path.
+  rationale: Verify scoped selection, validation, publication, and re-observation
+    together.
+- path: tests/test_github_actions_transport.py
+  type: modified
+  span:
+    start_line: 29
+    end_line: 35
+  summary: Cover paginated retrieval of changed PR files.
+  rationale: Protect the transport contract used to establish repair scope.
+- path: tests/test_github_actions_transport.py
+  type: modified
+  span:
+    start_line: 75
+    end_line: 78
+  summary: Cover paginated retrieval of changed PR files.
+  rationale: Protect the transport contract used to establish repair scope.
+- path: tests/test_procedrr_chat.py
+  type: modified
+  span:
+    start_line: 102
+    end_line: 102
+  summary: Check CI repair process registration and operation use.
+  rationale: Ensure supported workflows resolve through the current Procedrr catalog.
+- path: tests/test_procedrr_chat.py
+  type: modified
+  span:
+    start_line: 120
+    end_line: 128
+  summary: Check CI repair process registration and operation use.
+  rationale: Ensure supported workflows resolve through the current Procedrr catalog.
+- path: tests/test_procedrr_chat.py
+  type: modified
+  span:
+    start_line: 143
+    end_line: 156
+  summary: Check CI repair process registration and operation use.
+  rationale: Ensure supported workflows resolve through the current Procedrr catalog.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span:
+    start_line: 490
+    end_line: 493
+  summary: Update workflow integration fixtures for CI response inputs and outputs.
+  rationale: Keep nested process evaluation aligned with the production contract.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span:
+    start_line: 504
+    end_line: 509
+  summary: Update workflow integration fixtures for CI response inputs and outputs.
+  rationale: Keep nested process evaluation aligned with the production contract.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span:
+    start_line: 670
+    end_line: 671
+  summary: Update workflow integration fixtures for CI response inputs and outputs.
+  rationale: Keep nested process evaluation aligned with the production contract.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span:
+    start_line: 741
+    end_line: 748
+  summary: Update workflow integration fixtures for CI response inputs and outputs.
+  rationale: Keep nested process evaluation aligned with the production contract.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span:
+    start_line: 752
+    end_line: 752
+  summary: Update workflow integration fixtures for CI response inputs and outputs.
+  rationale: Keep nested process evaluation aligned with the production contract.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span:
+    start_line: 816
+    end_line: 816
+  summary: Update workflow integration fixtures for CI response inputs and outputs.
+  rationale: Keep nested process evaluation aligned with the production contract.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span:
+    start_line: 821
+    end_line: 821
+  summary: Update workflow integration fixtures for CI response inputs and outputs.
+  rationale: Keep nested process evaluation aligned with the production contract.

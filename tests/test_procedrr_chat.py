@@ -99,6 +99,7 @@ def test_all_supported_workflow_names_have_procedrr_processes() -> None:
         "fix-merge-conflicts",
         "handle-ad-hoc",
         "independent-skill-workflow-review",
+        "prepare-ci-repair",
         "review-architecture",
         "review-skill-workflow",
         "review-system",
@@ -116,15 +117,15 @@ def test_all_supported_workflow_names_have_procedrr_processes() -> None:
 
 def test_ci_response_procedure_runs_declared_verification_at_pinned_head() -> None:
     process = ProcessCatalog.load(bundled_process_directory()).get("respond-to-pr-ci")
-    question = process.document["steps"][0]["specialize"]["question"]
-
-    assert "powdrr-lift" in question
-    assert "respond-to-pr-ci" in question
-    assert "call a coding agent" in question.lower()
-    assert "exact observed PR head" in question
-    assert "--verification-command" in question
-    assert "pull_request_url" in question
-    assert "verification_command" in question
+    operation = process.document["steps"][0]["operation"]
+    assert operation["tool"] == "ci_observe"
+    assert operation["parameters"]["verification_command"] == {
+        "type": "reference",
+        "value": "verification_command",
+    }
+    assert process.document["steps"][1]["call"]["process"] == "prepare-ci-repair"
+    assert process.document["outputs"]["repair_preparation"]["type"] == "object"
+    assert process.document["inputs"][-1]["name"] == "implementation_context"
     execute = ProcessCatalog.load(bundled_process_directory()).get(
         "execute-proposed-pr-workflow"
     )
@@ -137,6 +138,20 @@ def test_ci_response_procedure_runs_declared_verification_at_pinned_head() -> No
         "type": "reference",
         "value": "task_context.proposed_pr_context.verification_command",
     }
+
+
+def test_ci_repair_preparation_uses_service_operations_and_one_targeted_question() -> (
+    None
+):
+    process = ProcessCatalog.load(bundled_process_directory()).get("prepare-ci-repair")
+    steps = process.document["steps"]
+
+    assert steps[0]["operation"]["tool"] == "ci_repair_research"
+    failure_steps = steps[1]["branch"]["cases"]["failure_selected"]
+    decision = failure_steps[0]["judge"]
+    assert decision["output"]["schema"]["properties"]["target_paths"]["maxItems"] == 3
+    assert "failure_id" not in decision["output"]["schema"]["properties"]
+    assert failure_steps[1]["operation"]["tool"] == "ci_repair_compile"
 
 
 def test_ci_repair_process_dispatches_only_the_prepared_repair_request() -> None:

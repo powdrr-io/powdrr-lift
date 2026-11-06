@@ -90,11 +90,16 @@ def compile_observed_ci_repair_request(
     if disposition not in {"repository_change", "human_prerequisite", "unresolved"}:
         raise ValueError("repair targeting decision has an unsupported disposition")
     if disposition != "repository_change":
-        return {
+        result = {
             "status": disposition,
             "failure_id": selected_failure_id,
             "explanation": str(decision.get("explanation", ""))[:1200],
         }
+        if disposition == "human_prerequisite":
+            result["manual_prerequisite"] = _validate_manual_prerequisite(
+                decision.get("manual_prerequisite")
+            )
+        return result
     pr_metadata = observation.get("pull_request_metadata")
     if (
         not isinstance(pr_metadata, Mapping)
@@ -200,6 +205,111 @@ def finalize_ci_repair_result(
     if follow_up_observation is not None:
         result["follow_up_observation"] = dict(follow_up_observation)
     return result
+
+
+def prepare_ci_repair_retry(
+    *,
+    repair_request: Mapping[str, Any],
+    attempt: Mapping[str, Any],
+    validation: Mapping[str, Any],
+    max_attempts: int = 2,
+) -> dict[str, Any]:
+    """Bound CI correction retries and pass exact validation findings forward."""
+    attempt_number = repair_request.get("attempt_number", 1)
+    if (
+        not isinstance(attempt_number, int)
+        or isinstance(attempt_number, bool)
+        or attempt_number < 1
+    ):
+        raise ValueError("CI repair request has an invalid attempt number")
+    if max_attempts < 1:
+        raise ValueError("max_attempts must be positive")
+    if validation.get("passed") is True:
+        return {
+            "done": True,
+            "attempt_number": attempt_number,
+            "repair_request": dict(repair_request),
+        }
+    if attempt_number >= max_attempts or attempt.get("worker_committed") is not True:
+        return {
+            "done": True,
+            "attempt_number": attempt_number,
+            "repair_request": dict(repair_request),
+        }
+    findings = validation.get("findings")
+    if (
+        not isinstance(findings, list)
+        or not findings
+        or not all(isinstance(item, str) and item.strip() for item in findings)
+    ):
+        return {
+            "done": True,
+            "attempt_number": attempt_number,
+            "repair_request": dict(repair_request),
+        }
+    prior_prompt = repair_request.get("prompt")
+    if not isinstance(prior_prompt, str) or not prior_prompt.strip():
+        raise ValueError("CI repair request is missing its worker prompt")
+    next_request = dict(repair_request)
+    next_request["attempt_number"] = attempt_number + 1
+    next_request["prompt"] = (
+        prior_prompt[:12000]
+        + "\n\nThe previous scoped repair attempt was rejected by deterministic "
+        "validation. Continue in the current worktree and address only these "
+        "findings; preserve the same CI failure, allowed paths, protected tests, "
+        "and required behavior. Do not weaken checks or broaden scope.\n"
+        + "\n".join(f"- {item[:600]}" for item in findings[:12])
+    )[:16000]
+    return {
+        "done": False,
+        "attempt_number": attempt_number + 1,
+        "repair_request": next_request,
+    }
+
+
+def start_ci_repair_attempts(repair_request: Mapping[str, Any]) -> dict[str, Any]:
+    """Initialize bounded repair execution with the immutable compiled request."""
+    if not isinstance(repair_request.get("prompt"), str):
+        raise ValueError("CI repair request is missing its compiled prompt")
+    initialized = dict(repair_request)
+    initialized["attempt_number"] = 1
+    return {
+        "done": False,
+        "attempt_number": 1,
+        "repair_request": initialized,
+    }
+
+
+def _validate_manual_prerequisite(value: object) -> dict[str, Any]:
+    required = {"title", "instructions", "verification", "trigger", "unblocks"}
+    if not isinstance(value, Mapping) or set(value) != required:
+        raise ValueError("human CI prerequisite must have the declared typed fields")
+    title = value.get("title")
+    instructions = value.get("instructions")
+    verification = value.get("verification")
+    trigger = value.get("trigger")
+    unblocks = value.get("unblocks")
+    if (
+        not isinstance(title, str)
+        or not title.strip()
+        or len(title.strip()) > 160
+        or not isinstance(instructions, list)
+        or not instructions
+        or not all(isinstance(item, str) and item.strip() for item in instructions)
+        or not isinstance(verification, str)
+        or not verification.strip()
+        or trigger != "after_implementation_before_validation"
+        or not isinstance(unblocks, str)
+        or not unblocks.strip()
+    ):
+        raise ValueError("human CI prerequisite fields are malformed")
+    return {
+        "title": title.strip(),
+        "instructions": [item.strip() for item in instructions],
+        "verification": verification.strip(),
+        "trigger": trigger,
+        "unblocks": unblocks.strip(),
+    }
 
 
 def _failure_from_data(data: Mapping[str, Any], head_sha: str) -> CIFailureUnit:

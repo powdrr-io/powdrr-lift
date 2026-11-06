@@ -2218,6 +2218,83 @@ def test_manual_prerequisite_contract_renders_actionable_public_instructions() -
         )
 
 
+def test_ci_manual_handoff_writes_existing_issue_continuation_checkpoint(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workflow = _workflow(tmp_path)
+    callbacks: list[tuple[str, str, Mapping[str, Any], str | None]] = []
+    prerequisite = {
+        "title": "Configure the GitHub Actions credential",
+        "instructions": ["Add the documented repository secret in settings."],
+        "verification": "Confirm the failed required check passes after setup.",
+        "trigger": "after_implementation_before_validation",
+        "unblocks": "The failed required GitHub Actions check.",
+    }
+    client = _ProcedrrFragmentClient(
+        [
+            {
+                "operation": {
+                    "tool": "task_handoff",
+                    "parameters": {
+                        "question": "The CI credential is unavailable.",
+                        "continuation_instructions": "Complete setup, then continue.",
+                        "manual_prerequisite": prerequisite,
+                    },
+                    "bind": "handoff_result",
+                }
+            },
+            {"terminal": "succeeded"},
+        ]
+    )
+    monkeypatch.setattr(
+        task_agent,
+        "_publish_workflow_progress",
+        lambda *_args, **_kwargs: "b" * 40,
+    )
+    monkeypatch.setattr(
+        task_agent,
+        "_git_output",
+        lambda *_args, **_kwargs: "powdrr/pr-12-implementation",
+    )
+    monkeypatch.setattr(
+        task_agent,
+        "_gh_result",
+        lambda _root, _parameters, **_kwargs: subprocess.CompletedProcess(
+            ["gh"], 0, '{"url":"https://github.com/example/project/pull/12"}', ""
+        ),
+    )
+    monkeypatch.setattr(
+        task_agent,
+        "load_workflow_git_state",
+        lambda *_args, **_kwargs: None,
+    )
+    config = WorkflowTaskAgentConfig(
+        workflow_dir=workflow.directory,
+        repo_root=tmp_path,
+        github_issue_number=34,
+        github_repository="example/project",
+        task_checkpoint_callback=lambda task_id, state_type, state, commit: (
+            callbacks.append((task_id, state_type, state, commit))
+        ),
+    )
+
+    stderr = io.StringIO()
+    exit_code = run_workflow_task(
+        config,
+        client=client,
+        stdout=io.StringIO(),
+        stderr=stderr,
+    )
+
+    assert exit_code == 0, stderr.getvalue()
+    assert len(callbacks) == 1
+    _task_id, state_type, state, commit_sha = callbacks[0]
+    assert state_type == "manual-prerequisite-checkpoint-v1"
+    assert state["pull_request_url"] == "https://github.com/example/project/pull/12"
+    assert state["prerequisite"] == prerequisite
+    assert commit_sha == "b" * 40
+
+
 def test_planned_manual_prerequisite_cannot_be_omitted_at_handoff() -> None:
     declared = {
         "title": "Install the CI credential",
@@ -4124,6 +4201,7 @@ def test_ci_repair_dispatch_uses_miniswe_with_service_compiled_request(
             minisweagent_model="test/model",
         ),
         events=[],
+        ci_repair_changed_paths=set(),
     )
     result = task_agent._TaskWorkflowExecutionStrategy._run_ci_repair_agent(
         cast(Any, strategy),

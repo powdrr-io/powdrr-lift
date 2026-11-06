@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import subprocess
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
@@ -391,6 +392,16 @@ def test_ci_repair_bridge_selects_one_failure_and_compiles_typed_request(
 
 
 def test_ci_repair_bridge_routes_human_prerequisite_without_worker_request() -> None:
+    prerequisite = {
+        "title": "Configure GitHub Actions credential",
+        "instructions": [
+            "Add the documented repository Actions secret in repository settings.",
+            "Do not include the secret value in issue or pull-request comments.",
+        ],
+        "verification": "Rerun the failed required CI check and confirm it passes.",
+        "trigger": "after_implementation_before_validation",
+        "unblocks": "The failed required GitHub Actions check.",
+    }
     result = compile_observed_ci_repair_request(
         observation={},
         research_result={"failure": {"failure_id": "ci-123"}},
@@ -398,16 +409,289 @@ def test_ci_repair_bridge_routes_human_prerequisite_without_worker_request() -> 
             "failure_id": "ci-123",
             "disposition": "human_prerequisite",
             "explanation": "The required organization secret is unavailable.",
+            "manual_prerequisite": prerequisite,
         },
         verification_command="pytest",
     )
 
     assert result["status"] == "human_prerequisite"
     assert "repair_request" not in result
+    assert result["manual_prerequisite"] == prerequisite
 
 
-def test_prepare_ci_repair_process_executes_validates_publishes_and_reobserves(
+def test_ci_repair_retry_is_bounded_and_carries_validation_findings() -> None:
+    from powdrr_service.ci_response import (
+        prepare_ci_repair_retry,
+        start_ci_repair_attempts,
+    )
+
+    original_request = {
+        "prompt": "Repair the runner setup.",
+        "contract_fingerprint": "a" * 64,
+        "allowed_paths": [".github/workflows/ci.yml"],
+    }
+    started = start_ci_repair_attempts(original_request)
+    assert started["attempt_number"] == 1
+    first = prepare_ci_repair_retry(
+        repair_request=started["repair_request"],
+        attempt={"worker_committed": True},
+        validation={"passed": False, "findings": ["Acceptance command failed."]},
+    )
+
+    assert first["done"] is False
+    assert first["attempt_number"] == 2
+    assert "Acceptance command failed." in first["repair_request"]["prompt"]
+    assert first["repair_request"]["contract_fingerprint"] == "a" * 64
+
+    exhausted = prepare_ci_repair_retry(
+        repair_request=first["repair_request"],
+        attempt={"worker_committed": True},
+        validation={"passed": False, "findings": ["Still failing."]},
+    )
+    passed = prepare_ci_repair_retry(
+        repair_request=started["repair_request"],
+        attempt={"worker_committed": True},
+        validation={"passed": True, "findings": []},
+    )
+    uncommitted = prepare_ci_repair_retry(
+        repair_request=started["repair_request"],
+        attempt={"worker_committed": False},
+        validation={"passed": False, "findings": ["Worker left a dirty tree."]},
+    )
+
+    assert exhausted["done"] is True
+    assert passed["done"] is True
+    assert uncommitted["done"] is True
+
+
+def test_ci_repair_worker_and_service_validate_two_attempts_in_temp_git_repo(
     tmp_path: Path,
+) -> None:
+    from powdrr_service.ci_response import (
+        prepare_ci_repair_retry,
+        research_observed_ci_failure,
+        validate_ci_repair_attempt,
+    )
+
+    from powdrr_lift.workrr.coding_agent import (
+        CodingAgentAttemptStore,
+        CodingAgentRunner,
+    )
+    from powdrr_lift.workrr.task_agent import _ci_repair_implementation_request
+
+    repo = tmp_path / "repository"
+    repo.mkdir()
+    (repo / ".github/workflows").mkdir(parents=True)
+    (repo / "scripts").mkdir()
+    (repo / "tests").mkdir()
+    (repo / ".github/workflows/ci.yml").write_text(
+        "name: CI\njobs: {}\n", encoding="utf-8"
+    )
+    verifier = repo / "scripts/verify-ci.sh"
+    verifier.write_text(
+        "#!/bin/sh\ngrep -q 'runs-on: ubuntu-latest' .github/workflows/ci.yml\n",
+        encoding="utf-8",
+    )
+    protected_test = repo / "tests/test_behavior.py"
+    protected_test.write_text(
+        "def test_behavior():\n    assert 2 + 2 == 4\n", encoding="utf-8"
+    )
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    subprocess.run(["git", "add", "."], cwd=repo, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.invalid",
+            "commit",
+            "-m",
+            "observed PR baseline",
+        ],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+    )
+    base = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=repo,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    protected_hash = hashlib.sha256(protected_test.read_bytes()).hexdigest()
+    contract, failure = _repair_fixture()
+    observation = {
+        "repository": contract.repository,
+        "pull_request": contract.pull_request,
+        "head_sha": base,
+        "changed_paths": [".github/workflows/ci.yml", "scripts/verify-ci.sh"],
+        "pull_request_metadata": {
+            "head_ref": "powdrr/plan/item-01",
+            "base_ref": "main",
+            "title": "Add behavior",
+            "body": "Implementation PR.",
+        },
+        "failures": [
+            {
+                "failure_id": failure.failure_id,
+                "job_id": failure.job_id,
+                "run_id": failure.run_id,
+                "run_attempt": failure.run_attempt,
+                "phase": failure.phase,
+                "signature": failure.signature,
+                "evidence": list(failure.evidence),
+                "locally_executable": failure.locally_executable,
+                "workflow_path": ".github/workflows/ci.yml",
+                "runner_labels": ["ubuntu-latest"],
+                "local_reproduction": contract.reproduction.to_dict(),
+            }
+        ],
+    }
+    research = research_observed_ci_failure(
+        observation, api_key=None, artifact_root=tmp_path / "research"
+    )
+    compiled = compile_observed_ci_repair_request(
+        observation=observation,
+        research_result=research,
+        decision={
+            "disposition": "repository_change",
+            "target_paths": [".github/workflows/ci.yml"],
+            "required_behavior": "Run the verification job on ubuntu-latest.",
+            "explanation": "The workflow does not declare a hosted runner.",
+        },
+        verification_command="sh scripts/verify-ci.sh",
+    )
+    repair_request = compiled["repair_request"]
+    repair_request["attempt_number"] = 1
+
+    class ScriptedMiniSWE:
+        provider_name = "scripted-miniswe"
+        calls = 0
+        prompts: list[str] = []
+
+        def run(
+            self,
+            request: Any,
+            *,
+            worktree_root: Path,
+            attempt_id: str,
+        ) -> subprocess.CompletedProcess[str]:
+            self.calls += 1
+            self.prompts.append(request.prompt)
+            if attempt_id.endswith("attempt-02"):
+                replacement = "name: CI\njobs:\n  verify:\n    runs-on: ubuntu-latest\n"
+            else:
+                replacement = (
+                    "name: CI\njobs:\n  verify:\n    runs-on: windows-latest\n"
+                )
+            (worktree_root / ".github/workflows/ci.yml").write_text(
+                replacement, encoding="utf-8"
+            )
+            subprocess.run(
+                ["git", "add", ".github/workflows/ci.yml"],
+                cwd=worktree_root,
+                check=True,
+            )
+            subprocess.run(
+                [
+                    "git",
+                    "-c",
+                    "user.name=MiniSWE",
+                    "-c",
+                    "user.email=miniswe@example.invalid",
+                    "commit",
+                    "-m",
+                    attempt_id,
+                ],
+                cwd=worktree_root,
+                check=True,
+                capture_output=True,
+            )
+            return subprocess.CompletedProcess(["mini"], 0, "patched", "")
+
+    scripted_provider = ScriptedMiniSWE()
+    runner = CodingAgentRunner(
+        provider=scripted_provider,
+        store=CodingAgentAttemptStore(tmp_path / "attempts"),
+    )
+    changed_paths: set[str] = set()
+    validation_findings: list[str] = []
+    attempts = []
+    validation = None
+    for attempt_number in (1, 2):
+        repair_request["attempt_number"] = attempt_number
+        worker_request = _ci_repair_implementation_request(
+            repair_request, base_commit=base
+        )
+        attempt = runner.run(
+            worker_request,
+            worktree_root=repo,
+            attempt_id=f"{worker_request.request_id}-attempt-{attempt_number:02d}",
+        )
+        attempts.append(attempt)
+        changed_paths.update(attempt.changed_paths)
+        attempt_data = {
+            "passed": attempt.status.value == "completed",
+            "attempt_id": attempt.attempt_id,
+            "head_sha": base,
+            "failure_id": failure.failure_id,
+            "changed_paths": sorted(changed_paths),
+            "worker_committed": attempt.worker_committed,
+        }
+        changed_files = {
+            path: (repo / path).read_text(encoding="utf-8")
+            for path in sorted(changed_paths)
+            if (repo / path).is_file()
+        }
+        validation = validate_ci_repair_attempt(
+            repair_request=repair_request,
+            attempt=attempt_data,
+            changed_files=changed_files,
+        )
+        acceptance = subprocess.run(
+            repair_request["acceptance_command"], cwd=repo, check=False
+        )
+        if acceptance.returncode != 0:
+            validation["passed"] = False
+            findings = validation.get("findings")
+            assert isinstance(findings, list)
+            findings.append("declared acceptance command failed after the CI repair")
+        transition = prepare_ci_repair_retry(
+            repair_request=repair_request,
+            attempt=attempt_data,
+            validation=validation,
+            max_attempts=2,
+        )
+        assert transition["done"] is (attempt_number == 2)
+        findings = validation.get("findings")
+        assert isinstance(findings, list)
+        validation_findings.extend(item for item in findings if isinstance(item, str))
+        if transition["done"]:
+            break
+        repair_request = transition["repair_request"]
+
+    assert len(attempts) == 2
+    assert attempts[0].worker_committed is True
+    assert validation is not None and validation["passed"] is True
+    assert (
+        "declared acceptance command failed after the CI repair" in validation_findings
+    )
+    assert (
+        "declared acceptance command failed after the CI repair"
+        in scripted_provider.prompts[1]
+    )
+    assert protected_hash == hashlib.sha256(protected_test.read_bytes()).hexdigest()
+    assert verifier.read_text(encoding="utf-8").startswith("#!/bin/sh\ngrep -q")
+    assert "runs-on: ubuntu-latest" in (repo / ".github/workflows/ci.yml").read_text(
+        encoding="utf-8"
+    )
+
+
+@pytest.mark.parametrize("second_attempt_passes", [True, False])
+def test_prepare_ci_repair_process_executes_validates_publishes_and_reobserves(
+    tmp_path: Path, second_attempt_passes: bool
 ) -> None:
     from powdrr_service.procedrr import ProcessCatalog
     from powdrr_service.procedrr_evaluator import Evaluator
@@ -443,6 +727,8 @@ def test_prepare_ci_repair_process_executes_validates_publishes_and_reobserves(
         ],
     }
     calls: list[str] = []
+    worker_requests: list[Mapping[str, Any]] = []
+    validation_count = [0]
     repair_attempt = {
         "passed": True,
         "attempt_id": "attempt-01",
@@ -478,12 +764,33 @@ def test_prepare_ci_repair_process_executes_validates_publishes_and_reobserves(
             return research(parameters)
         if operation == "ci_repair_compile":
             return compile_request(parameters)
+        if operation == "ci_repair_retry_start":
+            from powdrr_service.ci_response import start_ci_repair_attempts
+
+            calls.append("retry_start")
+            return start_ci_repair_attempts(parameters["repair_request"])
+        if operation == "ci_repair_retry":
+            from powdrr_service.ci_response import prepare_ci_repair_retry
+
+            calls.append("retry")
+            return prepare_ci_repair_retry(
+                repair_request=parameters["repair_request"],
+                attempt=parameters["attempt"],
+                validation=parameters["validation"],
+                max_attempts=parameters["max_attempts"],
+            )
         if operation == "invoke_tool":
             tool_parameters = parameters.get("parameters", {})
             if parameters.get("tool") == "coding-agent":
                 calls.append("worker")
-                assert tool_parameters["repair_request"]["head_sha"] == HEAD
-                return repair_attempt
+                request = tool_parameters["repair_request"]
+                assert request["head_sha"] == HEAD
+                worker_requests.append(request)
+                return {
+                    **repair_attempt,
+                    "attempt_id": f"attempt-{request['attempt_number']:02d}",
+                    "attempt_number": request["attempt_number"],
+                }
             if parameters.get("tool") == "gh":
                 calls.append("publish")
                 assert tool_parameters["operation"] == "pr_publish_clean"
@@ -493,6 +800,27 @@ def test_prepare_ci_repair_process_executes_validates_publishes_and_reobserves(
                 return "https://github.com/example/project/pull/42"
         if operation == "ci_repair_validate":
             calls.append("validate")
+            validation_count[0] += 1
+            if validation_count[0] == 1:
+                return {
+                    "passed": False,
+                    "findings": [
+                        "Acceptance command failed on the changed runner configuration."
+                    ],
+                    "head_sha": HEAD,
+                    "failure_id": failure.failure_id,
+                    "changed_paths": [".github/workflows/ci.yml"],
+                    "contract_fingerprint": "c" * 64,
+                }
+            if not second_attempt_passes:
+                return {
+                    "passed": False,
+                    "findings": ["The required behavior remains unverified."],
+                    "head_sha": HEAD,
+                    "failure_id": failure.failure_id,
+                    "changed_paths": [".github/workflows/ci.yml"],
+                    "contract_fingerprint": "c" * 64,
+                }
             return {
                 "passed": True,
                 "findings": [],
@@ -528,6 +856,7 @@ def test_prepare_ci_repair_process_executes_validates_publishes_and_reobserves(
                 "explanation": (
                     "The observed runner configuration is rejected before a job starts."
                 ),
+                "manual_prerequisite": None,
             }
 
     process = ProcessCatalog.load(bundled_process_directory()).get("prepare-ci-repair")
@@ -547,25 +876,142 @@ def test_prepare_ci_repair_process_executes_validates_publishes_and_reobserves(
         },
     )
 
-    assert calls == [
+    expected_calls = [
         "research",
         "compile",
+        "retry_start",
         "worker",
         "validate",
-        "publish",
-        "reobserve",
+        "retry",
+        "worker",
+        "validate",
+        "retry",
         "finalize",
     ]
+    if second_attempt_passes:
+        expected_calls[-1:-1] = ["publish", "reobserve"]
+    assert calls == expected_calls
     preparation = result.bindings["repair_preparation"]
-    assert preparation["status"] == "published"
-    assert preparation["attempt"]["attempt_id"] == "attempt-01"
-    assert (
-        preparation["pull_request_url"] == "https://github.com/example/project/pull/42"
+    assert preparation["status"] == (
+        "published" if second_attempt_passes else "rejected"
     )
-    assert preparation["follow_up_observation"]["head_sha"] == "d" * 40
+    assert preparation["attempt"]["attempt_id"] == "attempt-02"
+    if second_attempt_passes:
+        assert (
+            preparation["pull_request_url"]
+            == "https://github.com/example/project/pull/42"
+        )
+        assert preparation["follow_up_observation"]["head_sha"] == "d" * 40
+    else:
+        assert "pull_request_url" not in preparation
+        assert "follow_up_observation" not in preparation
     assert preparation["repair_request"]["allowed_paths"] == [
         ".github/workflows/ci.yml"
     ]
+    assert worker_requests[1]["attempt_number"] == 2
+    assert (
+        "Acceptance command failed on the changed runner configuration."
+        in worker_requests[1]["prompt"]
+    )
+
+
+def test_prepare_ci_repair_routes_human_prerequisite_to_durable_handoff(
+    tmp_path: Path,
+) -> None:
+    from powdrr_service.procedrr import ProcessCatalog
+    from powdrr_service.procedrr_evaluator import Evaluator
+    from powdrr_service.resources import bundled_process_directory
+
+    contract, failure = _repair_fixture()
+    observation = {
+        "repository": contract.repository,
+        "pull_request": contract.pull_request,
+        "issue": 62,
+        "head_sha": HEAD,
+        "changed_paths": [".github/workflows/ci.yml"],
+        "pull_request_metadata": {
+            "head_ref": "powdrr/plan/item-01",
+            "base_ref": "main",
+            "title": "Add behavior",
+            "body": "Implementation PR.",
+        },
+        "failures": [
+            {
+                "failure_id": failure.failure_id,
+                "job_id": failure.job_id,
+                "run_id": failure.run_id,
+                "run_attempt": failure.run_attempt,
+                "phase": failure.phase,
+                "signature": failure.signature,
+                "evidence": list(failure.evidence),
+                "local_reproduction": contract.reproduction.to_dict(),
+            }
+        ],
+    }
+    handoffs: list[Mapping[str, Any]] = []
+
+    class HumanPrerequisiteModel:
+        def complete_json(self, _messages: list[dict[str, str]]) -> dict[str, Any]:
+            return {
+                "disposition": "human_prerequisite",
+                "target_paths": [],
+                "required_behavior": "The credential must be available to CI.",
+                "explanation": "Repository settings lack the required credential.",
+                "manual_prerequisite": {
+                    "title": "Install the repository credential",
+                    "instructions": [
+                        "Add the documented GitHub Actions secret in repository "
+                        "settings.",
+                        "Do not include its value in comments.",
+                    ],
+                    "verification": "Rerun the failed required CI check.",
+                    "trigger": "after_implementation_before_validation",
+                    "unblocks": "The failed required GitHub Actions check.",
+                },
+            }
+
+    def execute(operation: str, parameters: Mapping[str, Any]) -> Any:
+        if operation == "ci_repair_research":
+            return research_observed_ci_failure(
+                parameters["observation"], api_key=None, artifact_root=tmp_path
+            )
+        if operation == "ci_repair_compile":
+            return compile_observed_ci_repair_request(
+                observation=parameters["observation"],
+                research_result=parameters["research_result"],
+                decision=parameters["decision"],
+                verification_command=parameters["verification_command"],
+            )
+        if operation == "task_handoff":
+            handoffs.append(parameters)
+            return {"suspended": True}
+        raise AssertionError(f"unexpected operation in human route: {operation}")
+
+    process = ProcessCatalog.load(bundled_process_directory()).get("prepare-ci-repair")
+    result = Evaluator(
+        HumanPrerequisiteModel(),
+        execute,
+        process_directory=bundled_process_directory(),
+    ).evaluate(
+        process.document,
+        {
+            "ci_observation_result": observation,
+            "pull_request_url": "https://github.com/example/project/pull/42",
+            "implementation_context": {
+                "acceptance_criteria": ["CI can access the credential."]
+            },
+            "verification_command": "pytest tests/test_behavior.py -q",
+        },
+    )
+
+    assert len(handoffs) == 1
+    assert handoffs[0]["manual_prerequisite"]["title"] == (
+        "Install the repository credential"
+    )
+    assert handoffs[0]["manual_prerequisite"]["trigger"] == (
+        "after_implementation_before_validation"
+    )
+    assert result.bindings["repair_preparation"]["status"] == "human_prerequisite"
 
 
 def test_ci_research_is_bounded_captured_and_mockable(tmp_path: Path) -> None:

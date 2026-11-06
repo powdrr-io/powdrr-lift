@@ -36,6 +36,8 @@ KNOWN_TOOLS = frozenset(
         "ci_repair_compile",
         "ci_repair_validate",
         "ci_repair_finalize",
+        "ci_repair_retry_start",
+        "ci_repair_retry",
     }
 )
 KNOWN_VALIDATORS = frozenset({"json_schema"})

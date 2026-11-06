@@ -2000,6 +2000,7 @@ class _TaskWorkflowExecutionStrategy:
     stalled_actions: dict[str, object] = field(default_factory=dict)
     clean_room_repair_pending: bool = False
     clean_room_repair_used: bool = False
+    ci_repair_changed_paths: set[str] = field(default_factory=set)
     repair_prompt_manifest: RepairPromptManifest | None = None
     terminalized: bool = False
     terminal_exit_code: int | None = None
@@ -3657,7 +3658,7 @@ class _TaskWorkflowExecutionStrategy:
         return result
 
     def _run_ci_repair_agent(self, mode_context: Mapping[str, Any]) -> dict[str, Any]:
-        """Dispatch a service-compiled, exact-head repair to MiniSWE once."""
+        """Dispatch one bounded service-compiled CI repair attempt to MiniSWE."""
         repair_request = mode_context.get("repair_request")
         if not isinstance(repair_request, Mapping):
             raise PowdrrExecutionError("CI repair mode requires repair_request data")
@@ -3670,7 +3671,38 @@ class _TaskWorkflowExecutionStrategy:
         )
         if current_head.returncode:
             raise PowdrrExecutionError("could not identify the CI repair base commit")
-        base_commit = current_head.stdout.strip()
+        observed_head = repair_request.get("head_sha")
+        if not isinstance(observed_head, str) or not re.fullmatch(
+            r"[0-9a-f]{40,64}", observed_head
+        ):
+            raise PowdrrExecutionError("CI repair request has an invalid observed head")
+        base_commit = observed_head
+        ancestry = subprocess.run(
+            [
+                "git",
+                "merge-base",
+                "--is-ancestor",
+                base_commit,
+                current_head.stdout.strip(),
+            ],
+            cwd=self.repo_root,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if ancestry.returncode != 0:
+            raise PowdrrExecutionError(
+                "current CI repair worktree is not based on the observed PR head"
+            )
+        attempt_number = repair_request.get("attempt_number", 1)
+        if (
+            not isinstance(attempt_number, int)
+            or isinstance(attempt_number, bool)
+            or attempt_number < 1
+        ):
+            raise PowdrrExecutionError(
+                "CI repair request has an invalid attempt number"
+            )
         request = _ci_repair_implementation_request(
             repair_request, base_commit=base_commit
         )
@@ -3679,7 +3711,7 @@ class _TaskWorkflowExecutionStrategy:
             / "powdrr-lift-ci-repair"
             / request.plan_fingerprint[:24]
         )
-        attempt_id = request.request_id + "-attempt-01"
+        attempt_id = request.request_id + f"-attempt-{attempt_number:02d}"
         provider = MiniSWEAgentProvider(
             inference_handler=create_miniswe_inference_handler(
                 self.config.coding_agent_timeout_seconds
@@ -3698,17 +3730,19 @@ class _TaskWorkflowExecutionStrategy:
             worktree_root=self.repo_root,
             attempt_id=attempt_id,
         )
+        self.ci_repair_changed_paths.update(attempt.changed_paths)
         result = {
             "passed": attempt.status.value == "completed",
             "attempt_id": attempt.attempt_id,
             "status": attempt.status.value,
             "head_sha": base_commit,
             "failure_id": repair_request["failure_id"],
-            "changed_paths": list(attempt.changed_paths),
+            "changed_paths": sorted(self.ci_repair_changed_paths),
             "protected_paths": list(request.protected_paths),
             "error": attempt.error,
             "diff_fingerprint": attempt.diff_fingerprint,
             "worker_committed": attempt.worker_committed,
+            "attempt_number": attempt_number,
         }
         self.events.append({"kind": "ci_repair_coding_agent", "result": result})
         return result
@@ -4159,6 +4193,40 @@ class _TaskProcedrrOperations:
             self.strategy.events.append(
                 {"kind": "ci_repair_finalization", "result": result}
             )
+            return result
+        if operation == "ci_repair_retry_start":
+            from powdrr_service.ci_response import start_ci_repair_attempts
+
+            repair_request = parameters.get("repair_request")
+            if not isinstance(repair_request, Mapping):
+                raise PowdrrExecutionError(
+                    "CI repair retry initialization requires a compiled request"
+                )
+            return start_ci_repair_attempts(repair_request)
+        if operation == "ci_repair_retry":
+            from powdrr_service.ci_response import prepare_ci_repair_retry
+
+            repair_request = parameters.get("repair_request")
+            attempt = parameters.get("attempt")
+            retry_validation = parameters.get("validation")
+            max_attempts = parameters.get("max_attempts", 2)
+            if (
+                not isinstance(repair_request, Mapping)
+                or not isinstance(attempt, Mapping)
+                or not isinstance(retry_validation, Mapping)
+                or not isinstance(max_attempts, int)
+                or isinstance(max_attempts, bool)
+            ):
+                raise PowdrrExecutionError(
+                    "CI repair retry requires its request, attempt, and validation"
+                )
+            result = prepare_ci_repair_retry(
+                repair_request=repair_request,
+                attempt=attempt,
+                validation=retry_validation,
+                max_attempts=max_attempts,
+            )
+            self.strategy.events.append({"kind": "ci_repair_retry", "result": result})
             return result
         if operation == "procedrr_fragment_start":
             from powdrr_service.procedrr.fragments import start_fragment
@@ -4900,6 +4968,8 @@ def run_workflow_task(
             "ci_repair_compile",
             "ci_repair_validate",
             "ci_repair_finalize",
+            "ci_repair_retry_start",
+            "ci_repair_retry",
             "procedrr_fragment_start",
             "procedrr_fragment_apply_edit",
             "internal",

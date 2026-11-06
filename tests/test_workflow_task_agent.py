@@ -2048,6 +2048,93 @@ def test_process_workflow_task_completes_claimed_agent_task(
     assert "Completed workflow task: agent-task" in stdout.getvalue()
 
 
+def test_unmanaged_git_worker_can_run_in_external_worktree(tmp_path: Path) -> None:
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    subprocess.run(
+        ["git", "init", "-b", "main", str(repository)],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(repository), "config", "user.name", "Powdrr Test"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(repository),
+            "config",
+            "user.email",
+            "powdrr-test@example.invalid",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    (repository / "README.md").write_text("worker baseline\n", encoding="utf-8")
+    subprocess.run(
+        ["git", "-C", str(repository), "add", "README.md"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    subprocess.run(
+        ["git", "-C", str(repository), "commit", "-m", "baseline"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    worktree = tmp_path / "isolated-worker"
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(repository),
+            "worktree",
+            "add",
+            "--detach",
+            str(worktree),
+            "HEAD",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    workflow = _workflow(tmp_path / "workflow")
+    client = _ProcedrrFragmentClient(
+        [
+            {
+                "operation": {
+                    "tool": "task_complete",
+                    "parameters": {"output_state": {"status": "complete"}},
+                }
+            },
+            {"terminal": "succeeded"},
+        ]
+    )
+
+    exit_code = run_workflow_task(
+        WorkflowTaskAgentConfig(
+            workflow_dir=workflow.directory,
+            repo_root=worktree,
+            allow_unmanaged_git=True,
+            publish_workflow_progress=False,
+        ),
+        client=client,
+        stdout=io.StringIO(),
+        stderr=io.StringIO(),
+    )
+
+    assert exit_code == 0
+    completed = WorkflowInstance.from_directory(workflow.directory).tasks[0]
+    assert completed.status is TaskStatus.COMPLETED
+
+
 def test_named_procedrr_process_outputs_complete_durable_task(
     tmp_path: Path,
 ) -> None:

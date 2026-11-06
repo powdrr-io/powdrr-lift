@@ -316,7 +316,7 @@ def test_ci_repair_cli_builds_and_runs_issue_backed_procedrr_task(
     )
 
     assert result["exit_code"] == 0
-    assert generated["process_id"] == "prepare-ci-repair"
+    assert generated["process_id"] == "run-ci-repair-from-observation"
     assert generated["input_state"]["pull_request_url"].endswith("/pull/270")
     assert generated["input_state"]["implementation_context"]["item_id"] == "ci-config"
     config = observed["config"]
@@ -325,5 +325,6 @@ def test_ci_repair_cli_builds_and_runs_issue_backed_procedrr_task(
     assert config.publish_workflow_progress is False
     assert config.provider == "deepinfra-cheap"
     assert result["status"] == "succeeded"
-    assert len(comments) == 2
+    assert len(comments) == 3
     assert "ci-response-checkpoint" in comments[1][1]
+    assert '"status": "succeeded"' in comments[2][1]

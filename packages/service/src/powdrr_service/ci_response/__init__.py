@@ -9,12 +9,14 @@ from powdrr_service.ci_response.evidence import (
 from powdrr_service.ci_response.observation import normalize_github_snapshot
 from powdrr_service.ci_response.repair import (
     RepairContract,
+    compile_ci_repair_request,
     compile_miniswe_repair_prompt,
     validate_repair_patch,
 )
 from powdrr_service.ci_response.reproduction import compare_local_reproduction
 from powdrr_service.ci_response.research import (
     github_actions_research_queries,
+    research_github_actions_failure,
     select_github_actions_sources,
 )
 
@@ -26,8 +28,10 @@ __all__ = [
     "normalize_github_snapshot",
     "RepairContract",
     "render_ci_observation_checkpoint",
+    "compile_ci_repair_request",
     "compile_miniswe_repair_prompt",
     "github_actions_research_queries",
+    "research_github_actions_failure",
     "select_github_actions_sources",
     "validate_repair_patch",
 ]

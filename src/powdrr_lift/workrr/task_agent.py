@@ -1110,6 +1110,42 @@ def _write_issue_worker_structrr_diff_artifacts(
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
             and node.name.startswith("test_")
         }
+    planned_test_cases = item_proposal.verification.get("required_test_cases")
+    if not isinstance(planned_test_cases, list):
+        raise PowdrrExecutionError(
+            "Structrr plan proposal is missing verification.required_test_cases; "
+            "regenerate the plan before executing this PR"
+        )
+    planned_cases_by_id: dict[str, str] = {}
+    for planned_case in planned_test_cases:
+        if not isinstance(planned_case, Mapping):
+            raise PowdrrExecutionError(
+                "Structrr planned test case must contain an id and description"
+            )
+        planned_id = planned_case.get("id")
+        planned_description = planned_case.get("description")
+        if (
+            not isinstance(planned_id, str)
+            or not isinstance(planned_description, str)
+            or planned_case.get("status") != "planned"
+            or planned_id in planned_cases_by_id
+        ):
+            raise PowdrrExecutionError(
+                "Structrr planned test case has an invalid or duplicate identity"
+            )
+        planned_cases_by_id[planned_id] = planned_description
+    actual_cases_by_id: dict[str, str] = {}
+    for obligation in test_obligations:
+        obligation_id = obligation.get("obligation_id")
+        source_text = obligation.get("source_text")
+        if isinstance(obligation_id, str) and isinstance(source_text, str):
+            actual_cases_by_id[obligation_id] = source_text.strip()
+    if planned_cases_by_id != actual_cases_by_id:
+        raise PowdrrExecutionError(
+            "generated tests do not match the test obligations recorded in the "
+            "Structrr plan proposal"
+        )
+
     required_test_cases: list[dict[str, Any]] = []
     test_case_ids_by_file: dict[str, list[str]] = {}
     candidate_test_result = integration_test_report.get("candidate")

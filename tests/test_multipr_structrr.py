@@ -71,6 +71,28 @@ def test_multi_pr_proposal_partitions_operations_over_projected_states() -> None
         operation.subject_id
         for operation in proposal.item_proposals["second"].operations
     ] == ["second-module"]
+    assert proposal.item_proposals["first"].verification == {
+        "required_test_cases": [
+            {
+                "id": "AC-01",
+                "description": "first works",
+                "status": "planned",
+            }
+        ],
+        "validation_runs": [],
+    }
+    assert proposal.full_proposal.verification["required_test_cases"] == [
+        {
+            "id": "first/AC-01",
+            "description": "first works",
+            "status": "planned",
+        },
+        {
+            "id": "second/AC-01",
+            "description": "second works",
+            "status": "planned",
+        },
+    ]
     assert any(
         entity["id"] == "first-module"
         for entity in proposal.item_baselines["second"]["entities"]
@@ -198,6 +220,10 @@ def test_multi_pr_proposal_round_trips_with_fingerprints(tmp_path: Path) -> None
     assert {key: value.fingerprint for key, value in loaded.item_proposals.items()} == {
         key: value.fingerprint for key, value in proposal.item_proposals.items()
     }
+    assert (
+        loaded.item_proposals["first"].verification
+        == proposal.item_proposals["first"].verification
+    )
 
 
 def test_multi_pr_proposal_preserves_code_evidence_outside_structrr_state(

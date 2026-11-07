@@ -1669,14 +1669,26 @@ def _author_execute_pr_tests(
             check=True,
             capture_output=True,
         )
-        test_root_relative = discover_python_test_root(
-            tuple(path.decode("utf-8") for path in tracked.stdout.split(b"\0") if path),
-            allowed_paths=request.allowed_paths,
+        tracked_paths = tuple(
+            path.decode("utf-8") for path in tracked.stdout.split(b"\0") if path
         )
+        test_root_relative = discover_python_test_root(
+            tracked_paths, allowed_paths=request.allowed_paths
+        )
+        title = proposed.get("title")
+        if not isinstance(title, str) or not title.strip():
+            raise PowdrrExecutionError(
+                "execute-PR test filename requires a descriptive proposed PR title"
+            )
         test_path = (
-            PurePosixPath(test_root_relative) / "test_powdrr_execute_pr_"
-            f"{hashlib.sha256(workflow_id.encode()).hexdigest()[:12]}.py"
+            PurePosixPath(test_root_relative)
+            / f"test_{slugify_workflow_id(title).replace('-', '_')}.py"
         ).as_posix()
+        if test_path in tracked_paths:
+            raise PowdrrExecutionError(
+                f"generated execute-PR test path already exists: {test_path}; "
+                "use a more specific proposed PR title"
+            )
         prompt = build_execute_pr_test_author_prompt(
             test_path=test_path,
             plan_context=plan_context,

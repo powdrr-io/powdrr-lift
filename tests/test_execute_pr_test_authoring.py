@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import hashlib
 import subprocess
 import sys
 from pathlib import Path
@@ -223,11 +222,7 @@ def test_execute_pr_test_repair_uses_nested_root_and_clean_baseline(
 
     provider_calls: list[tuple[str, ...]] = []
     author_prompts: list[str] = []
-    expected_test_path = (
-        "attestation/tests/test_powdrr_execute_pr_"
-        + hashlib.sha256(b"local-pr-01").hexdigest()[:12]
-        + ".py"
-    )
+    expected_test_path = "attestation/tests/test_add_attestation_ci.py"
     test_source = (
         "from sample import value\n\n"
         "# Covers: AC-01 test_expected_value\n"
@@ -625,11 +620,7 @@ def test_quality_shortcoming_is_repaired_once_then_accepted_with_pr_note(
         "refs/remotes/origin/HEAD",
         "refs/remotes/origin/main",
     )
-    test_path = (
-        "tests/test_powdrr_execute_pr_"
-        + hashlib.sha256(b"local-pr-quality-repair").hexdigest()[:12]
-        + ".py"
-    )
+    test_path = "tests/test_check_the_public_value.py"
     test_source = (
         "from pathlib import Path\n"
         "import sys\n\n"

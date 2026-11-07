@@ -7,7 +7,9 @@ outputs:
     type: object
     properties:
       passed: {type: boolean}
+      status: {type: string}
       changed_paths: {type: array, items: {type: string}}
+      out_of_scope_paths: {type: array, items: {type: string}}
       error: {type: [string, "null"]}
       retryable: {type: boolean}
       plan_defect_evidence: {type: array, items: {type: string}}

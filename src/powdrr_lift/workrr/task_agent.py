@@ -3704,6 +3704,7 @@ class _TaskWorkflowExecutionStrategy:
             "attempt_id": attempt_data["attempt_id"],
             "status": attempt_data["status"],
             "changed_paths": final_attempt["changed_paths"],
+            "out_of_scope_paths": list(attempt_data.get("out_of_scope_paths", [])),
             "validation": final_attempt["validation"],
             "structrr": final_attempt.get("structrr"),
             "integration_tests": final_attempt.get("integration_tests"),

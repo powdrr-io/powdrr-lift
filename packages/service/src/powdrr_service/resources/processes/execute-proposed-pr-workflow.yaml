@@ -50,6 +50,11 @@ steps:
             instructions:
               - If implementation_result.plan_defect_evidence is non-empty, classify plan_defect and cite that concrete repository evidence.
               - Classify plan_defect only when concrete repository evidence or contradictory acceptance criteria show that the reviewed plan cannot be implemented as written.
+              - When implementation_result.status is policy_denied because changed paths fall outside the reviewed allowed_paths, inspect each implementation_result.out_of_scope_paths entry against this item's acceptance criteria and implementation_steps.
+              - If an out-of-scope path is needed to produce an artifact required by an acceptance criterion or implementation step, classify plan_defect and cite both the path omitted from allowed_paths and the criterion or step that requires it.
+              - If out-of-scope paths do not support a criterion or implementation step, classify implementation_defect because the coding agent exceeded the reviewed scope.
+              - A policy_denied result means the changes were rejected by the path policy; it does not mean the coding agent produced no work. Use implementation_result.changed_paths and implementation_result.out_of_scope_paths as evidence.
+              - Do not classify an out-of-scope path denial as an environment failure. The policy decision and the relationship of changed paths to the reviewed item determine whether this is a plan or implementation defect.
               - A failure in generated acceptance tests is not by itself evidence of a plan defect. Those tests may be corrected within the execute-proposed-pr process, subject to its test-correction checks.
               - Classify implementation_defect when the failure is caused by incomplete, incorrect, or insufficiently verified implementation work.
               - Use unclear when the evidence does not establish which is true; unclear must stop for human review.

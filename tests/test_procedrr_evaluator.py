@@ -368,15 +368,17 @@ steps:
         "pull_request_url_valid",
         "plan_defect_detected",
         "unshaped_execution_error",
+        "policy_denied_required_paths",
     ),
     [
-        (False, False, False, True),
+        (False, False, False, True, False),
         *(
-            (implementation, pull_request, plan_defect, False)
+            (implementation, pull_request, plan_defect, False, False)
             for implementation in (True, False)
             for pull_request in (True, False)
             for plan_defect in (True, False)
         ),
+        (False, True, False, False, True),
     ],
 )
 def test_execute_proposed_pr_workflow_enforces_implementation_and_pr_calls(
@@ -385,6 +387,7 @@ def test_execute_proposed_pr_workflow_enforces_implementation_and_pr_calls(
     pull_request_url_valid: bool,
     plan_defect_detected: bool,
     unshaped_execution_error: bool,
+    policy_denied_required_paths: bool,
 ) -> None:
     from powdrr_service.procedrr import parse_and_validate
 
@@ -522,6 +525,19 @@ steps:
                     "language_labels": ["python"],
                 }
             if "Does the recorded failure demonstrate" in question:
+                if policy_denied_required_paths:
+                    assert '"status": "policy_denied"' in question
+                    assert '"out_of_scope_paths"' in question
+                    assert "attestation/fixtures/golden.json" in question
+                    assert (
+                        "attestation/verifier/src/powdrr_attestation/verify.py"
+                        in question
+                    )
+                    assert "Fixture generation produces golden files" in question
+                    assert (
+                        "DSSE envelope parsing accepts valid in-toto statements"
+                        in question
+                    )
                 if plan_defect_detected and not unshaped_execution_error:
                     assert "plan_defect_evidence" in question
                     assert "attestation/scripts/verify-all.sh" in question
@@ -530,12 +546,18 @@ steps:
                         "unclear"
                         if unshaped_execution_error
                         else "plan_defect"
-                        if plan_defect_detected
+                        if plan_defect_detected or policy_denied_required_paths
                         else "implementation_defect"
                     ),
                     "evidence": [
                         "The child process returned a retryable contract error."
                         if unshaped_execution_error
+                        else (
+                            "The item requires updating the golden fixture and "
+                            "verifier acceptance path, but both paths were excluded "
+                            "from allowed_paths."
+                        )
+                        if policy_denied_required_paths
                         else (
                             "The accepted plan conflicts with a concrete "
                             "repository fact."
@@ -546,12 +568,97 @@ steps:
                     "explanation": (
                         "The error does not establish whether the plan is defective."
                         if unshaped_execution_error
+                        else (
+                            "Required implementation paths are excluded by the "
+                            "reviewed path allowlist."
+                        )
+                        if policy_denied_required_paths
                         else "The accepted plan cannot be implemented as written."
                         if plan_defect_detected
                         else "The available evidence does not show a plan defect."
                     ),
                 }
             if "What minimal typed plan repair" in question:
+                if policy_denied_required_paths:
+                    return {
+                        "discovery": {
+                            "kind": "scope_defect",
+                            "summary": (
+                                "Allow required generated fixture and verifier paths."
+                            ),
+                            "requirement_ids": [],
+                            "item_ids": ["item-0003"],
+                            "evidence_ids": [],
+                            "requested_outcome": (
+                                "Allow paths required by this item's acceptance "
+                                "criteria."
+                            ),
+                        },
+                        "subjects": [
+                            {
+                                "subject_kind": "item",
+                                "reason": (
+                                    "The allowlist excludes files required by the "
+                                    "reviewed criteria."
+                                ),
+                            }
+                        ],
+                        "operations": [
+                            {
+                                "operation": "update_item",
+                                "item_id": "item-0003",
+                                "reason": (
+                                    "The implementation attempt demonstrated the "
+                                    "two omitted paths are required."
+                                ),
+                            }
+                        ],
+                        "replacement_items": {
+                            "item-0003": {
+                                "title": (
+                                    "Implement shared attestation schema and "
+                                    "obligation "
+                                    "block schema with fixtures"
+                                ),
+                                "objective": (
+                                    "Deliver DSSE envelope parsing and obligation "
+                                    "schema fixture generation."
+                                ),
+                                "scope": ["Implement repository work units."],
+                                "dependencies": ["item-0002"],
+                                "implementation_steps": [
+                                    (
+                                        "Implement DSSE envelope parsing and in-toto "
+                                        "statement handling, including focused tests."
+                                    ),
+                                    (
+                                        "Define obligation schema, generate a valid "
+                                        "fixture, and validate it against the schema."
+                                    ),
+                                ],
+                                "acceptance_criteria": [
+                                    (
+                                        "DSSE envelope parsing accepts valid in-toto "
+                                        "statements and rejects malformed ones."
+                                    ),
+                                    (
+                                        "Fixture generation produces golden files "
+                                        "that match the test expectations."
+                                    ),
+                                ],
+                                "allowed_paths": [
+                                    "attestation/fixtures/generate_fixtures.py",
+                                    "attestation/fixtures/golden.json",
+                                    "attestation/fixtures/schemas/obligation-block.json",
+                                    "attestation/tests/test_attestation.py",
+                                    "attestation/verifier/src/powdrr_attestation/dsse.py",
+                                    "attestation/verifier/src/powdrr_attestation/verify.py",
+                                ],
+                            }
+                        },
+                        "replacement_units": [],
+                        "replacement_requirements": {},
+                    }
                 return {
                     "discovery": {
                         "kind": "scope_defect",
@@ -621,6 +728,17 @@ steps:
             calls.append("amend")
             assert parameters["parameters"]["mode"] == "plan-amendment"
             assert "repair_request" in parameters["parameters"]
+            if policy_denied_required_paths:
+                replacement = parameters["parameters"]["repair_request"][
+                    "replacement_items"
+                ]["item-0003"]
+                assert (
+                    "attestation/fixtures/golden.json" in replacement["allowed_paths"]
+                )
+                assert (
+                    "attestation/verifier/src/powdrr_attestation/verify.py"
+                    in replacement["allowed_paths"]
+                )
             return {
                 "passed": True,
                 "changed_paths": [
@@ -644,6 +762,39 @@ steps:
                         "retryable": True,
                     }
                 )
+            if policy_denied_required_paths:
+                out_of_scope_paths = [
+                    "attestation/fixtures/golden.json",
+                    "attestation/verifier/src/powdrr_attestation/verify.py",
+                ]
+                changed_paths = [
+                    "attestation/fixtures/generate_fixtures.py",
+                    *out_of_scope_paths,
+                    "attestation/verifier/src/powdrr_attestation/dsse.py",
+                ]
+                return {
+                    "passed": False,
+                    "status": "policy_denied",
+                    "changed_paths": changed_paths,
+                    "out_of_scope_paths": out_of_scope_paths,
+                    "error": "worker changed paths outside the implementation request",
+                    "plan_defect_evidence": [],
+                    "attempts": [
+                        {
+                            "attempt": {
+                                "status": "policy_denied",
+                                "error": (
+                                    "worker changed paths outside the implementation "
+                                    "request"
+                                ),
+                                "out_of_scope_paths": out_of_scope_paths,
+                            },
+                            "changed_paths": changed_paths,
+                        }
+                    ],
+                    "structrr": {"passed": True},
+                    "integration_tests": {"passed": True},
+                }
             return {
                 "passed": implementation_passes,
                 "changed_paths": implementation_paths if implementation_passes else [],
@@ -678,6 +829,69 @@ steps:
         )
     )
     evaluator = Evaluator(WorkflowLLM(), execute, process_directory=tmp_path)
+    if policy_denied_required_paths:
+        result = evaluator.evaluate(
+            workflow,
+            {
+                "task_context": {
+                    "objective": (
+                        "Implement the shared attestation schema and DSSE verifier."
+                    ),
+                    "proposed_pr_context": {
+                        "github_repository": "example/repo",
+                        "github_issue_number": 42,
+                        "verification_command": "pytest -q",
+                        "item_id": "item-0003",
+                        "allowed_paths": [
+                            "attestation/fixtures/generate_fixtures.py",
+                            "attestation/fixtures/schemas/obligation-block.json",
+                            "attestation/tests/test_attestation.py",
+                            "attestation/verifier/src/powdrr_attestation/dsse.py",
+                        ],
+                        "acceptance_criteria": [
+                            (
+                                "DSSE envelope parsing accepts valid in-toto "
+                                "statements and rejects malformed ones."
+                            ),
+                            (
+                                "Fixture generation produces golden files that "
+                                "match the test expectations."
+                            ),
+                        ],
+                        "implementation_steps": [
+                            "Implement DSSE parsing and in-toto statement handling.",
+                            (
+                                "Extend fixture generation to produce a valid "
+                                "example and golden files."
+                            ),
+                        ],
+                    },
+                }
+            },
+        )
+        process_calls = [
+            event.data["name"] for event in result.events if event.kind == "process"
+        ]
+        assert process_calls == [
+            "execute-proposed-pr",
+            "finish-pr-prep",
+            "create-pull-request",
+            "amend-plan-and-open-pr",
+            "respond-to-pr-ci",
+        ]
+        assert calls == [
+            "implement",
+            "amend",
+            "finish",
+            "publish",
+            "observe",
+            "prepare",
+        ]
+        assert (
+            result.bindings["pull_request_url"]
+            == "https://github.com/example/repo/pull/123"
+        )
+        return
     if unshaped_execution_error:
         failed = evaluator.evaluate(
             workflow,

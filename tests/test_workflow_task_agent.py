@@ -1449,7 +1449,8 @@ def test_issue_worker_continues_after_nontrivial_validation_failure(
     assert result["structrr"]["passed"] is True
     structrr_artifact_paths = result["structrr"]["artifact_paths"]
     assert structrr_artifact_paths == [
-        "docs/structrr/diffs/feature-v1/feature-v1-pr-01/actual-structrr-diff.json",
+        "docs/structrr/diffs/feature-v1/feature-v1-pr-01/structrr-diff.yaml",
+        "docs/structrr/diffs/feature-v1/feature-v1-pr-01/structrr-actualization-report.json",
         "docs/structrr/diffs/feature-v1/feature-v1-pr-01/candidate-structrr-comparison.json",
     ]
     assert set(structrr_artifact_paths) <= set(result["changed_paths"])

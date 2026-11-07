@@ -1022,6 +1022,16 @@ def test_issue_worker_persists_only_structrr_changelog_diff(
         non_goals=(),
         allowed_paths=("src", "tests"),
         source_refs=("plan:item-0003",),
+        verification={
+            "required_test_cases": [
+                {
+                    "id": "AC-01",
+                    "description": "The verifier returns true for valid input.",
+                    "status": "planned",
+                }
+            ],
+            "validation_runs": [],
+        },
     )
 
     paths = task_agent._write_issue_worker_structrr_diff_artifacts(
@@ -1285,7 +1295,13 @@ def test_issue_worker_continues_after_nontrivial_validation_failure(
     proposal = compile_multi_pr_proposal(
         plan_id="feature-v1",
         baseline_snapshot=baseline,
-        items=[{"id": "feature-v1-pr-01", "allowed_paths": ["src"]}],
+        items=[
+            {
+                "id": "feature-v1-pr-01",
+                "allowed_paths": ["src"],
+                "acceptance_criteria": ["The feature value equals 42."],
+            }
+        ],
         proposed_operations=[],
         source_ref="docs/plans/feature-v1.md",
     )

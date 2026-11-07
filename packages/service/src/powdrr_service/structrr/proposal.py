@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -44,6 +44,7 @@ class ProposalRevision:
     source_refs: tuple[str, ...]
     code_evidence: tuple[Mapping[str, Any], ...] = ()
     schema_version: str = PROPOSAL_REVISION_SCHEMA_VERSION
+    verification: Mapping[str, Any] = field(default_factory=dict)
 
     def to_data(self, *, include_fingerprint: bool = True) -> dict[str, Any]:
         data: dict[str, Any] = {
@@ -59,6 +60,8 @@ class ProposalRevision:
         }
         if self.code_evidence:
             data["code_evidence"] = [dict(item) for item in self.code_evidence]
+        if self.verification:
+            data["verification"] = _canonical(dict(self.verification))
         if include_fingerprint:
             data["fingerprint"] = self.fingerprint
         return data
@@ -98,6 +101,7 @@ class ProposalRevision:
             source_refs=_string_tuple(raw, "source_refs"),
             code_evidence=_mapping_tuple(raw, "code_evidence", optional=True),
             schema_version=schema_version,
+            verification=_mapping_value(raw, "verification", optional=True),
         )
         if raw.get("fingerprint") != revision.fingerprint:
             raise ValueError("proposal revision fingerprint does not match its content")
@@ -115,6 +119,7 @@ def compile_proposal_revision(
     allowed_paths: Sequence[str],
     source_refs: Sequence[str],
     code_evidence: Sequence[Mapping[str, Any]] = (),
+    verification: Mapping[str, Any] | None = None,
 ) -> ProposalRevision:
     """Compile one canonical proposal identity from validated plan inputs."""
     operations: list[ProposalOperation] = []
@@ -160,6 +165,7 @@ def compile_proposal_revision(
         allowed_paths=tuple(dict.fromkeys(allowed_paths)),
         source_refs=tuple(dict.fromkeys(source_refs)),
         code_evidence=tuple(dict(item) for item in code_evidence),
+        verification=({} if verification is None else _canonical(dict(verification))),
     )
 
 
@@ -230,6 +236,15 @@ def _mapping_tuple(
     ):
         raise ValueError(f"proposal revision field {key!r} must be a list of mappings")
     return tuple(dict(item) for item in value)
+
+
+def _mapping_value(
+    raw: Mapping[str, Any], key: str, *, optional: bool = False
+) -> Mapping[str, Any]:
+    value = raw.get(key, {} if optional else None)
+    if not isinstance(value, Mapping):
+        raise ValueError(f"proposal revision field {key!r} must be an object")
+    return dict(value)
 
 
 __all__ = [

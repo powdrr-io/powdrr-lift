@@ -18,6 +18,7 @@ from powdrr_service.structrr.proposal import ProposalRevision, compile_proposal_
 from powdrr_service.structrr.rebase import rebase_structrr_snapshot
 from powdrr_service.structrr.snapshot import snapshot_digest
 from powdrr_service.structrr.source_manifest import SourceManifest
+from powdrr_service.verification.test_obligations import acceptance_criteria_contract
 
 MULTIPR_STRUCTRR_SCHEMA = "multipr-structrr-proposal-v1"
 _STRUCTURAL_SECTIONS = {"entities", "entity_relationships", "files"}
@@ -191,6 +192,27 @@ def compile_multi_pr_proposal(
             for item in selected_items
             for value in _strings(item.get("non_goals"))
         )
+        test_cases: list[dict[str, str]] = []
+        for item in selected_items:
+            item_id = str(item["id"])
+            criteria_for_item = _strings(item.get("acceptance_criteria"))
+            cases = (
+                acceptance_criteria_contract(criteria_for_item)
+                if criteria_for_item
+                else []
+            )
+            for case in cases:
+                test_cases.append(
+                    {
+                        "id": (
+                            case["obligation_id"]
+                            if len(selected_items) == 1
+                            else f"{item_id}/{case['obligation_id']}"
+                        ),
+                        "description": case["source_text"],
+                        "status": "planned",
+                    }
+                )
         return compile_proposal_revision(
             proposal_id,
             baseline,
@@ -201,6 +223,10 @@ def compile_multi_pr_proposal(
             allowed_paths=allowed_paths or (".",),
             source_refs=(source_ref,),
             code_evidence=code_evidence,
+            verification={
+                "required_test_cases": test_cases,
+                "validation_runs": [],
+            },
         )
 
     full = compile(

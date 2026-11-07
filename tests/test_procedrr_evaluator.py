@@ -831,46 +831,53 @@ steps:
         )
     )
     evaluator = Evaluator(WorkflowLLM(), execute, process_directory=tmp_path)
+
+    def wrapped_task_context(input_state: Mapping[str, Any]) -> dict[str, Any]:
+        return {"task_id": "feature-task-001", "input_state": dict(input_state)}
+
     if policy_denied_required_paths:
         result = evaluator.evaluate(
             workflow,
             {
-                "task_context": {
-                    "objective": (
-                        "Implement the shared attestation schema and DSSE verifier."
-                    ),
-                    "github_repository": "example/repo",
-                    "github_issue_number": 42,
-                    "proposed_pr_context": {
+                "task_context": wrapped_task_context(
+                    {
+                        "objective": (
+                            "Implement the shared attestation schema and DSSE verifier."
+                        ),
                         "github_repository": "example/repo",
                         "github_issue_number": 42,
-                        "verification_command": "pytest -q",
-                        "item_id": "item-0003",
-                        "allowed_paths": [
-                            "attestation/fixtures/generate_fixtures.py",
-                            "attestation/fixtures/schemas/obligation-block.json",
-                            "attestation/tests/test_attestation.py",
-                            "attestation/verifier/src/powdrr_attestation/dsse.py",
-                        ],
-                        "acceptance_criteria": [
-                            (
-                                "DSSE envelope parsing accepts valid in-toto "
-                                "statements and rejects malformed ones."
-                            ),
-                            (
-                                "Fixture generation produces golden files that "
-                                "match the test expectations."
-                            ),
-                        ],
-                        "implementation_steps": [
-                            "Implement DSSE parsing and in-toto statement handling.",
-                            (
-                                "Extend fixture generation to produce a valid "
-                                "example and golden files."
-                            ),
-                        ],
-                    },
-                }
+                        "proposed_pr_context": {
+                            "github_repository": "example/repo",
+                            "github_issue_number": 42,
+                            "verification_command": "pytest -q",
+                            "item_id": "item-0003",
+                            "allowed_paths": [
+                                "attestation/fixtures/generate_fixtures.py",
+                                "attestation/fixtures/schemas/obligation-block.json",
+                                "attestation/tests/test_attestation.py",
+                                "attestation/verifier/src/powdrr_attestation/dsse.py",
+                            ],
+                            "acceptance_criteria": [
+                                (
+                                    "DSSE envelope parsing accepts valid in-toto "
+                                    "statements and rejects malformed ones."
+                                ),
+                                (
+                                    "Fixture generation produces golden files that "
+                                    "match the test expectations."
+                                ),
+                            ],
+                            "implementation_steps": [
+                                "Implement DSSE parsing and in-toto statement "
+                                "handling.",
+                                (
+                                    "Extend fixture generation to produce a valid "
+                                    "example and golden files."
+                                ),
+                            ],
+                        },
+                    }
+                )
             },
         )
         process_calls = [
@@ -940,16 +947,18 @@ steps:
             result = evaluator.evaluate(
                 workflow,
                 {
-                    "task_context": {
-                        "objective": "Implement a feature",
-                        "github_repository": "example/repo",
-                        "github_issue_number": 42,
-                        "proposed_pr_context": {
+                    "task_context": wrapped_task_context(
+                        {
+                            "objective": "Implement a feature",
                             "github_repository": "example/repo",
                             "github_issue_number": 42,
-                            "verification_command": "pytest -q",
-                        },
-                    }
+                            "proposed_pr_context": {
+                                "github_repository": "example/repo",
+                                "github_issue_number": 42,
+                                "verification_command": "pytest -q",
+                            },
+                        }
+                    )
                 },
             )
             process_calls = [
@@ -1022,11 +1031,14 @@ steps:
         workflow,
         {
             "task_context": {
-                "objective": "Implement a feature",
-                "github_repository": "example/repo",
-                "github_issue_number": 42,
-                "proposed_pr_context": {
-                    "verification_command": "pytest -q",
+                "task_id": "feature-task-001",
+                "input_state": {
+                    "objective": "Implement a feature",
+                    "github_repository": "example/repo",
+                    "github_issue_number": 42,
+                    "proposed_pr_context": {
+                        "verification_command": "pytest -q",
+                    },
                 },
             }
         },

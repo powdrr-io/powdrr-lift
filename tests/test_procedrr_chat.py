@@ -139,18 +139,25 @@ def test_ci_response_procedure_runs_declared_verification_at_pinned_head() -> No
     ]
     assert ci_inputs["repository"] == {
         "type": "reference",
-        "value": "task_context.github_repository",
+        "value": "task_context.input_state.github_repository",
     }
     assert ci_inputs["issue_number"] == {
         "type": "reference",
-        "value": "task_context.github_issue_number",
+        "value": "task_context.input_state.github_issue_number",
     }
     assert execute.document["steps"][1]["branch"]["cases"][True][1]["call"]["inputs"][
         "verification_command"
     ] == {
         "type": "reference",
-        "value": "task_context.proposed_pr_context.verification_command",
+        "value": "task_context.input_state.proposed_pr_context.verification_command",
     }
+    assert ci_inputs["implementation_context"] == {
+        "type": "reference",
+        "value": "task_context.input_state.proposed_pr_context",
+    }
+    serialized_execute = yaml.safe_dump(execute.document)
+    assert serialized_execute.count("task_context.input_state.github_repository") == 2
+    assert serialized_execute.count("task_context.input_state.github_issue_number") == 2
 
 
 def test_ci_repair_task_wrapper_adapts_task_context_to_service_process(

@@ -967,18 +967,11 @@ def test_issue_worker_structrr_baseline_uses_target_commit_not_checkpoint(
     assert (repo_root / ".github/workflows/ci.yml").is_file()
 
 
-def test_issue_worker_persists_structrr_changelog_diff_and_diagnostics(
+def test_issue_worker_persists_only_structrr_changelog_diff(
     tmp_path: Path,
 ) -> None:
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
-    structural_report = {
-        "actual_diff": {
-            "schema_version": "structrr-actual-diff-v1",
-            "structural_operations": [{"action": "add", "subject_id": "Verifier"}],
-        },
-        "comparison": {"passed": True, "fulfilled_operations": ["operation-1"]},
-    }
     proposal = ProposalRevision(
         proposal_id="feature-v1:item-0003",
         structrr_baseline_fingerprint="sha256:baseline",
@@ -1007,28 +1000,19 @@ def test_issue_worker_persists_structrr_changelog_diff_and_diagnostics(
             "objective": "Provide a verifier component.",
         },
         proposal,
-        structural_report,
     )
 
-    assert paths == (
-        "docs/structrr/diffs/feature-v1/item-0003/structrr-diff.yaml",
-        "docs/structrr/diffs/feature-v1/item-0003/structrr-actualization-report.json",
-        "docs/structrr/diffs/feature-v1/item-0003/candidate-structrr-comparison.json",
-    )
+    assert paths == ("docs/structrr/diffs/feature-v1/item-0003/structrr-diff.yaml",)
     assert (
         parse_change_log((repo_root / paths[0]).read_text(encoding="utf-8"))
         .entity_changes[0]
         .id
         == "Verifier"
     )
-    assert (
-        json.loads((repo_root / paths[1]).read_text(encoding="utf-8"))
-        == (structural_report["actual_diff"])
-    )
-    assert (
-        json.loads((repo_root / paths[2]).read_text(encoding="utf-8"))
-        == (structural_report["comparison"])
-    )
+    artifact_dir = repo_root / "docs/structrr/diffs/feature-v1/item-0003"
+    assert sorted(path.name for path in artifact_dir.iterdir()) == [
+        "structrr-diff.yaml"
+    ]
 
 
 def test_issue_worker_blocks_file_addition_overlap_before_structrr_bootstrap(
@@ -1450,8 +1434,6 @@ def test_issue_worker_continues_after_nontrivial_validation_failure(
     structrr_artifact_paths = result["structrr"]["artifact_paths"]
     assert structrr_artifact_paths == [
         "docs/structrr/diffs/feature-v1/feature-v1-pr-01/structrr-diff.yaml",
-        "docs/structrr/diffs/feature-v1/feature-v1-pr-01/structrr-actualization-report.json",
-        "docs/structrr/diffs/feature-v1/feature-v1-pr-01/candidate-structrr-comparison.json",
     ]
     assert set(structrr_artifact_paths) <= set(result["changed_paths"])
     assert all((tmp_path / path).is_file() for path in structrr_artifact_paths)

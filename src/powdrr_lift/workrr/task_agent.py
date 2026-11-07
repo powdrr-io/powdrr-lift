@@ -998,16 +998,8 @@ def _write_issue_worker_structrr_diff_artifacts(
     repo_root: Path,
     proposed: Mapping[str, Any],
     item_proposal: ProposalRevision,
-    structural_report: Mapping[str, Any],
 ) -> tuple[str, ...]:
-    """Persist the accepted Structrr changelog and its machine reports."""
-    actual_diff = structural_report.get("actual_diff")
-    comparison = structural_report.get("comparison")
-    if not isinstance(actual_diff, Mapping) or not isinstance(comparison, Mapping):
-        raise PowdrrExecutionError(
-            "a passing planned implementation must include its Structrr actual "
-            "diff and candidate comparison"
-        )
+    """Persist the accepted Structrr changelog diff for the PR."""
     plan_id = str(proposed.get("plan_id", "")).strip()
     item_id = str(proposed.get("item_id", "")).strip()
     plan_slug = slugify_workflow_id(plan_id)
@@ -1077,23 +1069,9 @@ def _write_issue_worker_structrr_diff_artifacts(
         raise PowdrrExecutionError(
             f"compiled Structrr changelog-v2 diff is invalid: {error}"
         ) from error
-    artifacts = {
-        "structrr-diff.yaml": structrr_diff_text,
-        "structrr-actualization-report.json": actual_diff,
-        "candidate-structrr-comparison.json": comparison,
-    }
-    relative_paths: list[str] = []
-    for filename, value in artifacts.items():
-        path = artifact_root / filename
-        if isinstance(value, str):
-            path.write_text(value, encoding="utf-8")
-        else:
-            path.write_text(
-                json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
-                encoding="utf-8",
-            )
-        relative_paths.append((relative_directory / filename).as_posix())
-    return tuple(relative_paths)
+    path = artifact_root / "structrr-diff.yaml"
+    path.write_text(structrr_diff_text, encoding="utf-8")
+    return ((relative_directory / path.name).as_posix(),)
 
 
 def _merge_structrr_decision_sections(
@@ -3814,7 +3792,6 @@ class _TaskWorkflowExecutionStrategy:
                 self.repo_root,
                 proposed,
                 item_proposal,
-                structural_result,
             )
             changed_paths = sorted({*changed_paths, *artifact_paths})
             structural_result = {

@@ -134,6 +134,17 @@ def test_ci_response_procedure_runs_declared_verification_at_pinned_head() -> No
     import yaml
 
     assert "process: respond-to-pr-ci" in yaml.safe_dump(execute.document)
+    ci_inputs = execute.document["steps"][1]["branch"]["cases"][True][1]["call"][
+        "inputs"
+    ]
+    assert ci_inputs["repository"] == {
+        "type": "reference",
+        "value": "task_context.github_repository",
+    }
+    assert ci_inputs["issue_number"] == {
+        "type": "reference",
+        "value": "task_context.github_issue_number",
+    }
     assert execute.document["steps"][1]["branch"]["cases"][True][1]["call"]["inputs"][
         "verification_command"
     ] == {

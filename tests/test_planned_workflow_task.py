@@ -164,6 +164,8 @@ def test_plan_item_preparation_uses_unique_worktree_and_pinned_context(
         "powdrr/search-workflow-attempt-"
     )
     context = captured["workflow_inputs"]["proposed_pr_context"]
+    assert captured["workflow_inputs"]["github_issue_number"] == 42
+    assert captured["workflow_inputs"]["github_repository"] == "powdrr-io/example"
     assert context["original"] == "context"
     assert context["title"] == "Add search"
     assert context["scope"] == ["search endpoint"]

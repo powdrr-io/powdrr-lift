@@ -1,0 +1,23 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1392
+title: Plan Structrr user stories and behavioral testing
+intent:
+  problem: The proposed user-story workflow needs an executable implementation plan connecting confirmed interviews, durable Structrr graphs, design evolution, planning, generated tests, and observed verification evidence.
+  goal: Specify the records, identity and revision rules, graph validation, interview process, diff lifecycle, test references, implementation sequence, and acceptance criteria before implementation begins.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/plans/structrr-user-stories-and-behavioral-testing.md
+    type: added
+    span:
+      start_line: 1
+      end_line: 795
+    summary: Define a five-PR implementation plan for confirmed user stories as durable Structrr behavioral contracts linked to generated and executed tests.
+    rationale: Give an implementation agent explicit contracts, existing integration targets, lifecycle rules, and meaningful end-to-end completion criteria.
+entities:
+  - id: structrr-user-story-implementation-plan
+    type: Design doc
+    action: added
+entity_relationships: []
+invariants: []
+guidance: []

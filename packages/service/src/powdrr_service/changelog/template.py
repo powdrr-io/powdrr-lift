@@ -271,6 +271,11 @@ def _render_template_body(
         "# with `id` and `state` values.",
         "# Use `state: completed` for basis PRs that are already merged and",
         "# `state: in_progress` for basis PRs that are still underway.",
+        "# Use `verification.required_test_cases` to track acceptance-linked tests",
+        "# that this PR adds or updates. Record their exact pytest selectors and",
+        "# mark them passed only when the candidate run passed.",
+        "# Record repository check commands and their outcomes in",
+        "# `verification.validation_runs`.",
     ]
 
     if structured_file_paths:
@@ -342,6 +347,9 @@ def _render_template_body(
             "# it is done.",
             "features: []",
             "proposed_prs: []",
+            "verification:",
+            "  required_test_cases: []",
+            "  validation_runs: []",
         ]
     )
 

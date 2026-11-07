@@ -30,6 +30,7 @@ from powdrr_service.changelog.validation_policy import (
     validate_v2_file_sections,
     validate_v2_lifecycle_item,
     validate_v2_state_change,
+    validate_v2_verification,
 )
 from powdrr_service.specifications.system import (
     build_system_specification_validation_report,
@@ -273,6 +274,11 @@ def build_validation_report(
     available_proposed_pr_detail_ids = _load_available_proposed_pr_detail_ids(
         repo_root_path
     )
+    available_proposed_pr_detail_ids.update(
+        test_case.id
+        for test_case in change_log.verification.required_test_cases
+        if test_case.id is not None
+    )
     available_proposed_pr_ids = _load_known_proposed_pr_ids(repo_root_path)
     available_rationale_ids = (
         _load_available_rationale_ids(repo_root_path)
@@ -325,6 +331,17 @@ def build_validation_report(
                 available_proposed_pr_ids=available_proposed_pr_ids,
                 available_proposed_pr_detail_ids=available_proposed_pr_detail_ids,
                 available_rationale_ids=available_rationale_ids,
+            )
+        )
+        issues.extend(
+            _run_changelog_policy(
+                validate_v2_verification,
+                raw_change_log=raw_change_log,
+                available_files={
+                    file_change.path
+                    for file_change in change_log.file_changes
+                    if file_change.path is not None and file_change.path != ""
+                },
             )
         )
         if issues:

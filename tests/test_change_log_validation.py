@@ -4,9 +4,12 @@ import subprocess
 from pathlib import Path
 
 import pytest
+import yaml
+from powdrr_service.changelog.parser import parse_change_log
 from powdrr_service.changelog.validation_policy import (
     ChangelogValidationIssue,
     validate_v2_state_change,
+    validate_v2_verification,
 )
 
 from powdrr_lift import (
@@ -35,6 +38,71 @@ def test_service_owns_changelog_state_validation_policy() -> None:
     assert [(issue.code, issue.path) for issue in issues] == [
         ("invalid_feature_state", "features[0].state")
     ]
+
+
+def test_changelog_verification_tracks_test_cases_and_command_results() -> None:
+    document = {
+        "schema": "https://powdrr.io/schema/changelog-v2",
+        "change_id": "item-0005",
+        "title": "Add CI preservation note",
+        "intent": {"problem": "Missing validation tracking.", "goal": "Track it."},
+        "structured_files": [],
+        "files": [
+            {
+                "path": "tests/test_ci_preservation.py",
+                "type": "added",
+                "summary": "Add acceptance test.",
+                "rationale": "Prove the acceptance criterion.",
+                "related": {"required_test_cases": ["AC-01"]},
+            }
+        ],
+        "entities": [],
+        "entity_relationships": [],
+        "invariants": [],
+        "guidance": [],
+        "features": [],
+        "proposed_prs": [],
+        "verification": {
+            "required_test_cases": [
+                {
+                    "id": "AC-01",
+                    "description": "The CI pipeline remains configured.",
+                    "status": "passed",
+                    "selectors": [
+                        "tests/test_ci_preservation.py::test_ci_remains_configured"
+                    ],
+                }
+            ],
+            "validation_runs": [
+                {
+                    "id": "validation-pytest",
+                    "profile": "pytest",
+                    "command": ["python", "-m", "pytest"],
+                    "status": "passed",
+                    "returncode": 0,
+                }
+            ],
+        },
+    }
+    parsed = parse_change_log(yaml.safe_dump(document, sort_keys=False))
+    assert parsed.verification.required_test_cases[0].id == "AC-01"
+    assert parsed.verification.validation_runs[0].command == [
+        "python",
+        "-m",
+        "pytest",
+    ]
+
+    issues: list[ChangelogValidationIssue] = []
+    validate_v2_verification(
+        document,
+        issues,
+        available_files={"tests/test_ci_preservation.py"},
+    )
+    assert issues == []
+
+    issues = []
+    validate_v2_verification(document, issues, available_files=set())
+    assert [issue.code for issue in issues] == ["required_test_case_file_missing"]
 
 
 def test_rationale_and_parent_entity_loading_do_not_walk_commit_history(

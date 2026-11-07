@@ -307,6 +307,188 @@ def validate_v2_file_sections(
             )
 
 
+def validate_v2_verification(
+    raw_change_log: Mapping[str, Any],
+    issues: list[ChangelogValidationIssue],
+    *,
+    available_files: set[str],
+) -> None:
+    """Validate checkable test obligations and their recorded command results."""
+    raw_verification = raw_change_log.get("verification")
+    if raw_verification is None:
+        return
+    if not isinstance(raw_verification, Mapping):
+        issues.append(
+            ChangelogValidationIssue(
+                "verification_invalid",
+                "The verification section must be a mapping.",
+                "verification",
+            )
+        )
+        return
+
+    seen_ids: set[str] = set()
+    for index, raw_case in enumerate(
+        parse_changelog_sequence(raw_verification.get("required_test_cases")),
+        start=1,
+    ):
+        path = f"verification.required_test_cases[{index - 1}]"
+        if not isinstance(raw_case, Mapping):
+            issues.append(
+                ChangelogValidationIssue(
+                    "required_test_case_invalid",
+                    f"Required test case {index} must be a mapping.",
+                    path,
+                )
+            )
+            continue
+        case_id = normalize_changelog_id(
+            None if raw_case.get("id") is None else str(raw_case.get("id"))
+        )
+        description = raw_case.get("description")
+        status = raw_case.get("status")
+        if case_id is None:
+            issues.append(
+                ChangelogValidationIssue(
+                    "required_test_case_id_missing",
+                    f"Required test case {index} must have an id.",
+                    path,
+                )
+            )
+        elif case_id in seen_ids:
+            issues.append(
+                ChangelogValidationIssue(
+                    "verification_id_duplicate",
+                    f"Verification id {case_id!r} is repeated.",
+                    path,
+                )
+            )
+        else:
+            seen_ids.add(case_id)
+        if not isinstance(description, str) or not description.strip():
+            issues.append(
+                ChangelogValidationIssue(
+                    "required_test_case_description_missing",
+                    f"Required test case {index} must have a description.",
+                    path,
+                )
+            )
+        if status not in {"planned", "passed", "failed", "not_run"}:
+            issues.append(
+                ChangelogValidationIssue(
+                    "required_test_case_status_invalid",
+                    f"Required test case {index} has an unsupported status.",
+                    path,
+                )
+            )
+        selectors = parse_changelog_sequence(raw_case.get("selectors"))
+        if not selectors or any(
+            not isinstance(selector, str) or "::test_" not in selector
+            for selector in selectors
+        ):
+            issues.append(
+                ChangelogValidationIssue(
+                    "required_test_case_selectors_invalid",
+                    f"Required test case {index} must name one or more "
+                    "pytest selectors.",
+                    path,
+                )
+            )
+        else:
+            for selector in selectors:
+                if not isinstance(selector, str):
+                    continue
+                test_path = selector.split("::", 1)[0]
+                if test_path not in available_files:
+                    issues.append(
+                        ChangelogValidationIssue(
+                            "required_test_case_file_missing",
+                            f"Required test case {case_id or index} points to "
+                            f"{test_path!r}, which is absent from the files section.",
+                            path,
+                        )
+                    )
+
+    for index, raw_run in enumerate(
+        parse_changelog_sequence(raw_verification.get("validation_runs")),
+        start=1,
+    ):
+        path = f"verification.validation_runs[{index - 1}]"
+        if not isinstance(raw_run, Mapping):
+            issues.append(
+                ChangelogValidationIssue(
+                    "validation_run_invalid",
+                    f"Validation run {index} must be a mapping.",
+                    path,
+                )
+            )
+            continue
+        run_id = normalize_changelog_id(
+            None if raw_run.get("id") is None else str(raw_run.get("id"))
+        )
+        if run_id is None:
+            issues.append(
+                ChangelogValidationIssue(
+                    "validation_run_id_missing",
+                    f"Validation run {index} must have an id.",
+                    path,
+                )
+            )
+        elif run_id in seen_ids:
+            issues.append(
+                ChangelogValidationIssue(
+                    "verification_id_duplicate",
+                    f"Verification id {run_id!r} is repeated.",
+                    path,
+                )
+            )
+        else:
+            seen_ids.add(run_id)
+        command = raw_run.get("command")
+        if (
+            not isinstance(command, Sequence)
+            or isinstance(command, (str, bytes))
+            or not command
+            or any(not isinstance(token, str) or not token for token in command)
+        ):
+            issues.append(
+                ChangelogValidationIssue(
+                    "validation_run_command_invalid",
+                    f"Validation run {index} command must be a non-empty "
+                    "argument array.",
+                    path,
+                )
+            )
+        run_status = raw_run.get("status")
+        if run_status not in {"passed", "failed", "blocked", "timed_out", "not_run"}:
+            issues.append(
+                ChangelogValidationIssue(
+                    "validation_run_status_invalid",
+                    f"Validation run {index} has an unsupported status.",
+                    path,
+                )
+            )
+        returncode = raw_run.get("returncode")
+        if returncode is not None and (
+            not isinstance(returncode, int) or isinstance(returncode, bool)
+        ):
+            issues.append(
+                ChangelogValidationIssue(
+                    "validation_run_returncode_invalid",
+                    f"Validation run {index} returncode must be an integer or null.",
+                    path,
+                )
+            )
+        elif run_status == "passed" and returncode != 0:
+            issues.append(
+                ChangelogValidationIssue(
+                    "validation_run_pass_mismatch",
+                    f"Validation run {index} is marked passed without returncode 0.",
+                    path,
+                )
+            )
+
+
 def validate_v2_file_change(
     *,
     issues: list[ChangelogValidationIssue],
@@ -545,6 +727,16 @@ def validate_unique_changelog_ids(
     for index, proposed_pr in enumerate(change_log.proposed_prs or [], start=1):
         _register(proposed_pr.id, "proposed PR", index)
 
+    for index, test_case in enumerate(
+        change_log.verification.required_test_cases, start=1
+    ):
+        _register(test_case.id, "required test case", index)
+
+    for index, validation_run in enumerate(
+        change_log.verification.validation_runs, start=1
+    ):
+        _register(validation_run.id, "validation run", index)
+
 
 def collect_changelog_defined_ids(change_log: ChangeLog) -> set[str]:
     defined_ids: set[str] = set()
@@ -564,6 +756,14 @@ def collect_changelog_defined_ids(change_log: ChangeLog) -> set[str]:
             normalized_id = normalize_changelog_id(getattr(item, "id", None))
             if normalized_id is not None:
                 defined_ids.add(normalized_id)
+    verification_items: list[object] = [
+        *change_log.verification.required_test_cases,
+        *change_log.verification.validation_runs,
+    ]
+    for verification_item in verification_items:
+        normalized_id = normalize_changelog_id(getattr(verification_item, "id", None))
+        if normalized_id is not None:
+            defined_ids.add(normalized_id)
     return defined_ids
 
 

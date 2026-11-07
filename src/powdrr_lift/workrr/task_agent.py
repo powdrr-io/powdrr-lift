@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import ast
 import hashlib
 import json
 import os
@@ -29,6 +30,7 @@ from powdrr_local import (
     create_miniswe_inference_handler,
 )
 from powdrr_service.changelog.parser import parse_change_log
+from powdrr_service.changelog.template import is_structured_document_path
 from powdrr_service.planning.multipr_structrr import (
     active_decision_drift_findings,
     inherited_decision_records,
@@ -998,10 +1000,20 @@ def _write_issue_worker_structrr_diff_artifacts(
     repo_root: Path,
     proposed: Mapping[str, Any],
     item_proposal: ProposalRevision,
+    *,
+    base_commit: str,
+    changed_paths: Sequence[str],
+    test_sources: Mapping[str, str],
+    test_obligations: Sequence[Mapping[str, Any]],
+    coverage_references: Mapping[str, Sequence[str]],
+    integration_test_report: Mapping[str, Any],
+    validation_report: Mapping[str, Any],
 ) -> tuple[str, ...]:
-    """Persist the accepted Structrr changelog diff for the PR."""
+    """Persist actual file changes and their test/validation evidence."""
     plan_id = str(proposed.get("plan_id", "")).strip()
     item_id = str(proposed.get("item_id", "")).strip()
+    title = str(proposed.get("title") or item_id).strip()
+    objective = str(proposed.get("objective") or title).strip()
     plan_slug = slugify_workflow_id(plan_id)
     item_slug = slugify_workflow_id(item_id)
     if not plan_slug or not item_slug:
@@ -1018,15 +1030,20 @@ def _write_issue_worker_structrr_diff_artifacts(
         ) from error
     artifact_root.mkdir(parents=True, exist_ok=True)
     section_names = {
-        "files": "files",
         "entities": "entities",
         "entity_relationships": "entity_relationships",
     }
     diff_sections: dict[str, list[dict[str, Any]]] = {
-        section: [] for section in section_names.values()
+        "files": [],
+        "entities": [],
+        "entity_relationships": [],
     }
-    action_names = {"add": "added", "change": "changed", "remove": "deleted"}
+    action_names = {"add": "added", "change": "modified", "remove": "deleted"}
     for operation in item_proposal.operations:
+        if operation.section == "files":
+            # The plan's source-subject operation is not a changelog file record.
+            # The actual candidate paths below carry the precise changed-file list.
+            continue
         section = section_names.get(operation.section)
         action = action_names.get(operation.action)
         if section is None or action is None:
@@ -1036,11 +1053,156 @@ def _write_issue_worker_structrr_diff_artifacts(
             )
         content = dict(operation.content)
         content["action"] = action
-        if section != "files":
-            content["id"] = operation.subject_id
+        content["id"] = operation.subject_id
         diff_sections[section].append(content)
-    title = str(proposed.get("title") or item_id).strip()
-    objective = str(proposed.get("objective") or title).strip()
+
+    excluded_paths = set(_issue_worker_structrr_artifact_exclusions(proposed))
+    structured_files: list[str] = []
+    path_statuses: dict[str, str] = {}
+    for raw_path in sorted(set(changed_paths)):
+        path = PurePosixPath(raw_path)
+        if (
+            path.is_absolute()
+            or ".." in path.parts
+            or not path.parts
+            or raw_path in excluded_paths
+            or raw_path.startswith("docs/structrr/diffs/")
+        ):
+            continue
+        base_exists = (
+            subprocess.run(
+                ["git", "cat-file", "-e", f"{base_commit}:{raw_path}"],
+                cwd=repo_root,
+                capture_output=True,
+                check=False,
+            ).returncode
+            == 0
+        )
+        candidate_exists = (repo_root / path).is_file()
+        if not base_exists and candidate_exists:
+            file_type = "added"
+        elif base_exists and candidate_exists:
+            file_type = "modified"
+        elif base_exists:
+            file_type = "deleted"
+        else:
+            continue
+        path_statuses[raw_path] = file_type
+        if is_structured_document_path(raw_path):
+            structured_files.append(raw_path)
+
+    if not path_statuses:
+        raise PowdrrExecutionError(
+            "Structrr diff requires at least one changed repository file"
+        )
+
+    test_names_by_file: dict[str, set[str]] = {}
+    for test_file_path, source in test_sources.items():
+        try:
+            tree = ast.parse(source, filename=test_file_path)
+        except SyntaxError as error:
+            raise PowdrrExecutionError(
+                f"cannot record invalid generated test file {test_file_path}: {error}"
+            ) from error
+        test_names_by_file[test_file_path] = {
+            node.name
+            for node in ast.walk(tree)
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+            and node.name.startswith("test_")
+        }
+    required_test_cases: list[dict[str, Any]] = []
+    test_case_ids_by_file: dict[str, list[str]] = {}
+    candidate_test_result = integration_test_report.get("candidate")
+    candidate_tests_passed = (
+        isinstance(integration_test_report.get("passed"), bool)
+        and integration_test_report.get("passed") is True
+        and isinstance(candidate_test_result, Mapping)
+        and candidate_test_result.get("passed") is True
+    )
+    for obligation in test_obligations:
+        case_id = obligation.get("obligation_id")
+        description = obligation.get("source_text")
+        if not isinstance(case_id, str) or not isinstance(description, str):
+            raise PowdrrExecutionError(
+                "generated Structrr test obligation is missing its deterministic id "
+                "or acceptance criterion"
+            )
+        selectors: list[str] = []
+        for test_name in coverage_references.get(case_id, ()):
+            matching_paths = [
+                path for path, names in test_names_by_file.items() if test_name in names
+            ]
+            if len(matching_paths) != 1:
+                raise PowdrrExecutionError(
+                    f"required test {test_name!r} for {case_id} does not resolve to "
+                    "exactly one generated test file"
+                )
+            test_path = matching_paths[0]
+            selectors.append(f"{test_path}::{test_name}")
+            test_case_ids_by_file.setdefault(test_path, []).append(case_id)
+        if not selectors:
+            raise PowdrrExecutionError(
+                f"required test case {case_id} has no linked pytest selector"
+            )
+        required_test_cases.append(
+            {
+                "id": case_id,
+                "description": description,
+                "status": "passed" if candidate_tests_passed else "failed",
+                "selectors": sorted(set(selectors)),
+            }
+        )
+
+    for changed_file_path, file_type in sorted(path_statuses.items()):
+        if changed_file_path in structured_files:
+            continue
+        related_case_ids = test_case_ids_by_file.get(changed_file_path, [])
+        summary = (
+            f"Add independent acceptance tests for {title}."
+            if changed_file_path in test_sources
+            else f"Record the {file_type} implementation change for {title}."
+        )
+        entry: dict[str, Any] = {
+            "path": changed_file_path,
+            "type": file_type,
+            "summary": summary,
+            "rationale": f"This file implements planned work item {item_id}.",
+        }
+        if related_case_ids:
+            entry["related"] = {"required_test_cases": sorted(set(related_case_ids))}
+        diff_sections["files"].append(entry)
+
+    validation_runs: list[dict[str, Any]] = []
+    raw_validation_results = validation_report.get("results")
+    if isinstance(raw_validation_results, list):
+        for result in raw_validation_results:
+            if not isinstance(result, Mapping):
+                continue
+            profile = result.get("profile")
+            command = result.get("command")
+            status = result.get("status")
+            if (
+                not isinstance(profile, str)
+                or not isinstance(command, list)
+                or not all(isinstance(token, str) and token for token in command)
+                or not isinstance(status, str)
+            ):
+                raise PowdrrExecutionError(
+                    "repository validation result cannot be represented in Structrr"
+                )
+            validation_runs.append(
+                {
+                    "id": f"validation-{slugify_workflow_id(profile)}",
+                    "profile": profile,
+                    "command": command,
+                    "status": status,
+                    "returncode": result.get("returncode"),
+                }
+            )
+    if not validation_runs:
+        raise PowdrrExecutionError(
+            "Structrr diff requires the repository validation command result"
+        )
     document: dict[str, Any] = {
         "schema": "https://powdrr.io/schema/changelog-v2",
         "change_id": item_slug,
@@ -1050,12 +1212,16 @@ def _write_issue_worker_structrr_diff_artifacts(
             "goal": objective,
         },
         "human-decisions": [],
-        "structured_files": [],
+        "structured_files": structured_files,
         **diff_sections,
         "invariants": [],
         "guidance": [],
         "features": [],
         "proposed_prs": [],
+        "verification": {
+            "required_test_cases": required_test_cases,
+            "validation_runs": validation_runs,
+        },
     }
     structrr_diff_text = yaml.safe_dump(
         document,
@@ -1069,9 +1235,9 @@ def _write_issue_worker_structrr_diff_artifacts(
         raise PowdrrExecutionError(
             f"compiled Structrr changelog-v2 diff is invalid: {error}"
         ) from error
-    path = artifact_root / "structrr-diff.yaml"
-    path.write_text(structrr_diff_text, encoding="utf-8")
-    return ((relative_directory / path.name).as_posix(),)
+    output_path = artifact_root / "structrr-diff.yaml"
+    output_path.write_text(structrr_diff_text, encoding="utf-8")
+    return ((relative_directory / output_path.name).as_posix(),)
 
 
 def _merge_structrr_decision_sections(
@@ -3804,6 +3970,13 @@ class _TaskWorkflowExecutionStrategy:
                 self.repo_root,
                 proposed,
                 item_proposal,
+                base_commit=base_commit,
+                changed_paths=final_attempt["changed_paths"],
+                test_sources=integration_test_sources,
+                test_obligations=integration_test_authoring["test_obligations"],
+                coverage_references=integration_test_authoring["coverage_references"],
+                integration_test_report=final_attempt["integration_tests"],
+                validation_report=final_attempt["validation"],
             )
             changed_paths = sorted({*changed_paths, *artifact_paths})
             structural_result = {

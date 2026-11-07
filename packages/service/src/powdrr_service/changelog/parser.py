@@ -103,6 +103,29 @@ class ChangeProposedPRState:
 
 
 @dataclass(frozen=True, slots=True)
+class ChangeRequiredTestCase:
+    id: str | None = None
+    description: str | None = None
+    status: str | None = None
+    selectors: list[str] = field(default_factory=list)
+
+
+@dataclass(frozen=True, slots=True)
+class ChangeValidationRun:
+    id: str | None = None
+    profile: str | None = None
+    command: list[str] = field(default_factory=list)
+    status: str | None = None
+    returncode: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ChangeVerification:
+    required_test_cases: list[ChangeRequiredTestCase] = field(default_factory=list)
+    validation_runs: list[ChangeValidationRun] = field(default_factory=list)
+
+
+@dataclass(frozen=True, slots=True)
 class ChangeLog:
     version: int | str | None = None
     change_id: str | None = None
@@ -119,6 +142,7 @@ class ChangeLog:
     guidance_changes: list[ChangeGuidance] = field(default_factory=list)
     feature_changes: list[ChangeFeatureState] = field(default_factory=list)
     proposed_prs: list[ChangeProposedPRState] = field(default_factory=list)
+    verification: ChangeVerification = field(default_factory=ChangeVerification)
 
 
 def parse_change_log(yaml_content: str) -> ChangeLog:
@@ -194,7 +218,36 @@ def _parse_change_log_v2(data: Mapping[str, Any]) -> ChangeLog:
         guidance_changes=_parse_change_guidance(data),
         feature_changes=_parse_change_features(data),
         proposed_prs=_parse_change_proposed_prs(data),
+        verification=_parse_verification(data.get("verification")),
     )
+
+
+def _parse_verification(raw_verification: object | None) -> ChangeVerification:
+    if raw_verification is None:
+        return ChangeVerification()
+    data = _ensure_mapping(raw_verification)
+    required_test_cases = [
+        ChangeRequiredTestCase(
+            id=_coerce_optional_str(case.get("id")),
+            description=_coerce_optional_str(case.get("description")),
+            status=_coerce_optional_str(case.get("status")),
+            selectors=_parse_path_sequence(case.get("selectors")),
+        )
+        for raw_case in _ensure_sequence(data.get("required_test_cases"))
+        for case in (_ensure_mapping(raw_case),)
+    ]
+    validation_runs = [
+        ChangeValidationRun(
+            id=_coerce_optional_str(run.get("id")),
+            profile=_coerce_optional_str(run.get("profile")),
+            command=_parse_path_sequence(run.get("command")),
+            status=_coerce_optional_str(run.get("status")),
+            returncode=_coerce_int(run.get("returncode")),
+        )
+        for raw_run in _ensure_sequence(data.get("validation_runs"))
+        for run in (_ensure_mapping(raw_run),)
+    ]
+    return ChangeVerification(required_test_cases, validation_runs)
 
 
 def _parse_intent(raw_intent: object | None) -> Intent:

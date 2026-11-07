@@ -972,6 +972,39 @@ def test_issue_worker_persists_only_structrr_changelog_diff(
 ) -> None:
     repo_root = tmp_path / "repo"
     repo_root.mkdir()
+    subprocess.run(["git", "init", "-q"], cwd=repo_root, check=True)
+    subprocess.run(
+        ["git", "config", "user.name", "Test User"], cwd=repo_root, check=True
+    )
+    subprocess.run(
+        ["git", "config", "user.email", "test@example.invalid"],
+        cwd=repo_root,
+        check=True,
+    )
+    source_path = repo_root / "src" / "verifier.py"
+    source_path.parent.mkdir(parents=True)
+    source_path.write_text("def verify():\n    return True\n", encoding="utf-8")
+    subprocess.run(["git", "add", "."], cwd=repo_root, check=True)
+    subprocess.run(["git", "commit", "-m", "baseline"], cwd=repo_root, check=True)
+    base_commit = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    source_path.write_text(
+        "def verify():\n    return True\n\n# preserve\n",
+        encoding="utf-8",
+    )
+    test_path = "tests/test_add_verifier.py"
+    test_sources = {
+        test_path: (
+            "# Covers: AC-01 test_verify\ndef test_verify():\n    assert True\n"
+        )
+    }
+    (repo_root / test_path).parent.mkdir(parents=True)
+    (repo_root / test_path).write_text(test_sources[test_path], encoding="utf-8")
     proposal = ProposalRevision(
         proposal_id="feature-v1:item-0003",
         structrr_baseline_fingerprint="sha256:baseline",
@@ -1000,15 +1033,42 @@ def test_issue_worker_persists_only_structrr_changelog_diff(
             "objective": "Provide a verifier component.",
         },
         proposal,
+        base_commit=base_commit,
+        changed_paths=("src/verifier.py", test_path),
+        test_sources=test_sources,
+        test_obligations=(
+            {
+                "obligation_id": "AC-01",
+                "source_text": "The verifier returns true for valid input.",
+            },
+        ),
+        coverage_references={"AC-01": ["test_verify"]},
+        integration_test_report={"passed": True, "candidate": {"passed": True}},
+        validation_report={
+            "results": [
+                {
+                    "profile": "pytest",
+                    "command": ["python", "-m", "pytest"],
+                    "status": "passed",
+                    "returncode": 0,
+                }
+            ]
+        },
     )
 
     assert paths == ("docs/structrr/diffs/feature-v1/item-0003/structrr-diff.yaml",)
-    assert (
-        parse_change_log((repo_root / paths[0]).read_text(encoding="utf-8"))
-        .entity_changes[0]
-        .id
-        == "Verifier"
-    )
+    changelog = parse_change_log((repo_root / paths[0]).read_text(encoding="utf-8"))
+    assert changelog.entity_changes[0].id == "Verifier"
+    assert {item.path for item in changelog.file_changes} == {
+        "src/verifier.py",
+        test_path,
+    }
+    assert changelog.file_changes[1].related.required_test_cases == ["AC-01"]
+    assert changelog.verification.required_test_cases[0].status == "passed"
+    assert changelog.verification.required_test_cases[0].selectors == [
+        "tests/test_add_verifier.py::test_verify"
+    ]
+    assert changelog.verification.validation_runs[0].status == "passed"
     artifact_dir = repo_root / "docs/structrr/diffs/feature-v1/item-0003"
     assert sorted(path.name for path in artifact_dir.iterdir()) == [
         "structrr-diff.yaml"

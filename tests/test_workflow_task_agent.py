@@ -959,10 +959,44 @@ def test_issue_worker_structrr_baseline_uses_target_commit_not_checkpoint(
     )
     assert "tests/test_generated_feature.py" in candidate_exclusions
     assert "docs/reports/final.json" in candidate_exclusions
+    assert "docs/structrr/diffs" in candidate_exclusions
     assert report["classification"] == "clean"
     assert checkpoint_commit != base_commit
     assert git("rev-parse", "HEAD") == checkpoint_commit
     assert (repo_root / ".github/workflows/ci.yml").is_file()
+
+
+def test_issue_worker_persists_actual_structrr_diff_and_comparison(
+    tmp_path: Path,
+) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+    structural_report = {
+        "actual_diff": {
+            "schema_version": "structrr-actual-diff-v1",
+            "structural_operations": [{"action": "add", "subject_id": "Verifier"}],
+        },
+        "comparison": {"passed": True, "fulfilled_operations": ["operation-1"]},
+    }
+
+    paths = task_agent._write_issue_worker_structrr_diff_artifacts(
+        repo_root,
+        {"plan_id": "feature-v1", "item_id": "item-0003"},
+        structural_report,
+    )
+
+    assert paths == (
+        "docs/structrr/diffs/feature-v1/item-0003/actual-structrr-diff.json",
+        "docs/structrr/diffs/feature-v1/item-0003/candidate-structrr-comparison.json",
+    )
+    assert (
+        json.loads((repo_root / paths[0]).read_text(encoding="utf-8"))
+        == (structural_report["actual_diff"])
+    )
+    assert (
+        json.loads((repo_root / paths[1]).read_text(encoding="utf-8"))
+        == (structural_report["comparison"])
+    )
 
 
 def test_issue_worker_blocks_file_addition_overlap_before_structrr_bootstrap(
@@ -1381,6 +1415,13 @@ def test_issue_worker_continues_after_nontrivial_validation_failure(
     assert result["attempts"][0]["validation"]["status"] == "failed"
     assert result["attempts"][1]["validation"]["status"] == "passed"
     assert result["structrr"]["passed"] is True
+    structrr_artifact_paths = result["structrr"]["artifact_paths"]
+    assert structrr_artifact_paths == [
+        "docs/structrr/diffs/feature-v1/feature-v1-pr-01/actual-structrr-diff.json",
+        "docs/structrr/diffs/feature-v1/feature-v1-pr-01/candidate-structrr-comparison.json",
+    ]
+    assert set(structrr_artifact_paths) <= set(result["changed_paths"])
+    assert all((tmp_path / path).is_file() for path in structrr_artifact_paths)
     assert result["integration_tests"]["passed"] is True
     assert result["integration_tests"]["generation_method"] == "miniswe_pre_coding"
     assert result["integration_tests"]["test_sha256"] == {
@@ -1400,6 +1441,7 @@ def test_issue_worker_continues_after_nontrivial_validation_failure(
                 "docs/plans/feature-v1-execution-plan.yaml",
                 "docs/plans/feature-v1-structrr-proposal.json",
                 "docs/workflows/feature-v1/",
+                "docs/structrr/diffs",
                 "tests/integration/test_feature_e2e.py",
             )
         )

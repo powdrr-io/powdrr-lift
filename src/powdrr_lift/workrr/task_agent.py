@@ -984,12 +984,58 @@ def _issue_worker_structrr_artifact_exclusions(
         f"docs/plans/{plan_slug}-execution-plan.yaml",
         f"docs/plans/{plan_slug}-structrr-proposal.json",
         f"docs/workflows/{plan_slug}/",
+        "docs/structrr/diffs",
     ]
     final_report = proposed.get("final_review_report_path")
     if isinstance(final_report, str) and final_report:
         exclusions.append(final_report)
     exclusions.extend(additional_paths)
     return tuple(dict.fromkeys(exclusions))
+
+
+def _write_issue_worker_structrr_diff_artifacts(
+    repo_root: Path,
+    proposed: Mapping[str, Any],
+    structural_report: Mapping[str, Any],
+) -> tuple[str, ...]:
+    """Persist the observed actual diff and proposal comparison for the PR."""
+    actual_diff = structural_report.get("actual_diff")
+    comparison = structural_report.get("comparison")
+    if not isinstance(actual_diff, Mapping) or not isinstance(comparison, Mapping):
+        raise PowdrrExecutionError(
+            "a passing planned implementation must include its Structrr actual "
+            "diff and candidate comparison"
+        )
+    plan_id = str(proposed.get("plan_id", "")).strip()
+    item_id = str(proposed.get("item_id", "")).strip()
+    plan_slug = slugify_workflow_id(plan_id)
+    item_slug = slugify_workflow_id(item_id)
+    if not plan_slug or not item_slug:
+        raise PowdrrExecutionError(
+            "Structrr diff artifacts require the plan and item identifiers"
+        )
+    relative_directory = Path("docs/structrr/diffs") / plan_slug / item_slug
+    artifact_root = (repo_root / relative_directory).resolve()
+    try:
+        artifact_root.relative_to(repo_root.resolve())
+    except ValueError as error:
+        raise PowdrrExecutionError(
+            "Structrr diff artifact path must stay inside the repository"
+        ) from error
+    artifact_root.mkdir(parents=True, exist_ok=True)
+    artifacts = {
+        "actual-structrr-diff.json": actual_diff,
+        "candidate-structrr-comparison.json": comparison,
+    }
+    relative_paths: list[str] = []
+    for filename, value in artifacts.items():
+        path = artifact_root / filename
+        path.write_text(
+            json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        relative_paths.append((relative_directory / filename).as_posix())
+    return tuple(relative_paths)
 
 
 def _merge_structrr_decision_sections(
@@ -3699,14 +3745,31 @@ class _TaskWorkflowExecutionStrategy:
 
         final_attempt = attempt_records[-1]
         attempt_data = final_attempt["attempt"]
+        changed_paths = list(final_attempt["changed_paths"])
+        structural_result = final_attempt.get("structrr")
+        if bool(final_attempt["passed"]) and item_proposal is not None:
+            if not isinstance(structural_result, Mapping):
+                raise PowdrrExecutionError(
+                    "a passing planned implementation omitted its Structrr report"
+                )
+            artifact_paths = _write_issue_worker_structrr_diff_artifacts(
+                self.repo_root,
+                proposed,
+                structural_result,
+            )
+            changed_paths = sorted({*changed_paths, *artifact_paths})
+            structural_result = {
+                **structural_result,
+                "artifact_paths": list(artifact_paths),
+            }
         result = {
             "passed": bool(final_attempt["passed"]),
             "attempt_id": attempt_data["attempt_id"],
             "status": attempt_data["status"],
-            "changed_paths": final_attempt["changed_paths"],
+            "changed_paths": changed_paths,
             "out_of_scope_paths": list(attempt_data.get("out_of_scope_paths", [])),
             "validation": final_attempt["validation"],
-            "structrr": final_attempt.get("structrr"),
+            "structrr": structural_result,
             "integration_tests": final_attempt.get("integration_tests"),
             "error": attempt_data.get("error"),
             "attempts": attempt_records,

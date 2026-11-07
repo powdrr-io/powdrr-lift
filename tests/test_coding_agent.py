@@ -64,7 +64,14 @@ class FakeProvider:
                 ["fake"], 0, '{"type":"session.completed"}\n', ""
             )
         if self.action == "out-of-scope":
-            (worktree_root / "README.md").write_text("changed\n")
+            (worktree_root / "README.md").write_text("changed\n" * 25)
+            return subprocess.CompletedProcess(["fake"], 0, "", "")
+        if self.action == "supporting-edits":
+            (worktree_root / "attestation").mkdir(exist_ok=True)
+            (worktree_root / "attestation" / "golden.json").write_text(
+                '{"digest": "new"}\n'
+            )
+            (worktree_root / "verify.py").write_text("def verify():\n    return True\n")
             return subprocess.CompletedProcess(["fake"], 0, "", "")
         if self.action == "ephemeral":
             (worktree_root / "src").mkdir()
@@ -104,7 +111,7 @@ class FakeProvider:
         target = worktree_root / relative_path
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(
-            "committed unexpectedly\n"
+            "committed unexpectedly\n" * 25
             if relative_path == "README.md"
             else "committed change\n"
         )
@@ -798,6 +805,73 @@ def test_worker_out_of_scope_change_is_policy_denied(tmp_path: Path) -> None:
 
     assert attempt.status is CodingAgentStatus.POLICY_DENIED
     assert attempt.out_of_scope_paths == ("README.md",)
+
+
+def test_worker_accepts_small_supporting_edits_to_existing_files(
+    tmp_path: Path,
+) -> None:
+    worktree = _git_repo(tmp_path)
+    (worktree / "attestation").mkdir()
+    (worktree / "attestation" / "golden.json").write_text('{"digest": "old"}\n')
+    (worktree / "verify.py").write_text("def verify():\n    return False\n")
+    subprocess.run(
+        ["git", "add", "attestation/golden.json", "verify.py"], cwd=worktree, check=True
+    )
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.com",
+            "commit",
+            "-m",
+            "add validation fixtures",
+        ],
+        cwd=worktree,
+        check=True,
+        capture_output=True,
+    )
+
+    attempt = run_coding_agent(
+        FakeProvider("supporting-edits"),
+        _request(_head(worktree)),
+        worktree_root=worktree,
+        attempt_id="attempt-small-supporting-edits",
+    )
+
+    assert attempt.status is CodingAgentStatus.COMPLETED
+    assert attempt.changed_paths == ("attestation/golden.json", "verify.py")
+    assert attempt.out_of_scope_paths == ()
+
+
+def test_worker_removes_new_file_outside_scope(tmp_path: Path) -> None:
+    worktree = _git_repo(tmp_path)
+
+    class NewFileProvider:
+        provider_name = "fake"
+
+        def run(
+            self,
+            request: ImplementationRequest,
+            *,
+            worktree_root: Path,
+            attempt_id: str,
+        ) -> subprocess.CompletedProcess[str]:
+            del request, attempt_id
+            (worktree_root / "support.py").write_text("value = 1\n")
+            return subprocess.CompletedProcess(["fake"], 0, "", "")
+
+    attempt = run_coding_agent(
+        NewFileProvider(),
+        _request(_head(worktree)),
+        worktree_root=worktree,
+        attempt_id="attempt-new-unlisted-file",
+    )
+
+    assert attempt.status is CodingAgentStatus.COMPLETED
+    assert attempt.out_of_scope_paths == ()
+    assert not (worktree / "support.py").exists()
 
 
 def test_worker_change_to_protected_path_is_policy_denied(tmp_path: Path) -> None:

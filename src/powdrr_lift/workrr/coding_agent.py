@@ -35,6 +35,8 @@ from powdrr_lift.core.implementation_packet import ImplementationPacket
 
 CODING_AGENT_REQUEST_SCHEMA_VERSION = "implementation-request-v2"
 CODING_AGENT_ATTEMPT_SCHEMA_VERSION = "implementation-attempt-v2"
+MAX_SUPPORTING_EDIT_FILES = 2
+MAX_SUPPORTING_EDIT_LINES = 20
 MINISWEAGENT_MAX_TASK_ARGUMENT_BYTES = 64 * 1024
 DEFAULT_CODING_AGENT_TIMEOUT_SECONDS = 1800.0
 DEFAULT_CODING_AGENT_VALIDATION_TIMEOUT_SECONDS = 1800.0
@@ -312,11 +314,17 @@ class ImplementationRequest:
             "only; the surrounding workflow owns the full validation profile.\n\n"
             "Work in the existing task worktree. Do not create branches, "
             "commits, pull requests, or generated repository metadata. Use only "
-            "the allowed paths or declared ephemeral paths. Temporary helpers "
+            "the allowed paths or declared ephemeral paths. You may also make "
+            f"small supporting edits to at most {MAX_SUPPORTING_EDIT_FILES} "
+            "existing regular text files outside those paths, with no more than "
+            f"{MAX_SUPPORTING_EDIT_LINES} added or removed lines total. These edits "
+            "must directly support the acceptance criteria. Do not create, delete, "
+            "rename, or make binary changes outside the allowed paths. Protected "
+            "paths remain forbidden. Temporary helpers "
             "are permitted only in declared ephemeral paths. Stay in the current "
             "working directory; do not cd to, inspect, or select sibling "
-            "worktrees or paths outside it. Do not alter files outside the "
-            "request. Emit any uncertainty decisions as JSONL stdout events "
+            "worktrees or paths outside it. Do not make other changes outside "
+            "the request. Emit any uncertainty decisions as JSONL stdout events "
             "using type=uncertainty_decision with source_ref (instruction "
             "clause ID), dimension, uncertainty, selected_default, rationale, "
             "basis, basis_reference, confidence, and optional scenario and "
@@ -1303,11 +1311,17 @@ def run_coding_agent(
         for path in changed_paths
         if _path_is_allowed(path, request.protected_paths)
     )
+    supporting_edits = _permitted_supporting_edits(
+        worktree_root, before_head, out_of_scope, request.protected_paths
+    )
+    denied_out_of_scope = tuple(
+        path for path in out_of_scope if path not in supporting_edits
+    )
     fingerprint = _worktree_fingerprint(worktree_root, changed_paths)
     head_rewritten = before_head != after_head and not _git_is_ancestor(
         worktree_root, before_head, after_head
     )
-    if head_rewritten or out_of_scope or protected_changes:
+    if head_rewritten or denied_out_of_scope or protected_changes:
         status = CodingAgentStatus.POLICY_DENIED
         terminal_error = (
             "worker rewrote HEAD instead of adding commits"
@@ -1332,7 +1346,7 @@ def run_coding_agent(
         status=status,
         exit_code=completed.returncode,
         changed_paths=changed_paths,
-        out_of_scope_paths=out_of_scope,
+        out_of_scope_paths=denied_out_of_scope,
         diff_fingerprint=fingerprint,
         worker_committed=bool(commit_ids),
         commit_ids=commit_ids,
@@ -1426,6 +1440,66 @@ def _path_is_allowed(path: str, allowed_paths: Sequence[str]) -> bool:
         scope == "." or candidate == Path(scope) or Path(scope) in candidate.parents
         for scope in allowed_paths
     )
+
+
+def _permitted_supporting_edits(
+    worktree_root: Path,
+    base_commit: str,
+    paths: Sequence[str],
+    protected_paths: Sequence[str],
+) -> frozenset[str]:
+    """Accept a tightly bounded set of small edits to existing text files."""
+    if not paths or len(paths) > MAX_SUPPORTING_EDIT_FILES:
+        return frozenset()
+    if any(_path_is_allowed(path, protected_paths) for path in paths):
+        return frozenset()
+
+    result = subprocess.run(
+        ["git", "diff", "--numstat", "--no-renames", base_commit, "--", *paths],
+        cwd=worktree_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        return frozenset()
+    rows = result.stdout.splitlines()
+    if len(rows) != len(paths):
+        return frozenset()
+
+    changed_lines = 0
+    observed_paths: set[str] = set()
+    for row in rows:
+        parts = row.split("\t", 2)
+        if len(parts) != 3:
+            return frozenset()
+        additions, deletions, path = parts
+        if additions == "-" or deletions == "-" or path not in paths:
+            return frozenset()
+        try:
+            changed_lines += int(additions) + int(deletions)
+        except ValueError:
+            return frozenset()
+        baseline_file = subprocess.run(
+            ["git", "cat-file", "-e", f"{base_commit}:{path}"],
+            cwd=worktree_root,
+            capture_output=True,
+            check=False,
+        )
+        current_file = worktree_root / path
+        if (
+            baseline_file.returncode != 0
+            or not current_file.is_file()
+            or current_file.is_symlink()
+        ):
+            return frozenset()
+        observed_paths.add(path)
+
+    if observed_paths != set(paths) or changed_lines == 0:
+        return frozenset()
+    if changed_lines > MAX_SUPPORTING_EDIT_LINES:
+        return frozenset()
+    return frozenset(observed_paths)
 
 
 def _remove_ephemeral_paths(

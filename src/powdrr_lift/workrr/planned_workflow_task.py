@@ -90,6 +90,8 @@ def run_planned_workflow_task(
             }
         )
         workflow_inputs["feature_description"] = item.objective
+        workflow_inputs["github_issue_number"] = item.github_issue_number
+        workflow_inputs["github_repository"] = options.repository
         if item.implementation_steps:
             workflow_context["implementation_steps"] = list(item.implementation_steps)
         if item.inline_adjustments:

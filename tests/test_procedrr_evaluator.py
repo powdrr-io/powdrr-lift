@@ -817,6 +817,8 @@ steps:
                 else "not-a-pull-request-url"
             )
         if command == "observe":
+            assert parameters["repository"] == "example/repo"
+            assert parameters["issue_number"] == 42
             return {"outcome": "observed"}
         if command == "prepare":
             return {"status": "unresolved"}
@@ -837,6 +839,8 @@ steps:
                     "objective": (
                         "Implement the shared attestation schema and DSSE verifier."
                     ),
+                    "github_repository": "example/repo",
+                    "github_issue_number": 42,
                     "proposed_pr_context": {
                         "github_repository": "example/repo",
                         "github_issue_number": 42,
@@ -898,6 +902,8 @@ steps:
             {
                 "task_context": {
                     "objective": "Implement a feature",
+                    "github_repository": "example/repo",
+                    "github_issue_number": 42,
                     "proposed_pr_context": {
                         "github_repository": "example/repo",
                         "github_issue_number": 42,
@@ -919,6 +925,8 @@ steps:
                         {
                             "task_context": {
                                 "objective": "Implement a feature",
+                                "github_repository": "example/repo",
+                                "github_issue_number": 42,
                                 "proposed_pr_context": {
                                     "github_repository": "example/repo",
                                     "github_issue_number": 42,
@@ -934,6 +942,8 @@ steps:
                 {
                     "task_context": {
                         "objective": "Implement a feature",
+                        "github_repository": "example/repo",
+                        "github_issue_number": 42,
                         "proposed_pr_context": {
                             "github_repository": "example/repo",
                             "github_issue_number": 42,
@@ -974,6 +984,8 @@ steps:
             {
                 "task_context": {
                     "objective": "Implement a feature",
+                    "github_repository": "example/repo",
+                    "github_issue_number": 42,
                     "proposed_pr_context": {
                         "github_repository": "example/repo",
                         "github_issue_number": 42,
@@ -993,6 +1005,8 @@ steps:
                 {
                     "task_context": {
                         "objective": "Implement a feature",
+                        "github_repository": "example/repo",
+                        "github_issue_number": 42,
                         "proposed_pr_context": {
                             "github_repository": "example/repo",
                             "github_issue_number": 42,
@@ -1009,9 +1023,9 @@ steps:
         {
             "task_context": {
                 "objective": "Implement a feature",
+                "github_repository": "example/repo",
+                "github_issue_number": 42,
                 "proposed_pr_context": {
-                    "github_repository": "example/repo",
-                    "github_issue_number": 42,
                     "verification_command": "pytest -q",
                 },
             }

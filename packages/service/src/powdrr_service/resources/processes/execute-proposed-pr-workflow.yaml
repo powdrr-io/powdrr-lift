@@ -33,11 +33,15 @@ steps:
           - call:
               process: respond-to-pr-ci
               inputs:
-                repository: {type: reference, value: task_context.github_repository}
-                issue_number: {type: reference, value: task_context.github_issue_number}
+                repository:
+                  {type: reference, value: task_context.input_state.github_repository}
+                issue_number:
+                  {type: reference, value: task_context.input_state.github_issue_number}
                 pull_request_url: {type: reference, value: pull_request_url}
-                verification_command: {type: reference, value: task_context.proposed_pr_context.verification_command}
-                implementation_context: {type: reference, value: task_context.proposed_pr_context}
+                verification_command:
+                  {type: reference, value: task_context.input_state.proposed_pr_context.verification_command}
+                implementation_context:
+                  {type: reference, value: task_context.input_state.proposed_pr_context}
               outputs:
                 ci_observation_result: ci_observation_result
                 repair_preparation: repair_preparation
@@ -86,11 +90,15 @@ steps:
                 - call:
                     process: respond-to-pr-ci
                     inputs:
-                      repository: {type: reference, value: task_context.github_repository}
-                      issue_number: {type: reference, value: task_context.github_issue_number}
+                      repository:
+                        {type: reference, value: task_context.input_state.github_repository}
+                      issue_number:
+                        {type: reference, value: task_context.input_state.github_issue_number}
                       pull_request_url: {type: reference, value: pull_request_url}
-                      verification_command: {type: reference, value: task_context.proposed_pr_context.verification_command}
-                      implementation_context: {type: reference, value: task_context.proposed_pr_context}
+                      verification_command:
+                        {type: reference, value: task_context.input_state.proposed_pr_context.verification_command}
+                      implementation_context:
+                        {type: reference, value: task_context.input_state.proposed_pr_context}
                     outputs:
                       ci_observation_result: ci_observation_result
                       repair_preparation: repair_preparation

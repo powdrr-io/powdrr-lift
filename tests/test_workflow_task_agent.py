@@ -312,7 +312,7 @@ def test_execute_pr_test_author_prompt_leaves_workspace_path_for_agent(
 ) -> None:
     authoring_worktree = tmp_path / "isolated" / "authoring-worktree"
     prompt = build_execute_pr_test_author_prompt(
-        test_path="attestation/tests/test_powdrr_execute_pr_abcdef123456.py",
+        test_path="attestation/tests/test_add_ci_preservation_note.py",
         plan_context={"acceptance_criteria": ["The workflow runs on pull requests."]},
         obligations=acceptance_criteria_contract(
             ["The workflow runs on pull requests."]
@@ -333,7 +333,7 @@ def test_execute_pr_test_author_prompt_leaves_workspace_path_for_agent(
     assert "fail through a behavioral assertion" in prompt
     assert "Deterministic test obligations" in prompt
     assert "# Covers: AC-01 test_function_name" in prompt
-    assert "attestation/tests/test_powdrr_execute_pr_abcdef123456.py" in prompt
+    assert "attestation/tests/test_add_ci_preservation_note.py" in prompt
     assert "do not create other files" in prompt
     assert '"obligation_id": "AC-01"' in prompt
     assert "partitions" not in prompt

@@ -28,6 +28,7 @@ from powdrr_local import (
     LocalPowdrrService,
     create_miniswe_inference_handler,
 )
+from powdrr_service.changelog.parser import parse_change_log
 from powdrr_service.planning.multipr_structrr import (
     active_decision_drift_findings,
     inherited_decision_records,
@@ -996,9 +997,10 @@ def _issue_worker_structrr_artifact_exclusions(
 def _write_issue_worker_structrr_diff_artifacts(
     repo_root: Path,
     proposed: Mapping[str, Any],
+    item_proposal: ProposalRevision,
     structural_report: Mapping[str, Any],
 ) -> tuple[str, ...]:
-    """Persist the observed actual diff and proposal comparison for the PR."""
+    """Persist the accepted Structrr changelog and its machine reports."""
     actual_diff = structural_report.get("actual_diff")
     comparison = structural_report.get("comparison")
     if not isinstance(actual_diff, Mapping) or not isinstance(comparison, Mapping):
@@ -1023,17 +1025,73 @@ def _write_issue_worker_structrr_diff_artifacts(
             "Structrr diff artifact path must stay inside the repository"
         ) from error
     artifact_root.mkdir(parents=True, exist_ok=True)
+    section_names = {
+        "files": "files",
+        "entities": "entities",
+        "entity_relationships": "entity_relationships",
+    }
+    diff_sections: dict[str, list[dict[str, Any]]] = {
+        section: [] for section in section_names.values()
+    }
+    action_names = {"add": "added", "change": "changed", "remove": "deleted"}
+    for operation in item_proposal.operations:
+        section = section_names.get(operation.section)
+        action = action_names.get(operation.action)
+        if section is None or action is None:
+            raise PowdrrExecutionError(
+                "accepted Structrr proposal contains an operation that cannot be "
+                "serialized as a changelog-v2 diff"
+            )
+        content = dict(operation.content)
+        content["action"] = action
+        if section != "files":
+            content["id"] = operation.subject_id
+        diff_sections[section].append(content)
+    title = str(proposed.get("title") or item_id).strip()
+    objective = str(proposed.get("objective") or title).strip()
+    document: dict[str, Any] = {
+        "schema": "https://powdrr.io/schema/changelog-v2",
+        "change_id": item_slug,
+        "title": title,
+        "intent": {
+            "problem": f"The planned change {title!r} is not yet implemented.",
+            "goal": objective,
+        },
+        "human-decisions": [],
+        "structured_files": [],
+        **diff_sections,
+        "invariants": [],
+        "guidance": [],
+        "features": [],
+        "proposed_prs": [],
+    }
+    structrr_diff_text = yaml.safe_dump(
+        document,
+        allow_unicode=True,
+        default_flow_style=False,
+        sort_keys=False,
+    )
+    try:
+        parse_change_log(structrr_diff_text)
+    except (TypeError, ValueError) as error:
+        raise PowdrrExecutionError(
+            f"compiled Structrr changelog-v2 diff is invalid: {error}"
+        ) from error
     artifacts = {
-        "actual-structrr-diff.json": actual_diff,
+        "structrr-diff.yaml": structrr_diff_text,
+        "structrr-actualization-report.json": actual_diff,
         "candidate-structrr-comparison.json": comparison,
     }
     relative_paths: list[str] = []
     for filename, value in artifacts.items():
         path = artifact_root / filename
-        path.write_text(
-            json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
-            encoding="utf-8",
-        )
+        if isinstance(value, str):
+            path.write_text(value, encoding="utf-8")
+        else:
+            path.write_text(
+                json.dumps(value, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
         relative_paths.append((relative_directory / filename).as_posix())
     return tuple(relative_paths)
 
@@ -3755,6 +3813,7 @@ class _TaskWorkflowExecutionStrategy:
             artifact_paths = _write_issue_worker_structrr_diff_artifacts(
                 self.repo_root,
                 proposed,
+                item_proposal,
                 structural_result,
             )
             changed_paths = sorted({*changed_paths, *artifact_paths})

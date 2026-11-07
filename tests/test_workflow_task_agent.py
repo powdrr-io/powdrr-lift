@@ -13,6 +13,7 @@ from typing import Any, cast
 import pytest
 import yaml
 from powdrr_local import LocalPowdrrService
+from powdrr_service.changelog.parser import parse_change_log
 from powdrr_service.planning.multipr_structrr import (
     compile_multi_pr_proposal,
     write_multi_pr_proposal,
@@ -966,7 +967,7 @@ def test_issue_worker_structrr_baseline_uses_target_commit_not_checkpoint(
     assert (repo_root / ".github/workflows/ci.yml").is_file()
 
 
-def test_issue_worker_persists_actual_structrr_diff_and_comparison(
+def test_issue_worker_persists_structrr_changelog_diff_and_diagnostics(
     tmp_path: Path,
 ) -> None:
     repo_root = tmp_path / "repo"
@@ -978,23 +979,54 @@ def test_issue_worker_persists_actual_structrr_diff_and_comparison(
         },
         "comparison": {"passed": True, "fulfilled_operations": ["operation-1"]},
     }
+    proposal = ProposalRevision(
+        proposal_id="feature-v1:item-0003",
+        structrr_baseline_fingerprint="sha256:baseline",
+        operations=(
+            ProposalOperation(
+                operation_id="add:entities:Verifier",
+                section="entities",
+                subject_id="Verifier",
+                action="add",
+                content={"id": "Verifier", "type": "Component"},
+            ),
+        ),
+        acceptance_criteria=("The verifier is available.",),
+        must_preserve=(),
+        non_goals=(),
+        allowed_paths=("src", "tests"),
+        source_refs=("plan:item-0003",),
+    )
 
     paths = task_agent._write_issue_worker_structrr_diff_artifacts(
         repo_root,
-        {"plan_id": "feature-v1", "item_id": "item-0003"},
+        {
+            "plan_id": "feature-v1",
+            "item_id": "item-0003",
+            "title": "Add verifier",
+            "objective": "Provide a verifier component.",
+        },
+        proposal,
         structural_report,
     )
 
     assert paths == (
-        "docs/structrr/diffs/feature-v1/item-0003/actual-structrr-diff.json",
+        "docs/structrr/diffs/feature-v1/item-0003/structrr-diff.yaml",
+        "docs/structrr/diffs/feature-v1/item-0003/structrr-actualization-report.json",
         "docs/structrr/diffs/feature-v1/item-0003/candidate-structrr-comparison.json",
     )
     assert (
-        json.loads((repo_root / paths[0]).read_text(encoding="utf-8"))
-        == (structural_report["actual_diff"])
+        parse_change_log((repo_root / paths[0]).read_text(encoding="utf-8"))
+        .entity_changes[0]
+        .id
+        == "Verifier"
     )
     assert (
         json.loads((repo_root / paths[1]).read_text(encoding="utf-8"))
+        == (structural_report["actual_diff"])
+    )
+    assert (
+        json.loads((repo_root / paths[2]).read_text(encoding="utf-8"))
         == (structural_report["comparison"])
     )
 
@@ -1417,7 +1449,8 @@ def test_issue_worker_continues_after_nontrivial_validation_failure(
     assert result["structrr"]["passed"] is True
     structrr_artifact_paths = result["structrr"]["artifact_paths"]
     assert structrr_artifact_paths == [
-        "docs/structrr/diffs/feature-v1/feature-v1-pr-01/actual-structrr-diff.json",
+        "docs/structrr/diffs/feature-v1/feature-v1-pr-01/structrr-diff.yaml",
+        "docs/structrr/diffs/feature-v1/feature-v1-pr-01/structrr-actualization-report.json",
         "docs/structrr/diffs/feature-v1/feature-v1-pr-01/candidate-structrr-comparison.json",
     ]
     assert set(structrr_artifact_paths) <= set(result["changed_paths"])

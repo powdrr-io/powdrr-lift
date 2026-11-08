@@ -1719,6 +1719,11 @@ def test_plan_cli_creates_tracking_issue_and_publishes_compiled_artifacts(
 
     source = tmp_path / "proposal.md"
     source.write_text("# Proposal\nAdd a foundation.", encoding="utf-8")
+    monkeypatch.setenv("SUBQ_API_KEY", "subq-test-key")
+    monkeypatch.delenv("TYPESAFEAI_API_KEY", raising=False)
+    monkeypatch.delenv("TYPESAFE_API_KEY", raising=False)
+    monkeypatch.delenv("SYSTEM_ONE_API_KEY", raising=False)
+    monkeypatch.setenv("SUBQ_MODEL", "subq-test-model")
     source_text = source.read_text(encoding="utf-8")
     base_commit = "a" * 40
     staged: list[Any] = []
@@ -1903,6 +1908,12 @@ def test_plan_cli_creates_tracking_issue_and_publishes_compiled_artifacts(
     assert not hasattr(issue_client, "create_work_item_issue")
     assert len(machine_values) == 1
     assert machine_values[0][1]["verification_command"] == "scripts/verify-all.sh"
+    options = process_calls[0]["options"]
+    assert isinstance(
+        options.decision_client, jev_classifier.SubQSemanticClassifierClient
+    )
+    assert options.decision_provider == "SUBQ"
+    assert options.decision_model == "subq-test-model"
     assert (
         machine_values[0][1]["structrr_baseline"]["code_symbol_artifact"]["artifact_id"]
         == "structrr-code-symbols:sha256:test"

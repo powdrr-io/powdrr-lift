@@ -21,6 +21,7 @@ from powdrr_service.planning.questions import (
     MAX_QUESTION_ANSWER_CHARS,
     MAX_QUESTION_INPUT_CHARS,
     MAX_SOURCE_BLOCK_CHARS,
+    MAX_WORK_UNIT_ANSWER_CHARS,
     ContextRecord,
     NeedsQuestionAnswer,
     QuestionInputTooLarge,
@@ -55,6 +56,7 @@ def test_question_size_contract_constants_are_fixed() -> None:
     assert MAX_QUESTION_INPUT_CHARS == 24_000
     assert MAX_SOURCE_BLOCK_CHARS == 8_000
     assert MAX_QUESTION_ANSWER_CHARS == 4_000
+    assert MAX_WORK_UNIT_ANSWER_CHARS == 4_512
 
 
 def test_legacy_question_imports_use_service_owned_implementation() -> None:

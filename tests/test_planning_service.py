@@ -1039,7 +1039,7 @@ def test_oversized_work_unit_answer_replays_as_a_smaller_question_group() -> Non
         parent_digest=None,
         question=question,
         error=PlanningContractError(
-            "/", "serialized answer is 6304 characters; limit is 4000"
+            "/", "serialized answer is 6304 characters; limit is 4512"
         ),
         previous_answer={"records": []},
         id_counters={},
@@ -1062,7 +1062,7 @@ def test_oversized_work_unit_answer_replays_as_a_smaller_question_group() -> Non
         parent_digest=event.digest,
         question=single_question,
         error=PlanningContractError(
-            "/", "serialized answer is 4249 characters; limit is 4000"
+            "/", "serialized answer is 4649 characters; limit is 4512"
         ),
         previous_answer={"records": []},
         id_counters={},

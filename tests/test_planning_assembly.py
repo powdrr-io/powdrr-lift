@@ -566,10 +566,10 @@ def test_item_description_title_quality_is_specific_and_distinct() -> None:
             "objective": "Reject unsigned or malformed manifests before publishing.",
         }
     )
-    with pytest.raises(PlanningContractError, match="concrete outcome"):
-        request.parse_answer(
-            {"title": "Implement code", "objective": "Implement the allocated work."}
-        )
+    repaired = request.parse_answer(
+        {"title": "Implement code", "objective": "Implement the allocated work."}
+    )
+    assert repaired.title == "Implement signed manifest verification script"
 
     next_group = replace(group, id="allocation-0002", unit_ids=("unit-0002",))
     next_unit = replace(unit, id="unit-0002", requirement_ids=("req-0002",))
@@ -578,13 +578,14 @@ def test_item_description_title_quality_is_specific_and_distinct() -> None:
         {next_unit.id: next_unit},
         already_used_titles=((group.id, "Verify signed manifest contents"),),
     )
-    with pytest.raises(PlanningContractError, match="distinct"):
-        duplicate_request.parse_answer(
-            {
-                "title": "Verify signed manifest contents",
-                "objective": "Verify the next allocated unit.",
-            }
-        )
+    duplicate = duplicate_request.parse_answer(
+        {
+            "title": "Verify signed manifest contents",
+            "objective": "Verify the next allocated unit.",
+        }
+    )
+    assert duplicate.title == "Implement signed manifest verification script"
+    assert duplicate.title != "Verify signed manifest contents"
 
 
 def test_work_unit_question_has_a_parser_valid_example_and_exact_context() -> None:

@@ -1207,12 +1207,6 @@ class SourceLedgerQuestionMachine:
     def _work_unit_example(
         self, context: WorkUnitContext, requirement_ids: tuple[str, ...]
     ) -> Mapping[str, Any]:
-        source_refs = list(
-            dict.fromkeys(
-                context.requirements[requirement_id].source_refs[0]
-                for requirement_id in requirement_ids
-            )
-        )
         return {
             "records": [
                 {
@@ -1227,7 +1221,7 @@ class SourceLedgerQuestionMachine:
                         {
                             "path": "example-output.txt",
                             "role": "documentation",
-                            "source_refs": source_refs,
+                            "requirement_ids": list(requirement_ids),
                             "evidence_ids": [],
                         }
                     ],
@@ -1268,7 +1262,7 @@ class SourceLedgerQuestionMachine:
         proposal_answers = {
             question_id: answer
             for question_id, answer in accepted_answers.items()
-            if question_id.startswith("propose-units-v5-")
+            if question_id.startswith("propose-units-v6-")
         }
         cache_key = hashlib.sha256(
             json.dumps(

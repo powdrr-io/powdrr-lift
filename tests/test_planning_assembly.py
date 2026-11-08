@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 from dataclasses import replace
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 from powdrr_service.planning.assembly import (
@@ -96,7 +97,7 @@ def _proposal(
             {
                 "path": path,
                 "role": "test",
-                "source_refs": [anchor],
+                "requirement_ids": ["req-0001"],
                 "evidence_ids": [],
             }
         ],
@@ -104,6 +105,15 @@ def _proposal(
         "acceptance_criteria": ["The test covers the required behavior."],
         "required_outputs": [],
     }
+
+
+def _set_proposal_requirements(
+    proposal: dict[str, Any], requirement_ids: tuple[str, ...] | list[str]
+) -> None:
+    values = list(requirement_ids)
+    proposal["requirement_ids"] = values
+    for write in proposal["planned_writes"]:
+        write["requirement_ids"] = values
 
 
 def _unit(index: int, *, component: str = "core", runtime: str = "neutral") -> WorkUnit:
@@ -126,6 +136,27 @@ def test_swift_write_remains_swift_when_description_mentions_python() -> None:
     proposal = parse_work_unit_proposal(_proposal(context, anchor), context=context)
 
     assert proposal.implementation_runtime == "swift"
+    assert proposal.planned_writes[0].source_refs == (anchor,)
+
+
+def test_work_unit_response_schema_derives_source_refs_from_requirement_ids() -> None:
+    context, anchor = _context()
+    request = build_work_unit_proposal_request(
+        context,
+        ("req-0001",),
+        valid_example=_proposal(context, anchor),
+    )
+    write_properties = request.answer_schema["properties"]["records"]["items"][
+        "properties"
+    ]["planned_writes"]["items"]["properties"]
+
+    assert "source_refs" not in write_properties
+    assert write_properties["requirement_ids"]["items"]["enum"] == ["req-0001"]
+    assert (
+        write_properties["requirement_ids"]["maxItems"]
+        == MAX_WORK_UNIT_REQUIREMENTS_PER_PROPOSAL
+    )
+    assert "Powdrr derives each write's anchors" in request.exact_question
 
 
 def test_python_test_that_tests_swift_is_a_python_write() -> None:
@@ -152,8 +183,6 @@ def test_new_shell_script_runtime_is_derived_without_repository_evidence() -> No
     )
     requirement = replace(context.requirements["req-0001"], source_refs=(path_anchor,))
     context = replace(context, requirements={requirement.id: requirement})
-    answer["planned_writes"][0]["source_refs"] = [path_anchor]  # type: ignore[index]
-
     proposal = parse_work_unit_proposal(answer, context=context)
 
     assert proposal.planned_writes[0].runtime == "shell"
@@ -188,13 +217,13 @@ def test_requirement_can_be_covered_by_runtime_specific_units() -> None:
         {
             "path": "scripts/verify.sh",
             "role": "implementation",
-            "source_refs": [anchor],
+            "requirement_ids": ["req-0001"],
             "evidence_ids": [],
         },
         {
             "path": "tests/test_verify.py",
             "role": "test",
-            "source_refs": [anchor],
+            "requirement_ids": ["req-0001"],
             "evidence_ids": [],
         },
     ]
@@ -211,7 +240,9 @@ def test_requirement_can_be_covered_by_runtime_specific_units() -> None:
     )
     allocated = allocate_work_units(page.records, context=context)
 
-    assert "Repeat that requirement ID" in request.exact_question
+    assert "assign each requirement to the appropriate runtime's writes" in (
+        request.exact_question
+    )
     assert [unit.requirement_ids for unit in allocated.units] == [
         ("req-0001",),
         ("req-0001",),
@@ -324,7 +355,6 @@ def test_gitkeep_is_neutral_inside_a_source_named_directory() -> None:
     requirement = replace(context.requirements["req-0001"], source_refs=(path_anchor,))
     context = replace(context, requirements={requirement.id: requirement})
     answer = _proposal(context, anchor, path=path, runtime="neutral")
-    answer["planned_writes"][0]["source_refs"] = [path_anchor]  # type: ignore[index]
     answer["planned_writes"][0]["role"] = "configuration"  # type: ignore[index]
 
     proposal = parse_work_unit_proposal(answer, context=context)
@@ -572,12 +602,12 @@ def test_work_unit_question_has_a_parser_valid_example_and_exact_context() -> No
 
     request.validate()
     assert request.question.kind == "propose_work_units"
-    assert request.question.contract_version == 5
-    assert request.question.expected_answer_schema == "work-unit-proposals-v5"
-    assert request.question.question_id.startswith("propose-units-v5-")
+    assert request.question.contract_version == 6
+    assert request.question.expected_answer_schema == "work-unit-proposals-v6"
+    assert request.question.question_id.startswith("propose-units-v6-")
     assert "several strongly related requirements together" in request.exact_question
     assert "Do not create one unit per requirement" in request.exact_question
-    assert "requirement's own source_refs" in request.exact_question
+    assert "Powdrr derives each write's anchors" in request.exact_question
     assert "runtime are derived" in request.exact_question
     assert "return separate proposals" in request.exact_question
     assert "A .sh file is a shell write" in request.exact_question
@@ -703,7 +733,7 @@ def test_work_unit_question_bounds_evidence_without_losing_evidence_kinds() -> N
     )
     context = replace(context, implementation_phases=phases)
     proposal = _proposal(context, anchor)
-    proposal["requirement_ids"] = list(requirement_ids)
+    _set_proposal_requirements(proposal, requirement_ids)
     proposal["implementation_phase_id"] = "pr-01"
     request = build_work_unit_proposal_request(
         context,
@@ -735,7 +765,7 @@ def test_work_unit_question_bounds_evidence_without_losing_evidence_kinds() -> N
     )
 
 
-def test_work_unit_source_ref_error_names_required_and_supplied_anchors() -> None:
+def test_work_unit_source_refs_are_derived_for_each_assigned_requirement() -> None:
     text = "# Plan\n\n- First obligation.\n- Second obligation.\n"
     document = PinnedSourceDocument(
         "repo",
@@ -764,13 +794,11 @@ def test_work_unit_source_ref_error_names_required_and_supplied_anchors() -> Non
         source=source,
     )
     proposal = _proposal(context, first.id)
-    proposal["requirement_ids"] = ["req-0001", "req-0002"]
+    _set_proposal_requirements(proposal, ["req-0001", "req-0002"])
 
-    with pytest.raises(PlanningContractError) as exc_info:
-        parse_work_unit_proposal(proposal, context=context)
+    parsed = parse_work_unit_proposal(proposal, context=context)
 
-    assert second.id in str(exc_info.value)
-    assert first.id in str(exc_info.value)
+    assert set(parsed.planned_writes[0].source_refs) == {first.id, second.id}
 
 
 def test_work_unit_example_maps_each_requirement_to_its_own_source_anchor() -> None:
@@ -825,7 +853,8 @@ def test_work_unit_example_maps_each_requirement_to_its_own_source_anchor() -> N
     proposal = example["records"][0]
     assert proposal["requirement_ids"] == list(requirement_ids)
     assert len(proposal["planned_writes"]) == 1
-    assert set(proposal["planned_writes"][0]["source_refs"]) == set(clause_anchors)
+    assert proposal["planned_writes"][0]["requirement_ids"] == list(requirement_ids)
+    assert set(parsed.records[0].planned_writes[0].source_refs) == set(clause_anchors)
     assert parsed.records[0].requirement_ids == requirement_ids
 
 
@@ -1023,7 +1052,7 @@ def test_work_unit_proposals_scope_evidence_and_batch_independent_groups() -> No
                             {
                                 "path": "src/module_00_001.py",
                                 "role": "implementation",
-                                "source_refs": [anchor],
+                                "requirement_ids": [all_requirement_ids[0]],
                                 "evidence_ids": [foreign_evidence_id],
                             }
                         ],
@@ -1082,7 +1111,7 @@ def test_work_unit_page_cursor_is_derived_and_cannot_skip_uncovered_requirements
     proposals = []
     for requirement_id in requirement_ids[:3]:
         proposal = _proposal(context, anchor)
-        proposal["requirement_ids"] = [requirement_id]
+        _set_proposal_requirements(proposal, [requirement_id])
         proposals.append(proposal)
     request = build_work_unit_proposal_request(
         context,
@@ -1117,7 +1146,7 @@ def test_work_unit_page_cursor_is_derived_and_cannot_skip_uncovered_requirements
         )
 
     final_proposal = _proposal(context, anchor)
-    final_proposal["requirement_ids"] = ["req-0016"]
+    _set_proposal_requirements(final_proposal, ["req-0016"])
     next_request = build_work_unit_proposal_request(
         context,
         requirement_ids,
@@ -1181,7 +1210,7 @@ def test_work_unit_continuation_only_includes_uncovered_requirements(
     proposals = []
     for requirement_id in requirement_ids[:3]:
         proposal = _proposal(context, anchor)
-        proposal["requirement_ids"] = [requirement_id]
+        _set_proposal_requirements(proposal, [requirement_id])
         proposals.append(proposal)
     accepted = {
         initial_request.question.question_id: {
@@ -1196,7 +1225,7 @@ def test_work_unit_continuation_only_includes_uncovered_requirements(
     assert continuation is not None
     assert continuation.question.subject_ids == ("req-0016",)
     final_proposal = _proposal(context, anchor)
-    final_proposal["requirement_ids"] = ["req-0016"]
+    _set_proposal_requirements(final_proposal, ["req-0016"])
     accepted[continuation.question.question_id] = {
         "records": [final_proposal],
         "has_more": False,
@@ -1262,7 +1291,7 @@ def test_missing_grouped_requirement_gets_a_supplemental_question(
     grouped_records = []
     for requirement_id in requirement_ids[1:]:
         proposal = _proposal(context, anchor)
-        proposal["requirement_ids"] = [requirement_id]
+        _set_proposal_requirements(proposal, [requirement_id])
         grouped_records.append(proposal)
     accepted: dict[str, dict[str, object]] = {
         grouped_request.question.question_id: {
@@ -1279,7 +1308,7 @@ def test_missing_grouped_requirement_gets_a_supplemental_question(
     )
     assert supplemental_request.question.subject_ids == ("req-0021",)
     supplemental_proposal = _proposal(context, anchor)
-    supplemental_proposal["requirement_ids"] = ["req-0021"]
+    _set_proposal_requirements(supplemental_proposal, ["req-0021"])
     accepted[supplemental_request.question.question_id] = {
         "records": [supplemental_proposal],
         "has_more": False,

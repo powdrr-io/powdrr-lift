@@ -1631,7 +1631,15 @@ def build_item_description_request(
             already_used_titles=already_used_titles,
         )
         if issue is not None:
-            raise PlanningContractError("/title", issue)
+            return ItemDescription(
+                _deterministic_item_title(
+                    group=group,
+                    units=units,
+                    already_used_titles=already_used_titles,
+                ),
+                description.objective,
+                description.scope,
+            )
         return description
 
     return QuestionRequest(
@@ -1729,6 +1737,56 @@ def _item_title_quality_issue(
     if not meaningful.intersection(outcome_tokens):
         return "title must name an outcome from this group's concrete deliverables"
     return None
+
+
+def _deterministic_item_title(
+    *,
+    group: AllocationGroup,
+    units: Mapping[str, WorkUnit],
+    already_used_titles: Sequence[tuple[str, str]],
+) -> str:
+    """Build a concrete fallback title from the allocated units' deliverables."""
+    prior_titles = {
+        " ".join(title.casefold().split())
+        for item_id, title in already_used_titles
+        if item_id != group.id
+    }
+    deliverables = tuple(
+        " ".join(units[unit_id].deliverable.strip().rstrip(".!? ").split())
+        for unit_id in group.unit_ids
+    )
+    for deliverable in deliverables:
+        if not deliverable:
+            continue
+        without_article = re.sub(r"^(?:a|an|the)\s+", "", deliverable, flags=re.I)
+        title = (
+            deliverable
+            if re.match(
+                r"^(add|build|create|deliver|document|harden|implement|update|validate)\b",
+                deliverable,
+                flags=re.IGNORECASE,
+            )
+            else f"Implement {without_article}"
+        )
+        title = _truncate_item_title(title)
+        if " ".join(title.casefold().split()) not in prior_titles:
+            return title
+
+    component = next(iter(group.component_ids), "implementation")
+    base = deliverables[0] if deliverables and deliverables[0] else "Allocated work"
+    for suffix in (f"for {component}", f"for {group.id}"):
+        title = _truncate_item_title(f"Implement {base} {suffix}")
+        if " ".join(title.casefold().split()) not in prior_titles:
+            return title
+    raise PlanningContractError(
+        "/title", "could not derive a unique title from the group's deliverables"
+    )
+
+
+def _truncate_item_title(title: str) -> str:
+    if len(title) <= 160:
+        return title
+    return f"{title[:157].rsplit(' ', 1)[0].rstrip('.,;:')}..."
 
 
 def _digest(value: Any) -> str:

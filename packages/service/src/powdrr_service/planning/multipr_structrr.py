@@ -192,25 +192,43 @@ def compile_multi_pr_proposal(
             for item in selected_items
             for value in _strings(item.get("non_goals"))
         )
-        test_cases: list[dict[str, str]] = []
+        test_cases: list[dict[str, Any]] = []
         for item in selected_items:
             item_id = str(item["id"])
-            criteria_for_item = _strings(item.get("acceptance_criteria"))
-            cases = (
-                acceptance_criteria_contract(criteria_for_item)
-                if criteria_for_item
-                else []
+            verification = item.get("verification")
+            raw_test_cases = (
+                verification.get("required_test_cases")
+                if isinstance(verification, Mapping)
+                else None
             )
+            if isinstance(raw_test_cases, list):
+                cases = [
+                    dict(case) for case in raw_test_cases if isinstance(case, Mapping)
+                ]
+            else:
+                criteria_for_item = _strings(item.get("acceptance_criteria"))
+                cases = (
+                    acceptance_criteria_contract(criteria_for_item)
+                    if criteria_for_item
+                    else []
+                )
             for case in cases:
+                case_id = str(case.get("id", case.get("obligation_id", "")))
+                description = str(case.get("description", case.get("source_text", "")))
                 test_cases.append(
                     {
                         "id": (
-                            case["obligation_id"]
+                            case_id
                             if len(selected_items) == 1
-                            else f"{item_id}/{case['obligation_id']}"
+                            else f"{item_id}/{case_id}"
                         ),
-                        "description": case["source_text"],
+                        "description": description,
                         "status": "planned",
+                        **{
+                            key: case[key]
+                            for key in ("test_type", "scenario", "expected_outcome")
+                            if key in case
+                        },
                     }
                 )
         return compile_proposal_revision(

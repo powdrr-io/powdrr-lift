@@ -63,6 +63,7 @@ from powdrr_service.planning.multipr_structrr import (
 from powdrr_service.planning.plan_models import PlannedWorkItem, ReviewedExecutionPlan
 from powdrr_service.planning.questions import (
     QuestionRequest,
+    SourceExcerpt,
     batch_question_requests,
 )
 from powdrr_service.planning.source import (
@@ -94,6 +95,7 @@ from powdrr_service.planning.structrr import (
     partition_subject_enumeration_units,
     reject_unordered_subject_conflicts,
 )
+from powdrr_service.planning.test_coverage import build_test_coverage_request
 from powdrr_service.planning.workflow_ids import slugify_workflow_id
 from powdrr_service.structrr.code_symbols import CodeSymbolSearchResult
 from powdrr_service.structrr.snapshot import snapshot_digest
@@ -915,6 +917,12 @@ class SourceLedgerQuestionMachine:
                 downstream_requests.append(request)
         if downstream_requests:
             return self._batch_requests(downstream_requests)
+
+        pending_test_designs, _accepted_test_designs = self._accepted_test_coverage(
+            accepted_answers
+        )
+        if pending_test_designs:
+            return self._batch_requests(pending_test_designs)
 
         return self._batch_requests(
             tuple(
@@ -1802,6 +1810,14 @@ class SourceLedgerQuestionMachine:
             accepted_answers,
             plan_id=self.plan_id,
         )
+        pending_test_designs, test_designs = self._accepted_test_coverage(
+            accepted_answers
+        )
+        if pending_test_designs:
+            raise PlanningCompilationError(
+                "per-PR test design is incomplete at "
+                f"{pending_test_designs[0].question.question_id}"
+            )
         units = {unit.id: unit for unit in assembly.units}
         records = []
         for item in assembly.plan.items:
@@ -1812,11 +1828,89 @@ class SourceLedgerQuestionMachine:
                     "dependencies": list(item.dependencies),
                     "allowed_paths": list(item.allowed_paths),
                     "acceptance_criteria": list(item.acceptance_criteria),
+                    "verification": test_designs[item.item_id],
                     "unit_ids": list(unit_ids),
                     "units": [units[unit_id] for unit_id in unit_ids],
                 }
             )
         return tuple(records)
+
+    def _accepted_test_coverage(
+        self, accepted_answers: Mapping[str, Mapping[str, Any]]
+    ) -> tuple[tuple[QuestionRequest[Any], ...], dict[str, dict[str, Any]]]:
+        assembly = self.accepted_assembly(accepted_answers, plan_id=self.plan_id)
+        units_by_id = {unit.id: unit for unit in assembly.units}
+        ledger = self.accepted_ledger(accepted_answers)
+        requirements = {item.id: item for item in ledger.requirements}
+        anchors = {anchor.id: anchor for anchor in self.source.anchors}
+        pending: list[QuestionRequest[Any]] = []
+        accepted: dict[str, dict[str, Any]] = {}
+        for item in assembly.plan.items:
+            unit_ids = assembly.item_unit_ids[item.item_id]
+            item_units = tuple(units_by_id[unit_id] for unit_id in unit_ids)
+            source_refs = tuple(
+                dict.fromkeys(
+                    source_ref
+                    for unit in item_units
+                    for requirement_id in unit.requirement_ids
+                    for source_ref in requirements[requirement_id].source_refs
+                )
+            )
+            excerpt_records: list[SourceExcerpt] = []
+            for ref in source_refs:
+                anchor = anchors.get(ref)
+                if anchor is None:
+                    continue
+                text = self.source.document.text[
+                    anchor.start_offset : anchor.end_offset
+                ]
+                if len(text) <= 1_500:
+                    excerpt_records.append(
+                        SourceExcerpt(ref, text, anchor.start_offset)
+                    )
+                if len(excerpt_records) == 4:
+                    break
+            excerpts = tuple(excerpt_records)
+            test_paths = tuple(
+                sorted(
+                    path
+                    for path in self.repository_paths
+                    if _is_test_path(path)
+                    and _path_is_in_scope(path, item.allowed_paths)
+                )[:40]
+            )
+            request = build_test_coverage_request(
+                {
+                    "id": item.item_id,
+                    "title": item.title,
+                    "objective": item.objective,
+                    "scope": item.scope,
+                    "implementation_steps": item.implementation_steps,
+                    "acceptance_criteria": item.acceptance_criteria,
+                    "allowed_paths": item.allowed_paths,
+                },
+                existing_test_paths=test_paths,
+                source_excerpts=excerpts,
+            )
+            question_id = request.question.question_id
+            answer = accepted_answers.get(question_id)
+            if (
+                answer is not None
+                and self._accepted_question_input_digests is not None
+                and self._accepted_question_input_digests.get(question_id)
+                != request.question.input_digest
+            ):
+                self._invalid_accepted_question_ids.add(question_id)
+                answer = None
+            if answer is None:
+                pending.append(request)
+                continue
+            try:
+                accepted[item.item_id] = request.parse_answer(answer)
+            except PlanningContractError:
+                self._invalid_accepted_question_ids.add(question_id)
+                pending.append(request)
+        return tuple(pending), accepted
 
     def _structrr_requests(
         self, accepted_answers: Mapping[str, Mapping[str, Any]]
@@ -2825,6 +2919,26 @@ class SourceLedgerQuestionMachine:
 def _normalized_block_fingerprint(text: str) -> str:
     normalized = " ".join(text.split())
     return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+
+
+def _is_test_path(path: str) -> bool:
+    parts = path.casefold().split("/")
+    filename = parts[-1] if parts else ""
+    return (
+        any(part in {"test", "tests", "testing"} for part in parts[:-1])
+        or filename.startswith("test_")
+        or filename.endswith("_test.py")
+    )
+
+
+def _path_is_in_scope(path: str, allowed_paths: Sequence[str]) -> bool:
+    for allowed_path in allowed_paths:
+        normalized = allowed_path.rstrip("/")
+        if normalized in {"", "."} or path == normalized:
+            return True
+        if path.startswith(f"{normalized}/"):
+            return True
+    return False
 
 
 def _deterministic_block_disposition(

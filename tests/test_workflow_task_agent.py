@@ -313,7 +313,17 @@ def test_execute_pr_test_author_prompt_leaves_workspace_path_for_agent(
     authoring_worktree = tmp_path / "isolated" / "authoring-worktree"
     prompt = build_execute_pr_test_author_prompt(
         test_path="attestation/tests/test_add_ci_preservation_note.py",
-        plan_context={"acceptance_criteria": ["The workflow runs on pull requests."]},
+        plan_context={
+            "acceptance_criteria": ["The workflow runs on pull requests."],
+            "planned_test_cases": [
+                {
+                    "id": "AC-01",
+                    "test_type": "integration",
+                    "scenario": "Parse the workflow and inspect its trigger.",
+                    "expected_outcome": "Pull requests trigger the workflow.",
+                }
+            ],
+        },
         obligations=acceptance_criteria_contract(
             ["The workflow runs on pull requests."]
         ),
@@ -336,6 +346,7 @@ def test_execute_pr_test_author_prompt_leaves_workspace_path_for_agent(
     assert "attestation/tests/test_add_ci_preservation_note.py" in prompt
     assert "do not create other files" in prompt
     assert '"obligation_id": "AC-01"' in prompt
+    assert "Follow each case's test_type, scenario, and expected_outcome" in prompt
     assert "partitions" not in prompt
 
 
@@ -1028,6 +1039,9 @@ def test_issue_worker_persists_only_structrr_changelog_diff(
                     "id": "AC-01",
                     "description": "The verifier returns true for valid input.",
                     "status": "planned",
+                    "test_type": "unit",
+                    "scenario": "Call the verifier with valid input.",
+                    "expected_outcome": "The verifier accepts valid input.",
                 }
             ],
             "validation_runs": [],
@@ -1300,6 +1314,19 @@ def test_issue_worker_continues_after_nontrivial_validation_failure(
                 "id": "feature-v1-pr-01",
                 "allowed_paths": ["src"],
                 "acceptance_criteria": ["The feature value equals 42."],
+                "verification": {
+                    "required_test_cases": [
+                        {
+                            "id": "AC-01",
+                            "description": "The feature value equals 42.",
+                            "status": "planned",
+                            "test_type": "unit",
+                            "scenario": "Import the public feature value.",
+                            "expected_outcome": "The value equals 42.",
+                        }
+                    ],
+                    "validation_runs": [],
+                },
             }
         ],
         proposed_operations=[],

@@ -1087,6 +1087,40 @@ def test_coverage_evidence_policy_and_request_context_are_strict(
             supplied_evidence_ids=(test.id,),
         )
 
+    with pytest.raises(
+        PlanningContractError,
+        match=(
+            f"cite one of the supplied implementation evidence IDs: {implementation.id}"
+        ),
+    ):
+        bind_coverage_answer(
+            {
+                "status": "partial",
+                "evidence_ids": [test.id],
+                "reason": "A test exists but implementation is not cited.",
+                "remaining_statement": "Implement the behavior.",
+            },
+            evidence_by_id=evidence,
+            supplied_evidence_ids=(implementation.id, config.id, test.id),
+        )
+
+    with pytest.raises(
+        PlanningContractError,
+        match=(
+            "implementation/configuration evidence IDs: "
+            f"{implementation.id}, {config.id}"
+        ),
+    ):
+        bind_coverage_answer(
+            {
+                "status": "complete",
+                "evidence_ids": [test.id],
+                "reason": "A test exists.",
+            },
+            evidence_by_id=evidence,
+            supplied_evidence_ids=(implementation.id, config.id, test.id),
+        )
+
     requirement, segmented = _requirement(commit)
     request = build_requirement_coverage_request(
         requirement,
@@ -1102,6 +1136,7 @@ def test_coverage_evidence_policy_and_request_context_are_strict(
         "both relevant implementation/configuration evidence and relevant test"
         in request.exact_question
     )
+    assert "if only tests match, mark it missing, not partial" in request.exact_question
     assert request.valid_example == {
         "status": "complete",
         "evidence_ids": [implementation.id, test.id],

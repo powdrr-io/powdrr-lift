@@ -663,6 +663,38 @@ def test_provider_429_uses_shared_transport_backoff(
     assert delays == [0.25]
 
 
+def test_incomplete_provider_stream_uses_transport_backoff(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = _ScriptedClient(
+        {
+            ("extract_requirements", "block-01"): [
+                ProviderClientError(
+                    "Provider streaming response ended before a completion marker; "
+                    "received 7 content chunks"
+                ),
+                _VALID_PAGE,
+            ]
+        }
+    )
+    delays: list[float] = []
+    monkeypatch.setattr("powdrr_service.planning.inference.time.sleep", delays.append)
+
+    result = run_question(
+        client,
+        _request(_question("q-000001", "block-01")),
+        model="deepinfra-cheap",
+        stderr=None,
+        max_transport_retries=1,
+        transport_backoff_seconds=0.25,
+    )
+
+    assert not isinstance(result, NeedsQuestionAnswer)
+    assert result.attempts == 1
+    assert client.calls[("extract_requirements", "block-01")] == 2
+    assert delays == [0.25]
+
+
 def test_provider_retry_exhaustion_preserves_retry_count_and_backoff(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

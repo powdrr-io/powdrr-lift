@@ -111,6 +111,7 @@ def _is_retryable(error: RuntimeError) -> bool:
                 "getaddrinfo failed",
                 "streaming response did not include any events",
                 "streaming response content was empty",
+                "streaming response ended before a completion marker",
                 "response message content was empty",
             )
         )

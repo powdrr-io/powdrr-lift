@@ -139,11 +139,29 @@ def bind_coverage_answer(
                 "/evidence_ids", f"coverage answer cites unknown evidence {evidence_id}"
             )
         evidence.append(record)
+
+    supplied_evidence = tuple(
+        evidence_by_id[evidence_id]
+        for evidence_id in supplied_evidence_ids
+        if evidence_id in evidence_by_id
+    )
+
+    def available_ids(kinds: set[str]) -> list[str]:
+        return sorted(record.id for record in supplied_evidence if record.kind in kinds)
+
     if isinstance(answer, PartialCoverage) and not any(
         record.kind == "implementation" for record in evidence
     ):
+        implementation_ids = available_ids({"implementation"})
+        guidance = (
+            "cite one of the supplied implementation evidence IDs: "
+            + ", ".join(implementation_ids)
+            if implementation_ids
+            else "no implementation evidence was supplied; use missing instead"
+        )
         raise PlanningContractError(
-            "/evidence_ids", "partial coverage requires implementation evidence"
+            "/evidence_ids",
+            f"partial coverage requires implementation evidence; {guidance}",
         )
     if isinstance(answer, CompleteCoverage):
         kinds = {record.kind for record in evidence}
@@ -152,10 +170,29 @@ def bind_coverage_answer(
             bool(kinds & {"implementation", "configuration"}) and "test" in kinds
         )
         if not has_execution_receipt and not has_code_and_test:
+            missing: list[str] = []
+            if not kinds & {"implementation", "configuration"}:
+                code_ids = available_ids({"implementation", "configuration"})
+                missing.append(
+                    "implementation/configuration evidence IDs: "
+                    + (", ".join(code_ids) if code_ids else "none supplied")
+                )
+            if "test" not in kinds:
+                test_ids = available_ids({"test"})
+                missing.append(
+                    "test evidence IDs: "
+                    + (", ".join(test_ids) if test_ids else "none supplied")
+                )
+            receipt_ids = available_ids({"execution_receipt"})
+            if receipt_ids:
+                missing.append(
+                    "or cite an execution receipt ID: " + ", ".join(receipt_ids)
+                )
             raise PlanningContractError(
                 "/evidence_ids",
                 "complete coverage needs implementation/configuration plus test "
-                "evidence, or an execution receipt",
+                "evidence, or an execution receipt; include the missing supplied "
+                "evidence IDs (" + "; ".join(missing) + ")",
             )
     return answer
 
@@ -295,7 +332,9 @@ def build_requirement_coverage_request(
             "complete, cite either an execution_receipt or both relevant "
             "implementation/configuration evidence and relevant test evidence. "
             "Include the IDs for both kinds in evidence_ids; implementation alone "
-            "is partial, not complete. Keep reason to one concise sentence of at "
+            "is partial, not complete. Test evidence alone does not show that "
+            "behavior is implemented; if only tests match, mark it missing, not "
+            "partial. Keep reason to one concise sentence of at "
             "most 300 characters; put evidence citations in evidence_ids instead "
             "of listing files in reason."
         ),

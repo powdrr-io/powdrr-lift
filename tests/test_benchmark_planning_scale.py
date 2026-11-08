@@ -215,13 +215,13 @@ def test_dependency_metrics_preserve_incomplete_work_unit_checkpoint() -> None:
 
 def test_unresolved_question_diagnostics_show_validation_error_without_answer() -> None:
     question = Question(
-        question_id="propose-units-v5-req-0001-test",
+        question_id="propose-units-v6-req-0001-test",
         kind="propose_work_units",
-        contract_version=5,
+        contract_version=6,
         subject_ids=("req-0001", "req-0002"),
         input_digest="sha256:" + "a" * 64,
         context_ref_ids=(),
-        expected_answer_schema="work-unit-proposals-v5",
+        expected_answer_schema="work-unit-proposals-v6",
         attempt=3,
     )
     needs_answer = PlanningCheckpoint.needs_answer(
@@ -231,8 +231,8 @@ def test_unresolved_question_diagnostics_show_validation_error_without_answer() 
         parent_digest=None,
         question=question,
         error=PlanningContractError(
-            "/records/0/planned_writes/0/source_refs",
-            "must cite a source ref from each assigned requirement",
+            "/records/0/planned_writes/0/requirement_ids",
+            "must assign each requirement to a planned write",
         ),
         previous_answer={"private": "response body is omitted"},
         id_counters={},
@@ -240,13 +240,13 @@ def test_unresolved_question_diagnostics_show_validation_error_without_answer() 
 
     assert unresolved_question_diagnostics((needs_answer,)) == [
         {
-            "question_id": "propose-units-v5-req-0001-test",
+            "question_id": "propose-units-v6-req-0001-test",
             "kind": "propose_work_units",
             "subject_ids": ["req-0001", "req-0002"],
             "attempt": 3,
             "input_digest": "sha256:" + "a" * 64,
-            "error_pointer": "/records/0/planned_writes/0/source_refs",
-            "error_message": "must cite a source ref from each assigned requirement",
+            "error_pointer": "/records/0/planned_writes/0/requirement_ids",
+            "error_message": "must assign each requirement to a planned write",
         }
     ]
     assert "previous_answer" not in str(
@@ -256,13 +256,13 @@ def test_unresolved_question_diagnostics_show_validation_error_without_answer() 
 
 def test_resolved_question_is_removed_from_unresolved_diagnostics() -> None:
     question = Question(
-        question_id="propose-units-v5-req-0001-test",
+        question_id="propose-units-v6-req-0001-test",
         kind="propose_work_units",
-        contract_version=5,
+        contract_version=6,
         subject_ids=("req-0001",),
         input_digest="sha256:" + "a" * 64,
         context_ref_ids=(),
-        expected_answer_schema="work-unit-proposals-v5",
+        expected_answer_schema="work-unit-proposals-v6",
         attempt=3,
     )
     needs_answer = PlanningCheckpoint.needs_answer(

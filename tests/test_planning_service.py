@@ -229,7 +229,7 @@ class _PlanningScriptClient:
                             {
                                 "path": self.planned_path,
                                 "role": "implementation",
-                                "source_refs": [anchor_ref],
+                                "requirement_ids": ["req-0001"],
                                 "evidence_ids": [],
                             }
                         ],
@@ -1023,13 +1023,13 @@ def test_oversized_work_unit_answer_replays_as_a_smaller_question_group() -> Non
         ),
     )
     question = Question(
-        question_id="propose-units-v5-req-0057-example",
+        question_id="propose-units-v6-req-0057-example",
         kind="propose_work_units",
-        contract_version=5,
+        contract_version=6,
         subject_ids=("req-0057", "req-0058", "req-0059", "req-0060"),
         input_digest="sha256:" + "0" * 64,
         context_ref_ids=(),
-        expected_answer_schema="work-unit-proposals-v5",
+        expected_answer_schema="work-unit-proposals-v6",
         attempt=1,
     )
     event = PlanningCheckpoint.needs_answer(
@@ -1039,20 +1039,20 @@ def test_oversized_work_unit_answer_replays_as_a_smaller_question_group() -> Non
         parent_digest=None,
         question=question,
         error=PlanningContractError(
-            "/", "serialized answer is 6304 characters; limit is 4000"
+            "/", "serialized answer is 6304 characters; limit is 4512"
         ),
         previous_answer={"records": []},
         id_counters={},
     )
     store.append(event, expected_parent_digest=None)
     single_question = Question(
-        question_id="propose-units-v5-req-0058-single",
+        question_id="propose-units-v6-req-0058-single",
         kind="propose_work_units",
-        contract_version=5,
+        contract_version=6,
         subject_ids=("req-0058",),
         input_digest="sha256:" + "1" * 64,
         context_ref_ids=(),
-        expected_answer_schema="work-unit-proposals-v5",
+        expected_answer_schema="work-unit-proposals-v6",
         attempt=1,
     )
     single_event = PlanningCheckpoint.needs_answer(
@@ -1062,7 +1062,7 @@ def test_oversized_work_unit_answer_replays_as_a_smaller_question_group() -> Non
         parent_digest=event.digest,
         question=single_question,
         error=PlanningContractError(
-            "/", "serialized answer is 4249 characters; limit is 4000"
+            "/", "serialized answer is 4649 characters; limit is 4512"
         ),
         previous_answer={"records": []},
         id_counters={},
@@ -1375,10 +1375,6 @@ def test_source_question_machine_accounts_for_normative_and_context_blocks() -> 
             block.anchor_ids[0],
         )
 
-    requirement_anchor = next(
-        obligation_anchor(block) for block in source.blocks if "Implement" in block.text
-    )
-
     while True:
         for deterministic in machine.deterministic_answers(answers):
             answers[deterministic["question"].question_id] = dict(
@@ -1414,7 +1410,7 @@ def test_source_question_machine_accounts_for_normative_and_context_blocks() -> 
                             {
                                 "path": "src/behavior.txt",
                                 "role": "implementation",
-                                "source_refs": [requirement_anchor],
+                                "requirement_ids": ["req-0001"],
                                 "evidence_ids": [],
                             }
                         ],
@@ -1437,7 +1433,7 @@ def test_source_question_machine_accounts_for_normative_and_context_blocks() -> 
                             {
                                 "path": "src/test.txt",
                                 "role": "test",
-                                "source_refs": [requirement_anchor],
+                                "requirement_ids": ["req-0001"],
                                 "evidence_ids": [],
                             }
                         ],

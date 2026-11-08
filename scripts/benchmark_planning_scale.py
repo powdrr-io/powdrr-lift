@@ -677,13 +677,6 @@ class _ExampleAnswerClient:
 
     def _propose_work_units(self, packet: Mapping[str, Any]) -> dict[str, Any]:
         requirement_ids = tuple(packet["exact_question"]["subject_ids"])
-        facts = {
-            fact["ref_id"].removeprefix("requirement:"): fact["value"]
-            for fact in packet["accepted_facts"]
-            if isinstance(fact, Mapping)
-            and isinstance(fact.get("ref_id"), str)
-            and fact["ref_id"].startswith("requirement:")
-        }
         group_ordinal = (int(requirement_ids[0].removeprefix("req-")) - 1) // 4
         total_groups = self.profile.requirements // 4
         extra_units = self.profile.work_units - total_groups
@@ -695,9 +688,6 @@ class _ExampleAnswerClient:
         records = []
         for partition in partitions:
             first_number = partition[0].removeprefix("req-")
-            source_refs = tuple(
-                facts[requirement_id]["source_refs"][0] for requirement_id in partition
-            )
             records.append(
                 {
                     "requirement_ids": list(partition),
@@ -707,7 +697,7 @@ class _ExampleAnswerClient:
                         {
                             "path": f"src/generated/behavior-{first_number}.py",
                             "role": "implementation",
-                            "source_refs": list(source_refs),
+                            "requirement_ids": list(partition),
                             "evidence_ids": [],
                         }
                     ],

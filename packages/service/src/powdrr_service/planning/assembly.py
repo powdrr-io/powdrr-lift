@@ -115,7 +115,12 @@ WORK_UNIT_PROPOSAL_PAGE_JSON_SCHEMA: dict[str, Any] = {
                         "items": {
                             "type": "object",
                             "additionalProperties": False,
-                            "required": ["path", "role", "source_refs", "evidence_ids"],
+                            "required": [
+                                "path",
+                                "role",
+                                "requirement_ids",
+                                "evidence_ids",
+                            ],
                             "properties": {
                                 "path": {
                                     "type": "string",
@@ -123,7 +128,7 @@ WORK_UNIT_PROPOSAL_PAGE_JSON_SCHEMA: dict[str, Any] = {
                                     "maxLength": 500,
                                 },
                                 "role": {"type": "string", "enum": sorted(_ROLES)},
-                                "source_refs": {
+                                "requirement_ids": {
                                     "type": "array",
                                     "minItems": 1,
                                     "items": {"type": "string"},
@@ -409,10 +414,35 @@ def parse_work_unit_proposal(
         raise PlanningContractError(
             "/planned_writes", "must contain at least one write"
         )
-    writes = tuple(
-        _parse_planned_write(item, pointer=f"/planned_writes/{index}", context=context)
+    writes_with_requirements = tuple(
+        (
+            _parse_planned_write(
+                item,
+                pointer=f"/planned_writes/{index}",
+                context=context,
+                allowed_requirement_ids=set(requirement_ids),
+            ),
+            _planned_write_requirement_ids(
+                item,
+                pointer=f"/planned_writes/{index}",
+                allowed_requirement_ids=set(requirement_ids),
+            ),
+        )
         for index, item in enumerate(raw_writes)
     )
+    writes = tuple(write for write, _ in writes_with_requirements)
+    covered_requirement_ids = {
+        requirement_id
+        for _, write_requirement_ids in writes_with_requirements
+        for requirement_id in write_requirement_ids
+    }
+    if covered_requirement_ids != set(requirement_ids):
+        missing = sorted(set(requirement_ids) - covered_requirement_ids)
+        raise PlanningContractError(
+            "/planned_writes",
+            f"each requirement must be assigned to at least one planned write; "
+            f"unassigned: {missing}",
+        )
     runtime_by_path = {write.path: _write_runtime(write, context) for write in writes}
     non_neutral_runtimes = {
         runtime for runtime in runtime_by_path.values() if runtime is not None
@@ -427,7 +457,7 @@ def parse_work_unit_proposal(
             "/planned_writes",
             "one work unit cannot mix implementation runtimes. Planned paths "
             f"resolve to: {runtime_details}. Split these writes into separate "
-            "proposals and assign requirements by their cited source_refs.",
+            "proposals and assign each requirement to its implementing writes.",
         )
     derived_runtime = next(iter(non_neutral_runtimes), "neutral")
     step = _text(value["implementation_step"], "/implementation_step")
@@ -452,16 +482,6 @@ def parse_work_unit_proposal(
         )
         for index, item in enumerate(raw_outputs)
     )
-    source_refs = {ref for write in writes for ref in write.source_refs}
-    for requirement_id in requirement_ids:
-        requirement = context.requirements[requirement_id]
-        if not source_refs.intersection(requirement.source_refs):
-            raise PlanningContractError(
-                "/planned_writes",
-                f"writes for {requirement_id} need one of source anchors "
-                f"{sorted(requirement.source_refs)}, but this unit cites "
-                f"{sorted(source_refs)}",
-            )
     return WorkUnitProposal(
         requirement_ids,
         _text(value["deliverable"], "/deliverable", max_length=1_000),
@@ -477,26 +497,41 @@ def parse_work_unit_proposal(
 
 
 def _parse_planned_write(
-    value: Any, *, pointer: str, context: WorkUnitContext
+    value: Any,
+    *,
+    pointer: str,
+    context: WorkUnitContext,
+    allowed_requirement_ids: set[str],
 ) -> PlannedWrite:
     if not isinstance(value, Mapping):
         raise PlanningContractError(pointer, "must be an object")
     _exact_fields(
         value,
-        {"path", "role", "source_refs", "evidence_ids"},
+        {"path", "role", "requirement_ids", "evidence_ids"},
         pointer,
+    )
+    requirement_ids = _planned_write_requirement_ids(
+        value,
+        pointer=pointer,
+        allowed_requirement_ids=allowed_requirement_ids,
     )
     path = _text(value["path"], f"{pointer}/path", max_length=500)
     _validate_path_shape(path, f"{pointer}/path")
     role = _text(value["role"], f"{pointer}/role", max_length=40)
     if role not in _ROLES:
         raise PlanningContractError(f"{pointer}/role", "unknown planned-write role")
-    source_refs = _reference_list(
-        value["source_refs"],
-        f"{pointer}/source_refs",
-        known={item.id for item in context.source.anchors},
-        minimum=1,
+    source_refs = tuple(
+        dict.fromkeys(
+            source_ref
+            for requirement_id in requirement_ids
+            for source_ref in context.requirements[requirement_id].source_refs
+        )
     )
+    if not source_refs:
+        raise PlanningContractError(
+            f"{pointer}/requirement_ids",
+            "assigned requirements must have source anchors",
+        )
     evidence_ids = _reference_list(
         value["evidence_ids"],
         f"{pointer}/evidence_ids",
@@ -516,6 +551,23 @@ def _parse_planned_write(
     )
     _write_runtime(write, context)
     return write
+
+
+def _planned_write_requirement_ids(
+    value: Any,
+    *,
+    pointer: str,
+    allowed_requirement_ids: set[str],
+) -> tuple[str, ...]:
+    if not isinstance(value, Mapping):
+        raise PlanningContractError(pointer, "must be an object")
+    return _reference_list(
+        value.get("requirement_ids"),
+        f"{pointer}/requirement_ids",
+        known=allowed_requirement_ids,
+        minimum=1,
+        maximum=MAX_WORK_UNIT_REQUIREMENTS_PER_PROPOSAL,
+    )
 
 
 def _parse_required_output(
@@ -654,15 +706,23 @@ def _split_mixed_runtime_proposal(
         minimum=1,
         maximum=MAX_WORK_UNIT_REQUIREMENTS_PER_PROPOSAL,
     )
-    writes = tuple(
-        _parse_planned_write(item, pointer=f"/planned_writes/{index}", context=context)
-        for index, item in enumerate(
-            _array(value.get("planned_writes"), "/planned_writes", maximum=20)
+    raw_writes = _array(value.get("planned_writes"), "/planned_writes", maximum=20)
+    writes_by_runtime: dict[str | None, list[tuple[PlannedWrite, tuple[str, ...]]]] = {}
+    for index, item in enumerate(raw_writes):
+        write_requirement_ids = _planned_write_requirement_ids(
+            item,
+            pointer=f"/planned_writes/{index}",
+            allowed_requirement_ids=set(requirement_ids),
         )
-    )
-    writes_by_runtime: dict[str | None, list[PlannedWrite]] = {}
-    for write in writes:
-        writes_by_runtime.setdefault(write.runtime, []).append(write)
+        write = _parse_planned_write(
+            item,
+            pointer=f"/planned_writes/{index}",
+            context=context,
+            allowed_requirement_ids=set(requirement_ids),
+        )
+        writes_by_runtime.setdefault(write.runtime, []).append(
+            (write, write_requirement_ids)
+        )
     if len({runtime for runtime in writes_by_runtime if runtime is not None}) < 2:
         raise PlanningContractError(
             "/planned_writes", "could not safely partition mixed-runtime writes"
@@ -679,21 +739,20 @@ def _split_mixed_runtime_proposal(
         )
     )
     split_proposals: list[WorkUnitProposal] = []
-    for runtime, runtime_writes in writes_by_runtime.items():
-        runtime_refs = {ref for write in runtime_writes for ref in write.source_refs}
+    for runtime, runtime_records in writes_by_runtime.items():
         runtime_requirement_ids = tuple(
             requirement_id
             for requirement_id in requirement_ids
-            if runtime_refs.intersection(
-                context.requirements[requirement_id].source_refs
+            if any(
+                requirement_id in write_requirement_ids
+                for _, write_requirement_ids in runtime_records
             )
         )
         if not runtime_requirement_ids:
-            paths = sorted(write.path for write in runtime_writes)
+            paths = sorted(write.path for write, _ in runtime_records)
             raise PlanningContractError(
                 "/planned_writes",
-                "cannot assign runtime-specific writes to a supplied requirement "
-                f"by its source refs: {paths}",
+                f"cannot assign runtime-specific writes to requirements: {paths}",
             )
 
         runtime_name = runtime or "runtime-neutral"
@@ -703,10 +762,10 @@ def _split_mixed_runtime_proposal(
             {
                 "path": write.path,
                 "role": write.role,
-                "source_refs": list(write.source_refs),
+                "requirement_ids": list(write_requirement_ids),
                 "evidence_ids": list(write.evidence_ids),
             }
-            for write in runtime_writes
+            for write, write_requirement_ids in runtime_records
         ]
         original_deliverable = _text(
             value.get("deliverable"), "/deliverable", max_length=1_000
@@ -1032,13 +1091,13 @@ def build_work_unit_proposal_request(
         question_identity["maximum_proposals"] = maximum_proposals
     question_key = _digest(question_identity)[-12:]
     question = Question(
-        question_id=f"propose-units-v5-{requirement_ids[0]}-{question_key}",
+        question_id=f"propose-units-v6-{requirement_ids[0]}-{question_key}",
         kind="propose_work_units",
-        contract_version=5,
+        contract_version=6,
         subject_ids=tuple(requirement_ids),
-        input_digest=_digest({"schema_version": 5, **input_facts}),
+        input_digest=_digest({"schema_version": 6, **input_facts}),
         context_ref_ids=all_refs,
-        expected_answer_schema="work-unit-proposals-v5",
+        expected_answer_schema="work-unit-proposals-v6",
         attempt=1,
     )
     request_context = replace(
@@ -1065,7 +1124,10 @@ def build_work_unit_proposal_request(
         *([None] if not context.implementation_phases else []),
     ]
     write_properties = record_properties["planned_writes"]["items"]["properties"]
-    write_properties["source_refs"]["items"]["enum"] = list(source_refs)
+    write_properties["requirement_ids"]["items"]["enum"] = list(requirement_ids)
+    write_properties["requirement_ids"]["maxItems"] = (
+        MAX_WORK_UNIT_REQUIREMENTS_PER_PROPOSAL
+    )
     write_properties["evidence_ids"]["items"]["enum"] = sorted(request_evidence)
     output_properties = record_properties["required_outputs"]["items"]["properties"]
     output_properties["requirement_ids"]["items"]["enum"] = list(requirement_ids)
@@ -1100,18 +1162,16 @@ def build_work_unit_proposal_request(
             "those pinned repository languages if they can satisfy the source. "
             "Use another runtime only when the requirements or repository evidence "
             "require it. "
-            "For example, if a proposal needs both .sh and .py implementation "
-            "files, return separate proposals and assign each requirement to the "
-            "proposals whose writes cite that requirement's source_refs. A "
-            "requirement may appear in more than one proposal when its "
-            "implementation needs multiple runtimes. Repeat that requirement ID "
-            "in each runtime-specific proposal, cite one of its own source_refs "
-            "in each proposal, and describe only that proposal's runtime-specific "
-            "deliverable. Use required_outputs to express a real dependency "
-            "between those proposals when one consumes the other's output. "
-            "For each requirement ID in a unit, at least one planned write must "
-            "cite one of that requirement's own source_refs from its requirement "
-            "fact; do not cite only a neighboring requirement's anchors. "
+            "For each planned write, assign the supplied requirement IDs that it "
+            "implements. Every requirement in a proposal must be assigned to at "
+            "least one write. Do not return source_refs: Powdrr derives each "
+            "write's anchors from its assigned requirement IDs. For example, if a "
+            "proposal needs both .sh and .py implementation files, return separate "
+            "proposals and assign each requirement to the appropriate runtime's "
+            "writes. A requirement may appear in more than one proposal when its "
+            "implementation needs multiple runtimes. Use required_outputs to "
+            "express a real dependency between those proposals when one consumes "
+            "the other's output. "
             + (
                 "The source defines an explicit implementation PR sequence. Set "
                 "implementation_phase_id to one supplied phase ID for every "

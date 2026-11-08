@@ -107,6 +107,9 @@ class ChangeRequiredTestCase:
     id: str | None = None
     description: str | None = None
     status: str | None = None
+    test_type: str | None = None
+    scenario: str | None = None
+    expected_outcome: str | None = None
     selectors: list[str] = field(default_factory=list)
 
 
@@ -231,6 +234,9 @@ def _parse_verification(raw_verification: object | None) -> ChangeVerification:
             id=_coerce_optional_str(case.get("id")),
             description=_coerce_optional_str(case.get("description")),
             status=_coerce_optional_str(case.get("status")),
+            test_type=_coerce_optional_str(case.get("test_type")),
+            scenario=_coerce_optional_str(case.get("scenario")),
+            expected_outcome=_coerce_optional_str(case.get("expected_outcome")),
             selectors=_parse_path_sequence(case.get("selectors")),
         )
         for raw_case in _ensure_sequence(data.get("required_test_cases"))

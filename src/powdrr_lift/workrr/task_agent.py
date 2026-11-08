@@ -1110,6 +1110,53 @@ def _write_issue_worker_structrr_diff_artifacts(
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
             and node.name.startswith("test_")
         }
+    planned_test_cases = item_proposal.verification.get("required_test_cases")
+    if not isinstance(planned_test_cases, list):
+        raise PowdrrExecutionError(
+            "Structrr plan proposal is missing verification.required_test_cases; "
+            "regenerate the plan before executing this PR"
+        )
+    planned_cases_by_id: dict[str, Mapping[str, Any]] = {}
+    for planned_case in planned_test_cases:
+        if not isinstance(planned_case, Mapping):
+            raise PowdrrExecutionError(
+                "Structrr planned test case must contain an id and description"
+            )
+        planned_id = planned_case.get("id")
+        planned_description = planned_case.get("description")
+        test_type = planned_case.get("test_type")
+        scenario = planned_case.get("scenario")
+        expected_outcome = planned_case.get("expected_outcome")
+        if (
+            not isinstance(planned_id, str)
+            or not isinstance(planned_description, str)
+            or test_type not in {"unit", "integration", "end_to_end", "contract"}
+            or not isinstance(scenario, str)
+            or not scenario.strip()
+            or not isinstance(expected_outcome, str)
+            or not expected_outcome.strip()
+            or planned_case.get("status") != "planned"
+            or planned_id in planned_cases_by_id
+        ):
+            raise PowdrrExecutionError(
+                "Structrr planned test case has an invalid or duplicate identity"
+            )
+        planned_cases_by_id[planned_id] = planned_case
+    actual_cases_by_id: dict[str, str] = {}
+    for obligation in test_obligations:
+        obligation_id = obligation.get("obligation_id")
+        source_text = obligation.get("source_text")
+        if isinstance(obligation_id, str) and isinstance(source_text, str):
+            actual_cases_by_id[obligation_id] = source_text.strip()
+    if {
+        case_id: case.get("description")
+        for case_id, case in planned_cases_by_id.items()
+    } != actual_cases_by_id:
+        raise PowdrrExecutionError(
+            "generated tests do not match the test obligations recorded in the "
+            "Structrr plan proposal"
+        )
+
     required_test_cases: list[dict[str, Any]] = []
     test_case_ids_by_file: dict[str, list[str]] = {}
     candidate_test_result = integration_test_report.get("candidate")
@@ -1146,6 +1193,7 @@ def _write_issue_worker_structrr_diff_artifacts(
             )
         required_test_cases.append(
             {
+                **dict(planned_cases_by_id[case_id]),
                 "id": case_id,
                 "description": description,
                 "status": "passed" if candidate_tests_passed else "failed",
@@ -1816,6 +1864,7 @@ def _author_execute_pr_tests(
             "scope": proposed.get("scope", []),
             "implementation_steps": proposed.get("implementation_steps", []),
             "acceptance_criteria": proposed.get("acceptance_criteria", []),
+            "planned_test_cases": proposed.get("planned_test_cases", []),
             "accepted_structrr_operations": proposed.get(
                 "accepted_structrr_operations", []
             ),
@@ -3392,6 +3441,10 @@ class _TaskWorkflowExecutionStrategy:
         )
         test_authoring_context = dict(proposed)
         test_authoring_context["accepted_structrr_operations"] = accepted_operations
+        if item_proposal is not None:
+            test_authoring_context["planned_test_cases"] = (
+                item_proposal.verification.get("required_test_cases", [])
+            )
         integration_test_sources, integration_test_authoring = _author_execute_pr_tests(
             self.repo_root,
             base_commit=base_commit,

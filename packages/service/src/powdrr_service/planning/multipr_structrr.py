@@ -18,6 +18,7 @@ from powdrr_service.structrr.proposal import ProposalRevision, compile_proposal_
 from powdrr_service.structrr.rebase import rebase_structrr_snapshot
 from powdrr_service.structrr.snapshot import snapshot_digest
 from powdrr_service.structrr.source_manifest import SourceManifest
+from powdrr_service.verification.test_obligations import acceptance_criteria_contract
 
 MULTIPR_STRUCTRR_SCHEMA = "multipr-structrr-proposal-v1"
 _STRUCTURAL_SECTIONS = {"entities", "entity_relationships", "files"}
@@ -191,6 +192,45 @@ def compile_multi_pr_proposal(
             for item in selected_items
             for value in _strings(item.get("non_goals"))
         )
+        test_cases: list[dict[str, Any]] = []
+        for item in selected_items:
+            item_id = str(item["id"])
+            verification = item.get("verification")
+            raw_test_cases = (
+                verification.get("required_test_cases")
+                if isinstance(verification, Mapping)
+                else None
+            )
+            if isinstance(raw_test_cases, list):
+                cases = [
+                    dict(case) for case in raw_test_cases if isinstance(case, Mapping)
+                ]
+            else:
+                criteria_for_item = _strings(item.get("acceptance_criteria"))
+                cases = (
+                    acceptance_criteria_contract(criteria_for_item)
+                    if criteria_for_item
+                    else []
+                )
+            for case in cases:
+                case_id = str(case.get("id", case.get("obligation_id", "")))
+                description = str(case.get("description", case.get("source_text", "")))
+                test_cases.append(
+                    {
+                        "id": (
+                            case_id
+                            if len(selected_items) == 1
+                            else f"{item_id}/{case_id}"
+                        ),
+                        "description": description,
+                        "status": "planned",
+                        **{
+                            key: case[key]
+                            for key in ("test_type", "scenario", "expected_outcome")
+                            if key in case
+                        },
+                    }
+                )
         return compile_proposal_revision(
             proposal_id,
             baseline,
@@ -201,6 +241,10 @@ def compile_multi_pr_proposal(
             allowed_paths=allowed_paths or (".",),
             source_refs=(source_ref,),
             code_evidence=code_evidence,
+            verification={
+                "required_test_cases": test_cases,
+                "validation_runs": [],
+            },
         )
 
     full = compile(

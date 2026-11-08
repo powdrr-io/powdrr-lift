@@ -246,6 +246,22 @@ class _PlanningScriptClient:
                 "title": f"Implement behavior in {question['subject_ids'][0]}",
                 "objective": "Implement the behavior described by the plan.",
             }
+        if kind == "plan_test_coverage":
+            plan = next(
+                item["value"]
+                for item in packet["accepted_facts"]
+                if item["ref_id"].startswith("planned-pr:")
+            )
+            return {
+                "cases": [
+                    {
+                        "test_type": "integration",
+                        "scenario": "Exercise the public behavior for this criterion.",
+                        "expected_outcome": criterion,
+                    }
+                    for criterion in plan["acceptance_criteria"]
+                ]
+            }
         if kind == "review_dependency_candidate":
             return {"required": True}
         if kind == "describe_confirmed_dependency":
@@ -1436,6 +1452,8 @@ def test_source_question_machine_accounts_for_normative_and_context_blocks() -> 
         elif question.kind == "describe_item":
             answer = dict(request.valid_example)
             answer["title"] = f"Implement behavior in {question.subject_ids[0]}"
+        elif question.kind == "plan_test_coverage":
+            answer = dict(request.valid_example)
         elif question.kind == "assess_requirement_coverage":
             answer = {
                 "status": "partial",
@@ -1495,6 +1513,12 @@ def test_source_question_machine_accounts_for_normative_and_context_blocks() -> 
     assert len(assembled.plan.items) == 1
     structrr_proposal = machine.accepted_structrr_proposal(answers)
     assert set(structrr_proposal.item_proposals) == {"item-0001"}
+    planned_test_cases = structrr_proposal.item_proposals["item-0001"].verification[
+        "required_test_cases"
+    ]
+    assert len(planned_test_cases) == 2
+    assert all(case["test_type"] == "integration" for case in planned_test_cases)
+    assert all(case["status"] == "planned" for case in planned_test_cases)
     compiled = machine.compile_accepted_plan(
         answers,
         plan_id="bounded-plan",
@@ -1925,6 +1949,7 @@ def test_procedrr_runs_real_planning_machine_through_compiled_artifacts(
         "planning_question_batch",
         "propose_work_units",
         "describe_item",
+        "plan_test_coverage",
         "enumerate_structural_subjects",
     ]
     if planned_path == "src/behavior.py" and index_path:

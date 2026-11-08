@@ -273,6 +273,7 @@ def _render_template_body(
         "# `state: in_progress` for basis PRs that are still underway.",
         "# Use `verification.required_test_cases` to track acceptance-linked tests",
         "# that this PR adds or updates. Record their exact pytest selectors and",
+        "# the planned test type, scenario, and expected outcome when available.",
         "# mark them passed only when the candidate run passed.",
         "# Record repository check commands and their outcomes in",
         "# `verification.validation_runs`.",

@@ -20,6 +20,7 @@ QUESTION_KINDS = frozenset(
         "propose_work_units",
         "check_unit_cohesion",
         "describe_item",
+        "plan_test_coverage",
         "resolve_prerequisite_output",
         "confirm_dependency",
         "review_dependency_candidate",

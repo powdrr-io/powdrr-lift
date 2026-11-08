@@ -68,6 +68,9 @@ def test_changelog_verification_tracks_test_cases_and_command_results() -> None:
                     "id": "AC-01",
                     "description": "The CI pipeline remains configured.",
                     "status": "passed",
+                    "test_type": "integration",
+                    "scenario": "Load the workflow and inspect its triggers.",
+                    "expected_outcome": "Pull requests trigger the workflow.",
                     "selectors": [
                         "tests/test_ci_preservation.py::test_ci_remains_configured"
                     ],
@@ -86,6 +89,10 @@ def test_changelog_verification_tracks_test_cases_and_command_results() -> None:
     }
     parsed = parse_change_log(yaml.safe_dump(document, sort_keys=False))
     assert parsed.verification.required_test_cases[0].id == "AC-01"
+    assert parsed.verification.required_test_cases[0].test_type == "integration"
+    assert parsed.verification.required_test_cases[0].scenario == (
+        "Load the workflow and inspect its triggers."
+    )
     assert parsed.verification.validation_runs[0].command == [
         "python",
         "-m",

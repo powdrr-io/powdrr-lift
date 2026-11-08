@@ -381,6 +381,31 @@ def validate_v2_verification(
                     path,
                 )
             )
+        test_type = raw_case.get("test_type")
+        if test_type is not None and test_type not in {
+            "unit",
+            "integration",
+            "end_to_end",
+            "contract",
+        }:
+            issues.append(
+                ChangelogValidationIssue(
+                    "required_test_case_type_invalid",
+                    f"Required test case {index} has an unsupported test type.",
+                    path,
+                )
+            )
+        for key in ("scenario", "expected_outcome"):
+            value = raw_case.get(key)
+            if value is not None and (not isinstance(value, str) or not value.strip()):
+                issues.append(
+                    ChangelogValidationIssue(
+                        f"required_test_case_{key}_invalid",
+                        f"Required test case {index} {key.replace('_', ' ')} "
+                        "must be non-empty text.",
+                        path,
+                    )
+                )
         selectors = parse_changelog_sequence(raw_case.get("selectors"))
         if not selectors or any(
             not isinstance(selector, str) or "::test_" not in selector

@@ -56,7 +56,7 @@ def test_question_size_contract_constants_are_fixed() -> None:
     assert MAX_QUESTION_INPUT_CHARS == 24_000
     assert MAX_SOURCE_BLOCK_CHARS == 8_000
     assert MAX_QUESTION_ANSWER_CHARS == 4_000
-    assert MAX_WORK_UNIT_ANSWER_CHARS == 4_512
+    assert MAX_WORK_UNIT_ANSWER_CHARS == 6_144
 
 
 def test_legacy_question_imports_use_service_owned_implementation() -> None:
@@ -801,16 +801,16 @@ def test_input_and_output_limits_reject_without_truncation() -> None:
     )
 
 
-def test_work_unit_answers_allow_a_small_serialization_margin() -> None:
+def test_work_unit_answers_allow_bounded_response_headroom() -> None:
     request = _request(_question("q-000003", "block-01", kind="propose_work_units"))
     answer = {
-        "records": [{"statement": "x" * 3_950}],
+        "records": [{"statement": "x" * (MAX_WORK_UNIT_ANSWER_CHARS - 1_500)}],
         "has_more": False,
         "next_anchor": None,
     }
     serialized_size = len(json.dumps(answer, separators=(",", ":")))
     assert (
-        MAX_QUESTION_ANSWER_CHARS < serialized_size <= (MAX_QUESTION_ANSWER_CHARS + 128)
+        MAX_QUESTION_ANSWER_CHARS + 512 < serialized_size <= MAX_WORK_UNIT_ANSWER_CHARS
     )
     client = _ScriptedClient({("propose_work_units", "block-01"): [answer]})
 

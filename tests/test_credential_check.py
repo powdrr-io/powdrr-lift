@@ -115,6 +115,9 @@ def test_check_model_access_reports_missing_credentials(tmp_path: Path) -> None:
 def test_check_jev_access_makes_authenticated_request_without_exposing_key(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.delenv("SUBQ_API_KEY", raising=False)
+    monkeypatch.delenv("DEEPINFRA_API_KEY", raising=False)
+    monkeypatch.delenv("DEEPINFRA_API_TOKEN", raising=False)
     monkeypatch.setenv("TYPESAFEAI_API_KEY", "private-test-key")
     captured: dict[str, object] = {}
 
@@ -146,13 +149,46 @@ def test_check_jev_access_reports_missing_key(
         "TYPESAFE_API_KEY",
         "SYSTEM_ONE_API_KEY",
         "SUBQ_API_KEY",
+        "DEEPINFRA_API_KEY",
+        "DEEPINFRA_API_TOKEN",
     ):
         monkeypatch.delenv(name, raising=False)
 
     result = check_jev_access()
 
     assert result.status == "credentials_missing"
-    assert result.message == "Set a Jev or SUBQ_API_KEY to check classifier access."
+    assert "DEEPINFRA_API_KEY/DEEPINFRA_API_TOKEN" in str(result.message)
+
+
+def test_check_jev_access_uses_drex_when_deepinfra_key_is_available(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    for name in (
+        "TYPESAFEAI_API_KEY",
+        "TYPESAFE_API_KEY",
+        "SYSTEM_ONE_API_KEY",
+        "SUBQ_API_KEY",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("DEEPINFRA_API_TOKEN", "private-deepinfra-key")
+    captured: dict[str, object] = {}
+
+    def call_drex(
+        request: object, api_key: str, endpoint: str, model: str
+    ) -> dict[str, object]:
+        captured.update(
+            request=request, api_key=api_key, endpoint=endpoint, model=model
+        )
+        return {"answer": {"choice": "ok"}}
+
+    monkeypatch.setattr("powdrr_lift.workrr.credential_check._call_drex", call_drex)
+    result = check_jev_access()
+    assert result.status == "passed"
+    assert result.provider == "deepinfra-drex"
+    assert result.credential_source == "DEEPINFRA_API_TOKEN"
+    assert captured["endpoint"] == "https://api.deepinfra.com/v1/decisions"
+    assert captured["model"] == "nace-ai/drex-v2.0"
+    assert "private-deepinfra-key" not in str(result.to_data())
 
 
 def test_check_jev_access_uses_subq_when_jev_key_is_missing(
@@ -187,6 +223,9 @@ def test_check_jev_access_reports_authentication_failure(
 ) -> None:
     from urllib.error import HTTPError
 
+    monkeypatch.delenv("SUBQ_API_KEY", raising=False)
+    monkeypatch.delenv("DEEPINFRA_API_KEY", raising=False)
+    monkeypatch.delenv("DEEPINFRA_API_TOKEN", raising=False)
     monkeypatch.setenv("TYPESAFEAI_API_KEY", "private-test-key")
 
     def reject(*_args: object) -> object:

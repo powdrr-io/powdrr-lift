@@ -22,6 +22,8 @@ JEV_MODEL = "jev-latest"
 JEV_DEFAULT_BASE_URL = "https://api.typesafe.ai/v1/systemone"
 SUBQ_MODEL = "subq-snap-preview"
 SUBQ_DEFAULT_BASE_URL = "https://api.subq.ai/v1/systemone"
+DREX_MODEL = "nace-ai/drex-v2.0"
+DREX_DEFAULT_ENDPOINT = "https://api.deepinfra.com/v1/decisions"
 
 
 @dataclass(slots=True)
@@ -469,12 +471,47 @@ class SubQSemanticClassifierClient(_DecisionApiSemanticClassifierClient):
         return _call_subq(request_data, api_key, endpoint, self._model)
 
 
+class DrexSemanticClassifierClient(_DecisionApiSemanticClassifierClient):
+    """Use DeepInfra's Drex v2 typed decision endpoint without LLM fallback."""
+
+    provider = "DEEPINFRA_DREX"
+    default_model = DREX_MODEL
+    default_endpoint = DREX_DEFAULT_ENDPOINT
+    fallback_on_error = False
+
+    def __init__(
+        self,
+        fallback: _DecisionFallback,
+        *,
+        api_key: str | None = None,
+        endpoint: str | None = None,
+        model: str | None = None,
+        fail_closed: bool = False,
+    ) -> None:
+        super().__init__(
+            fallback,
+            api_key=api_key
+            or os.environ.get("DEEPINFRA_API_KEY")
+            or os.environ.get("DEEPINFRA_API_TOKEN"),
+            endpoint=endpoint or os.environ.get("DEEPINFRA_DECISIONS_URL"),
+            model=model or os.environ.get("DEEPINFRA_DREX_MODEL"),
+            fail_closed=fail_closed,
+        )
+
+    def _call(
+        self, request_data: Mapping[str, Any], api_key: str, endpoint: str
+    ) -> Mapping[str, Any]:
+        return _call_drex(request_data, api_key, endpoint, self._model)
+
+
 def preferred_semantic_classifier_client(
     fallback: _DecisionFallback, *, fail_closed: bool = False
 ) -> _DecisionApiSemanticClassifierClient | None:
-    """Prefer SubQ, then Jev, and let the caller use its LLM if neither is set."""
+    """Prefer SubQ, Drex, then Jev; caller uses its LLM if none are set."""
     if os.environ.get("SUBQ_API_KEY"):
         return SubQSemanticClassifierClient(fallback, fail_closed=fail_closed)
+    if os.environ.get("DEEPINFRA_API_KEY") or os.environ.get("DEEPINFRA_API_TOKEN"):
+        return DrexSemanticClassifierClient(fallback, fail_closed=fail_closed)
     if (
         os.environ.get("TYPESAFEAI_API_KEY")
         or os.environ.get("TYPESAFE_API_KEY")
@@ -792,6 +829,13 @@ def _call_subq(
     classifier: Mapping[str, Any], api_key: str, endpoint: str, model: str
 ) -> Mapping[str, Any]:
     """Call SubQ's Decisions endpoint and normalize its typed answer."""
+    return _call_decision_api(classifier, api_key, endpoint, model)
+
+
+def _call_drex(
+    classifier: Mapping[str, Any], api_key: str, endpoint: str, model: str
+) -> Mapping[str, Any]:
+    """Call DeepInfra's Drex decisions endpoint and normalize its answer."""
     return _call_decision_api(classifier, api_key, endpoint, model)
 
 

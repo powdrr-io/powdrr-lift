@@ -1,0 +1,115 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1411
+title: Add DeepInfra Drex v2 decision provider
+intent:
+  problem: Decision classification has Jev and SubQ options but cannot use the Drex v2 decision model through DeepInfra.
+  goal: Add DeepInfra Drex v2 as a selectable typed decision provider, expose its configuration to worker environments, and document its setup.
+human-decisions: []
+structured_files: []
+files:
+  - path: README.md
+    type: modified
+    span:
+      start_line: 296
+      end_line: 303
+    summary: Document Drex v2 model, DeepInfra credentials, endpoint overrides, and provider selection order.
+    rationale: Let operators configure the additional decision provider and understand which provider is selected.
+  - path: packages/service/src/powdrr_service/decision_classifier.py
+    type: modified
+    span:
+      start_line: 27
+      end_line: 841
+    summary: Add the Drex v2 typed decision client and prefer it after SubQ and before Jev when DeepInfra credentials are configured.
+    rationale: Make DeepInfra Drex available to existing decision classification callers with the provider's native decisions endpoint.
+  - path: src/powdrr_lift/integrations/harbor/_env.py
+    type: modified
+    span:
+      start_line: 11
+      end_line: 14
+    summary: Forward DeepInfra endpoint and model overrides into Harbor worker environments.
+    rationale: Preserve Drex configuration when decision classification runs inside Harbor.
+  - path: src/powdrr_lift/workrr/credential_check.py
+    type: modified
+    span:
+      start_line: 13
+      end_line: 193
+    summary: Check DeepInfra Drex credentials using the same provider preference order as normal classification.
+    rationale: Ensure credential preflight tests the provider that runtime selection will use.
+  - path: tests/test_credential_check.py
+    type: modified
+    span:
+      start_line: 117
+      end_line: 229
+    summary: Cover Drex credential preflight and isolate existing Jev preflight tests from configured provider credentials.
+    rationale: Verify the new provider is discoverable and keep preflight tests deterministic.
+  - path: tests/test_github_issue_plan_generation.py
+    type: modified
+    span:
+      start_line: 52
+      end_line: 63
+    summary: Clear DeepInfra and SubQ credentials in deterministic plan-generation tests.
+    rationale: Prevent ambient provider credentials from changing expected test behavior.
+  - path: tests/test_harbor_env.py
+    type: modified
+    span:
+      start_line: 37
+      end_line: 63
+    summary: Verify DeepInfra networking and provider configuration are available to Harbor workers.
+    rationale: Protect the environment forwarding required for Drex requests.
+  - path: tests/test_implement_feature_e2e.py
+    type: modified
+    span:
+      start_line: 132
+      end_line: 139
+    summary: Clear DeepInfra credentials from deterministic feature implementation tests.
+    rationale: Keep feature tests independent of developer machine provider configuration.
+  - path: tests/test_jev_classifier.py
+    type: modified
+    span:
+      start_line: 11
+      end_line: 363
+    summary: Verify Drex request formation, response normalization, credential aliases, overrides, and provider precedence.
+    rationale: Cover the DeepInfra API contract and integration with existing provider selection.
+  - path: tests/test_workflow_task_agent.py
+    type: modified
+    span:
+      start_line: 258
+      end_line: 270
+    summary: Clear DeepInfra and SubQ credentials in deterministic workflow-agent tests.
+    rationale: Prevent local credentials from routing tests to live decision providers.
+entities:
+  - id: drex-v2-decision-classifier
+    type: Class
+    action: added
+  - id: deepinfra-drex-decision-provider
+    type: Feature
+    action: added
+  - id: deepinfra-drex-decisions-endpoint
+    type: Model endpoint
+    action: added
+entity_relationships:
+  - source: drex-v2-decision-classifier
+    target: deepinfra-drex-decisions-endpoint
+    relationship: calls
+    action: added
+  - source: deepinfra-drex-decision-provider
+    target: drex-v2-decision-classifier
+    relationship: implemented_by
+    action: added
+invariants:
+  - id: drex-default-model-endpoint
+    description: Drex uses the DeepInfra typed decisions endpoint and model nace-ai/drex-v2.0 by default.
+    action: added
+  - id: provider-precedence-is-consistent
+    description: When multiple typed decision provider credentials exist, runtime and credential preflight select SubQ before Drex before Jev.
+    action: added
+  - id: tests-ignore-live-provider-credentials
+    description: Deterministic tests must not select live providers based on ambient credentials.
+    action: added
+guidance:
+  - id: configure-deepinfra-credentials
+    description: Set DEEPINFRA_API_KEY or DEEPINFRA_API_TOKEN to enable Drex.
+    action: added
+  - id: configure-deepinfra-overrides
+    description: DEEPINFRA_DECISIONS_URL and DEEPINFRA_DREX_MODEL override the default endpoint and model.
+    action: added

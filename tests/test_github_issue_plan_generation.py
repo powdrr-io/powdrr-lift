@@ -50,7 +50,14 @@ from powdrr_lift.workrr.planning.evidence import EvidenceError
 
 @pytest.fixture(autouse=True)
 def _disable_live_semantic_providers(monkeypatch: pytest.MonkeyPatch) -> None:
-    for name in ("TYPESAFEAI_API_KEY", "TYPESAFE_API_KEY", "SYSTEM_ONE_API_KEY"):
+    for name in (
+        "TYPESAFEAI_API_KEY",
+        "TYPESAFE_API_KEY",
+        "SYSTEM_ONE_API_KEY",
+        "DEEPINFRA_API_KEY",
+        "DEEPINFRA_API_TOKEN",
+        "SUBQ_API_KEY",
+    ):
         monkeypatch.delenv(name, raising=False)
 
 

@@ -294,6 +294,13 @@ remain in the Git common directory. Review and remove retained branches and
 worktrees when they are no longer needed; Powdrr does not automatically discard
 task evidence.
 
+Decision classification also supports Drex v2 through DeepInfra. Set
+`DEEPINFRA_API_KEY` or `DEEPINFRA_API_TOKEN` to use
+[`nace-ai/drex-v2.0`](https://deepinfra.com/nace-ai/drex-v2.0/api) at
+`https://api.deepinfra.com/v1/decisions`. `DEEPINFRA_DECISIONS_URL` and
+`DEEPINFRA_DREX_MODEL` optionally override the endpoint and model. When multiple
+decision-provider keys are present, selection prefers SubQ, then Drex, then Jev.
+
 ### For Codex Proxy Recording
 
 Use the built-in proxy when you want Codex to send OpenAI requests through a local

@@ -9,6 +9,9 @@ from urllib.error import HTTPError
 import pytest
 from powdrr_service import decision_classifier as jev_classifier
 from powdrr_service.decision_classifier import (
+    DREX_DEFAULT_ENDPOINT,
+    DREX_MODEL,
+    DrexSemanticClassifierClient,
     JevSemanticClassifierClient,
     SubQSemanticClassifierClient,
     preferred_semantic_classifier_client,
@@ -235,10 +238,84 @@ def test_preferred_classifier_uses_subq_key_before_jev(monkeypatch: Any) -> None
     assert isinstance(client, SubQSemanticClassifierClient)
 
 
+def test_drex_calls_deepinfra_typed_decision_endpoint(monkeypatch: Any) -> None:
+    import io
+    from urllib.request import Request
+
+    captured: dict[str, Any] = {}
+
+    def open_request(request: Request, *, timeout: float) -> io.BytesIO:
+        captured["url"] = request.full_url
+        captured["headers"] = dict(request.header_items())
+        assert isinstance(request.data, bytes)
+        captured["body"] = json.loads(request.data)
+        captured["timeout"] = timeout
+        return io.BytesIO(
+            json.dumps(
+                {
+                    "model": DREX_MODEL,
+                    "answers": {
+                        "decision": {
+                            "type": "choice",
+                            "choice": "present",
+                            "probabilities": {"present": 0.91, "absent": 0.09},
+                        }
+                    },
+                    "usage": {"input_tokens": 42, "output_tokens": 1},
+                }
+            ).encode()
+        )
+
+    monkeypatch.setattr(jev_classifier, "urlopen", open_request)
+    result = DrexSemanticClassifierClient(
+        _Fallback(), api_key="deepinfra-key"
+    ).complete_json(_messages("invariant"), response_schema=_decision_schema())
+
+    assert result == {"status": "resolved", "value": "present", "reason_code": None}
+    assert captured["url"] == DREX_DEFAULT_ENDPOINT
+    assert captured["headers"]["Authorization"] == "Bearer deepinfra-key"
+    assert captured["body"]["model"] == DREX_MODEL
+    assert set(captured["body"]["questions"]) == {"decision"}
+    assert captured["timeout"] == 10
+
+
+def test_preferred_classifier_uses_subq_then_drex_then_jev(
+    monkeypatch: Any,
+) -> None:
+    monkeypatch.setenv("TYPESAFEAI_API_KEY", "jev-key")
+    monkeypatch.setenv("DEEPINFRA_API_KEY", "deepinfra-key")
+    monkeypatch.delenv("DEEPINFRA_API_TOKEN", raising=False)
+    monkeypatch.setenv("SUBQ_API_KEY", "subq-key")
+    assert isinstance(
+        preferred_semantic_classifier_client(_Fallback()), SubQSemanticClassifierClient
+    )
+    monkeypatch.delenv("SUBQ_API_KEY")
+    assert isinstance(
+        preferred_semantic_classifier_client(_Fallback()), DrexSemanticClassifierClient
+    )
+    monkeypatch.delenv("DEEPINFRA_API_KEY")
+    assert isinstance(
+        preferred_semantic_classifier_client(_Fallback()), JevSemanticClassifierClient
+    )
+
+
+def test_drex_uses_token_alias_and_endpoint_overrides(monkeypatch: Any) -> None:
+    monkeypatch.delenv("DEEPINFRA_API_KEY", raising=False)
+    monkeypatch.setenv("DEEPINFRA_API_TOKEN", "token-alias")
+    monkeypatch.setenv("DEEPINFRA_DECISIONS_URL", "https://proxy.example/decisions")
+    monkeypatch.setenv("DEEPINFRA_DREX_MODEL", "nace-ai/drex-pinned")
+    client = DrexSemanticClassifierClient(_Fallback())
+    assert client._api_key == "token-alias"
+    assert client._endpoint == "https://proxy.example/decisions"
+    assert client._model == "nace-ai/drex-pinned"
+
+
 def test_preferred_classifier_uses_jev_when_subq_key_is_missing(
     monkeypatch: Any,
 ) -> None:
     monkeypatch.delenv("SUBQ_API_KEY", raising=False)
+    monkeypatch.delenv("DEEPINFRA_API_KEY", raising=False)
+    monkeypatch.delenv("DEEPINFRA_API_TOKEN", raising=False)
     monkeypatch.setenv("TYPESAFEAI_API_KEY", "jev-key")
 
     client = preferred_semantic_classifier_client(_Fallback())
@@ -281,6 +358,8 @@ def test_preferred_classifier_returns_none_without_provider_keys(
         "TYPESAFE_API_KEY",
         "SYSTEM_ONE_API_KEY",
         "SUBQ_API_KEY",
+        "DEEPINFRA_API_KEY",
+        "DEEPINFRA_API_TOKEN",
     ):
         monkeypatch.delenv(name, raising=False)
 

@@ -35,6 +35,7 @@ def test_pip_install_command_omits_user_flag_inside_virtualenv() -> None:
 def test_network_allowlist_includes_default_classification_provider() -> None:
     assert "api.typesafe.ai" in network_allowlist_domains()
     assert "api.subq.ai" in network_allowlist_domains()
+    assert "api.deepinfra.com" in network_allowlist_domains()
 
 
 def test_network_allowlist_includes_configured_classification_host() -> None:
@@ -53,6 +54,10 @@ def test_provider_credentials_are_forwarded_to_the_classifier_process() -> None:
         "TYPESAFEAI_API_KEY",
         "TYPESAFE_API_KEY",
         "SYSTEM_ONE_BASE_URL",
+        "DEEPINFRA_API_KEY",
+        "DEEPINFRA_API_TOKEN",
+        "DEEPINFRA_DECISIONS_URL",
+        "DEEPINFRA_DREX_MODEL",
         "SUBQ_API_KEY",
         "SUBQ_BASE_URL",
         "SUBQ_MODEL",

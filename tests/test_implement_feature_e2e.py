@@ -130,6 +130,8 @@ def keep_deterministic_feature_tests_off_live_jev(
         "TYPESAFE_API_KEY",
         "SYSTEM_ONE_API_KEY",
         "SUBQ_API_KEY",
+        "DEEPINFRA_API_KEY",
+        "DEEPINFRA_API_TOKEN",
     ):
         monkeypatch.delenv(name, raising=False)
 

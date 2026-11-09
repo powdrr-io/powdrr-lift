@@ -11,8 +11,11 @@ from typing import Any
 from urllib.error import HTTPError, URLError
 
 from powdrr_service.decision_classifier import (
+    DREX_DEFAULT_ENDPOINT,
+    DREX_MODEL,
     JEV_DEFAULT_BASE_URL,
     JEV_MODEL,
+    _call_drex,
     _call_jev,
     _call_subq,
 )
@@ -142,14 +145,9 @@ def check_coding_executable(executable: str, *, role: str) -> CredentialCheck:
 
 def check_jev_access() -> CredentialCheck:
     """Check the preferred configured typed decision classifier."""
-    key_names = (
-        "TYPESAFEAI_API_KEY",
-        "TYPESAFE_API_KEY",
-        "SYSTEM_ONE_API_KEY",
-    )
-    credential_source = next((name for name in key_names if os.environ.get(name)), None)
-    is_subq = credential_source is None and bool(os.environ.get("SUBQ_API_KEY"))
-    if is_subq:
+    key_names = ("TYPESAFEAI_API_KEY", "TYPESAFE_API_KEY", "SYSTEM_ONE_API_KEY")
+    credential_source: str | None
+    if os.environ.get("SUBQ_API_KEY"):
         credential_source = "SUBQ_API_KEY"
         model = os.environ.get("SUBQ_MODEL") or "subq-snap-preview"
         endpoint_root = os.environ.get("SUBQ_BASE_URL")
@@ -160,7 +158,20 @@ def check_jev_access() -> CredentialCheck:
         )
         provider_name = "subq"
         call = _call_subq
+    elif os.environ.get("DEEPINFRA_API_KEY") or os.environ.get("DEEPINFRA_API_TOKEN"):
+        credential_source = (
+            "DEEPINFRA_API_KEY"
+            if os.environ.get("DEEPINFRA_API_KEY")
+            else "DEEPINFRA_API_TOKEN"
+        )
+        model = os.environ.get("DEEPINFRA_DREX_MODEL") or DREX_MODEL
+        endpoint = os.environ.get("DEEPINFRA_DECISIONS_URL") or DREX_DEFAULT_ENDPOINT
+        provider_name = "deepinfra-drex"
+        call = _call_drex
     else:
+        credential_source = next(
+            (name for name in key_names if os.environ.get(name)), None
+        )
         model = os.environ.get("SYSTEM_ONE_MODEL") or JEV_MODEL
         endpoint_root = os.environ.get("SYSTEM_ONE_BASE_URL")
         endpoint = (
@@ -176,7 +187,10 @@ def check_jev_access() -> CredentialCheck:
             provider="typed-decision-api",
             model=model,
             status="credentials_missing",
-            message="Set a Jev or SUBQ_API_KEY to check classifier access.",
+            message=(
+                "Set DEEPINFRA_API_KEY/DEEPINFRA_API_TOKEN, SUBQ_API_KEY, "
+                "or a Jev API key to check classifier access."
+            ),
         )
 
     request = {

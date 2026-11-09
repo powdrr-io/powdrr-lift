@@ -2121,6 +2121,7 @@ class SourceLedgerQuestionMachine:
                     excluded_subject_ids=excluded_subject_ids,
                     basedpyright_reference_path_pairs=item_reference_path_pairs,
                     baseline_digest=baseline_digest,
+                    code_symbol_coverage=self._structural_symbol_coverage,
                 )
                 self._structural_subject_scope_cache[item_id] = scopes
                 completed_item_subjects: list[BoundStructuralSubject] = list(
@@ -2307,6 +2308,7 @@ class SourceLedgerQuestionMachine:
                 prior_subjects=item_subjects,
                 excluded_subject_ids=excluded_subject_ids,
                 basedpyright_reference_path_pairs=reference_path_pairs,
+                code_symbol_coverage=self._structural_symbol_coverage,
             )
         for scope in scopes:
             scope_id = scope.scope_id

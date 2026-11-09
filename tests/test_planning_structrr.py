@@ -497,6 +497,20 @@ def test_large_structural_subject_index_is_chunked_without_dropping_records(
         "source_subjects": source_subjects,
         "files": [],
     }
+    code_symbol_coverage = {
+        "component_id": "component:python:repository",
+        "status": "partial",
+        "artifact_id": "structrr-code-symbols:sha256:" + "a" * 64,
+        "source_revision": "b" * 40,
+        "requested_paths": ["src/large.py"],
+        "indexed_paths": [],
+        "unindexed_paths": ["src/large.py"],
+        "new_paths": [],
+        "indexed_path_count": 0,
+        "unindexed_path_count": 1,
+        "unindexed_paths_sample": ["src/large.py"],
+        "omitted_unindexed_path_count": 0,
+    }
     monkeypatch.setattr(
         structrr_module, "snapshot_digest", lambda _snapshot: "sha256:constant"
     )
@@ -508,6 +522,7 @@ def test_large_structural_subject_index_is_chunked_without_dropping_records(
         requirement_source_refs={"req-large": (source_ref,)},
         source=source,
         projected_baseline=baseline,
+        code_symbol_coverage=code_symbol_coverage,
     )
 
     assert len(scopes) > 1
@@ -525,6 +540,78 @@ def test_large_structural_subject_index_is_chunked_without_dropping_records(
             source=source,
             source_refs=scope.source_refs,
             projected_baseline=baseline,
+            scope_id=scope.scope_id,
+            baseline_subject_index=scope.baseline_subject_index,
+            code_symbol_coverage=code_symbol_coverage,
+        )
+        assert len(build_question_messages(request)[1]["content"]) < 24_000
+
+
+def test_oversized_subject_context_is_partitioned_by_source_reference() -> None:
+    paragraphs = ["requirement detail " * 400 for _ in range(3)]
+    text = "\n\n".join(
+        f"## Requirement {index}\n\n{paragraph}"
+        for index, paragraph in enumerate(paragraphs, start=1)
+    )
+    source = segment_markdown_source(
+        PinnedSourceDocument(
+            repository="owner/repo",
+            commit_sha="a" * 40,
+            path="docs/plan.md",
+            blob_sha="b" * 40,
+            content_sha256=hashlib.sha256(text.encode()).hexdigest(),
+            text=text,
+        )
+    )
+    source_refs = tuple(
+        anchor.id
+        for anchor in source.anchors
+        if anchor.clause_id is None
+        and len(text[anchor.start_offset : anchor.end_offset]) > 7_000
+    )
+    assert len(source_refs) == 3
+    unit = _unit(
+        "unit-large-source",
+        ("req-large-source",),
+        writes=(
+            PlannedWrite(
+                "src/large.py",
+                "implementation",
+                "python",
+                source_refs,
+                (),
+            ),
+        ),
+    )
+
+    scopes = partition_subject_enumeration_units(
+        plan_id="plan-large-source",
+        item_id="item-large-source",
+        units=(unit,),
+        requirement_source_refs={"req-large-source": source_refs},
+        source=source,
+        projected_baseline={
+            "entities": [],
+            "entity_relationships": [],
+            "files": [],
+            "source_subjects": [],
+        },
+    )
+
+    assert [scope.source_refs[0] for scope in scopes] == list(source_refs)
+    for scope in scopes:
+        request = build_subject_enumeration_request(
+            plan_id="plan-large-source",
+            item_id="item-large-source",
+            units=scope.units,
+            source=source,
+            source_refs=scope.source_refs,
+            projected_baseline={
+                "entities": [],
+                "entity_relationships": [],
+                "files": [],
+                "source_subjects": [],
+            },
             scope_id=scope.scope_id,
             baseline_subject_index=scope.baseline_subject_index,
         )

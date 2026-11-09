@@ -1176,6 +1176,7 @@ def partition_subject_enumeration_units(
     excluded_subject_ids: Sequence[tuple[str, str]] = (),
     basedpyright_reference_path_pairs: Sequence[tuple[str, str]] = (),
     baseline_digest: str | None = None,
+    code_symbol_coverage: Mapping[str, Any] | None = None,
 ) -> tuple[StructuralSubjectEnumerationScope, ...]:
     """Greedily bound per-item subject queries to the planner input limit."""
     scopes: list[StructuralSubjectEnumerationScope] = []
@@ -1186,18 +1187,23 @@ def partition_subject_enumeration_units(
             projected_baseline, group, fingerprint=baseline_digest
         )
 
-    def scope_id(group: Sequence[WorkUnit], subject_index: Mapping[str, Any]) -> str:
-        return _digest(
-            {
-                "unit_ids": [unit.id for unit in group],
-                "writes": [
-                    (unit.id, write.to_data())
-                    for unit in group
-                    for write in unit.planned_writes
-                ],
-                "baseline_subject_index": subject_index,
-            }
-        )[7:19]
+    def scope_id(
+        group: Sequence[WorkUnit],
+        subject_index: Mapping[str, Any],
+        source_refs: Sequence[str] | None = None,
+    ) -> str:
+        payload = {
+            "unit_ids": [unit.id for unit in group],
+            "writes": [
+                (unit.id, write.to_data())
+                for unit in group
+                for write in unit.planned_writes
+            ],
+            "baseline_subject_index": subject_index,
+        }
+        if source_refs is not None:
+            payload["source_refs"] = list(source_refs)
+        return _digest(payload)[7:19]
 
     def split_subject_index(
         subject_index: Mapping[str, Any], *, target_chars: int = 6_000
@@ -1245,8 +1251,13 @@ def partition_subject_enumeration_units(
     def request_for(
         group: Sequence[WorkUnit],
         subject_index: Mapping[str, Any],
+        selected_source_refs: Sequence[str] | None = None,
     ) -> QuestionRequest[StructuralSubjectPage]:
-        source_refs = source_refs_for(group)
+        source_refs = (
+            tuple(selected_source_refs)
+            if selected_source_refs is not None
+            else source_refs_for(group)
+        )
         paths = {write.path for unit in group for write in unit.planned_writes}
         reference_pairs = tuple(
             pair
@@ -1265,14 +1276,17 @@ def partition_subject_enumeration_units(
             basedpyright_reference_path_pairs=reference_pairs,
             page_ordinal=1,
             baseline_digest=baseline_digest,
-            scope_id=scope_id(group, subject_index),
+            scope_id=scope_id(group, subject_index, source_refs),
             baseline_subject_index=subject_index,
+            code_symbol_coverage=code_symbol_coverage,
         )
 
     def ensure_bounded(
-        group: Sequence[WorkUnit], subject_index: Mapping[str, Any]
+        group: Sequence[WorkUnit],
+        subject_index: Mapping[str, Any],
+        selected_source_refs: Sequence[str] | None = None,
     ) -> None:
-        request = request_for(group, subject_index)
+        request = request_for(group, subject_index, selected_source_refs)
         try:
             build_question_messages(request)
         except QuestionInputTooLarge:
@@ -1308,14 +1322,35 @@ def partition_subject_enumeration_units(
         )
 
     def append_scope(
-        group: Sequence[WorkUnit], subject_index: Mapping[str, Any]
+        group: Sequence[WorkUnit],
+        subject_index: Mapping[str, Any],
+        selected_source_refs: Sequence[str] | None = None,
     ) -> None:
-        ensure_bounded(group, subject_index)
+        source_refs = (
+            tuple(selected_source_refs)
+            if selected_source_refs is not None
+            else source_refs_for(group)
+        )
+        try:
+            ensure_bounded(group, subject_index, selected_source_refs)
+        except QuestionInputTooLarge:
+            smaller_index_chunks = split_subject_index(
+                subject_index, target_chars=3_000
+            )
+            if smaller_index_chunks:
+                for index_chunk in smaller_index_chunks:
+                    append_scope(group, index_chunk, selected_source_refs)
+                return
+            if len(source_refs) > 1:
+                for source_ref in source_refs:
+                    append_scope(group, subject_index, (source_ref,))
+                return
+            raise
         scopes.append(
             StructuralSubjectEnumerationScope(
-                scope_id=scope_id(group, subject_index),
+                scope_id=scope_id(group, subject_index, selected_source_refs),
                 units=tuple(group),
-                source_refs=source_refs_for(group),
+                source_refs=source_refs,
                 baseline_subject_index=subject_index,
             )
         )
@@ -1338,7 +1373,8 @@ def partition_subject_enumeration_units(
                 return
             index_chunks = split_subject_index(candidate_index)
             if not index_chunks:
-                raise
+                append_scope(candidate, candidate_index)
+                return
             for index_chunk in index_chunks:
                 append_scope(candidate, index_chunk)
         else:

@@ -2287,7 +2287,7 @@ def test_plan_resume_restores_checkout_before_checking_existing_output(
         )
 
 
-def test_publish_execution_plan_pull_request_rejects_detached_head(
+def test_publish_execution_plan_pull_request_uses_remote_default_from_detached_head(
     tmp_path: Any,
 ) -> None:
     _, plan = generate_execution_plan_yaml(
@@ -2298,8 +2298,10 @@ def test_publish_execution_plan_pull_request_rejects_detached_head(
     generated_file = tmp_path / "plan.yaml"
     generated_file.write_text("generated", encoding="utf-8")
 
+    commands: list[list[str]] = []
+
     def runner(
-        _command: list[str],
+        command: list[str],
         *,
         cwd: Path,
         capture_output: bool,
@@ -2307,16 +2309,45 @@ def test_publish_execution_plan_pull_request_rejects_detached_head(
         check: bool,
     ) -> Any:
         del cwd, capture_output, text, check
-        return type("Completed", (), {"returncode": 0, "stdout": "", "stderr": ""})()
+        commands.append(command)
+        if command == ["git", "branch", "--show-current"]:
+            stdout = ""
+        elif command == [
+            "git",
+            "symbolic-ref",
+            "--quiet",
+            "--short",
+            "refs/remotes/origin/HEAD",
+        ]:
+            stdout = "origin/main\n"
+        elif command[:3] == ["git", "rev-parse", "--verify"]:
+            stdout = "abc123\n"
+        elif command[:3] == ["gh", "pr", "create"]:
+            stdout = "https://github.com/example/repo/pull/42\n"
+        else:
+            stdout = ""
+        return type(
+            "Completed",
+            (),
+            {"returncode": 0, "stdout": stdout, "stderr": ""},
+        )()
 
-    with pytest.raises(PlanGenerationError, match="detached HEAD"):
-        publish_execution_plan_pull_request(
-            repo_root=tmp_path,
-            plan=plan,
-            generated_files=(generated_file,),
-            source_plan_path="proposal.md",
-            runner=runner,
-        )
+    pull_request = publish_execution_plan_pull_request(
+        repo_root=tmp_path,
+        plan=plan,
+        generated_files=(generated_file,),
+        source_plan_path="proposal.md",
+        runner=runner,
+    )
+
+    assert pull_request.base_branch == "main"
+    assert pull_request.commit_sha == "abc123"
+    assert pull_request.pull_request_url.endswith("/pull/42")
+    assert ["git", "switch", "-c", pull_request.branch_name] in commands
+    pr_command = next(
+        command for command in commands if command[:3] == ["gh", "pr", "create"]
+    )
+    assert pr_command[pr_command.index("--base") + 1] == "main"
 
 
 def test_publish_execution_plan_pr_preserves_other_staged_changes(

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import copy
+import hashlib
+import json
 from pathlib import Path
 from typing import Any
 
@@ -213,8 +215,13 @@ def test_multi_pr_proposal_round_trips_with_fingerprints(tmp_path: Path) -> None
     path = tmp_path / "proposal.json"
 
     write_multi_pr_proposal(path, proposal)
+    persisted = json.loads(path.read_text(encoding="utf-8"))
     loaded = load_multi_pr_proposal(path)
 
+    assert persisted["schema_version"] == "multipr-structrr-proposal-v2"
+    assert persisted["item_order"] == ["first", "second"]
+    assert "item_baselines" not in persisted
+    assert set(persisted["item_baseline_fingerprints"]) == {"first", "second"}
     assert loaded.plan_id == proposal.plan_id
     assert loaded.full_proposal.fingerprint == proposal.full_proposal.fingerprint
     assert {key: value.fingerprint for key, value in loaded.item_proposals.items()} == {
@@ -224,6 +231,51 @@ def test_multi_pr_proposal_round_trips_with_fingerprints(tmp_path: Path) -> None
         loaded.item_proposals["first"].verification
         == proposal.item_proposals["first"].verification
     )
+
+
+def test_legacy_multi_pr_proposal_recovers_original_item_order(
+    tmp_path: Path,
+) -> None:
+    proposal = compile_multi_pr_proposal(
+        plan_id="feature-v1",
+        baseline_snapshot={
+            "entities": [{"id": "existing", "type": "Module"}],
+            "entity_relationships": [],
+            "source_subjects": [],
+        },
+        items=[_plan_item("second"), _plan_item("first")],
+        proposed_operations=[
+            {
+                "operation_id": f"{item_id}-add",
+                "item_id": item_id,
+                "section": "entities",
+                "subject_id": f"{item_id}-module",
+                "action": "added",
+                "content": {"id": f"{item_id}-module", "type": "Module"},
+            }
+            for item_id in ("second", "first")
+        ],
+        source_ref="docs/plans/feature.md",
+    )
+    legacy = proposal.to_data()
+    legacy["schema_version"] = "multipr-structrr-proposal-v1"
+    legacy.pop("item_order")
+    legacy.pop("item_baseline_fingerprints")
+    legacy["item_baselines"] = {
+        item_id: dict(snapshot) for item_id, snapshot in proposal.item_baselines.items()
+    }
+    legacy.pop("fingerprint")
+    encoded = json.dumps(
+        legacy, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    ).encode("utf-8")
+    legacy["fingerprint"] = "sha256:" + hashlib.sha256(encoded).hexdigest()
+    path = tmp_path / "legacy-proposal.json"
+    path.write_text(json.dumps(legacy, sort_keys=True), encoding="utf-8")
+
+    loaded = load_multi_pr_proposal(path)
+
+    assert loaded.item_order == ("second", "first")
+    assert loaded.item_baselines == proposal.item_baselines
 
 
 def test_multi_pr_proposal_preserves_code_evidence_outside_structrr_state(

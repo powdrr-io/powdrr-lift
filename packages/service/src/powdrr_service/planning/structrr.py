@@ -621,6 +621,12 @@ def build_subject_enumeration_request(
 ) -> QuestionRequest[StructuralSubjectPage]:
     unit_ids = {unit.id for unit in units}
     requirement_ids = {req for unit in units for req in unit.requirement_ids}
+    planned_paths = {
+        write.path for unit in units for write in unit.planned_writes if write.path
+    }
+    scoped_code_symbol_coverage = _scope_code_symbol_coverage(
+        code_symbol_coverage, planned_paths
+    )
     path_refs_list: list[ContextRecord] = []
     path_ref_counts: dict[str, int] = {}
     for unit in units:
@@ -698,10 +704,10 @@ def build_subject_enumeration_request(
         (
             ContextRecord(
                 f"code-symbol-coverage:{item_id}",
-                {"code_symbol_coverage": dict(code_symbol_coverage)},
+                {"code_symbol_coverage": scoped_code_symbol_coverage},
             ),
         )
-        if code_symbol_coverage is not None
+        if scoped_code_symbol_coverage is not None
         else ()
     )
     prior_counts: dict[str, int] = {}
@@ -794,8 +800,8 @@ def build_subject_enumeration_request(
                     "basedpyright_references": reference_fact.value,
                     "code_symbol_coverage": (
                         None
-                        if code_symbol_coverage is None
-                        else dict(code_symbol_coverage)
+                        if scoped_code_symbol_coverage is None
+                        else dict(scoped_code_symbol_coverage)
                     ),
                     "page": page_ordinal,
                 }
@@ -1456,6 +1462,42 @@ def _structural_subject_index(
             for record in source_subjects
         ],
     }
+
+
+def _scope_code_symbol_coverage(
+    coverage: Mapping[str, Any] | None,
+    planned_paths: set[str],
+) -> dict[str, Any] | None:
+    """Limit symbol coverage facts to paths written by this plan item."""
+    if coverage is None:
+        return None
+    requested = coverage.get("requested_paths")
+    if not isinstance(requested, Sequence) or isinstance(requested, (str, bytes)):
+        return dict(coverage)
+    scope_paths = planned_paths & {path for path in requested if isinstance(path, str)}
+    if not scope_paths:
+        return None
+
+    scoped = dict(coverage)
+    for key in ("requested_paths", "indexed_paths", "unindexed_paths", "new_paths"):
+        values = coverage.get(key)
+        if isinstance(values, Sequence) and not isinstance(values, (str, bytes)):
+            scoped[key] = sorted(
+                {
+                    path
+                    for path in values
+                    if isinstance(path, str) and path in scope_paths
+                }
+            )
+    unindexed = scoped.get("unindexed_paths", [])
+    indexed = scoped.get("indexed_paths", [])
+    scoped["unindexed_paths_sample"] = list(unindexed[:20])
+    scoped["indexed_path_count"] = len(indexed)
+    scoped["unindexed_path_count"] = len(unindexed)
+    scoped["omitted_unindexed_path_count"] = max(0, len(unindexed) - 20)
+    if coverage.get("status") in {"complete", "partial"}:
+        scoped["status"] = "partial" if unindexed else "complete"
+    return scoped
 
 
 def _subject_page_schema(

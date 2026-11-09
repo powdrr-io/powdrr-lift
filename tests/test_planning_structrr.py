@@ -323,6 +323,73 @@ def test_structural_questions_send_only_relevant_baseline_subjects(
     assert unrelated_payload not in change_input
 
 
+def test_structural_subject_enumeration_scopes_symbol_coverage_to_item_paths() -> None:
+    text = "# Plan\n\nUpdate the relevant module.\n"
+    source = segment_markdown_source(
+        PinnedSourceDocument(
+            repository="owner/repo",
+            commit_sha="a" * 40,
+            path="docs/plan.md",
+            blob_sha="b" * 40,
+            content_sha256=hashlib.sha256(text.encode()).hexdigest(),
+            text=text,
+        )
+    )
+    source_ref = source.anchors[0].id
+    relevant_path = "src/relevant.py"
+    unrelated_paths = [f"src/module_{index:04d}.py" for index in range(2_000)]
+    coverage_paths = [*unrelated_paths, relevant_path]
+    code_symbol_coverage = {
+        "component_id": "component:python:repository",
+        "status": "partial",
+        "artifact_id": "structrr-code-symbols:sha256:abc",
+        "source_revision": "a" * 40,
+        "requested_paths": coverage_paths,
+        "indexed_paths": [relevant_path],
+        "unindexed_paths": unrelated_paths,
+        "new_paths": [],
+        "indexed_path_count": 1,
+        "unindexed_path_count": len(unrelated_paths),
+        "unindexed_paths_sample": unrelated_paths[:20],
+        "omitted_unindexed_path_count": len(unrelated_paths) - 20,
+    }
+
+    request = build_subject_enumeration_request(
+        plan_id="plan",
+        item_id="item-0001",
+        units=(
+            _unit(
+                writes=(
+                    PlannedWrite(relevant_path, "implementation", "python", (), ()),
+                )
+            ),
+        ),
+        source=source,
+        source_refs=(source_ref,),
+        projected_baseline={
+            "entities": [],
+            "entity_relationships": [],
+            "files": [],
+            "source_subjects": [],
+        },
+        code_symbol_coverage=code_symbol_coverage,
+    )
+
+    message = build_question_messages(request)[1]["content"]
+    coverage_fact = next(
+        fact.value["code_symbol_coverage"]
+        for fact in request.accepted_facts
+        if fact.ref_id == "code-symbol-coverage:item-0001"
+    )
+    assert len(message) < 24_000
+    assert coverage_fact["requested_paths"] == [relevant_path]
+    assert coverage_fact["indexed_paths"] == [relevant_path]
+    assert coverage_fact["unindexed_paths"] == []
+    assert coverage_fact["unindexed_paths_sample"] == []
+    assert coverage_fact["status"] == "complete"
+    assert unrelated_paths[0] not in message
+
+
 def test_large_structural_subject_context_is_partitioned_into_bounded_scopes(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

@@ -5,14 +5,41 @@ from collections.abc import Mapping
 from email.message import Message
 from typing import Any
 from urllib.error import HTTPError
+from urllib.request import Request
 
 import pytest
 from powdrr_service import decision_classifier as jev_classifier
 from powdrr_service.decision_classifier import (
-    JevSemanticClassifierClient,
-    SubQSemanticClassifierClient,
-    preferred_semantic_classifier_client,
+    DREX_DEFAULT_ENDPOINT,
+    DREX_MODEL,
+    DecisionProviderFactory,
+    DrexDecisionProvider,
+    JevDecisionProvider,
+    SubQDecisionProvider,
+    create_decision_provider,
 )
+
+
+@pytest.fixture(autouse=True)
+def _clear_ambient_decision_provider_configuration(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    for name in (
+        "POWDRR_DECISION_PROVIDER",
+        "SUBQ_API_KEY",
+        "SUBQ_BASE_URL",
+        "SUBQ_MODEL",
+        "DEEPINFRA_API_KEY",
+        "DEEPINFRA_API_TOKEN",
+        "DEEPINFRA_DECISIONS_URL",
+        "DEEPINFRA_DREX_MODEL",
+        "TYPESAFEAI_API_KEY",
+        "TYPESAFE_API_KEY",
+        "SYSTEM_ONE_API_KEY",
+        "SYSTEM_ONE_BASE_URL",
+        "SYSTEM_ONE_MODEL",
+    ):
+        monkeypatch.delenv(name, raising=False)
 
 
 class _Fallback:
@@ -137,7 +164,7 @@ def test_jev_uses_valid_choice_regardless_of_confidence(monkeypatch: Any) -> Non
         lambda *_: {"choice": "present", "confidence": 0.99},
     )
 
-    result = JevSemanticClassifierClient(fallback, api_key="key").complete_json(
+    result = JevDecisionProvider(fallback, api_key="key").complete_json(
         _messages("has_exception"), response_schema=_decision_schema()
     )
 
@@ -166,7 +193,7 @@ def test_jev_explicit_batch_maps_answers_back_to_each_input(monkeypatch: Any) ->
         }
 
     monkeypatch.setattr(jev_classifier, "_call_jev_batch", call_batch)
-    client = JevSemanticClassifierClient(fallback, api_key="key")
+    client = JevDecisionProvider(fallback, api_key="key")
     requests: list[tuple[list[dict[str, str]], Mapping[str, Any]]] = [
         (_messages("has_exception"), _decision_schema()),
         (_messages("has_exception"), _decision_schema()),
@@ -195,7 +222,7 @@ def test_subq_uses_typed_choice_and_maps_to_workflow_result(monkeypatch: Any) ->
         return {"choice": "present", "confidence": 0.7}
 
     monkeypatch.setattr(jev_classifier, "_call_subq", call)
-    result = SubQSemanticClassifierClient(fallback, api_key="subq-key").complete_json(
+    result = SubQDecisionProvider(fallback, api_key="subq-key").complete_json(
         _messages("has_exception"), response_schema=_decision_schema()
     )
 
@@ -218,7 +245,7 @@ def test_subq_bad_request_fails_without_planning_fallback(
     monkeypatch.setattr(jev_classifier, "_call_subq", fail)
 
     with pytest.raises(HTTPError) as error:
-        SubQSemanticClassifierClient(fallback, api_key="key").complete_json(
+        SubQDecisionProvider(fallback, api_key="key").complete_json(
             _messages("polarity"), response_schema=_decision_schema()
         )
 
@@ -228,29 +255,122 @@ def test_subq_bad_request_fails_without_planning_fallback(
 
 def test_preferred_classifier_uses_subq_key_before_jev(monkeypatch: Any) -> None:
     monkeypatch.setenv("TYPESAFEAI_API_KEY", "jev-key")
+    monkeypatch.setenv("DEEPINFRA_API_KEY", "deepinfra-key")
     monkeypatch.setenv("SUBQ_API_KEY", "subq-key")
 
-    client = preferred_semantic_classifier_client(_Fallback())
+    client = create_decision_provider(_Fallback())
 
-    assert isinstance(client, SubQSemanticClassifierClient)
+    assert isinstance(client, SubQDecisionProvider)
 
 
-def test_preferred_classifier_uses_jev_when_subq_key_is_missing(
+def test_decision_provider_factory_prefers_drex_before_jev(
     monkeypatch: Any,
 ) -> None:
-    monkeypatch.delenv("SUBQ_API_KEY", raising=False)
+    monkeypatch.setenv("DEEPINFRA_API_KEY", "deepinfra-key")
     monkeypatch.setenv("TYPESAFEAI_API_KEY", "jev-key")
 
-    client = preferred_semantic_classifier_client(_Fallback())
+    client = create_decision_provider(_Fallback())
 
-    assert isinstance(client, JevSemanticClassifierClient)
+    assert isinstance(client, DrexDecisionProvider)
+
+
+def test_decision_provider_factory_uses_jev_when_other_keys_are_missing(
+    monkeypatch: Any,
+) -> None:
+    monkeypatch.setenv("TYPESAFEAI_API_KEY", "jev-key")
+
+    client = create_decision_provider(_Fallback())
+
+    assert isinstance(client, JevDecisionProvider)
+
+
+def test_decision_provider_factory_freezes_provider_selection_at_startup(
+    monkeypatch: Any,
+) -> None:
+    monkeypatch.setenv("SUBQ_API_KEY", "subq-key")
+    factory = DecisionProviderFactory()
+    monkeypatch.delenv("SUBQ_API_KEY")
+    monkeypatch.setenv("DEEPINFRA_API_KEY", "deepinfra-key")
+
+    provider = factory.create(_Fallback())
+
+    assert factory.provider_name == "subq"
+    assert isinstance(provider, SubQDecisionProvider)
+
+
+def test_decision_provider_factory_honors_explicit_provider(
+    monkeypatch: Any,
+) -> None:
+    monkeypatch.setenv("SUBQ_API_KEY", "subq-key")
+    monkeypatch.setenv("DEEPINFRA_API_TOKEN", "deepinfra-key")
+    monkeypatch.setenv("POWDRR_DECISION_PROVIDER", "drex")
+
+    factory = DecisionProviderFactory()
+
+    assert factory.provider_name == "deepinfra-drex"
+    assert isinstance(factory.create(_Fallback()), DrexDecisionProvider)
+
+
+def test_drex_uses_typed_decision_endpoint_and_normalizes_the_answer(
+    monkeypatch: Any,
+) -> None:
+    import io
+
+    captured: dict[str, Any] = {}
+
+    def open_request(request: Request, *, timeout: float) -> io.BytesIO:
+        captured["url"] = request.full_url
+        captured["headers"] = dict(request.header_items())
+        assert isinstance(request.data, bytes)
+        captured["body"] = json.loads(request.data)
+        captured["timeout"] = timeout
+        return io.BytesIO(
+            json.dumps(
+                {
+                    "model": DREX_MODEL,
+                    "answers": {
+                        "decision": {
+                            "type": "choice",
+                            "choice": "present",
+                            "probabilities": {"present": 0.91, "absent": 0.09},
+                        }
+                    },
+                    "usage": {"input_tokens": 42, "output_tokens": 1},
+                }
+            ).encode()
+        )
+
+    monkeypatch.setattr(jev_classifier, "urlopen", open_request)
+    result = DrexDecisionProvider(_Fallback(), api_key="deepinfra-key").complete_json(
+        _messages("invariant"), response_schema=_decision_schema()
+    )
+
+    assert result == {"status": "resolved", "value": "present", "reason_code": None}
+    assert captured["url"] == DREX_DEFAULT_ENDPOINT
+    assert captured["headers"]["Authorization"] == "Bearer deepinfra-key"
+    assert captured["body"]["model"] == DREX_MODEL
+    assert set(captured["body"]["questions"]) == {"decision"}
+    assert captured["timeout"] == 10
+
+
+def test_drex_honors_endpoint_and_model_environment_overrides(
+    monkeypatch: Any,
+) -> None:
+    monkeypatch.setenv("DEEPINFRA_API_TOKEN", "deepinfra-token")
+    monkeypatch.setenv("DEEPINFRA_DECISIONS_URL", "https://proxy.example/decision")
+    monkeypatch.setenv("DEEPINFRA_DREX_MODEL", "custom/drex")
+
+    client = DrexDecisionProvider(_Fallback())
+
+    assert client.model == "custom/drex"
+    assert client.endpoint == "https://proxy.example/decision"
 
 
 def test_jev_missing_key_fails_without_using_fallback(monkeypatch: Any) -> None:
     for name in ("TYPESAFEAI_API_KEY", "TYPESAFE_API_KEY", "SYSTEM_ONE_API_KEY"):
         monkeypatch.delenv(name, raising=False)
     fallback = _Fallback()
-    client = JevSemanticClassifierClient(fallback, fail_closed=True)
+    client = JevDecisionProvider(fallback, fail_closed=True)
 
     with pytest.raises(RuntimeError, match="JEV classifier requires an API key"):
         client.complete_json(
@@ -284,7 +404,7 @@ def test_preferred_classifier_returns_none_without_provider_keys(
     ):
         monkeypatch.delenv(name, raising=False)
 
-    assert preferred_semantic_classifier_client(_Fallback()) is None
+    assert create_decision_provider(_Fallback()) is None
 
 
 def test_jev_logs_correlated_successful_call(
@@ -294,7 +414,7 @@ def test_jev_logs_correlated_successful_call(
     monkeypatch.setattr(jev_classifier, "_call_jev", lambda *_: {"choice": "present"})
     caplog.set_level("WARNING", logger="powdrr_service.decision_classifier")
 
-    JevSemanticClassifierClient(fallback, api_key="key").complete_json(
+    JevDecisionProvider(fallback, api_key="key").complete_json(
         _messages("has_exception"), response_schema=_decision_schema()
     )
 
@@ -323,7 +443,7 @@ def test_routing_request_uses_target_and_bounded_context_only(
         return {"choice": "include"}
 
     monkeypatch.setattr(jev_classifier, "_call_jev", classify)
-    result = JevSemanticClassifierClient(fallback, api_key="key").complete_json(
+    result = JevDecisionProvider(fallback, api_key="key").complete_json(
         _routing_messages(), response_schema=_decision_schema()
     )
 
@@ -451,9 +571,9 @@ def test_jev_model_can_be_pinned_per_client(monkeypatch: Any) -> None:
         return {"choice": "present"}
 
     monkeypatch.setattr(jev_classifier, "_call_jev", classify)
-    JevSemanticClassifierClient(
-        fallback, api_key="key", model="jev-pinned"
-    ).complete_json(_messages("has_exception"), response_schema=_decision_schema())
+    JevDecisionProvider(fallback, api_key="key", model="jev-pinned").complete_json(
+        _messages("has_exception"), response_schema=_decision_schema()
+    )
 
     assert captured == ["jev-pinned"]
 
@@ -466,7 +586,7 @@ def test_jev_routes_other_semantic_classifier_kinds(monkeypatch: Any) -> None:
         lambda *_: {"choice": "present", "confidence": 0.72},
     )
 
-    result = JevSemanticClassifierClient(fallback, api_key="key").complete_json(
+    result = JevDecisionProvider(fallback, api_key="key").complete_json(
         _messages("polarity"), response_schema=_decision_schema()
     )
 
@@ -483,7 +603,7 @@ def test_jev_maps_candidate_relation_requests(monkeypatch: Any) -> None:
 
     monkeypatch.setattr(jev_classifier, "_call_jev", classify)
 
-    result = JevSemanticClassifierClient(fallback, api_key="key").complete_json(
+    result = JevDecisionProvider(fallback, api_key="key").complete_json(
         _candidate_relation_messages(), response_schema=_decision_schema()
     )
 
@@ -516,7 +636,7 @@ def test_jev_maps_boolean_atomicity_classifier(monkeypatch: Any) -> None:
         },
     ]
 
-    result = JevSemanticClassifierClient(fallback, api_key="key").complete_json(
+    result = JevDecisionProvider(fallback, api_key="key").complete_json(
         messages,
         response_schema={
             "type": "object",
@@ -611,7 +731,7 @@ def test_jev_handles_field_entailment_classifiers(monkeypatch: Any) -> None:
         },
     ]
 
-    result = JevSemanticClassifierClient(fallback, api_key="key").complete_json(
+    result = JevDecisionProvider(fallback, api_key="key").complete_json(
         messages, response_schema=_decision_schema()
     )
 
@@ -629,7 +749,7 @@ def test_jev_abstention_maps_to_unresolved_result(monkeypatch: Any) -> None:
         jev_classifier, "_call_jev", lambda *_: {"choice": "unresolved"}
     )
 
-    result = JevSemanticClassifierClient(fallback, api_key="key").complete_json(
+    result = JevDecisionProvider(fallback, api_key="key").complete_json(
         _messages("polarity"), response_schema=_decision_schema()
     )
 
@@ -653,7 +773,7 @@ def test_jev_batch_bad_request_fails_without_planning_fallback(
         raise error
 
     monkeypatch.setattr(jev_classifier, "_call_jev_batch", fail)
-    client = JevSemanticClassifierClient(fallback, api_key="key")
+    client = JevDecisionProvider(fallback, api_key="key")
 
     with pytest.raises(HTTPError) as raised:
         client.complete_json_batch(
@@ -680,7 +800,7 @@ def test_jev_bad_request_fails_without_planning_fallback(
     monkeypatch.setattr(jev_classifier, "_call_jev", fail)
 
     with pytest.raises(HTTPError) as error:
-        JevSemanticClassifierClient(fallback, api_key="key").complete_json(
+        JevDecisionProvider(fallback, api_key="key").complete_json(
             _messages("polarity"), response_schema=_decision_schema()
         )
 
@@ -710,7 +830,7 @@ def test_jev_enum_gate_failure_does_not_use_planning_fallback(
 
     monkeypatch.setattr(jev_classifier, "_call_jev", fail)
     with pytest.raises((RuntimeError, ValueError)):
-        JevSemanticClassifierClient(fallback, api_key="key").complete_json(
+        JevDecisionProvider(fallback, api_key="key").complete_json(
             [
                 {"role": "system", "content": "Return JSON."},
                 {

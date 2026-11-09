@@ -124,6 +124,7 @@ class PowdrrAgent(BaseInstalledAgent):
                 network_allowlist_domains(
                     self._get_env("SYSTEM_ONE_BASE_URL"),
                     self._get_env("SUBQ_BASE_URL"),
+                    self._get_env("DEEPINFRA_DECISIONS_URL"),
                 )
             )
         )

@@ -595,7 +595,9 @@ def test_execute_pr_test_quality_review_outage_is_advisory(
         item["decision_reports_shortcoming"] is None for item in review["assessments"]
     )
     assert len(review["notes"]) == 7
-    assert all("SubQ test-quality check" in note for note in review["notes"])
+    assert all(
+        "decision-provider test-quality check" in note for note in review["notes"]
+    )
 
 
 def test_quality_shortcoming_is_repaired_once_then_accepted_with_pr_note(

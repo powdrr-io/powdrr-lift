@@ -15,7 +15,6 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
-import os
 import sys
 import time
 from collections import Counter, defaultdict
@@ -26,7 +25,7 @@ from pathlib import Path
 from threading import Lock
 from typing import Any
 
-from powdrr_service.decision_classifier import JEV_MODEL, JevSemanticClassifierClient
+from powdrr_service.decision_classifier import create_decision_provider
 from powdrr_service.planning.assembly import (
     MAX_ITEM_CRITERIA,
     MAX_ITEM_SCOPE_ENTRIES,
@@ -623,7 +622,7 @@ class _ExampleAnswerClient:
         self,
         requests: list[tuple[list[dict[str, str]], Mapping[str, Any]]],
     ) -> list[dict[str, Any]]:
-        """Model one bounded Jev batch while keeping member answers independent."""
+        """Model one bounded decision-provider batch with independent answers."""
         answers = []
         for messages, _schema in requests:
             packet = json.loads(messages[-1]["content"])
@@ -777,8 +776,8 @@ def run_profile(
     repository_root: Path,
     client: Any | None = None,
     decision_client: Any | None = None,
-    decision_provider: str = "JEV",
-    decision_model: str = JEV_MODEL,
+    decision_provider: str = "decision-provider",
+    decision_model: str = "configured",
     provider: str = "deterministic-profile",
     model: str = "deterministic-profile",
     concurrency: int = 4,
@@ -1131,7 +1130,8 @@ def main() -> int:
     live_decision_client = None
     provider = "deterministic-profile"
     model = "deterministic-profile"
-    decision_model = JEV_MODEL
+    decision_model = "deterministic-profile"
+    decision_provider_name = "deterministic-profile"
     if args.live:
         provider = resolve_workflow_provider(args.provider)
         mapping = configured_model_mapping(provider, args.model)
@@ -1151,10 +1151,11 @@ def main() -> int:
         if callable(set_output_limit):
             set_output_limit(8192)
         live_client = _ProgressClient(live_client)
-        live_decision_client = JevSemanticClassifierClient(
-            live_client, fail_closed=True
-        )
-        decision_model = os.environ.get("SYSTEM_ONE_MODEL") or JEV_MODEL
+        live_decision_client = create_decision_provider(live_client, fail_closed=True)
+        if live_decision_client is None:
+            raise RuntimeError("Live planning requires a configured decision provider")
+        decision_model = live_decision_client.model
+        decision_provider_name = live_decision_client.provider
         model = mapping.model
     report = [
         run_profile(
@@ -1162,7 +1163,7 @@ def main() -> int:
             repository_root=repository_root,
             client=live_client,
             decision_client=live_decision_client,
-            decision_provider="JEV",
+            decision_provider=decision_provider_name,
             decision_model=decision_model,
             provider=provider,
             model=model,

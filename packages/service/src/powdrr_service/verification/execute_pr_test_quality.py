@@ -98,8 +98,8 @@ def build_quality_question(
 
 def build_opinion_system_prompt() -> str:
     return (
-        "Answer the exact same yes-or-no question SubQ was asked. Do not broaden "
-        "it or make an overall quality judgment. Use the supplied plan, "
+        "Answer the exact same yes-or-no question as the decision provider. Do "
+        "not broaden it or make an overall quality judgment. Use the supplied plan, "
         "criterion, test source, and baseline result as evidence. Return "
         "shortcoming_present=true only when the specific shortcoming in the "
         "question is present. Include a concise explanation."
@@ -285,7 +285,7 @@ def execute_pr_test_quality_notes(
     for assessment in assessments:
         if assessment.get("decision_error"):
             notes.append(
-                f"{assessment.get('test_id')}: SubQ test-quality check "
+                f"{assessment.get('test_id')}: decision-provider test-quality check "
                 f"{assessment.get('check_id')} was unavailable "
                 f"({assessment.get('decision_error')}); review manually."
             )
@@ -296,7 +296,8 @@ def execute_pr_test_quality_notes(
                 suggestion = assessment.get("suggestion")
                 if isinstance(suggestion, Mapping):
                     note = (
-                        f"{assessment.get('test_id')}: both SubQ and the LLM "
+                        f"{assessment.get('test_id')}: both the decision provider "
+                        "and the LLM "
                         "identified "
                         f"{assessment.get('check_id')}; suggested test: "
                         f"{suggestion.get('test_name', 'unspecified')}. Review whether "
@@ -304,14 +305,15 @@ def execute_pr_test_quality_notes(
                     )
                 elif assessment.get("repair_suggestion_requested") is False:
                     note = (
-                        f"{assessment.get('test_id')}: both SubQ and the LLM still "
+                        f"{assessment.get('test_id')}: both the decision provider "
+                        "and the LLM still "
                         f"identified {assessment.get('check_id')} after a targeted "
                         "repair attempt; consider adding more coverage."
                     )
                 else:
                     note = (
-                        f"{assessment.get('test_id')}: both SubQ and the LLM "
-                        "identified "
+                        f"{assessment.get('test_id')}: both the decision provider "
+                        "and the LLM identified "
                         f"{assessment.get('check_id')}, but a test suggestion was "
                         f"unavailable ({assessment.get('llm_error', 'no result')}); "
                         "consider adding more coverage."
@@ -319,13 +321,14 @@ def execute_pr_test_quality_notes(
                 notes.append(note)
             elif assessment.get("llm_agrees_shortcoming") is False:
                 notes.append(
-                    f"{assessment.get('test_id')}: SubQ and the LLM disagreed about "
+                    f"{assessment.get('test_id')}: the decision provider and the LLM "
+                    "disagreed about "
                     f"{assessment.get('check_id')}; review manually. "
                     f"LLM view: {explanation or 'no explanation returned'}"
                 )
             else:
                 notes.append(
-                    f"{assessment.get('test_id')}: SubQ flagged "
+                    f"{assessment.get('test_id')}: the decision provider flagged "
                     f"{assessment.get('check_id')}, but the LLM comparison was "
                     f"unavailable ({assessment.get('llm_error', 'no result')})."
                 )
@@ -382,7 +385,7 @@ def review_execute_pr_test_quality(
                 verdict = decision.get("shortcoming_present")
                 if not isinstance(verdict, bool):
                     raise ValueError(
-                        "SubQ test-quality decision did not return a boolean"
+                        "Decision-provider test-quality result did not return a boolean"
                     )
                 assessment["decision_reports_shortcoming"] = verdict
             except Exception as error:  # Review outages remain advisory.
@@ -460,7 +463,7 @@ def review_execute_pr_test_quality(
             assessments.append(assessment)
 
     return {
-        "provider": "subq",
+        "provider": getattr(decision_client, "provider_name", "decision-provider"),
         "outcome": "advisory",
         "assessments": assessments,
         "suggestions": suggestions,

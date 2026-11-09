@@ -33,14 +33,22 @@ mini --help
 ## 2. Set provider API keys
 
 Powdrr's default planning and coding routes use DeepInfra. A single DeepInfra
-token can serve both routes. Feature workflows can also use Typesafe AI's JEV
-service for semantic classifications. Keep keys in your shell environment or a
-secret manager; do not commit them to the repository.
+token can serve both routes and can also serve Drex v2 decision classification.
+Decision-provider selection happens once at startup and prefers SubQ, then
+DeepInfra Drex v2, then Jev based on available credentials. Set
+`POWDRR_DECISION_PROVIDER` to `subq`, `deepinfra-drex`, or `jev` to choose
+explicitly. Keep keys in your shell environment or a secret manager; do not
+commit them to the repository.
 
 ```bash
 export DEEPINFRA_API_TOKEN="your-deepinfra-token"
-export TYPESAFEAI_API_KEY="your-typesafe-ai-key"
+export SUBQ_API_KEY="your-subq-key"
 ```
+
+For Drex v2, use `DEEPINFRA_API_KEY` or `DEEPINFRA_API_TOKEN`. Its defaults are
+`nace-ai/drex-v2.0` and `https://api.deepinfra.com/v1/decisions`; override them
+with `DEEPINFRA_DREX_MODEL` and `DEEPINFRA_DECISIONS_URL`. Jev remains available
+with `TYPESAFEAI_API_KEY` (or `TYPESAFE_API_KEY` / `SYSTEM_ONE_API_KEY`).
 
 Put the exports in your shell profile if you want them available in future
 terminals. Avoid putting real secrets in shell history; use your shell's secure
@@ -53,9 +61,9 @@ The `--repo-root` option defaults to the current directory, so it can be omitted
 when you are already in the repository. The check makes authenticated requests
 to the configured planning and coding model routes, checks that the default
 mini-SWE-agent executable is available, and checks GitHub authentication and
-write access to the repository. It also sends an authenticated request to
-Typesafe AI to verify that API key. It reports credential sources and failures
-without printing key values. These provider checks make live requests and may
+write access to the repository. It also sends one authenticated request to the
+decision provider selected by the startup factory. It reports credential
+sources and failures without printing key values. These provider checks make live requests and may
 incur usage charges.
 
 ```bash

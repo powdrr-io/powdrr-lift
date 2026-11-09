@@ -8,7 +8,7 @@ from typing import Any
 
 import powdrr_service.external_contract_research as research_module
 import pytest
-from powdrr_service.decision_classifier import JevSemanticClassifierClient
+from powdrr_service.decision_classifier import JevDecisionProvider
 from powdrr_service.external_contract_research import (
     bind_external_contract_assessments,
     bind_external_contract_claims,
@@ -789,8 +789,8 @@ def test_external_research_gate_and_evidence_control_model_calls(
         ProcedrrModelClient(planning, process_directory=process_directory),
         execute,
         judge_clients={
-            "jev": ProcedrrModelClient(
-                JevSemanticClassifierClient(planning, api_key="test-key"),
+            "decision": ProcedrrModelClient(
+                JevDecisionProvider(planning, api_key="test-key"),
                 process_directory=process_directory,
             ),
         },

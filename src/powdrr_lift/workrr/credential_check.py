@@ -11,10 +11,7 @@ from typing import Any
 from urllib.error import HTTPError, URLError
 
 from powdrr_service.decision_classifier import (
-    JEV_DEFAULT_BASE_URL,
-    JEV_MODEL,
-    _call_jev,
-    _call_subq,
+    DecisionProviderFactory,
 )
 from powdrr_service.providers.config import (
     LLMModelMapping,
@@ -140,60 +137,48 @@ def check_coding_executable(executable: str, *, role: str) -> CredentialCheck:
     )
 
 
-def check_jev_access() -> CredentialCheck:
-    """Check the preferred configured typed decision classifier."""
-    key_names = (
-        "TYPESAFEAI_API_KEY",
-        "TYPESAFE_API_KEY",
-        "SYSTEM_ONE_API_KEY",
-    )
-    credential_source = next((name for name in key_names if os.environ.get(name)), None)
-    is_subq = credential_source is None and bool(os.environ.get("SUBQ_API_KEY"))
-    if is_subq:
-        credential_source = "SUBQ_API_KEY"
-        model = os.environ.get("SUBQ_MODEL") or "subq-snap-preview"
-        endpoint_root = os.environ.get("SUBQ_BASE_URL")
-        endpoint = (
-            f"{endpoint_root.rstrip('/')}/systemone"
-            if endpoint_root
-            else "https://api.subq.ai/v1/systemone"
-        )
-        provider_name = "subq"
-        call = _call_subq
-    else:
-        model = os.environ.get("SYSTEM_ONE_MODEL") or JEV_MODEL
-        endpoint_root = os.environ.get("SYSTEM_ONE_BASE_URL")
-        endpoint = (
-            f"{endpoint_root.rstrip('/')}/systemone"
-            if endpoint_root
-            else JEV_DEFAULT_BASE_URL
-        )
-        provider_name = "typesafe-ai"
-        call = _call_jev
-    if credential_source is None:
+def check_decision_provider_access() -> CredentialCheck:
+    """Check whichever decision provider the startup factory selected."""
+    try:
+        factory = DecisionProviderFactory()
+    except RuntimeError as error:
         return CredentialCheck(
-            role="decision-classifier",
-            provider="typed-decision-api",
-            model=model,
+            role="decision-provider",
+            provider="decision-provider",
+            model="configured",
             status="credentials_missing",
-            message="Set a Jev or SUBQ_API_KEY to check classifier access.",
+            message=str(error),
+        )
+    provider = factory.create(_CredentialCheckFallback(), fail_closed=True)
+    if provider is None:
+        return CredentialCheck(
+            role="decision-provider",
+            provider="decision-provider",
+            model="configured",
+            status="credentials_missing",
+            message=(
+                "Configure a decision provider with POWDRR_DECISION_PROVIDER and "
+                "its credentials, or configure one supported provider key."
+            ),
         )
 
-    request = {
-        "allowed_values": ["ok"],
-        "criteria": {"ok": "This request verifies authenticated API access."},
-        "instructions": ["Return ok for this credential check."],
-        "question": "Select the result for this credential check.",
-        "state": {"credential_check": True},
-    }
     try:
-        response = call(request, os.environ[credential_source], endpoint, model)
-        answer = response.get("answer", response)
-        choice = answer.get("choice") if isinstance(answer, Mapping) else None
-        if choice not in {"ok", "unresolved"}:
-            raise ValueError(
-                "Decision API returned an invalid credential-check result."
-            )
+        messages = [
+            {"role": "system", "content": ""},
+            {
+                "role": "user",
+                "content": (
+                    "Return true to confirm authenticated decision-provider access."
+                    '\n\nContext:\n{"decision_provider_check":{"text":'
+                    '"authenticated decision-provider access check"}}'
+                ),
+            },
+        ]
+        result = provider.complete_json(
+            messages, response_schema=DECISION_PROVIDER_RESPONSE_SCHEMA
+        )
+        if not isinstance(result.get("decision"), bool):
+            raise ValueError("Decision provider returned an invalid health result.")
     except HTTPError as error:
         status = {
             401: "authentication_failed",
@@ -201,30 +186,45 @@ def check_jev_access() -> CredentialCheck:
             429: "rate_or_quota_limited",
         }.get(error.code, "provider_rejected_request")
         return CredentialCheck(
-            role="decision-classifier",
-            provider=provider_name,
-            model=model,
+            role="decision-provider",
+            provider=factory.provider_name or "decision-provider",
+            model=provider.model,
             status=status,
-            credential_source=credential_source,
-            message=f"Decision API returned HTTP {error.code}.",
+            credential_source=factory.credential_source,
+            message=f"Decision provider returned HTTP {error.code}.",
         )
-    except (OSError, TimeoutError, URLError, ValueError) as error:
+    except (OSError, TimeoutError, URLError, ValueError, RuntimeError) as error:
         return CredentialCheck(
-            role="decision-classifier",
-            provider=provider_name,
-            model=model,
+            role="decision-provider",
+            provider=factory.provider_name or "decision-provider",
+            model=provider.model,
             status="unavailable",
-            credential_source=credential_source,
-            message=f"Decision API credential check failed: {error}",
+            credential_source=factory.credential_source,
+            message=(
+                f"Decision-provider access check failed: {_safe_error_message(error)}"
+            ),
         )
 
     return CredentialCheck(
-        role="decision-classifier",
-        provider=provider_name,
-        model=model,
+        role="decision-provider",
+        provider=factory.provider_name or "decision-provider",
+        model=provider.model,
         status="passed",
-        credential_source=credential_source,
+        credential_source=factory.credential_source,
     )
+
+
+class _CredentialCheckFallback:
+    def complete_json(self, _messages: list[dict[str, str]]) -> dict[str, Any]:
+        raise RuntimeError("Decision-provider health check cannot use an LLM fallback")
+
+
+DECISION_PROVIDER_RESPONSE_SCHEMA = {
+    "type": "object",
+    "properties": {"decision": {"type": "boolean"}},
+    "required": ["decision"],
+    "additionalProperties": False,
+}
 
 
 def configured_model_mapping(provider: str, model: str | None) -> LLMModelMapping:
@@ -253,6 +253,10 @@ def _safe_error_message(error: Exception) -> str:
         "OPENROUTER_API_KEY",
         "DEEPINFRA_API_TOKEN",
         "DEEPINFRA_API_KEY",
+        "SUBQ_API_KEY",
+        "TYPESAFEAI_API_KEY",
+        "TYPESAFE_API_KEY",
+        "SYSTEM_ONE_API_KEY",
     ):
         # The error itself should not include these variables, but strip any
         # accidental echo from a custom endpoint or provider response.
@@ -265,7 +269,7 @@ def _safe_error_message(error: Exception) -> str:
 __all__ = [
     "CredentialCheck",
     "check_coding_executable",
-    "check_jev_access",
+    "check_decision_provider_access",
     "check_model_access",
     "configured_model_mapping",
 ]

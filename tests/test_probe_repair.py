@@ -5,7 +5,7 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
-from powdrr_service import decision_classifier as jev_classifier
+from powdrr_service import decision_classifier as decision_classifier
 from powdrr_service.behavior_contract import BEHAVIOR_DIMENSIONS
 from powdrr_service.verification import probe_repair
 
@@ -162,7 +162,7 @@ def test_probe_repair_adds_related_source_and_typed_obligation_guidance(
         {
             "scenario_id": "scenario:instruction-001",
             "obligation_type": "property_exposure",
-            "categorized_by": "jev",
+            "categorized_by": "decision-provider",
         }
     ]
     assert client.messages is not None
@@ -183,8 +183,10 @@ def test_probe_repair_adds_related_source_and_typed_obligation_guidance(
     )
 
 
-def test_jev_obligation_classifier_distinguishes_property_exposure() -> None:
-    messages = probe_repair._build_jev_obligation_category_messages(
+def test_decision_provider_obligation_classifier_distinguishes_property_exposure() -> (
+    None
+):
+    messages = probe_repair._build_decision_provider_obligation_category_messages(
         "DdlTable exposes a property constrained_columns."
     )
     payload = json.loads(messages[1]["content"].split("Context:\n", 1)[1])
@@ -195,7 +197,7 @@ def test_jev_obligation_classifier_distinguishes_property_exposure() -> None:
         classifier["instructions"]
     )
 
-    classifier_request = jev_classifier._classifier_request(
+    classifier_request = decision_classifier._classifier_request(
         messages, probe_repair.OBLIGATION_CATEGORY_RESPONSE_SCHEMA
     )
 
@@ -583,7 +585,7 @@ def test_faithfulness_recheck_accepts_canonicalized_original_scenario(
             assert response_schema is not None
             detail_messages.append(messages)
             detail_request = json.loads(messages[-1]["content"])
-            assert detail_request["jev_categories"][0]["value"] == "entailed"
+            assert detail_request["decision_categories"][0]["value"] == "entailed"
             return {
                 "results": [
                     {
@@ -700,10 +702,12 @@ def test_faithfulness_recheck_accepts_canonicalized_original_scenario(
     assert review["outcome"]["reviews"][0]["source_evidence_valid"] is True
     assert "given and when context" in categorizer_messages[0][1]["content"]
     assert "source_evidence" not in categorizer_messages[0][1]["content"]
-    assert "JEV already classified" in detail_messages[0][0]["content"]
+    assert (
+        "The decision provider already classified" in detail_messages[0][0]["content"]
+    )
 
 
-def test_jev_claim_category_messages_use_classifier_adapter_envelope() -> None:
+def test_decision_provider_claim_category_uses_classifier_envelope() -> None:
     request = {
         "source_text": "The source instruction",
         "context_text": '{"source_clauses": []}',
@@ -713,8 +717,8 @@ def test_jev_claim_category_messages_use_classifier_adapter_envelope() -> None:
         },
     }
 
-    classifier_request = jev_classifier._classifier_request(
-        probe_repair._build_jev_claim_category_messages(request),
+    classifier_request = decision_classifier._classifier_request(
+        probe_repair._build_decision_provider_claim_category_messages(request),
         probe_repair.CLAIM_CATEGORY_RESPONSE_SCHEMA,
     )
 

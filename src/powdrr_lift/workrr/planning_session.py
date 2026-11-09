@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import os
 import re
 import subprocess
 import sys
@@ -25,11 +24,7 @@ from powdrr_local.planning.checkpoints import (
 )
 from powdrr_local.planning.sessions import GitHubPlanningIssueStore
 from powdrr_local.planning.source import read_pinned_source
-from powdrr_service.decision_classifier import (
-    JEV_MODEL,
-    SUBQ_MODEL,
-    preferred_semantic_classifier_client,
-)
+from powdrr_service.decision_classifier import create_decision_provider
 from powdrr_service.planning.assembly import PathFact, WorkUnit
 from powdrr_service.planning.compiler import PlanningCompilationError
 from powdrr_service.planning.driver import SourceLedgerQuestionMachine
@@ -229,18 +224,12 @@ def run_planning_session(
         )
         if callable(set_output_limit):
             set_output_limit(8192)
-        decision_client = preferred_semantic_classifier_client(
-            planning_client, fail_closed=True
-        )
+        decision_client = create_decision_provider(planning_client, fail_closed=True)
         if decision_client is None:
             raise PlanningServiceError(
-                "planning requires SUBQ_API_KEY or a Jev decision API key"
+                "planning requires a configured decision provider"
             )
-        decision_model = (
-            os.environ.get("SUBQ_MODEL") or SUBQ_MODEL
-            if decision_client.provider == "SUBQ"
-            else os.environ.get("SYSTEM_ONE_MODEL") or JEV_MODEL
-        )
+        decision_model = decision_client.model
 
         source = segment_markdown_source(pinned_source)
         taxonomy = load_entity_taxonomy(repo_root, _structrr_taxonomy_path(repo_root))

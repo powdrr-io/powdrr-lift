@@ -238,7 +238,7 @@ class ProcedrrModelClient:
                     )
                     if len(batch_outputs) != len(pending):
                         raise ProcedrrResponseError(
-                            "JEV returned a different number of results than requests"
+                            "Decision provider returned a mismatched batch length"
                         )
                     for (index, _, schema, _), output in zip(
                         pending, batch_outputs, strict=True

@@ -5,7 +5,7 @@ from types import SimpleNamespace
 from typing import Any
 
 from powdrr_contracts.models import OperationRequest
-from powdrr_service.decision_classifier import SubQSemanticClassifierClient
+from powdrr_service.decision_classifier import SubQDecisionProvider
 from powdrr_service.local_service import LocalPowdrrService
 from powdrr_service.verification.execute_pr_test_quality import (
     DECISION_SCHEMA,
@@ -30,7 +30,7 @@ def test_subq_accepts_the_quality_review_boolean_question(
 
     monkeypatch.setattr("powdrr_service.decision_classifier._call_subq", call)
     fallback: Any = object()
-    client = SubQSemanticClassifierClient(fallback, api_key="subq-key")
+    client = SubQDecisionProvider(fallback, api_key="subq-key")
     messages = [
         {"role": "system", "content": ""},
         {
@@ -163,14 +163,6 @@ def test_verification_health_resolves_provider_credentials_inside_service(
         provider_calls.append(kwargs)
         return llm_client
 
-    class FakeSubQClient:
-        def __init__(self, fallback: object, *, fail_closed: bool) -> None:
-            assert fallback is llm_client
-            assert fail_closed
-
-        def complete_json(self, *_args: Any, **_kwargs: Any) -> dict[str, Any]:
-            return {"shortcoming_present": False}
-
     monkeypatch.setattr(
         "powdrr_service.providers.credentials.resolve_provider_credentials",
         resolve_credentials,
@@ -178,17 +170,20 @@ def test_verification_health_resolves_provider_credentials_inside_service(
     monkeypatch.setattr(
         "powdrr_service.providers.clients.build_provider_client", build_client
     )
-    monkeypatch.setattr(
-        "powdrr_service.decision_classifier.SubQSemanticClassifierClient",
-        FakeSubQClient,
-    )
+    decision_requests: list[dict[str, Any]] = []
+
+    def call_subq(
+        request: dict[str, Any], *_args: Any, **_kwargs: Any
+    ) -> dict[str, Any]:
+        decision_requests.append(request)
+        return {"choice": "false"}
+
+    monkeypatch.setattr("powdrr_service.decision_classifier._call_subq", call_subq)
 
     def reject_jev(*_args: Any, **_kwargs: Any) -> Any:
         raise AssertionError("execute-PR quality review must not call Jev")
 
-    monkeypatch.setattr(
-        "powdrr_service.decision_classifier.JevSemanticClassifierClient", reject_jev
-    )
+    monkeypatch.setattr("powdrr_service.decision_classifier._call_jev", reject_jev)
 
     update = LocalPowdrrService().start(
         OperationRequest(
@@ -223,3 +218,4 @@ def test_verification_health_resolves_provider_credentials_inside_service(
     assert report["provider"] == "subq"
     assert report["outcome"] == "advisory"
     assert len(report["assessments"]) == 7
+    assert len(decision_requests) == 7

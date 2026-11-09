@@ -9,6 +9,8 @@ PROVIDER_ENVIRONMENT_KEYS = (
     "DEEPINFRA_API_KEY",
     "DEEPINFRA_API_TOKEN",
     "DEEPINFRA_BASE_URL",
+    "DEEPINFRA_DECISIONS_URL",
+    "DEEPINFRA_DREX_MODEL",
     "ISOQUANT_API_KEY",
     "ISOQUANT_BASE_URL",
     "SYSTEM_ONE_API_KEY",
@@ -16,6 +18,7 @@ PROVIDER_ENVIRONMENT_KEYS = (
     "SUBQ_API_KEY",
     "SUBQ_BASE_URL",
     "SUBQ_MODEL",
+    "POWDRR_DECISION_PROVIDER",
     "TYPESAFEAI_API_KEY",
     "TYPESAFE_API_KEY",
     "TAVILY_API_KEY",
@@ -50,6 +53,7 @@ def env_flag_is_enabled(value: str | None) -> bool:
 def network_allowlist_domains(
     system_one_base_url: str | None = None,
     subq_base_url: str | None = None,
+    deepinfra_decisions_url: str | None = None,
 ) -> tuple[str, ...]:
     """Return hosts required by package installation and configured providers."""
     domains = {
@@ -62,7 +66,11 @@ def network_allowlist_domains(
         "pypi.org",
         "registry.npmjs.org",
     }
-    for base_url in (system_one_base_url, subq_base_url):
+    for base_url in (
+        system_one_base_url,
+        subq_base_url,
+        deepinfra_decisions_url,
+    ):
         if not base_url:
             continue
         host = urlsplit(base_url).hostname

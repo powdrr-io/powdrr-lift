@@ -316,8 +316,8 @@ class PlanningOptions:
     use_provider_schema: bool = True
     provider: str = "unknown"
     decision_client: PlanningModelClient | None = None
-    decision_provider: str = "JEV"
-    decision_model: str = "jev-latest"
+    decision_provider: str = "decision-provider"
+    decision_model: str = "configured"
     telemetry_sink: Callable[[Mapping[str, Any]], None] | None = None
     deterministic_telemetry_sink: Callable[[Mapping[str, Any]], None] | None = None
 
@@ -901,8 +901,8 @@ def _run_question_batch(
         )
         if uses_decision_client and options.decision_client is None:
             raise PlanningServiceError(
-                "structural candidate reviews require the configured Jev "
-                "decision client"
+                "structural candidate reviews require the configured "
+                "decision-provider client"
             )
         request_model = (
             options.decision_model if uses_decision_client else options.model
@@ -1061,7 +1061,7 @@ def _run_decision_question_batch(
     options: PlanningOptions,
     stderr: Any,
 ) -> tuple[tuple[QuestionRequest[Any], Any, Exception | None], ...]:
-    """Run independent Jev booleans in one bounded provider batch."""
+    """Run independent decisions in one bounded provider batch."""
     output_stream = stderr if stderr is not None else sys.stdout
     outcomes: list[tuple[QuestionRequest[Any], Any, Exception | None]] = []
     configured_batch_size = getattr(client, "max_batch_size", len(requests))
@@ -1094,7 +1094,7 @@ def _run_decision_question_batch(
             )
             if len(answers) != len(batch_requests):
                 raise PlanningServiceError(
-                    "Jev decision batch returned a different number of answers "
+                    "Decision-provider batch returned a different number of answers "
                     "than requests"
                 )
         except Exception as caught_batch_error:

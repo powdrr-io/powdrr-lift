@@ -395,8 +395,9 @@ def _build_repair_messages(
                 "`then`. Use the full source instruction and related source clauses "
                 "to understand how an atomic clause fits the requested deliverable; "
                 "the verifier and hidden tests are never inputs. The obligation "
-                "category was assigned by JEV. Use that category to select "
-                "the right kind of probe, then derive all concrete setup and expected "
+                "category was assigned by the decision provider. Use that category "
+                "to select the right kind of probe, then derive all concrete setup "
+                "and expected "
                 "details from the source clause and repository contract. For a "
                 "property_exposure obligation, assert that the named property can be "
                 "accessed; do not infer its returned value. For derived_property, "
@@ -630,7 +631,7 @@ def _obligation_guidance(
         if client is not None:
             try:
                 response = client.complete_json(
-                    _build_jev_obligation_category_messages(source),
+                    _build_decision_provider_obligation_category_messages(source),
                     response_schema=OBLIGATION_CATEGORY_RESPONSE_SCHEMA,
                 )
                 candidate = response.get("category")
@@ -655,13 +656,17 @@ def _obligation_guidance(
             {
                 "scenario_id": scenario_id,
                 "obligation_type": kind,
-                "categorized_by": "jev" if kind != "uncertain" else "unresolved",
+                "categorized_by": (
+                    "decision-provider" if kind != "uncertain" else "unresolved"
+                ),
             }
         )
     return result
 
 
-def _build_jev_obligation_category_messages(source: str) -> list[dict[str, str]]:
+def _build_decision_provider_obligation_category_messages(
+    source: str,
+) -> list[dict[str, str]]:
     categories = [
         "property_exposure: the source requires a named property to be exposed, but "
         "does not specify its value",
@@ -846,10 +851,10 @@ def _build_faithfulness_retry_messages(
     ]
 
 
-def _build_jev_claim_category_messages(
+def _build_decision_provider_claim_category_messages(
     request: Mapping[str, Any],
 ) -> list[dict[str, str]]:
-    """Build the enum-classifier envelope recognized by the JEV adapter."""
+    """Build a typed-decision envelope for scenario-claim classification."""
     claim = request.get("claim")
     if not isinstance(claim, Mapping):
         raise ValueError("scenario claim request has no claim")
@@ -974,7 +979,7 @@ def _check_revised_scenario_faithfulness(
                 raise ValueError("faithfulness classifier is unavailable")
             category_results = [
                 client.complete_json(
-                    _build_jev_claim_category_messages(request),
+                    _build_decision_provider_claim_category_messages(request),
                     response_schema=CLAIM_CATEGORY_RESPONSE_SCHEMA,
                 )
                 for request in requests
@@ -989,7 +994,8 @@ def _check_revised_scenario_faithfulness(
                     {
                         "role": "system",
                         "content": (
-                            "JEV already classified each claim. Do not change or "
+                            "The decision provider already classified each claim. "
+                            "Do not change or "
                             "second-guess its category. For each claim, provide exact "
                             "source quotes with clause IDs that explain that category. "
                             "Quotes must be exact substrings of the supplied source "
@@ -1009,7 +1015,7 @@ def _check_revised_scenario_faithfulness(
                         "content": json.dumps(
                             {
                                 "requests": requests,
-                                "jev_categories": [
+                                "decision_categories": [
                                     dict(item) for item in category_results
                                 ],
                             },

@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any, TextIO
 from uuid import uuid4
 
-from powdrr_service.decision_classifier import JevSemanticClassifierClient
+from powdrr_service.decision_classifier import create_decision_provider
 from powdrr_service.procedrr import ProcessCatalog, ProcessDefinition
 from powdrr_service.procedrr_evaluator.evaluator import SuspendEvaluation
 from powdrr_service.procedrr_evaluator.model_client import ProcedrrModelClient
@@ -679,19 +679,23 @@ def run_procedrr_workflow_chat(
         {name: operation_handler(name) for name in operation_names}
     )
     planning_client = procedrr_client("normal")
-    jev_classifier = JevSemanticClassifierClient(planning_client)
-    jev_client = ProcedrrModelClient(
-        jev_classifier,
-        process_directory=process_dir,
-        max_retries=config.max_stalled_roundtrips,
-        provider_retry_attempts=config.provider_retry_attempts,
-        provider_retry_delay_seconds=config.provider_retry_delay_seconds,
-        telemetry_sink=record_provider_attempt,
+    decision_provider = create_decision_provider(planning_client)
+    decision_judge_client = (
+        ProcedrrModelClient(
+            decision_provider,
+            process_directory=process_dir,
+            max_retries=config.max_stalled_roundtrips,
+            provider_retry_attempts=config.provider_retry_attempts,
+            provider_retry_delay_seconds=config.provider_retry_delay_seconds,
+            telemetry_sink=record_provider_attempt,
+        )
+        if decision_provider is not None
+        else planning_client
     )
     judge_clients = {
         "planning": planning_client,
         "adversarial": procedrr_client("adversarial"),
-        "jev": jev_client,
+        "decision": decision_judge_client,
     }
 
     run_directory.mkdir(parents=True, exist_ok=True)

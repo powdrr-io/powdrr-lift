@@ -11,7 +11,7 @@ from powdrr_service.providers.credentials import ProviderCredentials
 from powdrr_lift.cli import build_parser, main
 from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.workrr.credential_check import (
-    check_jev_access,
+    check_decision_provider_access,
     check_model_access,
     configured_model_mapping,
 )
@@ -112,10 +112,11 @@ def test_check_model_access_reports_missing_credentials(tmp_path: Path) -> None:
     assert result.status == "credentials_missing"
 
 
-def test_check_jev_access_makes_authenticated_request_without_exposing_key(
+def test_check_decision_provider_access_uses_selected_provider_without_exposing_key(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("TYPESAFEAI_API_KEY", "private-test-key")
+    monkeypatch.setenv("POWDRR_DECISION_PROVIDER", "jev")
     captured: dict[str, object] = {}
 
     def call_jev(
@@ -124,13 +125,14 @@ def test_check_jev_access_makes_authenticated_request_without_exposing_key(
         captured.update(
             request=request, api_key=api_key, endpoint=endpoint, model=model
         )
-        return {"answer": {"choice": "ok"}}
+        return {"answer": {"choice": "true"}}
 
-    monkeypatch.setattr("powdrr_lift.workrr.credential_check._call_jev", call_jev)
+    monkeypatch.setattr("powdrr_service.decision_classifier._call_jev", call_jev)
 
-    result = check_jev_access()
+    result = check_decision_provider_access()
 
     assert result.status == "passed"
+    assert result.provider == "jev"
     assert result.credential_source == "TYPESAFEAI_API_KEY"
     assert "private-test-key" not in str(result.to_data())
     assert captured["api_key"] == "private-test-key"
@@ -138,7 +140,7 @@ def test_check_jev_access_makes_authenticated_request_without_exposing_key(
     assert captured["model"] == "jev-latest"
 
 
-def test_check_jev_access_reports_missing_key(
+def test_check_decision_provider_access_reports_missing_key(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     for name in (
@@ -146,21 +148,25 @@ def test_check_jev_access_reports_missing_key(
         "TYPESAFE_API_KEY",
         "SYSTEM_ONE_API_KEY",
         "SUBQ_API_KEY",
+        "DEEPINFRA_API_KEY",
+        "DEEPINFRA_API_TOKEN",
+        "POWDRR_DECISION_PROVIDER",
     ):
         monkeypatch.delenv(name, raising=False)
 
-    result = check_jev_access()
+    result = check_decision_provider_access()
 
     assert result.status == "credentials_missing"
-    assert result.message == "Set a Jev or SUBQ_API_KEY to check classifier access."
+    assert "Configure a decision provider" in (result.message or "")
 
 
-def test_check_jev_access_uses_subq_when_jev_key_is_missing(
+def test_check_decision_provider_access_uses_factory_selected_subq(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     for name in ("TYPESAFEAI_API_KEY", "TYPESAFE_API_KEY", "SYSTEM_ONE_API_KEY"):
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setenv("SUBQ_API_KEY", "private-subq-key")
+    monkeypatch.setenv("POWDRR_DECISION_PROVIDER", "subq")
     captured: dict[str, object] = {}
 
     def call_subq(
@@ -169,11 +175,11 @@ def test_check_jev_access_uses_subq_when_jev_key_is_missing(
         captured.update(
             request=request, api_key=api_key, endpoint=endpoint, model=model
         )
-        return {"answer": {"choice": "ok"}}
+        return {"answer": {"choice": "true"}}
 
-    monkeypatch.setattr("powdrr_lift.workrr.credential_check._call_subq", call_subq)
+    monkeypatch.setattr("powdrr_service.decision_classifier._call_subq", call_subq)
 
-    result = check_jev_access()
+    result = check_decision_provider_access()
 
     assert result.status == "passed"
     assert result.credential_source == "SUBQ_API_KEY"
@@ -182,23 +188,70 @@ def test_check_jev_access_uses_subq_when_jev_key_is_missing(
     assert captured["model"] == "subq-snap-preview"
 
 
-def test_check_jev_access_reports_authentication_failure(
+def test_check_decision_provider_access_uses_factory_selected_drex(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("DEEPINFRA_API_TOKEN", "private-drex-key")
+    monkeypatch.setenv("POWDRR_DECISION_PROVIDER", "deepinfra-drex")
+    captured: dict[str, object] = {}
+
+    def call_drex(
+        request: object, api_key: str, endpoint: str, model: str
+    ) -> dict[str, object]:
+        captured.update(
+            request=request, api_key=api_key, endpoint=endpoint, model=model
+        )
+        return {"choice": "true"}
+
+    monkeypatch.setattr("powdrr_service.decision_classifier._call_drex", call_drex)
+
+    result = check_decision_provider_access()
+
+    assert result.status == "passed"
+    assert result.provider == "deepinfra-drex"
+    assert result.credential_source == "DEEPINFRA_API_TOKEN"
+    assert captured["endpoint"] == "https://api.deepinfra.com/v1/decisions"
+    assert captured["model"] == "nace-ai/drex-v2.0"
+    assert "private-drex-key" not in str(result.to_data())
+
+
+def test_check_decision_provider_access_reports_authentication_failure(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     from urllib.error import HTTPError
 
     monkeypatch.setenv("TYPESAFEAI_API_KEY", "private-test-key")
+    monkeypatch.setenv("POWDRR_DECISION_PROVIDER", "jev")
 
     def reject(*_args: object) -> object:
         raise HTTPError("https://api.typesafe.ai", 401, "Unauthorized", Message(), None)
 
-    monkeypatch.setattr("powdrr_lift.workrr.credential_check._call_jev", reject)
+    monkeypatch.setattr("powdrr_service.decision_classifier._call_jev", reject)
 
-    result = check_jev_access()
+    result = check_decision_provider_access()
 
     assert result.status == "authentication_failed"
-    assert result.message == "Decision API returned HTTP 401."
+    assert result.message == "Decision provider returned HTTP 401."
     assert "private-test-key" not in str(result.to_data())
+
+
+def test_check_decision_provider_access_redacts_provider_key_from_errors(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    secret = "private-drex-key"
+    monkeypatch.setenv("DEEPINFRA_API_TOKEN", secret)
+    monkeypatch.setenv("POWDRR_DECISION_PROVIDER", "deepinfra-drex")
+
+    def reject(*_args: object) -> object:
+        raise RuntimeError(f"request failed with {secret}")
+
+    monkeypatch.setattr("powdrr_service.decision_classifier._call_drex", reject)
+
+    result = check_decision_provider_access()
+
+    assert result.status == "unavailable"
+    assert secret not in str(result.to_data())
+    assert "[redacted]" in (result.message or "")
 
 
 def test_check_credentials_cli_checks_both_routes_and_executable(
@@ -243,12 +296,12 @@ def test_check_credentials_cli_checks_both_routes_and_executable(
         ),
     )
     monkeypatch.setattr(
-        "powdrr_lift.cli.check_jev_access",
+        "powdrr_lift.cli.check_decision_provider_access",
         lambda: SimpleNamespace(
             to_data=lambda: {
-                "role": "jev-classifier",
-                "provider": "typesafe-ai",
-                "model": "jev-latest",
+                "role": "decision-provider",
+                "provider": "subq",
+                "model": "subq-snap-preview",
                 "status": "passed",
             }
         ),
@@ -292,9 +345,9 @@ def test_check_credentials_cli_checks_both_routes_and_executable(
     assert report["passed"] is True
     assert report["checks"][0]["roles"] == ["planning", "coding"]
     assert report["checks"][-2] == {
-        "role": "jev-classifier",
-        "provider": "typesafe-ai",
-        "model": "jev-latest",
+        "role": "decision-provider",
+        "provider": "subq",
+        "model": "subq-snap-preview",
         "status": "passed",
     }
     assert report["checks"][-1] == {

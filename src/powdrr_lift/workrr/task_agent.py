@@ -1797,7 +1797,7 @@ def _review_execute_pr_test_quality(
         raise ExecutePrTestError("service omitted the execute-PR quality report")
     except Exception as error:  # Quality review remains advisory on service outages.
         return {
-            "provider": "subq",
+            "provider": "decision-provider",
             "outcome": "advisory",
             "assessments": [],
             "suggestions": [],
@@ -2084,7 +2084,7 @@ def _author_execute_pr_tests(
             coverage_references = quality_repair_fallback["coverage_references"]
             quality_reviews.append(
                 {
-                    "provider": "subq",
+                    "provider": "decision-provider",
                     "outcome": "advisory",
                     "assessments": [],
                     "suggestions": [],
@@ -2099,7 +2099,7 @@ def _author_execute_pr_tests(
                 }
             )
         quality_report = {
-            "provider": "subq",
+            "provider": "decision-provider",
             "outcome": "advisory",
             "reviews": quality_reviews,
             "notes": quality_reviews[-1].get("notes", []) if quality_reviews else [],

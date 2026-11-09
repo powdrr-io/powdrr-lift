@@ -11,7 +11,7 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
-from powdrr_service.decision_classifier import JevSemanticClassifierClient
+from powdrr_service.decision_classifier import DecisionProvider
 from powdrr_service.procedrr import ProcessCatalog
 from powdrr_service.procedrr_evaluator.model_client import ProcedrrModelClient
 from powdrr_service.resources import bundled_process_directory
@@ -744,9 +744,10 @@ def test_workflow_context_rejects_unsafe_conversation_id(tmp_path: Path) -> None
         chat_context._workflow_context_path(tmp_path, conversation_id="../shared")
 
 
-def test_chat_jev_provider_uses_the_decision_classifier(
+def test_chat_uses_the_configured_decision_provider(
     tmp_path: Path, monkeypatch: Any
 ) -> None:
+    monkeypatch.setenv("SUBQ_API_KEY", "test-subq-key")
     process_dir = tmp_path / "processes"
     process_dir.mkdir()
     repo_root = tmp_path / ".worktrees" / "chat"
@@ -801,7 +802,7 @@ steps:
             processes_dir=process_dir,
             repo_root=repo_root,
             provider="local",
-            execution_id="jev-provider-wiring",
+            execution_id="decision-provider-wiring",
         ),
         procedrr_client_factory=lambda _role: client,
         input_func=lambda: "Exercise judge wiring.",
@@ -810,4 +811,5 @@ steps:
     )
 
     assert exit_code == 0, stderr.getvalue()
-    assert isinstance(captured["jev"]._client, JevSemanticClassifierClient)
+    assert isinstance(captured["decision"]._client, DecisionProvider)
+    assert captured["decision"]._client.provider_name == "subq"

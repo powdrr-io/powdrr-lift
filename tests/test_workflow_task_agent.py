@@ -256,7 +256,15 @@ def test_execute_pr_test_findings_retry_provider_429_with_backoff(
                 "rationale": "Observe the command on the pull request path.",
             }
 
-    for name in ("TYPESAFEAI_API_KEY", "TYPESAFE_API_KEY", "SYSTEM_ONE_API_KEY"):
+    for name in (
+        "TYPESAFEAI_API_KEY",
+        "TYPESAFE_API_KEY",
+        "SYSTEM_ONE_API_KEY",
+        "SUBQ_API_KEY",
+        "DEEPINFRA_API_KEY",
+        "DEEPINFRA_API_TOKEN",
+        "POWDRR_DECISION_PROVIDER",
+    ):
         monkeypatch.delenv(name, raising=False)
     delays: list[float] = []
     monkeypatch.setattr(

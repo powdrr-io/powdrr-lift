@@ -33,7 +33,7 @@ from powdrr_service.behavior_contract import (
 )
 from powdrr_service.changelog import parse_change_log
 from powdrr_service.decision_classifier import (
-    preferred_semantic_classifier_client,
+    create_decision_provider,
 )
 from powdrr_service.decision_obligation import (
     DecisionOutcome,
@@ -744,12 +744,12 @@ def _execute_procedrr_flow(
             replay_responses=replay_responses,
             telemetry_sink=record_provider_attempt,
         )
-        classifier_client = preferred_semantic_classifier_client(config.planning_client)
-        if classifier_client is None:
-            classifier_judge_client = planning_client
+        decision_provider = create_decision_provider(config.planning_client)
+        if decision_provider is None:
+            decision_judge_client = planning_client
         else:
-            classifier_judge_client = ProcedrrModelClient(
-                classifier_client,
+            decision_judge_client = ProcedrrModelClient(
+                decision_provider,
                 process_directory=flow_directory,
                 replay_responses=replay_responses,
                 telemetry_sink=record_provider_attempt,
@@ -761,13 +761,13 @@ def _execute_procedrr_flow(
             operation_executor,
             judge_clients={
                 "planning": planning_client,
-                "jev": classifier_judge_client,
+                "decision": decision_judge_client,
             },
             command_catalog=command_catalog,
             event_sink=record_procedrr_event,
         )
         state["probe_generation_client"] = planning_client
-        state["scenario_claim_faithfulness_client"] = classifier_judge_client
+        state["scenario_claim_faithfulness_client"] = decision_judge_client
         execution_result = execution_service.execute(
             str(flow["name"]),
             {

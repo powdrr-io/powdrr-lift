@@ -35,16 +35,20 @@ def test_pip_install_command_omits_user_flag_inside_virtualenv() -> None:
 def test_network_allowlist_includes_default_classification_provider() -> None:
     assert "api.typesafe.ai" in network_allowlist_domains()
     assert "api.subq.ai" in network_allowlist_domains()
+    assert "api.deepinfra.com" in network_allowlist_domains()
 
 
 def test_network_allowlist_includes_configured_classification_host() -> None:
     domains = network_allowlist_domains(
-        "https://models.example.test/v1", "https://subq.example.test/v1"
+        "https://models.example.test/v1",
+        "https://subq.example.test/v1",
+        "https://drex.example.test/v1/decisions",
     )
 
     assert "models.example.test" in domains
     assert "api.typesafe.ai" in domains
     assert "subq.example.test" in domains
+    assert "drex.example.test" in domains
 
 
 def test_provider_credentials_are_forwarded_to_the_classifier_process() -> None:
@@ -56,6 +60,11 @@ def test_provider_credentials_are_forwarded_to_the_classifier_process() -> None:
         "SUBQ_API_KEY",
         "SUBQ_BASE_URL",
         "SUBQ_MODEL",
+        "DEEPINFRA_API_KEY",
+        "DEEPINFRA_API_TOKEN",
+        "DEEPINFRA_DECISIONS_URL",
+        "DEEPINFRA_DREX_MODEL",
+        "POWDRR_DECISION_PROVIDER",
         "TAVILY_API_KEY",
     } <= set(PROVIDER_ENVIRONMENT_KEYS)
 

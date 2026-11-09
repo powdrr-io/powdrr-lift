@@ -1589,7 +1589,7 @@ def build_dependency_candidate_review_request(
     allowed_requirement_ids: set[str],
     code_reference_paths: Sequence[str] = (),
 ) -> QuestionRequest[bool]:
-    """Ask Jev whether one discovered producer/consumer pair is a real edge."""
+    """Ask the decision provider whether one candidate is a real edge."""
     facts = _dependency_candidate_facts(
         producer,
         consumer,
@@ -1681,7 +1681,7 @@ def build_confirmed_dependency_details_request(
     candidate_review: QuestionRequest[bool],
     code_reference_paths: Sequence[str] = (),
 ) -> QuestionRequest[DependencyConfirmation]:
-    """Ask the generative planner for edge explanation after Jev confirms it."""
+    """Ask the planner for edge details after the decision provider confirms it."""
     facts = _dependency_candidate_facts(
         producer,
         consumer,
@@ -1690,7 +1690,7 @@ def build_confirmed_dependency_details_request(
         code_reference_paths=code_reference_paths,
     )
     review_fact = ContextRecord(
-        "jev-dependency-candidate-review",
+        "decision-provider-dependency-candidate-review",
         {
             "question_id": candidate_review.question.question_id,
             "input_digest": candidate_review.question.input_digest,
@@ -1735,7 +1735,8 @@ def build_confirmed_dependency_details_request(
             1,
         ),
         exact_question=(
-            "Jev confirmed this dependency candidate. Identify which supplied "
+            "The decision provider confirmed this dependency candidate. Identify "
+            "which supplied "
             "requirements connect the producer and consumer, and briefly explain "
             "how the consumer uses the named output. The output itself is fixed."
         ),

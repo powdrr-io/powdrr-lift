@@ -21,6 +21,7 @@ from powdrr_contracts.models import (
     artifact_manifest_digest,
 )
 
+from powdrr_service.decision_classifier import DecisionProviderFactory
 from powdrr_service.providers.inference import (
     InferenceClient,
     RoutedInferenceClient,
@@ -37,11 +38,15 @@ class LocalPowdrrService:
         inference_client: InferenceClient | None = None,
         quality_review_clients: tuple[Any, Any] | None = None,
         probe_repair_clients: tuple[Any, Any] | None = None,
+        decision_provider_factory: DecisionProviderFactory | None = None,
     ) -> None:
         self._planning_issue_store = planning_issue_store
         self._inference_client = inference_client or RoutedInferenceClient()
         self._quality_review_clients = quality_review_clients
         self._probe_repair_clients = probe_repair_clients
+        self._decision_provider_factory = (
+            decision_provider_factory or DecisionProviderFactory()
+        )
 
     def start(self, request: OperationRequest) -> OperationUpdate:
         if request.operation_kind == "render_changelog_template":
@@ -278,9 +283,6 @@ class LocalPowdrrService:
 
         try:
             if self._quality_review_clients is None:
-                from powdrr_service.decision_classifier import (
-                    JevSemanticClassifierClient,
-                )
                 from powdrr_service.providers.clients import build_provider_client
                 from powdrr_service.providers.config import (
                     ProviderConfigurationError,
@@ -333,12 +335,16 @@ class LocalPowdrrService:
                     base_url=credentials.base_url,
                     progress_stream=None,
                 )
-                jev_client = JevSemanticClassifierClient(llm_client, fail_closed=True)
+                decision_client = self._decision_provider_factory.create(
+                    llm_client, fail_closed=True
+                )
+                if decision_client is None:
+                    raise RuntimeError("No decision provider is configured")
             else:
-                jev_client, llm_client = self._quality_review_clients
+                decision_client, llm_client = self._quality_review_clients
             report = review_execute_pr_test_quality(
                 evidence,
-                jev_client=jev_client,
+                decision_client=decision_client,
                 llm_client=llm_client,
                 max_timeout_retries=retries,
                 timeout_backoff_seconds=float(backoff),
@@ -346,7 +352,9 @@ class LocalPowdrrService:
             )
         except Exception as exc:  # Quality review is advisory, including outages.
             report = {
-                "provider": "jev",
+                "provider": (
+                    self._decision_provider_factory.provider_name or "decision-provider"
+                ),
                 "outcome": "advisory",
                 "assessments": [],
                 "suggestions": [],
@@ -423,9 +431,6 @@ class LocalPowdrrService:
 
         try:
             if self._probe_repair_clients is None:
-                from powdrr_service.decision_classifier import (
-                    JevSemanticClassifierClient,
-                )
                 from powdrr_service.providers.clients import build_provider_client
                 from powdrr_service.providers.credentials import (
                     resolve_provider_credentials,
@@ -451,16 +456,20 @@ class LocalPowdrrService:
                     base_url=credentials.base_url,
                     progress_stream=None,
                 )
-                jev_client = JevSemanticClassifierClient(llm_client, fail_closed=True)
+                decision_client = self._decision_provider_factory.create(
+                    llm_client, fail_closed=True
+                )
+                if decision_client is None:
+                    raise RuntimeError("No decision provider is configured")
             else:
-                jev_client, llm_client = self._probe_repair_clients
+                decision_client, llm_client = self._probe_repair_clients
             revised, report = repair_behavior_probes(
                 llm_client,
                 instruction=instruction,
                 scenarios=scenarios,
                 faithfulness_evidence=faithfulness_evidence,
                 ledger_clauses=ledger_clauses,
-                faithfulness_client=jev_client,
+                faithfulness_client=decision_client,
                 faithfulness_detail_client=llm_client,
                 repository_contract=repository_contract,
             )

@@ -50,7 +50,15 @@ from powdrr_lift.workrr.planning.evidence import EvidenceError
 
 @pytest.fixture(autouse=True)
 def _disable_live_semantic_providers(monkeypatch: pytest.MonkeyPatch) -> None:
-    for name in ("TYPESAFEAI_API_KEY", "TYPESAFE_API_KEY", "SYSTEM_ONE_API_KEY"):
+    for name in (
+        "TYPESAFEAI_API_KEY",
+        "TYPESAFE_API_KEY",
+        "SYSTEM_ONE_API_KEY",
+        "SUBQ_API_KEY",
+        "DEEPINFRA_API_KEY",
+        "DEEPINFRA_API_TOKEN",
+        "POWDRR_DECISION_PROVIDER",
+    ):
         monkeypatch.delenv(name, raising=False)
 
 
@@ -1909,9 +1917,7 @@ def test_plan_cli_creates_tracking_issue_and_publishes_compiled_artifacts(
     assert len(machine_values) == 1
     assert machine_values[0][1]["verification_command"] == "scripts/verify-all.sh"
     options = process_calls[0]["options"]
-    assert isinstance(
-        options.decision_client, jev_classifier.SubQSemanticClassifierClient
-    )
+    assert isinstance(options.decision_client, jev_classifier.SubQDecisionProvider)
     assert options.decision_provider == "SUBQ"
     assert options.decision_model == "subq-test-model"
     assert (

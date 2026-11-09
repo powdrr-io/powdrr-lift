@@ -7,6 +7,7 @@ import logging
 import os
 import time
 import uuid
+from abc import ABC, abstractmethod
 from collections.abc import Callable, Mapping
 from concurrent.futures import Future
 from dataclasses import dataclass
@@ -22,6 +23,8 @@ JEV_MODEL = "jev-latest"
 JEV_DEFAULT_BASE_URL = "https://api.typesafe.ai/v1/systemone"
 SUBQ_MODEL = "subq-snap-preview"
 SUBQ_DEFAULT_BASE_URL = "https://api.subq.ai/v1/systemone"
+DREX_MODEL = "nace-ai/drex-v2.0"
+DREX_DEFAULT_ENDPOINT = "https://api.deepinfra.com/v1/decisions"
 
 
 @dataclass(slots=True)
@@ -39,8 +42,47 @@ class _DecisionFallback(Protocol):
     def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]: ...
 
 
-class _DecisionApiSemanticClassifierClient:
-    """Common typed-decision API adapter with optional planning fallback."""
+class DecisionProvider(ABC):
+    """Abstract interface for typed decisions from a configured provider."""
+
+    provider = "decision-provider"
+    provider_name = "decision-provider"
+    default_model = ""
+    default_endpoint = ""
+    fallback_on_error = True
+
+    @property
+    @abstractmethod
+    def model(self) -> str:
+        """Configured decision model identifier."""
+
+    @property
+    @abstractmethod
+    def endpoint(self) -> str:
+        """Configured decision endpoint identifier."""
+
+    @abstractmethod
+    def complete_json(
+        self,
+        messages: list[dict[str, str]],
+        *,
+        response_schema: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Return one structured decision matching the supplied schema."""
+
+    def complete_json_batch(
+        self,
+        requests: list[tuple[list[dict[str, str]], Mapping[str, Any]]],
+    ) -> list[dict[str, Any]]:
+        """Complete decisions independently when the provider has no batch API."""
+        return [
+            self.complete_json(messages, response_schema=schema)
+            for messages, schema in requests
+        ]
+
+
+class _DecisionApiSemanticClassifierClient(DecisionProvider):
+    """Shared transport and schema mapping for decision API providers."""
 
     provider = "DECISION_API"
     default_model = ""
@@ -73,6 +115,16 @@ class _DecisionApiSemanticClassifierClient:
             or self.default_model
         )
         self._fail_closed = fail_closed
+
+    @property
+    def model(self) -> str:
+        """The configured model name, independent of provider selection."""
+        return self._model
+
+    @property
+    def endpoint(self) -> str:
+        """The configured provider endpoint, useful for diagnostics and preflight."""
+        return self._endpoint
 
     def complete_json(
         self,
@@ -353,10 +405,11 @@ class _DecisionApiSemanticClassifierClient:
         raise NotImplementedError
 
 
-class JevSemanticClassifierClient(_DecisionApiSemanticClassifierClient):
+class JevDecisionProvider(_DecisionApiSemanticClassifierClient):
     """Use Jev for classifier judges and propagate provider errors."""
 
     provider = "JEV"
+    provider_name = "jev"
     default_model = JEV_MODEL
     default_endpoint = JEV_DEFAULT_BASE_URL
     fallback_on_error = False
@@ -435,10 +488,11 @@ class JevSemanticClassifierClient(_DecisionApiSemanticClassifierClient):
         return _call_jev_batch(batch, api_key, endpoint, self._model)
 
 
-class SubQSemanticClassifierClient(_DecisionApiSemanticClassifierClient):
+class SubQDecisionProvider(_DecisionApiSemanticClassifierClient):
     """Use SubQ Decisions for classifier judges without an LLM fallback."""
 
     provider = "SUBQ"
+    provider_name = "subq"
     default_model = SUBQ_MODEL
     default_endpoint = SUBQ_DEFAULT_BASE_URL
     fallback_on_error = False
@@ -469,19 +523,138 @@ class SubQSemanticClassifierClient(_DecisionApiSemanticClassifierClient):
         return _call_subq(request_data, api_key, endpoint, self._model)
 
 
-def preferred_semantic_classifier_client(
-    fallback: _DecisionFallback, *, fail_closed: bool = False
-) -> _DecisionApiSemanticClassifierClient | None:
-    """Prefer SubQ, then Jev, and let the caller use its LLM if neither is set."""
-    if os.environ.get("SUBQ_API_KEY"):
-        return SubQSemanticClassifierClient(fallback, fail_closed=fail_closed)
-    if (
-        os.environ.get("TYPESAFEAI_API_KEY")
-        or os.environ.get("TYPESAFE_API_KEY")
-        or os.environ.get("SYSTEM_ONE_API_KEY")
-    ):
-        return JevSemanticClassifierClient(fallback, fail_closed=fail_closed)
-    return None
+class DrexDecisionProvider(_DecisionApiSemanticClassifierClient):
+    """Use DeepInfra Drex v2's typed decisions endpoint."""
+
+    provider = "DEEPINFRA_DREX"
+    provider_name = "deepinfra-drex"
+    default_model = DREX_MODEL
+    default_endpoint = DREX_DEFAULT_ENDPOINT
+    fallback_on_error = False
+
+    def __init__(
+        self,
+        fallback: _DecisionFallback,
+        *,
+        api_key: str | None = None,
+        endpoint: str | None = None,
+        model: str | None = None,
+        fail_closed: bool = False,
+    ) -> None:
+        super().__init__(
+            fallback,
+            api_key=(
+                api_key
+                or os.environ.get("DEEPINFRA_API_KEY")
+                or os.environ.get("DEEPINFRA_API_TOKEN")
+            ),
+            endpoint=endpoint or os.environ.get("DEEPINFRA_DECISIONS_URL"),
+            model=model or os.environ.get("DEEPINFRA_DREX_MODEL"),
+            fail_closed=fail_closed,
+        )
+
+    def _call(
+        self, request_data: Mapping[str, Any], api_key: str, endpoint: str
+    ) -> Mapping[str, Any]:
+        return _call_drex(request_data, api_key, endpoint, self._model)
+
+
+@dataclass(frozen=True, slots=True)
+class _DecisionProviderRegistration:
+    name: str
+    provider_type: type[DecisionProvider]
+    credential_names: tuple[str, ...]
+
+
+_DECISION_PROVIDERS = {
+    "jev": _DecisionProviderRegistration(
+        "jev",
+        JevDecisionProvider,
+        ("TYPESAFEAI_API_KEY", "TYPESAFE_API_KEY", "SYSTEM_ONE_API_KEY"),
+    ),
+    "subq": _DecisionProviderRegistration(
+        "subq", SubQDecisionProvider, ("SUBQ_API_KEY",)
+    ),
+    "deepinfra-drex": _DecisionProviderRegistration(
+        "deepinfra-drex",
+        DrexDecisionProvider,
+        ("DEEPINFRA_API_KEY", "DEEPINFRA_API_TOKEN"),
+    ),
+}
+
+
+class DecisionProviderFactory:
+    """Select one configured decision provider and build clients from it."""
+
+    def __init__(self, provider_name: str | None = None) -> None:
+        requested = provider_name or os.environ.get("POWDRR_DECISION_PROVIDER")
+        if requested is not None:
+            normalized = requested.strip().lower()
+            if normalized in {"drex", "deepinfra"}:
+                normalized = "deepinfra-drex"
+            registration = _DECISION_PROVIDERS.get(normalized)
+            if registration is None:
+                supported = ", ".join(sorted(_DECISION_PROVIDERS))
+                raise ValueError(
+                    f"Unsupported decision provider {requested!r}; "
+                    f"supported: {supported}"
+                )
+            credential_source = self._credential_source(registration)
+            if credential_source is None:
+                raise RuntimeError(
+                    f"Decision provider {normalized!r} requires one of: "
+                    f"{', '.join(registration.credential_names)}"
+                )
+            self._registration = registration
+            self.credential_source = credential_source
+            return
+
+        # Prefer SubQ when both providers are configured. Selection happens once
+        # here; requests never silently switch providers after an error.
+        for name in ("subq", "deepinfra-drex", "jev"):
+            registration = _DECISION_PROVIDERS[name]
+            credential_source = self._credential_source(registration)
+            if credential_source is not None:
+                self._registration = registration
+                self.credential_source = credential_source
+                return
+        self._registration = None
+        self.credential_source = None
+
+    @staticmethod
+    def _credential_source(
+        registration: _DecisionProviderRegistration,
+    ) -> str | None:
+        return next(
+            (name for name in registration.credential_names if os.environ.get(name)),
+            None,
+        )
+
+    @property
+    def provider_name(self) -> str | None:
+        return self._registration.name if self._registration is not None else None
+
+    def create(
+        self,
+        fallback: _DecisionFallback,
+        *,
+        fail_closed: bool = False,
+    ) -> DecisionProvider | None:
+        if self._registration is None:
+            return None
+        return self._registration.provider_type(fallback, fail_closed=fail_closed)
+
+
+def create_decision_provider(
+    fallback: _DecisionFallback,
+    *,
+    provider_name: str | None = None,
+    fail_closed: bool = False,
+) -> DecisionProvider | None:
+    """Select and construct the configured provider for a workflow startup."""
+    return DecisionProviderFactory(provider_name).create(
+        fallback, fail_closed=fail_closed
+    )
 
 
 def _fallback(
@@ -792,6 +965,13 @@ def _call_subq(
     classifier: Mapping[str, Any], api_key: str, endpoint: str, model: str
 ) -> Mapping[str, Any]:
     """Call SubQ's Decisions endpoint and normalize its typed answer."""
+    return _call_decision_api(classifier, api_key, endpoint, model)
+
+
+def _call_drex(
+    classifier: Mapping[str, Any], api_key: str, endpoint: str, model: str
+) -> Mapping[str, Any]:
+    """Call DeepInfra Drex's decisions endpoint using the shared envelope."""
     return _call_decision_api(classifier, api_key, endpoint, model)
 
 

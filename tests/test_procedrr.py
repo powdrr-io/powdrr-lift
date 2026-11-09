@@ -636,7 +636,7 @@ def test_checked_in_design_interview_definition_parses() -> None:
 
     collect_judges(document["steps"])
     assert judge_providers["classify_one"]
-    assert set(judge_providers["classify_one"]) == {"jev", "planning"}
+    assert set(judge_providers["classify_one"]) == {"decision", "planning"}
     assert set(judge_providers["construct_one"]) == {"planning"}
     assert document["name"] == "design-interview"
     assert validate_single_decision(document) == ()
@@ -864,8 +864,8 @@ def test_feature_plan_gets_complexity_and_quality_reviews_before_final_plan() ->
         "resolve-feature-context",
     ]
     assert "sole source of matching decisions" in steps[select_index]["details"]
-    assert code_quality_judge["provider"] == "jev"
-    assert effect_allocation_judge["provider"] == "jev"
+    assert code_quality_judge["provider"] == "decision"
+    assert effect_allocation_judge["provider"] == "decision"
     assert code_quality_judge["output"]["schema"]["properties"]["disposition"][
         "enum"
     ] == ["supported", "unsupported", "unclear"]

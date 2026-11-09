@@ -629,7 +629,7 @@ steps:
                       minLength: 1
       - judge:
           kind: classify_one
-          provider: jev
+          provider: decision
           question: Do the code-quality pushbacks provide evidence that supports each recommendation?
           subject: code_quality_review.pushbacks
           prompt_system: Return only the declared JSON object.
@@ -706,7 +706,7 @@ steps:
           exactly {"action":"next_step","outputs":{"proposed_pr_plan":{"proposed_prs":[{"id":"proposed-pr-id","intent":"Implement
           the change","justification":"Required by the feature","dependent_pr_ids":[]}]}}}. Review code_quality_evidence_review
           alongside each original pushback. Resolve unsupported or unclear claims by checking the cited source
-          and requirement evidence; do not treat a JEV disposition as a new requirement or automatically discard
+          and requirement evidence; do not treat a decision-provider disposition as a new requirement or automatically discard
           a valid issue.'
         outputs:
         - name: proposed_pr_plan
@@ -837,7 +837,7 @@ steps:
                       minLength: 1
       - judge:
           kind: classify_one
-          provider: jev
+          provider: decision
           question: Do all proposed PR assignments fit their authoritative effects and the stated PR scopes?
           subject: effect_allocation.assignments
           prompt_system: Return only the declared JSON object.
@@ -869,7 +869,7 @@ steps:
           validation:
             kind: json_schema
       - id: reconcile-proposed-pr-effect-allocation
-        description: Reconcile the planned effect allocation with independent JEV checks.
+        description: Reconcile the planned effect allocation with independent decision-provider checks.
         actions: []
         step_type: governed
         llm_type: high_reasoning

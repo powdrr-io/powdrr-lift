@@ -885,7 +885,7 @@ def build_structural_candidate_review_request(
     projected_baseline: Mapping[str, Any],
     baseline_index: StructuralBaselineIndex | None = None,
 ) -> QuestionRequest[bool]:
-    """Ask Jev whether one deterministic existing Structrr candidate changes."""
+    """Ask the decision provider whether one existing Structrr subject changes."""
     if subject.section not in {"entities", "entity_relationships"} or subject.is_new:
         raise ValueError("candidate review requires an existing entity or relationship")
     baseline_index = baseline_index or index_structural_baseline(projected_baseline)

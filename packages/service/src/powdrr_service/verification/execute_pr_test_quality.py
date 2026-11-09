@@ -98,7 +98,7 @@ def build_quality_question(
 
 def build_opinion_system_prompt() -> str:
     return (
-        "Answer the exact same yes-or-no question Jev was asked. Do not broaden "
+        "Answer the exact same yes-or-no question SubQ was asked. Do not broaden "
         "it or make an overall quality judgment. Use the supplied plan, "
         "criterion, test source, and baseline result as evidence. Return "
         "shortcoming_present=true only when the specific shortcoming in the "
@@ -126,7 +126,7 @@ def build_suggestion_context(
         {
             **suite_evidence,
             "review_target": target,
-            "jev_reports_shortcoming": True,
+            "decision_reports_shortcoming": True,
             "llm_explanation": explanation,
         },
         ensure_ascii=False,
@@ -283,33 +283,35 @@ def execute_pr_test_quality_notes(
     """Render advisory review findings for the workflow artifact."""
     notes: list[str] = []
     for assessment in assessments:
-        if assessment.get("jev_error"):
+        if assessment.get("decision_error"):
             notes.append(
-                f"{assessment.get('test_id')}: Jev test-quality check "
+                f"{assessment.get('test_id')}: SubQ test-quality check "
                 f"{assessment.get('check_id')} was unavailable "
-                f"({assessment.get('jev_error')}); review manually."
+                f"({assessment.get('decision_error')}); review manually."
             )
             continue
-        if assessment.get("jev_reports_shortcoming") is True:
+        if assessment.get("decision_reports_shortcoming") is True:
             explanation = assessment.get("llm_explanation")
             if assessment.get("llm_agrees_shortcoming") is True:
                 suggestion = assessment.get("suggestion")
                 if isinstance(suggestion, Mapping):
                     note = (
-                        f"{assessment.get('test_id')}: both Jev and the LLM identified "
+                        f"{assessment.get('test_id')}: both SubQ and the LLM "
+                        "identified "
                         f"{assessment.get('check_id')}; suggested test: "
                         f"{suggestion.get('test_name', 'unspecified')}. Review whether "
                         "the added coverage fully addresses it."
                     )
                 elif assessment.get("repair_suggestion_requested") is False:
                     note = (
-                        f"{assessment.get('test_id')}: both Jev and the LLM still "
+                        f"{assessment.get('test_id')}: both SubQ and the LLM still "
                         f"identified {assessment.get('check_id')} after a targeted "
                         "repair attempt; consider adding more coverage."
                     )
                 else:
                     note = (
-                        f"{assessment.get('test_id')}: both Jev and the LLM identified "
+                        f"{assessment.get('test_id')}: both SubQ and the LLM "
+                        "identified "
                         f"{assessment.get('check_id')}, but a test suggestion was "
                         f"unavailable ({assessment.get('llm_error', 'no result')}); "
                         "consider adding more coverage."
@@ -317,13 +319,13 @@ def execute_pr_test_quality_notes(
                 notes.append(note)
             elif assessment.get("llm_agrees_shortcoming") is False:
                 notes.append(
-                    f"{assessment.get('test_id')}: Jev and the LLM disagreed about "
+                    f"{assessment.get('test_id')}: SubQ and the LLM disagreed about "
                     f"{assessment.get('check_id')}; review manually. "
                     f"LLM view: {explanation or 'no explanation returned'}"
                 )
             else:
                 notes.append(
-                    f"{assessment.get('test_id')}: Jev flagged "
+                    f"{assessment.get('test_id')}: SubQ flagged "
                     f"{assessment.get('check_id')}, but the LLM comparison was "
                     f"unavailable ({assessment.get('llm_error', 'no result')})."
                 )
@@ -344,7 +346,7 @@ class JsonCompletionClient(Protocol):
 def review_execute_pr_test_quality(
     suite_evidence: Mapping[str, Any],
     *,
-    jev_client: JsonCompletionClient,
+    decision_client: JsonCompletionClient,
     llm_client: JsonCompletionClient,
     max_timeout_retries: int = 8,
     timeout_backoff_seconds: float = 10.0,
@@ -367,26 +369,26 @@ def review_execute_pr_test_quality(
                 "criterion_ids": target["criterion_ids"],
                 "check_id": check_id,
                 "question": question,
-                "jev_reports_shortcoming": None,
+                "decision_reports_shortcoming": None,
                 "llm_agrees_shortcoming": None,
                 "llm_explanation": None,
                 "suggestion": None,
                 "repair_suggestion_requested": suggest_tests,
             }
             try:
-                decision = jev_client.complete_json(
+                decision = decision_client.complete_json(
                     messages, response_schema=DECISION_SCHEMA
                 )
                 verdict = decision.get("shortcoming_present")
                 if not isinstance(verdict, bool):
                     raise ValueError(
-                        "Jev test-quality decision did not return a boolean"
+                        "SubQ test-quality decision did not return a boolean"
                     )
-                assessment["jev_reports_shortcoming"] = verdict
+                assessment["decision_reports_shortcoming"] = verdict
             except Exception as error:  # Review outages remain advisory.
-                assessment["jev_error"] = str(error)
+                assessment["decision_error"] = str(error)
 
-            if assessment["jev_reports_shortcoming"] is True:
+            if assessment["decision_reports_shortcoming"] is True:
                 try:
                     opinion = _complete_json_with_retry(
                         llm_client,
@@ -458,7 +460,7 @@ def review_execute_pr_test_quality(
             assessments.append(assessment)
 
     return {
-        "provider": "jev",
+        "provider": "subq",
         "outcome": "advisory",
         "assessments": assessments,
         "suggestions": suggestions,

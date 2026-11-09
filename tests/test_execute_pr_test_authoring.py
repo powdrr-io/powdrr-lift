@@ -230,21 +230,21 @@ def test_execute_pr_test_repair_uses_nested_root_and_clean_baseline(
         "    assert value == 2, 'AssertionError: expected value 2'\n"
     )
 
-    jev_calls: list[tuple[list[dict[str, str]], dict[str, Any]]] = []
+    subq_calls: list[tuple[list[dict[str, str]], dict[str, Any]]] = []
 
-    class FakeJevClient:
+    class FakeSubQClient:
         def complete_json(
             self,
             messages: list[dict[str, str]],
             *,
             response_schema: dict[str, Any],
         ) -> dict[str, Any]:
-            jev_calls.append((messages, response_schema))
+            subq_calls.append((messages, response_schema))
             return {"shortcoming_present": False}
 
     class UnusedLLMClient:
         def complete_json(self, *_args: Any, **_kwargs: Any) -> dict[str, Any]:
-            pytest.fail("the LLM must not be asked when Jev finds no shortcoming")
+            pytest.fail("the LLM must not be asked when SubQ finds no shortcoming")
 
     class FakeMiniSWEAgentProvider:
         provider_name = "fake-miniswe"
@@ -282,7 +282,7 @@ def test_execute_pr_test_repair_uses_nested_root_and_clean_baseline(
 
     monkeypatch.setattr(task_agent, "MiniSWEAgentProvider", FakeMiniSWEAgentProvider)
     quality_review_service = LocalPowdrrService(
-        quality_review_clients=(FakeJevClient(), UnusedLLMClient())
+        quality_review_clients=(FakeSubQClient(), UnusedLLMClient())
     )
 
     request = ImplementationRequest(
@@ -338,15 +338,15 @@ def test_execute_pr_test_repair_uses_nested_root_and_clean_baseline(
     assert "never guess a branch name" in author_prompts[0]
     assert '"name": "main"' in author_prompts[0]
     assert '"source": "refs/remotes/origin/HEAD"' in author_prompts[0]
-    assert len(jev_calls) == 7
-    assert jev_calls[0][1]["properties"]["shortcoming_present"]["type"] == "boolean"
+    assert len(subq_calls) == 7
+    assert subq_calls[0][1]["properties"]["shortcoming_present"]["type"] == "boolean"
     assert (
         "Does this test fail to demonstrate observable behavior"
-        in jev_calls[0][0][1]["content"]
+        in subq_calls[0][0][1]["content"]
     )
-    jev_context = jev_calls[0][0][1]["content"]
-    assert "repository_default_branch" in jev_context
-    assert "refs/remotes/origin/HEAD" in jev_context
+    subq_context = subq_calls[0][0][1]["content"]
+    assert "repository_default_branch" in subq_context
+    assert "refs/remotes/origin/HEAD" in subq_context
 
 
 def test_repository_default_branch_evidence_uses_remote_head(
@@ -399,20 +399,20 @@ def test_repository_default_branch_evidence_uses_remote_show_fallback(
 def test_execute_pr_test_quality_asks_individual_questions_and_suggests_a_fix(
     monkeypatch: Any,
 ) -> None:
-    jev_calls: list[list[dict[str, str]]] = []
+    subq_calls: list[list[dict[str, str]]] = []
     llm_calls: list[tuple[list[dict[str, str]], dict[str, Any]]] = []
-    jev_results = iter([True, False, False, False, False, False])
+    subq_results = iter([True, False, False, False, False, False])
 
-    class FakeJevClient:
+    class FakeSubQClient:
         def complete_json(
             self,
             messages: list[dict[str, str]],
             *,
             response_schema: dict[str, Any],
         ) -> dict[str, Any]:
-            jev_calls.append(messages)
+            subq_calls.append(messages)
             assert response_schema["required"] == ["shortcoming_present"]
-            return {"shortcoming_present": next(jev_results)}
+            return {"shortcoming_present": next(subq_results)}
 
     class FakeLLMClient:
         def complete_json(
@@ -434,7 +434,7 @@ def test_execute_pr_test_quality_asks_individual_questions_and_suggests_a_fix(
             }
 
     service = LocalPowdrrService(
-        quality_review_clients=(FakeJevClient(), FakeLLMClient())
+        quality_review_clients=(FakeSubQClient(), FakeLLMClient())
     )
     evidence = {
         "contract": {
@@ -443,7 +443,7 @@ def test_execute_pr_test_quality_asks_individual_questions_and_suggests_a_fix(
             "scope": ["Relevant public API behavior."],
             "acceptance_criteria": [
                 "AC-01: Reject invalid payloads.",
-                "AC-99: Unrelated criterion that must not reach this Jev question.",
+                "AC-99: Unrelated criterion that must not reach this SubQ question.",
             ],
             "unrelated_repository_dump": "unrelated evidence " * 20_000,
         },
@@ -485,15 +485,15 @@ def test_execute_pr_test_quality_asks_individual_questions_and_suggests_a_fix(
         service=service,
     )
 
-    assert len(jev_calls) == 7
+    assert len(subq_calls) == 7
     assert len(llm_calls) == 2
-    assert jev_calls[0][1]["content"] == llm_calls[0][0][1]["content"]
+    assert subq_calls[0][1]["content"] == llm_calls[0][0][1]["content"]
     assert "tests/test_api.py::test_rejects_payload" in llm_calls[0][0][1]["content"]
     assert "AC-01: Reject invalid payloads." in llm_calls[0][0][1]["content"]
-    assert "test_unrelated_repository_behavior" not in jev_calls[0][1]["content"]
-    assert "AC-99" not in jev_calls[0][1]["content"]
-    assert "unrelated evidence" not in jev_calls[0][1]["content"]
-    assert len(jev_calls[0][1]["content"]) < 8_000
+    assert "test_unrelated_repository_behavior" not in subq_calls[0][1]["content"]
+    assert "AC-99" not in subq_calls[0][1]["content"]
+    assert "unrelated evidence" not in subq_calls[0][1]["content"]
+    assert len(subq_calls[0][1]["content"]) < 8_000
     assert "baseline_result" in llm_calls[1][0][1]["content"]
     assert "unrelated_repository_dump" in llm_calls[1][0][1]["content"]
     assert review["outcome"] == "advisory"
@@ -501,12 +501,12 @@ def test_execute_pr_test_quality_asks_individual_questions_and_suggests_a_fix(
     assert review["assessments"][0]["check_id"] == "observable_coverage"
 
 
-def test_execute_pr_test_quality_accepts_jev_concern_as_advisory_on_disagreement(
+def test_execute_pr_test_quality_accepts_subq_concern_as_advisory_on_disagreement(
     monkeypatch: Any,
 ) -> None:
     llm_calls = 0
 
-    class FakeJevClient:
+    class FakeSubQClient:
         calls = 0
 
         def complete_json(
@@ -527,7 +527,7 @@ def test_execute_pr_test_quality_accepts_jev_concern_as_advisory_on_disagreement
             }
 
     service = LocalPowdrrService(
-        quality_review_clients=(FakeJevClient(), FakeLLMClient())
+        quality_review_clients=(FakeSubQClient(), FakeLLMClient())
     )
     review = task_agent._review_execute_pr_test_quality(
         {
@@ -555,22 +555,22 @@ def test_execute_pr_test_quality_review_outage_is_advisory(
 ) -> None:
     llm_calls = 0
 
-    class BrokenJevClient:
+    class BrokenSubQClient:
         def __init__(self, _fallback: Any, *, fail_closed: bool) -> None:
             assert fail_closed
 
         def complete_json(self, *_args: Any, **_kwargs: Any) -> dict[str, Any]:
-            raise RuntimeError("Jev is unavailable")
+            raise RuntimeError("SubQ is unavailable")
 
-    def must_not_replace_jev(*_args: Any, **_kwargs: Any) -> dict[str, Any]:
+    def must_not_replace_subq(*_args: Any, **_kwargs: Any) -> dict[str, Any]:
         nonlocal llm_calls
         llm_calls += 1
-        raise AssertionError("LLM must not replace a failed Jev judgment")
+        raise AssertionError("LLM must not replace a failed SubQ judgment")
 
     service = LocalPowdrrService(
         quality_review_clients=(
-            BrokenJevClient(None, fail_closed=True),
-            type("UnusedLLMClient", (), {"complete_json": must_not_replace_jev})(),
+            BrokenSubQClient(None, fail_closed=True),
+            type("UnusedLLMClient", (), {"complete_json": must_not_replace_subq})(),
         )
     )
     review = task_agent._review_execute_pr_test_quality(
@@ -592,10 +592,10 @@ def test_execute_pr_test_quality_review_outage_is_advisory(
     assert len(review["assessments"]) == 7
     assert llm_calls == 0
     assert all(
-        item["jev_reports_shortcoming"] is None for item in review["assessments"]
+        item["decision_reports_shortcoming"] is None for item in review["assessments"]
     )
     assert len(review["notes"]) == 7
-    assert all("Jev test-quality check" in note for note in review["notes"])
+    assert all("SubQ test-quality check" in note for note in review["notes"])
 
 
 def test_quality_shortcoming_is_repaired_once_then_accepted_with_pr_note(
@@ -632,7 +632,7 @@ def test_quality_shortcoming_is_repaired_once_then_accepted_with_pr_note(
     )
     author_prompts: list[str] = []
 
-    class FakeJevClient:
+    class FakeSubQClient:
         calls = 0
 
         def complete_json(
@@ -692,7 +692,7 @@ def test_quality_shortcoming_is_repaired_once_then_accepted_with_pr_note(
 
     monkeypatch.setattr(task_agent, "MiniSWEAgentProvider", FakeMiniSWEAgentProvider)
     quality_review_service = LocalPowdrrService(
-        quality_review_clients=(FakeJevClient(), FakeLLMClient())
+        quality_review_clients=(FakeSubQClient(), FakeLLMClient())
     )
     monkeypatch.setattr(
         task_agent,

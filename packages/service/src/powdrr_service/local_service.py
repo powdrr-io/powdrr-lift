@@ -279,7 +279,7 @@ class LocalPowdrrService:
         try:
             if self._quality_review_clients is None:
                 from powdrr_service.decision_classifier import (
-                    JevSemanticClassifierClient,
+                    SubQSemanticClassifierClient,
                 )
                 from powdrr_service.providers.clients import build_provider_client
                 from powdrr_service.providers.config import (
@@ -333,12 +333,14 @@ class LocalPowdrrService:
                     base_url=credentials.base_url,
                     progress_stream=None,
                 )
-                jev_client = JevSemanticClassifierClient(llm_client, fail_closed=True)
+                decision_client = SubQSemanticClassifierClient(
+                    llm_client, fail_closed=True
+                )
             else:
-                jev_client, llm_client = self._quality_review_clients
+                decision_client, llm_client = self._quality_review_clients
             report = review_execute_pr_test_quality(
                 evidence,
-                jev_client=jev_client,
+                decision_client=decision_client,
                 llm_client=llm_client,
                 max_timeout_retries=retries,
                 timeout_backoff_seconds=float(backoff),
@@ -346,7 +348,7 @@ class LocalPowdrrService:
             )
         except Exception as exc:  # Quality review is advisory, including outages.
             report = {
-                "provider": "jev",
+                "provider": "subq",
                 "outcome": "advisory",
                 "assessments": [],
                 "suggestions": [],

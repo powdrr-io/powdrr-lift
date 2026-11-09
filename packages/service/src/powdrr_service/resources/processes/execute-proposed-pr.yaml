@@ -48,7 +48,7 @@ description: >-
   reviewed plan item. Permit one bounded correction to generated tests when
   they conflict with their linked criterion or repository evidence; require
   each corrected test to remain behaviorally red on a fresh baseline and pass
-  on the candidate, then review each test with Jev and the LLM. Keep test-quality
+  on the candidate, then review each test with SubQ and the LLM. Keep test-quality
   findings advisory and include unresolved concerns in the PR. Validate the
   re-bootstrapped candidate against its accepted Structrr diff and inherited
   decision reviews.

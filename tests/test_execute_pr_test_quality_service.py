@@ -5,14 +5,52 @@ from types import SimpleNamespace
 from typing import Any
 
 from powdrr_contracts.models import OperationRequest
+from powdrr_service.decision_classifier import SubQSemanticClassifierClient
 from powdrr_service.local_service import LocalPowdrrService
 from powdrr_service.verification.execute_pr_test_quality import (
+    DECISION_SCHEMA,
     QUALITY_CHECKS,
     build_quality_question,
     execute_pr_test_review_context,
     execute_pr_test_review_targets,
     render_execute_pr_test_quality_pr_notes,
 )
+
+
+def test_subq_accepts_the_quality_review_boolean_question(
+    monkeypatch: Any,
+) -> None:
+    requests: list[dict[str, Any]] = []
+
+    def call(
+        request: dict[str, Any], _api_key: str, _endpoint: str, _model: str
+    ) -> dict[str, Any]:
+        requests.append(request)
+        return {"choice": "true"}
+
+    monkeypatch.setattr("powdrr_service.decision_classifier._call_subq", call)
+    fallback: Any = object()
+    client = SubQSemanticClassifierClient(fallback, api_key="subq-key")
+    messages = [
+        {"role": "system", "content": ""},
+        {
+            "role": "user",
+            "content": build_quality_question(
+                QUALITY_CHECKS[0][1],
+                {
+                    "test_id": "tests/test_contract.py::test_contract",
+                    "test_source": "def test_contract():\n    assert True",
+                },
+            ),
+        },
+    ]
+
+    result = client.complete_json(messages, response_schema=DECISION_SCHEMA)
+
+    assert result == {"shortcoming_present": True}
+    assert requests[0]["kind"] == "boolean_classifier"
+    assert requests[0]["allowed_values"] == ["true", "false"]
+    assert requests[0]["state"]["source_text"]
 
 
 def test_quality_review_targets_are_split_by_linked_acceptance_criterion() -> None:
@@ -109,6 +147,8 @@ def test_pr_note_rendering_marks_advisory_and_preserves_each_note() -> None:
 def test_verification_health_resolves_provider_credentials_inside_service(
     monkeypatch: Any,
 ) -> None:
+    monkeypatch.setenv("SUBQ_API_KEY", "subq-secret")
+    monkeypatch.setenv("SYSTEM_ONE_API_KEY", "jev-secret")
     provider_calls: list[dict[str, Any]] = []
     llm_client = object()
 
@@ -123,7 +163,7 @@ def test_verification_health_resolves_provider_credentials_inside_service(
         provider_calls.append(kwargs)
         return llm_client
 
-    class FakeJevClient:
+    class FakeSubQClient:
         def __init__(self, fallback: object, *, fail_closed: bool) -> None:
             assert fallback is llm_client
             assert fail_closed
@@ -139,8 +179,15 @@ def test_verification_health_resolves_provider_credentials_inside_service(
         "powdrr_service.providers.clients.build_provider_client", build_client
     )
     monkeypatch.setattr(
-        "powdrr_service.decision_classifier.JevSemanticClassifierClient",
-        FakeJevClient,
+        "powdrr_service.decision_classifier.SubQSemanticClassifierClient",
+        FakeSubQClient,
+    )
+
+    def reject_jev(*_args: Any, **_kwargs: Any) -> Any:
+        raise AssertionError("execute-PR quality review must not call Jev")
+
+    monkeypatch.setattr(
+        "powdrr_service.decision_classifier.JevSemanticClassifierClient", reject_jev
     )
 
     update = LocalPowdrrService().start(
@@ -173,5 +220,6 @@ def test_verification_health_resolves_provider_credentials_inside_service(
     assert provider_calls[0]["model"] == "deepseek-ai/example-model"
     assert provider_calls[0]["api_key"] == "service-secret"
     report = json.loads(update.output_artifacts[0].data)
+    assert report["provider"] == "subq"
     assert report["outcome"] == "advisory"
     assert len(report["assessments"]) == 7

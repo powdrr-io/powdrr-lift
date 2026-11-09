@@ -7,7 +7,7 @@ import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from powdrr_service.structrr.actual_diff import (
     StructrrActualDiff,
@@ -20,7 +20,8 @@ from powdrr_service.structrr.snapshot import snapshot_digest
 from powdrr_service.structrr.source_manifest import SourceManifest
 from powdrr_service.verification.test_obligations import acceptance_criteria_contract
 
-MULTIPR_STRUCTRR_SCHEMA = "multipr-structrr-proposal-v1"
+MULTIPR_STRUCTRR_SCHEMA = "multipr-structrr-proposal-v2"
+_LEGACY_MULTIPR_STRUCTRR_SCHEMA = "multipr-structrr-proposal-v1"
 _STRUCTURAL_SECTIONS = {"entities", "entity_relationships", "files"}
 _ACTIONS = {"added", "changed", "deleted", "removed"}
 
@@ -33,6 +34,7 @@ class MultiPRStructrrProposal:
     baseline_snapshot: Mapping[str, Any]
     full_proposal: ProposalRevision
     item_proposals: Mapping[str, ProposalRevision]
+    item_order: tuple[str, ...]
     item_baselines: Mapping[str, Mapping[str, Any]]
     expected_final_snapshot: Mapping[str, Any]
 
@@ -47,8 +49,9 @@ class MultiPRStructrrProposal:
                 item_id: proposal.to_data()
                 for item_id, proposal in sorted(self.item_proposals.items())
             },
-            "item_baselines": {
-                item_id: dict(snapshot)
+            "item_order": list(self.item_order),
+            "item_baseline_fingerprints": {
+                item_id: snapshot_digest(snapshot)
                 for item_id, snapshot in sorted(self.item_baselines.items())
             },
             "expected_final_fingerprint": snapshot_digest(self.expected_final_snapshot),
@@ -269,12 +272,13 @@ def compile_multi_pr_proposal(
         projected = _apply_sections(projected, grouped[item_id])
     expected_final = projected
     return MultiPRStructrrProposal(
-        plan_id,
-        dict(baseline_snapshot),
-        full,
-        item_proposals,
-        item_baselines,
-        expected_final,
+        plan_id=plan_id,
+        baseline_snapshot=dict(baseline_snapshot),
+        full_proposal=full,
+        item_proposals=item_proposals,
+        item_order=tuple(item_by_id),
+        item_baselines=item_baselines,
+        expected_final_snapshot=expected_final,
     )
 
 
@@ -286,10 +290,10 @@ def load_multi_pr_proposal(path: str | Path) -> MultiPRStructrrProposal:
         raise ValueError(
             f"could not read multi-PR Structrr proposal: {error}"
         ) from error
-    if (
-        not isinstance(raw, Mapping)
-        or raw.get("schema_version") != MULTIPR_STRUCTRR_SCHEMA
-    ):
+    if not isinstance(raw, Mapping) or raw.get("schema_version") not in {
+        MULTIPR_STRUCTRR_SCHEMA,
+        _LEGACY_MULTIPR_STRUCTRR_SCHEMA,
+    }:
         raise ValueError("unsupported multi-PR Structrr proposal")
     unsigned = {key: value for key, value in raw.items() if key != "fingerprint"}
     if raw.get("fingerprint") != _content_fingerprint(unsigned):
@@ -297,7 +301,6 @@ def load_multi_pr_proposal(path: str | Path) -> MultiPRStructrrProposal:
     baseline = raw.get("baseline_snapshot")
     full_raw = raw.get("full_proposal")
     item_raw = raw.get("item_proposals")
-    item_baseline_raw = raw.get("item_baselines")
     expected_final = raw.get("expected_final_snapshot")
     if (
         not isinstance(baseline, Mapping)
@@ -314,21 +317,50 @@ def load_multi_pr_proposal(path: str | Path) -> MultiPRStructrrProposal:
         for key, value in item_raw.items()
     ):
         raise ValueError("multi-PR item proposals must be a mapping")
-    if not isinstance(item_baseline_raw, Mapping) or not all(
-        isinstance(key, str) and isinstance(value, Mapping)
-        for key, value in item_baseline_raw.items()
-    ):
-        raise ValueError("multi-PR item baselines must be a mapping")
-    if set(item_raw) != set(item_baseline_raw):
-        raise ValueError("multi-PR item proposal and baseline IDs differ")
+    item_proposals = {
+        key: ProposalRevision.from_data(value) for key, value in item_raw.items()
+    }
+    item_baselines: dict[str, Mapping[str, Any]]
+    item_order: list[str]
+    if raw.get("schema_version") == _LEGACY_MULTIPR_STRUCTRR_SCHEMA:
+        item_baseline_raw = raw.get("item_baselines")
+        if not isinstance(item_baseline_raw, Mapping) or not all(
+            isinstance(key, str) and isinstance(value, Mapping)
+            for key, value in item_baseline_raw.items()
+        ):
+            raise ValueError("multi-PR item baselines must be a mapping")
+        if set(item_raw) != set(item_baseline_raw):
+            raise ValueError("multi-PR item proposal and baseline IDs differ")
+        item_baselines = {key: dict(value) for key, value in item_baseline_raw.items()}
+        item_order = _recover_item_order(
+            dict(baseline), item_proposals, item_baselines, dict(expected_final)
+        )
+    else:
+        item_order_raw = raw.get("item_order")
+        fingerprints_raw = raw.get("item_baseline_fingerprints")
+        if (
+            not isinstance(item_order_raw, list)
+            or not all(isinstance(item_id, str) for item_id in item_order_raw)
+            or len(item_order_raw) != len(set(item_order_raw))
+            or set(item_order_raw) != set(item_proposals)
+            or not isinstance(fingerprints_raw, Mapping)
+            or not all(isinstance(key, str) for key in fingerprints_raw)
+            or set(fingerprints_raw) != set(item_proposals)
+            or not all(isinstance(value, str) for value in fingerprints_raw.values())
+        ):
+            raise ValueError("multi-PR item baseline references are invalid")
+        item_order = cast(list[str], item_order_raw)
+        fingerprints = cast(Mapping[str, Any], fingerprints_raw)
+        item_baselines = _reconstruct_item_baselines(
+            dict(baseline), item_order, item_proposals, fingerprints
+        )
     proposal = MultiPRStructrrProposal(
         plan_id=_required_string(raw, "plan_id"),
         baseline_snapshot=dict(baseline),
         full_proposal=ProposalRevision.from_data(full_raw),
-        item_proposals={
-            key: ProposalRevision.from_data(value) for key, value in item_raw.items()
-        },
-        item_baselines={key: dict(value) for key, value in item_baseline_raw.items()},
+        item_proposals=item_proposals,
+        item_order=tuple(item_order),
+        item_baselines=item_baselines,
         expected_final_snapshot=dict(expected_final),
     )
     if proposal.full_proposal.structrr_baseline_fingerprint != snapshot_digest(
@@ -342,7 +374,102 @@ def load_multi_pr_proposal(path: str | Path) -> MultiPRStructrrProposal:
             raise ValueError(
                 f"item {item_id!r} proposal does not match its projected baseline"
             )
+    if raw.get("schema_version") == MULTIPR_STRUCTRR_SCHEMA:
+        final_item_baseline = proposal.baseline_snapshot
+        for item_id in proposal.item_order:
+            final_item_baseline = project_structural_operations(
+                final_item_baseline,
+                _proposal_structural_operations(proposal.item_proposals[item_id]),
+            )
+        if snapshot_digest(final_item_baseline) != snapshot_digest(
+            proposal.expected_final_snapshot
+        ):
+            raise ValueError(
+                "multi-PR item proposals do not produce the saved final snapshot"
+            )
     return proposal
+
+
+def _recover_item_order(
+    baseline: Mapping[str, Any],
+    item_proposals: Mapping[str, ProposalRevision],
+    item_baselines: Mapping[str, Mapping[str, Any]],
+    expected_final: Mapping[str, Any],
+) -> list[str]:
+    """Recover the original sequence from legacy snapshots serialized by key."""
+    projected = dict(baseline)
+    item_ids_by_fingerprint: dict[str, list[str]] = {}
+    for item_id, snapshot in item_baselines.items():
+        item_ids_by_fingerprint.setdefault(snapshot_digest(snapshot), []).append(
+            item_id
+        )
+    for item_ids in item_ids_by_fingerprint.values():
+        item_ids.sort()
+    ordered: list[str] = []
+    while len(ordered) < len(item_proposals):
+        projected_fingerprint = snapshot_digest(projected)
+        matching = item_ids_by_fingerprint.get(projected_fingerprint)
+        if not matching:
+            raise ValueError("legacy multi-PR item baselines have no valid order")
+        item_id = matching.pop(0)
+        ordered.append(item_id)
+        projected = project_structural_operations(
+            projected, _proposal_structural_operations(item_proposals[item_id])
+        )
+    if snapshot_digest(projected) != snapshot_digest(expected_final):
+        raise ValueError(
+            "legacy multi-PR item order does not produce the saved final snapshot"
+        )
+    return ordered
+
+
+def _reconstruct_item_baselines(
+    baseline: Mapping[str, Any],
+    item_order: Sequence[str],
+    item_proposals: Mapping[str, ProposalRevision],
+    fingerprints: Mapping[str, Any],
+) -> dict[str, Mapping[str, Any]]:
+    """Rebuild per-item baselines from compact fingerprints and prior diffs."""
+    projected = dict(baseline)
+    item_baselines: dict[str, Mapping[str, Any]] = {}
+    for item_id in item_order:
+        if fingerprints.get(item_id) != snapshot_digest(projected):
+            raise ValueError(
+                f"item {item_id!r} baseline fingerprint does not match its projection"
+            )
+        item_baselines[item_id] = dict(projected)
+        projected = project_structural_operations(
+            projected, _proposal_structural_operations(item_proposals[item_id])
+        )
+    return item_baselines
+
+
+def _proposal_structural_operations(
+    proposal: ProposalRevision,
+) -> list[dict[str, Any]]:
+    action_map = {"add": "added", "change": "changed", "remove": "removed"}
+    operations: list[dict[str, Any]] = []
+    for operation in proposal.operations:
+        action = action_map.get(operation.action)
+        if action is None:
+            raise ValueError(
+                f"unsupported proposal operation action: {operation.action!r}"
+            )
+        subject_id = operation.subject_id
+        if operation.section == "files":
+            stable_key = operation.content.get("stable_key")
+            if isinstance(stable_key, str) and stable_key:
+                subject_id = stable_key
+        operations.append(
+            {
+                "operation_id": operation.operation_id,
+                "section": operation.section,
+                "subject_id": subject_id,
+                "action": action,
+                "content": dict(operation.content),
+            }
+        )
+    return operations
 
 
 def rebase_item_proposal(

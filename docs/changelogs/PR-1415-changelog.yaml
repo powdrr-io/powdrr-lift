@@ -1,0 +1,69 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1415
+title: Implement Python Structrr annotation parsing and scope indexing
+intent:
+  problem: Source annotations have no deterministic parser or scope index for discovering
+    applicable Structrr references.
+  goal: Implement the pure Python parser and scope index as step 1 of the source annotations
+    plan.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/plans/structrr-source-references.md
+  type: modified
+  span:
+    start_line: 3
+    end_line: 16
+  summary: Record the implemented parser API, scope-status semantics, and remaining
+    phases.
+  rationale: Keep the source annotations plan aligned with the implemented first step.
+- path: packages/service/src/powdrr_service/structrr/source_references.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 463
+  summary: Implement immutable source indexes, comment-token parsing, AST ownership,
+    inherited references, and owner selection.
+  rationale: Make source annotations discoverable without executing source or conflating
+    observed spans with durable identity.
+- path: tests/test_structrr_source_references.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 300
+  summary: Verify comment grammar, scope binding, inheritance, partial failures, serialization,
+    and source bounds.
+  rationale: Prevent false-positive annotations and silent scope or encoding errors.
+entities:
+- id: structrr-python-source-reference-index
+  type: Class
+  action: added
+- id: structrr-python-annotation-indexer
+  type: Function
+  action: added
+- id: structrr-python-applicable-references
+  type: Function
+  action: added
+- id: structrr-python-owner-selector
+  type: Function
+  action: added
+entity_relationships:
+- id: structrr-indexer-creates-reference-index
+  source: structrr-python-annotation-indexer
+  target: structrr-python-source-reference-index
+  relationship: creates
+  type: creates
+  action: added
+  description: The indexer binds real comment tokens to Python AST source owners.
+  rationale: Keep scope observation deterministic and independent of model or filesystem
+    execution.
+invariants:
+- id: structrr-python-reference-indexing-does-not-execute-source
+  action: added
+  description: Python source reference indexing tokenizes and parses the supplied
+    byte snapshot without importing or executing candidate modules.
+- id: structrr-python-failed-scopes-remain-unresolved
+  action: added
+  description: A failed Python scope extraction retains discovered annotations as
+    unbound observations and never claims inherited scope coverage.
+guidance: []

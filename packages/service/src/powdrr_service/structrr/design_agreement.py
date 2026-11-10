@@ -14,6 +14,7 @@ from typing import Any
 
 from powdrr_service.decision_obligation import content_fingerprint
 from powdrr_service.structrr.design import DesignHandoff, subject_identity
+from powdrr_service.structrr.reference_definitions import ReferenceDefinition
 from powdrr_service.structrr.source_manifest import SourceManifest
 
 
@@ -79,12 +80,19 @@ def check_design_agreement(
         if not isinstance(records, list):
             continue
         for record in records:
+            canonical_required = False
+            if section == "reference_definitions":
+                definition = ReferenceDefinition.from_data(record)
+                if definition.lifecycle != "active":
+                    continue
+                canonical_required = definition.kind in {"feature", "invariant"}
             subject = f"{section}:{subject_identity(section, record)}"
             checks = record.get("verification", [])
             if explicit_only and not checks:
                 continue
             if (
                 section not in required_sections
+                and not canonical_required
                 and not checks
                 and record.get("required") is not True
             ):

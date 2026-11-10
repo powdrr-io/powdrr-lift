@@ -1,0 +1,157 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1416
+title: Implement frozen Structrr reference catalogs and lifecycle resolution
+intent:
+  problem: Source readers lack a frozen projection of accepted canonical reference
+    meaning, lifecycle history, and authorized amendments.
+  goal: Compile immutable revision-bound catalogs and resolve source reference IDs
+    without losing intent or confusing authority.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/design/structrr-reference-catalog.md
+  type: added
+  span:
+    start_line: 1
+    end_line: 163
+  summary: Document canonical definitions, catalog projection, lifecycle semantics,
+    and authorized amendment inputs.
+  rationale: Define serialization, authority, and caller trust boundaries for later
+    source readers.
+- path: docs/plans/structrr-source-references.md
+  type: modified
+  span:
+    start_line: 5
+    end_line: 11
+  summary: Record completed frozen catalog and canonical-definition work and link
+    its contract.
+  rationale: Keep implementation progress and the next planned steps explicit.
+- path: packages/service/src/powdrr_service/structrr/design.py
+  type: modified
+  span:
+    start_line: 18
+    end_line: 18
+  summary: Preserve and validate canonical reference definitions and assumption sections
+    in desired state.
+  rationale: Keep typed meaning intact across design serialization and handoffs.
+- path: packages/service/src/powdrr_service/structrr/design.py
+  type: modified
+  span:
+    start_line: 25
+    end_line: 26
+  summary: Preserve and validate canonical reference definitions and assumption sections
+    in desired state.
+  rationale: Keep typed meaning intact across design serialization and handoffs.
+- path: packages/service/src/powdrr_service/structrr/design.py
+  type: modified
+  span:
+    start_line: 190
+    end_line: 191
+  summary: Preserve and validate canonical reference definitions and assumption sections
+    in desired state.
+  rationale: Keep typed meaning intact across design serialization and handoffs.
+- path: packages/service/src/powdrr_service/structrr/design_agreement.py
+  type: modified
+  span:
+    start_line: 17
+    end_line: 17
+  summary: Require current evidence for active canonical feature and invariant definitions
+    while excluding inactive history.
+  rationale: A new canonical representation must not bypass existing implementation
+    agreement gates.
+- path: packages/service/src/powdrr_service/structrr/design_agreement.py
+  type: modified
+  span:
+    start_line: 83
+    end_line: 88
+  summary: Require current evidence for active canonical feature and invariant definitions
+    while excluding inactive history.
+  rationale: A new canonical representation must not bypass existing implementation
+    agreement gates.
+- path: packages/service/src/powdrr_service/structrr/design_agreement.py
+  type: modified
+  span:
+    start_line: 95
+    end_line: 95
+  summary: Require current evidence for active canonical feature and invariant definitions
+    while excluding inactive history.
+  rationale: A new canonical representation must not bypass existing implementation
+    agreement gates.
+- path: packages/service/src/powdrr_service/structrr/reference_catalog.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 464
+  summary: Compile immutable reference catalogs and resolve exact IDs with lifecycle
+    and authority provenance.
+  rationale: Prevent candidate overlays, stale inputs, and implicit successor redirection
+    from becoming accepted worker context.
+- path: packages/service/src/powdrr_service/structrr/reference_definitions.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 137
+  summary: Define validated immutable canonical records for source-addressable product
+    intent.
+  rationale: Represent feature and assumption meaning explicitly before enabling their
+    catalog adapters.
+- path: tests/test_structrr_reference_catalog.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 509
+  summary: Verify kind adapters, lifecycle history, immutable round trips, amendment
+    authority, corruption checks, and agreement integration.
+  rationale: Protect exact intent and authority across independently consumed catalog
+    artifacts.
+entities:
+- id: structrr-reference-definition-model-v1
+  type: Class
+  action: added
+- id: structrr-frozen-catalog-model-v1
+  type: Class
+  action: added
+- id: structrr-authorized-reference-amendment-model-v1
+  type: Class
+  action: added
+- id: structrr-reference-catalog-compiler-v1
+  type: Function
+  action: added
+- id: structrr-reference-catalog-resolver-v1
+  type: Function
+  action: added
+entity_relationships:
+- id: structrr-catalog-compiler-produces-frozen-catalog
+  source: structrr-reference-catalog-compiler-v1
+  target: structrr-frozen-catalog-model-v1
+  relationship: creates
+  type: creates
+  action: added
+  description: The compiler projects accepted definitions and revision-bound authorized
+    amendments into a sorted immutable catalog.
+  rationale: Give readers stable meaning tied to exact accepted inputs.
+- id: structrr-catalog-resolver-reads-frozen-catalog
+  source: structrr-reference-catalog-resolver-v1
+  target: structrr-frozen-catalog-model-v1
+  relationship: uses
+  type: uses
+  action: added
+  description: The resolver returns active, inactive, or unresolved exact-ID outcomes
+    from the frozen catalog.
+  rationale: Retain lifecycle and successor information without silently redirecting
+    references.
+invariants:
+- id: structrr-reference-catalog-amendments-require-bound-authority
+  action: added
+  description: Catalog amendments require an explicit caller-authorized envelope bound
+    to the exact accepted document and full base commit; replacements advance reference
+    versions.
+- id: structrr-reference-catalog-inactive-history-is-not-active-context
+  action: added
+  description: Inactive definitions remain available for diagnostics but never resolve
+    as current applicability or redirect implicitly to a successor.
+- id: structrr-canonical-definitions-retain-agreement-obligations
+  action: added
+  description: Active canonical features and invariants require current evidence in
+    complete desired-design agreement checks.
+guidance: []

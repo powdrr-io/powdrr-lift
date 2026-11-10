@@ -18,6 +18,7 @@ class Decision:
     id: str | None = None
     summary: str | None = None
     replaces: str | None = None
+    rationale: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,6 +49,7 @@ class ChangeEntity:
     type: str | None = None
     action: str | None = None
     related: RelatedSection = field(default_factory=RelatedSection)
+    rationale: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -80,6 +82,7 @@ class ChangeInvariant:
     description: str | None = None
     action: str | None = None
     related: RelatedSection = field(default_factory=RelatedSection)
+    rationale: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -88,6 +91,7 @@ class ChangeGuidance:
     description: str | None = None
     action: str | None = None
     related: RelatedSection = field(default_factory=RelatedSection)
+    rationale: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -270,6 +274,7 @@ def _parse_decision(raw_decision: object | None) -> Decision:
         id=_coerce_optional_str(data.get("id")),
         summary=_coerce_optional_str(data.get("summary")),
         replaces=_coerce_optional_str(data.get("replaces")),
+        rationale=_coerce_optional_str(data.get("rationale")),
     )
 
 
@@ -288,6 +293,7 @@ def _parse_decisions(data: Mapping[str, Any]) -> list[Decision]:
 def _parse_entity(raw_entity: object) -> ChangeEntity:
     data = _ensure_mapping(raw_entity)
     return ChangeEntity(
+        rationale=_coerce_optional_str(data.get("rationale")),
         id=_coerce_optional_str(data.get("id")),
         type=_coerce_optional_str(data.get("type")),
         action=_coerce_optional_str(data.get("action")),
@@ -406,6 +412,7 @@ def _parse_invariant(raw_invariant: object) -> ChangeInvariant:
         description=_coerce_optional_str(data.get("description")),
         action=_coerce_optional_str(data.get("action")),
         related=_parse_related_section(data.get("related")),
+        rationale=_coerce_optional_str(data.get("rationale")),
     )
 
 
@@ -416,6 +423,7 @@ def _parse_guidance(raw_guidance: object) -> ChangeGuidance:
         description=_coerce_optional_str(data.get("description")),
         action=_coerce_optional_str(data.get("action")),
         related=_parse_related_section(data.get("related")),
+        rationale=_coerce_optional_str(data.get("rationale")),
     )
 
 

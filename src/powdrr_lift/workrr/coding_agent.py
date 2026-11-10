@@ -19,7 +19,10 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from enum import StrEnum
 from pathlib import Path
-from typing import Any, Protocol, cast
+from typing import TYPE_CHECKING, Any, Protocol, cast
+
+if TYPE_CHECKING:
+    from powdrr_service.structrr.design import DesignHandoff
 
 from powdrr_agent.execution.minisweagent_monitor import (
     MiniSWEAgentSnapshot,
@@ -112,6 +115,37 @@ class ImplementationRequest:
     implementation_packet: ImplementationPacket | None = None
     allow_existing_changes: bool = False
     schema_version: str = CODING_AGENT_REQUEST_SCHEMA_VERSION
+
+    @classmethod
+    def from_structrr_handoff(
+        cls,
+        handoff: DesignHandoff,
+        *,
+        validation_profiles: tuple[str, ...] = (),
+        allowed_commands: tuple[str, ...] = (),
+    ) -> ImplementationRequest:
+        """Compile a complete desired design without a chat or execution plan."""
+        from powdrr_service.structrr.design import DesignHandoff
+        from powdrr_service.structrr.proposal import ProposalRevision
+
+        validated = DesignHandoff.from_data(handoff.to_data())
+        data = validated.to_data()
+        proposal = ProposalRevision.from_data(data["proposal"])
+        return cls(
+            request_id=f"{proposal.proposal_id}-design",
+            objective=f"Implement Structrr design {proposal.proposal_id}",
+            prompt=validated.render(),
+            base_commit=data["base_commit"],
+            plan_fingerprint=data["fingerprint"],
+            allowed_paths=proposal.allowed_paths,
+            acceptance_criteria=(
+                *proposal.acceptance_criteria,
+                *proposal.must_preserve,
+            ),
+            validation_profiles=validation_profiles,
+            allowed_commands=allowed_commands,
+            context_refs=(f"structrr-design:{data['desired']['fingerprint']}",),
+        )
 
     def to_data(self) -> dict[str, Any]:
         return {
@@ -246,7 +280,13 @@ class ImplementationRequest:
         intent_packet = IntentPacket(
             operation_id=unit.unit_id,
             required_operations=tuple(
-                {"kind": "addition", "change": dict(change)}
+                {
+                    "kind": "modification"
+                    if change.get("action")
+                    in {"change", "changed", "altered", "modified"}
+                    else "addition",
+                    "change": dict(change),
+                }
                 for change in unit.planned_additions
             )
             + tuple(
@@ -280,7 +320,7 @@ class ImplementationRequest:
             )
             remaining_changes = []
             if additions:
-                remaining_changes.append(f"Additions: {additions}")
+                remaining_changes.append(f"Additions and changes: {additions}")
             if deletions:
                 remaining_changes.append(f"Deletions: {deletions}")
             if remaining_changes:

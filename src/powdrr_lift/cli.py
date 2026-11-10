@@ -74,9 +74,13 @@ from powdrr_service.specifications.system import (
     build_system_specification_validation_report,
 )
 from powdrr_service.structrr.bootstrap import bootstrap_structrr
+from powdrr_service.structrr.design import DesignHandoff
+from powdrr_service.structrr.design_agreement import check_design_agreement
 from powdrr_service.structrr.entity_taxonomy import load_entity_taxonomy
 from powdrr_service.structrr.intent_lineage import audit_intent_lineage
+from powdrr_service.structrr.proposal import ProposalRevision, compile_proposal_revision
 from powdrr_service.structrr.rebase import rebase_structrr_snapshot
+from powdrr_service.structrr.source_manifest import compile_source_manifest
 from powdrr_service.structrr.verification_health import (
     VerificationPolicyMode,
     audit_verification_health,
@@ -2497,6 +2501,29 @@ def build_parser() -> argparse.ArgumentParser:
     )
     compile_workflow_parser.set_defaults(func=_run_compile_execution_plan)
 
+    design_parser = subparsers.add_parser(
+        "compile-structrr-handoff",
+        help="Compile Structrr and a design diff into a portable coding request.",
+    )
+    design_parser.add_argument("--baseline", type=Path, required=True)
+    design_parser.add_argument("--proposal", type=Path, required=True)
+    design_parser.add_argument("--base-commit", required=True)
+    design_parser.add_argument("--output", type=Path, required=True)
+    design_parser.add_argument("--allowed-path", action="append", default=[])
+    design_parser.add_argument("--validation-profile", action="append", default=[])
+    design_parser.add_argument("--allowed-command", action="append", default=[])
+    design_parser.set_defaults(func=_run_compile_structrr_handoff)
+
+    agreement_parser = subparsers.add_parser(
+        "check-structrr-design",
+        help="Check source and revision-bound evidence against a Structrr handoff.",
+    )
+    agreement_parser.add_argument("--handoff", type=Path, required=True)
+    agreement_parser.add_argument("--repo-root", type=Path, required=True)
+    agreement_parser.add_argument("--evidence", type=Path)
+    agreement_parser.add_argument("--output", type=Path, required=True)
+    agreement_parser.set_defaults(func=_run_check_structrr_design)
+
     request_parser = subparsers.add_parser(
         "compile-implementation-request",
         aliases=["compile_implementation_request"],
@@ -4523,6 +4550,118 @@ def _run_coding_agent(args: argparse.Namespace) -> int:
         attempt.status is not CodingAgentStatus.COMPLETED
         or validation.status is not ValidationReportStatus.PASSED
     )
+
+
+def _run_compile_structrr_handoff(args: argparse.Namespace) -> int:
+    baseline = _load_structured_mapping(args.baseline)
+    raw = _load_structured_mapping(args.proposal)
+    if raw.get("schema_version") == "proposal-revision-v1":
+        proposal = ProposalRevision.from_data(raw)
+    else:
+
+        def statements(section: str) -> tuple[str, ...]:
+            values = raw.get(section, [])
+            if not isinstance(values, list):
+                raise ValueError(f"{section} must be a list")
+            result = []
+            for value in values:
+                text = (
+                    value.get("description", value.get("statement"))
+                    if isinstance(value, Mapping)
+                    else value
+                )
+                if not isinstance(text, str) or not text.strip():
+                    raise ValueError(f"{section} requires non-empty statements")
+                result.append(text)
+            return tuple(result)
+
+        proposal = compile_proposal_revision(
+            str(raw.get("change_id", "design-change")),
+            baseline,
+            raw,
+            acceptance_criteria=statements("acceptance_criteria"),
+            must_preserve=statements("must_preserve"),
+            non_goals=statements("non_goals"),
+            allowed_paths=tuple(args.allowed_path),
+            source_refs=(str(args.proposal),),
+        )
+    if not proposal.allowed_paths:
+        raise ValueError("Structrr handoff requires explicit allowed paths")
+    handoff = DesignHandoff.compile(baseline, proposal, base_commit=args.base_commit)
+    request = ImplementationRequest.from_structrr_handoff(
+        handoff,
+        validation_profiles=tuple(args.validation_profile),
+        allowed_commands=tuple(args.allowed_command),
+    )
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    args.output.write_text(
+        json.dumps(handoff.to_data(), indent=2, sort_keys=True) + "\n"
+    )
+    request_path = args.output.with_suffix(".request.json")
+    prompt_path = args.output.with_suffix(".prompt.md")
+    request_path.write_text(request.to_json())
+    prompt_path.write_text(request.prompt + "\n")
+    args.output.with_suffix(".desired.json").write_text(
+        json.dumps(handoff.to_data()["desired"], indent=2, sort_keys=True) + "\n"
+    )
+    print(
+        json.dumps(
+            {
+                "handoff": str(args.output),
+                "request": str(request_path),
+                "prompt": str(prompt_path),
+                "fingerprint": handoff.to_data()["fingerprint"],
+            }
+        )
+    )
+    return 0
+
+
+def _run_check_structrr_design(args: argparse.Namespace) -> int:
+    handoff = DesignHandoff.from_data(_load_structured_mapping(args.handoff))
+    root = args.repo_root.resolve()
+    paths = subprocess.run(
+        ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+        cwd=root,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.split("\0")
+    # Cached Git entries can name intentionally deleted candidate files.
+    # Inventory the working tree, retaining dangling links as extraction errors.
+    paths = [
+        path
+        for path in paths
+        if path and ((root / path).exists() or (root / path).is_symlink())
+    ]
+    for path in filter(None, paths):
+        if not (root / path).resolve().is_relative_to(root):
+            raise ValueError(f"source inventory path escapes repository: {path}")
+    data = handoff.to_data()
+    manifest = compile_source_manifest(
+        root,
+        tuple(filter(None, paths)),
+        submission_base=data["base_commit"],
+        source_revision="candidate",
+        taxonomy_fingerprint="structrr-design-v1",
+        excluded_paths=(".git", ".venv", ".worktrees", ".powdrr", ".powdrr-lift"),
+    )
+    evidence = (
+        _load_structured_mapping(args.evidence).get("evidence", [])
+        if args.evidence
+        else []
+    )
+    if not isinstance(evidence, list) or not all(
+        isinstance(item, Mapping) for item in evidence
+    ):
+        raise ValueError("design evidence must be a list of objects")
+    report = check_design_agreement(
+        handoff, root=root, manifest=manifest, evidence=evidence
+    )
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    args.output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
+    print(json.dumps(report, indent=2, sort_keys=True))
+    return 0 if report["passed"] else 1
 
 
 def _run_compile_implementation_request(args: argparse.Namespace) -> int:

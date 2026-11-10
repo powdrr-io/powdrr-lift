@@ -571,7 +571,22 @@ def _after_matches(operation: Any, record: Mapping[str, Any] | None) -> bool:
     if record is None:
         return operation.action == "remove"
     expected = {
-        key: value for key, value in operation.content.items() if key not in {"action"}
+        key: value
+        for key, value in operation.content.items()
+        if key
+        not in {
+            "action",
+            "rationale",
+            "change_reason",
+            "source_refs",
+            "related",
+            "intent_effect",
+            "instruction_ref",
+            "verification",
+            "required",
+            "supersedes",
+            "supersedes_clause_id",
+        }
     }
     return all(
         key in record and record[key] == value for key, value in expected.items()

@@ -2290,6 +2290,8 @@ def test_operation_identity_and_attribution_are_bound_by_runtime() -> None:
         "action": "changed",
         "content": {
             "description": "Updated description.",
+            "rationale": "The requirement changes the description.",
+            "change_reason": "The requirement changes the description.",
             "id": "entity-01",
             "action": "changed",
         },

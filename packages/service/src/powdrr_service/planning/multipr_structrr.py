@@ -14,6 +14,7 @@ from powdrr_service.structrr.actual_diff import (
     compile_actual_structrr_diff,
 )
 from powdrr_service.structrr.candidate_comparison import compare_candidate_snapshot
+from powdrr_service.structrr.design import project_sections
 from powdrr_service.structrr.proposal import ProposalRevision, compile_proposal_revision
 from powdrr_service.structrr.rebase import rebase_structrr_snapshot
 from powdrr_service.structrr.snapshot import snapshot_digest
@@ -673,102 +674,8 @@ def write_multi_pr_proposal(
 def _apply_sections(
     baseline: Mapping[str, Any], sections: Mapping[str, list[dict[str, Any]]]
 ) -> dict[str, Any]:
-    """Project a reviewed sequence of structural operations for later PRs."""
-    result = dict(baseline)
-    collection_names = {
-        "entities": ("entities", "id"),
-        "entity_relationships": ("entity_relationships", "id"),
-        "files": ("source_subjects", "stable_key"),
-    }
-    for section, operations in sections.items():
-        if section not in collection_names:
-            raise ValueError(f"cannot project unsupported Structrr section {section!r}")
-        collection_name, identity_key = collection_names[section]
-        raw_collection = result.get(collection_name, [])
-        if not isinstance(raw_collection, list):
-            raise ValueError(f"Structrr baseline {collection_name} must be a list")
-        records = [
-            dict(record) for record in raw_collection if isinstance(record, Mapping)
-        ]
-        by_id = {
-            str(record[identity_key]): index
-            for index, record in enumerate(records)
-            if isinstance(record.get(identity_key), str) and record[identity_key]
-        }
-        for operation in operations:
-            action = operation.get("action")
-            identity = operation.get(identity_key)
-            if not isinstance(identity, str) or not identity:
-                raise ValueError(
-                    f"projected {section} operation has no {identity_key} identity"
-                )
-            current_index = by_id.get(identity)
-            if action == "added":
-                if current_index is not None:
-                    raise ValueError(
-                        f"cannot project added {section} subject already present: "
-                        f"{identity}"
-                    )
-                record = {
-                    key: value for key, value in operation.items() if key != "action"
-                }
-                by_id[identity] = len(records)
-                records.append(record)
-            elif action == "changed":
-                if current_index is None:
-                    path = (
-                        identity.removeprefix("path::")
-                        if section == "files" and identity.startswith("path::")
-                        else None
-                    )
-                    raw_files = result.get("files", [])
-                    file_exists = (
-                        isinstance(raw_files, list)
-                        and path is not None
-                        and operation.get("path") == path
-                        and any(
-                            isinstance(record, Mapping) and record.get("path") == path
-                            for record in raw_files
-                        )
-                    )
-                    if file_exists:
-                        # A repository file can exist in the baseline without
-                        # having a Structrr source_subject entry yet. A change
-                        # to that known path materializes its source subject in
-                        # the projection so later plan items can see it.
-                        by_id[identity] = len(records)
-                        records.append(
-                            {
-                                key: value
-                                for key, value in operation.items()
-                                if key != "action"
-                            }
-                        )
-                        continue
-                    raise ValueError(
-                        f"cannot project changed {section} subject absent from "
-                        f"baseline: {identity}"
-                    )
-                records[current_index].update(
-                    {key: value for key, value in operation.items() if key != "action"}
-                )
-            elif action in {"deleted", "removed"}:
-                if current_index is None:
-                    raise ValueError(
-                        f"cannot project removed {section} subject absent from "
-                        f"baseline: {identity}"
-                    )
-                records.pop(current_index)
-                by_id = {
-                    str(record[identity_key]): index
-                    for index, record in enumerate(records)
-                    if isinstance(record.get(identity_key), str)
-                    and record[identity_key]
-                }
-            else:
-                raise ValueError(f"unsupported projected Structrr action: {action!r}")
-        result[collection_name] = records
-    return result
+    """Use the shared desired-state transition semantics."""
+    return project_sections(baseline, sections)
 
 
 def project_structural_operations(

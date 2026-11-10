@@ -143,8 +143,9 @@ def test_cli_routes_selected_plan_state_through_service(
     assert result["plans"][0]["workflow_count"] == 1
 
 
+@pytest.mark.parametrize("rationale", [None, "Preserve fixture ownership."])
 def test_cli_projects_changelog_entities_from_service_snapshot(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], rationale: str | None
 ) -> None:
     root, _ = _repository(tmp_path, with_workflow=False)
     changelog = root / "docs/changelogs/PR-17-changelog.yaml"
@@ -159,6 +160,8 @@ def test_cli_projects_changelog_entities_from_service_snapshot(
         "    action: added\n",
         encoding="utf-8",
     )
+    if rationale is not None:
+        changelog.write_text(changelog.read_text() + f"    rationale: {rationale}\n")
     _git(root, "add", "--all")
     _git(root, "commit", "-m", "Add fixture #17")
     sha = _git(root, "rev-parse", "HEAD")
@@ -188,6 +191,7 @@ def test_cli_projects_changelog_entities_from_service_snapshot(
             "id": "capability:fixture",
             "type": "capability",
             "action": "added",
+            **({"rationale": rationale} if rationale is not None else {}),
             "source": {
                 "kind": "changelog",
                 "change_id": "17",

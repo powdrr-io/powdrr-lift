@@ -541,6 +541,8 @@ def bind_structural_operation(change: StructuralChange) -> dict[str, Any] | None
         return None
     identity_field = "stable_key" if change.section == "files" else "id"
     content = {**dict(change.desired_content or {}), identity_field: change.subject_id}
+    content.setdefault("rationale", change.reason)
+    content["change_reason"] = change.reason
     if change.section == "files":
         content.setdefault("id", f"file:{content.get('path', change.subject_id)}")
     content["action"] = change.action

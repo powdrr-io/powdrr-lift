@@ -394,6 +394,11 @@ def _materialize_entities(
                 **previous,
                 "id": change.id,
                 "type": change.type or previous.get("type"),
+                **(
+                    {"rationale": change.rationale}
+                    if change.rationale is not None
+                    else {}
+                ),
                 "action": change.action,
                 "source": {
                     "kind": "changelog",

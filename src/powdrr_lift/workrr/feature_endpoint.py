@@ -60,6 +60,7 @@ from powdrr_service.procedrr_evaluator.model_client import ProcedrrModelClient
 from powdrr_service.procedrr_evaluator.operations import ProcedrrOperationExecutor
 from powdrr_service.procedrr_evaluator.runtime import ProcedrrExecutionService
 from powdrr_service.resources import bundled_process_directory
+from powdrr_service.structrr.actions import normalize_action
 from powdrr_service.structrr.active_intent import (
     ActiveIntentReference,
     ActiveIntentResolutionError,
@@ -74,6 +75,8 @@ from powdrr_service.structrr.bootstrap import (
     validate_bootstrap_sections,
 )
 from powdrr_service.structrr.candidate_comparison import compare_candidate_snapshot
+from powdrr_service.structrr.design import DesignHandoff
+from powdrr_service.structrr.design_agreement import check_design_agreement
 from powdrr_service.structrr.gate_compiler import (
     compile_proposal_worklist,
     evaluate_structural_proposal_gate,
@@ -962,6 +965,20 @@ def _prepare_proposal_review(
         encoding="utf-8",
     )
     state["proposal_revision"] = proposal
+    handoff = DesignHandoff.compile(
+        baseline_document,
+        proposal,
+        base_commit=str(
+            state.get("submission_base")
+            or _git_output(runner, worktree, ["git", "rev-parse", "HEAD"])
+        ),
+    )
+    handoff_path = output_root / "structrr-design-handoff.json"
+    handoff_path.write_text(
+        json.dumps(handoff.to_data(), indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    state["design_handoff_path"] = handoff_path
     state["proposal_worklist"] = worklist
     state["active_intent_clause_ids"] = active_intent_clause_ids
     return {
@@ -2385,14 +2402,15 @@ def _task_structrr_changes(
             ):
                 continue
             action = item.get("action")
-            if action not in {"added", "deleted", "removed"}:
+            if action is None:
                 continue
+            normalized_action = normalize_action(action)
             subject_id = item.get("id")
             if not isinstance(subject_id, str) or not subject_id:
                 raise PowdrrExecutionError("selected Structrr operation has no id")
             change = {"section": section, **dict(item)}
-            (additions if action == "added" else deletions).append(change)
-            operation = "add" if action == "added" else "remove"
+            (additions if normalized_action != "remove" else deletions).append(change)
+            operation = normalized_action
             operation_refs.append(f"{plan_ref}#{operation}:{section}:{subject_id}")
             covered.add(str(item["instruction_ref"]))
     if missing := selected - covered:
@@ -4344,7 +4362,9 @@ def _proposal_execution_units(
                 dependencies=(units[-1].unit_id,) if units else (),
                 validation_profiles=validation_profiles,
                 acceptance_criteria=operation_criteria,
-                planned_additions=(content,) if operation.action == "add" else (),
+                planned_additions=(content,)
+                if operation.action in {"add", "change"}
+                else (),
                 planned_deletions=(content,) if operation.action == "remove" else (),
                 must_preserve=must_preserve,
                 non_goals=non_goals,
@@ -4523,10 +4543,11 @@ def _load_implementation_plan(
             if not isinstance(item, Mapping):
                 continue
             action = item.get("action")
-            if action not in {"added", "deleted", "removed"}:
+            if action is None:
                 continue
+            normalized_action = normalize_action(action)
             planned = {"section": section, **dict(item)}
-            if action == "added":
+            if normalized_action != "remove":
                 additions.append(planned)
             else:
                 deletions.append(planned)
@@ -6841,12 +6862,15 @@ def _compile_initial_worker_prompt(
     for section in ("features", "invariants", "guidance"):
         for item in _mapping_values(diff_document.get(section)):
             action = item.get("action")
-            if action not in {"added", "deleted", "removed"}:
+            if action is None:
                 continue
+            normalized_action = normalize_action(action)
             change = {"section": section, **dict(item)}
-            (planned_additions if action == "added" else planned_deletions).append(
-                change
-            )
+            (
+                planned_additions
+                if normalized_action != "remove"
+                else planned_deletions
+            ).append(change)
     try:
         packet = compile_implementation_packet(
             objective=config.feature_description,
@@ -7716,6 +7740,19 @@ def _prepare_final_implementation_review(
         )
     if candidate_bootstrap.source_manifest is None:
         raise PowdrrExecutionError("candidate bootstrap omitted its source manifest")
+    handoff_path = state.get("design_handoff_path")
+    if not isinstance(handoff_path, Path):
+        raise PowdrrExecutionError("final review requires the frozen design handoff")
+    handoff = DesignHandoff.from_data(json.loads(handoff_path.read_text()))
+    if handoff.to_data()["proposal"]["fingerprint"] != proposal.fingerprint:
+        raise PowdrrExecutionError("final review design handoff is stale")
+    source_agreement = check_design_agreement(
+        handoff,
+        root=worktree,
+        manifest=candidate_bootstrap.source_manifest,
+        explicit_only=True,
+    )
+    _write_flow_artifact(output_root, "source-design-agreement.json", source_agreement)
     actual_diff = compile_actual_structrr_diff(
         baseline_document,
         candidate_bootstrap.document,
@@ -7895,10 +7932,8 @@ def _prepare_final_implementation_review(
             },
             {
                 "decision_id": "final:structrr-comparison",
-                "check": "candidate_comparison_resolved_or_retries_exhausted",
-                "passed": comparison_passed
-                or int(state.get("candidate_correction_attempts", 0))
-                >= config.max_repair_attempts,
+                "check": "candidate_comparison_satisfied",
+                "passed": comparison_passed,
                 "blockers": comparison_blockers,
             },
             {
@@ -7926,6 +7961,7 @@ def _prepare_final_implementation_review(
         "candidate_comparison_path": comparison_json_file,
         "candidate_comparison_fingerprint": candidate_comparison["fingerprint"],
         "candidate_structural_gate_passed": comparison_passed,
+        "source_design_agreement": source_agreement,
         "candidate_comparison_blockers": comparison_blockers,
         "reviewable_additions_by_path": candidate_comparison.get(
             "reviewable_additions_by_path", []
@@ -8564,24 +8600,14 @@ def _finalize_implementation_review(
     correction_limit = review.get("candidate_correction_limit", 2)
     if not isinstance(correction_limit, int) or isinstance(correction_limit, bool):
         raise PowdrrExecutionError("candidate correction limit is malformed")
-    correction_exhausted = (
-        review.get("candidate_structural_gate_passed") is not True
-        and int(review.get("candidate_correction_attempts", 0)) >= correction_limit
-    )
-    raw_structural_ids = review.get("structural_operation_ids")
-    unresolved_structural_ids = (
-        {item for item in raw_structural_ids if isinstance(item, str) and item}
-        if correction_exhausted and isinstance(raw_structural_ids, list)
-        else set()
-    )
-    if any(
-        decision.get("outcome") != "pass"
-        and not (
-            specification.get("category") == "operation"
-            and specification.get("subject_id") in unresolved_structural_ids
-        )
-        for specification, decision in zip(specifications, semantic, strict=True)
-    ):
+    if review.get("candidate_structural_gate_passed") is False:
+        result["accepted"] = False
+    source_agreement = review.get("source_design_agreement")
+    if isinstance(source_agreement, Mapping):
+        result["source_design_agreement"] = dict(source_agreement)
+        if source_agreement.get("passed") is not True:
+            result["accepted"] = False
+    if any(decision.get("outcome") != "pass" for decision in semantic):
         result["accepted"] = False
     invariant_worklist = review.get("invariant_worklist")
     invariant_specifications = _flow_items(
@@ -8725,32 +8751,10 @@ def _finalize_implementation_review(
         }
         for specification, decision in zip(specifications, semantic, strict=True)
     ]
-    excluded_operation_ids = {
-        str(specification.get("subject_id"))
-        for specification in specifications
-        if specification.get("category") == "operation"
-        and specification.get("subject_id") in unresolved_structural_ids
-    }
-
-    def is_excluded_operation_decision(item: Mapping[str, Any]) -> bool:
-        decision_id = item.get("decision_id")
-        return (
-            isinstance(decision_id, str)
-            and decision_id.startswith("operation:")
-            and decision_id.removeprefix("operation:") in excluded_operation_ids
-        )
-
-    bound_decisions = [
-        item for item in bound_decisions if not is_excluded_operation_decision(item)
-    ]
     actualization = reconcile_actualization(
         proposal_fingerprint=str(review.get("proposal_fingerprint", "")),
         diff_fingerprint=str(review.get("diff_fingerprint", "")),
-        operation_ids=[
-            str(item)
-            for item in review.get("operation_ids", [])
-            if str(item) not in excluded_operation_ids
-        ],
+        operation_ids=[str(item) for item in review.get("operation_ids", [])],
         retained_clause_ids=[
             str(item) for item in review.get("retained_clause_ids", [])
         ],

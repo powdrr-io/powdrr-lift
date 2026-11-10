@@ -8,7 +8,12 @@ implemented in the service's `structrr/reference_catalog.py` and
 `structrr/reference_definitions.py`, with tests in
 `tests/test_structrr_reference_catalog.py`. See
 [the catalog contract](../design/structrr-reference-catalog.md) for schemas,
-adapters, and the caller's authorization responsibility. The remaining modules
+adapters, and the caller's authorization responsibility. Step 3 (bounded source
+reader, literal search, context pagination, and digest-keyed cache) is implemented
+in the service's `structrr/source_reader.py`, with the compatibility command in
+`powdrr_lift.structrr.source_reader` and tests in `tests/test_structrr_source_reader.py`.
+See [the reader contract](../design/structrr-source-reader.md). Environment
+integration and independent observation verification remain planned. The modules
 marked **new** below are planned. Legacy module paths refer to the service-owned
 responsibilities described in section 12.4.
 

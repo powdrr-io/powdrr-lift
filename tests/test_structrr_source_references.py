@@ -275,6 +275,10 @@ def test_serialization_is_exact_and_rejects_invalid_or_inconsistent_records() ->
         lambda d: d["annotations"][0].update(ref="bad id"),
         lambda d: d["annotations"][0]["owner"].update(end_line=999),
         lambda d: d.update(extra="unexpected"),
+        lambda d: d["owners"][0].update(qualified_name=42),
+        lambda d: d["diagnostics"].append(
+            {"code": "malformed_annotation", "message": 42}
+        ),
     ):
         data = result.to_data()
         mutate(data)

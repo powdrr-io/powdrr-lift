@@ -35,7 +35,7 @@ class SourceOwner:
     def __post_init__(self) -> None:
         if self.kind not in {"module", "class", "function", "async_function", "block"}:
             raise ValueError("invalid source owner kind")
-        if not self.qualified_name:
+        if not isinstance(self.qualified_name, str) or not self.qualified_name:
             raise ValueError("source owner requires a name")
         _span(self.start_line, self.end_line)
         _integer(self.column, 0)
@@ -75,6 +75,7 @@ class SourceReferenceDiagnostic:
                 "invalid_scope",
                 "scope_resolution_failed",
             }
+            or not isinstance(self.message, str)
             or not self.message
         ):
             raise ValueError("invalid source reference diagnostic")

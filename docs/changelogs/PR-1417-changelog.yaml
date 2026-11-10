@@ -1,0 +1,80 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1417
+title: Add context-aware Structrr source reads and literal search
+intent:
+  problem: Source inspection cannot yet attach frozen accepted Structrr context to
+    exact source snapshots.
+  goal: Provide bounded read and search observations with explicit incomplete context
+    and exact continuation pages.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/design/structrr-source-reader.md
+  type: added
+  span:
+    start_line: 1
+    end_line: 70
+  summary: Document reader commands, observation fields, limits, and trust boundaries.
+  rationale: Define the contract for later environment integration.
+- path: docs/plans/structrr-source-references.md
+  type: modified
+  span:
+    start_line: 11
+    end_line: 16
+  summary: Record completed source reader implementation and remaining integration
+    work.
+  rationale: Keep the implementation sequence explicit.
+- path: packages/service/src/powdrr_service/structrr/source_reader.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 731
+  summary: Implement bounded Python source reads, literal search, exact context pagination,
+    and snapshot caching.
+  rationale: Expose inherited Structrr context without altering source or executing
+    candidate code.
+- path: src/powdrr_lift/structrr/source_reader.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 6
+  summary: Expose the service-owned reader through the planned module command.
+  rationale: Preserve the documented command path across the package boundary.
+- path: tests/test_structrr_source_reader.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 223
+  summary: Verify inherited context, bounds, lifecycle diagnostics, path safety, search,
+    pagination, cache invalidation, and CLI output.
+  rationale: Protect completeness claims and exact snapshot context.
+entities:
+- id: structrr-source-reader-v1
+  type: Class
+  action: added
+- id: structrr-source-read-observation-v1
+  type: Class
+  action: added
+- id: structrr-source-reader-command-v1
+  type: Command
+  action: added
+entity_relationships:
+- id: structrr-reader-produces-observation
+  source: structrr-source-reader-v1
+  target: structrr-source-read-observation-v1
+  relationship: creates
+  type: creates
+  action: added
+  description: The reader returns immutable versioned observations separating original
+    source from resolved context.
+  rationale: Allow subsequent environment verification without synthetic source comments.
+invariants:
+- id: structrr-reader-hashes-indexed-snapshot
+  action: added
+  description: Source hashing, decoding, and scope indexing use the same bounded byte
+    snapshot; cache identity includes its digest.
+- id: structrr-reader-reports-incomplete-context
+  action: added
+  description: Missing, inactive, overflowing, or unresolved scope context cannot
+    produce a complete observation.
+guidance: []

@@ -32,6 +32,34 @@ def run(): pass
     assert result.annotations[0].owner == find_owner(result, "function", "run")
 
 
+def test_fstring_expression_comments_are_not_source_annotations() -> None:
+    result = index(
+        'text = f"""{(\n# structrr: hidden\n42\n)}"""\n'
+        "# structrr: visible\ndef run(): pass\n"
+    )
+    assert not result.diagnostics
+    assert [a.ref for a in result.annotations] == ["visible"]
+
+
+def test_nested_class_owners_keep_lexical_qualification() -> None:
+    result = index("""# structrr: outer
+class Outer:
+    # structrr: inner
+    class Inner:
+        # structrr: method
+        def run(self):
+            pass
+""")
+    assert not result.diagnostics
+    assert find_owner(result, "class", "Outer.Inner")
+    assert find_owner(result, "function", "Outer.Inner.run")
+    assert {a.ref for a in applicable_references(result, 7, 7)} == {
+        "outer",
+        "inner",
+        "method",
+    }
+
+
 @pytest.mark.parametrize(
     "marker",
     [

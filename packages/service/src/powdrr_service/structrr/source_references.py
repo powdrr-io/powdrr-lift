@@ -215,8 +215,15 @@ def index_python_source(path: str, source: bytes) -> SourceReferenceIndex:
     text = text.replace("\r\n", "\n").replace("\r", "\n")
     line_count = text.count("\n") + int(bool(text) and not text.endswith("\n"))
     token_failure = False
+    fstring_depth = 0
     try:
         for token in tokenize.generate_tokens(io.StringIO(text).readline):
+            if token.type == tokenize.FSTRING_START:
+                fstring_depth += 1
+            elif token.type == tokenize.FSTRING_END:
+                fstring_depth -= 1
+            if fstring_depth:
+                continue
             if token.type != tokenize.COMMENT:
                 continue
             standalone = not token.line[: token.start[1]].strip()

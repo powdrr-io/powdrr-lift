@@ -35,8 +35,8 @@ from powdrr_lift.core.implementation_packet import ImplementationPacket
 
 CODING_AGENT_REQUEST_SCHEMA_VERSION = "implementation-request-v2"
 CODING_AGENT_ATTEMPT_SCHEMA_VERSION = "implementation-attempt-v2"
-MAX_SUPPORTING_EDIT_FILES = 2
 MAX_SUPPORTING_EDIT_LINES = 20
+GitRunner = Callable[..., subprocess.CompletedProcess[Any]]
 MINISWEAGENT_MAX_TASK_ARGUMENT_BYTES = 64 * 1024
 DEFAULT_CODING_AGENT_TIMEOUT_SECONDS = 1800.0
 DEFAULT_CODING_AGENT_VALIDATION_TIMEOUT_SECONDS = 1800.0
@@ -315,8 +315,8 @@ class ImplementationRequest:
             "Work in the existing task worktree. Do not create branches, "
             "commits, pull requests, or generated repository metadata. Use only "
             "the allowed paths or declared ephemeral paths. You may also make "
-            f"small supporting edits to at most {MAX_SUPPORTING_EDIT_FILES} "
-            "existing regular text files outside those paths, with no more than "
+            "small supporting edits to any number of existing regular text files "
+            "outside those paths, with no more than "
             f"{MAX_SUPPORTING_EDIT_LINES} added or removed lines total. These edits "
             "must directly support the acceptance criteria. Do not create, delete, "
             "rename, or make binary changes outside the allowed paths. Protected "
@@ -531,6 +531,7 @@ class CodingAgentAttempt:
     exit_code: int | None
     changed_paths: tuple[str, ...] = ()
     out_of_scope_paths: tuple[str, ...] = ()
+    supporting_edit_paths: tuple[str, ...] = ()
     diff_fingerprint: str | None = None
     worker_committed: bool = False
     commit_ids: tuple[str, ...] = ()
@@ -551,6 +552,7 @@ class CodingAgentAttempt:
             "exit_code": self.exit_code,
             "changed_paths": list(self.changed_paths),
             "out_of_scope_paths": list(self.out_of_scope_paths),
+            "supporting_edit_paths": list(self.supporting_edit_paths),
             "diff_fingerprint": self.diff_fingerprint,
             "worker_committed": self.worker_committed,
             "commit_ids": list(self.commit_ids),
@@ -1186,6 +1188,9 @@ class CodingAgentAttemptStore:
             out_of_scope_paths=tuple(
                 cast(list[str], data.get("out_of_scope_paths", []))
             ),
+            supporting_edit_paths=tuple(
+                cast(list[str], data.get("supporting_edit_paths", []))
+            ),
             diff_fingerprint=cast(str | None, data.get("diff_fingerprint")),
             worker_committed=bool(data.get("worker_committed", False)),
             commit_ids=tuple(cast(list[str], data.get("commit_ids", []))),
@@ -1314,7 +1319,7 @@ def run_coding_agent(
         for path in changed_paths
         if _path_is_allowed(path, request.protected_paths)
     )
-    supporting_edits = _permitted_supporting_edits(
+    supporting_edits = permitted_supporting_edit_paths(
         worktree_root, before_head, out_of_scope, request.protected_paths
     )
     denied_out_of_scope = tuple(
@@ -1350,6 +1355,7 @@ def run_coding_agent(
         exit_code=completed.returncode,
         changed_paths=changed_paths,
         out_of_scope_paths=denied_out_of_scope,
+        supporting_edit_paths=tuple(sorted(supporting_edits)),
         diff_fingerprint=fingerprint,
         worker_committed=bool(commit_ids),
         commit_ids=commit_ids,
@@ -1445,19 +1451,21 @@ def _path_is_allowed(path: str, allowed_paths: Sequence[str]) -> bool:
     )
 
 
-def _permitted_supporting_edits(
+def permitted_supporting_edit_paths(
     worktree_root: Path,
     base_commit: str,
     paths: Sequence[str],
     protected_paths: Sequence[str],
+    *,
+    runner: GitRunner = subprocess.run,
 ) -> frozenset[str]:
-    """Accept a tightly bounded set of small edits to existing text files."""
-    if not paths or len(paths) > MAX_SUPPORTING_EDIT_FILES:
+    """Accept small edits to any number of existing text files."""
+    if not paths:
         return frozenset()
     if any(_path_is_allowed(path, protected_paths) for path in paths):
         return frozenset()
 
-    result = subprocess.run(
+    result = runner(
         ["git", "diff", "--numstat", "--no-renames", base_commit, "--", *paths],
         cwd=worktree_root,
         capture_output=True,
@@ -1483,7 +1491,7 @@ def _permitted_supporting_edits(
             changed_lines += int(additions) + int(deletions)
         except ValueError:
             return frozenset()
-        baseline_file = subprocess.run(
+        baseline_file = runner(
             ["git", "cat-file", "-e", f"{base_commit}:{path}"],
             cwd=worktree_root,
             capture_output=True,

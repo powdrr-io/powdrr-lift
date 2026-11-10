@@ -67,11 +67,13 @@ class FakeProvider:
             (worktree_root / "README.md").write_text("changed\n" * 25)
             return subprocess.CompletedProcess(["fake"], 0, "", "")
         if self.action == "supporting-edits":
-            (worktree_root / "attestation").mkdir(exist_ok=True)
-            (worktree_root / "attestation" / "golden.json").write_text(
-                '{"digest": "new"}\n'
-            )
-            (worktree_root / "verify.py").write_text("def verify():\n    return True\n")
+            for index in range(10):
+                (worktree_root / "supporting" / f"notes-{index:02}.md").write_text(
+                    "value = new\n"
+                )
+            return subprocess.CompletedProcess(["fake"], 0, "", "")
+        if self.action == "supporting-edits-over-budget":
+            (worktree_root / "docs" / "notes.md").write_text("value = new\n" * 20)
             return subprocess.CompletedProcess(["fake"], 0, "", "")
         if self.action == "ephemeral":
             (worktree_root / "src").mkdir()
@@ -807,16 +809,14 @@ def test_worker_out_of_scope_change_is_policy_denied(tmp_path: Path) -> None:
     assert attempt.out_of_scope_paths == ("README.md",)
 
 
-def test_worker_accepts_small_supporting_edits_to_existing_files(
+def test_worker_accepts_small_supporting_edits_across_many_files(
     tmp_path: Path,
 ) -> None:
     worktree = _git_repo(tmp_path)
-    (worktree / "attestation").mkdir()
-    (worktree / "attestation" / "golden.json").write_text('{"digest": "old"}\n')
-    (worktree / "verify.py").write_text("def verify():\n    return False\n")
-    subprocess.run(
-        ["git", "add", "attestation/golden.json", "verify.py"], cwd=worktree, check=True
-    )
+    (worktree / "supporting").mkdir()
+    for index in range(10):
+        (worktree / "supporting" / f"notes-{index:02}.md").write_text("value = old\n")
+    subprocess.run(["git", "add", "supporting"], cwd=worktree, check=True)
     subprocess.run(
         [
             "git",
@@ -841,8 +841,51 @@ def test_worker_accepts_small_supporting_edits_to_existing_files(
     )
 
     assert attempt.status is CodingAgentStatus.COMPLETED
-    assert attempt.changed_paths == ("attestation/golden.json", "verify.py")
+    assert attempt.changed_paths == tuple(
+        f"supporting/notes-{index:02}.md" for index in range(10)
+    )
     assert attempt.out_of_scope_paths == ()
+    assert attempt.supporting_edit_paths == attempt.changed_paths
+    store = CodingAgentAttemptStore(tmp_path / "attempt-artifacts")
+    store.save_attempt(attempt)
+    assert (
+        store.load_attempt(attempt.attempt_id).supporting_edit_paths
+        == attempt.supporting_edit_paths
+    )
+
+
+def test_worker_rejects_supporting_edits_over_twenty_changed_lines(
+    tmp_path: Path,
+) -> None:
+    worktree = _git_repo(tmp_path)
+    (worktree / "docs").mkdir()
+    (worktree / "docs" / "notes.md").write_text("value = old\n")
+    subprocess.run(["git", "add", "docs/notes.md"], cwd=worktree, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.com",
+            "commit",
+            "-m",
+            "add supporting note",
+        ],
+        cwd=worktree,
+        check=True,
+        capture_output=True,
+    )
+
+    attempt = run_coding_agent(
+        FakeProvider("supporting-edits-over-budget"),
+        _request(_head(worktree)),
+        worktree_root=worktree,
+        attempt_id="attempt-over-budget-supporting-edits",
+    )
+
+    assert attempt.status is CodingAgentStatus.POLICY_DENIED
+    assert attempt.out_of_scope_paths == ("docs/notes.md",)
 
 
 def test_worker_removes_new_file_outside_scope(tmp_path: Path) -> None:

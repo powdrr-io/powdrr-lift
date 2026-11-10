@@ -4421,6 +4421,7 @@ def _operation_checkpoint(
             or Path(scope) in Path(path).parents
             for scope in request.allowed_paths
         )
+        and path not in attempt.supporting_edit_paths
     )
     diff_check = runner(
         ["git", "diff", "--check"],
@@ -4458,6 +4459,7 @@ def _operation_checkpoint(
         "status": "passed" if passed else "failed",
         "passed": passed,
         "changed_paths": list(task_paths),
+        "supporting_edit_paths": list(attempt.supporting_edit_paths),
         "state_changed": state_changed,
         "before_state_fingerprint": before_state_fingerprint,
         "after_state_fingerprint": after_state_fingerprint,
@@ -5041,6 +5043,7 @@ def review_feature_diff(
             or Path(scope) in Path(path).parents
             for scope in request.allowed_paths
         )
+        and path not in attempt.supporting_edit_paths
     )
     diff_check = runner(
         ["git", "diff", "--check"],
@@ -5060,6 +5063,7 @@ def review_feature_diff(
     return {
         "passed": passed,
         "changed_paths": list(changed),
+        "supporting_edit_paths": list(attempt.supporting_edit_paths),
         "out_of_scope_paths": list(out_of_scope),
         "diff_check_returncode": diff_check.returncode,
         "worker_status": attempt.status.value,
@@ -7658,6 +7662,12 @@ def _prepare_final_implementation_review(
             worktree,
             submission_base=submission_base,
             allowed_paths=config.allowed_paths,
+            supporting_paths=(
+                state["attempt"].supporting_edit_paths
+                if isinstance(state.get("attempt"), CodingAgentAttempt)
+                else ()
+            ),
+            protected_paths=request.protected_paths,
             artifact_exclusions=_feature_structrr_artifact_exclusions(config),
             message=f"Implement {config.work_item_name}",
             runner=runner,

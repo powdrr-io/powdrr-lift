@@ -1,0 +1,83 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1412
+title: Publish diagnostics for failed issue-worker tasks
+intent:
+  problem: The issue worker reported a generic failure when a task runner returned a nonzero status after writing its cause to stderr.
+  goal: Include the task runner's bounded stderr diagnostic in the GitHub issue failure comment while continuing to stream it to the worker's terminal.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/pr_execution_session.py
+    type: modified
+    span:
+      start_line: 24
+      end_line: 53
+    summary: Add a bounded stderr tee and typed error for returned task failures.
+    rationale: Preserve the task runner's reason when it returns a failure code instead of raising.
+  - path: src/powdrr_lift/workrr/pr_execution_session.py
+    type: modified
+    span:
+      start_line: 121
+      end_line: 125
+    summary: Start capturing stderr while forwarding output to the caller.
+    rationale: Retain diagnostics without hiding live task output.
+  - path: src/powdrr_lift/workrr/pr_execution_session.py
+    type: modified
+    span:
+      start_line: 136
+      end_line: 136
+    summary: Send task stderr through the capture stream.
+    rationale: Make the runner's failure text available to the issue queue.
+  - path: src/powdrr_lift/workrr/pr_execution_session.py
+    type: modified
+    span:
+      start_line: 138
+      end_line: 141
+    summary: Raise a typed failure containing the status and captured stderr for nonzero task results.
+    rationale: Route returned failures through the queue's existing exception detail reporting.
+  - path: tests/test_pr_execution_session.py
+    type: modified
+    span:
+      start_line: 3
+      end_line: 3
+    summary: Import the in-memory stream used to capture task stderr in the test.
+    rationale: Verify failure diagnostics are captured without changing terminal output behavior.
+  - path: tests/test_pr_execution_session.py
+    type: modified
+    span:
+      start_line: 7
+      end_line: 8
+    summary: Import pytest for asserting the typed task failure.
+    rationale: Exercise nonzero task results at the adapter boundary.
+  - path: tests/test_pr_execution_session.py
+    type: modified
+    span:
+      start_line: 13
+      end_line: 13
+    summary: Import the task failure type raised for nonzero results.
+    rationale: Assert that returned task failures include their diagnostic.
+  - path: tests/test_pr_execution_session.py
+    type: modified
+    span:
+      start_line: 113
+      end_line: 161
+    summary: Verify a nonzero task result raises with its stderr diagnostic while stderr remains visible to the caller.
+    rationale: Guard the failure reporting behavior at the task session boundary.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span:
+      start_line: 1426
+      end_line: 1426
+    summary: Assert that exception details appear in the failure comment posted to the issue.
+    rationale: Preserve coverage that the queue publishes task failure details rather than only marking the item blocked.
+entities:
+  - id: issue-task-failure-diagnostics
+    type: Feature
+    action: added
+entity_relationships: []
+invariants:
+  - id: nonzero-task-status-includes-stderr-diagnostic
+    action: added
+    description: A nonzero task-runner result is reported with up to the trailing 4,000 characters of stderr, or an explicit message when stderr is empty.
+    rationale: Make returned failures diagnosable from the issue checkpoint without losing live terminal output.
+guidance: []

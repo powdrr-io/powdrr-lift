@@ -1423,6 +1423,7 @@ def test_worker_updates_issue_after_task_retries_are_exhausted(tmp_path: Path) -
         if issue_number == 100 and "did not finish successfully" in body
     ]
     assert len(final_status_comments) == 1
+    assert "RuntimeError: final retry failed" in final_status_comments[0]
     assert not any(
         "powdrr-task-checkpoint" in body
         for issue_number, body in client.comments

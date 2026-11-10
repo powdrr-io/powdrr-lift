@@ -1,0 +1,301 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1413
+title: Allow bounded supporting edits across files
+intent:
+  problem: The coding-agent policy rejects useful small supporting edits outside the
+    planned path set when they touch more than two files.
+  goal: Permit supporting edits across any number of existing text files when their
+    combined additions and deletions stay within the existing 20-line budget, and
+    preserve that decision through later review and checkpoints.
+human-decisions: []
+structured_files: []
+files:
+- path: packages/service/src/powdrr_service/resources/processes/execute-proposed-pr.yaml
+  type: modified
+  span:
+    start_line: 13
+    end_line: 13
+  summary: Add supporting paths to the implementation result contract
+  rationale: Allow the workflow process to retain the accepted supporting-edit paths.
+- path: src/powdrr_lift/workrr/candidate_checkpoint.py
+  type: modified
+  span:
+    start_line: 11
+    end_line: 12
+  summary: Retain prevalidated supporting edits during candidate checkpointing
+  rationale: Prevent the candidate checkpoint from rejecting edits already accepted
+    by the coding-agent policy.
+- path: src/powdrr_lift/workrr/candidate_checkpoint.py
+  type: modified
+  span:
+    start_line: 46
+    end_line: 47
+  summary: Retain prevalidated supporting edits during candidate checkpointing
+  rationale: Prevent the candidate checkpoint from rejecting edits already accepted
+    by the coding-agent policy.
+- path: src/powdrr_lift/workrr/candidate_checkpoint.py
+  type: modified
+  span:
+    start_line: 72
+    end_line: 80
+  summary: Retain prevalidated supporting edits during candidate checkpointing
+  rationale: Prevent the candidate checkpoint from rejecting edits already accepted
+    by the coding-agent policy.
+- path: src/powdrr_lift/workrr/candidate_checkpoint.py
+  type: modified
+  span:
+    start_line: 82
+    end_line: 85
+  summary: Retain prevalidated supporting edits during candidate checkpointing
+  rationale: Prevent the candidate checkpoint from rejecting edits already accepted
+    by the coding-agent policy.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 38
+    end_line: 38
+  summary: Remove the file-count cap and record accepted supporting-edit paths
+  rationale: The worker already enforces a shared 20-line budget; the request prompt
+    and attempt record now match that policy without a file-count limit.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 39
+    end_line: 39
+  summary: Remove the file-count cap and record accepted supporting-edit paths
+  rationale: The worker already enforces a shared 20-line budget; the request prompt
+    and attempt record now match that policy without a file-count limit.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 318
+    end_line: 319
+  summary: Remove the file-count cap and record accepted supporting-edit paths
+  rationale: The worker already enforces a shared 20-line budget; the request prompt
+    and attempt record now match that policy without a file-count limit.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 534
+    end_line: 534
+  summary: Remove the file-count cap and record accepted supporting-edit paths
+  rationale: The worker already enforces a shared 20-line budget; the request prompt
+    and attempt record now match that policy without a file-count limit.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 555
+    end_line: 555
+  summary: Remove the file-count cap and record accepted supporting-edit paths
+  rationale: The worker already enforces a shared 20-line budget; the request prompt
+    and attempt record now match that policy without a file-count limit.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 1191
+    end_line: 1193
+  summary: Remove the file-count cap and record accepted supporting-edit paths
+  rationale: The worker already enforces a shared 20-line budget; the request prompt
+    and attempt record now match that policy without a file-count limit.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 1322
+    end_line: 1322
+  summary: Remove the file-count cap and record accepted supporting-edit paths
+  rationale: The worker already enforces a shared 20-line budget; the request prompt
+    and attempt record now match that policy without a file-count limit.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 1358
+    end_line: 1358
+  summary: Remove the file-count cap and record accepted supporting-edit paths
+  rationale: The worker already enforces a shared 20-line budget; the request prompt
+    and attempt record now match that policy without a file-count limit.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 1454
+    end_line: 1454
+  summary: Remove the file-count cap and record accepted supporting-edit paths
+  rationale: The worker already enforces a shared 20-line budget; the request prompt
+    and attempt record now match that policy without a file-count limit.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 1459
+    end_line: 1460
+  summary: Remove the file-count cap and record accepted supporting-edit paths
+  rationale: The worker already enforces a shared 20-line budget; the request prompt
+    and attempt record now match that policy without a file-count limit.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 1462
+    end_line: 1463
+  summary: Remove the file-count cap and record accepted supporting-edit paths
+  rationale: The worker already enforces a shared 20-line budget; the request prompt
+    and attempt record now match that policy without a file-count limit.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 1468
+    end_line: 1468
+  summary: Remove the file-count cap and record accepted supporting-edit paths
+  rationale: The worker already enforces a shared 20-line budget; the request prompt
+    and attempt record now match that policy without a file-count limit.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 1494
+    end_line: 1494
+  summary: Remove the file-count cap and record accepted supporting-edit paths
+  rationale: The worker already enforces a shared 20-line budget; the request prompt
+    and attempt record now match that policy without a file-count limit.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 4424
+    end_line: 4424
+  summary: Preserve supporting-edit decisions in operation checkpoints
+  rationale: Keep the feature workflow from reclassifying accepted supporting paths
+    as out of scope.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 4462
+    end_line: 4462
+  summary: Preserve supporting-edit decisions in operation checkpoints
+  rationale: Keep the feature workflow from reclassifying accepted supporting paths
+    as out of scope.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 5046
+    end_line: 5046
+  summary: Preserve supporting-edit decisions in operation checkpoints
+  rationale: Keep the feature workflow from reclassifying accepted supporting paths
+    as out of scope.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 5066
+    end_line: 5066
+  summary: Preserve supporting-edit decisions in operation checkpoints
+  rationale: Keep the feature workflow from reclassifying accepted supporting paths
+    as out of scope.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 7665
+    end_line: 7670
+  summary: Preserve supporting-edit decisions in operation checkpoints
+  rationale: Keep the feature workflow from reclassifying accepted supporting paths
+    as out of scope.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 4045
+    end_line: 4047
+  summary: Include accepted supporting paths in the worker result
+  rationale: Preserve auditable path-policy evidence for the issue workflow.
+- path: tests/test_candidate_checkpoint.py
+  type: modified
+  span:
+    start_line: 100
+    end_line: 124
+  summary: Cover checkpoint acceptance of validated supporting paths
+  rationale: Ensure the final candidate checkpoint honors the coding-agent decision.
+- path: tests/test_coding_agent.py
+  type: modified
+  span:
+    start_line: 70
+    end_line: 76
+  summary: Cover many-file acceptance and the 20-line rejection boundary
+  rationale: Verify that ten supporting files are accepted at the existing aggregate
+    limit and edits exceeding that limit remain denied.
+- path: tests/test_coding_agent.py
+  type: modified
+  span:
+    start_line: 812
+    end_line: 812
+  summary: Cover many-file acceptance and the 20-line rejection boundary
+  rationale: Verify that ten supporting files are accepted at the existing aggregate
+    limit and edits exceeding that limit remain denied.
+- path: tests/test_coding_agent.py
+  type: modified
+  span:
+    start_line: 816
+    end_line: 819
+  summary: Cover many-file acceptance and the 20-line rejection boundary
+  rationale: Verify that ten supporting files are accepted at the existing aggregate
+    limit and edits exceeding that limit remain denied.
+- path: tests/test_coding_agent.py
+  type: modified
+  span:
+    start_line: 844
+    end_line: 846
+  summary: Cover many-file acceptance and the 20-line rejection boundary
+  rationale: Verify that ten supporting files are accepted at the existing aggregate
+    limit and edits exceeding that limit remain denied.
+- path: tests/test_coding_agent.py
+  type: modified
+  span:
+    start_line: 848
+    end_line: 888
+  summary: Cover many-file acceptance and the 20-line rejection boundary
+  rationale: Verify that ten supporting files are accepted at the existing aggregate
+    limit and edits exceeding that limit remain denied.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 2994
+    end_line: 3041
+  summary: Cover final review of a validated supporting edit
+  rationale: Ensure the review gate preserves an accepted outside-path edit.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 4617
+    end_line: 4671
+  summary: Cover final review of a validated supporting edit
+  rationale: Ensure the review gate preserves an accepted outside-path edit.
+- path: tests/test_implement_feature_e2e.py
+  type: modified
+  span:
+    start_line: 2088
+    end_line: 2088
+  summary: Cover end-to-end acceptance of a small supporting edit
+  rationale: Exercise the coding-agent policy and feature workflow gates together
+    with an existing-file edit outside the allowed-path set.
+- path: tests/test_implement_feature_e2e.py
+  type: modified
+  span:
+    start_line: 2116
+    end_line: 2118
+  summary: Cover end-to-end acceptance of a small supporting edit
+  rationale: Exercise the coding-agent policy and feature workflow gates together
+    with an existing-file edit outside the allowed-path set.
+entities:
+- id: bounded-supporting-edit-policy
+  type: Function
+  action: added
+- id: supporting-edit-many-file-regression
+  type: Regression test
+  action: added
+entity_relationships:
+- id: supporting-edit-test-verifies-policy
+  type: verifies
+  source: supporting-edit-many-file-regression
+  target: bounded-supporting-edit-policy
+  action: added
+  description: The regression test verifies acceptance across many existing text files
+    and rejection above the aggregate line budget.
+invariants:
+- id: supporting-edit-budget-remains-aggregate
+  description: Supporting edits outside allowed paths may touch any number of existing
+    regular text files, but all additions and deletions together must not exceed 20
+    lines; protected paths and new, deleted, renamed, or binary files remain forbidden.
+  action: added
+guidance: []

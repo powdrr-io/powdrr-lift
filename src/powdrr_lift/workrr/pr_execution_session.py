@@ -21,6 +21,36 @@ from powdrr_lift.workrr.planned_workflow_task import (
     run_planned_workflow_task,
 )
 
+_MAX_PUBLISHED_TASK_DIAGNOSTIC_CHARS = 4_000
+
+
+class _TeeTailCapture:
+    """Forward task output while retaining only its bounded trailing text."""
+
+    def __init__(self, stream: TextIO, *, limit: int) -> None:
+        self._stream = stream
+        self._limit = limit
+        self._tail = ""
+
+    def write(self, value: str) -> int:
+        written = self._stream.write(value)
+        self._tail = (self._tail + value)[-self._limit :]
+        return len(value) if written is None else written
+
+    def flush(self) -> None:
+        self._stream.flush()
+
+    def diagnostic(self) -> str:
+        return self._tail.strip()
+
+
+class TaskExecutionFailure(RuntimeError):
+    """A task runner returned failure without raising an exception."""
+
+    def __init__(self, return_code: int, diagnostic: str) -> None:
+        self.return_code = return_code
+        super().__init__(f"task runner exited with status {return_code}: {diagnostic}")
+
 
 @dataclass(frozen=True, slots=True)
 class PrExecutionSessionConfig:
@@ -88,7 +118,11 @@ def run_pr_execution_worker(
         fulfilled_without_pr_dependencies: tuple[str, ...],
         checkpoint_callback: TaskCheckpointCallback,
     ) -> int:
-        return run_planned_workflow_task(
+        captured_stderr = _TeeTailCapture(
+            diagnostics,
+            limit=_MAX_PUBLISHED_TASK_DIAGNOSTIC_CHARS,
+        )
+        return_code = run_planned_workflow_task(
             workflow_path=workflow_path,
             workflow_id=workflow_id,
             worker_id=worker_id,
@@ -99,8 +133,12 @@ def run_pr_execution_worker(
             repo_root=repo_root,
             options=options,
             stdout=output,
-            stderr=diagnostics,
+            stderr=captured_stderr,  # type: ignore[arg-type]
         )
+        if return_code != 0:
+            detail = captured_stderr.diagnostic() or "no stderr diagnostic was emitted"
+            raise TaskExecutionFailure(return_code, detail)
+        return return_code
 
     return run_worker_once(
         client=GitHubIssueClient(config.repository),

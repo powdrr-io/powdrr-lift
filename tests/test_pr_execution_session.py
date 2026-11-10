@@ -1,12 +1,16 @@
 from __future__ import annotations
 
+from io import StringIO
 from pathlib import Path
 from typing import Any, cast
+
+import pytest
 
 from powdrr_lift.workrr import pr_execution_session
 from powdrr_lift.workrr.github_issue_queue import WorkerReport
 from powdrr_lift.workrr.pr_execution_session import (
     PrExecutionSessionConfig,
+    TaskExecutionFailure,
     run_pr_execution_worker,
 )
 
@@ -106,4 +110,52 @@ def test_worker_adapter_passes_typed_configuration_to_existing_queue(
     assert options.coding_agent_timeout_seconds == 120
     assert options.coding_agent_validation_timeout_seconds == 240
     assert task["stdout"] is stdout
-    assert task["stderr"] is stderr
+    assert task["stderr"]._stream is stderr
+
+
+def test_nonzero_task_result_is_raised_with_stderr_diagnostic(
+    tmp_path: Path, monkeypatch: Any
+) -> None:
+    output = StringIO()
+    errors = StringIO()
+
+    monkeypatch.setattr(
+        pr_execution_session, "resolve_repo_root", lambda _path: tmp_path
+    )
+    monkeypatch.setattr(
+        pr_execution_session, "GitHubIssueClient", lambda _repository: object()
+    )
+
+    def execute_task(**kwargs: Any) -> int:
+        kwargs["stderr"].write("Procedrr task failed: provider returned HTTP 402\n")
+        return 1
+
+    monkeypatch.setattr(pr_execution_session, "run_planned_workflow_task", execute_task)
+
+    def run_queue(**kwargs: Any) -> None:
+        kwargs["run_task"](
+            tmp_path / "workflow.yaml",
+            "workflow-id",
+            "worker-id",
+            cast(Any, object()),
+            cast(Any, object()),
+            (),
+            cast(Any, lambda *_args: None),
+        )
+
+    monkeypatch.setattr(pr_execution_session, "run_worker_once", run_queue)
+
+    with pytest.raises(TaskExecutionFailure, match="HTTP 402") as failure:
+        run_pr_execution_worker(
+            PrExecutionSessionConfig(
+                repo_root=tmp_path,
+                repository="owner/repo",
+                worker_id="worker-id",
+            ),
+            stdout=output,
+            stderr=errors,
+        )
+
+    assert failure.value.return_code == 1
+    assert "HTTP 402" in str(failure.value)
+    assert "HTTP 402" in errors.getvalue()

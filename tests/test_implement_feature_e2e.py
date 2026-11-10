@@ -2085,7 +2085,7 @@ def test_implement_feature_uses_deterministic_structural_proposal_gate(
     assert result.worktree is not None
 
 
-def test_implement_feature_rejects_worker_out_of_scope_edits(
+def test_implement_feature_accepts_small_supporting_edits_outside_allowed_paths(
     tmp_path: Path,
 ) -> None:
     repo = _fixture_repo(tmp_path)
@@ -2113,9 +2113,9 @@ def test_implement_feature_rejects_worker_out_of_scope_edits(
         )
     )
 
-    assert result.status == "completed_with_issues"
-    assert result.review["benchmark_mode"] is True
-    assert result.review["potential_issues"]
+    assert result.status == "completed"
+    assert result.review["passed"] is True
+    assert not result.review.get("potential_issues")
     assert result.worktree is not None
     assert (result.worktree / "unexpected.py").read_text(
         encoding="utf-8"

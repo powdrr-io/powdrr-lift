@@ -97,6 +97,31 @@ def test_candidate_checkpoint_skips_empty_commits(tmp_path: Path) -> None:
     assert checkpoint.candidate_revision == submission_base
 
 
+def test_candidate_checkpoint_accepts_prevalidated_supporting_paths(
+    tmp_path: Path,
+) -> None:
+    root, _ = _repo(tmp_path)
+    (root / "docs").mkdir()
+    (root / "docs" / "note.md").write_text("old note\n", encoding="utf-8")
+    _git(root, "add", "docs/note.md")
+    _git(root, "commit", "-m", "add supporting note")
+    submission_base = _git(root, "rev-parse", "HEAD")
+    (root / "docs" / "note.md").write_text("updated note\n", encoding="utf-8")
+
+    checkpoint = checkpoint_candidate_changes(
+        root,
+        submission_base=submission_base,
+        allowed_paths=("src",),
+        supporting_paths=("docs/note.md",),
+        artifact_exclusions=(),
+        message="candidate with supporting edit",
+    )
+
+    assert checkpoint.committed is True
+    assert checkpoint.committed_paths == ("docs/note.md",)
+    assert checkpoint.candidate_revision != submission_base
+
+
 def test_candidate_checkpoint_ignores_untracked_path_removed_after_status_scan(
     tmp_path: Path,
 ) -> None:

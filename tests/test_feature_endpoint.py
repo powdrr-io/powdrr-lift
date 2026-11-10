@@ -2991,6 +2991,54 @@ def test_review_feature_diff_requires_validation_success(tmp_path: Path) -> None
     assert review["passed"] is False
 
 
+def test_review_feature_diff_accepts_prevalidated_supporting_edit(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "app.py").write_text("print('old')\n", encoding="utf-8")
+    (tmp_path / "docs").mkdir()
+    (tmp_path / "docs" / "guide.md").write_text("old guidance\n", encoding="utf-8")
+    _git(tmp_path, "init", "-q")
+    _git(tmp_path, "config", "user.email", "test@example.com")
+    _git(tmp_path, "config", "user.name", "Test")
+    _git(tmp_path, "add", "app.py", "docs/guide.md")
+    _git(tmp_path, "commit", "-qm", "initial")
+    base_commit = _git(tmp_path, "rev-parse", "HEAD").stdout.strip()
+    (tmp_path / "app.py").write_text("print('new')\n", encoding="utf-8")
+    (tmp_path / "docs" / "guide.md").write_text("new guidance\n", encoding="utf-8")
+
+    request = ImplementationRequest(
+        request_id="request",
+        objective="change app",
+        prompt="change app",
+        base_commit=base_commit,
+        plan_fingerprint="plan",
+        allowed_paths=("app.py",),
+        acceptance_criteria=(),
+        validation_profiles=("feature-validation",),
+    )
+    attempt = CodingAgentAttempt(
+        attempt_id="attempt",
+        request_id="request",
+        provider="opencode",
+        status=CodingAgentStatus.COMPLETED,
+        exit_code=0,
+        changed_paths=("app.py", "docs/guide.md"),
+        supporting_edit_paths=("docs/guide.md",),
+    )
+    validation = ValidationReport(
+        attempt_id="attempt",
+        request_id="request",
+        status=ValidationReportStatus.PASSED,
+        results=(),
+    )
+
+    review = review_feature_diff(tmp_path, request, attempt, validation)
+
+    assert review["passed"] is True
+    assert review["out_of_scope_paths"] == []
+    assert review["supporting_edit_paths"] == ["docs/guide.md"]
+
+
 def test_create_pr_changelog_absorbs_and_removes_temporary_proposal(
     tmp_path: Path,
 ) -> None:
@@ -4564,6 +4612,61 @@ def test_operation_checkpoint_requires_new_in_scope_changes(tmp_path: Path) -> N
     )
     assert reused["passed"] is False
     assert reused["changed_paths"] == []
+
+
+def test_operation_checkpoint_accepts_prevalidated_supporting_edit(
+    tmp_path: Path,
+) -> None:
+    unit = ExecutionUnit(
+        unit_id="implement-adapter-add-features-parse",
+        objective="Parse input.",
+        paths=("src",),
+        validation_profiles=("feature-validation",),
+        acceptance_criteria=("Parse input.",),
+    )
+    request = ImplementationRequest(
+        request_id="request",
+        objective="Parse input.",
+        prompt="Parse input.",
+        base_commit="base",
+        plan_fingerprint="fingerprint",
+        allowed_paths=("src",),
+        acceptance_criteria=("Parse input.",),
+        validation_profiles=("feature-validation",),
+    )
+    attempt = CodingAgentAttempt(
+        attempt_id="attempt",
+        request_id="request",
+        provider="opencode",
+        status=CodingAgentStatus.COMPLETED,
+        exit_code=0,
+        changed_paths=("docs/validation.md", "src/adapter.py"),
+        supporting_edit_paths=("docs/validation.md",),
+    )
+
+    def runner(
+        command: list[str], **kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
+        del kwargs
+        if command[-1] == "--check":
+            return subprocess.CompletedProcess(command, 0, "", "")
+        return subprocess.CompletedProcess(
+            command, 0, "docs/validation.md\nsrc/adapter.py\n", ""
+        )
+
+    checkpoint = _operation_checkpoint(
+        runner=runner,
+        worktree=tmp_path,
+        unit=unit,
+        request=request,
+        attempt=attempt,
+        before_paths=set(),
+    )
+
+    assert checkpoint["passed"] is True
+    assert checkpoint["out_of_scope_paths"] == []
+    assert checkpoint["changed_paths"] == ["docs/validation.md", "src/adapter.py"]
+    assert checkpoint["supporting_edit_paths"] == ["docs/validation.md"]
 
 
 def test_code_task_agent_continues_after_timed_out_attempt(

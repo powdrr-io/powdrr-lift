@@ -8,6 +8,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from powdrr_lift.workrr.coding_agent import permitted_supporting_edit_paths
+
 Runner = Callable[..., subprocess.CompletedProcess[Any]]
 
 
@@ -41,6 +43,8 @@ def checkpoint_candidate_changes(
     allowed_paths: Sequence[str],
     artifact_exclusions: Sequence[str],
     message: str,
+    supporting_paths: Sequence[str] = (),
+    protected_paths: Sequence[str] = (),
     runner: Runner = subprocess.run,
 ) -> CandidateCheckpoint:
     """Commit only scoped product changes and retain cumulative base history.
@@ -65,8 +69,20 @@ def checkpoint_candidate_changes(
     product_paths = tuple(
         sorted(path for path in changed_paths if path not in set(excluded))
     )
+    approved_supporting_paths = set(
+        permitted_supporting_edit_paths(
+            root_path,
+            submission_base,
+            supporting_paths,
+            protected_paths,
+            runner=runner,
+        )
+    )
     out_of_scope = tuple(
-        path for path in product_paths if not _within_allowed_paths(path, allowed_paths)
+        path
+        for path in product_paths
+        if not _within_allowed_paths(path, allowed_paths)
+        and path not in approved_supporting_paths
     )
     if out_of_scope:
         raise ValueError(

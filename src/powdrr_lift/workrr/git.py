@@ -1414,6 +1414,7 @@ def _related_workflow_attempt_pull_requests(
             and (
                 value["headRefName"].startswith(f"{branch_prefix}-attempt-")
                 or value["headRefName"].startswith(f"{branch_prefix}-implementation-")
+                or value["headRefName"].startswith(f"{branch_prefix}-correction-")
             )
         ],
         None,

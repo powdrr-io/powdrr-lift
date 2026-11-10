@@ -1,7 +1,19 @@
 # Structrr references in source and automatic miniSWE context
 
-Status: implementation plan. This document specifies new behavior; the modules
-marked **new** below do not exist yet. It does not implement that behavior.
+Status: implementation in progress. Step 1 (Python parser and scope index) is
+implemented in `packages/service/src/powdrr_service/structrr/source_references.py`
+with tests in `tests/test_structrr_source_references.py`. The remaining modules
+marked **new** below are planned. Legacy module paths refer to the service-owned
+responsibilities described in section 12.4.
+
+The pure parser exposes `index_python_source`, `applicable_references`, and
+`find_owner`, with versioned `SourceReferenceIndex` serialization. Parse status
+describes scope extraction; annotation diagnostics must also be checked. Partial
+source failures retain discovered markers without claiming inherited context.
+Applicable-reference results retain every contributing location, ordered by ID
+and source location, so consumers can resolve distinct IDs once. Owner selectors
+fail on duplicate qualified names; spans distinguish observations within one
+hashed snapshot and do not establish identity across moves.
 
 ## 1. Outcome
 

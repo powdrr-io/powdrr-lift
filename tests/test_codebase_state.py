@@ -37,11 +37,13 @@ def test_build_codebase_state_report_collates_current_state(tmp_path: Path) -> N
         "Keep the service boundary explicit and current."
     )
     assert report.invariants[0].last_action == "altered"
+    assert report.invariants[0].rationale == "Keep persistence separate from transport."
     assert report.guidance == []
     assert [decision.key for decision in report.decisions] == ["DEC-001"]
     assert len(report.decisions[0].sources) == 2
     assert report.decisions[0].summary == "Define the current codebase snapshot."
     assert report.decisions[0].status == "current"
+    assert report.decisions[0].rationale == "Future changes need the accepted design."
     assert report.decisions[0].replaces is None
     assert [intent.problem for intent in report.intents] == [
         "Keep the state description up to date."
@@ -62,6 +64,7 @@ def test_build_current_decisions_report_returns_only_current_decisions(
 
     assert [decision.decision_id for decision in report.decisions] == ["DEC-001"]
     assert report.decisions[0].status == "current"
+    assert report.decisions[0].rationale == "Future changes need the accepted design."
     assert report.decisions[0].replaces is None
     assert len(report.decisions[0].sources) == 2
 
@@ -80,6 +83,7 @@ def test_build_invariants_report_returns_current_invariants(tmp_path: Path) -> N
         "Keep the service boundary explicit and current."
     )
     assert report.invariants[0].last_action == "altered"
+    assert report.invariants[0].rationale == "Keep persistence separate from transport."
 
 
 def test_cli_codebase_state_writes_default_file(tmp_path: Path) -> None:
@@ -182,6 +186,7 @@ def _create_repo_with_state_branch(tmp_path: Path) -> Path:
         decisions:
           - id: DEC-001
             summary: Define the current codebase snapshot.
+            rationale: Future changes need the accepted design.
 
         entities:
           - id: Alpha
@@ -202,6 +207,7 @@ def _create_repo_with_state_branch(tmp_path: Path) -> Path:
         invariants:
           - id: inv-1
             description: Keep the service boundary explicit.
+            rationale: Keep persistence separate from transport.
             action: added
 
         guidance:
@@ -228,6 +234,7 @@ def _create_repo_with_state_branch(tmp_path: Path) -> Path:
         decisions:
           - id: DEC-001
             summary: Define the current codebase snapshot.
+            rationale: Future changes need the accepted design.
 
         entities:
           - id: Alpha

@@ -3746,7 +3746,7 @@ def test_final_invariant_review_is_separate_and_candidate_bound(
     assert receipt["outcomes"][0]["invariant_id"] == "stable-order"
 
 
-def test_structural_comparison_mismatch_does_not_block_finalization(
+def test_structural_comparison_mismatch_blocks_finalization_after_exhaustion(
     tmp_path: Path,
 ) -> None:
     review = {
@@ -3781,10 +3781,40 @@ def test_structural_comparison_mismatch_does_not_block_finalization(
         output_root=tmp_path,
     )
 
-    assert result["accepted"] is True
+    assert result["accepted"] is False
     assert result["candidate_structural_gate_passed"] is False
     assert result["candidate_correction_attempts"] == 2
-    assert result["actualization_passed"] is True
+    assert result["actualization_passed"] is False
+
+
+def test_explicit_design_source_failure_blocks_favorable_final_review(
+    tmp_path: Path,
+) -> None:
+    review = {
+        "proposal_fingerprint": "sha256:proposal",
+        "diff_fingerprint": "sha256:candidate",
+        "candidate_structural_gate_passed": True,
+        "source_design_agreement": {
+            "passed": False,
+            "findings": [{"subject": "invariants:boundary", "status": "contradicted"}],
+        },
+        "semantic_worklist": {"specifications": []},
+        "invariant_worklist": {"specifications": []},
+        "operation_ids": [],
+        "retained_clause_ids": [],
+        "unexplained_changes": [],
+    }
+    result = _finalize_implementation_review(
+        {
+            "review": review,
+            "deterministic_decisions": [{"outcome": "pass"}],
+            "semantic_decisions": [],
+            "invariant_decisions": [],
+        },
+        output_root=tmp_path,
+    )
+    assert result["accepted"] is False
+    assert result["source_design_agreement"]["passed"] is False
 
 
 def test_instruction_coverage_records_unmet_must_and_blocks_finalization(

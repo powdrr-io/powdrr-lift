@@ -124,6 +124,12 @@ the ability to say no.
 
 ## Design
 
+Structrr describes the intended source design and its rationale. Design and
+debugging agents produce Structrr changes; coding agents implement them, and
+validation checks agreement. The implemented state, portable handoff, and
+agreement contracts are described in
+[`Structrr as the intended source design`](docs/design/structrr-desired-source-design.md).
+
 The proposed service boundary is detailed in
 [`docs/plans/hosted-instruction-compiler.md`](docs/plans/hosted-instruction-compiler.md).
 It moves instruction interpretation, design compilation, prompt assembly, and

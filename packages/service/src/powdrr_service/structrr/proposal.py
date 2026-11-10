@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from powdrr_service.structrr.actions import ACTION_ALIASES, normalize_action
 from powdrr_service.structrr.snapshot import snapshot_digest
 
 PROPOSAL_REVISION_SCHEMA_VERSION = "proposal-revision-v1"
@@ -45,6 +46,7 @@ class ProposalRevision:
     code_evidence: tuple[Mapping[str, Any], ...] = ()
     schema_version: str = PROPOSAL_REVISION_SCHEMA_VERSION
     verification: Mapping[str, Any] = field(default_factory=dict)
+    intent: Mapping[str, Any] | None = None
 
     def to_data(self, *, include_fingerprint: bool = True) -> dict[str, Any]:
         data: dict[str, Any] = {
@@ -62,6 +64,8 @@ class ProposalRevision:
             data["code_evidence"] = [dict(item) for item in self.code_evidence]
         if self.verification:
             data["verification"] = _canonical(dict(self.verification))
+        if self.intent is not None:
+            data["intent"] = _canonical(self.intent)
         if include_fingerprint:
             data["fingerprint"] = self.fingerprint
         return data
@@ -88,6 +92,9 @@ class ProposalRevision:
         if not isinstance(operations_raw, list):
             raise ValueError("proposal revision operations must be a list")
         operations = tuple(_operation_from_data(item) for item in operations_raw)
+        intent = raw.get("intent")
+        if intent is not None and not isinstance(intent, Mapping):
+            raise ValueError("proposal revision intent must be an object")
         revision = cls(
             proposal_id=_required_string(raw, "proposal_id"),
             structrr_baseline_fingerprint=_required_string(
@@ -102,6 +109,7 @@ class ProposalRevision:
             code_evidence=_mapping_tuple(raw, "code_evidence", optional=True),
             schema_version=schema_version,
             verification=_mapping_value(raw, "verification", optional=True),
+            intent=intent,
         )
         if raw.get("fingerprint") != revision.fingerprint:
             raise ValueError("proposal revision fingerprint does not match its content")
@@ -131,16 +139,18 @@ def compile_proposal_revision(
             if not isinstance(item, Mapping):
                 continue
             raw_action = item.get("action")
-            if raw_action not in {"added", "deleted", "removed", "changed"}:
+            if raw_action is None:
                 continue
-            action = (
-                "remove"
-                if raw_action in {"deleted", "removed"}
-                else "change"
-                if raw_action == "changed"
-                else "add"
+            if not isinstance(raw_action, str) or raw_action not in ACTION_ALIASES:
+                raise ValueError(f"unsupported Structrr action: {raw_action!r}")
+            action = normalize_action(raw_action)
+            raw_subject = (
+                item.get(
+                    "stable_key", item.get("id", item.get("path", f"item-{index}"))
+                )
+                if section == "files"
+                else item.get("id", item.get("clause_id", f"item-{index}"))
             )
-            raw_subject = item.get("id", item.get("stable_key", f"item-{index}"))
             subject_id = str(raw_subject)
             operation_id = f"{action}:{section}:{subject_id}"
             if operation_id in seen_ids:
@@ -166,6 +176,9 @@ def compile_proposal_revision(
         source_refs=tuple(dict.fromkeys(source_refs)),
         code_evidence=tuple(dict(item) for item in code_evidence),
         verification=({} if verification is None else _canonical(dict(verification))),
+        intent=dict(plan["intent"])
+        if isinstance(plan.get("intent"), Mapping)
+        else None,
     )
 
 

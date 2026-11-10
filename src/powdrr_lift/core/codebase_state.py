@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
@@ -39,6 +39,7 @@ class CodebaseStateEntity:
     type: str | None
     last_action: str | None
     source: CodebaseStateSource
+    rationale: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,6 +58,7 @@ class CodebaseStateLifecycleItem:
     description: str | None
     last_action: str | None
     source: CodebaseStateSource
+    rationale: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -67,6 +69,7 @@ class CodebaseStateDecision:
     status: str | None
     replaces: str | None
     sources: list[CodebaseStateSource] = field(default_factory=list)
+    rationale: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -173,7 +176,14 @@ def build_current_decisions_report(
         parent_branch=resolved_parent_branch,
     )
 
-    current_decisions = _collect_current_decisions(state.store, resolved_branch)
+    rationale_by_key = {
+        decision.key: decision.rationale
+        for decision in _collect_decisions(state.source_index.documents)
+    }
+    current_decisions = [
+        replace(decision, rationale=rationale_by_key.get(decision.key))
+        for decision in _collect_current_decisions(state.store, resolved_branch)
+    ]
     return CodebaseStateDecisionReport(
         repo_root=str(repo_root_path),
         branch_name=resolved_branch,
@@ -304,6 +314,7 @@ def build_current_state_specification_report(
             {
                 "id": item.id,
                 "description": item.description,
+                "rationale": item.rationale,
                 "action": "added",
             }
             for item in codebase_state_report.invariants
@@ -312,6 +323,7 @@ def build_current_state_specification_report(
             {
                 "id": item.id,
                 "description": item.description,
+                "rationale": item.rationale,
                 "action": "added",
             }
             for item in codebase_state_report.guidance
@@ -446,6 +458,11 @@ def _collect_current_entities(
                 type=entity_type,
                 last_action=action,
                 source=source,
+                rationale=entity_change.rationale
+                if entity_change.rationale is not None
+                else existing.rationale
+                if existing
+                else None,
             )
 
     return [entities_by_id[entity_id] for entity_id in sorted(entities_by_id)]
@@ -530,6 +547,11 @@ def _collect_current_lifecycle_items(
                 description=description,
                 last_action=action,
                 source=source,
+                rationale=raw_item.rationale
+                if raw_item.rationale is not None
+                else existing.rationale
+                if existing
+                else None,
             )
 
     return [items_by_id[item_id] for item_id in sorted(items_by_id)]
@@ -991,6 +1013,7 @@ def _collect_decisions(
                         status="superseded",
                         replaces=replaced_row.replaces,
                         sources=list(replaced_row.sources),
+                        rationale=replaced_row.rationale,
                     )
 
             existing = decision_rows.get(key)
@@ -1002,6 +1025,7 @@ def _collect_decisions(
                     status="current",
                     replaces=replaces,
                     sources=[source],
+                    rationale=decision.rationale,
                 )
             else:
                 sources = list(existing.sources)
@@ -1014,6 +1038,9 @@ def _collect_decisions(
                     status=existing.status or "current",
                     replaces=existing.replaces or replaces,
                     sources=sources,
+                    rationale=decision.rationale
+                    if decision.rationale is not None
+                    else existing.rationale,
                 )
 
             if decision_id is not None:
@@ -1077,6 +1104,7 @@ def _codebase_state_report_to_data(report: CodebaseStateReport) -> dict[str, Any
             {
                 "id": entity.id,
                 "type": entity.type,
+                "rationale": entity.rationale,
                 "last_action": entity.last_action,
                 "source": _source_to_data(entity.source),
             }
@@ -1097,6 +1125,7 @@ def _codebase_state_report_to_data(report: CodebaseStateReport) -> dict[str, Any
             {
                 "id": item.id,
                 "description": item.description,
+                "rationale": item.rationale,
                 "last_action": item.last_action,
                 "source": _source_to_data(item.source),
             }
@@ -1106,6 +1135,7 @@ def _codebase_state_report_to_data(report: CodebaseStateReport) -> dict[str, Any
             {
                 "id": item.id,
                 "description": item.description,
+                "rationale": item.rationale,
                 "last_action": item.last_action,
                 "source": _source_to_data(item.source),
             }
@@ -1116,6 +1146,7 @@ def _codebase_state_report_to_data(report: CodebaseStateReport) -> dict[str, Any
                 "key": decision.key,
                 "decision_id": decision.decision_id,
                 "summary": decision.summary,
+                "rationale": decision.rationale,
                 "status": decision.status,
                 "replaces": decision.replaces,
                 "sources": [_source_to_data(source) for source in decision.sources],
@@ -1251,6 +1282,7 @@ def _current_decisions_report_to_data(
                 "key": decision.key,
                 "decision_id": decision.decision_id,
                 "summary": decision.summary,
+                "rationale": decision.rationale,
                 "status": decision.status,
                 "replaces": decision.replaces,
                 "sources": [_source_to_data(source) for source in decision.sources],
@@ -1274,6 +1306,7 @@ def _invariants_report_to_data(
             {
                 "id": item.id,
                 "description": item.description,
+                "rationale": item.rationale,
                 "last_action": item.last_action,
                 "source": _source_to_data(item.source),
             }

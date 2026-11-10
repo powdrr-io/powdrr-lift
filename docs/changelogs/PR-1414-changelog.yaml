@@ -1,0 +1,748 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1414
+title: Make Structrr a portable desired source design contract
+intent:
+  problem: Design changes can lose meaning or rationale during coding handoff, and
+    unresolved structural changes can be waived after retries.
+  goal: Preserve intended source design and its reasons in a replayable handoff and
+    require current evidence of agreement.
+human-decisions: []
+structured_files: []
+files:
+- path: README.md
+  type: modified
+  span:
+    start_line: 127
+    end_line: 132
+  summary: Link the intended source design contract and agent roles.
+  rationale: Make the implemented Structrr handoff discoverable.
+- path: docs/design/structrr-desired-source-design.md
+  type: added
+  span:
+    start_line: 1
+    end_line: 209
+  summary: Specify desired state, change semantics, portable handoffs, and source
+    agreement.
+  rationale: Define the design/debug-to-coding boundary and its evidence requirements.
+- path: packages/service/src/powdrr_service/artifact_state.py
+  type: modified
+  span:
+    start_line: 397
+    end_line: 401
+  summary: Retain entity rationale when materializing changelog history.
+  rationale: Preserve design reasons across repository revisions.
+- path: packages/service/src/powdrr_service/changelog/parser.py
+  type: modified
+  span:
+    start_line: 21
+    end_line: 21
+  summary: Parse rationale on entities, decisions, invariants, and guidance.
+  rationale: Prevent typed changelog conversion from dropping design explanations.
+- path: packages/service/src/powdrr_service/changelog/parser.py
+  type: modified
+  span:
+    start_line: 52
+    end_line: 52
+  summary: Parse rationale on entities, decisions, invariants, and guidance.
+  rationale: Prevent typed changelog conversion from dropping design explanations.
+- path: packages/service/src/powdrr_service/changelog/parser.py
+  type: modified
+  span:
+    start_line: 85
+    end_line: 85
+  summary: Parse rationale on entities, decisions, invariants, and guidance.
+  rationale: Prevent typed changelog conversion from dropping design explanations.
+- path: packages/service/src/powdrr_service/changelog/parser.py
+  type: modified
+  span:
+    start_line: 94
+    end_line: 94
+  summary: Parse rationale on entities, decisions, invariants, and guidance.
+  rationale: Prevent typed changelog conversion from dropping design explanations.
+- path: packages/service/src/powdrr_service/changelog/parser.py
+  type: modified
+  span:
+    start_line: 277
+    end_line: 277
+  summary: Parse rationale on entities, decisions, invariants, and guidance.
+  rationale: Prevent typed changelog conversion from dropping design explanations.
+- path: packages/service/src/powdrr_service/changelog/parser.py
+  type: modified
+  span:
+    start_line: 296
+    end_line: 296
+  summary: Parse rationale on entities, decisions, invariants, and guidance.
+  rationale: Prevent typed changelog conversion from dropping design explanations.
+- path: packages/service/src/powdrr_service/changelog/parser.py
+  type: modified
+  span:
+    start_line: 415
+    end_line: 415
+  summary: Parse rationale on entities, decisions, invariants, and guidance.
+  rationale: Prevent typed changelog conversion from dropping design explanations.
+- path: packages/service/src/powdrr_service/changelog/parser.py
+  type: modified
+  span:
+    start_line: 426
+    end_line: 426
+  summary: Parse rationale on entities, decisions, invariants, and guidance.
+  rationale: Prevent typed changelog conversion from dropping design explanations.
+- path: packages/service/src/powdrr_service/planning/multipr_structrr.py
+  type: modified
+  span:
+    start_line: 17
+    end_line: 17
+  summary: Project multi-PR changes through the shared desired-state transition.
+  rationale: Give standalone and multi-PR changes the same state semantics.
+- path: packages/service/src/powdrr_service/planning/multipr_structrr.py
+  type: modified
+  span:
+    start_line: 677
+    end_line: 678
+  summary: Project multi-PR changes through the shared desired-state transition.
+  rationale: Give standalone and multi-PR changes the same state semantics.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 544
+    end_line: 545
+  summary: Retain enduring rationale and the reason for each structural change.
+  rationale: Keep design justification in the portable operation.
+- path: packages/service/src/powdrr_service/structrr/actions.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 22
+  summary: Normalize current and legacy design operation spellings.
+  rationale: Preserve changes and removals without silently ignoring legacy actions.
+- path: packages/service/src/powdrr_service/structrr/candidate_comparison.py
+  type: modified
+  span:
+    start_line: 574
+    end_line: 589
+  summary: Exclude explanatory metadata from observed structural value matching.
+  rationale: Source extraction establishes structure rather than reconstructing rationale.
+- path: packages/service/src/powdrr_service/structrr/design.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 323
+  summary: Implement immutable desired state, shared projection, and replay-validated
+    handoffs.
+  rationale: Let independent coding sessions consume complete intended design and
+    reasons.
+- path: packages/service/src/powdrr_service/structrr/design_agreement.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 259
+  summary: Evaluate source predicates and current evidence as satisfied, contradicted,
+    or unknown.
+  rationale: Keep unsupported checks, stale evidence, and design violations visible
+    and blocking.
+- path: packages/service/src/powdrr_service/structrr/proposal.py
+  type: modified
+  span:
+    start_line: 12
+    end_line: 12
+  summary: Preserve change intent and normalize modification operations and file identities.
+  rationale: Keep proposal meaning stable across serialization and compilation.
+- path: packages/service/src/powdrr_service/structrr/proposal.py
+  type: modified
+  span:
+    start_line: 49
+    end_line: 49
+  summary: Preserve change intent and normalize modification operations and file identities.
+  rationale: Keep proposal meaning stable across serialization and compilation.
+- path: packages/service/src/powdrr_service/structrr/proposal.py
+  type: modified
+  span:
+    start_line: 67
+    end_line: 68
+  summary: Preserve change intent and normalize modification operations and file identities.
+  rationale: Keep proposal meaning stable across serialization and compilation.
+- path: packages/service/src/powdrr_service/structrr/proposal.py
+  type: modified
+  span:
+    start_line: 95
+    end_line: 97
+  summary: Preserve change intent and normalize modification operations and file identities.
+  rationale: Keep proposal meaning stable across serialization and compilation.
+- path: packages/service/src/powdrr_service/structrr/proposal.py
+  type: modified
+  span:
+    start_line: 112
+    end_line: 112
+  summary: Preserve change intent and normalize modification operations and file identities.
+  rationale: Keep proposal meaning stable across serialization and compilation.
+- path: packages/service/src/powdrr_service/structrr/proposal.py
+  type: modified
+  span:
+    start_line: 142
+    end_line: 142
+  summary: Preserve change intent and normalize modification operations and file identities.
+  rationale: Keep proposal meaning stable across serialization and compilation.
+- path: packages/service/src/powdrr_service/structrr/proposal.py
+  type: modified
+  span:
+    start_line: 144
+    end_line: 152
+  summary: Preserve change intent and normalize modification operations and file identities.
+  rationale: Keep proposal meaning stable across serialization and compilation.
+- path: packages/service/src/powdrr_service/structrr/proposal.py
+  type: modified
+  span:
+    start_line: 143
+    end_line: 143
+  summary: Preserve change intent and normalize modification operations and file identities.
+  rationale: Keep proposal meaning stable across serialization and compilation.
+- path: packages/service/src/powdrr_service/structrr/proposal.py
+  type: modified
+  span:
+    start_line: 179
+    end_line: 181
+  summary: Preserve change intent and normalize modification operations and file identities.
+  rationale: Keep proposal meaning stable across serialization and compilation.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 77
+    end_line: 78
+  summary: Expose portable handoff compilation and independent source agreement commands.
+  rationale: Support design and coding agents without shared conversation or workflow
+    state.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 81
+    end_line: 81
+  summary: Expose portable handoff compilation and independent source agreement commands.
+  rationale: Support design and coding agents without shared conversation or workflow
+    state.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 83
+    end_line: 83
+  summary: Expose portable handoff compilation and independent source agreement commands.
+  rationale: Support design and coding agents without shared conversation or workflow
+    state.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 2504
+    end_line: 2526
+  summary: Expose portable handoff compilation and independent source agreement commands.
+  rationale: Support design and coding agents without shared conversation or workflow
+    state.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 4555
+    end_line: 4666
+  summary: Expose portable handoff compilation and independent source agreement commands.
+  rationale: Support design and coding agents without shared conversation or workflow
+    state.
+- path: src/powdrr_lift/core/codebase_state.py
+  type: modified
+  span:
+    start_line: 3
+    end_line: 3
+  summary: Retain rationale through state reconstruction, supersession, and reports.
+  rationale: Carry design reasons forward for later changes.
+- path: src/powdrr_lift/core/codebase_state.py
+  type: modified
+  span:
+    start_line: 42
+    end_line: 42
+  summary: Retain rationale through state reconstruction, supersession, and reports.
+  rationale: Carry design reasons forward for later changes.
+- path: src/powdrr_lift/core/codebase_state.py
+  type: modified
+  span:
+    start_line: 61
+    end_line: 61
+  summary: Retain rationale through state reconstruction, supersession, and reports.
+  rationale: Carry design reasons forward for later changes.
+- path: src/powdrr_lift/core/codebase_state.py
+  type: modified
+  span:
+    start_line: 72
+    end_line: 72
+  summary: Retain rationale through state reconstruction, supersession, and reports.
+  rationale: Carry design reasons forward for later changes.
+- path: src/powdrr_lift/core/codebase_state.py
+  type: modified
+  span:
+    start_line: 179
+    end_line: 186
+  summary: Retain rationale through state reconstruction, supersession, and reports.
+  rationale: Carry design reasons forward for later changes.
+- path: src/powdrr_lift/core/codebase_state.py
+  type: modified
+  span:
+    start_line: 317
+    end_line: 317
+  summary: Retain rationale through state reconstruction, supersession, and reports.
+  rationale: Carry design reasons forward for later changes.
+- path: src/powdrr_lift/core/codebase_state.py
+  type: modified
+  span:
+    start_line: 326
+    end_line: 326
+  summary: Retain rationale through state reconstruction, supersession, and reports.
+  rationale: Carry design reasons forward for later changes.
+- path: src/powdrr_lift/core/codebase_state.py
+  type: modified
+  span:
+    start_line: 461
+    end_line: 465
+  summary: Retain rationale through state reconstruction, supersession, and reports.
+  rationale: Carry design reasons forward for later changes.
+- path: src/powdrr_lift/core/codebase_state.py
+  type: modified
+  span:
+    start_line: 550
+    end_line: 554
+  summary: Retain rationale through state reconstruction, supersession, and reports.
+  rationale: Carry design reasons forward for later changes.
+- path: src/powdrr_lift/core/codebase_state.py
+  type: modified
+  span:
+    start_line: 1016
+    end_line: 1016
+  summary: Retain rationale through state reconstruction, supersession, and reports.
+  rationale: Carry design reasons forward for later changes.
+- path: src/powdrr_lift/core/codebase_state.py
+  type: modified
+  span:
+    start_line: 1028
+    end_line: 1028
+  summary: Retain rationale through state reconstruction, supersession, and reports.
+  rationale: Carry design reasons forward for later changes.
+- path: src/powdrr_lift/core/codebase_state.py
+  type: modified
+  span:
+    start_line: 1041
+    end_line: 1043
+  summary: Retain rationale through state reconstruction, supersession, and reports.
+  rationale: Carry design reasons forward for later changes.
+- path: src/powdrr_lift/core/codebase_state.py
+  type: modified
+  span:
+    start_line: 1107
+    end_line: 1107
+  summary: Retain rationale through state reconstruction, supersession, and reports.
+  rationale: Carry design reasons forward for later changes.
+- path: src/powdrr_lift/core/codebase_state.py
+  type: modified
+  span:
+    start_line: 1128
+    end_line: 1128
+  summary: Retain rationale through state reconstruction, supersession, and reports.
+  rationale: Carry design reasons forward for later changes.
+- path: src/powdrr_lift/core/codebase_state.py
+  type: modified
+  span:
+    start_line: 1138
+    end_line: 1138
+  summary: Retain rationale through state reconstruction, supersession, and reports.
+  rationale: Carry design reasons forward for later changes.
+- path: src/powdrr_lift/core/codebase_state.py
+  type: modified
+  span:
+    start_line: 1149
+    end_line: 1149
+  summary: Retain rationale through state reconstruction, supersession, and reports.
+  rationale: Carry design reasons forward for later changes.
+- path: src/powdrr_lift/core/codebase_state.py
+  type: modified
+  span:
+    start_line: 1285
+    end_line: 1285
+  summary: Retain rationale through state reconstruction, supersession, and reports.
+  rationale: Carry design reasons forward for later changes.
+- path: src/powdrr_lift/core/codebase_state.py
+  type: modified
+  span:
+    start_line: 1309
+    end_line: 1309
+  summary: Retain rationale through state reconstruction, supersession, and reports.
+  rationale: Carry design reasons forward for later changes.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 22
+    end_line: 25
+  summary: Compile portable Structrr handoffs and preserve modification intent in
+    worker requests.
+  rationale: Send the intended design, reasons, and verification context to independent
+    coding workers.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 119
+    end_line: 149
+  summary: Compile portable Structrr handoffs and preserve modification intent in
+    worker requests.
+  rationale: Send the intended design, reasons, and verification context to independent
+    coding workers.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 283
+    end_line: 289
+  summary: Compile portable Structrr handoffs and preserve modification intent in
+    worker requests.
+  rationale: Send the intended design, reasons, and verification context to independent
+    coding workers.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 323
+    end_line: 323
+  summary: Compile portable Structrr handoffs and preserve modification intent in
+    worker requests.
+  rationale: Send the intended design, reasons, and verification context to independent
+    coding workers.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 63
+    end_line: 63
+  summary: Freeze design handoffs, preserve modifications, and enforce structural
+    and source-check gates.
+  rationale: Prevent repair exhaustion or favorable reviews from waiving required
+    design discrepancies.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 78
+    end_line: 79
+  summary: Freeze design handoffs, preserve modifications, and enforce structural
+    and source-check gates.
+  rationale: Prevent repair exhaustion or favorable reviews from waiving required
+    design discrepancies.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 968
+    end_line: 981
+  summary: Freeze design handoffs, preserve modifications, and enforce structural
+    and source-check gates.
+  rationale: Prevent repair exhaustion or favorable reviews from waiving required
+    design discrepancies.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 2405
+    end_line: 2405
+  summary: Freeze design handoffs, preserve modifications, and enforce structural
+    and source-check gates.
+  rationale: Prevent repair exhaustion or favorable reviews from waiving required
+    design discrepancies.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 2407
+    end_line: 2407
+  summary: Freeze design handoffs, preserve modifications, and enforce structural
+    and source-check gates.
+  rationale: Prevent repair exhaustion or favorable reviews from waiving required
+    design discrepancies.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 2412
+    end_line: 2413
+  summary: Freeze design handoffs, preserve modifications, and enforce structural
+    and source-check gates.
+  rationale: Prevent repair exhaustion or favorable reviews from waiving required
+    design discrepancies.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 4365
+    end_line: 4367
+  summary: Freeze design handoffs, preserve modifications, and enforce structural
+    and source-check gates.
+  rationale: Prevent repair exhaustion or favorable reviews from waiving required
+    design discrepancies.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 4546
+    end_line: 4546
+  summary: Freeze design handoffs, preserve modifications, and enforce structural
+    and source-check gates.
+  rationale: Prevent repair exhaustion or favorable reviews from waiving required
+    design discrepancies.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 4548
+    end_line: 4548
+  summary: Freeze design handoffs, preserve modifications, and enforce structural
+    and source-check gates.
+  rationale: Prevent repair exhaustion or favorable reviews from waiving required
+    design discrepancies.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 4550
+    end_line: 4550
+  summary: Freeze design handoffs, preserve modifications, and enforce structural
+    and source-check gates.
+  rationale: Prevent repair exhaustion or favorable reviews from waiving required
+    design discrepancies.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 6865
+    end_line: 6865
+  summary: Freeze design handoffs, preserve modifications, and enforce structural
+    and source-check gates.
+  rationale: Prevent repair exhaustion or favorable reviews from waiving required
+    design discrepancies.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 6867
+    end_line: 6867
+  summary: Freeze design handoffs, preserve modifications, and enforce structural
+    and source-check gates.
+  rationale: Prevent repair exhaustion or favorable reviews from waiving required
+    design discrepancies.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 6869
+    end_line: 6873
+  summary: Freeze design handoffs, preserve modifications, and enforce structural
+    and source-check gates.
+  rationale: Prevent repair exhaustion or favorable reviews from waiving required
+    design discrepancies.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 7743
+    end_line: 7755
+  summary: Freeze design handoffs, preserve modifications, and enforce structural
+    and source-check gates.
+  rationale: Prevent repair exhaustion or favorable reviews from waiving required
+    design discrepancies.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 7935
+    end_line: 7936
+  summary: Freeze design handoffs, preserve modifications, and enforce structural
+    and source-check gates.
+  rationale: Prevent repair exhaustion or favorable reviews from waiving required
+    design discrepancies.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 7964
+    end_line: 7964
+  summary: Freeze design handoffs, preserve modifications, and enforce structural
+    and source-check gates.
+  rationale: Prevent repair exhaustion or favorable reviews from waiving required
+    design discrepancies.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 8603
+    end_line: 8610
+  summary: Freeze design handoffs, preserve modifications, and enforce structural
+    and source-check gates.
+  rationale: Prevent repair exhaustion or favorable reviews from waiving required
+    design discrepancies.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 8728
+    end_line: 8745
+  summary: Freeze design handoffs, preserve modifications, and enforce structural
+    and source-check gates.
+  rationale: Prevent repair exhaustion or favorable reviews from waiving required
+    design discrepancies.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 8757
+    end_line: 8757
+  summary: Freeze design handoffs, preserve modifications, and enforce structural
+    and source-check gates.
+  rationale: Prevent repair exhaustion or favorable reviews from waiving required
+    design discrepancies.
+- path: tests/test_agent_service_artifact_state_e2e.py
+  type: modified
+  span:
+    start_line: 146
+    end_line: 146
+  summary: Verify artifact-state output preserves optional entity rationale without
+    adding absent fields.
+  rationale: Retain output compatibility while carrying supplied design reasons across
+    the service boundary.
+- path: tests/test_agent_service_artifact_state_e2e.py
+  type: modified
+  span:
+    start_line: 148
+    end_line: 148
+  summary: Verify artifact-state output preserves optional entity rationale without
+    adding absent fields.
+  rationale: Retain output compatibility while carrying supplied design reasons across
+    the service boundary.
+- path: tests/test_agent_service_artifact_state_e2e.py
+  type: modified
+  span:
+    start_line: 163
+    end_line: 164
+  summary: Verify artifact-state output preserves optional entity rationale without
+    adding absent fields.
+  rationale: Retain output compatibility while carrying supplied design reasons across
+    the service boundary.
+- path: tests/test_agent_service_artifact_state_e2e.py
+  type: modified
+  span:
+    start_line: 194
+    end_line: 194
+  summary: Verify artifact-state output preserves optional entity rationale without
+    adding absent fields.
+  rationale: Retain output compatibility while carrying supplied design reasons across
+    the service boundary.
+- path: tests/test_codebase_state.py
+  type: modified
+  span:
+    start_line: 40
+    end_line: 40
+  summary: Verify rationale survives history reconstruction and current-state reports.
+  rationale: Protect durable design explanations.
+- path: tests/test_codebase_state.py
+  type: modified
+  span:
+    start_line: 46
+    end_line: 46
+  summary: Verify rationale survives history reconstruction and current-state reports.
+  rationale: Protect durable design explanations.
+- path: tests/test_codebase_state.py
+  type: modified
+  span:
+    start_line: 67
+    end_line: 67
+  summary: Verify rationale survives history reconstruction and current-state reports.
+  rationale: Protect durable design explanations.
+- path: tests/test_codebase_state.py
+  type: modified
+  span:
+    start_line: 86
+    end_line: 86
+  summary: Verify rationale survives history reconstruction and current-state reports.
+  rationale: Protect durable design explanations.
+- path: tests/test_codebase_state.py
+  type: modified
+  span:
+    start_line: 189
+    end_line: 189
+  summary: Verify rationale survives history reconstruction and current-state reports.
+  rationale: Protect durable design explanations.
+- path: tests/test_codebase_state.py
+  type: modified
+  span:
+    start_line: 210
+    end_line: 210
+  summary: Verify rationale survives history reconstruction and current-state reports.
+  rationale: Protect durable design explanations.
+- path: tests/test_codebase_state.py
+  type: modified
+  span:
+    start_line: 237
+    end_line: 237
+  summary: Verify rationale survives history reconstruction and current-state reports.
+  rationale: Protect durable design explanations.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 3749
+    end_line: 3749
+  summary: Verify missing structural operations and explicit source-check failures
+    block final acceptance.
+  rationale: Prevent final-review bypasses after correction exhaustion.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 3784
+    end_line: 3784
+  summary: Verify missing structural operations and explicit source-check failures
+    block final acceptance.
+  rationale: Prevent final-review bypasses after correction exhaustion.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 3787
+    end_line: 3817
+  summary: Verify missing structural operations and explicit source-check failures
+    block final acceptance.
+  rationale: Prevent final-review bypasses after correction exhaustion.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span:
+    start_line: 2293
+    end_line: 2294
+  summary: Verify structural operations retain rationale and change reasons.
+  rationale: Prevent loss of design justification during operation binding.
+- path: tests/test_structrr_design.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 575
+  summary: Exercise independent handoffs, complete design transitions, source checks,
+    evidence freshness, and compatibility.
+  rationale: Verify the full design-to-coding contract and its failure cases.
+entities:
+- id: structrr-canonical-desired-state
+  type: Class
+  action: added
+- id: structrr-portable-design-handoff
+  type: Class
+  action: added
+- id: structrr-design-agreement-checker
+  type: Function
+  action: added
+- id: structrr-design-handoff-command
+  type: Subcommand
+  action: added
+- id: structrr-design-agreement-command
+  type: Subcommand
+  action: added
+entity_relationships:
+- id: structrr-handoff-projects-desired-state
+  source: structrr-portable-design-handoff
+  target: structrr-canonical-desired-state
+  type: uses
+  relationship: uses
+  action: added
+  description: The handoff replays the proposal to derive the complete desired state.
+  rationale: Bind implementation to an exact intended design.
+- id: structrr-agreement-checks-handoff
+  source: structrr-design-agreement-checker
+  target: structrr-portable-design-handoff
+  type: verifies
+  relationship: verifies
+  action: added
+  description: Agreement binds source findings to the immutable handoff and candidate
+    digest.
+  rationale: A favorable result for other design or source cannot establish agreement.
+invariants:
+- id: structrr-required-discrepancies-remain-blocking
+  action: added
+  description: Required source-design discrepancies remain blocking after correction
+    exhaustion until source is corrected or the design is explicitly amended.
+  rationale: Exhausting implementation retries does not change intended meaning.
+- id: structrr-agreement-requires-current-evidence
+  action: added
+  description: Required design subjects are satisfied only by supported source checks
+    or evidence bound to the current handoff and candidate content.
+  rationale: Declarations and stale results do not prove implementation agreement.
+guidance: []

@@ -15,12 +15,15 @@ from typing import Any
 from powdrr_service.decision_obligation import content_fingerprint
 from powdrr_service.structrr.actions import normalize_action
 from powdrr_service.structrr.proposal import ProposalRevision
+from powdrr_service.structrr.reference_definitions import ReferenceDefinition
 from powdrr_service.structrr.snapshot import snapshot_digest
 
 DESIGN_SCHEMA = "structrr-desired-state-v1"
 HANDOFF_SCHEMA = "structrr-design-handoff-v1"
 DESIGN_SECTIONS = frozenset(
     {
+        "reference_definitions",
+        "assumptions",
         "entities",
         "entity_relationships",
         "source_subjects",
@@ -184,6 +187,8 @@ class DesiredState:
                 identities.add(identity)
                 # A materialized state describes what holds, not past operations.
                 record.pop("action", None)
+                if section == "reference_definitions":
+                    record = ReferenceDefinition.from_data(record).to_data()
                 records.append(record)
             document[section] = sorted(
                 records, key=lambda item: subject_identity(section, item)

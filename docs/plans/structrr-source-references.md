@@ -2,7 +2,13 @@
 
 Status: implementation in progress. Step 1 (Python parser and scope index) is
 implemented in `packages/service/src/powdrr_service/structrr/source_references.py`
-with tests in `tests/test_structrr_source_references.py`. The remaining modules
+with tests in `tests/test_structrr_source_references.py`. Step 2 (frozen catalog,
+canonical definitions, lifecycle resolution, and authorized amendments) is
+implemented in the service's `structrr/reference_catalog.py` and
+`structrr/reference_definitions.py`, with tests in
+`tests/test_structrr_reference_catalog.py`. See
+[the catalog contract](../design/structrr-reference-catalog.md) for schemas,
+adapters, and the caller's authorization responsibility. The remaining modules
 marked **new** below are planned. Legacy module paths refer to the service-owned
 responsibilities described in section 12.4.
 

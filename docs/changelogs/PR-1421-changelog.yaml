@@ -1,0 +1,102 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1421
+title: Protect worker Structrr baselines and format PR descriptions
+intent:
+  problem: Issue-worker tests can misread documentation review criteria as a demand
+    to modify the tracked Structrr bootstrap, and generated PR descriptions can
+    include unprocessed validation logs.
+  goal: Keep the accepted bootstrap immutable during implementation, treat review as
+    a pull-request process requirement, and publish concise Markdown validation
+    summaries.
+human-decisions: []
+structured_files: []
+files:
+- path: packages/service/src/powdrr_service/resources/processes/finish-implementation-pr.yaml
+  type: modified
+  span:
+    start_line: 60
+    end_line: 62
+  summary: Require concise validation summaries in generated PR descriptions
+  rationale: Keep captured command output and logs out of the human-facing PR body.
+- path: packages/service/src/powdrr_service/verification/execute_pr_test_authoring.py
+  type: modified
+  span:
+    start_line: 73
+    end_line: 80
+  summary: Clarify documentation review and Structrr baseline boundaries for test authors
+  rationale: Prevent generated tests from treating the prior bootstrap as a current
+    review record.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 451
+    end_line: 458
+  summary: Protect the committed Structrr bootstrap from worker edits
+  rationale: Keep implementation workers focused on product files and the generated
+    per-item Structrr diff artifact.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 359
+    end_line: 364
+  summary: Cover review-record guidance in generated test-author prompts
+  rationale: Ensure documentation criteria do not cause tests to expect bootstrap
+    mutations.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 702
+    end_line: 702
+  summary: Assert the issue-worker request protects the committed bootstrap
+  rationale: Verify the protected-path policy reaches the coding worker request.
+- path: tests/test_workflow_template_specification.py
+  type: modified
+  span:
+    start_line: 391
+    end_line: 398
+  summary: Cover concise validation formatting in generated PR descriptions
+  rationale: Guard against raw validation output being pasted into the PR body.
+entities:
+- id: issue-worker-bootstrap-protection
+  type: Function
+  action: added
+- id: execute-pr-test-authoring-boundaries
+  type: Function
+  action: added
+- id: concise-pr-validation-description
+  type: Function
+  action: added
+- id: worker-publication-regression-coverage
+  type: Regression test
+  action: added
+entity_relationships:
+- id: publication-regression-covers-bootstrap-protection
+  source: worker-publication-regression-coverage
+  target: issue-worker-bootstrap-protection
+  type: verifies
+  action: added
+  description: Worker request and prompt tests verify that implementation work uses
+    the generated Structrr diff rather than editing the tracked bootstrap.
+- id: publication-regression-covers-concise-pr-description
+  source: worker-publication-regression-coverage
+  target: concise-pr-validation-description
+  type: verifies
+  action: added
+  description: Process specification tests verify concise command summaries and
+    prohibit raw validation logs in generated PR descriptions.
+invariants:
+- id: issue-worker-does-not-edit-current-structrr-bootstrap
+  action: added
+  description: Issue-worker implementation requests protect docs/structrr/current/baseline-bootstrap.yaml;
+    product changes are represented by the generated per-item docs/structrr/diffs
+    artifact.
+- id: generated-pr-validation-is-a-concise-summary
+  action: added
+  description: Generated PR descriptions report validation commands, status, and
+    concise test counts without copying stdout, stderr, logs, or traces.
+- id: documentation-review-remains-a-pr-process-requirement
+  action: added
+  description: Documentation review acceptance criteria do not require mutation of
+    generated bootstrap metadata unless that behavior is explicitly part of the
+    product contract.
+guidance: []

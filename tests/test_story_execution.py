@@ -252,6 +252,7 @@ def execute(
         profile=PROFILE,
         repository="fixture/repo",
         artifact_root=store,
+        report_path="docs/plans/story-validation.json",
         timeout_seconds=30,
     )
 
@@ -287,6 +288,12 @@ def test_prose_to_plan_author_execution_repair_and_approved_amendment(
     )
     failed = execute(root, graph, artifact, tmp_path / "runs")
     assert not failed["story_coverage"]["verified"]
+    assert (
+        json.loads((root / "docs/plans/story-validation.json").read_text())["coverage"][
+            "verified"
+        ]
+        is False
+    )
     feature_state = {
         "story_test_authoring": artifact,
         "story_test_sources": artifact["test_sources"],
@@ -318,6 +325,10 @@ def test_prose_to_plan_author_execution_repair_and_approved_amendment(
     (root / "app.py").write_text(GOOD)
     passed = execute(root, graph, artifact, tmp_path / "runs")
     assert passed["story_coverage"]["verified"]
+    assert (
+        json.loads((root / "docs/plans/story-validation.json").read_text())["receipts"]
+        == passed["story_receipts"]
+    )
     published = root / "docs/structrr/diffs/plan/integration/story-execution.json"
     published.parent.mkdir(parents=True)
     published.write_text(

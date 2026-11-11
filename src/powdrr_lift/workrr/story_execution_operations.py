@@ -40,9 +40,14 @@ def execute_story_validation(
     artifact_root: Path,
     timeout_seconds: float,
     excluded_paths: Sequence[str] = (),
+    report_path: str | None = None,
 ) -> dict[str, Any]:
     """Capture actual observations, delegate proof decisions, retain every run."""
     manifest = authoring["story_test_links"]
+    if report_path is not None:
+        if Path(report_path).is_absolute() or ".." in Path(report_path).parts:
+            raise ValueError("story report must stay within the repository")
+        excluded_paths = (*excluded_paths, report_path)
     paths = tuple(authoring["test_sources"])
     collection = collect_story_tests(
         profile, root=root, paths=paths, timeout_seconds=timeout_seconds
@@ -134,4 +139,23 @@ def execute_story_validation(
         execution_context=after,
         story_evidence_path=str(destination),
     )
+    if report_path is not None:
+        target = root / report_path
+        if not target.resolve().is_relative_to(root.resolve()):
+            raise ValueError("story report resolves outside the repository")
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(
+            json.dumps(
+                {
+                    "schema_version": "story-validation-report-v1",
+                    "manifest": manifest,
+                    "coverage": coverage,
+                    "receipts": payload["receipts"],
+                },
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
     return result

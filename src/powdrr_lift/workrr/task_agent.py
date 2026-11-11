@@ -1068,6 +1068,16 @@ def _issue_worker_structrr_artifact_exclusions(
     return tuple(dict.fromkeys(exclusions))
 
 
+def _story_validation_report_path(proposed: Mapping[str, Any]) -> str | None:
+    if (
+        proposed.get("item_id") != "story-integration-validation"
+        or proposed.get("story_validation") is not True
+    ):
+        return None
+    plan_slug = slugify_workflow_id(str(proposed["plan_id"]))
+    return f"docs/plans/{plan_slug}-story-validation.json"
+
+
 def _write_issue_worker_structrr_diff_artifacts(
     repo_root: Path,
     proposed: Mapping[str, Any],
@@ -4048,6 +4058,7 @@ class _TaskWorkflowExecutionStrategy:
             except ExecutePrTestError as error:
                 raise PowdrrExecutionError(str(error)) from error
             if integration_test_authoring.get("story_test_links"):
+                story_report_path = _story_validation_report_path(proposed)
                 integration_test_result = execute_story_validation(
                     self.repo_root,
                     snapshot=story_snapshot,
@@ -4060,6 +4071,7 @@ class _TaskWorkflowExecutionStrategy:
                     artifact_root=store_root / "story-executions",
                     timeout_seconds=self.config.coding_agent_validation_timeout_seconds,
                     excluded_paths=_issue_worker_structrr_artifact_exclusions(proposed),
+                    report_path=story_report_path,
                 )
             else:
                 integration_test_result = run_generated_pytest(

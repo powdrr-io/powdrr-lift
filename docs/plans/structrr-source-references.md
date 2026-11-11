@@ -12,8 +12,12 @@ adapters, and the caller's authorization responsibility. Step 3 (bounded source
 reader, literal search, context pagination, and digest-keyed cache) is implemented
 in the service's `structrr/source_reader.py`, with the compatibility command in
 `powdrr_lift.structrr.source_reader` and tests in `tests/test_structrr_source_reader.py`.
-See [the reader contract](../design/structrr-source-reader.md). Environment
-integration and independent observation verification remain planned. The modules
+See [the reader contract](../design/structrr-source-reader.md). Step 4 (miniSWE
+environment integration and independent observation verification) is implemented
+through the agent's `execution/minisweagent_environment.py`, the local IPC bridge,
+and the service's `structrr/source_observation.py`. See
+[the environment contract](../design/structrr-miniswe-environment.md).
+Placement handoffs, validation, and Workrr rollout remain planned. The modules
 marked **new** below are planned. Legacy module paths refer to the service-owned
 responsibilities described in section 12.4.
 

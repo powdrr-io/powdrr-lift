@@ -15,6 +15,11 @@ from minisweagent.exceptions import FormatError, InterruptAgentFlow
 from minisweagent.models import get_model
 from minisweagent.utils.serialize import UNSET, recursive_merge
 
+from powdrr_agent.execution.minisweagent_environment import (
+    StructrrObservationModel,
+    configure_source_environment,
+)
+
 
 def main() -> int:
     parser = argparse.ArgumentParser()
@@ -66,7 +71,10 @@ def main() -> int:
             "model": model_settings,
         },
     )
+    source_context_enabled = configure_source_environment(config)
     model = get_model(config=config.get("model", {}))
+    if source_context_enabled:
+        model = StructrrObservationModel(model)
     environment = get_environment(config.get("environment", {}), default_type="local")
     agent = cast(
         Any,

@@ -16,6 +16,7 @@ import subprocess
 import sys
 import tempfile
 from collections.abc import Callable, Mapping, Sequence
+from contextlib import ExitStack
 from dataclasses import dataclass, field, replace
 from enum import StrEnum
 from pathlib import Path
@@ -30,8 +31,12 @@ from powdrr_agent.execution.minisweagent_monitor import (
 )
 from powdrr_agent.execution.opencode_monitor import run_opencode
 from powdrr_contracts.models import ChatCompletionRequest, ChatCompletionResponse
+from powdrr_local.structrr_context import StructrrContextBridge
 from powdrr_service.behavior_contract import BehaviorScenario
 from powdrr_service.intent_packet import IntentPacket
+from powdrr_service.structrr.reference_catalog import ReferenceCatalog
+from powdrr_service.structrr.source_observation import SourceObservationSession
+from powdrr_service.structrr.source_reader import ReaderLimits, SourceReader
 
 from powdrr_lift.core.execution_plan import ExecutionPlan, ExecutionUnit
 from powdrr_lift.core.implementation_packet import ImplementationPacket
@@ -785,6 +790,9 @@ class MiniSWEAgentProvider:
     progress_callback: Callable[[str], None] | None = None
     write_denied_paths: tuple[Path, ...] = ()
     session_trajectory: Path | None = field(default=None, init=False)
+    source_reference_mode: str = "off"
+    source_reference_catalog: ReferenceCatalog | None = field(default=None, repr=False)
+    source_reader_limits: ReaderLimits = field(default_factory=ReaderLimits)
 
     def prepare_request(self, request: ImplementationRequest) -> ImplementationRequest:
         return _tailor_request_prompt(request, self.prompt_prefix, self.prompt_suffix)
@@ -793,6 +801,14 @@ class MiniSWEAgentProvider:
         self, request: ImplementationRequest, *, worktree_root: Path, attempt_id: str
     ) -> subprocess.CompletedProcess[str]:
         workspace_root = worktree_root.resolve()
+        if self.source_reference_mode not in {"off", "observe", "enforce"}:
+            raise ValueError("invalid source reference mode")
+        if self.source_reference_mode != "off" and (
+            self.source_reference_catalog is None or self.diagnostics_root is None
+        ):
+            raise ValueError(
+                "source references require a frozen catalog and diagnostics root"
+            )
         worker_prompt = request.prompt.replace(
             "{{powdrr_workspace_root}}", str(workspace_root)
         )
@@ -806,7 +822,19 @@ class MiniSWEAgentProvider:
             "- Do not `cd` to, read from, or write to any other checkout or path.\n\n"
             f"{worker_prompt}"
         )
+        if self.source_reference_mode != "off":
+            task_prompt += (
+                "\n\nSource inspection: use `python -m "
+                "powdrr_agent.execution.source_reader read PATH --start N --end N` "
+                "or `search LITERAL PATH` to retrieve enclosing Structrr context. "
+                "Follow context pagination until required context is complete. "
+                "Ordinary shell output discovers visible markers only."
+            )
         environment = os.environ.copy()
+        for name in tuple(environment):
+            if name.startswith("POWDRR_STRUCTRR_"):
+                environment.pop(name)
+        environment["POWDRR_STRUCTRR_MODE"] = self.source_reference_mode
         environment.pop("VIRTUAL_ENV", None)
         _remove_provider_credentials(environment)
         # Avoid loading per-user MiniSWE .env files in the worker. Provider
@@ -924,28 +952,47 @@ class MiniSWEAgentProvider:
                 sandbox_profile = Path(profile_stream.name)
             command = [sandbox_executable, "-f", str(sandbox_profile), *command]
         try:
-            completed = run_minisweagent(
-                command,
-                trajectory_path=(
-                    self.diagnostics_root / f"{attempt_id}.traj.json"
-                    if self.diagnostics_root is not None
-                    else None
-                ),
-                log_path=(
-                    self.diagnostics_root / f"{attempt_id}.ndjson"
-                    if self.diagnostics_root is not None
-                    else None
-                ),
-                cwd=worktree_root,
-                env=environment,
-                timeout_seconds=self.timeout_seconds,
-                inference_parent=inference_parent,
-                inference_child=inference_child,
-                inference_handler=self.inference_handler,
-                on_snapshot=(
-                    report_progress if self.progress_callback is not None else None
-                ),
-            )
+            with ExitStack() as resources:
+                if self.source_reference_mode != "off":
+                    assert self.source_reference_catalog is not None
+                    assert self.diagnostics_root is not None
+                    source_bridge = resources.enter_context(
+                        StructrrContextBridge(
+                            SourceObservationSession(
+                                SourceReader(
+                                    workspace_root,
+                                    self.source_reference_catalog,
+                                    limits=self.source_reader_limits,
+                                )
+                            ),
+                            self.diagnostics_root
+                            / f"{attempt_id}.source-events.ndjson",
+                            self.source_reference_mode,
+                        )
+                    )
+                    environment["POWDRR_STRUCTRR_ENDPOINT"] = source_bridge.endpoint
+                completed = run_minisweagent(
+                    command,
+                    trajectory_path=(
+                        self.diagnostics_root / f"{attempt_id}.traj.json"
+                        if self.diagnostics_root is not None
+                        else None
+                    ),
+                    log_path=(
+                        self.diagnostics_root / f"{attempt_id}.ndjson"
+                        if self.diagnostics_root is not None
+                        else None
+                    ),
+                    cwd=worktree_root,
+                    env=environment,
+                    timeout_seconds=self.timeout_seconds,
+                    inference_parent=inference_parent,
+                    inference_child=inference_child,
+                    inference_handler=self.inference_handler,
+                    on_snapshot=(
+                        report_progress if self.progress_callback is not None else None
+                    ),
+                )
         finally:
             if task_file is not None:
                 task_file.unlink(missing_ok=True)

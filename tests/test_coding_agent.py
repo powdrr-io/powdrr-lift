@@ -10,6 +10,8 @@ import pytest
 from powdrr_agent.execution.minisweagent_monitor import MiniSWEAgentSnapshot
 from powdrr_contracts.models import ChatCompletionRequest, ChatCompletionResponse
 from powdrr_service.behavior_contract import BEHAVIOR_DIMENSIONS
+from powdrr_service.structrr.reference_catalog import compile_reference_catalog
+from powdrr_service.structrr.reference_definitions import ReferenceDefinition
 
 from powdrr_lift.cli import main
 from powdrr_lift.core.execution_plan import ExecutionPlan, ExecutionUnit
@@ -179,6 +181,89 @@ def _request(base_commit: str = "base") -> ImplementationRequest:
         validation_profiles=("python",),
         allowed_commands=("python3 *",),
     )
+
+
+@pytest.mark.parametrize("task_file", [False, True])
+def test_miniswe_source_context_reaches_fake_model_and_resumed_trajectory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, task_file: bool
+) -> None:
+    monkeypatch.setenv("MSWEA_COST_TRACKING", "ignore_errors")
+    if task_file:
+        monkeypatch.setattr(
+            "powdrr_lift.workrr.coding_agent.MINISWEAGENT_MAX_TASK_ARGUMENT_BYTES", 0
+        )
+    statement = "Preserve exact accepted meaning. " + "requirement " * 950
+    definition = ReferenceDefinition("retry", "invariant", statement, "spec:1")
+    catalog = compile_reference_catalog(
+        {"reference_definitions": [definition.to_data()]}, base_commit="a" * 40
+    )
+    (tmp_path / "retry.py").write_text(
+        "# structrr: retry\ndef retry():\n    return 42\n"
+    )
+    calls: list[ChatCompletionRequest] = []
+
+    def infer(request: ChatCompletionRequest) -> ChatCompletionResponse:
+        calls.append(request)
+        if len(calls) % 2 == 1:
+            command = (
+                f"{sys.executable} -m powdrr_agent.execution.source_reader "
+                "read retry.py --start 3 --end 3"
+            )
+        else:
+            tools = [m for m in request.messages if m.get("role") == "tool"]
+            assert statement in tools[-1]["content"]
+            assert "verified_reader" in tools[-1]["content"]
+            assert "output_head" in tools[-1]["content"]
+            command = (
+                "printf 'COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT\\nclean artifact\\n'"
+            )
+        call = {
+            "id": f"call-{len(calls)}",
+            "type": "function",
+            "function": {
+                "name": "bash",
+                "arguments": json.dumps({"command": command}),
+            },
+        }
+        return ChatCompletionResponse(
+            content=None, tool_calls=(call,), finish_reason="tool_calls"
+        )
+
+    provider = MiniSWEAgentProvider(
+        inference_handler=infer,
+        model="test",
+        diagnostics_root=tmp_path / "diagnostics",
+        source_reference_mode="enforce",
+        source_reference_catalog=catalog,
+        timeout_seconds=30,
+    )
+    for attempt in ("first", "resumed"):
+        completed = provider.run(_request(), worktree_root=tmp_path, attempt_id=attempt)
+        assert completed.returncode == 0, completed.stdout
+        trajectory = json.loads(
+            (tmp_path / "diagnostics" / f"{attempt}.traj.json").read_text()
+        )
+        assert trajectory["messages"][-1]["content"] == "clean artifact\n"
+        events = [
+            json.loads(line)
+            for line in (tmp_path / "diagnostics" / f"{attempt}.source-events.ndjson")
+            .read_text()
+            .splitlines()
+        ]
+        assert [e["enrichment_mode"] for e in events] == [
+            "verified_reader",
+            "submission",
+        ]
+        assert events[0]["catalog_digest"] == catalog.digest
+    assert len(calls) == 4
+
+
+def test_miniswe_enforcement_requires_frozen_inputs(tmp_path: Path) -> None:
+    provider = MiniSWEAgentProvider(
+        inference_handler=_unused_inference_handler, source_reference_mode="enforce"
+    )
+    with pytest.raises(ValueError, match="frozen catalog"):
+        provider.run(_request(), worktree_root=tmp_path, attempt_id="missing")
 
 
 def test_execution_unit_compiles_to_worker_request() -> None:

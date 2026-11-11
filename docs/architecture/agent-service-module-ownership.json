@@ -4030,6 +4030,24 @@
       "path": "packages/contracts/src/powdrr_contracts/ci.py",
       "rationale": "versioned public transport types for CI evidence and local reproduction",
       "reviewed": false
+    },
+    {
+      "extraction_pr": "source-annotations-step-4",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "agent",
+      "path": "packages/agent/src/powdrr_agent/execution/minisweagent_environment.py",
+      "rationale": "MiniSWE execution and formatting adapter using public local IPC",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "source-annotations-step-4",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "agent",
+      "path": "packages/agent/src/powdrr_agent/execution/source_reader.py",
+      "rationale": "isolated worker source inspection command using public local IPC",
+      "reviewed": false
     }
   ],
   "inventory_scope": [

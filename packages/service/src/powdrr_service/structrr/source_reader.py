@@ -545,6 +545,18 @@ class SourceReader:
         }
         return self._finish("context", [], [reference], [], offset=offset)
 
+    def contexts(self, refs: list[str]) -> SourceReadResult:
+        """Resolve distinct visible IDs under one shared observation budget."""
+        references = [
+            {
+                "ref": ref,
+                "status": resolve_reference(self.catalog, ref).status,
+                "locations": [],
+            }
+            for ref in sorted(set(refs))
+        ]
+        return self._finish("context", [], references, [])
+
     def search(self, query: str, path: str = ".") -> SourceReadResult:
         diagnostics: list[dict[str, Any]] = []
         excerpts: list[dict[str, Any]] = []

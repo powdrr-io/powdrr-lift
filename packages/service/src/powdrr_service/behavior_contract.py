@@ -11,6 +11,7 @@ from powdrr_service.planning.semantic_decision import (
     DECISION_VALUES,
     SEMANTIC_DIMENSION_DECISION_KINDS,
 )
+from powdrr_service.structrr.story_coverage import StoryCaseRef, parse_story_case_refs
 
 BEHAVIOR_DIMENSIONS = (
     "normal_result",
@@ -62,6 +63,7 @@ class BehaviorScenario:
     validation_group_id: str | None = None
     validation_relation: str = "independent"
     routing: str = "include"
+    story_refs: tuple[StoryCaseRef, ...] = ()
 
     def to_data(self) -> dict[str, Any]:
         data = {
@@ -96,6 +98,8 @@ class BehaviorScenario:
         if self.validation_group_id is not None:
             data["validation_group_id"] = self.validation_group_id
             data["validation_relation"] = self.validation_relation
+        if self.story_refs:
+            data["story_refs"] = [ref.to_data() for ref in self.story_refs]
         return data
 
 
@@ -331,6 +335,7 @@ def compile_behavior_scenarios(
                 validation_group_id=validation_group_id,
                 validation_relation=str(validation_relation),
                 routing=str(routing),
+                story_refs=parse_story_case_refs(item.get("story_refs", [])),
             )
         )
     return tuple(scenarios)

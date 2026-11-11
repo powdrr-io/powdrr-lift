@@ -15,7 +15,7 @@ from powdrr_service.decision_obligation import (
     evidence_fingerprint,
 )
 
-STORY_REVIEW_POLICY = "story-semantic-review-v1"
+STORY_REVIEW_POLICY = "story-semantic-review-v2"
 STORY_REVIEW_DIMENSIONS = (
     "source_fidelity",
     "step_atomicity",
@@ -149,6 +149,15 @@ class StorySemanticReviewer:
                         {
                             "decision": specification.to_data(),
                             "context": dict(request.context),
+                            "case_policy": (
+                                "Derived cases, fixtures and initial conditions must "
+                                "follow the confirmed graph and source decisions. "
+                                "Missing customer choices are ambiguous, invented "
+                                "behavior is contradictory; untestable observations "
+                                "are unresolved. Check repeated-transition walks and "
+                                "zero/one/repeated attempt fixtures. Graph coverage "
+                                "does not establish full input-domain coverage."
+                            ),
                         },
                         ensure_ascii=False,
                     ),

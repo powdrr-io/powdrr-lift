@@ -17,6 +17,7 @@ from typing import Any
 
 from powdrr_service.planning.instruction_ledger import InstructionLedger
 from powdrr_service.planning.semantic_contract import PartialSemanticContract
+from powdrr_service.structrr.story_coverage import StoryCaseRef, parse_story_case_refs
 
 
 class FeatureObligationError(ValueError):
@@ -56,6 +57,7 @@ class DesignProjection:
     acceptance_criterion: str
     expected_test: str
     behavior_scenario: Mapping[str, Any] | None = None
+    story_refs: tuple[StoryCaseRef, ...] = ()
 
     @property
     def design_id(self) -> str:
@@ -76,6 +78,8 @@ class DesignProjection:
         }
         if self.behavior_scenario is not None:
             data["behavior_scenario"] = dict(self.behavior_scenario)
+        if self.story_refs:
+            data["story_refs"] = [ref.to_data() for ref in self.story_refs]
         if include_fingerprint:
             data["fingerprint"] = self.fingerprint
         return data
@@ -103,6 +107,11 @@ class FeatureObligation:
             "description": self.projection.description,
             "acceptance_criterion": self.projection.acceptance_criterion,
             "expected_test": self.projection.expected_test,
+            **(
+                {"story_refs": [ref.to_data() for ref in self.projection.story_refs]}
+                if self.projection.story_refs
+                else {}
+            ),
         }
         if include_fingerprint:
             data["fingerprint"] = self.fingerprint
@@ -114,6 +123,7 @@ class RequiredTestContract:
     obligation_id: str
     work_item_slug: str
     description: str = ""
+    story_refs: tuple[StoryCaseRef, ...] = ()
 
     @property
     def test_id(self) -> str:
@@ -157,6 +167,11 @@ class RequiredTestContract:
             "expectation": "pass",
             "applicability": {"mode": "required"},
             "status": "active",
+            **(
+                {"story_refs": [ref.to_data() for ref in self.story_refs]}
+                if self.story_refs
+                else {}
+            ),
         }
 
 
@@ -313,6 +328,7 @@ def compile_feature_design(
                 if isinstance(design.get("behavior_scenario"), Mapping)
                 else None
             ),
+            story_refs=parse_story_case_refs(design.get("story_refs", [])),
         )
         projections.append(projection)
         semantic_projections[clause.clause_id] = projection
@@ -350,7 +366,12 @@ def compile_feature_design(
         projections=tuple(projections),
         obligations=tuple(obligations),
         test_contracts=tuple(
-            RequiredTestContract(item.obligation_id, slug, item.projection.description)
+            RequiredTestContract(
+                item.obligation_id,
+                slug,
+                item.projection.description,
+                item.projection.story_refs,
+            )
             for item in obligations
         ),
     )

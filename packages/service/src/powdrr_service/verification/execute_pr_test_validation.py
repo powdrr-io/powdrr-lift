@@ -8,6 +8,8 @@ from collections.abc import Mapping, Sequence
 from pathlib import PurePosixPath
 from typing import Any
 
+from powdrr_service.verification.story_test_links import python_test_assertions
+
 
 class ExecutePrTestAuthoringValidationError(ValueError):
     """An authored execute-PR test suite violates its contract."""
@@ -84,7 +86,10 @@ def discover_python_test_root(
 
 
 def validate_coverage_references(
-    files: Mapping[str, str], obligations: Sequence[Mapping[str, Any]]
+    files: Mapping[str, str],
+    obligations: Sequence[Mapping[str, Any]],
+    *,
+    linked_story_tests: Sequence[str] = (),
 ) -> dict[str, list[str]]:
     """Require every deterministic obligation to link to an actual authored test."""
     tests = {
@@ -94,7 +99,11 @@ def validate_coverage_references(
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
         and node.name.startswith("test_")
     }
-    expected_ids = [str(item.get("obligation_id", "")) for item in obligations]
+    expected_ids = [
+        str(item.get("obligation_id", ""))
+        for item in obligations
+        if not item.get("story_refs")
+    ]
     if not expected_ids or any(not item for item in expected_ids):
         raise ExecutePrTestAuthoringValidationError(
             "coverage obligations must have non-empty IDs"
@@ -133,7 +142,7 @@ def validate_coverage_references(
             "coverage references contain no actual tests"
         )
     referenced_tests = set().union(*references.values())
-    unlinked_tests = sorted(tests - referenced_tests)
+    unlinked_tests = sorted(tests - referenced_tests - set(linked_story_tests))
     if unlinked_tests:
         raise ExecutePrTestAuthoringValidationError(
             "authored tests must link to an acceptance criterion; "
@@ -187,7 +196,9 @@ def validate_generated_test_files(
                 raise ExecutePrTestAuthoringValidationError(
                     f"{raw_path}:{test.name} must be a synchronous test"
                 )
-            if not any(isinstance(node, ast.Assert) for node in ast.walk(test)):
+            if not any(
+                isinstance(node, ast.Assert) for node in ast.walk(test)
+            ) and not python_test_assertions(test):
                 raise ExecutePrTestAuthoringValidationError(
                     f"{raw_path}:{test.name} has no behavior assertion"
                 )
@@ -205,6 +216,7 @@ def validate_test_correction(
     expected_paths: Sequence[str],
     obligations: Sequence[Mapping[str, Any]],
     test_root: str = "tests",
+    linked_story_tests: Sequence[str] = (),
 ) -> tuple[dict[str, str], dict[str, list[str]]]:
     """Validate a bounded correction to the generated acceptance-test suite."""
     if set(files) != set(expected_paths):
@@ -213,7 +225,9 @@ def validate_test_correction(
             f"expected={sorted(expected_paths)}, actual={sorted(files)}"
         )
     validated = validate_generated_test_files(files, test_root=test_root)
-    return validated, validate_coverage_references(validated, obligations)
+    return validated, validate_coverage_references(
+        validated, obligations, linked_story_tests=linked_story_tests
+    )
 
 
 def generated_test_source_paths_under_root(

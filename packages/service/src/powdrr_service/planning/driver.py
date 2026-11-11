@@ -1961,6 +1961,7 @@ class SourceLedgerQuestionMachine:
                     "allowed_paths": list(item.allowed_paths),
                     "acceptance_criteria": list(item.acceptance_criteria),
                     "story_refs": [ref.to_data() for ref in item.story_refs],
+                    "story_validation": item.story_validation,
                     "verification": test_designs[item.item_id],
                     "unit_ids": list(unit_ids),
                     "units": [units[unit_id] for unit_id in unit_ids],

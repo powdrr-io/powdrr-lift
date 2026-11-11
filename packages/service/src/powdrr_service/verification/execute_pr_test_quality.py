@@ -46,6 +46,26 @@ QUALITY_CHECKS = (
     ),
 )
 
+STORY_QUALITY_CHECKS = (
+    *QUALITY_CHECKS,
+    (
+        "story_case_fidelity",
+        "Does the test invent fixture requirements or observations that "
+        "contradict or go beyond the pinned story case?",
+    ),
+    (
+        "story_assertion_adequacy",
+        "Do the linked executable assertions fail to establish their particular "
+        "pinned observation IDs? Other tests may cover complementary observations.",
+    ),
+    (
+        "story_public_boundary",
+        "Does the test bypass the recorded user/API/CLI boundary, mock the target "
+        "behavior, or substitute an undeclared dependency instead of proving "
+        "the actual story path?",
+    ),
+)
+
 DECISION_SCHEMA = {
     "type": "object",
     "properties": {"shortcoming_present": {"type": "boolean"}},
@@ -191,6 +211,45 @@ def execute_pr_test_review_targets(
                         "source_text": criteria.get(criterion_id, ""),
                     }
                 )
+    manifest = suite_evidence.get("story_test_links", {})
+    if isinstance(manifest, Mapping):
+        by_id = {
+            item.get("obligation_id"): item
+            for item in obligations
+            if isinstance(item, Mapping)
+        }
+        for link in manifest.get("links", []):
+            source = sources.get(link["path"])
+            if not isinstance(source, str):
+                continue
+            node = next(
+                (
+                    node
+                    for node in ast.parse(source).body
+                    if isinstance(node, ast.FunctionDef)
+                    and node.name == link["test_name"]
+                ),
+                None,
+            )
+            if node is None:
+                continue
+            target = targets.setdefault(
+                link["selector"],
+                {
+                    "test_id": link["selector"],
+                    "test_name": link["test_name"],
+                    "path": link["path"],
+                    "test_source": "\n".join(
+                        source.splitlines()[node.lineno - 1 : node.end_lineno]
+                    ),
+                    "criterion_ids": [],
+                    "acceptance_criteria": [],
+                },
+            )
+            if link["obligation_id"] not in target["criterion_ids"]:
+                target["criterion_ids"].append(link["obligation_id"])
+                target["acceptance_criteria"].append(by_id[link["obligation_id"]])
+            target["test_module_source"] = source
     scoped_targets = []
     for test_id in sorted(targets):
         target = targets[test_id]
@@ -251,6 +310,23 @@ def execute_pr_test_review_context(
     }
     if contract_context:
         context["plan_context"] = contract_context
+    story_criteria = [
+        criterion for criterion in criteria if criterion.get("story_refs")
+    ]
+    if story_criteria:
+        context["pinned_story_cases"] = story_criteria
+        context["test_module_source"] = target.get("test_module_source")
+        context["story_assertion_links"] = [
+            link
+            for link in suite_evidence.get("story_test_links", {}).get("links", [])
+            if link["selector"] == target["test_id"]
+            and link["obligation_id"] in target["criterion_ids"]
+        ]
+        if isinstance(contract, Mapping):
+            context["story_context"] = contract.get("story_context")
+            context["public_entrypoint_evidence"] = contract.get(
+                "public_entrypoint_evidence", []
+            )
     return context
 
 
@@ -361,7 +437,30 @@ def review_execute_pr_test_quality(
 
     for target in execute_pr_test_review_targets(suite_evidence):
         review_context = execute_pr_test_review_context(suite_evidence, target)
-        for check_id, question in QUALITY_CHECKS:
+        checks = (
+            STORY_QUALITY_CHECKS
+            if any(
+                criterion.get("story_refs")
+                for criterion in target["acceptance_criteria"]
+            )
+            else QUALITY_CHECKS
+        )
+        if (
+            checks is STORY_QUALITY_CHECKS
+            and len(json.dumps(review_context, sort_keys=True)) > 48000
+        ):
+            assessments.extend(
+                {
+                    "test_id": target["test_id"],
+                    "criterion_ids": target["criterion_ids"],
+                    "check_id": check_id,
+                    "decision_error": "Story review context exceeds 48,000 "
+                    "characters; partition case/test context without truncation.",
+                }
+                for check_id, _ in checks
+            )
+            continue
+        for check_id, question in checks:
             question_text = build_quality_question(question, review_context)
             messages = [
                 {"role": "system", "content": ""},

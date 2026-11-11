@@ -9,6 +9,8 @@ from typing import Any
 
 import yaml
 
+from powdrr_service.structrr.user_stories import STORY_SECTIONS
+
 ENTITY_ACTIONS = frozenset({"added", "removed", "changed"})
 
 
@@ -111,6 +113,13 @@ def normalize_specification_v1_yaml(content: str) -> str:
                 return
             if isinstance(current, yaml.MappingNode):
                 for key_node, value_node in current.value:
+                    if (
+                        isinstance(key_node, yaml.ScalarNode)
+                        and key_node.value in STORY_SECTIONS
+                    ):
+                        # Empty preconditions, allocator retirement lists and fixtures
+                        # are meaningful required story data, not template residue.
+                        continue
                     if isinstance(value_node, yaml.ScalarNode) and value_node.tag == (
                         "tag:yaml.org,2002:null"
                     ):

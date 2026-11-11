@@ -17,11 +17,18 @@ from powdrr_service.structrr.actions import normalize_action
 from powdrr_service.structrr.proposal import ProposalRevision
 from powdrr_service.structrr.reference_definitions import ReferenceDefinition
 from powdrr_service.structrr.snapshot import snapshot_digest
+from powdrr_service.structrr.user_stories import (
+    STORY_SECTIONS,
+    parse_story_catalog,
+    validate_story_catalog,
+    validate_story_evolution,
+)
 
 DESIGN_SCHEMA = "structrr-desired-state-v1"
 HANDOFF_SCHEMA = "structrr-design-handoff-v1"
 DESIGN_SECTIONS = frozenset(
     {
+        *STORY_SECTIONS,
         "reference_definitions",
         "assumptions",
         "entities",
@@ -123,14 +130,41 @@ def project_sections(
                         "baseline: "
                         f"{identity}"
                     )
+            if (
+                section in STORY_SECTIONS
+                and operation.get("expected_before") is not None
+            ):
+                if (
+                    content_fingerprint(by_id.get(identity))
+                    != operation["expected_before"]
+                ):
+                    raise ValueError(
+                        f"stale story expected-before fingerprint: {identity}"
+                    )
             if action == "remove":
                 del by_id[identity]
             else:
-                content = {
-                    key: value for key, value in operation.items() if key != "action"
-                }
+                content = (
+                    dict(operation["content"])
+                    if section in STORY_SECTIONS
+                    and isinstance(operation.get("content"), Mapping)
+                    else {
+                        key: value
+                        for key, value in operation.items()
+                        if key != "action"
+                    }
+                )
+                if subject_identity(section, content) != identity:
+                    raise ValueError(
+                        "story operation content identity differs from envelope"
+                    )
                 by_id[identity] = {**by_id.get(identity, {}), **content}
         result[collection] = [by_id[key] for key in sorted(by_id)]
+    if any(section in sections for section in STORY_SECTIONS):
+        before = parse_story_catalog(baseline)
+        after = parse_story_catalog(result)
+        validate_story_evolution(before, after)
+        validate_story_catalog(after).require_valid()
     return result
 
 
@@ -144,6 +178,7 @@ class DesiredState:
     def from_snapshot(cls, snapshot: Mapping[str, Any]) -> DesiredState:
         if snapshot.get("schema_version") == DESIGN_SCHEMA:
             return cls.from_data(snapshot)
+        validate_story_catalog(parse_story_catalog(snapshot)).require_valid()
         metadata = {
             "schema",
             "structrr_schema",
@@ -175,7 +210,11 @@ class DesiredState:
                         f"desired-state {section} requires identified records"
                     )
                 record = dict(raw)
-                if record.get("action") in {"remove", "removed", "deleted"}:
+                if isinstance(record.get("action"), str) and record.get("action") in {
+                    "remove",
+                    "removed",
+                    "deleted",
+                }:
                     raise ValueError(
                         "desired state cannot adopt a removal delta as an active record"
                     )
@@ -186,7 +225,8 @@ class DesiredState:
                     )
                 identities.add(identity)
                 # A materialized state describes what holds, not past operations.
-                record.pop("action", None)
+                if section not in STORY_SECTIONS:
+                    record.pop("action", None)
                 if section == "reference_definitions":
                     record = ReferenceDefinition.from_data(record).to_data()
                 records.append(record)
@@ -207,6 +247,7 @@ class DesiredState:
                 raise ValueError(
                     "desired relationship endpoints must identify active entities"
                 )
+        validate_story_catalog(parse_story_catalog(document)).require_valid()
         return cls(
             json.dumps(document, sort_keys=True, ensure_ascii=False, allow_nan=False)
         )
@@ -268,7 +309,19 @@ class DesignHandoff:
                 content["id"] = operation.subject_id
             if subject_identity(operation.section, content) != operation.subject_id:
                 raise ValueError("proposal subject identity differs from content")
-            content["action"] = operation.action
+            if operation.section in STORY_SECTIONS:
+                content = {
+                    "id": operation.subject_id,
+                    "action": operation.action,
+                    "content": content,
+                    **(
+                        {"expected_before": operation.expected_before}
+                        if operation.expected_before
+                        else {}
+                    ),
+                }
+            else:
+                content["action"] = operation.action
             sections.setdefault(operation.section, []).append(content)
         after = DesiredState.from_snapshot(project_sections(before.document, sections))
         data = {

@@ -13,6 +13,7 @@ from powdrr_service.specifications.common import (
     validate_module_tool_references,
     validate_related_module_references,
 )
+from powdrr_service.structrr.user_story_validation import validate_story_document
 
 
 @dataclass(frozen=True, slots=True)
@@ -345,6 +346,10 @@ def build_implementation_specification_validation_report(
         for issue in validate_related_module_references(
             scoped_sections, module_ids=set(architecture_summary.module_ids)
         )
+    )
+    issues.extend(
+        ImplementationSpecificationValidationIssue(i.code, i.message, i.subject_id)
+        for i in validate_story_document(raw_spec).issues
     )
     return ImplementationSpecificationValidationReport(
         validation_successful=not issues,

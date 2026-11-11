@@ -6,6 +6,8 @@ from typing import Any, cast
 
 import yaml
 
+from powdrr_service.structrr.user_stories import StorySectionChange, parse_story_changes
+
 
 @dataclass(frozen=True, slots=True)
 class Intent:
@@ -150,6 +152,7 @@ class ChangeLog:
     feature_changes: list[ChangeFeatureState] = field(default_factory=list)
     proposed_prs: list[ChangeProposedPRState] = field(default_factory=list)
     verification: ChangeVerification = field(default_factory=ChangeVerification)
+    story_changes: tuple[StorySectionChange, ...] = ()
 
 
 def parse_change_log(yaml_content: str) -> ChangeLog:
@@ -212,6 +215,7 @@ def _parse_change_log_v2(data: Mapping[str, Any]) -> ChangeLog:
         )
 
     return ChangeLog(
+        story_changes=parse_story_changes(data),
         version=_normalize_version(data.get("version")),
         change_id=_coerce_optional_str(data.get("change_id", data.get("pr_id"))),
         title=_coerce_optional_str(data.get("title")),

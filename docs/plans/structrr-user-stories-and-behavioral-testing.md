@@ -1,6 +1,10 @@
 # Structrr User Stories and Behavioral Testing
 
-Status: implementation plan; no implementation is included in this change.
+Status: first implementation slice implements story contracts, identity allocation,
+graph validation, digests, projection/rebase, bootstrap preservation and queries.
+Interview readiness, story allocation through planning, behavioral test authoring,
+and execution evidence remain planned. See the
+[story contract implementation](../design/structrr-user-stories.md).
 Date: 2026-11-06
 
 ## 1. Objective and accepted decisions

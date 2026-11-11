@@ -1,0 +1,750 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1420
+title: Add durable Structrr user story contracts and graph transactions
+intent:
+  problem: Customer behavior has no durable typed graph that survives Structrr projection
+    and repository reload.
+  goal: Persist story declarations, stable identities and graph changes without confusing
+    design declarations with implementation evidence.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/design/structrr-user-stories.md
+  type: added
+  span:
+    start_line: 1
+    end_line: 102
+  summary: Document the implemented story contracts and their authority boundaries.
+  rationale: Make the compiler API and remaining interview/evidence work explicit.
+- path: docs/plans/structrr-user-stories-and-behavioral-testing.md
+  type: modified
+  span:
+    start_line: 3
+    end_line: 7
+  summary: Record implementation of the first story-contract slice.
+  rationale: Keep progress separate from future readiness and behavioral verification.
+- path: packages/service/src/powdrr_service/changelog/parser.py
+  type: modified
+  span:
+    start_line: 9
+    end_line: 10
+  summary: Retain typed story operations in changelog-v2 parsing.
+  rationale: Preserve all four story collections and nested behavioral actions.
+- path: packages/service/src/powdrr_service/changelog/parser.py
+  type: modified
+  span:
+    start_line: 155
+    end_line: 155
+  summary: Retain typed story operations in changelog-v2 parsing.
+  rationale: Preserve all four story collections and nested behavioral actions.
+- path: packages/service/src/powdrr_service/changelog/parser.py
+  type: modified
+  span:
+    start_line: 218
+    end_line: 218
+  summary: Retain typed story operations in changelog-v2 parsing.
+  rationale: Preserve all four story collections and nested behavioral actions.
+- path: packages/service/src/powdrr_service/planning/multipr_structrr.py
+  type: modified
+  span:
+    start_line: 22
+    end_line: 22
+  summary: Project and reload story operations in multi-PR proposal artifacts.
+  rationale: Keep story declarations intact at existing projection and rebase boundaries.
+- path: packages/service/src/powdrr_service/planning/multipr_structrr.py
+  type: modified
+  span:
+    start_line: 27
+    end_line: 27
+  summary: Project and reload story operations in multi-PR proposal artifacts.
+  rationale: Keep story declarations intact at existing projection and rebase boundaries.
+- path: packages/service/src/powdrr_service/planning/multipr_structrr.py
+  type: modified
+  span:
+    start_line: 150
+    end_line: 158
+  summary: Project and reload story operations in multi-PR proposal artifacts.
+  rationale: Keep story declarations intact at existing projection and rebase boundaries.
+- path: packages/service/src/powdrr_service/planning/multipr_structrr.py
+  type: modified
+  span:
+    start_line: 499
+    end_line: 503
+  summary: Project and reload story operations in multi-PR proposal artifacts.
+  rationale: Keep story declarations intact at existing projection and rebase boundaries.
+- path: packages/service/src/powdrr_service/planning/multipr_structrr.py
+  type: modified
+  span:
+    start_line: 520
+    end_line: 524
+  summary: Project and reload story operations in multi-PR proposal artifacts.
+  rationale: Keep story declarations intact at existing projection and rebase boundaries.
+- path: packages/service/src/powdrr_service/planning/multipr_structrr.py
+  type: modified
+  span:
+    start_line: 736
+    end_line: 742
+  summary: Project and reload story operations in multi-PR proposal artifacts.
+  rationale: Keep story declarations intact at existing projection and rebase boundaries.
+- path: packages/service/src/powdrr_service/specifications/architecture.py
+  type: modified
+  span:
+    start_line: 17
+    end_line: 17
+  summary: Validate declared story graphs and story operation shapes.
+  rationale: Reject malformed story records at architecture-specification entry points.
+- path: packages/service/src/powdrr_service/specifications/architecture.py
+  type: modified
+  span:
+    start_line: 197
+    end_line: 200
+  summary: Validate declared story graphs and story operation shapes.
+  rationale: Reject malformed story records at architecture-specification entry points.
+- path: packages/service/src/powdrr_service/specifications/common.py
+  type: modified
+  span:
+    start_line: 12
+    end_line: 13
+  summary: Preserve meaningful empty arrays within story declarations during normalization.
+  rationale: Do not erase required preconditions, retirement state, or fixture values.
+- path: packages/service/src/powdrr_service/specifications/common.py
+  type: modified
+  span:
+    start_line: 116
+    end_line: 122
+  summary: Preserve meaningful empty arrays within story declarations during normalization.
+  rationale: Do not erase required preconditions, retirement state, or fixture values.
+- path: packages/service/src/powdrr_service/specifications/implementation.py
+  type: modified
+  span:
+    start_line: 16
+    end_line: 16
+  summary: Validate story declarations and delta shapes with the shared service validator.
+  rationale: Prevent implementation specifications from silently accepting malformed
+    stories.
+- path: packages/service/src/powdrr_service/specifications/implementation.py
+  type: modified
+  span:
+    start_line: 350
+    end_line: 353
+  summary: Validate story declarations and delta shapes with the shared service validator.
+  rationale: Prevent implementation specifications from silently accepting malformed
+    stories.
+- path: packages/service/src/powdrr_service/specifications/system.py
+  type: modified
+  span:
+    start_line: 12
+    end_line: 13
+  summary: Validate story declarations and delta shapes with the shared service validator.
+  rationale: Keep system specification validation consistent with the story parser.
+- path: packages/service/src/powdrr_service/specifications/system.py
+  type: modified
+  span:
+    start_line: 169
+    end_line: 172
+  summary: Validate story declarations and delta shapes with the shared service validator.
+  rationale: Keep system specification validation consistent with the story parser.
+- path: packages/service/src/powdrr_service/structrr/actual_diff.py
+  type: modified
+  span:
+    start_line: 16
+    end_line: 16
+  summary: Report story changes as intent declarations.
+  rationale: Keep declared customer behavior distinct from observed implementation
+    evidence.
+- path: packages/service/src/powdrr_service/structrr/actual_diff.py
+  type: modified
+  span:
+    start_line: 118
+    end_line: 119
+  summary: Report story changes as intent declarations.
+  rationale: Keep declared customer behavior distinct from observed implementation
+    evidence.
+- path: packages/service/src/powdrr_service/structrr/actual_diff.py
+  type: modified
+  span:
+    start_line: 136
+    end_line: 140
+  summary: Report story changes as intent declarations.
+  rationale: Keep declared customer behavior distinct from observed implementation
+    evidence.
+- path: packages/service/src/powdrr_service/structrr/bootstrap.py
+  type: modified
+  span:
+    start_line: 28
+    end_line: 35
+  summary: Preserve canonical stories and project accepted story changelists with
+    versioned sections.
+  rationale: Code scans cannot reconstruct or replace approved behavior graphs.
+- path: packages/service/src/powdrr_service/structrr/bootstrap.py
+  type: modified
+  span:
+    start_line: 77
+    end_line: 78
+  summary: Preserve canonical stories and project accepted story changelists with
+    versioned sections.
+  rationale: Code scans cannot reconstruct or replace approved behavior graphs.
+- path: packages/service/src/powdrr_service/structrr/bootstrap.py
+  type: modified
+  span:
+    start_line: 90
+    end_line: 90
+  summary: Preserve canonical stories and project accepted story changelists with
+    versioned sections.
+  rationale: Code scans cannot reconstruct or replace approved behavior graphs.
+- path: packages/service/src/powdrr_service/structrr/bootstrap.py
+  type: modified
+  span:
+    start_line: 185
+    end_line: 190
+  summary: Preserve canonical stories and project accepted story changelists with
+    versioned sections.
+  rationale: Code scans cannot reconstruct or replace approved behavior graphs.
+- path: packages/service/src/powdrr_service/structrr/bootstrap.py
+  type: modified
+  span:
+    start_line: 422
+    end_line: 428
+  summary: Preserve canonical stories and project accepted story changelists with
+    versioned sections.
+  rationale: Code scans cannot reconstruct or replace approved behavior graphs.
+- path: packages/service/src/powdrr_service/structrr/bootstrap.py
+  type: modified
+  span:
+    start_line: 625
+    end_line: 630
+  summary: Preserve canonical stories and project accepted story changelists with
+    versioned sections.
+  rationale: Code scans cannot reconstruct or replace approved behavior graphs.
+- path: packages/service/src/powdrr_service/structrr/bootstrap.py
+  type: modified
+  span:
+    start_line: 1166
+    end_line: 1204
+  summary: Preserve canonical stories and project accepted story changelists with
+    versioned sections.
+  rationale: Code scans cannot reconstruct or replace approved behavior graphs.
+- path: packages/service/src/powdrr_service/structrr/bootstrap.py
+  type: modified
+  span:
+    start_line: 1401
+    end_line: 1403
+  summary: Preserve canonical stories and project accepted story changelists with
+    versioned sections.
+  rationale: Code scans cannot reconstruct or replace approved behavior graphs.
+- path: packages/service/src/powdrr_service/structrr/bootstrap.py
+  type: modified
+  span:
+    start_line: 1419
+    end_line: 1426
+  summary: Preserve canonical stories and project accepted story changelists with
+    versioned sections.
+  rationale: Code scans cannot reconstruct or replace approved behavior graphs.
+- path: packages/service/src/powdrr_service/structrr/bootstrap.py
+  type: modified
+  span:
+    start_line: 1547
+    end_line: 1550
+  summary: Preserve canonical stories and project accepted story changelists with
+    versioned sections.
+  rationale: Code scans cannot reconstruct or replace approved behavior graphs.
+- path: packages/service/src/powdrr_service/structrr/design.py
+  type: modified
+  span:
+    start_line: 20
+    end_line: 25
+  summary: Register story sections, validate atomic graph projection, and retain nested
+    actions in handoffs.
+  rationale: Apply graph transactions without losing identity or accepting stale amendment
+    inputs.
+- path: packages/service/src/powdrr_service/structrr/design.py
+  type: modified
+  span:
+    start_line: 31
+    end_line: 31
+  summary: Register story sections, validate atomic graph projection, and retain nested
+    actions in handoffs.
+  rationale: Apply graph transactions without losing identity or accepting stale amendment
+    inputs.
+- path: packages/service/src/powdrr_service/structrr/design.py
+  type: modified
+  span:
+    start_line: 133
+    end_line: 143
+  summary: Register story sections, validate atomic graph projection, and retain nested
+    actions in handoffs.
+  rationale: Apply graph transactions without losing identity or accepting stale amendment
+    inputs.
+- path: packages/service/src/powdrr_service/structrr/design.py
+  type: modified
+  span:
+    start_line: 147
+    end_line: 160
+  summary: Register story sections, validate atomic graph projection, and retain nested
+    actions in handoffs.
+  rationale: Apply graph transactions without losing identity or accepting stale amendment
+    inputs.
+- path: packages/service/src/powdrr_service/structrr/design.py
+  type: modified
+  span:
+    start_line: 163
+    end_line: 167
+  summary: Register story sections, validate atomic graph projection, and retain nested
+    actions in handoffs.
+  rationale: Apply graph transactions without losing identity or accepting stale amendment
+    inputs.
+- path: packages/service/src/powdrr_service/structrr/design.py
+  type: modified
+  span:
+    start_line: 181
+    end_line: 181
+  summary: Register story sections, validate atomic graph projection, and retain nested
+    actions in handoffs.
+  rationale: Apply graph transactions without losing identity or accepting stale amendment
+    inputs.
+- path: packages/service/src/powdrr_service/structrr/design.py
+  type: modified
+  span:
+    start_line: 213
+    end_line: 217
+  summary: Register story sections, validate atomic graph projection, and retain nested
+    actions in handoffs.
+  rationale: Apply graph transactions without losing identity or accepting stale amendment
+    inputs.
+- path: packages/service/src/powdrr_service/structrr/design.py
+  type: modified
+  span:
+    start_line: 228
+    end_line: 229
+  summary: Register story sections, validate atomic graph projection, and retain nested
+    actions in handoffs.
+  rationale: Apply graph transactions without losing identity or accepting stale amendment
+    inputs.
+- path: packages/service/src/powdrr_service/structrr/design.py
+  type: modified
+  span:
+    start_line: 250
+    end_line: 250
+  summary: Register story sections, validate atomic graph projection, and retain nested
+    actions in handoffs.
+  rationale: Apply graph transactions without losing identity or accepting stale amendment
+    inputs.
+- path: packages/service/src/powdrr_service/structrr/design.py
+  type: modified
+  span:
+    start_line: 312
+    end_line: 324
+  summary: Register story sections, validate atomic graph projection, and retain nested
+    actions in handoffs.
+  rationale: Apply graph transactions without losing identity or accepting stale amendment
+    inputs.
+- path: packages/service/src/powdrr_service/structrr/proposal.py
+  type: modified
+  span:
+    start_line: 14
+    end_line: 14
+  summary: Compile story operation content and expected-before fingerprints.
+  rationale: Bind portable amendments to their exact baseline subjects.
+- path: packages/service/src/powdrr_service/structrr/proposal.py
+  type: modified
+  span:
+    start_line: 26
+    end_line: 26
+  summary: Compile story operation content and expected-before fingerprints.
+  rationale: Bind portable amendments to their exact baseline subjects.
+- path: packages/service/src/powdrr_service/structrr/proposal.py
+  type: modified
+  span:
+    start_line: 35
+    end_line: 39
+  summary: Compile story operation content and expected-before fingerprints.
+  rationale: Bind portable amendments to their exact baseline subjects.
+- path: packages/service/src/powdrr_service/structrr/proposal.py
+  type: modified
+  span:
+    start_line: 166
+    end_line: 187
+  summary: Compile story operation content and expected-before fingerprints.
+  rationale: Bind portable amendments to their exact baseline subjects.
+- path: packages/service/src/powdrr_service/structrr/proposal.py
+  type: modified
+  span:
+    start_line: 194
+    end_line: 206
+  summary: Compile story operation content and expected-before fingerprints.
+  rationale: Bind portable amendments to their exact baseline subjects.
+- path: packages/service/src/powdrr_service/structrr/proposal.py
+  type: modified
+  span:
+    start_line: 267
+    end_line: 267
+  summary: Compile story operation content and expected-before fingerprints.
+  rationale: Bind portable amendments to their exact baseline subjects.
+- path: packages/service/src/powdrr_service/structrr/rebase.py
+  type: modified
+  span:
+    start_line: 15
+    end_line: 19
+  summary: Compare story primitives and classify changes to referenced stories as
+    conflicts.
+  rationale: Avoid silently replaying changed or removed customer behavior.
+- path: packages/service/src/powdrr_service/structrr/rebase.py
+  type: modified
+  span:
+    start_line: 29
+    end_line: 38
+  summary: Compare story primitives and classify changes to referenced stories as
+    conflicts.
+  rationale: Avoid silently replaying changed or removed customer behavior.
+- path: packages/service/src/powdrr_service/structrr/rebase.py
+  type: modified
+  span:
+    start_line: 140
+    end_line: 140
+  summary: Compare story primitives and classify changes to referenced stories as
+    conflicts.
+  rationale: Avoid silently replaying changed or removed customer behavior.
+- path: packages/service/src/powdrr_service/structrr/rebase.py
+  type: modified
+  span:
+    start_line: 161
+    end_line: 165
+  summary: Compare story primitives and classify changes to referenced stories as
+    conflicts.
+  rationale: Avoid silently replaying changed or removed customer behavior.
+- path: packages/service/src/powdrr_service/structrr/rebase.py
+  type: modified
+  span:
+    start_line: 173
+    end_line: 183
+  summary: Compare story primitives and classify changes to referenced stories as
+    conflicts.
+  rationale: Avoid silently replaying changed or removed customer behavior.
+- path: packages/service/src/powdrr_service/structrr/rebase.py
+  type: modified
+  span:
+    start_line: 206
+    end_line: 206
+  summary: Compare story primitives and classify changes to referenced stories as
+    conflicts.
+  rationale: Avoid silently replaying changed or removed customer behavior.
+- path: packages/service/src/powdrr_service/structrr/rebase.py
+  type: modified
+  span:
+    start_line: 567
+    end_line: 567
+  summary: Compare story primitives and classify changes to referenced stories as
+    conflicts.
+  rationale: Avoid silently replaying changed or removed customer behavior.
+- path: packages/service/src/powdrr_service/structrr/snapshot.py
+  type: modified
+  span:
+    start_line: 10
+    end_line: 15
+  summary: Canonicalize unordered story collections while retaining case and fixture
+    order.
+  rationale: Stable hashes must not erase meaningful execution sequences.
+- path: packages/service/src/powdrr_service/structrr/snapshot.py
+  type: modified
+  span:
+    start_line: 37
+    end_line: 37
+  summary: Canonicalize unordered story collections while retaining case and fixture
+    order.
+  rationale: Stable hashes must not erase meaningful execution sequences.
+- path: packages/service/src/powdrr_service/structrr/snapshot.py
+  type: modified
+  span:
+    start_line: 39
+    end_line: 41
+  summary: Canonicalize unordered story collections while retaining case and fixture
+    order.
+  rationale: Stable hashes must not erase meaningful execution sequences.
+- path: packages/service/src/powdrr_service/structrr/user_stories.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 936
+  summary: Implement typed stories, graph indexes, identity allocation, digests, atomic
+    edits, and story history projection.
+  rationale: Provide durable behavior declarations through the existing Structrr operation
+    vocabulary.
+- path: packages/service/src/powdrr_service/structrr/user_story_validation.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 330
+  summary: Validate owners, graph reachability, observations, case walks, retirement,
+    and confirmation freshness.
+  rationale: Structural validity must be explicit and remain separate from semantic
+    readiness and execution proof.
+- path: src/powdrr_lift/core/code_index.py
+  type: modified
+  span:
+    start_line: 3
+    end_line: 3
+  summary: Persist typed story operations through cached changelog reloads and advance
+    the cache version.
+  rationale: Avoid losing story deltas when a branch index is reused.
+- path: src/powdrr_lift/core/code_index.py
+  type: modified
+  span:
+    start_line: 25
+    end_line: 25
+  summary: Persist typed story operations through cached changelog reloads and advance
+    the cache version.
+  rationale: Avoid losing story deltas when a branch index is reused.
+- path: src/powdrr_lift/core/code_index.py
+  type: modified
+  span:
+    start_line: 52
+    end_line: 52
+  summary: Persist typed story operations through cached changelog reloads and advance
+    the cache version.
+  rationale: Avoid losing story deltas when a branch index is reused.
+- path: src/powdrr_lift/core/code_index.py
+  type: modified
+  span:
+    start_line: 891
+    end_line: 899
+  summary: Persist typed story operations through cached changelog reloads and advance
+    the cache version.
+  rationale: Avoid losing story deltas when a branch index is reused.
+- path: src/powdrr_lift/core/code_index.py
+  type: modified
+  span:
+    start_line: 1043
+    end_line: 1043
+  summary: Persist typed story operations through cached changelog reloads and advance
+    the cache version.
+  rationale: Avoid losing story deltas when a branch index is reused.
+- path: src/powdrr_lift/core/code_index.py
+  type: modified
+  span:
+    start_line: 1474
+    end_line: 1475
+  summary: Persist typed story operations through cached changelog reloads and advance
+    the cache version.
+  rationale: Avoid losing story deltas when a branch index is reused.
+- path: src/powdrr_lift/core/code_index.py
+  type: modified
+  span:
+    start_line: 1491
+    end_line: 1500
+  summary: Persist typed story operations through cached changelog reloads and advance
+    the cache version.
+  rationale: Avoid losing story deltas when a branch index is reused.
+- path: src/powdrr_lift/core/code_index.py
+  type: modified
+  span:
+    start_line: 2374
+    end_line: 2374
+  summary: Persist typed story operations through cached changelog reloads and advance
+    the cache version.
+  rationale: Avoid losing story deltas when a branch index is reused.
+- path: src/powdrr_lift/core/codebase_state.py
+  type: modified
+  span:
+    start_line: 8
+    end_line: 12
+  summary: Materialize canonical story sections and reviewed changelist operations
+    in current state.
+  rationale: Preserve story state through existing report and template consumers.
+- path: src/powdrr_lift/core/codebase_state.py
+  type: modified
+  span:
+    start_line: 307
+    end_line: 326
+  summary: Materialize canonical story sections and reviewed changelist operations
+    in current state.
+  rationale: Preserve story state through existing report and template consumers.
+- path: src/powdrr_lift/core/codebase_state.py
+  type: modified
+  span:
+    start_line: 329
+    end_line: 329
+  summary: Materialize canonical story sections and reviewed changelist operations
+    in current state.
+  rationale: Preserve story state through existing report and template consumers.
+- path: src/powdrr_lift/core/feature_planning_specification.py
+  type: modified
+  span:
+    start_line: 10
+    end_line: 10
+  summary: Retain all four story sections and operation envelopes in feature template
+    generation.
+  rationale: Keep nested step actions intact when transporting compiler-generated
+    declarations.
+- path: src/powdrr_lift/core/feature_planning_specification.py
+  type: modified
+  span:
+    start_line: 251
+    end_line: 251
+  summary: Retain all four story sections and operation envelopes in feature template
+    generation.
+  rationale: Keep nested step actions intact when transporting compiler-generated
+    declarations.
+- path: src/powdrr_lift/core/feature_planning_specification.py
+  type: modified
+  span:
+    start_line: 278
+    end_line: 294
+  summary: Retain all four story sections and operation envelopes in feature template
+    generation.
+  rationale: Keep nested step actions intact when transporting compiler-generated
+    declarations.
+- path: src/powdrr_lift/core/feature_planning_specification.py
+  type: modified
+  span:
+    start_line: 425
+    end_line: 425
+  summary: Retain all four story sections and operation envelopes in feature template
+    generation.
+  rationale: Keep nested step actions intact when transporting compiler-generated
+    declarations.
+- path: src/powdrr_lift/core/plan_diff_specification.py
+  type: modified
+  span:
+    start_line: 10
+    end_line: 10
+  summary: Include story subject identities in plan-to-changelog comparisons.
+  rationale: Report missing declared story changes through the existing comparison
+    path.
+- path: src/powdrr_lift/core/plan_diff_specification.py
+  type: modified
+  span:
+    start_line: 212
+    end_line: 213
+  summary: Include story subject identities in plan-to-changelog comparisons.
+  rationale: Report missing declared story changes through the existing comparison
+    path.
+- path: src/powdrr_lift/core/plan_diff_specification.py
+  type: modified
+  span:
+    start_line: 321
+    end_line: 324
+  summary: Include story subject identities in plan-to-changelog comparisons.
+  rationale: Report missing declared story changes through the existing comparison
+    path.
+- path: src/powdrr_lift/core/plan_diff_specification.py
+  type: modified
+  span:
+    start_line: 346
+    end_line: 346
+  summary: Include story subject identities in plan-to-changelog comparisons.
+  rationale: Report missing declared story changes through the existing comparison
+    path.
+- path: src/powdrr_lift/core/plan_diff_specification.py
+  type: modified
+  span:
+    start_line: 356
+    end_line: 357
+  summary: Include story subject identities in plan-to-changelog comparisons.
+  rationale: Report missing declared story changes through the existing comparison
+    path.
+- path: src/powdrr_lift/core/spec_context.py
+  type: modified
+  span:
+    start_line: 10
+    end_line: 10
+  summary: Expose the four story collections to scoped specification queries.
+  rationale: Allow retrieval without changing existing context ordering.
+- path: src/powdrr_lift/core/spec_context.py
+  type: modified
+  span:
+    start_line: 15
+    end_line: 15
+  summary: Expose the four story collections to scoped specification queries.
+  rationale: Allow retrieval without changing existing context ordering.
+- path: src/powdrr_lift/core/spec_context.py
+  type: modified
+  span:
+    start_line: 62
+    end_line: 62
+  summary: Expose the four story collections to scoped specification queries.
+  rationale: Allow retrieval without changing existing context ordering.
+- path: tests/fixtures/structrr/golden-python-symbols.yaml
+  type: modified
+  span:
+    start_line: 8
+    end_line: 8
+  summary: Refresh source spans for changed bootstrap and rebase symbols.
+  rationale: Keep golden extraction expectations bound to the current source.
+- path: tests/fixtures/structrr/golden-python-symbols.yaml
+  type: modified
+  span:
+    start_line: 14
+    end_line: 15
+  summary: Refresh source spans for changed bootstrap and rebase symbols.
+  rationale: Keep golden extraction expectations bound to the current source.
+- path: tests/fixtures/structrr/golden-python-symbols.yaml
+  type: modified
+  span:
+    start_line: 21
+    end_line: 22
+  summary: Refresh source spans for changed bootstrap and rebase symbols.
+  rationale: Keep golden extraction expectations bound to the current source.
+- path: tests/fixtures/structrr/golden-python-symbols.yaml
+  type: modified
+  span:
+    start_line: 28
+    end_line: 29
+  summary: Refresh source spans for changed bootstrap and rebase symbols.
+  rationale: Keep golden extraction expectations bound to the current source.
+- path: tests/fixtures/structrr/golden-python-symbols.yaml
+  type: modified
+  span:
+    start_line: 35
+    end_line: 36
+  summary: Refresh source spans for changed bootstrap and rebase symbols.
+  rationale: Keep golden extraction expectations bound to the current source.
+- path: tests/fixtures/user_stories/session-resume.yaml
+  type: added
+  span:
+    start_line: 1
+    end_line: 112
+  summary: Add a complete resume graph with normal and failure cases.
+  rationale: Supply a shared source-anchored story fixture for compiler integration
+    tests.
+- path: tests/test_structrr_user_stories.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 777
+  summary: Exercise story parsing, atomic changes, allocation replay, hashes, loops,
+    conflicts, bootstrap, handoff, and cache integration.
+  rationale: Verify the first vertical slice without treating declarations as behavioral
+    proof.
+entities:
+- id: structrr-user-story-catalog-v1
+  type: Class
+  action: added
+- id: structrr-user-story-validator-v1
+  type: Function
+  action: added
+- id: structrr-user-story-edit-allocator-v1
+  type: Function
+  action: added
+- id: structrr-story-contract-digest-v1
+  type: Function
+  action: added
+entity_relationships:
+- id: structrr-story-validator-uses-catalog
+  source: structrr-user-story-validator-v1
+  target: structrr-user-story-catalog-v1
+  relationship: uses
+  type: uses
+  action: added
+  description: The validator checks ownership, connected paths, observations and identity
+    state from the typed catalog.
+  rationale: Validate complete projected story graphs deterministically.
+invariants:
+- id: structrr-story-declarations-are-not-implementation-evidence
+  action: added
+  description: Story graph changes remain intent declarations and cannot establish
+    implementation or behavioral verification.
+- id: structrr-story-local-identities-remain-retired
+  action: added
+  description: Removed local story IDs remain retired and allocation counters cannot
+    regress across projected transactions.
+guidance: []

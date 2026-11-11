@@ -14,6 +14,7 @@ from powdrr_service.specifications.common import (
     validate_module_tool_sections,
     validate_related_module_references,
 )
+from powdrr_service.structrr.user_story_validation import validate_story_document
 
 
 @dataclass(frozen=True, slots=True)
@@ -193,6 +194,10 @@ def build_architecture_specification_validation_report(
         issues=issues,
     )
 
+    issues.extend(
+        ArchitectureSpecificationValidationIssue(i.code, i.message, i.subject_id)
+        for i in validate_story_document(raw_spec).issues
+    )
     return ArchitectureSpecificationValidationReport(
         validation_successful=not issues,
         title=title,

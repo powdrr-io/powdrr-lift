@@ -13,6 +13,7 @@ from powdrr_service.structrr.source_manifest import (
     SourceManifest,
     compare_source_manifests,
 )
+from powdrr_service.structrr.user_stories import STORY_SECTIONS
 
 ACTUAL_DIFF_SCHEMA_VERSION = "structrr-actual-diff-v1"
 
@@ -114,7 +115,8 @@ def compile_actual_structrr_diff(
             "evidence_paths": evidence_paths,
             "reason": str(change["reason"]),
         }
-        operations.append(operation)
+        if operation["section"] not in STORY_SECTIONS:
+            operations.append(operation)
         if action == "unresolved":
             unknowns.append(
                 "ambiguous structural identity for "
@@ -131,6 +133,11 @@ def compile_actual_structrr_diff(
         for item in source_report["changes"]
         if item["evidence_kind"] == "declaration"
     ]
+    declaration_changes.extend(
+        {**item, "evidence_kind": "declaration"}
+        for item in raw_operations
+        if item["area"] in STORY_SECTIONS
+    )
     behavior_paths = tuple(
         sorted(
             {

@@ -7,6 +7,12 @@ import json
 from collections.abc import Mapping, Sequence
 from typing import Any
 
+from powdrr_service.structrr.user_stories import (
+    STORY_SECTIONS,
+    canonical_story_data,
+    parse_story_catalog,
+)
+
 
 def snapshot_digest(snapshot: Mapping[str, Any]) -> str:
     """Return a content address for a Structrr snapshot.
@@ -28,7 +34,11 @@ def _canonical_snapshot(snapshot: Mapping[str, Any]) -> dict[str, Any]:
         "source_bindings",
     }
     result: dict[str, Any] = {}
+    stories = canonical_story_data(parse_story_catalog(snapshot))
     for key, value in snapshot.items():
+        if key in STORY_SECTIONS:
+            result[key] = stories[key]
+            continue
         if (
             key in collections
             and isinstance(value, Sequence)

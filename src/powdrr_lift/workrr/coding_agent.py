@@ -25,6 +25,8 @@ from typing import TYPE_CHECKING, Any, Protocol, cast
 if TYPE_CHECKING:
     from powdrr_service.structrr.design import DesignHandoff
 
+    from powdrr_lift.workrr.source_reference_run import SourceReferenceRun
+
 from powdrr_agent.execution.minisweagent_monitor import (
     MiniSWEAgentSnapshot,
     run_minisweagent,
@@ -187,12 +189,18 @@ class ImplementationRequest:
             source_reference_prompt=prompt,
         )
 
-    def require_supported_execution(self) -> None:
+    def require_supported_execution(
+        self, provider: object | None = None, worktree_root: Path | None = None
+    ) -> None:
         if self.source_reference_prompt is not None:
-            raise ValueError(
-                "Source-reference execution requires immutable worker rollout "
-                "inputs, which are not integrated yet."
-            )
+            from powdrr_lift.workrr.source_reference_run import SourceReferenceRun
+
+            execution = getattr(provider, "source_reference_execution", None)
+            if not isinstance(execution, SourceReferenceRun):
+                raise ValueError(
+                    "Protected rollout inputs are not integrated with this provider."
+                )
+            execution.authorize(self, provider=provider, worktree_root=worktree_root)
 
     @classmethod
     def from_structrr_handoff(
@@ -906,6 +914,9 @@ class MiniSWEAgentProvider:
     source_reference_mode: str = "off"
     source_reference_catalog: ReferenceCatalog | None = field(default=None, repr=False)
     source_reader_limits: ReaderLimits = field(default_factory=ReaderLimits)
+    source_reference_execution: SourceReferenceRun | None = field(
+        default=None, repr=False
+    )
 
     def prepare_request(self, request: ImplementationRequest) -> ImplementationRequest:
         return _tailor_request_prompt(request, self.prompt_prefix, self.prompt_suffix)
@@ -913,8 +924,13 @@ class MiniSWEAgentProvider:
     def run(
         self, request: ImplementationRequest, *, worktree_root: Path, attempt_id: str
     ) -> subprocess.CompletedProcess[str]:
-        request.require_supported_execution()
+        request.require_supported_execution(self, worktree_root)
         workspace_root = worktree_root.resolve()
+        execution = (
+            self.source_reference_execution
+            if request.source_reference_prompt is not None
+            else None
+        )
         if self.source_reference_mode not in {"off", "observe", "enforce"}:
             raise ValueError("invalid source reference mode")
         if self.source_reference_mode != "off" and (
@@ -944,6 +960,11 @@ class MiniSWEAgentProvider:
                 "Follow context pagination until required context is complete. "
                 "Ordinary shell output discovers visible markers only."
             )
+        if execution is not None:
+            # The compiled prompt already carries the concrete workspace and
+            # protocol. Never prepend, append, substitute, or repair its bytes.
+            task_prompt = request.prompt
+            execution.claim_invocation(request, attempt_id)
         environment = os.environ.copy()
         for name in tuple(environment):
             if name.startswith("POWDRR_STRUCTRR_"):
@@ -956,7 +977,14 @@ class MiniSWEAgentProvider:
         environment["MSWEA_CONFIGURED"] = "true"
         environment["MSWEA_SILENT_STARTUP"] = "true"
         environment["PWD"] = str(workspace_root)
-        inference_config_root = Path(tempfile.mkdtemp(prefix="powdrr-miniswe-config-"))
+        inference_config_root = Path(
+            tempfile.mkdtemp(
+                prefix="powdrr-miniswe-config-",
+                dir=execution.public_root if execution else None,
+            )
+        )
+        if execution is not None:
+            environment.update(execution.process_environment())
         environment["MSWEA_GLOBAL_CONFIG_DIR"] = str(inference_config_root)
         inference_parent, inference_child = socket.socketpair()
         environment["POWDRR_MINISWE_INFERENCE_FD"] = str(inference_child.fileno())
@@ -966,6 +994,8 @@ class MiniSWEAgentProvider:
             if self.diagnostics_root is not None
             else None
         )
+        if execution is not None:
+            output_path = execution.public_root / f"{attempt_id}.traj.json"
         task_file: Path | None = None
         use_task_file = len(task_prompt.encode("utf-8")) > (
             MINISWEAGENT_MAX_TASK_ARGUMENT_BYTES
@@ -984,6 +1014,7 @@ class MiniSWEAgentProvider:
                 prefix="powdrr-miniswe-task-",
                 suffix=".txt",
                 delete=False,
+                dir=execution.public_root if execution else None,
             ) as task_stream:
                 task_stream.write(task_prompt)
                 task_file = Path(task_stream.name)
@@ -1041,7 +1072,7 @@ class MiniSWEAgentProvider:
             last_reported_at = snapshot.elapsed_seconds
 
         sandbox_profile: Path | None = None
-        if self.write_denied_paths:
+        if self.write_denied_paths and execution is None:
             if sys.platform != "darwin":
                 raise RuntimeError(
                     "MiniSWE write protection is supported only on macOS; "
@@ -1065,6 +1096,8 @@ class MiniSWEAgentProvider:
                 )
                 sandbox_profile = Path(profile_stream.name)
             command = [sandbox_executable, "-f", str(sandbox_profile), *command]
+        if execution is not None:
+            command = list(execution.protect_command(tuple(command)))
         try:
             with ExitStack() as resources:
                 if self.source_reference_mode != "off":
@@ -1082,12 +1115,15 @@ class MiniSWEAgentProvider:
                             self.diagnostics_root
                             / f"{attempt_id}.source-events.ndjson",
                             self.source_reference_mode,
+                            reference_check=execution.check if execution else None,
                         )
                     )
                     environment["POWDRR_STRUCTRR_ENDPOINT"] = source_bridge.endpoint
                 completed = run_minisweagent(
                     command,
-                    trajectory_path=(
+                    trajectory_path=output_path
+                    if execution
+                    else (
                         self.diagnostics_root / f"{attempt_id}.traj.json"
                         if self.diagnostics_root is not None
                         else None
@@ -1116,9 +1152,12 @@ class MiniSWEAgentProvider:
             inference_child.close()
             shutil.rmtree(inference_config_root, ignore_errors=True)
         if output_path is not None and output_path.exists():
-            self.session_trajectory = output_path
+            if execution is None:
+                self.session_trajectory = output_path
         if completed.returncode == 0 and self.diagnostics_root is not None:
-            trajectory_path = self.diagnostics_root / f"{attempt_id}.traj.json"
+            trajectory_path = (
+                output_path or self.diagnostics_root / f"{attempt_id}.traj.json"
+            )
             exit_status = _mini_trajectory_exit_status(trajectory_path)
             if exit_status is not None and exit_status != "Submitted":
                 diagnostic = (
@@ -1132,6 +1171,8 @@ class MiniSWEAgentProvider:
                     completed.stdout,
                     stderr,
                 )
+        if execution is not None:
+            execution.verify_inputs()
         return completed
 
 
@@ -1450,7 +1491,7 @@ def run_coding_agent(
 ) -> CodingAgentAttempt:
     """Run one worker and derive the result from the observed repository state."""
     try:
-        request.require_supported_execution()
+        request.require_supported_execution(provider, worktree_root)
     except ValueError as error:
         return CodingAgentAttempt(
             attempt_id,

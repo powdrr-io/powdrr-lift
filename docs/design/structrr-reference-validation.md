@@ -6,10 +6,11 @@ ownership from supplied baseline and candidate bytes. The local adapter
 acquires those bytes from Git and the worktree. Compatibility exports are in
 `powdrr_lift.structrr.reference_validation`.
 
-This implements step 6 of the source annotations plan. Automatic worker rollout
-remains step 7. Reference-bearing implementation requests stay blocked before
-provider invocation until that rollout binds the private context and attempt
-metadata. Adding this validator does not enable those requests by itself.
+This implements step 6 of the source annotations plan. The
+[step 7 rollout](structrr-reference-rollout.md) binds this context to protected
+worker execution and attempt metadata. Unbound reference-bearing requests remain
+blocked before provider invocation. Behavioral profiles run before the final
+source check so their candidate edits cannot invalidate an earlier passing proof.
 
 ## Frozen inputs and coverage
 

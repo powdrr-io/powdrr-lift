@@ -26,10 +26,12 @@ Step 6 (independent placement/preservation validation, structured owner review,
 local checks, and validation-report integration) is implemented in the service's
 `structrr/reference_validation.py` and Workrr's `source_reference_validation.py`.
 See [the validation contract](../design/structrr-reference-validation.md) and
-`tests/test_structrr_reference_validation.py`. Worker rollout remains planned;
-reference-bearing requests cannot execute until immutable rollout inputs and
-private validation contexts are bound by orchestration. The modules
-marked **new** below are planned. Legacy module paths refer to the service-owned
+`tests/test_structrr_reference_validation.py`. Step 7 supplies the initial local
+macOS rollout through `workrr/source_reference_run.py`: immutable private inputs,
+one protected miniSWE invocation, verified context coverage, independent final
+validation, and terminal artifacts. See [the rollout contract](../design/structrr-reference-rollout.md).
+Other platforms require a protection adapter and fail closed today. The modules
+marked **new** below identify the original implementation stages. Legacy module paths refer to the service-owned
 responsibilities described in section 12.4.
 
 The pure parser exposes `index_python_source`, `applicable_references`, and

@@ -25,6 +25,14 @@ continuation, or validation-derived repair prompt in this target design.
 
 ## Design handoff artifacts
 
+Source-annotation placement compilation is implemented as the scoped projection
+described in [Structrr placement handoffs](structrr-source-reference-handoff.md).
+Its public prompt and private manifest share canonical placement/preservation
+inputs and fingerprints, preserving the eight-section layout below. It uses
+distinct source-reference schema names and does not claim the complete behavioral
+compiler or execution/validation rollout specified here. Reference-bearing
+requests remain blocked from provider execution until those checks are wired.
+
 The design phase emits exactly one worker-facing
 `minisweagent-implementation-prompt-v1` containing:
 

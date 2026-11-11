@@ -190,8 +190,8 @@ class ImplementationRequest:
     def require_supported_execution(self) -> None:
         if self.source_reference_prompt is not None:
             raise ValueError(
-                "Source-reference execution requires placement validation and "
-                "worker rollout, which are not integrated yet."
+                "Source-reference execution requires immutable worker rollout "
+                "inputs, which are not integrated yet."
             )
 
     @classmethod
@@ -1602,18 +1602,22 @@ def _commits_between(
 
 
 def _committed_paths(
-    worktree_root: Path, before_head: str, after_head: str
+    worktree_root: Path,
+    before_head: str,
+    after_head: str,
+    *,
+    output: Callable[..., str] | None = None,
 ) -> set[str]:
     if before_head == after_head:
         return set()
-    output = _git_output(
+    result = (output or _git_output)(
         worktree_root,
         "diff",
         "--name-only",
         "--no-renames",
         f"{before_head}..{after_head}",
     )
-    return {line for line in output.splitlines() if line}
+    return {line for line in result.splitlines() if line}
 
 
 def _git_is_ancestor(worktree_root: Path, ancestor: str, revision: str) -> bool:
@@ -1627,15 +1631,17 @@ def _git_is_ancestor(worktree_root: Path, ancestor: str, revision: str) -> bool:
     return result.returncode == 0
 
 
-def _working_paths(worktree_root: Path) -> set[str]:
+def _working_paths(
+    worktree_root: Path, *, output: Callable[..., str] | None = None
+) -> set[str]:
     paths: set[str] = set()
     for arguments in (
         ("diff", "--name-only"),
         ("diff", "--cached", "--name-only"),
         ("ls-files", "--others", "--exclude-standard"),
     ):
-        output = _git_output(worktree_root, *arguments)
-        paths.update(line for line in output.splitlines() if line)
+        result = (output or _git_output)(worktree_root, *arguments)
+        paths.update(line for line in result.splitlines() if line)
     return paths
 
 

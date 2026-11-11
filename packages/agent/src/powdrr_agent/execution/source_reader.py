@@ -37,6 +37,7 @@ def main(argv: list[str] | None = None) -> int:
     context = commands.add_parser("context")
     context.add_argument("--ref", required=True)
     context.add_argument("--offset", type=int, default=0)
+    commands.add_parser("check")
     args = parser.parse_args(argv)
     try:
         response = context_request(
@@ -58,6 +59,8 @@ def main(argv: list[str] | None = None) -> int:
     # Continuation commands must work inside the isolated worker distribution.
     # Keep the issued envelope exact; the formatter supplies adapted commands.
     print(json.dumps(response, ensure_ascii=False))
+    if args.operation == "check":
+        return 0 if response["status"] == "passed" else 1
     return 0 if response["observation"]["status"] == "complete" else 1
 
 

@@ -1,0 +1,387 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1425
+title: Validate Structrr source references against frozen placement contracts
+intent:
+  problem: Source annotation presence and worker claims do not prove correct ownership,
+    preserved baseline bindings, or fresh validation inputs.
+  goal: Independently validate placements and preservation from authoritative snapshots
+    and integrate a distinct source-reference result with existing checks.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/design/structrr-reference-validation.md
+  type: added
+  span:
+    start_line: 1
+    end_line: 143
+  summary: Document independent ownership/preservation validation, evidence binding,
+    bounds, local commands, report integration, and remaining rollout.
+  rationale: State the source proof guarantee separately from behavioral acceptance
+    and process isolation.
+- path: docs/design/structrr-source-reference-handoff.md
+  type: modified
+  span:
+    start_line: 110
+    end_line: 112
+  summary: Link the implemented placement validator and retain the worker rollout
+    prerequisite.
+  rationale: Keep the handoff contract aligned with the next implementation stage.
+- path: docs/design/structrr-source-reference-handoff.md
+  type: modified
+  span:
+    start_line: 120
+    end_line: 120
+  summary: Link the implemented placement validator and retain the worker rollout
+    prerequisite.
+  rationale: Keep the handoff contract aligned with the next implementation stage.
+- path: docs/plans/structrr-source-references.md
+  type: modified
+  span:
+    start_line: 25
+    end_line: 31
+  summary: Record completed independent reference validation and the remaining orchestration
+    step.
+  rationale: Keep automatic execution gated until immutable rollout inputs are bound.
+- path: packages/agent/src/powdrr_agent/execution/source_reader.py
+  type: modified
+  span:
+    start_line: 40
+    end_line: 40
+  summary: Add the check proxy command with explicit placement-validation exit status.
+  rationale: Allow an isolated worker to request a trusted check without selecting
+    private inputs.
+- path: packages/agent/src/powdrr_agent/execution/source_reader.py
+  type: modified
+  span:
+    start_line: 62
+    end_line: 63
+  summary: Add the check proxy command with explicit placement-validation exit status.
+  rationale: Allow an isolated worker to request a trusted check without selecting
+    private inputs.
+- path: packages/local/src/powdrr_local/structrr_context.py
+  type: modified
+  span:
+    start_line: 9
+    end_line: 9
+  summary: Dispatch reader check requests to an optional trusted validation callback.
+  rationale: Keep private context and manifest selection in the host process.
+- path: packages/local/src/powdrr_local/structrr_context.py
+  type: modified
+  span:
+    start_line: 14
+    end_line: 14
+  summary: Dispatch reader check requests to an optional trusted validation callback.
+  rationale: Keep private context and manifest selection in the host process.
+- path: packages/local/src/powdrr_local/structrr_context.py
+  type: modified
+  span:
+    start_line: 22
+    end_line: 27
+  summary: Dispatch reader check requests to an optional trusted validation callback.
+  rationale: Keep private context and manifest selection in the host process.
+- path: packages/local/src/powdrr_local/structrr_context.py
+  type: modified
+  span:
+    start_line: 34
+    end_line: 34
+  summary: Dispatch reader check requests to an optional trusted validation callback.
+  rationale: Keep private context and manifest selection in the host process.
+- path: packages/local/src/powdrr_local/structrr_context.py
+  type: modified
+  span:
+    start_line: 117
+    end_line: 122
+  summary: Dispatch reader check requests to an optional trusted validation callback.
+  rationale: Keep private context and manifest selection in the host process.
+- path: packages/service/src/powdrr_service/structrr/reference_validation.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 951
+  summary: Recompute direct placements and baseline preservation from source snapshots
+    with structured independent review and immutable reports.
+  rationale: Reject ID stuffing, missing ownership, unauthorized removals, stale inputs,
+    ambiguous evidence, and incomplete coverage without relying on worker claims.
+- path: packages/service/src/powdrr_service/structrr/source_reader.py
+  type: modified
+  span:
+    start_line: 18
+    end_line: 18
+  summary: Expose bounded snapshot bytes and an optional host check command callback.
+  rationale: Reuse safe source acquisition and command parsing without importing local
+    orchestration into the service.
+- path: packages/service/src/powdrr_service/structrr/source_reader.py
+  type: modified
+  span:
+    start_line: 264
+    end_line: 267
+  summary: Expose bounded snapshot bytes and an optional host check command callback.
+  rationale: Reuse safe source acquisition and command parsing without importing local
+    orchestration into the service.
+- path: packages/service/src/powdrr_service/structrr/source_reader.py
+  type: modified
+  span:
+    start_line: 694
+    end_line: 696
+  summary: Expose bounded snapshot bytes and an optional host check command callback.
+  rationale: Reuse safe source acquisition and command parsing without importing local
+    orchestration into the service.
+- path: packages/service/src/powdrr_service/structrr/source_reader.py
+  type: modified
+  span:
+    start_line: 711
+    end_line: 714
+  summary: Expose bounded snapshot bytes and an optional host check command callback.
+  rationale: Reuse safe source acquisition and command parsing without importing local
+    orchestration into the service.
+- path: packages/service/src/powdrr_service/structrr/source_reader.py
+  type: modified
+  span:
+    start_line: 716
+    end_line: 718
+  summary: Expose bounded snapshot bytes and an optional host check command callback.
+  rationale: Reuse safe source acquisition and command parsing without importing local
+    orchestration into the service.
+- path: src/powdrr_lift/structrr/reference_validation.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 15
+  summary: Export service-owned reference validation APIs through the planned compatibility
+    module.
+  rationale: Preserve repository-facing imports while keeping validation policy in
+    the service.
+- path: src/powdrr_lift/structrr/source_reader.py
+  type: modified
+  span:
+    start_line: 3
+    end_line: 13
+  summary: Register the IPC check proxy with the compatibility reader command.
+  rationale: Expose checks without importing Workrr orchestration or selecting alternate
+    manifests.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 193
+    end_line: 194
+  summary: Allow trusted acquisition to reuse attributable-path helpers and clarify
+    the remaining rollout guard.
+  rationale: Cover committed and dirty changes through existing machinery while preserving
+    legacy execution behavior.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 1605
+    end_line: 1609
+  summary: Allow trusted acquisition to reuse attributable-path helpers and clarify
+    the remaining rollout guard.
+  rationale: Cover committed and dirty changes through existing machinery while preserving
+    legacy execution behavior.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 1613
+    end_line: 1613
+  summary: Allow trusted acquisition to reuse attributable-path helpers and clarify
+    the remaining rollout guard.
+  rationale: Cover committed and dirty changes through existing machinery while preserving
+    legacy execution behavior.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 1620
+    end_line: 1620
+  summary: Allow trusted acquisition to reuse attributable-path helpers and clarify
+    the remaining rollout guard.
+  rationale: Cover committed and dirty changes through existing machinery while preserving
+    legacy execution behavior.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 1634
+    end_line: 1636
+  summary: Allow trusted acquisition to reuse attributable-path helpers and clarify
+    the remaining rollout guard.
+  rationale: Cover committed and dirty changes through existing machinery while preserving
+    legacy execution behavior.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 1643
+    end_line: 1644
+  summary: Allow trusted acquisition to reuse attributable-path helpers and clarify
+    the remaining rollout guard.
+  rationale: Cover committed and dirty changes through existing machinery while preserving
+    legacy execution behavior.
+- path: src/powdrr_lift/workrr/coding_agent_validation.py
+  type: modified
+  span:
+    start_line: 21
+    end_line: 23
+  summary: Add a reserved reference-validation result and trusted context integration
+    alongside ordinary profiles.
+  rationale: Prevent placement evidence from masking behavioral failures or missing
+    validation context.
+- path: src/powdrr_lift/workrr/coding_agent_validation.py
+  type: modified
+  span:
+    start_line: 148
+    end_line: 148
+  summary: Add a reserved reference-validation result and trusted context integration
+    alongside ordinary profiles.
+  rationale: Prevent placement evidence from masking behavioral failures or missing
+    validation context.
+- path: src/powdrr_lift/workrr/coding_agent_validation.py
+  type: modified
+  span:
+    start_line: 153
+    end_line: 155
+  summary: Add a reserved reference-validation result and trusted context integration
+    alongside ordinary profiles.
+  rationale: Prevent placement evidence from masking behavioral failures or missing
+    validation context.
+- path: src/powdrr_lift/workrr/coding_agent_validation.py
+  type: modified
+  span:
+    start_line: 217
+    end_line: 217
+  summary: Add a reserved reference-validation result and trusted context integration
+    alongside ordinary profiles.
+  rationale: Prevent placement evidence from masking behavioral failures or missing
+    validation context.
+- path: src/powdrr_lift/workrr/coding_agent_validation.py
+  type: modified
+  span:
+    start_line: 221
+    end_line: 221
+  summary: Add a reserved reference-validation result and trusted context integration
+    alongside ordinary profiles.
+  rationale: Prevent placement evidence from masking behavioral failures or missing
+    validation context.
+- path: src/powdrr_lift/workrr/coding_agent_validation.py
+  type: modified
+  span:
+    start_line: 230
+    end_line: 245
+  summary: Add a reserved reference-validation result and trusted context integration
+    alongside ordinary profiles.
+  rationale: Prevent placement evidence from masking behavioral failures or missing
+    validation context.
+- path: src/powdrr_lift/workrr/coding_agent_validation.py
+  type: modified
+  span:
+    start_line: 259
+    end_line: 259
+  summary: Add a reserved reference-validation result and trusted context integration
+    alongside ordinary profiles.
+  rationale: Prevent placement evidence from masking behavioral failures or missing
+    validation context.
+- path: src/powdrr_lift/workrr/coding_agent_validation.py
+  type: modified
+  span:
+    start_line: 267
+    end_line: 268
+  summary: Add a reserved reference-validation result and trusted context integration
+    alongside ordinary profiles.
+  rationale: Prevent placement evidence from masking behavioral failures or missing
+    validation context.
+- path: src/powdrr_lift/workrr/coding_agent_validation.py
+  type: modified
+  span:
+    start_line: 287
+    end_line: 287
+  summary: Add a reserved reference-validation result and trusted context integration
+    alongside ordinary profiles.
+  rationale: Prevent placement evidence from masking behavioral failures or missing
+    validation context.
+- path: src/powdrr_lift/workrr/coding_agent_validation.py
+  type: modified
+  span:
+    start_line: 292
+    end_line: 310
+  summary: Add a reserved reference-validation result and trusted context integration
+    alongside ordinary profiles.
+  rationale: Prevent placement evidence from masking behavioral failures or missing
+    validation context.
+- path: src/powdrr_lift/workrr/coding_agent_validation.py
+  type: modified
+  span:
+    start_line: 333
+    end_line: 375
+  summary: Add a reserved reference-validation result and trusted context integration
+    alongside ordinary profiles.
+  rationale: Prevent placement evidence from masking behavioral failures or missing
+    validation context.
+- path: src/powdrr_lift/workrr/source_reference_validation.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 328
+  summary: Acquire bounded baseline and worktree snapshots using safe Git plumbing
+    and recheck them after validation.
+  rationale: Include committed, staged, untracked, deleted, renamed, and explicitly
+    named unchanged source while rejecting concurrent mutations.
+- path: tests/test_structrr_reference_validation.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 698
+  summary: Test ownership stuffing, diagnostics, preservation, review receipts, collection
+    evidence, safe Git acquisition, concurrency, profile separation, and local/proxy
+    checks.
+  rationale: Exercise authoritative source and privacy boundaries without paid model
+    calls.
+entities:
+- id: structrr-reference-validation-report-v1
+  type: Class
+  action: added
+- id: structrr-reference-validation-context-v1
+  type: Class
+  action: added
+- id: structrr-source-reference-validator-v1
+  type: Function
+  action: added
+- id: structrr-source-reference-review-client-v1
+  type: Interface
+  action: added
+- id: structrr-source-reader-check-v1
+  type: Subcommand
+  action: added
+entity_relationships:
+- id: structrr-validation-context-uses-source-validator
+  source: structrr-reference-validation-context-v1
+  target: structrr-source-reference-validator-v1
+  relationship: uses
+  type: uses
+  action: added
+  description: The context acquires fresh Git/worktree snapshots and supplies frozen
+    private identities to the pure validator.
+  rationale: Base source proof on actual candidate bytes and complete attributable
+    scope.
+- id: structrr-source-validator-produces-reference-report
+  source: structrr-source-reference-validator-v1
+  target: structrr-reference-validation-report-v1
+  relationship: creates
+  type: creates
+  action: added
+  description: The validator emits immutable source-only findings, coverage, and bound
+    semantic decisions.
+  rationale: Keep ownership/preservation evidence separate from behavioral acceptance.
+invariants:
+- id: structrr-required-placement-is-direct-owner-bound
+  action: added
+  description: Required placements use direct exact or independently reviewed owner
+    bindings; inherited markers and ID counts cannot satisfy another owner.
+- id: structrr-baseline-reference-removal-needs-accepted-authority
+  action: added
+  description: Changed or deleted baseline bindings must survive or have accepted
+    removal, supersession, or independently reviewed relocation.
+- id: structrr-source-proof-requires-fresh-complete-evidence
+  action: added
+  description: Stale inputs, incomplete acquisition, ambiguous or unavailable review,
+    and concurrent source mutation block acceptance.
+- id: structrr-placement-proof-is-not-behavioral-proof
+  action: added
+  description: Reference reports never claim behavioral evidence; the reserved reference
+    profile cannot replace ordinary required validation profiles.
+guidance: []

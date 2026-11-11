@@ -6,10 +6,12 @@ import json
 import socket
 import tempfile
 import threading
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
 from powdrr_agent.execution.inference_ipc import receive_frame, send_frame
+from powdrr_service.structrr.reference_validation import ReferenceValidationReport
 from powdrr_service.structrr.source_observation import SourceObservationSession
 
 
@@ -17,13 +19,19 @@ class StructrrContextBridge:
     """Serve bounded read and enrichment requests; never send the catalog file."""
 
     def __init__(
-        self, session: SourceObservationSession, event_path: Path, mode: str
+        self,
+        session: SourceObservationSession,
+        event_path: Path,
+        mode: str,
+        *,
+        reference_check: Callable[[], ReferenceValidationReport] | None = None,
     ) -> None:
         if mode not in {"observe", "enforce"}:
             raise ValueError("source reference mode must be observe or enforce")
         self.session = session
         self.event_path = event_path
         self.mode = mode
+        self.reference_check = reference_check
         self._temporary: tempfile.TemporaryDirectory[str] | None = None
         self._socket: socket.socket | None = None
         self._thread: threading.Thread | None = None
@@ -106,6 +114,12 @@ class StructrrContextBridge:
             and set(request) == {"operation", "request"}
             and isinstance(request["request"], dict)
         ):
+            if request["request"] == {"operation": "check"}:
+                if self.reference_check is None:
+                    raise ValueError(
+                        "Trusted reference validation inputs are not configured."
+                    )
+                return self.reference_check().to_data()
             return self.session.read(request["request"])
         if (
             operation in {"observe", "submission"}

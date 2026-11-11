@@ -22,8 +22,13 @@ serialization) is implemented in the service's `structrr/source_reference_handof
 with compatibility exports under `powdrr_lift.workrr.source_reference_handoff` and
 tests in `tests/test_source_reference_handoff.py`. See
 [the handoff contract](../design/structrr-source-reference-handoff.md).
-Independent placement validation and worker rollout remain planned;
-reference-bearing requests cannot execute until they are integrated. The modules
+Step 6 (independent placement/preservation validation, structured owner review,
+local checks, and validation-report integration) is implemented in the service's
+`structrr/reference_validation.py` and Workrr's `source_reference_validation.py`.
+See [the validation contract](../design/structrr-reference-validation.md) and
+`tests/test_structrr_reference_validation.py`. Worker rollout remains planned;
+reference-bearing requests cannot execute until immutable rollout inputs and
+private validation contexts are bound by orchestration. The modules
 marked **new** below are planned. Legacy module paths refer to the service-owned
 responsibilities described in section 12.4.
 

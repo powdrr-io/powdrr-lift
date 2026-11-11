@@ -107,7 +107,9 @@ requests use explicit `off`. The legacy Structrr handoff adapter rejects designs
 containing reference placement/preservation records, preventing silent bypass.
 
 Reference-bearing requests are deliberately rejected before provider invocation
-until placement validation and worker rollout are integrated. The common runner
+until worker rollout binds the private validation context. Independent
+[placement validation](structrr-reference-validation.md) is now available, but
+does not itself enable provider execution. The common runner
 returns policy denied, and direct miniSWE/OpenCode adapters also reject them.
 The optional local check is rendered only when supplied; otherwise the prompt
 explicitly reports that the check is unavailable and cannot be claimed passing.
@@ -115,5 +117,5 @@ Supplying a command is not evidence that its validator exists or has passed.
 
 Environment integration is tracked separately in
 [PR #1418](https://github.com/powdrr-io/powdrr-lift/pull/1418), which was still open
-when this implementation began. Step 6 supplies independent placement and
+when this implementation began. Step 6 now supplies independent placement and
 preservation validation; step 7 binds immutable worker inputs and enables rollout.

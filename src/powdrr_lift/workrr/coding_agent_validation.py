@@ -18,6 +18,9 @@ from powdrr_lift.workrr.coding_agent import (
     CodingAgentStatus,
     ImplementationRequest,
 )
+from powdrr_lift.workrr.source_reference_validation import (
+    SourceReferenceValidationContext,
+)
 
 CODING_AGENT_VALIDATION_REPORT_SCHEMA_VERSION = "coding-agent-validation-report-v1"
 
@@ -142,11 +145,14 @@ def execute_coding_agent_attempt(
     attempt_id: str,
     profiles: Mapping[str, ValidationProfile],
     validation_timeout_seconds: float,
+    reference_context: SourceReferenceValidationContext | None = None,
 ) -> CodingAgentExecutionResult:
     """Run one agent attempt and its common local validation gates."""
     attempt = runner.run(request, worktree_root=worktree_root, attempt_id=attempt_id)
     validation = ValidationRunner(
-        profiles, timeout_seconds=validation_timeout_seconds
+        profiles,
+        timeout_seconds=validation_timeout_seconds,
+        reference_context=reference_context,
     ).run(request, attempt, worktree_root=worktree_root)
     runner.store.save_validation_report(validation)
     diff_check = subprocess.run(
@@ -208,9 +214,11 @@ class ValidationRunner:
         profiles: Mapping[str, ValidationProfile],
         *,
         timeout_seconds: float = 600.0,
+        reference_context: SourceReferenceValidationContext | None = None,
     ) -> None:
         self.profiles = dict(profiles)
         self.timeout_seconds = timeout_seconds
+        self.reference_context = reference_context
 
     def run(
         self,
@@ -219,6 +227,22 @@ class ValidationRunner:
         *,
         worktree_root: Path,
     ) -> ValidationReport:
+        reference_required = (
+            request.source_reference_prompt is not None
+            or "structrr-references" in request.validation_profiles
+        )
+        names = (
+            request.validation_profiles
+            if not reference_required
+            else tuple(
+                dict.fromkeys(
+                    (
+                        *request.validation_profiles,
+                        *(("structrr-references",) if reference_required else ()),
+                    )
+                )
+            )
+        )
         if attempt.status is not CodingAgentStatus.COMPLETED:
             return ValidationReport(
                 attempt_id=attempt.attempt_id,
@@ -232,7 +256,7 @@ class ValidationRunner:
                         returncode=None,
                         error=f"coding-agent attempt was {attempt.status.value}",
                     )
-                    for name in request.validation_profiles
+                    for name in names
                 ),
                 error="validation is blocked until the coding-agent attempt completes",
             )
@@ -240,6 +264,8 @@ class ValidationRunner:
         profiles: list[ValidationProfile] = []
         missing: list[str] = []
         for name in request.validation_profiles:
+            if name == "structrr-references":
+                continue
             profile = self.profiles.get(name)
             if profile is None:
                 missing.append(name)
@@ -258,13 +284,30 @@ class ValidationRunner:
                         returncode=None,
                         error=f"validation profile is not registered: {name}",
                     )
-                    for name in request.validation_profiles
+                    for name in names
                 ),
                 error="one or more validation profiles are not registered",
             )
 
-        results = tuple(
-            self._run_profile(profile, request, worktree_root) for profile in profiles
+        reference_results: list[ValidationResult] = []
+        if reference_required:
+            reference_results.append(self._run_references(request, worktree_root))
+            if not profiles:
+                reference_results.append(
+                    ValidationResult(
+                        profile="behavioral-evidence",
+                        command=(),
+                        status=ValidationResultStatus.BLOCKED,
+                        returncode=None,
+                        error="Reference evidence cannot replace behavioral profiles.",
+                    )
+                )
+        results = (
+            *reference_results,
+            *(
+                self._run_profile(profile, request, worktree_root)
+                for profile in profiles
+            ),
         )
         blocked = any(
             result.status is ValidationResultStatus.BLOCKED for result in results
@@ -286,6 +329,49 @@ class ValidationRunner:
             ),
             results=results,
         )
+
+    def _run_references(
+        self, request: ImplementationRequest, worktree_root: Path
+    ) -> ValidationResult:
+        import json
+
+        try:
+            if (
+                self.reference_context is None
+                or request.source_reference_prompt is None
+            ):
+                raise ValueError(
+                    "Frozen reference context and public prompt are required."
+                )
+            self.reference_context.handoff.require_matches(
+                request.source_reference_prompt
+            )
+            report = self.reference_context.check(worktree_root)
+            status = {
+                "passed": ValidationResultStatus.PASSED,
+                "failed": ValidationResultStatus.FAILED,
+                "needs_review": ValidationResultStatus.BLOCKED,
+            }[report.status]
+            return ValidationResult(
+                profile="structrr-references",
+                command=(),
+                status=status,
+                returncode=0 if report.status == "passed" else 1,
+                stdout=json.dumps(report.to_data()),
+                expected=(
+                    "Reference placements and preservation pass; "
+                    "behavior is checked separately."
+                ),
+                actual=report.status,
+            )
+        except (ValueError, OSError, RuntimeError) as error:
+            return ValidationResult(
+                profile="structrr-references",
+                command=(),
+                status=ValidationResultStatus.BLOCKED,
+                returncode=None,
+                error=str(error),
+            )
 
     def _run_profile(
         self,

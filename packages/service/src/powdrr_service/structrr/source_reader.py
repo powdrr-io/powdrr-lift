@@ -15,7 +15,7 @@ import os
 import stat
 import tokenize
 from collections import OrderedDict
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import asdict, dataclass
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any
@@ -260,6 +260,10 @@ class SourceReader:
         self._indexes: OrderedDict[tuple[str, str], SourceReferenceIndex] = (
             OrderedDict()
         )
+
+    def snapshot_bytes(self, path: str) -> bytes:
+        """Acquire one bounded regular-source snapshot using the reader path policy."""
+        return self._bytes(_relative(path))
 
     def _target(self, relative: str) -> Path:
         target = (self.workspace / relative).resolve(strict=True)
@@ -687,7 +691,9 @@ def read_source(
     return SourceReader(workspace, catalog).read(path, start, end)
 
 
-def main(argv: list[str] | None = None) -> int:
+def main(
+    argv: list[str] | None = None, *, reference_check: Callable[[], int] | None = None
+) -> int:
     parser = argparse.ArgumentParser(
         description="Read Python source with frozen Structrr context."
     )
@@ -702,7 +708,14 @@ def main(argv: list[str] | None = None) -> int:
     context = commands.add_parser("context")
     context.add_argument("--ref", required=True)
     context.add_argument("--offset", type=int, default=0)
+    if reference_check is not None:
+        commands.add_parser(
+            "check", help="Check source references using trusted inputs."
+        )
     args = parser.parse_args(argv)
+    if args.operation == "check":
+        assert reference_check is not None
+        return reference_check()
     try:
         workspace = Path(os.environ["POWDRR_STRUCTRR_WORKSPACE"])
         catalog_path = Path(os.environ["POWDRR_STRUCTRR_CATALOG"])

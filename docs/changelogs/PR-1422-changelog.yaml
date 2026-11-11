@@ -1,0 +1,266 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1422
+title: Compile Structrr source placement handoffs and versioned requests
+intent:
+  problem: Accepted source annotation intent lacks a canonical handoff shared by coding
+    prompts and private placement validation.
+  goal: Compile exact placement and preservation contracts atomically with immutable
+    public prompts and private validation inputs.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/design/external-coding-agent-boundary.md
+  type: modified
+  span:
+    start_line: 28
+    end_line: 35
+  summary: Link the placement-focused handoff implementation and distinguish its current
+    execution boundary.
+  rationale: Avoid claiming that the full behavioral compiler or validation rollout
+    is implemented.
+- path: docs/design/structrr-source-reference-handoff.md
+  type: added
+  span:
+    start_line: 1
+    end_line: 119
+  summary: Document accepted placement and preservation records, atomic artifacts,
+    privacy, versioning, and rollout guards.
+  rationale: Define the contract consumed by later placement validators and worker
+    orchestration.
+- path: docs/plans/structrr-source-references.md
+  type: modified
+  span:
+    start_line: 15
+    end_line: 24
+  summary: Record completed placement handoff work and separate pending environment,
+    validation, and rollout work.
+  rationale: Keep implementation progress and prerequisites explicit.
+- path: packages/service/src/powdrr_service/structrr/design.py
+  type: modified
+  span:
+    start_line: 33
+    end_line: 34
+  summary: Preserve placement and preservation sections and stable placement obligation
+    identities in desired-state projection.
+  rationale: Carry accepted annotation intent through ordinary design transitions.
+- path: packages/service/src/powdrr_service/structrr/design.py
+  type: modified
+  span:
+    start_line: 65
+    end_line: 69
+  summary: Preserve placement and preservation sections and stable placement obligation
+    identities in desired-state projection.
+  rationale: Carry accepted annotation intent through ordinary design transitions.
+- path: packages/service/src/powdrr_service/structrr/design.py
+  type: modified
+  span:
+    start_line: 314
+    end_line: 315
+  summary: Preserve placement and preservation sections and stable placement obligation
+    identities in desired-state projection.
+  rationale: Carry accepted annotation intent through ordinary design transitions.
+- path: packages/service/src/powdrr_service/structrr/proposal.py
+  type: modified
+  span:
+    start_line: 154
+    end_line: 158
+  summary: Identify placement proposal operations using obligation_id and reject missing
+    identities.
+  rationale: Keep proposal operations consistent with desired placement records.
+- path: packages/service/src/powdrr_service/structrr/proposal.py
+  type: modified
+  span:
+    start_line: 164
+    end_line: 165
+  summary: Identify placement proposal operations using obligation_id and reject missing
+    identities.
+  rationale: Keep proposal operations consistent with desired placement records.
+- path: packages/service/src/powdrr_service/structrr/source_reference_handoff.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 565
+  summary: Compile canonical placements and preservation rules into a bounded eight-section
+    public prompt and private validation manifest.
+  rationale: Share exact intent, selectors, scope, and fingerprints without deriving
+    IDs from candidate code or leaking private validation data.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 35
+    end_line: 38
+  summary: Add v3 source-reference request serialization, legacy read compatibility,
+    immutable prompt checks, and execution guards.
+  rationale: Require enforce mode for reference contracts and prevent unsupported
+    execution, downgrade, or repair mutation.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 43
+    end_line: 43
+  summary: Add v3 source-reference request serialization, legacy read compatibility,
+    immutable prompt checks, and execution guards.
+  rationale: Require enforce mode for reference contracts and prevent unsupported
+    execution, downgrade, or repair mutation.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 121
+    end_line: 122
+  summary: Add v3 source-reference request serialization, legacy read compatibility,
+    immutable prompt checks, and execution guards.
+  rationale: Require enforce mode for reference contracts and prevent unsupported
+    execution, downgrade, or repair mutation.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 125
+    end_line: 191
+  summary: Add v3 source-reference request serialization, legacy read compatibility,
+    immutable prompt checks, and execution guards.
+  rationale: Require enforce mode for reference contracts and prevent unsupported
+    execution, downgrade, or repair mutation.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 206
+    end_line: 215
+  summary: Add v3 source-reference request serialization, legacy read compatibility,
+    immutable prompt checks, and execution guards.
+  rationale: Require enforce mode for reference contracts and prevent unsupported
+    execution, downgrade, or repair mutation.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 235
+    end_line: 244
+  summary: Add v3 source-reference request serialization, legacy read compatibility,
+    immutable prompt checks, and execution guards.
+  rationale: Require enforce mode for reference contracts and prevent unsupported
+    execution, downgrade, or repair mutation.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 282
+    end_line: 285
+  summary: Add v3 source-reference request serialization, legacy read compatibility,
+    immutable prompt checks, and execution guards.
+  rationale: Require enforce mode for reference contracts and prevent unsupported
+    execution, downgrade, or repair mutation.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 323
+    end_line: 331
+  summary: Add v3 source-reference request serialization, legacy read compatibility,
+    immutable prompt checks, and execution guards.
+  rationale: Require enforce mode for reference contracts and prevent unsupported
+    execution, downgrade, or repair mutation.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 333
+    end_line: 338
+  summary: Add v3 source-reference request serialization, legacy read compatibility,
+    immutable prompt checks, and execution guards.
+  rationale: Require enforce mode for reference contracts and prevent unsupported
+    execution, downgrade, or repair mutation.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 820
+    end_line: 820
+  summary: Add v3 source-reference request serialization, legacy read compatibility,
+    immutable prompt checks, and execution guards.
+  rationale: Require enforce mode for reference contracts and prevent unsupported
+    execution, downgrade, or repair mutation.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 908
+    end_line: 908
+  summary: Add v3 source-reference request serialization, legacy read compatibility,
+    immutable prompt checks, and execution guards.
+  rationale: Require enforce mode for reference contracts and prevent unsupported
+    execution, downgrade, or repair mutation.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 1405
+    end_line: 1415
+  summary: Add v3 source-reference request serialization, legacy read compatibility,
+    immutable prompt checks, and execution guards.
+  rationale: Require enforce mode for reference contracts and prevent unsupported
+    execution, downgrade, or repair mutation.
+- path: src/powdrr_lift/workrr/source_reference_handoff.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 13
+  summary: Export the service-owned placement compiler and artifact models through
+    the planned compatibility path.
+  rationale: Keep business rules in the service while preserving repository-facing
+    imports.
+- path: tests/test_coding_agent.py
+  type: modified
+  span:
+    start_line: 218
+    end_line: 218
+  summary: Expect the new default implementation-request-v3 serialization.
+  rationale: Match the explicit request schema extension.
+- path: tests/test_source_reference_handoff.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 481
+  summary: Verify prompt/manifest parity, private input binding, selectors, relationships,
+    preservation, projection, versioning, bounds, and execution denial.
+  rationale: Protect source intent and authority before validators and rollout consume
+    the handoff.
+entities:
+- id: structrr-source-reference-prompt-v1
+  type: Class
+  action: added
+- id: structrr-compiled-source-reference-handoff-v1
+  type: Class
+  action: added
+- id: structrr-source-reference-handoff-compiler-v1
+  type: Function
+  action: added
+- id: coding-agent-implementation-request-v3
+  type: Class
+  action: added
+entity_relationships:
+- id: structrr-placement-compiler-creates-handoff
+  source: structrr-source-reference-handoff-compiler-v1
+  target: structrr-compiled-source-reference-handoff-v1
+  relationship: creates
+  type: creates
+  action: added
+  description: The compiler binds one public prompt and private manifest to accepted
+    placement and preservation intent.
+  rationale: Give coding and validation the same canonical obligations and input identities.
+- id: structrr-placement-request-uses-public-prompt
+  source: coding-agent-implementation-request-v3
+  target: structrr-source-reference-prompt-v1
+  relationship: uses
+  type: uses
+  action: added
+  description: Reference-bearing v3 requests retain only the public compiled prompt
+    artifact with enforce mode.
+  rationale: Prevent private manifest contents from crossing the worker request boundary.
+invariants:
+- id: structrr-placement-handoff-shares-canonical-contract
+  action: added
+  description: Prompt and manifest carry the same canonical placement and preservation
+    contract; artifact identities also bind private validation input digests.
+- id: structrr-semantic-owner-binding-needs-independent-review
+  action: added
+  description: Semantic selectors retain requires_semantic_review and one_or_more
+    cardinality; worker claims do not establish passing ownership.
+- id: structrr-reference-requests-cannot-downgrade-or-bypass-rollout
+  action: added
+  description: Reference-bearing requests require v3 enforce mode and exact compiled
+    prompt/scope identities; execution remains denied until placement validation and
+    rollout are integrated.
+guidance: []

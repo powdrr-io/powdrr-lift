@@ -1,0 +1,3 @@
+version: 1
+freshness: &shared {max_age_seconds: 86400}
+copy: *shared

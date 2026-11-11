@@ -1,0 +1,24 @@
+[build-system]
+requires = ["hatchling==1.27.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "powdrr-attestation-verifier"
+version = "0.1.0"
+description = "Portable protocol records and strict configuration parsing for Powdrr local validation attestation"
+requires-python = ">=3.12"
+dependencies = ["PyYAML==6.0.3"]
+
+[project.optional-dependencies]
+test = ["pytest==8.4.2", "cryptography==49.0.0"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/powdrr_attestation"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+
+[tool.mypy]
+python_version = "3.12"
+strict = true

@@ -1,0 +1,12 @@
+version: 1
+users:
+  octocat:
+    github_user_id: 583231
+    providers:
+      - provider_id: laptop-test
+        key_id: sha256:56475aa75463474c0285df5dbf2bcab73da651358839e9b77481b2eab107708c
+        algorithm: ed25519
+        public_key: A6EHv/POEL4dcN0Y50vAmWfk1jCbpQ1fHdyGZBJVMbg=
+        status: active
+        not_before: '2026-01-01T00:00:00Z'
+        not_after: null

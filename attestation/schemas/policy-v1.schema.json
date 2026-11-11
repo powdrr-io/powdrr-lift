@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://powdrr.io/schemas/local-validation-policy-v1.json",
+  "title": "Powdrr local validation policy v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "freshness", "environment", "defaults", "steps"],
+  "properties": {
+    "version": {"const": 1},
+    "freshness": {"type": "object", "additionalProperties": false, "required": ["max_age_seconds"], "properties": {"max_age_seconds": {"type": "integer", "minimum": 300, "maximum": 604800}}},
+    "environment": {"type": "object", "additionalProperties": false, "required": ["toolchain", "network"], "properties": {"toolchain": {"type": "string", "minLength": 1, "maxLength": 128}, "network": {"const": "allowed"}}},
+    "defaults": {"type": "object", "additionalProperties": false, "required": ["timeout_seconds"], "properties": {"timeout_seconds": {"type": "integer", "minimum": 1, "maximum": 14400}}},
+    "steps": {"type": "array", "minItems": 1, "maxItems": 32, "items": {"$ref": "#/$defs/step"}}
+  },
+  "$defs": {
+    "step": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z][a-z0-9_-]{0,63}$"},
+        "argv": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}},
+        "shell": {"type": "string", "minLength": 1, "maxLength": 16384},
+        "cwd": {"type": "string", "minLength": 1},
+        "env": {"type": "object", "additionalProperties": {"type": "string"}},
+        "timeout_seconds": {"type": "integer", "minimum": 1, "maximum": 14400}
+      },
+      "oneOf": [
+        {"required": ["argv"], "not": {"required": ["shell"]}},
+        {"required": ["shell"], "not": {"required": ["argv"]}}
+      ]
+    }
+  }
+}

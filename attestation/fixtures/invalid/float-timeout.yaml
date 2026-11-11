@@ -1,0 +1,5 @@
+version: 1
+freshness: {max_age_seconds: 86400}
+environment: {toolchain: stable, network: allowed}
+defaults: {timeout_seconds: 60}
+steps: [{id: one, argv: [echo], timeout_seconds: 1.5}]

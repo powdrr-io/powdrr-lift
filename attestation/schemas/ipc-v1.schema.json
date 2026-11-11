@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://powdrr.io/schemas/local-validation-ipc-v1.json",
+  "title": "Powdrr local validation IPC request v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "request_id", "method"],
+  "properties": {
+    "version": {"const": 1},
+    "request_id": {"type": "string", "format": "uuid"},
+    "method": {"enum": ["health", "run", "status", "logs", "cancel", "export", "public_enrollment_record"]},
+    "run_id": {"type": "string", "format": "uuid"},
+    "repository_id": {"type": "integer", "minimum": 1},
+    "repository": {"type": "string", "pattern": "^[^/\\s]+/[^/\\s]+$"},
+    "commit": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+    "source_bundle": {"type": "string", "contentEncoding": "base64", "maxLength": 11184812},
+    "step_id": {"type": "string", "pattern": "^[a-z][a-z0-9_-]{0,63}$"}
+  },
+  "allOf": [
+    {"if": {"properties": {"method": {"const": "run"}}}, "then": {"required": ["repository_id", "repository", "commit", "source_bundle"]}},
+    {"if": {"properties": {"method": {"enum": ["status", "logs", "cancel", "export"]}}}, "then": {"required": ["run_id"]}},
+    {"if": {"properties": {"method": {"const": "logs"}}}, "then": {"required": ["step_id"]}}
+  ],
+  "x-max-request-bytes": 8388608
+}

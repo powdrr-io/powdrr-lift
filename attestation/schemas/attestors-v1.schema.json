@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://powdrr.io/schemas/local-validation-attestors-v1.json",
+  "title": "Powdrr attestor registry v1",
+  "type": "object", "additionalProperties": false,
+  "required": ["version", "users"],
+  "properties": {
+    "version": {"const": 1},
+    "users": {"type": "object", "maxProperties": 1024, "propertyNames": {"minLength": 1, "maxLength": 128}, "additionalProperties": {"$ref": "#/$defs/user"}}
+  },
+  "$defs": {
+    "user": {"type": "object", "additionalProperties": false, "required": ["github_user_id", "providers"], "properties": {"github_user_id": {"type": "integer", "minimum": 1}, "providers": {"type": "array", "minItems": 1, "maxItems": 64, "items": {"$ref": "#/$defs/provider"}}}},
+    "provider": {"type": "object", "additionalProperties": false, "required": ["provider_id", "key_id", "algorithm", "public_key", "status", "not_before"], "properties": {"provider_id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"}, "key_id": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"}, "algorithm": {"const": "ed25519"}, "public_key": {"type": "string", "pattern": "^[A-Za-z0-9+/]{43}=$"}, "status": {"enum": ["active", "revoked"]}, "not_before": {"type": "string", "format": "date-time"}, "not_after": {"type": "string", "format": "date-time"}}}
+  }
+}

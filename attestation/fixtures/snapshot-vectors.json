@@ -1,0 +1,36 @@
+{
+  "records": [
+    {
+      "path_hex": "656d7074792e747874",
+      "kind": 0,
+      "executable": false,
+      "content_hex": ""
+    },
+    {
+      "path_hex": "62696e2f746f6f6c",
+      "kind": 0,
+      "executable": true,
+      "content_hex": "23212f62696e2f73680a"
+    },
+    {
+      "path_hex": "6c696e6b",
+      "kind": 1,
+      "executable": false,
+      "content_hex": "62696e2f746f6f6c"
+    },
+    {
+      "path_hex": "636166c3a92e747874",
+      "kind": 0,
+      "executable": false,
+      "content_hex": "6f6cc3a1"
+    }
+  ],
+  "digest": "6d26d51453e938c3c8bce29baee3adaf4426e4511a702e917745e8daa595f5c3",
+  "reverse_order_digest": "6d26d51453e938c3c8bce29baee3adaf4426e4511a702e917745e8daa595f5c3",
+  "policy_sha256": "f666504d115358df3dd2368dd55b0a6d0b3d74fadad19071dd00134bf9bb0550",
+  "step_definition_sha256": {
+    "setup": "c2c1bcab4741a5e2fe1758647b1b9eb33c78a7b0f1ce575ea04d6f023cd5ba7e",
+    "tests": "e5afcf32d8a7247e4a3494c6c2624a085f2fb0e6456c6376141c2e11275744f3",
+    "quality": "0b9a8ee83b5de3758688338e10247679f9988a5029b6a23867994560e4b632de"
+  }
+}

@@ -448,7 +448,14 @@ def _issue_worker_implementation_request(
         allowed_commands=(verification_command,),
         implementation_packet=packet,
     )
-    return replace(request, allow_existing_changes=True), validation_profile
+    return (
+        replace(
+            request,
+            allow_existing_changes=True,
+            protected_paths=("docs/structrr/current/baseline-bootstrap.yaml",),
+        ),
+        validation_profile,
+    )
 
 
 def _ci_repair_implementation_request(

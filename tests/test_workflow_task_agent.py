@@ -356,6 +356,12 @@ def test_execute_pr_test_author_prompt_leaves_workspace_path_for_agent(
     assert '"obligation_id": "AC-01"' in prompt
     assert "Follow each case's test_type, scenario, and expected_outcome" in prompt
     assert "partitions" not in prompt
+    assert "do not treat a pull-request review, merge" in prompt
+    assert (
+        "Do not assert or request edits to "
+        "`docs/structrr/current/baseline-bootstrap.yaml`" in prompt
+    )
+    assert "Documentation review is a pull-request process requirement" in prompt
 
 
 def test_execute_pr_test_author_write_denials_cover_primary_checkout(
@@ -693,6 +699,7 @@ def test_issue_worker_compiles_the_benchmark_implementation_request() -> None:
     assert "Implement the parser and report stable rejection codes." in request.prompt
     assert "Do not create branches, commits, pull requests" in request.prompt
     assert request.allow_existing_changes is True
+    assert request.protected_paths == ("docs/structrr/current/baseline-bootstrap.yaml",)
     assert validation.command == (sys.executable, "verify.py")
 
 

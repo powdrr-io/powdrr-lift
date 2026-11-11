@@ -70,6 +70,14 @@ def build_execute_pr_test_author_prompt(
         "Treat the supplied suite "
         "as a contract: assert every acceptance criterion directly and keep "
         "checks linked to the same workflow/job/step that provides the behavior.\n\n"
+        "Review and documentation boundaries: do not treat a pull-request review, "
+        "merge, or repository review record as runtime behavior unless the reviewed "
+        "acceptance criteria explicitly require a public interface for it. Do not "
+        "assert or request edits to `docs/structrr/current/baseline-bootstrap.yaml`; "
+        "it is the prior accepted snapshot, not a review log for the current change. "
+        "Documentation review is a pull-request process requirement. For a "
+        "documentation criterion, test the required statements and tracked file "
+        "path without expecting generated bootstrap metadata to change.\n\n"
         f"{json.dumps(list(obligations), indent=2, sort_keys=True)}\n"
     )
 

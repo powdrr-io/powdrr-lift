@@ -5,35 +5,35 @@ symbols:
     stable_key: python::packages.service.src.powdrr_service.structrr.bootstrap
     span:
       start_line: 1
-      end_line: 1839
+      end_line: 1923
   - path: packages/service/src/powdrr_service/structrr/bootstrap.py
     kind: function
     qualified_name: packages.service.src.powdrr_service.structrr.bootstrap.bootstrap_structrr
     stable_key: python::packages.service.src.powdrr_service.structrr.bootstrap.bootstrap_structrr
     span:
-      start_line: 126
-      end_line: 246
+      start_line: 137
+      end_line: 263
   - path: packages/service/src/powdrr_service/structrr/bootstrap.py
     kind: function
     qualified_name: packages.service.src.powdrr_service.structrr.bootstrap._extract_python_source_model
     stable_key: python::packages.service.src.powdrr_service.structrr.bootstrap._extract_python_source_model
     span:
-      start_line: 1593
-      end_line: 1661
+      start_line: 1677
+      end_line: 1745
   - path: packages/service/src/powdrr_service/structrr/rebase.py
     kind: function
     qualified_name: packages.service.src.powdrr_service.structrr.rebase.rebase_structrr_snapshot
     stable_key: python::packages.service.src.powdrr_service.structrr.rebase.rebase_structrr_snapshot
     span:
-      start_line: 119
-      end_line: 171
+      start_line: 133
+      end_line: 202
   - path: packages/service/src/powdrr_service/structrr/rebase.py
     kind: method
     qualified_name: packages.service.src.powdrr_service.structrr.rebase.StructrrRebaseReport.to_data
     stable_key: python::packages.service.src.powdrr_service.structrr.rebase.StructrrRebaseReport.to_data
     span:
-      start_line: 105
-      end_line: 116
+      start_line: 119
+      end_line: 130
   - path: packages/service/src/powdrr_service/procedrr_evaluator/model_client.py
     kind: class
     qualified_name: packages.service.src.powdrr_service.procedrr_evaluator.model_client.ProcedrrModelClient

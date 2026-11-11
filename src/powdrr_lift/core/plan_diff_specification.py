@@ -7,6 +7,7 @@ from typing import Any, cast
 
 import yaml
 from powdrr_service.changelog import parse_change_log
+from powdrr_service.structrr.user_stories import STORY_SECTIONS
 
 from powdrr_lift.core.repo import resolve_repo_root as _resolve_repo_root
 from powdrr_lift.core.spec_paths import (
@@ -208,7 +209,8 @@ def _collect_differences(
                 )
             )
 
-    section_map = {
+    section_map: dict[str, str] = {
+        **{section: section for section in STORY_SECTIONS},
         "features": "feature_changes",
         "decisions": "decisions",
         "entities": "entity_changes",
@@ -316,6 +318,10 @@ def _collect_plan_intent(
 
 def _collect_plan_sections(raw_plan: Mapping[str, Any]) -> dict[str, set[str]]:
     return {
+        **{
+            section: _collect_plan_id_set(raw_plan, section)
+            for section in STORY_SECTIONS
+        },
         "features": _collect_plan_id_set(raw_plan, "features"),
         "decisions": _collect_plan_id_set(raw_plan, "decisions"),
         "entities": _collect_plan_id_set(raw_plan, "entities"),
@@ -337,6 +343,7 @@ def _collect_changelog_sections(
     changelog_docs: Sequence[tuple[Path, Any]],
 ) -> dict[str, set[str]]:
     sections: dict[str, set[str]] = {
+        **{section: set() for section in STORY_SECTIONS},
         "feature_changes": set(),
         "decisions": set(),
         "entity_changes": set(),
@@ -346,6 +353,8 @@ def _collect_changelog_sections(
     }
 
     for _, changelog in changelog_docs:
+        for change in changelog.story_changes:
+            sections[change.section].add(change.id)
         sections["feature_changes"].update(
             _collect_object_ids(changelog.feature_changes)
         )

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sqlite3
 import time
 from collections.abc import Sequence
@@ -21,6 +22,7 @@ from powdrr_service.changelog import (
     Span,
     parse_change_log,
 )
+from powdrr_service.structrr.user_stories import STORY_SECTIONS, parse_story_changes
 
 from powdrr_lift.change_log_template import _resolve_default_branch, _resolve_repo_root
 from powdrr_lift.core.index import (
@@ -47,7 +49,7 @@ from powdrr_lift.core.index import (
 )
 from powdrr_lift.errors import PowdrrExecutionError
 
-INDEX_CACHE_VERSION = 14
+INDEX_CACHE_VERSION = 15
 
 
 @dataclass(frozen=True, slots=True)
@@ -886,6 +888,15 @@ class CodeIndexStore:
                 );
                 """
             )
+            document_columns = {
+                row[1]
+                for row in connection.execute("PRAGMA table_info(branch_document)")
+            }
+            if "story_changes_json" not in document_columns:
+                connection.execute(
+                    "ALTER TABLE branch_document ADD COLUMN story_changes_json "
+                    "TEXT NOT NULL DEFAULT '{}'"
+                )
             branch_state_info = connection.execute(
                 "PRAGMA table_info(branch_state)"
             ).fetchall()
@@ -1029,7 +1040,7 @@ class CodeIndexStore:
                 """
                 SELECT pr_number, changelog_path, commit_sha, commit_timestamp,
                        commit_subject, title, change_id, intent_problem,
-                       intent_goal, changelog_version
+                       intent_goal, changelog_version, story_changes_json
                 FROM branch_document
                 WHERE branch_name = ?
                 ORDER BY pr_number
@@ -1460,8 +1471,8 @@ class CodeIndexStore:
                     INSERT INTO branch_document (
                       branch_name, pr_number, changelog_path, changelog_version,
                       commit_sha, commit_timestamp, commit_subject, title,
-                      change_id, intent_problem, intent_goal
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                      change_id, intent_problem, intent_goal, story_changes_json
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         branch_name,
@@ -1477,6 +1488,16 @@ class CodeIndexStore:
                         document.changelog.change_id,
                         document.changelog.intent.problem,
                         document.changelog.intent.goal,
+                        json.dumps(
+                            {
+                                section: [
+                                    change.to_data()
+                                    for change in document.changelog.story_changes
+                                    if change.section == section
+                                ]
+                                for section in STORY_SECTIONS
+                            }
+                        ),
                     ),
                 )
                 for decision_state in _collect_decision_states(
@@ -2350,6 +2371,7 @@ def _load_changelog_document_from_cache_row(
     ]
 
     changelog = ChangeLog(
+        story_changes=parse_story_changes(json.loads(row["story_changes_json"])),
         version=row["changelog_version"],
         change_id=row["change_id"],
         title=row["title"],

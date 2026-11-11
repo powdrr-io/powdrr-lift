@@ -19,11 +19,12 @@ from powdrr_service.structrr.proposal import ProposalRevision, compile_proposal_
 from powdrr_service.structrr.rebase import rebase_structrr_snapshot
 from powdrr_service.structrr.snapshot import snapshot_digest
 from powdrr_service.structrr.source_manifest import SourceManifest
+from powdrr_service.structrr.user_stories import STORY_SECTIONS
 from powdrr_service.verification.test_obligations import acceptance_criteria_contract
 
 MULTIPR_STRUCTRR_SCHEMA = "multipr-structrr-proposal-v2"
 _LEGACY_MULTIPR_STRUCTRR_SCHEMA = "multipr-structrr-proposal-v1"
-_STRUCTURAL_SECTIONS = {"entities", "entity_relationships", "files"}
+_STRUCTURAL_SECTIONS = {"entities", "entity_relationships", "files", *STORY_SECTIONS}
 _ACTIONS = {"added", "changed", "deleted", "removed"}
 
 
@@ -146,7 +147,15 @@ def compile_multi_pr_proposal(
                 f"Structrr operation {operation_id!r} content identity differs "
                 "from subject_id"
             )
-        normalized = {**dict(content), identity_key: subject_id, "action": action}
+        normalized = (
+            {
+                "id": subject_id,
+                "action": action,
+                "content": {**dict(content), "id": subject_id},
+            }
+            if section in STORY_SECTIONS
+            else {**dict(content), identity_key: subject_id, "action": action}
+        )
         grouped[item_id].setdefault(section, []).append(normalized)
         all_sections.setdefault(section, []).append(normalized)
         raw_evidence = raw.get("code_evidence", [])
@@ -487,6 +496,11 @@ def rebase_item_proposal(
         current_baseline,
         referenced_entity_ids=entity_refs,
         referenced_source_subject_keys=source_subject_refs,
+        referenced_story_subject_ids=[
+            operation.subject_id
+            for operation in proposal.operations
+            if operation.section in STORY_SECTIONS
+        ],
     )
     return report.to_data()
 
@@ -503,6 +517,11 @@ def rebase_final_plan_state(
         current_snapshot,
         referenced_entity_ids=entity_refs,
         referenced_source_subject_keys=source_subject_refs,
+        referenced_story_subject_ids=[
+            operation.subject_id
+            for operation in proposal.operations
+            if operation.section in STORY_SECTIONS
+        ],
     )
     return report.to_data()
 
@@ -714,7 +733,13 @@ def project_structural_operations(
                 "from subject_id"
             )
         grouped.setdefault(section, []).append(
-            {**dict(content), identity_key: subject_id, "action": action}
+            {
+                "id": subject_id,
+                "action": action,
+                "content": {**dict(content), "id": subject_id},
+            }
+            if section in STORY_SECTIONS
+            else {**dict(content), identity_key: subject_id, "action": action}
         )
     return _apply_sections(baseline_snapshot, grouped)
 

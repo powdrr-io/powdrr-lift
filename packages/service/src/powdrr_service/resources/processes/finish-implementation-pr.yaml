@@ -57,7 +57,9 @@ steps:
         - Make the feature-name a concise, human-readable description of the code change. Never use the plan ID, proposed PR ID, issue number, workflow ID, or a generic workflow label as the pull-request title.
         - "Format populated-pr-description as Markdown with these exact headings, in this order, each on its own line with a blank line after it: ## Objective, ## Scope, ## Implementation Details, ## Acceptance Criteria, ## Validation, and ## Advisory Test-Quality Notes."
         - Put each section's content on following lines. Use concise paragraphs or bullets; never put multiple headings or sections in one paragraph or line.
-        - Include the objective, scope, implementation details, acceptance criteria, and exact validation commands and results in their matching sections.
+        - Include the objective, scope, implementation details, acceptance criteria, and validation commands with their pass/fail result in their matching sections.
+        - In Validation, report one concise Markdown bullet per command, including the command and a short result summary. Never copy raw stdout, stderr, terminal logs, progress output, dependency-install output, or full test traces into the PR description. Summarize test counts when available.
+        - Keep the entire PR description concise and readable in GitHub Markdown. Do not paste structured JSON or unprocessed tool output into any section.
         - "In Advisory Test-Quality Notes, include each distinct implementation_result.integration_tests.quality_notes concern once. Group multiple labels for the same test into one concise bullet, summarize the concern and evidence in at most two sentences, and never copy full model reasoning or raw prompts. Write `None.` when there are no concerns. These notes are advisory and never block publication."
         - Keep the description focused on this PR. Do not add empty sections, template instructions, or placeholder text.
         - Set base-branch to main.

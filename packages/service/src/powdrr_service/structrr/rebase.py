@@ -12,6 +12,11 @@ from dataclasses import dataclass
 from typing import Any, Literal
 
 from powdrr_service.structrr.snapshot import snapshot_digest
+from powdrr_service.structrr.user_stories import (
+    STORY_SECTIONS,
+    canonical_story_data,
+    parse_story_catalog,
+)
 
 RebaseClassification = Literal[
     "clean",
@@ -21,7 +26,16 @@ RebaseClassification = Literal[
     "conflicted",
     "invalidated",
 ]
-ChangeArea = Literal["entity", "relationship", "source_subject", "source_binding"]
+ChangeArea = Literal[
+    "entity",
+    "relationship",
+    "source_subject",
+    "source_binding",
+    "user_stories",
+    "user_story_steps",
+    "user_story_transitions",
+    "user_story_cases",
+]
 ChangeKind = Literal[
     "added",
     "removed",
@@ -123,6 +137,7 @@ def rebase_structrr_snapshot(
     referenced_entity_ids: Iterable[str] = (),
     referenced_source_subject_keys: Iterable[str] = (),
     referenced_binding_ids: Iterable[str] = (),
+    referenced_story_subject_ids: Iterable[str] = (),
 ) -> StructrrRebaseReport:
     """Compare snapshots and classify the impact on referenced proposal data.
 
@@ -143,6 +158,11 @@ def rebase_structrr_snapshot(
     remappings.extend(source_remappings)
     changes.extend(_compare_bindings(baseline, current, remappings))
 
+    before_stories = canonical_story_data(parse_story_catalog(baseline))
+    after_stories = canonical_story_data(parse_story_catalog(current))
+    for section in STORY_SECTIONS:
+        changes.extend(_compare_keyed(section, before_stories, after_stories, section))
+    story_refs = set(referenced_story_subject_ids)
     entity_refs = {value for value in referenced_entity_ids if value}
     subject_refs = {value for value in referenced_source_subject_keys if value}
     binding_refs = {value for value in referenced_binding_ids if value}
@@ -150,6 +170,17 @@ def rebase_structrr_snapshot(
         change
         for change in changes
         if _is_affected(change, entity_refs, subject_refs, binding_refs)
+        or (
+            change.area in STORY_SECTIONS
+            and bool(
+                {
+                    change.identity,
+                    _text(change.before, "story_id"),
+                    _text(change.after, "story_id"),
+                }
+                & story_refs
+            )
+        )
     )
     conflicts = tuple(change for change in affected if _is_conflict(change))
     affected_remappings = tuple(
@@ -172,7 +203,7 @@ def rebase_structrr_snapshot(
 
 
 def _compare_keyed(
-    area: Literal["entity", "relationship"],
+    area: ChangeArea,
     baseline: Mapping[str, Any],
     current: Mapping[str, Any],
     collection_name: str,
@@ -533,7 +564,7 @@ _PRESENTATION_FIELDS = {"description", "title", "summary", "rationale"}
 
 
 def _record_key(area: str) -> Callable[[Mapping[str, Any]], str]:
-    if area == "entity":
+    if area == "entity" or area in STORY_SECTIONS:
         return lambda item: _text(item, "id")
     return lambda item: (
         _text(item, "id")

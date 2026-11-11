@@ -25,6 +25,14 @@ from powdrr_service.structrr.source_manifest import (
     compile_source_manifest,
     is_specification_path,
 )
+from powdrr_service.structrr.user_stories import (
+    STORY_SECTIONS,
+    StoryContractError,
+    parse_story_catalog,
+    parse_story_changes,
+    project_story_changes,
+    validate_story_catalog,
+)
 from powdrr_service.structrr.validation import validation_context
 from powdrr_service.structrr.validation_models import (
     validate_validation_records,
@@ -66,6 +74,8 @@ _SOURCE_LINKABLE_TYPES = {
     "Skill",
     "Tool",
 }
+
+
 _STATEMENT_KINDS = {
     "requirement",
     "invariant",
@@ -77,6 +87,7 @@ _STATEMENT_KINDS = {
 }
 _PYTHON_SOURCE_SUFFIXES = {".py", ".pyi"}
 BOOTSTRAP_SECTION_VERSIONS: dict[str, int] = {
+    **{section: 1 for section in STORY_SECTIONS},
     "intent": 1,
     "active_intent": 1,
     "human-decisions": 1,
@@ -171,6 +182,12 @@ def bootstrap_structrr(
         repository_name=repository_name,
         validation_files=validation_files,
     )
+    # Accepted changelist deltas extend canonical declarations; code discovery
+    # cannot reconstruct or replace customer intent.
+    for _, changelist in _load_story_changelists(root):
+        changes = parse_story_changes(changelist)
+        if changes:
+            document = project_story_changes(document, changes)
     source_revision_result = subprocess.run(
         ["git", "-C", str(root), "rev-parse", "HEAD"],
         capture_output=True,
@@ -402,6 +419,13 @@ def validate_bootstrap_document(
     root_path = Path(root).resolve()
     issues: list[BootstrapIssue] = []
     issues.extend(validate_bootstrap_sections(document))
+    try:
+        story_report = validate_story_catalog(parse_story_catalog(document))
+        issues.extend(
+            BootstrapIssue(i.code, i.message, i.subject_id) for i in story_report.issues
+        )
+    except StoryContractError as error:
+        issues.append(BootstrapIssue(error.code, str(error), error.subject_id))
     if document.get("schema") != _SCHEMA:
         issues.append(
             BootstrapIssue("schema_invalid", "Bootstrap must use changelog-v2.")
@@ -598,6 +622,12 @@ def validate_bootstrap_sections(
             ),
         )
     for section, expected_version in BOOTSTRAP_SECTION_VERSIONS.items():
+        if (
+            section in STORY_SECTIONS
+            and section not in document
+            and section not in versions
+        ):
+            continue
         if section not in document:
             issues.append(
                 BootstrapIssue(
@@ -1133,6 +1163,45 @@ def _is_bootstrap_file(path: str, *, include_validation_metadata: bool = False) 
     )
 
 
+def _load_story_changelists(root: Path) -> list[tuple[str, Mapping[str, Any]]]:
+    tracked = subprocess.run(
+        ["git", "-C", str(root), "ls-files", "--", "docs/changelogs"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    paths = set(tracked.stdout.splitlines()) if tracked.returncode == 0 else set()
+    if not paths:
+        return []
+    history = subprocess.run(
+        [
+            "git",
+            "-C",
+            str(root),
+            "log",
+            "--reverse",
+            "--topo-order",
+            "--diff-filter=A",
+            "--format=",
+            "--name-only",
+            "--",
+            "docs/changelogs",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    ordered = list(
+        dict.fromkeys(path for path in history.stdout.splitlines() if path in paths)
+    )
+    ordered.extend(sorted(paths - set(ordered)))
+    return [
+        (path, document)
+        for path, document in _load_spec_documents(root, ordered)
+        if any(section in document for section in STORY_SECTIONS)
+    ]
+
+
 def _load_spec_documents(
     root: Path, paths: Sequence[str]
 ) -> list[tuple[str, Mapping[str, Any]]]:
@@ -1329,6 +1398,9 @@ def _build_document(
     guidance: dict[str, dict[str, Any]] = {}
     tools: dict[str, dict[str, Any]] = {}
     statements: dict[str, dict[str, Any]] = {}
+    story_records: dict[str, dict[str, Any]] = {
+        section: {} for section in STORY_SECTIONS
+    }
 
     repository_id = f"repository:{repository_name or root.name}"
     entities[repository_id] = {
@@ -1344,6 +1416,14 @@ def _build_document(
         entities[entity_id] = {"id": entity_id, "type": entity_type, "action": "added"}
 
     for spec_path, spec in spec_documents:
+        for section in STORY_SECTIONS:
+            for record in parse_story_catalog(spec).to_data()[section]:
+                existing = story_records[section].get(record["id"])
+                if existing is not None and existing != record:
+                    raise StoryContractError(
+                        "story_declaration_conflict", record["id"], spec_path
+                    )
+                story_records[section][record["id"]] = record
         for raw_entity in _mappings(spec.get("entities")):
             entity_id = _text(raw_entity.get("id"))
             entity_type = _text(raw_entity.get("type"))
@@ -1464,6 +1544,10 @@ def _build_document(
         )
 
     return {
+        **{
+            section: list(records.values())
+            for section, records in story_records.items()
+        },
         "schema": _SCHEMA,
         "structrr_schema": _BOOTSTRAP_SCHEMA,
         "section_versions": dict(BOOTSTRAP_SECTION_VERSIONS),

@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from powdrr_service.structrr.user_stories import STORY_SECTIONS
 
 from powdrr_lift.change_log_template import (
     _git_output,
@@ -247,6 +248,7 @@ def render_feature_pr_specification_template(
     document["id"] = normalized_work_item_name
     document["title"] = title or interview.get("feature_description")
     section_names = (
+        *STORY_SECTIONS,
         "requirements",
         "approach",
         "entities",
@@ -273,6 +275,23 @@ def render_feature_pr_specification_template(
         deleted = value.get("deleted", [])
         if not isinstance(added, list) or not isinstance(deleted, list):
             raise ValueError(f"Interview input {key}_edits must contain lists.")
+        if key in STORY_SECTIONS:
+            document[key] = [
+                dict(item)
+                if isinstance(item.get("action"), str)
+                else {"id": item.get("id"), "action": "added", "content": dict(item)}
+                for item in added
+                if isinstance(item, dict)
+            ] + [
+                {
+                    "id": item.get("id"),
+                    "action": "removed",
+                    "content": {"id": item.get("id")},
+                }
+                for item in deleted
+                if isinstance(item, dict)
+            ]
+            continue
         items = [dict(item) for item in added if isinstance(item, dict)]
         items.extend(
             {
@@ -403,6 +422,7 @@ def create_design_interview_input_template(
     )
     resolved.parent.mkdir(parents=True, exist_ok=True)
     sections = (
+        *STORY_SECTIONS,
         "requirements",
         "approach",
         "entities",

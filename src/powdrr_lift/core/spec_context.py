@@ -7,10 +7,12 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from powdrr_service.structrr.user_stories import STORY_SECTIONS
 
 from powdrr_lift.core.spec_paths import PROPOSED_PR_SPECIFICATION_FILENAME
 
 _CONTEXT_TYPE_ALIASES: dict[str, str] = {
+    **{section: section for section in STORY_SECTIONS},
     "requirements": "requirements",
     "approach": "approach",
     "entities": "entities",
@@ -57,6 +59,7 @@ _SUPPORTED_CONTEXT_TYPES: tuple[str, ...] = (
     "proposed_prs",
     "modules",
     "tools",
+    *STORY_SECTIONS,
 )
 
 

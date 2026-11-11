@@ -11,6 +11,7 @@ from typing import Any
 
 from powdrr_service.structrr.actions import ACTION_ALIASES, normalize_action
 from powdrr_service.structrr.snapshot import snapshot_digest
+from powdrr_service.structrr.user_stories import STORY_SECTIONS
 
 PROPOSAL_REVISION_SCHEMA_VERSION = "proposal-revision-v1"
 
@@ -22,6 +23,7 @@ class ProposalOperation:
     subject_id: str
     action: str
     content: Mapping[str, Any]
+    expected_before: str | None = None
 
     def to_data(self) -> dict[str, Any]:
         return {
@@ -30,6 +32,11 @@ class ProposalOperation:
             "subject_id": self.subject_id,
             "action": self.action,
             "content": _canonical(dict(self.content)),
+            **(
+                {"expected_before": self.expected_before}
+                if self.expected_before is not None
+                else {}
+            ),
         }
 
 
@@ -156,13 +163,47 @@ def compile_proposal_revision(
             if operation_id in seen_ids:
                 operation_id = f"{operation_id}:{index}"
             seen_ids.add(operation_id)
+            expected_before = item.get("expected_before")
+            if section in STORY_SECTIONS and action != "add":
+                before = next(
+                    (
+                        record
+                        for record in baseline.get(section, [])
+                        if record.get("id") == subject_id
+                    ),
+                    None,
+                )
+                if before is None:
+                    raise ValueError(
+                        f"story operation subject absent from baseline: {subject_id}"
+                    )
+                from powdrr_service.decision_obligation import content_fingerprint
+
+                fingerprint = content_fingerprint(before)
+                if expected_before is not None and expected_before != fingerprint:
+                    raise ValueError(
+                        f"stale story expected-before fingerprint: {subject_id}"
+                    )
+                expected_before = fingerprint
             operations.append(
                 ProposalOperation(
                     operation_id=operation_id,
                     section=section,
                     subject_id=subject_id,
                     action=action,
-                    content=dict(item),
+                    expected_before=expected_before,
+                    content=(
+                        dict(item["content"])
+                        if section in STORY_SECTIONS
+                        and isinstance(item.get("content"), Mapping)
+                        else {
+                            key: value
+                            for key, value in item.items()
+                            if key not in {"action", "expected_before"}
+                        }
+                        if section in STORY_SECTIONS
+                        else dict(item)
+                    ),
                 )
             )
     return ProposalRevision(
@@ -223,6 +264,7 @@ def _operation_from_data(raw: Any) -> ProposalOperation:
         subject_id=_required_string(raw, "subject_id"),
         action=_required_string(raw, "action"),
         content=content,
+        expected_before=raw.get("expected_before"),
     )
 
 

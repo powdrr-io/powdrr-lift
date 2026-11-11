@@ -1,0 +1,112 @@
+user_stories:
+- id: story:session-resume
+  title: Resume interrupted planning
+  narrative: A maintainer resumes planning without losing accepted decisions.
+  actor: Repository maintainer
+  goal: Complete interrupted planning while retaining valid accepted answers.
+  preconditions:
+  - A planning session and its checkpoint exist.
+  scope:
+  - Resume an existing session with unchanged planning inputs.
+  entry_step_id: story:session-resume:step:1
+  source_refs:
+  - interview:resume:answer:1
+  identity_state:
+    next_step: 5
+    next_transition: 4
+    next_case: 3
+    next_observation: 3
+    retired_ids: []
+user_story_steps:
+- id: story:session-resume:step:1
+  story_id: story:session-resume
+  kind: user_action
+  description: The maintainer requests resume using an existing session ID.
+  action:
+    actor: Maintainer
+    operation: Resume planning
+    input: Existing session ID
+  source_refs:
+  - interview:resume:answer:1
+- id: story:session-resume:step:2
+  story_id: story:session-resume
+  kind: decision
+  description: Determine whether the session checkpoint can be read.
+  source_refs:
+  - interview:resume:answer:2
+- id: story:session-resume:step:3
+  story_id: story:session-resume
+  kind: outcome
+  description: Complete remaining planning questions and publish the plan.
+  outcome: success
+  expected_observations:
+  - id: story:session-resume:observation:1
+    description: The published plan preserves accepted decisions and includes newly
+      completed answers.
+    boundary: Published plan and persisted session checkpoint
+  source_refs:
+  - interview:resume:answer:1
+- id: story:session-resume:step:4
+  story_id: story:session-resume
+  kind: outcome
+  description: Report checkpoint unavailability and stop resume without changing accepted
+    decisions.
+  outcome: failure
+  expected_observations:
+  - id: story:session-resume:observation:2
+    description: Resume reports the unavailable checkpoint and preserves the session's
+      accepted decisions.
+    boundary: Command result and persisted session state
+  source_refs:
+  - interview:resume:answer:2
+user_story_transitions:
+- id: story:session-resume:transition:1
+  story_id: story:session-resume
+  from_step_id: story:session-resume:step:1
+  to_step_id: story:session-resume:step:2
+  condition:
+    kind: always
+    description: Resume was requested.
+  source_refs:
+  - interview:resume:answer:1
+- id: story:session-resume:transition:2
+  story_id: story:session-resume
+  from_step_id: story:session-resume:step:2
+  to_step_id: story:session-resume:step:3
+  condition:
+    kind: predicate
+    description: The checkpoint can be read.
+  source_refs:
+  - interview:resume:answer:2
+- id: story:session-resume:transition:3
+  story_id: story:session-resume
+  from_step_id: story:session-resume:step:2
+  to_step_id: story:session-resume:step:4
+  condition:
+    kind: otherwise
+    description: The checkpoint cannot be read.
+  source_refs:
+  - interview:resume:answer:2
+user_story_cases:
+- id: story:session-resume:case:1
+  story_id: story:session-resume
+  description: Resume a readable checkpoint.
+  initial_conditions: []
+  transition_ids:
+  - story:session-resume:transition:1
+  - story:session-resume:transition:2
+  expected_observations:
+  - story:session-resume:observation:1
+  source_refs:
+  - interview:resume:answer:1
+- id: story:session-resume:case:2
+  story_id: story:session-resume
+  description: Report an unavailable checkpoint.
+  initial_conditions: []
+  transition_ids:
+  - story:session-resume:transition:1
+  - story:session-resume:transition:3
+  expected_observations:
+  - story:session-resume:observation:2
+  source_refs:
+  - interview:resume:answer:2

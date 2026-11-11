@@ -5,6 +5,11 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from powdrr_service.structrr.user_stories import (
+    STORY_SECTIONS,
+    parse_story_catalog,
+    project_story_changes,
+)
 
 from powdrr_lift.change_log_template import _resolve_default_branch, _resolve_repo_root
 from powdrr_lift.core.code_index import (
@@ -299,8 +304,29 @@ def build_current_state_specification_report(
         state.source_index.specification_documents,
     )
     codebase_state_report = _build_codebase_state_report(state)
+    story_state: dict[str, Any] = {section: [] for section in STORY_SECTIONS}
+    for specification in sorted(
+        current_specifications, key=_specification_document_sort_key
+    ):
+        declared = parse_story_catalog(specification.content).to_data()
+        for section in STORY_SECTIONS:
+            by_id = {item["id"]: item for item in story_state[section]}
+            for item in declared[section]:
+                if item["id"] in by_id and by_id[item["id"]] != item:
+                    raise ValueError(f"conflicting story declaration: {item['id']}")
+                by_id[item["id"]] = item
+            story_state[section] = list(by_id.values())
+    for document in sorted(
+        state.source_index.documents,
+        key=lambda d: (d.commit_timestamp or 0, d.pr_number or 0),
+    ):
+        if document.changelog.story_changes:
+            story_state = project_story_changes(
+                story_state, document.changelog.story_changes
+            )
 
     return {
+        **(story_state if any(story_state.values()) else {}),
         "schema": SPECIFICATION_SCHEMA_URL,
         "id": _current_state_report_id(resolved_branch),
         "title": f"Current state synthesized for {resolved_branch}",

@@ -9,6 +9,8 @@ from typing import Any, cast
 import yaml
 from yaml.nodes import MappingNode, ScalarNode, SequenceNode
 
+from powdrr_service.structrr.user_story_validation import validate_story_document
+
 _ALLOWED_STATES = {"added", "removed", "supercedes"}
 
 
@@ -164,6 +166,10 @@ def build_system_specification_validation_report(
             issues=issues,
         )
 
+    issues.extend(
+        SystemSpecificationValidationIssue(i.code, i.message, i.subject_id)
+        for i in validate_story_document(raw_spec).issues
+    )
     return SystemSpecificationValidationReport(
         validation_successful=not issues,
         system_id=system_id,

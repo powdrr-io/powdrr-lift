@@ -36,10 +36,20 @@ files:
   type: modified
   span:
     start_line: 15
-    end_line: 20
+    end_line: 23
   summary: Record completed environment integration and the remaining implementation
     sequence.
-  rationale: Make placement handoffs the next implementation step.
+  rationale: Keep completed integration distinct from pending placement validation
+    and rollout.
+- path: docs/plans/structrr-source-references.md
+  type: modified
+  span:
+    start_line: 25
+    end_line: 26
+  summary: Record completed environment integration and the remaining implementation
+    sequence.
+  rationale: Keep completed integration distinct from pending placement validation
+    and rollout.
 - path: packages/agent/src/powdrr_agent/execution/minisweagent_environment.py
   type: added
   span:
@@ -146,8 +156,8 @@ files:
 - path: src/powdrr_lift/workrr/coding_agent.py
   type: modified
   span:
-    start_line: 793
-    end_line: 795
+    start_line: 906
+    end_line: 908
   summary: Compose enabled source sessions in miniSWE provider launches and preserve
     legacy off mode.
   rationale: Bind workspace, catalog, limits, endpoint, and diagnostics before worker
@@ -155,8 +165,8 @@ files:
 - path: src/powdrr_lift/workrr/coding_agent.py
   type: modified
   span:
-    start_line: 804
-    end_line: 811
+    start_line: 918
+    end_line: 925
   summary: Compose enabled source sessions in miniSWE provider launches and preserve
     legacy off mode.
   rationale: Bind workspace, catalog, limits, endpoint, and diagnostics before worker
@@ -164,8 +174,8 @@ files:
 - path: src/powdrr_lift/workrr/coding_agent.py
   type: modified
   span:
-    start_line: 825
-    end_line: 832
+    start_line: 939
+    end_line: 946
   summary: Compose enabled source sessions in miniSWE provider launches and preserve
     legacy off mode.
   rationale: Bind workspace, catalog, limits, endpoint, and diagnostics before worker
@@ -173,8 +183,8 @@ files:
 - path: src/powdrr_lift/workrr/coding_agent.py
   type: modified
   span:
-    start_line: 834
-    end_line: 837
+    start_line: 948
+    end_line: 951
   summary: Compose enabled source sessions in miniSWE provider launches and preserve
     legacy off mode.
   rationale: Bind workspace, catalog, limits, endpoint, and diagnostics before worker
@@ -182,8 +192,8 @@ files:
 - path: src/powdrr_lift/workrr/coding_agent.py
   type: modified
   span:
-    start_line: 955
-    end_line: 995
+    start_line: 1069
+    end_line: 1109
   summary: Compose enabled source sessions in miniSWE provider launches and preserve
     legacy off mode.
   rationale: Bind workspace, catalog, limits, endpoint, and diagnostics before worker

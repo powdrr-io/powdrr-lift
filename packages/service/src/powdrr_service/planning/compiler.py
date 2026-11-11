@@ -22,6 +22,12 @@ from powdrr_service.planning.plan_document import (
 )
 from powdrr_service.planning.plan_models import PlannedWorkItem, ReviewedExecutionPlan
 from powdrr_service.planning.plan_sizing import CANONICAL_RUNTIMES
+from powdrr_service.planning.story_allocation import (
+    merge_story_refs,
+    parse_story_refs,
+    pin_story,
+    validate_story_refs,
+)
 from powdrr_service.planning.workflow_ids import slugify_workflow_id
 from powdrr_service.planning.workflow_instance import (
     PLAN_WORKFLOW_PROCESS,
@@ -117,6 +123,14 @@ def compile_plan(
     _repository_path(plan_path, "plan_path")
     _validate_plan_record_links(plan, manifest)
     proposal_data = structrr_proposal.to_data()
+    for item in plan.items:
+        if item.story_refs != structrr_proposal.item_story_refs.get(item.item_id, ()):
+            raise PlanningCompilationError(
+                f"{item.item_id}: plan/proposal story allocations differ"
+            )
+    _validate_story_allocation(
+        plan, manifest, structrr_proposal.expected_final_snapshot
+    )
     proposal_info = manifest.data["structrr"]
     assert isinstance(proposal_info, Mapping)
     if structrr_proposal.plan_id != plan.plan_id:
@@ -255,6 +269,7 @@ def validate_compiled_plan(
         if parsed_plan != compiled.plan:
             errors.append("execution plan file differs from compiled plan record")
         manifest = PlanningManifest.from_data(parsed_plan.planning or {})
+        _validate_plan_record_links(parsed_plan, manifest)
         manifest_structrr = manifest.data["structrr"]
         assert isinstance(manifest_structrr, Mapping)
         proposal = json.loads(compiled.files[compiled.proposal_path])
@@ -269,6 +284,18 @@ def validate_compiled_plan(
         ):
             errors.append("Structrr proposal file differs from planning manifest")
         workflow_ids = {item.item_id: item.workflow_id for item in compiled.plan.items}
+        if isinstance(proposal, Mapping) and isinstance(
+            proposal.get("expected_final_snapshot"), Mapping
+        ):
+            _validate_story_allocation(
+                parsed_plan, manifest, proposal["expected_final_snapshot"]
+            )
+            if proposal.get("item_story_refs", {}) != {
+                item.item_id: [ref.to_data() for ref in item.story_refs]
+                for item in parsed_plan.items
+                if item.story_refs
+            }:
+                errors.append("Structrr proposal story allocation differs from plan")
         expected_workflow_paths = {
             item.workflow_file for item in compiled.plan.items if item.workflow_file
         }
@@ -295,6 +322,12 @@ def validate_compiled_plan(
                     f"workflow {item.workflow_id!r} has different dependencies"
                 )
             context = workflow.inputs["proposed_pr_context"]
+            if isinstance(context, Mapping) and (
+                context.get("story_refs", [])
+                != [ref.to_data() for ref in item.story_refs]
+                or context.get("story_validation", False) != item.story_validation
+            ):
+                errors.append(f"workflow {item.workflow_id!r} changed story allocation")
             if not isinstance(context, Mapping) or any(
                 context.get(field) != expected
                 for field, expected in (
@@ -357,6 +390,9 @@ def _workflow_definition(
     }
     if item.manual_prerequisite is not None:
         context["manual_prerequisite"] = dict(item.manual_prerequisite)
+    if item.story_refs:
+        context["story_refs"] = [ref.to_data() for ref in item.story_refs]
+        context["story_validation"] = item.story_validation
     if item.item_id == "final-integration-review":
         context.update(
             final_integration_review=True,
@@ -376,6 +412,73 @@ def _workflow_definition(
             "proposed_pr_context": context,
         },
     }
+
+
+def _validate_story_allocation(
+    plan: ReviewedExecutionPlan, manifest: PlanningManifest, snapshot: Mapping[str, Any]
+) -> None:
+    requirements = {
+        record["id"]: parse_story_refs(record.get("story_refs", []))
+        for record in manifest.data["requirements"]
+    }
+    units = {record["id"]: record for record in manifest.data["units"]}
+    for unit in units.values():
+        expected = merge_story_refs(
+            [requirements[identity] for identity in unit["requirement_ids"]]
+        )
+        refs = parse_story_refs(unit.get("story_refs", []))
+        if refs != expected:
+            raise PlanningCompilationError(
+                f"{unit['id']}: work unit dropped or changed "
+                "requirement story references"
+            )
+    for item in plan.items:
+        refs = merge_story_refs(
+            [
+                parse_story_refs(units[identity].get("story_refs", []))
+                for identity in manifest.data["item_unit_ids"][item.item_id]
+            ]
+        )
+        if item.story_refs != refs:
+            raise PlanningCompilationError(
+                f"{item.item_id}: item dropped or changed work unit story references"
+            )
+        validate_story_refs(item.story_refs, snapshot)
+    all_refs = merge_story_refs(list(requirements.values()))
+    by_id = {item.item_id: item for item in plan.items}
+    for ref in all_refs:
+        full = pin_story(snapshot, ref.story_id)
+        owners = [
+            item
+            for item in plan.items
+            if any(r.story_id == ref.story_id for r in item.story_refs)
+        ]
+
+        def ancestors(item_id: str) -> set[str]:
+            result: set[str] = set()
+            pending = list(by_id[item_id].dependencies)
+            while pending:
+                parent = pending.pop()
+                if parent not in result:
+                    result.add(parent)
+                    pending.extend(by_id[parent].dependencies)
+            return result
+
+        gates = [
+            item for item in owners if item.story_validation and full in item.story_refs
+        ]
+        if not any(
+            all(
+                owner.item_id == gate.item_id
+                or owner.item_id in ancestors(gate.item_id)
+                for owner in owners
+            )
+            for gate in gates
+        ):
+            raise PlanningCompilationError(
+                f"{ref.story_id}: full-story validation must depend "
+                "on every implementation owner"
+            )
 
 
 def _validate_plan_record_links(
@@ -775,6 +878,7 @@ def _validate_manifest(value: Mapping[str, Any]) -> None:
             raise PlanningCompilationError("context and duplicate blocks need a reason")
 
     for requirement in requirements.values():
+        parse_story_refs(requirement.get("story_refs", []))
         if not _nonempty(requirement.get("statement")) or requirement.get(
             "kind"
         ) not in {"behavior", "constraint", "acceptance", "human_setup"}:
@@ -826,6 +930,7 @@ def _validate_manifest(value: Mapping[str, Any]) -> None:
             )
 
     for unit in units.values():
+        parse_story_refs(unit.get("story_refs", []))
         implementation_phase_id = unit.get("implementation_phase_id")
         if implementation_phase_id is not None and (
             not isinstance(implementation_phase_id, str)

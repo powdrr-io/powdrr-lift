@@ -3,7 +3,9 @@ name: plan-execution
 description: >-
   Advance bounded-planning questions in dependency-aware batches, then return
   control to the planning service when every question in the state machine is
-  accepted. The tracker issue is not an executable queue item.
+  accepted. Confirmed source stories retain pinned references through requirements,
+  work units and PR items; cross-PR ownership adds dependent integration validation.
+  The tracker issue is not an executable queue item.
 inputs:
   - {name: session_id, type: string, required: true}
   - {name: issue_number, type: integer, required: true}

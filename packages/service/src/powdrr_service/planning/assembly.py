@@ -36,6 +36,7 @@ from powdrr_service.planning.source import (
     Requirement,
     SegmentedSource,
 )
+from powdrr_service.planning.story_allocation import StoryPlanRef, merge_story_refs
 
 MAX_WORK_UNIT_CRITERIA = 2
 MAX_WORK_UNIT_REQUIREMENTS_PER_PROPOSAL = 4
@@ -263,6 +264,7 @@ class WorkUnit:
     validation_ids: tuple[str, ...]
     prerequisite_unit_ids: tuple[str, ...] = ()
     implementation_phase_id: str | None = None
+    story_refs: tuple[StoryPlanRef, ...] = ()
 
     def to_data(self) -> dict[str, Any]:
         return {
@@ -277,6 +279,11 @@ class WorkUnit:
             "acceptance_criteria": list(self.acceptance_criteria),
             "validation_ids": list(self.validation_ids),
             "prerequisite_unit_ids": list(self.prerequisite_unit_ids),
+            **(
+                {"story_refs": [ref.to_data() for ref in self.story_refs]}
+                if self.story_refs
+                else {}
+            ),
         }
 
 
@@ -307,6 +314,7 @@ class WorkUnitContext:
     preferred_runtimes: tuple[str, ...] = ()
     evidence_by_requirement: Mapping[str, tuple[Evidence, ...]] | None = None
     implementation_phases: tuple[ImplementationPhase, ...] = ()
+    story_context: Mapping[str, Any] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -898,6 +906,12 @@ def allocate_work_units(
                 acceptance_criteria=proposal.acceptance_criteria,
                 validation_ids=proposal.validation_ids,
                 implementation_phase_id=proposal.implementation_phase_id,
+                story_refs=merge_story_refs(
+                    [
+                        context.requirements[identity].story_refs
+                        for identity in proposal.requirement_ids
+                    ]
+                ),
             )
         )
         pending.extend(
@@ -1010,6 +1024,16 @@ def build_work_unit_proposal_request(
                 "id": requirement_id,
                 "statement": context.requirements[requirement_id].statement,
                 "source_refs": list(context.requirements[requirement_id].source_refs),
+                **(
+                    {
+                        "story_refs": [
+                            ref.to_data()
+                            for ref in context.requirements[requirement_id].story_refs
+                        ]
+                    }
+                    if context.requirements[requirement_id].story_refs
+                    else {}
+                ),
             },
         )
         for requirement_id in requirement_ids
@@ -1044,8 +1068,25 @@ def build_work_unit_proposal_request(
         if context.implementation_phases
         else ()
     )
+    story_refs = merge_story_refs(
+        [context.requirements[identity].story_refs for identity in requirement_ids]
+    )
+    story_facts = (
+        (
+            ContextRecord(
+                "story-contract-context",
+                {
+                    "story_refs": [ref.to_data() for ref in story_refs],
+                    "story_context": context.story_context,
+                },
+            ),
+        )
+        if story_refs
+        else ()
+    )
     accepted = (
         *requirement_facts,
+        *story_facts,
         *validations,
         *components,
         *preferred_runtimes,
@@ -1081,6 +1122,12 @@ def build_work_unit_proposal_request(
         ],
         "page_after": page_after,
     }
+    story_refs = merge_story_refs(
+        [context.requirements[identity].story_refs for identity in requirement_ids]
+    )
+    if story_refs:
+        input_facts["story_refs"] = [ref.to_data() for ref in story_refs]
+        input_facts["story_context"] = context.story_context
     question_identity: dict[str, Any] = {
         "requirement_ids": list(requirement_ids),
         "implementation_phases": [phase.id for phase in context.implementation_phases],

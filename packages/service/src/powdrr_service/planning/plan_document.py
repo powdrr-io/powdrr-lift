@@ -11,6 +11,7 @@ from typing import Any
 import yaml
 
 from powdrr_service.planning.plan_models import PlannedWorkItem, ReviewedExecutionPlan
+from powdrr_service.planning.story_allocation import parse_story_refs
 
 QUEUE_SCHEMA = "https://powdrr.io/schemas/github-issue-execution-plan-v1"
 MANUAL_PREREQUISITE_TRIGGER = "after_implementation_before_validation"
@@ -90,6 +91,8 @@ def parse_reviewed_plan_yaml(text: str) -> ReviewedExecutionPlan:
                 "allowed_paths",
                 "manual_prerequisite",
                 "code_evidence",
+                "story_refs",
+                "story_validation",
             }
         ):
             raise PlanDocumentError(f"{field} has unknown or missing fields")
@@ -143,7 +146,15 @@ def parse_reviewed_plan_yaml(text: str) -> ReviewedExecutionPlan:
                 if "code_evidence" in raw
                 else ()
             ),
+            story_refs=parse_story_refs(raw.get("story_refs", [])),
+            story_validation=raw.get("story_validation", False),
         )
+        if not isinstance(item.story_validation, bool) or (
+            item.story_validation and not item.story_refs
+        ):
+            raise PlanDocumentError(
+                f"{field}.story_validation requires typed story references"
+            )
         if not item.scope or not item.acceptance_criteria:
             raise PlanDocumentError(
                 f"{field} must declare scope and acceptance criteria"
@@ -219,6 +230,10 @@ def serialize_reviewed_plan_yaml(plan: ReviewedExecutionPlan) -> str:
             record["code_evidence"] = [
                 dict(reference) for reference in item.code_evidence
             ]
+        if item.story_refs:
+            record["story_refs"] = [ref.to_data() for ref in item.story_refs]
+        if item.story_validation:
+            record["story_validation"] = True
         items.append(record)
     data["items"] = items
     if plan.planning is not None:

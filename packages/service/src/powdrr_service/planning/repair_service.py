@@ -11,6 +11,10 @@ from typing import Any
 
 import yaml
 
+from powdrr_service.planning.compiler import (
+    PlanningManifest,
+    _validate_story_allocation,
+)
 from powdrr_service.planning.multipr_structrr import load_multi_pr_proposal
 from powdrr_service.planning.plan_document import (
     parse_reviewed_plan_yaml,
@@ -164,6 +168,12 @@ def apply_repair_request(
             "repair discovery must contain exactly: "
             + ", ".join(sorted(discovery_fields))
         )
+    if raw_discovery.get("kind") == "design_amendment_needed":
+        raise PlanRepairServiceError(
+            "design_amendment_needed: return to story-design-interview, "
+            "confirm the changed contract, publish its normal Structrr proposal, "
+            "then re-plan; plan repair cannot approve customer behavior"
+        )
     base = draft.manifest.get("base")
     pinned_base_commit = base_commit or (
         base.get("commit_sha") if isinstance(base, Mapping) else None
@@ -303,6 +313,27 @@ def _compile_artifacts(
         plan.plan_id, plan.items, plan.source_document, dict(manifest)
     )
     artifacts = dict(original.artifacts)
+    proposal_info = manifest.get("structrr", {})
+    if isinstance(proposal_info, Mapping):
+        proposal_text = original.artifacts.get(
+            str(proposal_info.get("proposal_path", ""))
+        )
+        if proposal_text is not None:
+            proposal_data = json.loads(proposal_text)
+            _validate_story_allocation(
+                plan,
+                PlanningManifest.from_data(manifest),
+                proposal_data["expected_final_snapshot"],
+            )
+            if proposal_data.get("item_story_refs", {}) != {
+                item.item_id: [ref.to_data() for ref in item.story_refs]
+                for item in plan.items
+                if item.story_refs
+            }:
+                raise PlanRepairServiceError(
+                    "story allocation changes require a refreshed "
+                    "approved Structrr proposal"
+                )
     artifacts[plan_path] = serialize_reviewed_plan_yaml(rendered_plan)
     try:
         if parse_reviewed_plan_yaml(artifacts[plan_path]) != rendered_plan:
@@ -407,6 +438,8 @@ def _planned_item(
         )
     replacement = PlannedWorkItem(
         item_id=item_id,
+        story_refs=current.story_refs if current else (),
+        story_validation=current.story_validation if current else False,
         title=str(value["title"]),
         objective=str(value["objective"]),
         scope=tuple(value["scope"]),

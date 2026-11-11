@@ -1644,6 +1644,11 @@ def generate_execution_plan_yaml(
     """Analyze source Markdown and compile a queue plan with workflow refs."""
     if not source_plan.strip():
         raise PlanGenerationError("source plan must not be empty")
+    if re.search(r"(?m)^\s*(?:user_stories|story_refs):", source_plan):
+        raise PlanGenerationError(
+            "Story-aware plans require the source-ledger planning session "
+            "so confirmation, allocation and integration gates are enforced."
+        )
     if len(source_plan) > MAX_SOURCE_PLAN_CHARS:
         raise PlanGenerationError(
             f"source plan exceeds {MAX_SOURCE_PLAN_CHARS} characters"
@@ -2369,6 +2374,11 @@ def write_execution_plan_artifacts(
     if structrr_proposal is None:
         raise PlanGenerationError(
             "execute-proposed-pr workflows require a generated Structrr proposal"
+        )
+    if any(item.story_refs for item in plan.items) or structrr_proposal.item_story_refs:
+        raise PlanGenerationError(
+            "Story-aware artifacts require the source-ledger compiler "
+            "to validate allocations and integration dependencies before writing."
         )
     plan_item_ids = {item.item_id for item in plan.items}
     if structrr_proposal.plan_id != plan.plan_id:

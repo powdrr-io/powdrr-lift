@@ -53,6 +53,7 @@ from powdrr_service.obligation_review import (
     bind_obligation_review,
     compile_obligation_evidence_packets,
 )
+from powdrr_service.planning.story_allocation import story_proposal_context
 from powdrr_service.planning.workflow_ids import slugify_workflow_id
 from powdrr_service.procedrr import ProcessCatalog, parse_and_validate
 from powdrr_service.procedrr_evaluator.evaluator import EvaluationError
@@ -979,6 +980,17 @@ def _prepare_proposal_review(
         encoding="utf-8",
     )
     state["design_handoff_path"] = handoff_path
+    story_context = story_proposal_context(
+        baseline_document,
+        plan_document,
+        proposal,
+        base_commit=handoff.to_data()["base_commit"],
+    )
+    if story_context:
+        state["story_planning_context"] = story_context
+        (output_root / "story-planning-context.json").write_text(
+            json.dumps(story_context, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
     state["proposal_worklist"] = worklist
     state["active_intent_clause_ids"] = active_intent_clause_ids
     return {
@@ -2540,6 +2552,17 @@ def _run_code_agent_phase(
         source_refs=source_refs,
     )
     proposal_revision_path = plan_path.parent / "proposal-revision.json"
+    story_context = story_proposal_context(
+        baseline_document,
+        plan_document,
+        proposal_revision,
+        base_commit=str(state.get("submission_base") or "feature-planning"),
+    )
+    if state.get("story_planning_context", {}) != story_context:
+        raise PowdrrExecutionError(
+            "story planning context changed after review; refresh "
+            "the approved proposal before coding"
+        )
     if not proposal_revision_path.exists():
         proposal_revision_path.write_text(
             json.dumps(proposal_revision.to_data(), indent=2, sort_keys=True) + "\n",
@@ -3124,6 +3147,15 @@ def _run_code_agent_phase(
             )
         elif index > 1 or isinstance(code_task, Mapping):
             request = replace(request, allow_existing_changes=True)
+        if story_context:
+            request = replace(
+                request,
+                prompt=request.prompt
+                + "\n\nPinned story planning context:\n"
+                + json.dumps(story_context, indent=2, sort_keys=True)
+                + "\nPreserve these contracts. A design_amendment_needed discovery "
+                "returns to story-design-interview and an approved Structrr proposal.",
+            )
         if (
             not config.capture_worker_prompts_only
             and not repair_mode

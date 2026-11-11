@@ -5,10 +5,15 @@ from __future__ import annotations
 import hashlib
 import json
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, cast
 
+from powdrr_service.planning.story_allocation import (
+    StoryPlanRef,
+    parse_story_refs,
+    validate_story_refs,
+)
 from powdrr_service.structrr.actual_diff import (
     StructrrActualDiff,
     compile_actual_structrr_diff,
@@ -39,6 +44,9 @@ class MultiPRStructrrProposal:
     item_order: tuple[str, ...]
     item_baselines: Mapping[str, Mapping[str, Any]]
     expected_final_snapshot: Mapping[str, Any]
+    item_story_refs: Mapping[str, tuple[StoryPlanRef, ...]] = field(
+        default_factory=dict
+    )
 
     def to_data(self) -> dict[str, Any]:
         data = {
@@ -59,6 +67,11 @@ class MultiPRStructrrProposal:
             "expected_final_fingerprint": snapshot_digest(self.expected_final_snapshot),
             "expected_final_snapshot": dict(self.expected_final_snapshot),
         }
+        if self.item_story_refs:
+            data["item_story_refs"] = {
+                key: [ref.to_data() for ref in refs]
+                for key, refs in sorted(self.item_story_refs.items())
+            }
         data["fingerprint"] = _content_fingerprint(data)
         return data
 
@@ -280,6 +293,7 @@ def compile_multi_pr_proposal(
             evidence_by_item[item_id],
         )
         projected = _apply_sections(projected, grouped[item_id])
+        validate_story_refs(parse_story_refs(item.get("story_refs", [])), projected)
     expected_final = projected
     return MultiPRStructrrProposal(
         plan_id=plan_id,
@@ -289,6 +303,11 @@ def compile_multi_pr_proposal(
         item_order=tuple(item_by_id),
         item_baselines=item_baselines,
         expected_final_snapshot=expected_final,
+        item_story_refs={
+            item_id: parse_story_refs(item.get("story_refs", []))
+            for item_id, item in item_by_id.items()
+            if item.get("story_refs")
+        },
     )
 
 
@@ -364,6 +383,9 @@ def load_multi_pr_proposal(path: str | Path) -> MultiPRStructrrProposal:
         item_baselines = _reconstruct_item_baselines(
             dict(baseline), item_order, item_proposals, fingerprints
         )
+    raw_refs = raw.get("item_story_refs", {})
+    if not isinstance(raw_refs, Mapping) or set(raw_refs) - set(item_proposals):
+        raise ValueError("multi-PR story allocation references unknown items")
     proposal = MultiPRStructrrProposal(
         plan_id=_required_string(raw, "plan_id"),
         baseline_snapshot=dict(baseline),
@@ -372,6 +394,9 @@ def load_multi_pr_proposal(path: str | Path) -> MultiPRStructrrProposal:
         item_order=tuple(item_order),
         item_baselines=item_baselines,
         expected_final_snapshot=dict(expected_final),
+        item_story_refs={
+            key: parse_story_refs(value) for key, value in raw_refs.items()
+        },
     )
     if proposal.full_proposal.structrr_baseline_fingerprint != snapshot_digest(
         proposal.baseline_snapshot
@@ -384,6 +409,13 @@ def load_multi_pr_proposal(path: str | Path) -> MultiPRStructrrProposal:
             raise ValueError(
                 f"item {item_id!r} proposal does not match its projected baseline"
             )
+        validate_story_refs(
+            proposal.item_story_refs.get(item_id, ()),
+            project_structural_operations(
+                proposal.item_baselines[item_id],
+                _proposal_structural_operations(item_proposal),
+            ),
+        )
     if raw.get("schema_version") == MULTIPR_STRUCTRR_SCHEMA:
         final_item_baseline = proposal.baseline_snapshot
         for item_id in proposal.item_order:
@@ -788,6 +820,7 @@ __all__ = [
     "inherited_decision_records",
     "compile_multi_pr_proposal",
     "project_structural_operations",
+    "project_item_proposal",
     "load_multi_pr_proposal",
     "rebase_item_proposal",
     "rebase_final_plan_state",
@@ -795,3 +828,12 @@ __all__ = [
     "structural_repair_findings",
     "write_multi_pr_proposal",
 ]
+
+
+def project_item_proposal(
+    baseline: Mapping[str, Any], proposal: ProposalRevision
+) -> dict[str, Any]:
+    """Project a compiled item through the planner's normalized operation codec."""
+    return project_structural_operations(
+        baseline, _proposal_structural_operations(proposal)
+    )

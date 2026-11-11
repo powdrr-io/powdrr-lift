@@ -2,7 +2,9 @@ version: 1
 name: plan-repair-execution
 description: >-
   Apply one typed repair patch to an unpublished planning draft after the
-  deterministic impact set and accepted replacement records are ready.
+  deterministic impact set and accepted replacement records are ready. Preserve
+  pinned story allocations. Customer behavior changes return to story-design-interview
+  and an approved Structrr proposal before re-planning; repair cannot grant confirmation.
 inputs:
   - {name: repair_id, type: string, required: true}
   - {name: base_plan_digest, type: string, required: true}

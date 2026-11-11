@@ -209,6 +209,9 @@ def item_content_digest(item: PlannedWorkItem) -> str:
         "manual_prerequisite": item.manual_prerequisite,
         "inline_adjustments": list(item.inline_adjustments),
     }
+    if item.story_refs:
+        value["story_refs"] = [ref.to_data() for ref in item.story_refs]
+        value["story_validation"] = item.story_validation
     return _digest(value)
 
 

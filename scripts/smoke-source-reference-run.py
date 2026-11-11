@@ -79,7 +79,7 @@ def main() -> int:
             {
                 "obligation_id": "place:twice",
                 "ref": "feature:twice",
-                "relationship": "realizes",
+                "relationship": "implements",
                 "requirement": "Return twice the numeric input.",
                 "owner": {
                     "path": "value.py",

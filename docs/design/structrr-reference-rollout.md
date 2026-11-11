@@ -79,3 +79,7 @@ gaps, and validation that mutates source. Native integration cases require macOS
 and permission to create the nested sandbox. They make no provider calls.
 The optional `scripts/smoke-source-reference-run.py` requires both `--live` and
 `POWDRR_LIVE_SOURCE_REFERENCE_SMOKE=1`; it is never part of routine verification.
+
+Workrr plan items can now select this execution path through a reviewed
+`source_reference_design_file`. See [task dispatch](structrr-source-task-dispatch.md)
+for committed authority, candidate isolation, patch transfer, and supported task types.

@@ -1,0 +1,230 @@
+"""Dispatch reviewed source-reference tasks without entering legacy recovery."""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import re
+import subprocess
+import tempfile
+from collections.abc import Mapping
+from pathlib import Path
+from typing import Any
+
+import yaml
+from powdrr_local.miniswe_inference import create_miniswe_inference_handler
+from powdrr_service.planning.plan_models import source_reference_design_file
+
+from powdrr_lift.errors import PowdrrExecutionError
+from powdrr_lift.workrr.coding_agent_validation import ValidationProfile
+from powdrr_lift.workrr.llm import WorkflowLLMClient, complete_json
+from powdrr_lift.workrr.source_reference_run import SourceReferenceRun
+
+DESIGN_SCHEMA = "structrr-source-reference-task-v1"
+MAX_DESIGN_BYTES = 1_000_000
+
+
+def _git(root: Path, *arguments: str, data: bytes | None = None) -> bytes:
+    result = subprocess.run(
+        ["git", *arguments], cwd=root, input=data, capture_output=True, check=False
+    )
+    if result.returncode:
+        raise PowdrrExecutionError(result.stderr.decode(errors="replace").strip())
+    return result.stdout
+
+
+def load_reviewed_source_design(
+    repo_root: Path, proposed: Mapping[str, Any], *, base_commit: str
+) -> tuple[str, dict[str, Any]]:
+    """Read accepted intent from a regular committed blob, never candidate files."""
+    path = source_reference_design_file(proposed.get("source_reference_design_file"))
+    if not re.fullmatch(r"[a-f0-9]{40}", base_commit):
+        raise ValueError("Source task requires an exact Git base commit")
+    tree = _git(repo_root, "ls-tree", "-z", base_commit, "--", path).split(b"\0")
+    entries = [entry for entry in tree if entry]
+    if len(entries) != 1 or entries[0].split(b" ", 1)[0] not in {b"100644", b"100755"}:
+        raise ValueError("Source design must be a regular committed file at the base")
+    blob = f"{base_commit}:{path}"
+    if int(_git(repo_root, "cat-file", "-s", blob)) > MAX_DESIGN_BYTES:
+        raise ValueError("Source design exceeds the committed input byte limit")
+    document = yaml.safe_load(_git(repo_root, "show", blob))
+    if (
+        not isinstance(document, dict)
+        or set(document) != {"schema_version", "plan_id", "item_id", "design"}
+        or document["schema_version"] != DESIGN_SCHEMA
+        or not isinstance(document["design"], dict)
+        or any(
+            not isinstance(document[key], str)
+            or not document[key].strip()
+            or document[key] != proposed.get(key)
+            for key in ("plan_id", "item_id")
+        )
+    ):
+        raise ValueError(
+            "Committed source design does not match the reviewed plan item"
+        )
+    return path, document["design"]
+
+
+class _ReferenceReviewer:
+    def __init__(self, client: WorkflowLLMClient) -> None:
+        self.client = client
+
+    def complete_json(
+        self, messages: list[dict[str, str]], *, response_schema: Any = None
+    ) -> dict[str, Any]:
+        return complete_json(self.client, messages, response_schema=response_schema)
+
+
+def dispatch_source_reference_task(
+    *,
+    repo_root: Path,
+    proposed: Mapping[str, Any],
+    base_commit: str,
+    workflow_id: str,
+    task_id: str,
+    objective: str,
+    allowed_paths: tuple[str, ...],
+    profile: ValidationProfile,
+    code_agent: str,
+    model: str | None,
+    worker_timeout_seconds: float,
+    validation_timeout_seconds: float,
+    review_client: WorkflowLLMClient,
+) -> dict[str, Any]:
+    """Run once in a clean candidate, then transfer only an accepted patch."""
+    if proposed.get("source_reference_mode", "enforce") != "enforce":
+        raise PowdrrExecutionError(
+            "Source reference tasks cannot downgrade enforce mode"
+        )
+    if code_agent != "minisweagent" or not model:
+        raise PowdrrExecutionError("Source reference tasks require miniSWE and a model")
+    if proposed.get("story_refs") or proposed.get("story_validation"):
+        raise PowdrrExecutionError(
+            "Source reference tasks with story coverage require a protected adapter"
+        )
+    design_path, design = load_reviewed_source_design(
+        repo_root, proposed, base_commit=base_commit
+    )
+    identity = hashlib.sha256(
+        json.dumps(
+            [str(repo_root.resolve()), workflow_id, task_id, base_commit, design_path]
+        ).encode()
+    ).hexdigest()
+    root = Path(tempfile.gettempdir()) / "powdrr-source-tasks" / identity
+    root.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        root.mkdir(mode=0o700)
+    except FileExistsError as error:
+        raise PowdrrExecutionError(
+            f"Source task already dispatched; inspect {root}. "
+            "Accept a new design revision before another implementation attempt."
+        ) from error
+    candidate = root / "candidate"
+    result: dict[str, Any] = {
+        "passed": False,
+        "retryable": False,
+        "changed_paths": [],
+        "attempts": [],
+        "continuations": 0,
+        "source_reference_artifact_root": str(root),
+        "source_reference_mode": "enforce",
+    }
+    try:
+        if _git(repo_root, "rev-parse", "HEAD").decode().strip() != base_commit:
+            raise ValueError("Task checkout differs from the reviewed source base")
+        _git(repo_root, "worktree", "add", "--detach", str(candidate), base_commit)
+        run = SourceReferenceRun.prepare(
+            workspace_root=candidate,
+            accepted_design=design,
+            base_commit=base_commit,
+            objective=objective,
+            allowed_paths=allowed_paths,
+            profiles={profile.name: profile},
+            artifact_root=root / "runs",
+            run_id="implementation",
+            model=model,
+            worker_timeout_seconds=worker_timeout_seconds,
+            validation_timeout_seconds=validation_timeout_seconds,
+            review_client=_ReferenceReviewer(review_client),
+        )
+        outcome = run.execute(create_miniswe_inference_handler(worker_timeout_seconds))
+        data = outcome.to_data()
+        attempt = data["attempt"] or {}
+        result.update(
+            attempt_id=attempt.get("attempt_id"),
+            status=attempt.get("status", "failed"),
+            validation=data["validation"],
+            source_reference_outcome=data["outcome"],
+            source_reference_terminal=str(run.private_root / "terminal.json"),
+            attempts=[data],
+            error=data["error"],
+        )
+        if not outcome.accepted:
+            return result
+        run.verify_candidate()
+        changed = tuple(attempt["changed_paths"])
+        # The reviewed intent and task metadata are never implementation output.
+        reserved = {
+            design_path,
+            proposed.get("execution_plan_file"),
+            proposed.get("structrr_proposal_file"),
+        }
+        if any(path in reserved or path.startswith(".powdrr/") for path in changed):
+            raise ValueError(
+                "Source candidate changed reviewed intent or runtime state"
+            )
+        patch = _git(
+            candidate,
+            "diff",
+            "--no-ext-diff",
+            "--no-textconv",
+            "--binary",
+            "--full-index",
+            base_commit,
+        )
+        for raw_path in _git(
+            candidate, "ls-files", "--others", "--exclude-standard", "-z"
+        ).split(b"\0"):
+            if not raw_path:
+                continue
+            untracked = subprocess.run(
+                [
+                    "git",
+                    "diff",
+                    "--no-index",
+                    "--no-ext-diff",
+                    "--no-textconv",
+                    "--binary",
+                    "--full-index",
+                    "--",
+                    "/dev/null",
+                    raw_path.decode(),
+                ],
+                cwd=candidate,
+                capture_output=True,
+                check=False,
+            )
+            if untracked.returncode != 1:
+                raise ValueError("Could not export validated untracked source")
+            patch += untracked.stdout
+        run.verify_candidate()
+        (root / "accepted.patch").write_bytes(patch)
+        if _git(repo_root, "rev-parse", "HEAD").decode().strip() != base_commit:
+            raise ValueError("Task checkout moved while the source worker ran")
+        if _git(
+            repo_root, "status", "--porcelain", "--untracked-files=all", "--", *changed
+        ):
+            raise ValueError(
+                "Task checkout changed on candidate paths; patch not applied"
+            )
+        _git(repo_root, "apply", "--check", "--binary", "-", data=patch)
+        _git(repo_root, "apply", "--binary", "-", data=patch)
+        result.update(passed=True, changed_paths=list(changed))
+    except Exception as error:
+        result["error"] = str(error)
+        result["status"] = "failed"
+    finally:
+        (root / "dispatch.json").write_text(json.dumps(result, indent=2) + "\n")
+    # Preserve the candidate and all evidence for diagnosis and human review.
+    return result

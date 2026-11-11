@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+from pathlib import PurePosixPath
 from typing import Any
 
 from powdrr_service.planning.story_allocation import StoryPlanRef
@@ -28,6 +29,7 @@ class PlannedWorkItem:
     code_evidence: tuple[Mapping[str, Any], ...] = ()
     story_refs: tuple[StoryPlanRef, ...] = ()
     story_validation: bool = False
+    source_reference_design_file: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -39,3 +41,21 @@ class ReviewedExecutionPlan:
 
 
 __all__ = ["PlannedWorkItem", "ReviewedExecutionPlan"]
+
+
+def source_reference_design_file(value: Any) -> str:
+    """Validate the reviewed design pointer used by plan and workflow records."""
+    if (
+        not isinstance(value, str)
+        or not value.strip()
+        or value != value.strip()
+        or "\\" in value
+        or PurePosixPath(value).is_absolute()
+        or ".." in PurePosixPath(value).parts
+        or PurePosixPath(value).as_posix() != value
+        or value == "."
+    ):
+        raise ValueError(
+            "source_reference_design_file must be a normalized repository-relative file"
+        )
+    return value

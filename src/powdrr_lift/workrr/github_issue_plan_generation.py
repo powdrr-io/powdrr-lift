@@ -2498,6 +2498,15 @@ def write_execution_plan_artifacts(
                         "structrr_item_id": item.item_id,
                         "require_structrr_proposal": True,
                         **(
+                            {
+                                "source_reference_design_file": (
+                                    item.source_reference_design_file
+                                )
+                            }
+                            if item.source_reference_design_file is not None
+                            else {}
+                        ),
+                        **(
                             {"manual_prerequisite": dict(item.manual_prerequisite)}
                             if item.manual_prerequisite is not None
                             else {}

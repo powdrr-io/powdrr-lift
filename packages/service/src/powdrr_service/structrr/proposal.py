@@ -151,11 +151,18 @@ def compile_proposal_revision(
             if not isinstance(raw_action, str) or raw_action not in ACTION_ALIASES:
                 raise ValueError(f"unsupported Structrr action: {raw_action!r}")
             action = normalize_action(raw_action)
+            if section == "source_reference_placements" and (
+                not isinstance(item.get("obligation_id"), str)
+                or not item["obligation_id"].strip()
+            ):
+                raise ValueError("placement operations require obligation_id")
             raw_subject = (
                 item.get(
                     "stable_key", item.get("id", item.get("path", f"item-{index}"))
                 )
                 if section == "files"
+                else item["obligation_id"]
+                if section == "source_reference_placements"
                 else item.get("id", item.get("clause_id", f"item-{index}"))
             )
             subject_id = str(raw_subject)

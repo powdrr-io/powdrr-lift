@@ -300,7 +300,7 @@ def test_execution_unit_compiles_to_worker_request() -> None:
     assert "Validation profiles that will run: unit-tests" in request.prompt
     assert "Workrr" not in request.prompt
     assert (
-        json.loads(request.to_json())["schema_version"] == "implementation-request-v2"
+        json.loads(request.to_json())["schema_version"] == "implementation-request-v3"
     )
 
 

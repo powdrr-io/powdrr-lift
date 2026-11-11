@@ -667,13 +667,13 @@ def allocate_story_edit(
     )
 
 
-def apply_story_edits(
+def preview_story_edits(
     catalog: StoryCatalog,
     allocated_edits: Sequence[AllocatedStoryEdit],
     expected_snapshot_digest: str,
 ) -> StoryCatalog:
-    """Apply an entire edit transaction before validating graph integrity."""
-    from powdrr_service.structrr.design import project_sections
+    """Project an authoring draft with identity checks but no readiness claim."""
+    from powdrr_service.structrr.design import _project_sections
 
     if catalog.fingerprint != expected_snapshot_digest:
         raise StoryContractError(
@@ -747,9 +747,19 @@ def apply_story_edits(
                     **({"confirmation": None} if story_id in changed_contracts else {}),
                 }
             )
-    result = project_sections(catalog.to_data(), operations)
+    result = _project_sections(catalog.to_data(), operations)
     candidate = parse_story_catalog(result)
     validate_story_evolution(catalog, candidate)
+    return candidate
+
+
+def apply_story_edits(
+    catalog: StoryCatalog,
+    allocated_edits: Sequence[AllocatedStoryEdit],
+    expected_snapshot_digest: str,
+) -> StoryCatalog:
+    """Publish only a structurally complete projected edit transaction."""
+    candidate = preview_story_edits(catalog, allocated_edits, expected_snapshot_digest)
     validate_story_catalog(candidate).require_valid()
     return candidate
 

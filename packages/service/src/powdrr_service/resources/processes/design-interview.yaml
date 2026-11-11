@@ -6,7 +6,9 @@ description: >-
   questions, then ask one bounded semantic question at a time to define each
   atomic clause's durable obligation and verification shape. The compiler owns
   identity, references, selectors, fingerprints, executable test contracts,
-  and aggregation.
+  and aggregation. Interactive customer-story authoring and real user
+  confirmation are owned by story-design-interview through specify-a-feature;
+  this semantic compiler never grants user_confirmation authority.
 inputs:
   - {name: work_item_name, type: string, required: true}
   - {name: feature_description, type: string, required: true}

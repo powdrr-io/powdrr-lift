@@ -213,9 +213,27 @@ class Evaluator:
         events: _EventLog = _EventLog(self.event_sink)
         if checkpoint is not None:
             list.extend(events, checkpoint.events)
-            self._replay_events = {
-                (event.kind, event.path): event for event in checkpoint.events
-            }
+            self._replay_events = {}
+            for event in checkpoint.events:
+                self._replay_events[(event.kind, event.path)] = event
+                if event.kind == "resume":
+                    original = self._replay_events.get(("operation", event.path))
+                    if original is not None:
+                        # A later suspension must replay the previously accepted
+                        # answer, not the initial suspended operation's placeholder.
+                        self._replay_events[("operation", event.path)] = (
+                            EvaluationEvent(
+                                "operation",
+                                event.path,
+                                {
+                                    **original.data,
+                                    **event.data,
+                                    "replay_output": event.data.get(
+                                        "replay_output", event.data.get("output")
+                                    ),
+                                },
+                            )
+                        )
             self._resume_value = resume_value
             self._resume_path = checkpoint.suspended_at
         else:
@@ -806,6 +824,9 @@ class Evaluator:
                         path,
                         {
                             "output": _compact_value(result, max_chars=12000),
+                            "replay_output": result,
+                            "resume_with_executor": resume_with_executor,
+                            "resume_data": resume_data,
                             "suspended": suspended_reason is not None,
                         },
                     )

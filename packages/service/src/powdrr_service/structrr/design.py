@@ -79,7 +79,7 @@ def subject_identity(section: str, record: Mapping[str, Any]) -> str:
     raise ValueError(f"{section} design record requires a stable identity")
 
 
-def project_sections(
+def _project_sections(
     baseline: Mapping[str, Any], sections: Mapping[str, Sequence[Mapping[str, Any]]]
 ) -> dict[str, Any]:
     """Apply add/change/remove without mutating inputs or discarding metadata.
@@ -167,6 +167,14 @@ def project_sections(
                     )
                 by_id[identity] = {**by_id.get(identity, {}), **content}
         result[collection] = [by_id[key] for key in sorted(by_id)]
+    return result
+
+
+def project_sections(
+    baseline: Mapping[str, Any], sections: Mapping[str, Sequence[Mapping[str, Any]]]
+) -> dict[str, Any]:
+    """Project a complete published transaction and validate its story graphs."""
+    result = _project_sections(baseline, sections)
     if any(section in sections for section in STORY_SECTIONS):
         before = parse_story_catalog(baseline)
         after = parse_story_catalog(result)

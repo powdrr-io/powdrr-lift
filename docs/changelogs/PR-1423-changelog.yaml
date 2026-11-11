@@ -1,0 +1,448 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1423
+title: Add interactive Structrr story design and actual-user confirmation
+intent:
+  problem: Story graphs lack an interactive path preserving real answers and separating
+    user authority from generated metadata.
+  goal: Draft and amend stories through typed operations, obtain current review and
+    exact user confirmation, and publish normal source-linked proposals.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/design/structrr-story-interview.md
+  type: added
+  span:
+    start_line: 1
+    end_line: 123
+  summary: Document interactive story authoring, bounded review, actual-user confirmation
+    and publication.
+  rationale: Make the implemented authority boundary and later verification slices
+    explicit.
+- path: docs/plans/structrr-user-stories-and-behavioral-testing.md
+  type: modified
+  span:
+    start_line: 3
+    end_line: 9
+  summary: Record progress on the interactive story design slice.
+  rationale: Distinguish authoring from future planning and behavioral evidence.
+- path: packages/service/src/powdrr_service/procedrr_evaluator/evaluator.py
+  type: modified
+  span:
+    start_line: 216
+    end_line: 236
+  summary: Retain accepted resume outputs across later suspensions.
+  rationale: Preserve actual prior answers and source references across checkpoint
+    replay.
+- path: packages/service/src/powdrr_service/procedrr_evaluator/evaluator.py
+  type: modified
+  span:
+    start_line: 827
+    end_line: 829
+  summary: Retain accepted resume outputs across later suspensions.
+  rationale: Preserve actual prior answers and source references across checkpoint
+    replay.
+- path: packages/service/src/powdrr_service/resources/processes/design-interview.yaml
+  type: modified
+  span:
+    start_line: 9
+    end_line: 11
+  summary: Document the headless compiler and interactive authority boundary.
+  rationale: Keep semantic compilation separate from actual user confirmation.
+- path: packages/service/src/powdrr_service/resources/processes/specify-a-feature.yaml
+  type: modified
+  span:
+    start_line: 3
+    end_line: 3
+  summary: Connect the feature interview to typed story design and proposal generation.
+  rationale: Preserve existing module, quality, legacy-behavior and delivery context
+    while enforcing story publication.
+- path: packages/service/src/powdrr_service/resources/processes/specify-a-feature.yaml
+  type: modified
+  span:
+    start_line: 20
+    end_line: 32
+  summary: Connect the feature interview to typed story design and proposal generation.
+  rationale: Preserve existing module, quality, legacy-behavior and delivery context
+    while enforcing story publication.
+- path: packages/service/src/powdrr_service/resources/processes/story-design-interview.yaml
+  type: added
+  span:
+    start_line: 1
+    end_line: 110
+  summary: Define a bounded native story process with a deterministic readiness gate.
+  rationale: Prevent empty or unconfirmed authoring from counting as completed design.
+- path: packages/service/src/powdrr_service/structrr/bootstrap.py
+  type: modified
+  span:
+    start_line: 6
+    end_line: 6
+  summary: Project reviewed story-source deltas in Git introduction order and deduplicate
+    changelist operations.
+  rationale: Keep story proposals readable after reload without a second inventory.
+- path: packages/service/src/powdrr_service/structrr/bootstrap.py
+  type: modified
+  span:
+    start_line: 174
+    end_line: 174
+  summary: Project reviewed story-source deltas in Git introduction order and deduplicate
+    changelist operations.
+  rationale: Keep story proposals readable after reload without a second inventory.
+- path: packages/service/src/powdrr_service/structrr/bootstrap.py
+  type: modified
+  span:
+    start_line: 186
+    end_line: 186
+  summary: Project reviewed story-source deltas in Git introduction order and deduplicate
+    changelist operations.
+  rationale: Keep story proposals readable after reload without a second inventory.
+- path: packages/service/src/powdrr_service/structrr/bootstrap.py
+  type: modified
+  span:
+    start_line: 191
+    end_line: 195
+  summary: Project reviewed story-source deltas in Git introduction order and deduplicate
+    changelist operations.
+  rationale: Keep story proposals readable after reload without a second inventory.
+- path: packages/service/src/powdrr_service/structrr/bootstrap.py
+  type: modified
+  span:
+    start_line: 198
+    end_line: 200
+  summary: Project reviewed story-source deltas in Git introduction order and deduplicate
+    changelist operations.
+  rationale: Keep story proposals readable after reload without a second inventory.
+- path: packages/service/src/powdrr_service/structrr/bootstrap.py
+  type: modified
+  span:
+    start_line: 1394
+    end_line: 1394
+  summary: Project reviewed story-source deltas in Git introduction order and deduplicate
+    changelist operations.
+  rationale: Keep story proposals readable after reload without a second inventory.
+- path: packages/service/src/powdrr_service/structrr/bootstrap.py
+  type: modified
+  span:
+    start_line: 1429
+    end_line: 1429
+  summary: Project reviewed story-source deltas in Git introduction order and deduplicate
+    changelist operations.
+  rationale: Keep story proposals readable after reload without a second inventory.
+- path: packages/service/src/powdrr_service/structrr/bootstrap.py
+  type: modified
+  span:
+    start_line: 1431
+    end_line: 1440
+  summary: Project reviewed story-source deltas in Git introduction order and deduplicate
+    changelist operations.
+  rationale: Keep story proposals readable after reload without a second inventory.
+- path: packages/service/src/powdrr_service/structrr/bootstrap.py
+  type: modified
+  span:
+    start_line: 1442
+    end_line: 1442
+  summary: Project reviewed story-source deltas in Git introduction order and deduplicate
+    changelist operations.
+  rationale: Keep story proposals readable after reload without a second inventory.
+- path: packages/service/src/powdrr_service/structrr/bootstrap.py
+  type: modified
+  span:
+    start_line: 1568
+    end_line: 1568
+  summary: Project reviewed story-source deltas in Git introduction order and deduplicate
+    changelist operations.
+  rationale: Keep story proposals readable after reload without a second inventory.
+- path: packages/service/src/powdrr_service/structrr/bootstrap.py
+  type: modified
+  span:
+    start_line: 1621
+    end_line: 1662
+  summary: Project reviewed story-source deltas in Git introduction order and deduplicate
+    changelist operations.
+  rationale: Keep story proposals readable after reload without a second inventory.
+- path: packages/service/src/powdrr_service/structrr/design.py
+  type: modified
+  span:
+    start_line: 75
+    end_line: 75
+  summary: Separate draft projection from whole-graph publication validation.
+  rationale: Permit incremental authoring while retaining strict accepted-design gates.
+- path: packages/service/src/powdrr_service/structrr/design.py
+  type: modified
+  span:
+    start_line: 163
+    end_line: 170
+  summary: Separate draft projection from whole-graph publication validation.
+  rationale: Permit incremental authoring while retaining strict accepted-design gates.
+- path: packages/service/src/powdrr_service/structrr/story_interview.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 999
+  summary: Implement durable drafting, scoped context, answer provenance, readiness
+    and exact-digest confirmation.
+  rationale: Keep identity and authority in the service and require evidence before
+    normal proposal compilation.
+- path: packages/service/src/powdrr_service/structrr/story_semantic_review.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 281
+  summary: Review one dimension through a typed decision and separate explanation.
+  rationale: Bind findings to contract, dependency and source fingerprints; retain
+    failed or oversized reviews as unavailable.
+- path: packages/service/src/powdrr_service/structrr/user_stories.py
+  type: modified
+  span:
+    start_line: 670
+    end_line: 670
+  summary: Expose identity-checked previews while validating accepted story edits
+    structurally.
+  rationale: Allow partial graph construction without claiming readiness.
+- path: packages/service/src/powdrr_service/structrr/user_stories.py
+  type: modified
+  span:
+    start_line: 675
+    end_line: 676
+  summary: Expose identity-checked previews while validating accepted story edits
+    structurally.
+  rationale: Allow partial graph construction without claiming readiness.
+- path: packages/service/src/powdrr_service/structrr/user_stories.py
+  type: modified
+  span:
+    start_line: 750
+    end_line: 750
+  summary: Expose identity-checked previews while validating accepted story edits
+    structurally.
+  rationale: Allow partial graph construction without claiming readiness.
+- path: packages/service/src/powdrr_service/structrr/user_stories.py
+  type: modified
+  span:
+    start_line: 753
+    end_line: 762
+  summary: Expose identity-checked previews while validating accepted story edits
+    structurally.
+  rationale: Allow partial graph construction without claiming readiness.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 29
+    end_line: 29
+  summary: Connect story operations, fragment construction, actual answers and publication
+    checks to chat.
+  rationale: Prevent fabricated or reused resume answers from authorizing another
+    displayed story.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 62
+    end_line: 62
+  summary: Connect story operations, fragment construction, actual answers and publication
+    checks to chat.
+  rationale: Prevent fabricated or reused resume answers from authorizing another
+    displayed story.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 658
+    end_line: 664
+  summary: Connect story operations, fragment construction, actual answers and publication
+    checks to chat.
+  rationale: Prevent fabricated or reused resume answers from authorizing another
+    displayed story.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 679
+    end_line: 680
+  summary: Connect story operations, fragment construction, actual answers and publication
+    checks to chat.
+  rationale: Prevent fabricated or reused resume answers from authorizing another
+    displayed story.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 706
+    end_line: 708
+  summary: Connect story operations, fragment construction, actual answers and publication
+    checks to chat.
+  rationale: Prevent fabricated or reused resume answers from authorizing another
+    displayed story.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 943
+    end_line: 944
+  summary: Connect story operations, fragment construction, actual answers and publication
+    checks to chat.
+  rationale: Prevent fabricated or reused resume answers from authorizing another
+    displayed story.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 1120
+    end_line: 1122
+  summary: Connect story operations, fragment construction, actual answers and publication
+    checks to chat.
+  rationale: Prevent fabricated or reused resume answers from authorizing another
+    displayed story.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 1135
+    end_line: 1139
+  summary: Connect story operations, fragment construction, actual answers and publication
+    checks to chat.
+  rationale: Prevent fabricated or reused resume answers from authorizing another
+    displayed story.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 1142
+    end_line: 1217
+  summary: Connect story operations, fragment construction, actual answers and publication
+    checks to chat.
+  rationale: Prevent fabricated or reused resume answers from authorizing another
+    displayed story.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 1219
+    end_line: 1220
+  summary: Connect story operations, fragment construction, actual answers and publication
+    checks to chat.
+  rationale: Prevent fabricated or reused resume answers from authorizing another
+    displayed story.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 1122
+    end_line: 1129
+  summary: Connect story operations, fragment construction, actual answers and publication
+    checks to chat.
+  rationale: Prevent fabricated or reused resume answers from authorizing another
+    displayed story.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 1224
+    end_line: 1235
+  summary: Connect story operations, fragment construction, actual answers and publication
+    checks to chat.
+  rationale: Prevent fabricated or reused resume answers from authorizing another
+    displayed story.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 1251
+    end_line: 1251
+  summary: Connect story operations, fragment construction, actual answers and publication
+    checks to chat.
+  rationale: Prevent fabricated or reused resume answers from authorizing another
+    displayed story.
+- path: src/powdrr_lift/workrr/procedrr_chat.py
+  type: modified
+  span:
+    start_line: 1357
+    end_line: 1359
+  summary: Connect story operations, fragment construction, actual answers and publication
+    checks to chat.
+  rationale: Prevent fabricated or reused resume answers from authorizing another
+    displayed story.
+- path: src/powdrr_lift/workrr/story_interview_operations.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 455
+  summary: Persist sessions and actual input, assemble repository context, and publish/check
+    artifacts.
+  rationale: Keep actual-user transport and filesystem effects at the local adapter
+    boundary.
+- path: tests/fixtures/structrr/golden-python-symbols.yaml
+  type: modified
+  span:
+    start_line: 8
+    end_line: 8
+  summary: Refresh spans for changed bootstrap symbols.
+  rationale: Keep extraction expectations aligned with current source.
+- path: tests/fixtures/structrr/golden-python-symbols.yaml
+  type: modified
+  span:
+    start_line: 14
+    end_line: 15
+  summary: Refresh spans for changed bootstrap symbols.
+  rationale: Keep extraction expectations aligned with current source.
+- path: tests/fixtures/structrr/golden-python-symbols.yaml
+  type: modified
+  span:
+    start_line: 21
+    end_line: 22
+  summary: Refresh spans for changed bootstrap symbols.
+  rationale: Keep extraction expectations aligned with current source.
+- path: tests/test_story_interview.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 442
+  summary: Exercise confirmation freshness, resume identity, dependencies, review
+    failures/retries, scope and cases.
+  rationale: Reject model flags, defaults, failed reviews and stale answers as user
+    authority.
+- path: tests/test_story_interview_chat.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 513
+  summary: Run the native process across suspensions, fresh adapters and repository
+    proposal reload.
+  rationale: Prove real input transport and independent publication gates.
+entities:
+- id: structrr-story-interview-session-v1
+  type: Class
+  action: added
+- id: structrr-story-semantic-reviewer-v1
+  type: Class
+  action: added
+- id: structrr-story-user-response-v1
+  type: Class
+  action: added
+- id: story-design-interview-process-v1
+  type: Workflow
+  action: added
+- id: story-interview-local-adapter-v1
+  type: Class
+  action: added
+entity_relationships:
+- id: story-session-uses-semantic-reviewer
+  source: structrr-story-interview-session-v1
+  target: structrr-story-semantic-reviewer-v1
+  relationship: uses
+  type: uses
+  action: added
+  description: The session binds semantic findings to the story, its source and dependency
+    digests.
+  rationale: Derive readiness from current evidence rather than a generated status.
+- id: story-local-adapter-captures-user-response
+  source: story-interview-local-adapter-v1
+  target: structrr-story-user-response-v1
+  relationship: creates
+  type: creates
+  action: added
+  description: The adapter supplies actual synchronous or caller-validated resumed
+    input.
+  rationale: Keep approval authority outside generated graph metadata.
+invariants:
+- id: story-confirmation-requires-current-user-channel-evidence
+  action: added
+  description: Publication requires current semantic review and an actual response
+    to the exact displayed contract and context; flags, defaults and benchmark execution
+    cannot grant user confirmation.
+- id: story-answer-replay-preserves-original-authority
+  action: added
+  description: Accepted answers retain source references across suspensions; exact
+    redelivery is idempotent and conflicting redelivery cannot overwrite the recorded
+    answer.
+- id: story-publication-preserves-confirmed-artifact-scope
+  action: added
+  description: Publication checks current dependencies and exact proposal/evidence/seed/declaration
+    content and requires every confirmed artifact in scope.
+guidance: []

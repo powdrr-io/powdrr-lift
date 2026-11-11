@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from powdrr_service.structrr.proposal import ProposalRevision
+from powdrr_service.structrr.story_coverage import StoryCaseRef, parse_story_case_refs
 from powdrr_service.structrr.verification_contract import VerificationContract
 
 VERIFICATION_OBLIGATION_SCHEMA_VERSION = "verification-obligation-v1"
@@ -57,6 +58,7 @@ class VerificationObligation:
     protected_inputs: tuple[str, ...]
     verifier_fingerprint: str
     provider_inventory_fingerprint: str
+    story_refs: tuple[StoryCaseRef, ...] = ()
 
     @classmethod
     def from_data(cls, value: Mapping[str, Any]) -> VerificationObligation:
@@ -76,6 +78,7 @@ class VerificationObligation:
             ),
             verifier_fingerprint=str(value["verifier_fingerprint"]),
             provider_inventory_fingerprint=str(value["provider_inventory_fingerprint"]),
+            story_refs=parse_story_case_refs(value.get("story_refs", [])),
         )
 
     def to_data(self) -> dict[str, Any]:
@@ -93,6 +96,11 @@ class VerificationObligation:
             "protected_inputs": list(self.protected_inputs),
             "verifier_fingerprint": self.verifier_fingerprint,
             "provider_inventory_fingerprint": self.provider_inventory_fingerprint,
+            **(
+                {"story_refs": [ref.to_data() for ref in self.story_refs]}
+                if self.story_refs
+                else {}
+            ),
         }
 
 
@@ -281,6 +289,7 @@ def compile_verification_obligations(
                 protected_inputs=contract.protected_inputs,
                 verifier_fingerprint=verifier_fingerprint,
                 provider_inventory_fingerprint=inventory_fingerprint,
+                story_refs=contract.story_refs,
             )
         )
     for contract in contracts:

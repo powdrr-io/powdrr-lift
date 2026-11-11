@@ -4048,6 +4048,55 @@
       "path": "packages/agent/src/powdrr_agent/execution/source_reader.py",
       "rationale": "isolated worker source inspection command using public local IPC",
       "reviewed": false
+    },
+    {
+      "extraction_pr": "story-cases-step-4",
+      "internal_imports": [
+        "powdrr_agent.execution.execute_pr_tests"
+      ],
+      "kind": "python_module",
+      "owner": "agent",
+      "path": "packages/agent/src/powdrr_agent/execution/story_test_collection.py",
+      "rationale": "local pytest collection and exact node identity transport without story policy",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "story-cases-step-4",
+      "internal_imports": [
+        "powdrr_service.decision_obligation",
+        "powdrr_service.structrr.user_stories"
+      ],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/structrr/story_coverage.py",
+      "rationale": "finite story path, coverage and pinned case-reference compilation",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "story-cases-step-4",
+      "internal_imports": [
+        "powdrr_service.planning.story_allocation",
+        "powdrr_service.structrr.story_coverage",
+        "powdrr_service.structrr.user_stories"
+      ],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/verification/story_test_authoring.py",
+      "rationale": "story-derived test obligation and supported-author policy",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "story-cases-step-4",
+      "internal_imports": [
+        "powdrr_service.decision_obligation",
+        "powdrr_service.structrr.story_coverage",
+        "powdrr_service.verification.execute_pr_test_quality"
+      ],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/verification/story_test_links.py",
+      "rationale": "typed assertion linkage and required semantic review policy",
+      "reviewed": false
     }
   ],
   "inventory_scope": [

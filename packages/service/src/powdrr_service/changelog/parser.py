@@ -6,6 +6,7 @@ from typing import Any, cast
 
 import yaml
 
+from powdrr_service.structrr.story_coverage import parse_story_case_refs
 from powdrr_service.structrr.user_stories import StorySectionChange, parse_story_changes
 
 
@@ -117,6 +118,7 @@ class ChangeRequiredTestCase:
     scenario: str | None = None
     expected_outcome: str | None = None
     selectors: list[str] = field(default_factory=list)
+    story_refs: list[dict[str, Any]] = field(default_factory=list)
 
 
 @dataclass(frozen=True, slots=True)
@@ -246,6 +248,10 @@ def _parse_verification(raw_verification: object | None) -> ChangeVerification:
             scenario=_coerce_optional_str(case.get("scenario")),
             expected_outcome=_coerce_optional_str(case.get("expected_outcome")),
             selectors=_parse_path_sequence(case.get("selectors")),
+            story_refs=[
+                ref.to_data()
+                for ref in parse_story_case_refs(case.get("story_refs", []))
+            ],
         )
         for raw_case in _ensure_sequence(data.get("required_test_cases"))
         for case in (_ensure_mapping(raw_case),)

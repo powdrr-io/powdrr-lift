@@ -23,6 +23,7 @@ from powdrr_agent.execution.execute_pr_tests import (
     install_frozen_test_files,
     run_generated_pytest,
 )
+from powdrr_agent.execution.story_test_collection import collect_story_tests
 from powdrr_contracts.models import OperationRequest
 from powdrr_local import (
     JsonServiceBridge,
@@ -74,6 +75,7 @@ from powdrr_service.structrr.bootstrap import bootstrap_structrr
 from powdrr_service.structrr.proposal import ProposalRevision
 from powdrr_service.structrr.snapshot import snapshot_digest
 from powdrr_service.structrr.source_manifest import SourceManifest
+from powdrr_service.structrr.story_coverage import StoryCoverageError
 from powdrr_service.verification.execute_pr_acceptance import (
     build_execute_pr_test_report,
     execute_pr_attempt_passed,
@@ -98,6 +100,15 @@ from powdrr_service.verification.execute_pr_test_validation import (
     validate_coverage_references,
     validate_generated_test_files,
     validate_test_correction,
+)
+from powdrr_service.verification.story_test_authoring import (
+    prepare_story_test_obligations,
+    require_supported_story_author,
+)
+from powdrr_service.verification.story_test_links import (
+    compile_story_test_links,
+    require_story_test_quality,
+    story_link_coverage,
 )
 from powdrr_service.verification.test_obligations import (
     acceptance_criteria_contract,
@@ -812,6 +823,16 @@ def _issue_worker_structrr_context(
         raise PowdrrExecutionError(
             "workflow story references differ from reviewed Structrr allocation"
         )
+    if story_refs:
+        expected_validation = any(
+            case.get("story_refs")
+            for case in item_proposal.verification.get("required_test_cases", [])
+        )
+        if proposed.get("story_validation", False) != expected_validation:
+            raise PowdrrExecutionError(
+                "story validation responsibility differs from reviewed case "
+                "obligations; refresh the plan"
+            )
     try:
         validate_story_refs(
             story_refs,
@@ -1177,8 +1198,17 @@ def _write_issue_worker_structrr_diff_artifacts(
     for obligation in test_obligations:
         obligation_id = obligation.get("obligation_id")
         source_text = obligation.get("source_text")
-        if isinstance(obligation_id, str) and isinstance(source_text, str):
-            actual_cases_by_id[obligation_id] = source_text.strip()
+        if not isinstance(obligation_id, str) or not isinstance(source_text, str):
+            raise PowdrrExecutionError(
+                "test obligation requires a stable ID and source text"
+            )
+        actual_cases_by_id[obligation_id] = source_text.strip()
+        if obligation.get("story_refs", []) != planned_cases_by_id.get(
+            obligation_id, {}
+        ).get("story_refs", []):
+            raise PowdrrExecutionError(
+                "generated test story references differ from planned obligations"
+            )
     if {
         case_id: case.get("description")
         for case_id, case in planned_cases_by_id.items()
@@ -1207,6 +1237,17 @@ def _write_issue_worker_structrr_diff_artifacts(
             )
         selectors: list[str] = []
         for test_name in coverage_references.get(case_id, ()):
+            if obligation.get("story_refs"):
+                test_path, _, function = test_name.partition("::")
+                if function.split("[", 1)[0] not in test_names_by_file.get(
+                    test_path, set()
+                ):
+                    raise PowdrrExecutionError(
+                        f"unresolved collected story selector: {test_name}"
+                    )
+                selectors.append(test_name)
+                test_case_ids_by_file.setdefault(test_path, []).append(case_id)
+                continue
             matching_paths = [
                 path for path, names in test_names_by_file.items() if test_name in names
             ]
@@ -1763,6 +1804,14 @@ def _validate_execute_pr_test_correction(
         expected_paths=tuple(original_sources),
         obligations=obligations,
         test_root=test_root,
+        linked_story_tests=tuple(
+            node.name
+            for source in corrected_sources.values()
+            for node in ast.parse(source).body
+            if isinstance(node, ast.FunctionDef) and node.name.startswith("test_")
+        )
+        if any(obligation.get("story_refs") for obligation in obligations)
+        else (),
     )
 
     corrected_test_ids = changed_execute_pr_test_cases(original_sources, validated)
@@ -1772,6 +1821,29 @@ def _validate_execute_pr_test_correction(
             repo_root, baseline_worktree, base_commit=baseline_commit
         )
         install_frozen_test_files(baseline_worktree, validated)
+        story_links = {}
+        if any(obligation.get("story_refs") for obligation in obligations):
+            collection = collect_story_tests(
+                validation_profile,
+                root=baseline_worktree,
+                paths=tuple(validated),
+                timeout_seconds=timeout_seconds,
+            )
+            if collection["status"] != "collected":
+                raise StoryCoverageError(
+                    f"corrected story test collection unavailable: {collection}"
+                )
+            story_links = compile_story_test_links(
+                validated, obligations, collection["selectors"]
+            )
+            coverage = validate_coverage_references(
+                validated,
+                obligations,
+                linked_story_tests=tuple(
+                    link["test_name"] for link in story_links["links"]
+                ),
+            )
+            coverage.update(story_link_coverage(story_links))
         baseline_result = run_generated_pytest(
             validation_profile,
             root=baseline_worktree,
@@ -1781,6 +1853,8 @@ def _validate_execute_pr_test_correction(
         require_execute_pr_test_correction_baseline(
             baseline_result, corrected_test_ids=corrected_test_ids
         )
+        if story_links:
+            baseline_result["story_test_links"] = story_links
         return validated, coverage, baseline_result
     finally:
         shutil.rmtree(baseline_worktree, ignore_errors=True)
@@ -1903,12 +1977,24 @@ def _author_execute_pr_tests(
         plan_context["repository_default_branch"] = _repository_default_branch_evidence(
             repo_root
         )
+        for field in ("story_refs", "story_context", "story_validation"):
+            if field in proposed:
+                plan_context[field] = proposed[field]
+        if proposed.get("story_refs"):
+            plan_context["public_entrypoint_evidence"] = proposed.get(
+                "public_entrypoint_evidence", []
+            )
         acceptance_criteria = plan_context["acceptance_criteria"]
         if not isinstance(acceptance_criteria, list) or not acceptance_criteria:
             raise PowdrrExecutionError(
                 "execute-PR test coverage requires explicit acceptance criteria"
             )
         obligations = acceptance_criteria_contract(acceptance_criteria)
+        story_obligations = prepare_story_test_obligations(plan_context)
+        require_supported_story_author(
+            tuple(validation_profile.command), story_obligations
+        )
+        obligations.extend(story_obligations)
         tracked = subprocess.run(
             ["git", "ls-files", "-z"],
             cwd=authoring_worktree,
@@ -1983,6 +2069,7 @@ def _author_execute_pr_tests(
         baseline_report: dict[str, Any] | None = None
         quality_report: dict[str, Any] | None = None
         coverage_references: dict[str, list[str]] = {}
+        story_links: dict[str, Any] = {}
         for attempt_number in range(1, 4):
             if attempt_number > 1:
                 # A repair starts from the baseline. Reusing a rejected
@@ -1996,6 +2083,7 @@ def _author_execute_pr_tests(
                 baseline_report = None
                 quality_report = None
                 coverage_references = {}
+                story_links = {}
                 author_request = replace(
                     author_request,
                     request_id=f"{workflow_id}-integration-test-author-repair",
@@ -2043,9 +2131,28 @@ def _author_execute_pr_tests(
                 test_sources = validate_generated_test_files(
                     raw_sources, test_root=test_root_relative
                 )
+                if story_obligations:
+                    collection = collect_story_tests(
+                        validation_profile,
+                        root=authoring_worktree,
+                        paths=tuple(test_sources),
+                        timeout_seconds=config.coding_agent_validation_timeout_seconds,
+                    )
+                    if collection["status"] != "collected":
+                        raise StoryCoverageError(
+                            f"story collection unavailable: {collection}"
+                        )
+                    story_links = compile_story_test_links(
+                        test_sources, obligations, collection["selectors"]
+                    )
                 coverage_references = validate_coverage_references(
-                    test_sources, obligations
+                    test_sources,
+                    [record for record in obligations if not record.get("story_refs")],
+                    linked_story_tests=tuple(
+                        link["test_name"] for link in story_links.get("links", [])
+                    ),
                 )
+                coverage_references.update(story_link_coverage(story_links))
                 for path in test_sources:
                     tracked = subprocess.run(
                         ["git", "cat-file", "-e", f"{base_commit}:{path}"],
@@ -2070,6 +2177,7 @@ def _author_execute_pr_tests(
                     "coverage_references": coverage_references,
                     "test_sources": test_sources,
                     "baseline_result": baseline_report,
+                    "story_test_links": story_links,
                 }
                 quality_report = _review_execute_pr_test_quality(
                     suite_evidence,
@@ -2078,12 +2186,15 @@ def _author_execute_pr_tests(
                     service=quality_review_service,
                 )
                 quality_reviews.append(quality_report)
+                if story_links:
+                    require_story_test_quality(quality_report, story_links)
                 suggestions = quality_report.get("suggestions", [])
                 if suggestions and not quality_repair_attempted:
                     quality_repair_fallback = {
                         "test_sources": dict(test_sources),
                         "baseline_result": baseline_report,
                         "coverage_references": dict(coverage_references),
+                        "story_test_links": story_links,
                     }
                     validation_error = (
                         "Independent per-test review suggested these targeted "
@@ -2101,8 +2212,24 @@ def _author_execute_pr_tests(
                 ExecutePrTestError,
                 ExecutePrTestVerificationError,
                 ExecutePrTestAuthoringValidationError,
+                StoryCoverageError,
             ) as error:
                 validation_error = str(error)
+                (test_root / f"rejected-attempt-{attempt_number:02d}.json").write_text(
+                    json.dumps(
+                        {
+                            "error": validation_error,
+                            "test_sources": test_sources,
+                            "story_test_links": story_links,
+                            "quality_reviews": quality_reviews,
+                            "baseline_result": baseline_report,
+                        },
+                        indent=2,
+                        sort_keys=True,
+                    )
+                    + "\n",
+                    encoding="utf-8",
+                )
         if validation_error is not None or baseline_report is None:
             if quality_repair_fallback is None:
                 raise PowdrrExecutionError(
@@ -2113,6 +2240,7 @@ def _author_execute_pr_tests(
             test_sources = quality_repair_fallback["test_sources"]
             baseline_report = quality_repair_fallback["baseline_result"]
             coverage_references = quality_repair_fallback["coverage_references"]
+            story_links = quality_repair_fallback["story_test_links"]
             quality_reviews.append(
                 {
                     "provider": "decision-provider",
@@ -2150,11 +2278,17 @@ def _author_execute_pr_tests(
             "baseline_result": baseline_report,
             "baseline_execution_evidence": pytest_execution_evidence(baseline_report),
             "authoring_attempts": attempts,
+            **({"story_test_links": story_links} if story_links else {}),
         }
         (test_root / "suite.json").write_text(
             json.dumps(artifact, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
         )
+        if story_links:
+            (test_root / "story-test-links.json").write_text(
+                json.dumps(story_links, indent=2, sort_keys=True) + "\n",
+                encoding="utf-8",
+            )
         (test_root / "authoring-prompt.md").write_text(
             prompt.rstrip() + "\n", encoding="utf-8"
         )
@@ -3490,8 +3624,15 @@ class _TaskWorkflowExecutionStrategy:
             ),
         )
         test_authoring_context = dict(proposed)
+        if proposed.get("story_refs"):
+            test_authoring_context["story_context"] = story_planning_context(
+                current_structrr or {}, parse_story_refs(proposed["story_refs"])
+            )
         test_authoring_context["accepted_structrr_operations"] = accepted_operations
         if item_proposal is not None:
+            test_authoring_context["public_entrypoint_evidence"] = list(
+                item_proposal.code_evidence
+            )
             test_authoring_context["planned_test_cases"] = (
                 item_proposal.verification.get("required_test_cases", [])
             )
@@ -3656,6 +3797,28 @@ class _TaskWorkflowExecutionStrategy:
                             self.config.coding_agent_validation_timeout_seconds
                         ),
                     )
+                    if corrected_baseline.get("story_test_links"):
+                        correction_review = _review_execute_pr_test_quality(
+                            {
+                                "contract": test_authoring_context,
+                                "test_obligations": integration_test_authoring[
+                                    "test_obligations"
+                                ],
+                                "test_sources": corrected_test_sources,
+                                "baseline_result": corrected_baseline,
+                                "story_test_links": corrected_baseline[
+                                    "story_test_links"
+                                ],
+                            },
+                            config=self.config,
+                            suggest_tests=False,
+                        )
+                        require_story_test_quality(
+                            correction_review, corrected_baseline["story_test_links"]
+                        )
+                        integration_test_authoring["story_test_links"] = (
+                            corrected_baseline["story_test_links"]
+                        )
                     integration_test_sources.clear()
                     integration_test_sources.update(corrected_test_sources)
                     integration_test_authoring["coverage_references"] = (
@@ -3690,6 +3853,33 @@ class _TaskWorkflowExecutionStrategy:
                 integration_test_result["test_correction_rejected"] = (
                     test_correction_error
                 )
+            if integration_test_authoring.get("story_test_links"):
+                try:
+                    collection = collect_story_tests(
+                        validation_profile,
+                        root=self.repo_root,
+                        paths=tuple(integration_test_sources),
+                        timeout_seconds=self.config.coding_agent_validation_timeout_seconds,
+                    )
+                    if collection["status"] != "collected":
+                        raise StoryCoverageError(
+                            f"candidate story collection unavailable: {collection}"
+                        )
+                    candidate_links = compile_story_test_links(
+                        integration_test_sources,
+                        integration_test_authoring["test_obligations"],
+                        collection["selectors"],
+                    )
+                    if (
+                        candidate_links
+                        != integration_test_authoring["story_test_links"]
+                    ):
+                        raise StoryCoverageError(
+                            "candidate story selectors or assertions "
+                            "changed after review"
+                        )
+                except ValueError as error:
+                    integration_test_result["coverage_evidence_error"] = str(error)
             if test_correction_accepted:
                 correction_review = _review_execute_pr_test_quality(
                     {
@@ -3706,6 +3896,9 @@ class _TaskWorkflowExecutionStrategy:
                         ],
                         "candidate_result": integration_test_result,
                         "correction_attempt_id": attempt_id,
+                        "story_test_links": integration_test_authoring.get(
+                            "story_test_links", {}
+                        ),
                     },
                     config=self.config,
                     suggest_tests=False,
@@ -3713,6 +3906,14 @@ class _TaskWorkflowExecutionStrategy:
                 integration_test_authoring.setdefault(
                     "correction_quality_reviews", []
                 ).append(correction_review)
+                if integration_test_authoring.get("story_test_links"):
+                    try:
+                        require_story_test_quality(
+                            correction_review,
+                            integration_test_authoring["story_test_links"],
+                        )
+                    except StoryCoverageError as error:
+                        integration_test_result["coverage_evidence_error"] = str(error)
             try:
                 execution_evidence = pytest_execution_evidence(integration_test_result)
                 expected_test_functions = {
@@ -3723,6 +3924,37 @@ class _TaskWorkflowExecutionStrategy:
                     for test_id in test_ids
                 }
                 minimum_case_count = len(expected_test_functions)
+                if integration_test_authoring.get("story_test_links"):
+                    selectors = {
+                        link["selector"]
+                        for link in integration_test_authoring["story_test_links"][
+                            "links"
+                        ]
+                    }
+                    remaining = {
+                        identity
+                        for identity in expected_test_functions
+                        if "::" not in identity
+                        and not any(
+                            selector.split("[", 1)[0].endswith("::" + identity)
+                            for selector in selectors
+                        )
+                    }
+                    minimum_case_count = len(selectors) + len(remaining)
+                    if any(
+                        execution_evidence.get("counts", {}).get(status, 0)
+                        for status in (
+                            "skipped",
+                            "xfailed",
+                            "xpassed",
+                            "errors",
+                            "error",
+                        )
+                    ):
+                        integration_test_result["coverage_evidence_error"] = (
+                            "required story tests were skipped, "
+                            "xfailed, xpassed or unavailable"
+                        )
                 if execution_evidence["executed"] < minimum_case_count:
                     integration_test_result["coverage_evidence_error"] = (
                         "pytest executed fewer tests than the obligation contract "

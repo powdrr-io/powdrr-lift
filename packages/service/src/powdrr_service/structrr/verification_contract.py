@@ -8,6 +8,8 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any
 
+from powdrr_service.structrr.story_coverage import StoryCaseRef, parse_story_case_refs
+
 VERIFICATION_CONTRACT_SCHEMA_VERSION = "verification-contract-v1"
 VERIFICATION_CONTRACT_FIELDS = frozenset(
     {
@@ -19,6 +21,7 @@ VERIFICATION_CONTRACT_FIELDS = frozenset(
         "applicability",
         "protected_inputs",
         "status",
+        "story_refs",
     }
 )
 REQUIRED_VERIFICATION_CONTRACT_FIELDS = (
@@ -47,6 +50,7 @@ class VerificationContract:
     applicability: Mapping[str, Any] | None = None
     protected_inputs: tuple[str, ...] = ()
     status: str | None = None
+    story_refs: tuple[StoryCaseRef, ...] = ()
 
     @classmethod
     def from_mapping(cls, value: Mapping[str, Any]) -> VerificationContract:
@@ -61,6 +65,7 @@ class VerificationContract:
             applicability=_optional_mapping(value.get("applicability")),
             protected_inputs=_string_sequence(value.get("protected_inputs")),
             status=_optional_text(value.get("status")),
+            story_refs=parse_story_case_refs(value.get("story_refs", [])),
         )
 
     @property
@@ -112,6 +117,10 @@ class VerificationContract:
                 errors.append(f"{field_name} must contain non-empty strings")
         if "applicability" in value and not isinstance(value["applicability"], Mapping):
             errors.append("applicability must be an object")
+        try:
+            parse_story_case_refs(value.get("story_refs", []))
+        except ValueError as error:
+            errors.append(str(error))
         return tuple(errors)
 
     def to_data(self) -> dict[str, Any]:
@@ -133,6 +142,8 @@ class VerificationContract:
             data["applicability"] = dict(self.applicability)
         if self.protected_inputs:
             data["protected_inputs"] = list(self.protected_inputs)
+        if self.story_refs:
+            data["story_refs"] = [ref.to_data() for ref in self.story_refs]
         return data
 
     @property

@@ -1,0 +1,831 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1428
+title: Connect finite story cases and assertion links to the existing test author
+intent:
+  problem: Story cases and their observations lack durable linkage to independently
+    authored and actually collected tests.
+  goal: Compile finite case coverage and typed assertion links through existing planning,
+    MiniSWE authoring, semantic review and correction paths without treating links
+    as execution proof.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 4051
+    end_line: 4099
+  summary: Classify local collection as agent I/O and case, link and review policy
+    as service ownership.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: docs/design/structrr-story-test-authoring.md
+  type: added
+  span:
+    start_line: 1
+    end_line: 96
+  summary: Document finite case refinement, pinned obligations, assertion linkage
+    and execution limitations.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: docs/plans/structrr-user-stories-and-behavioral-testing.md
+  type: modified
+  span:
+    start_line: 8
+    end_line: 11
+  summary: Record completion of the case and existing test-author integration slice.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: docs/plans/structrr-user-stories-and-behavioral-testing.md
+  type: modified
+  span:
+    start_line: 14
+    end_line: 15
+  summary: Record completion of the case and existing test-author integration slice.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: packages/agent/src/powdrr_agent/execution/story_test_collection.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 107
+  summary: Collect actual pytest identities through public framework hooks in an isolated
+    subprocess.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: packages/service/src/powdrr_service/behavior_contract.py
+  type: modified
+  span:
+    start_line: 14
+    end_line: 14
+  summary: Retain typed story case references in existing behavior scenarios.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: packages/service/src/powdrr_service/behavior_contract.py
+  type: modified
+  span:
+    start_line: 66
+    end_line: 66
+  summary: Retain typed story case references in existing behavior scenarios.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: packages/service/src/powdrr_service/behavior_contract.py
+  type: modified
+  span:
+    start_line: 101
+    end_line: 102
+  summary: Retain typed story case references in existing behavior scenarios.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: packages/service/src/powdrr_service/behavior_contract.py
+  type: modified
+  span:
+    start_line: 338
+    end_line: 338
+  summary: Retain typed story case references in existing behavior scenarios.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: packages/service/src/powdrr_service/changelog/parser.py
+  type: modified
+  span:
+    start_line: 9
+    end_line: 9
+  summary: Preserve typed case references in required-test-case evidence.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: packages/service/src/powdrr_service/changelog/parser.py
+  type: modified
+  span:
+    start_line: 121
+    end_line: 121
+  summary: Preserve typed case references in required-test-case evidence.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: packages/service/src/powdrr_service/changelog/parser.py
+  type: modified
+  span:
+    start_line: 251
+    end_line: 254
+  summary: Preserve typed case references in required-test-case evidence.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 1964
+    end_line: 1964
+  summary: Carry full-story validation responsibility into Structrr compilation.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: packages/service/src/powdrr_service/planning/feature_obligation.py
+  type: modified
+  span:
+    start_line: 20
+    end_line: 20
+  summary: Retain story references through instruction projections and required test
+    contracts.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: packages/service/src/powdrr_service/planning/feature_obligation.py
+  type: modified
+  span:
+    start_line: 60
+    end_line: 60
+  summary: Retain story references through instruction projections and required test
+    contracts.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: packages/service/src/powdrr_service/planning/feature_obligation.py
+  type: modified
+  span:
+    start_line: 81
+    end_line: 82
+  summary: Retain story references through instruction projections and required test
+    contracts.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: packages/service/src/powdrr_service/planning/feature_obligation.py
+  type: modified
+  span:
+    start_line: 110
+    end_line: 114
+  summary: Retain story references through instruction projections and required test
+    contracts.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: packages/service/src/powdrr_service/planning/feature_obligation.py
+  type: modified
+  span:
+    start_line: 126
+    end_line: 126
+  summary: Retain story references through instruction projections and required test
+    contracts.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: packages/service/src/powdrr_service/planning/feature_obligation.py
+  type: modified
+  span:
+    start_line: 170
+    end_line: 174
+  summary: Retain story references through instruction projections and required test
+    contracts.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: packages/service/src/powdrr_service/planning/feature_obligation.py
+  type: modified
+  span:
+    start_line: 331
+    end_line: 331
+  summary: Retain story references through instruction projections and required test
+    contracts.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: packages/service/src/powdrr_service/planning/feature_obligation.py
+  type: modified
+  span:
+    start_line: 369
+    end_line: 374
+  summary: Retain story references through instruction projections and required test
+    contracts.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: packages/service/src/powdrr_service/planning/multipr_structrr.py
+  type: modified
+  span:
+    start_line: 28
+    end_line: 30
+  summary: Compile pinned story cases into normal per-item test obligations without
+    projecting non-story legacy plans.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: packages/service/src/powdrr_service/planning/multipr_structrr.py
+  type: modified
+  span:
+    start_line: 263
+    end_line: 294
+  summary: Compile pinned story cases into normal per-item test obligations without
+    projecting non-story legacy plans.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: packages/service/src/powdrr_service/resources/processes/story-design-interview.yaml
+  type: modified
+  span:
+    start_line: 80
+    end_line: 87
+  summary: Expose bounded candidate discovery and normal compiler-owned case refinement
+    after graph confirmation.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: packages/service/src/powdrr_service/structrr/story_coverage.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 359
+  summary: Compile deterministic finite walks, missing targets, pinned case references
+    and source-linked test obligations.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: packages/service/src/powdrr_service/structrr/story_semantic_review.py
+  type: modified
+  span:
+    start_line: 18
+    end_line: 18
+  summary: Review case fixtures, observations and repeated walks against actual confirmed
+    source decisions.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: packages/service/src/powdrr_service/structrr/story_semantic_review.py
+  type: modified
+  span:
+    start_line: 152
+    end_line: 160
+  summary: Review case fixtures, observations and repeated walks against actual confirmed
+    source decisions.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: packages/service/src/powdrr_service/structrr/verification_contract.py
+  type: modified
+  span:
+    start_line: 11
+    end_line: 12
+  summary: Parse, serialize and fingerprint optional story case references in verification
+    contracts.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: packages/service/src/powdrr_service/structrr/verification_contract.py
+  type: modified
+  span:
+    start_line: 24
+    end_line: 24
+  summary: Parse, serialize and fingerprint optional story case references in verification
+    contracts.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: packages/service/src/powdrr_service/structrr/verification_contract.py
+  type: modified
+  span:
+    start_line: 53
+    end_line: 53
+  summary: Parse, serialize and fingerprint optional story case references in verification
+    contracts.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: packages/service/src/powdrr_service/structrr/verification_contract.py
+  type: modified
+  span:
+    start_line: 68
+    end_line: 68
+  summary: Parse, serialize and fingerprint optional story case references in verification
+    contracts.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: packages/service/src/powdrr_service/structrr/verification_contract.py
+  type: modified
+  span:
+    start_line: 120
+    end_line: 123
+  summary: Parse, serialize and fingerprint optional story case references in verification
+    contracts.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: packages/service/src/powdrr_service/structrr/verification_contract.py
+  type: modified
+  span:
+    start_line: 145
+    end_line: 146
+  summary: Parse, serialize and fingerprint optional story case references in verification
+    contracts.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: packages/service/src/powdrr_service/structrr/verification_obligations.py
+  type: modified
+  span:
+    start_line: 13
+    end_line: 13
+  summary: Preserve case pins through verification obligation compilation and reload.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: packages/service/src/powdrr_service/structrr/verification_obligations.py
+  type: modified
+  span:
+    start_line: 61
+    end_line: 61
+  summary: Preserve case pins through verification obligation compilation and reload.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: packages/service/src/powdrr_service/structrr/verification_obligations.py
+  type: modified
+  span:
+    start_line: 81
+    end_line: 81
+  summary: Preserve case pins through verification obligation compilation and reload.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: packages/service/src/powdrr_service/structrr/verification_obligations.py
+  type: modified
+  span:
+    start_line: 99
+    end_line: 103
+  summary: Preserve case pins through verification obligation compilation and reload.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: packages/service/src/powdrr_service/structrr/verification_obligations.py
+  type: modified
+  span:
+    start_line: 292
+    end_line: 292
+  summary: Preserve case pins through verification obligation compilation and reload.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: packages/service/src/powdrr_service/verification/execute_pr_acceptance.py
+  type: modified
+  span:
+    start_line: 64
+    end_line: 68
+  summary: Retain the validated story link manifest in the existing execution report.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: packages/service/src/powdrr_service/verification/execute_pr_test_authoring.py
+  type: modified
+  span:
+    start_line: 52
+    end_line: 52
+  summary: Give the existing MiniSWE author pinned case policy and typed Python assertion-link
+    requests.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: packages/service/src/powdrr_service/verification/execute_pr_test_authoring.py
+  type: modified
+  span:
+    start_line: 82
+    end_line: 108
+  summary: Give the existing MiniSWE author pinned case policy and typed Python assertion-link
+    requests.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: packages/service/src/powdrr_service/verification/execute_pr_test_quality.py
+  type: modified
+  span:
+    start_line: 49
+    end_line: 68
+  summary: Review pinned observations, assertion links and authored module wiring;
+    report oversized story review context as unavailable.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: packages/service/src/powdrr_service/verification/execute_pr_test_quality.py
+  type: modified
+  span:
+    start_line: 214
+    end_line: 252
+  summary: Review pinned observations, assertion links and authored module wiring;
+    report oversized story review context as unavailable.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: packages/service/src/powdrr_service/verification/execute_pr_test_quality.py
+  type: modified
+  span:
+    start_line: 313
+    end_line: 329
+  summary: Review pinned observations, assertion links and authored module wiring;
+    report oversized story review context as unavailable.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: packages/service/src/powdrr_service/verification/execute_pr_test_quality.py
+  type: modified
+  span:
+    start_line: 440
+    end_line: 463
+  summary: Review pinned observations, assertion links and authored module wiring;
+    report oversized story review context as unavailable.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: packages/service/src/powdrr_service/verification/execute_pr_test_validation.py
+  type: modified
+  span:
+    start_line: 11
+    end_line: 12
+  summary: Retain local AC linkage while accepting validated complementary story tests
+    and recognized framework assertions.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: packages/service/src/powdrr_service/verification/execute_pr_test_validation.py
+  type: modified
+  span:
+    start_line: 89
+    end_line: 92
+  summary: Retain local AC linkage while accepting validated complementary story tests
+    and recognized framework assertions.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: packages/service/src/powdrr_service/verification/execute_pr_test_validation.py
+  type: modified
+  span:
+    start_line: 102
+    end_line: 106
+  summary: Retain local AC linkage while accepting validated complementary story tests
+    and recognized framework assertions.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: packages/service/src/powdrr_service/verification/execute_pr_test_validation.py
+  type: modified
+  span:
+    start_line: 145
+    end_line: 145
+  summary: Retain local AC linkage while accepting validated complementary story tests
+    and recognized framework assertions.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: packages/service/src/powdrr_service/verification/execute_pr_test_validation.py
+  type: modified
+  span:
+    start_line: 199
+    end_line: 201
+  summary: Retain local AC linkage while accepting validated complementary story tests
+    and recognized framework assertions.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: packages/service/src/powdrr_service/verification/execute_pr_test_validation.py
+  type: modified
+  span:
+    start_line: 219
+    end_line: 219
+  summary: Retain local AC linkage while accepting validated complementary story tests
+    and recognized framework assertions.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: packages/service/src/powdrr_service/verification/execute_pr_test_validation.py
+  type: modified
+  span:
+    start_line: 228
+    end_line: 230
+  summary: Retain local AC linkage while accepting validated complementary story tests
+    and recognized framework assertions.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: packages/service/src/powdrr_service/verification/story_test_authoring.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 88
+  summary: Require complete declared cases for full-story validation and report unsupported
+    author adapters explicitly.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: packages/service/src/powdrr_service/verification/story_test_links.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 281
+  summary: Compile typed requests into collected-selector and assertion-span links;
+    gate story assertion quality on complete current review.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: src/powdrr_lift/workrr/story_interview_operations.py
+  type: modified
+  span:
+    start_line: 14
+    end_line: 14
+  summary: Transport finite case discovery through the existing interactive story
+    operation.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: src/powdrr_lift/workrr/story_interview_operations.py
+  type: modified
+  span:
+    start_line: 100
+    end_line: 100
+  summary: Transport finite case discovery through the existing interactive story
+    operation.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: src/powdrr_lift/workrr/story_interview_operations.py
+  type: modified
+  span:
+    start_line: 206
+    end_line: 211
+  summary: Transport finite case discovery through the existing interactive story
+    operation.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 26
+    end_line: 26
+  summary: Connect case obligations, collection, source digests, link manifests, strict
+    story review and bounded correction to the existing author path.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 78
+    end_line: 78
+  summary: Connect case obligations, collection, source digests, link manifests, strict
+    story review and bounded correction to the existing author path.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 104
+    end_line: 112
+  summary: Connect case obligations, collection, source digests, link manifests, strict
+    story review and bounded correction to the existing author path.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 826
+    end_line: 835
+  summary: Connect case obligations, collection, source digests, link manifests, strict
+    story review and bounded correction to the existing author path.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 1201
+    end_line: 1211
+  summary: Connect case obligations, collection, source digests, link manifests, strict
+    story review and bounded correction to the existing author path.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 1240
+    end_line: 1250
+  summary: Connect case obligations, collection, source digests, link manifests, strict
+    story review and bounded correction to the existing author path.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 1807
+    end_line: 1814
+  summary: Connect case obligations, collection, source digests, link manifests, strict
+    story review and bounded correction to the existing author path.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 1824
+    end_line: 1846
+  summary: Connect case obligations, collection, source digests, link manifests, strict
+    story review and bounded correction to the existing author path.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 1856
+    end_line: 1857
+  summary: Connect case obligations, collection, source digests, link manifests, strict
+    story review and bounded correction to the existing author path.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 1980
+    end_line: 1986
+  summary: Connect case obligations, collection, source digests, link manifests, strict
+    story review and bounded correction to the existing author path.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 1993
+    end_line: 1997
+  summary: Connect case obligations, collection, source digests, link manifests, strict
+    story review and bounded correction to the existing author path.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 2072
+    end_line: 2072
+  summary: Connect case obligations, collection, source digests, link manifests, strict
+    story review and bounded correction to the existing author path.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 2086
+    end_line: 2086
+  summary: Connect case obligations, collection, source digests, link manifests, strict
+    story review and bounded correction to the existing author path.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 2134
+    end_line: 2147
+  summary: Connect case obligations, collection, source digests, link manifests, strict
+    story review and bounded correction to the existing author path.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 2149
+    end_line: 2153
+  summary: Connect case obligations, collection, source digests, link manifests, strict
+    story review and bounded correction to the existing author path.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 2155
+    end_line: 2155
+  summary: Connect case obligations, collection, source digests, link manifests, strict
+    story review and bounded correction to the existing author path.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 2180
+    end_line: 2180
+  summary: Connect case obligations, collection, source digests, link manifests, strict
+    story review and bounded correction to the existing author path.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 2189
+    end_line: 2190
+  summary: Connect case obligations, collection, source digests, link manifests, strict
+    story review and bounded correction to the existing author path.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 2197
+    end_line: 2197
+  summary: Connect case obligations, collection, source digests, link manifests, strict
+    story review and bounded correction to the existing author path.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 2215
+    end_line: 2215
+  summary: Connect case obligations, collection, source digests, link manifests, strict
+    story review and bounded correction to the existing author path.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 2218
+    end_line: 2232
+  summary: Connect case obligations, collection, source digests, link manifests, strict
+    story review and bounded correction to the existing author path.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 2243
+    end_line: 2243
+  summary: Connect case obligations, collection, source digests, link manifests, strict
+    story review and bounded correction to the existing author path.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 2281
+    end_line: 2281
+  summary: Connect case obligations, collection, source digests, link manifests, strict
+    story review and bounded correction to the existing author path.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 2287
+    end_line: 2291
+  summary: Connect case obligations, collection, source digests, link manifests, strict
+    story review and bounded correction to the existing author path.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 3627
+    end_line: 3630
+  summary: Connect case obligations, collection, source digests, link manifests, strict
+    story review and bounded correction to the existing author path.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 3633
+    end_line: 3635
+  summary: Connect case obligations, collection, source digests, link manifests, strict
+    story review and bounded correction to the existing author path.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 3800
+    end_line: 3821
+  summary: Connect case obligations, collection, source digests, link manifests, strict
+    story review and bounded correction to the existing author path.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 3856
+    end_line: 3882
+  summary: Connect case obligations, collection, source digests, link manifests, strict
+    story review and bounded correction to the existing author path.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 3899
+    end_line: 3901
+  summary: Connect case obligations, collection, source digests, link manifests, strict
+    story review and bounded correction to the existing author path.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 3909
+    end_line: 3916
+  summary: Connect case obligations, collection, source digests, link manifests, strict
+    story review and bounded correction to the existing author path.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 3927
+    end_line: 3957
+  summary: Connect case obligations, collection, source digests, link manifests, strict
+    story review and bounded correction to the existing author path.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+- path: tests/test_story_test_authoring.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 636
+  summary: Exercise finite retry graphs, actual collection and baseline execution,
+    native scripted MiniSWE authoring, many-to-many links and rejection boundaries.
+  rationale: Preserve approved case identity and require actual collected assertion
+    evidence through the existing author and service policy.
+entities:
+- id: structrr-story-case-reference-v1
+  type: Class
+  action: added
+- id: structrr-story-case-candidate-v1
+  type: Class
+  action: added
+- id: structrr-story-case-expansion-v1
+  type: Class
+  action: added
+- id: story-test-link-manifest-compiler-v1
+  type: Function
+  action: added
+- id: story-pytest-selector-collector-v1
+  type: Function
+  action: added
+entity_relationships: []
+invariants:
+- id: finite-story-search-never-hides-uncovered-targets
+  action: added
+  description: A bounded deterministic search returns every uncovered transition,
+    outcome, observation and cycle-count target on exhaustion; candidate walks are
+    not accepted stored cases or full input-domain coverage.
+- id: story-links-require-collected-executable-assertions
+  action: added
+  description: Every required case observation resolves through typed declarations
+    to actual collected test selectors and executable assertion spans in the pinned
+    test source; comments and invented selectors cannot satisfy linkage.
+- id: story-test-quality-failure-is-blocking
+  action: added
+  description: Story assertion inadequacy, mocked targets, missing public wiring and
+    unavailable semantic review block story author acceptance; bounded corrections
+    are recollected, relinked and reviewed.
+guidance: []

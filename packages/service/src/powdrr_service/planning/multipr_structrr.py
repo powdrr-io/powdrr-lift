@@ -25,6 +25,9 @@ from powdrr_service.structrr.rebase import rebase_structrr_snapshot
 from powdrr_service.structrr.snapshot import snapshot_digest
 from powdrr_service.structrr.source_manifest import SourceManifest
 from powdrr_service.structrr.user_stories import STORY_SECTIONS
+from powdrr_service.verification.story_test_authoring import (
+    prepare_story_test_obligations,
+)
 from powdrr_service.verification.test_obligations import acceptance_criteria_contract
 
 MULTIPR_STRUCTRR_SCHEMA = "multipr-structrr-proposal-v2"
@@ -255,6 +258,38 @@ def compile_multi_pr_proposal(
                             for key in ("test_type", "scenario", "expected_outcome")
                             if key in case
                         },
+                    }
+                )
+        for selected in selected_items:
+            if not selected.get("story_refs"):
+                continue
+            for obligation in prepare_story_test_obligations(
+                {
+                    **selected,
+                    "story_context": _apply_sections(
+                        baseline,
+                        {
+                            section: records
+                            for section, records in sections.items()
+                            if section in STORY_SECTIONS
+                        },
+                    ),
+                }
+            ):
+                test_cases.append(
+                    {
+                        "id": obligation["obligation_id"]
+                        if len(selected_items) == 1
+                        else f"{selected['id']}/{obligation['obligation_id']}",
+                        "description": obligation["source_text"],
+                        "status": "planned",
+                        "test_type": "integration",
+                        "scenario": obligation["case"]["description"],
+                        "expected_outcome": "; ".join(
+                            record["description"]
+                            for record in obligation["expected_observations"]
+                        ),
+                        "story_refs": obligation["story_refs"],
                     }
                 )
         return compile_proposal_revision(

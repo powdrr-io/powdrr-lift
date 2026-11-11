@@ -11,6 +11,7 @@ from uuid import uuid4
 
 import yaml
 from powdrr_service.structrr.bootstrap import bootstrap_structrr
+from powdrr_service.structrr.story_coverage import expand_story_cases
 from powdrr_service.structrr.story_interview import (
     StoryInterview,
     StoryUserResponse,
@@ -96,6 +97,7 @@ class StoryInterviewOperations:
             "edit": {"edit", "checkpoint_key"},
             "ask": {"dimension", "text", "proposed_assumption"},
             "review": {"dimension"},
+            "cases": {"edge_budget"},
             "present": set(),
             "publish": set(),
         }
@@ -201,6 +203,12 @@ class StoryInterviewOperations:
             result = session.review(
                 _decode(str, parameters.get("dimension"), "dimension"), self.reviewer
             )
+        elif action == "cases":
+            result = expand_story_cases(
+                session.catalog,
+                session.story_id,
+                edge_budget=parameters.get("edge_budget", 1000),
+            ).to_data()
         elif action == "present":
             self._check_dependencies(session)
             result = session.present()

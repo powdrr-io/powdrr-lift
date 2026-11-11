@@ -61,6 +61,11 @@ def build_execute_pr_test_report(
         "baseline": authoring["baseline_result"],
         "correction_baseline": authoring.get("correction_baseline"),
         "candidate": dict(candidate_result),
+        **(
+            {"story_test_links": authoring["story_test_links"]}
+            if authoring.get("story_test_links")
+            else {}
+        ),
         "repair_findings": findings,
     }
     return report, findings

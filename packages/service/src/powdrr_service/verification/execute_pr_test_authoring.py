@@ -49,7 +49,7 @@ def build_execute_pr_test_author_prompt(
         "Deterministic test obligations. IDs are assigned in acceptance-criterion "
         "order. Every authored test must identify the criterion or criteria it "
         "covers with one or more comments of the form `# Covers: AC-01 "
-        "test_function_name` immediately above the test. Cover every ID. You "
+        "test_function_name` immediately above the test. Cover every AC ID. You "
         "may use multiple tests for a criterion and one test for multiple "
         "criteria. Choose useful normal, boundary, invalid, interaction, or "
         "state cases from the contract; do not invent behavior beyond it. "
@@ -79,6 +79,33 @@ def build_execute_pr_test_author_prompt(
         "documentation criterion, test the required statements and tracked file "
         "path without expecting generated bootstrap metadata to change.\n\n"
         f"{json.dumps(list(obligations), indent=2, sort_keys=True)}\n"
+        + (
+            "\nPinned story cases are additional obligations. Follow their complete "
+            "transition walks, fixtures, initial conditions and observations. "
+            "Do not replace expected observations or invent missing customer choices. "
+            "Report design_amendment_needed if a behavioral decision is missing. "
+            "For SC obligations, add one module-level Python literal declaration "
+            "__powdrr_story_links__. This is a typed request to the existing artifact "
+            "writer; it compiles the manifest after actual pytest collection. Shape:\n"
+            "__powdrr_story_links__ = {\n"
+            "  'test_actual_function': [{\n"
+            "    'obligation_id': '<supplied SC-ID>',\n"
+            "    'observations': {'<observation ID>': [<assertion start line>]},\n"
+            "    'description': '<what those assertions establish>',\n"
+            "    'boundary': '<real public/API/CLI integration boundary>',\n"
+            "    'substitutions': ['<external dependency boundary, if any>'],\n"
+            "  }],\n"
+            "}\n"
+            "Use [] for substitutions when there are none. Reference executable "
+            "assert statements or pytest.raises start lines inside that test, not "
+            "comments, helper functions, setup or a mocked target. Each required "
+            "observation must have a link. Several tests may establish one case, "
+            "and one test may link several cases with separate requests. No authored "
+            "selector or # Covers comment can replace collected assertion links. "
+            "Story semantic review is required; unavailable review blocks authoring.\n"
+            if any(obligation.get("story_refs") for obligation in obligations)
+            else ""
+        )
     )
 
 

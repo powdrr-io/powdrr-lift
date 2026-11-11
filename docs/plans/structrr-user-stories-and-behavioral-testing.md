@@ -5,11 +5,14 @@ projection/rebase, bootstrap preservation and queries are implemented. The secon
 slice adds interactive story authoring, bounded semantic readiness reviews,
 actual-user digest confirmation and proposal publication. The third slice carries
 pinned stories through planning, multi-PR integration allocation, execution preflight
-and repair, with approved-amendment impact reports. Behavioral test authoring and
-execution evidence remain planned. See the
+and repair, with approved-amendment impact reports. The fourth slice adds finite
+case discovery, pinned test obligations, pytest collection and assertion links,
+and required story test review through the existing author. Candidate-bound
+execution receipts and complete verification remain planned. See the
 [story contracts](../design/structrr-user-stories.md) and
 [interactive story design](../design/structrr-story-interview.md) and
-[story planning](../design/structrr-story-planning.md).
+[story planning](../design/structrr-story-planning.md) and
+[story test authoring](../design/structrr-story-test-authoring.md).
 Date: 2026-11-06
 
 ## 1. Objective and accepted decisions

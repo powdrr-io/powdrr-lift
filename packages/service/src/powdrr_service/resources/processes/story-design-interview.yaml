@@ -77,6 +77,14 @@ steps:
           atomicity and observability always apply. Review failures are unavailable,
           never empty successes. Use each unresolved finding's focused question and
           refine that neighborhood; do not ask again about unchanged accepted answers.
+        - After contract confirmation, {action: cases, edge_budget: 1000} returns
+          deterministic finite candidate walks and uncovered targets. It never allocates
+          cases or changes behavior. Refine fixtures and initial conditions with the
+          confirmed graph and actual source answers, then add user_story_cases through
+          normal edit operations. Preserve repeated transitions for loops and reference
+          existing observation IDs. Review the resulting case fixtures and observations;
+          missing behavioral choices return to ask. case_expansion_incomplete means
+          partition work or supply explicit finite paths, not omit uncovered branches.
         - {action: present} returns the complete readable graph, branch conditions,
           outcomes, observations, state effects, assumptions and exact digest. When
           answered is false, use prompt_user with that exact text and story_question_id.

@@ -35,12 +35,19 @@ from powdrr_service.planning.multipr_structrr import (
     active_decision_drift_findings,
     inherited_decision_records,
     load_multi_pr_proposal,
+    project_item_proposal,
     rebase_final_plan_state,
     rebase_item_proposal,
     reconcile_item_candidate,
     structural_repair_findings,
 )
 from powdrr_service.planning.reviewed_plan import reviewed_file_creation_conflicts
+from powdrr_service.planning.story_allocation import (
+    parse_story_refs,
+    story_amendment_impact,
+    story_planning_context,
+    validate_story_refs,
+)
 from powdrr_service.planning.workflow_ids import slugify_workflow_id
 from powdrr_service.procedrr import ProcessCatalog
 from powdrr_service.procedrr_evaluator import (
@@ -800,6 +807,23 @@ def _issue_worker_structrr_context(
         base_commit=base_commit,
     )
     current = _merge_structrr_decision_sections(current, committed_baseline)
+    story_refs = plan_proposal.item_story_refs.get(item_id, ())
+    if parse_story_refs(proposed.get("story_refs", [])) != story_refs:
+        raise PowdrrExecutionError(
+            "workflow story references differ from reviewed Structrr allocation"
+        )
+    try:
+        validate_story_refs(
+            story_refs,
+            project_item_proposal(current, item_proposal) if story_refs else current,
+        )
+    except ValueError as error:
+        impact = story_amendment_impact(
+            plan_proposal.baseline_snapshot, current, {item_id: story_refs}
+        )
+        raise PowdrrExecutionError(
+            f"story allocation conflict: {error}; {json.dumps(impact, sort_keys=True)}"
+        ) from error
     if final_review:
         # Check the latest tree against the projected plan result. Unrelated
         # interlaced work carries forward; changes to plan-owned subjects require
@@ -3436,6 +3460,25 @@ class _TaskWorkflowExecutionStrategy:
             request,
             prompt=(
                 request.prompt
+                + (
+                    "\n\nPinned customer story contract and selected cases "
+                    "(planned coverage, not verification):\n"
+                    + json.dumps(
+                        story_planning_context(
+                            current_structrr or {},
+                            parse_story_refs(proposed.get("story_refs", [])),
+                        ),
+                        indent=2,
+                        sort_keys=True,
+                    )
+                    + "\nPreserve these exact references. Report discoveries as "
+                    "implementation_defect, environment_blocked, or "
+                    "design_amendment_needed. A behavior amendment returns to "
+                    "story-design-interview and a reviewed Structrr proposal; "
+                    "the coding worker cannot approve it."
+                    if proposed.get("story_refs")
+                    else ""
+                )
                 + "\n\nAccepted Structrr proposal operations for this PR:\n"
                 + json.dumps(accepted_operations, indent=2, sort_keys=True)
                 + "\nInherited decisions and invariants from the Structrr baseline:\n"

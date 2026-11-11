@@ -14,6 +14,7 @@ from powdrr_service.planning.plan_document import (
     PlanDocumentError,
     parse_manual_prerequisite,
 )
+from powdrr_service.planning.story_allocation import parse_story_refs
 
 PLAN_WORKFLOW_SCHEMA = "https://powdrr.io/schemas/plan-workflow-instance-v2"
 PLAN_WORKFLOW_PROCESS = "execute-proposed-pr-workflow"
@@ -100,6 +101,16 @@ def parse_plan_workflow_instance_yaml(text: str) -> PlanWorkflowInstance:
     context = inputs.get("proposed_pr_context")
     if not isinstance(context, Mapping):
         raise PlanWorkflowInstanceError("proposed_pr_context must be an object")
+    try:
+        refs = parse_story_refs(context.get("story_refs", []))
+    except ValueError as error:
+        raise PlanWorkflowInstanceError(str(error)) from error
+    if not isinstance(context.get("story_validation", False), bool) or (
+        context.get("story_validation") and not refs
+    ):
+        raise PlanWorkflowInstanceError(
+            "story_validation requires typed story references"
+        )
     for field in ("plan_id", "item_id", "title", "objective", "verification_command"):
         value = context.get(field)
         if not isinstance(value, str) or not value.strip():

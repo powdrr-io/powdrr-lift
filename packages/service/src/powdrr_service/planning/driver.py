@@ -17,6 +17,7 @@ from powdrr_service.planning.assembly import (
     ItemDescription,
     PathFact,
     PendingUnitOutput,
+    PlannedWrite,
     WorkUnit,
     WorkUnitContext,
     WorkUnitProposal,
@@ -43,6 +44,7 @@ from powdrr_service.planning.dependencies import (
     DependencyCandidateDiscovery,
     DependencyGraph,
     HumanSetupNeed,
+    ItemDependencyEdge,
     ManualSetup,
     UnitDependencyEdge,
     Validation,
@@ -76,6 +78,11 @@ from powdrr_service.planning.source import (
     build_fidelity_request,
     deduplicate_requirement_records,
     extract_implementation_phases,
+)
+from powdrr_service.planning.story_allocation import (
+    merge_story_refs,
+    source_story_refs,
+    story_planning_context,
 )
 from powdrr_service.planning.structrr import (
     BoundStructuralSubject,
@@ -517,6 +524,9 @@ class SourceLedgerQuestionMachine:
         self.plan_id = plan_id
         self.structrr_baseline = (
             None if structrr_baseline is None else dict(structrr_baseline)
+        )
+        self.story_refs = source_story_refs(
+            source.document.text, self.structrr_baseline or {}
         )
         self.taxonomy_entity_types = taxonomy_entity_types
         self._invalid_accepted_question_ids: set[str] = set()
@@ -1202,6 +1212,11 @@ class SourceLedgerQuestionMachine:
             preferred_runtimes=self.preferred_runtimes,
             evidence_by_requirement=evidence_by_requirement,
             implementation_phases=self._implementation_phases,
+            story_context=story_planning_context(
+                self.structrr_baseline or {}, self.story_refs
+            )
+            if self.story_refs
+            else None,
         )
 
     def _work_unit_example(
@@ -1782,9 +1797,132 @@ class SourceLedgerQuestionMachine:
                             for write in unit.planned_writes
                         )
                     ),
+                    story_refs=merge_story_refs(
+                        [unit.story_refs for unit in item_units]
+                    ),
                 )
             )
             ordered_allocations[item_id] = item_unit_ids[item_id]
+        story_owners = [item for item in plan_items if item.story_refs]
+        if self.story_refs and len(story_owners) != 1:
+            # A validation-only unit is explicit work, with dependencies on every
+            # implementation owner. It cannot be counted as proof by the planner.
+            integration_id = "story-integration-validation"
+            unit_id = "unit-story-integration"
+            requirement_ids = tuple(
+                r.id for r in proposals_context.requirements.values() if r.story_refs
+            )
+            source_refs = tuple(
+                dict.fromkeys(
+                    ref
+                    for r in proposals_context.requirements.values()
+                    if r.story_refs
+                    for ref in r.source_refs
+                )
+            )
+            report_path = (
+                f"docs/plans/{slugify_workflow_id(plan_id)}-story-validation.json"
+            )
+            criteria = (
+                "Validate every allocated story path and observation against "
+                "the integrated candidate; report unavailable or partial "
+                "evidence explicitly.",
+            )
+            prerequisites = tuple(
+                unit.id for unit in finalized_units if unit.story_refs
+            )
+            integration = WorkUnit(
+                id=unit_id,
+                requirement_ids=requirement_ids,
+                deliverable="Integrated story validation",
+                component="story-validation",
+                implementation_runtime="neutral",
+                planned_writes=(
+                    PlannedWrite(report_path, "documentation", None, source_refs, ()),
+                ),
+                implementation_step=criteria[0],
+                acceptance_criteria=criteria,
+                validation_ids=("validation-0001",),
+                prerequisite_unit_ids=prerequisites,
+                implementation_phase_id=(
+                    self._implementation_phases[-1].id
+                    if self._implementation_phases
+                    else None
+                ),
+                story_refs=self.story_refs,
+            )
+            finalized_units += (integration,)
+            dependencies = tuple(item.item_id for item in story_owners)
+            workflow_id = f"{slugify_workflow_id(plan_id)}-story-validation"
+            plan_items.append(
+                PlannedWorkItem(
+                    item_id=integration_id,
+                    title="Validate integrated customer stories",
+                    objective=criteria[0],
+                    scope=(
+                        "Validate the full pinned story graph after "
+                        "its implementation slices.",
+                    ),
+                    acceptance_criteria=criteria,
+                    dependencies=dependencies,
+                    workflow_directory=None,
+                    workflow_id=workflow_id,
+                    workflow_file=(
+                        workflow_root
+                        / slugify_workflow_id(plan_id)
+                        / f"{workflow_id}.yaml"
+                    ).as_posix(),
+                    implementation_steps=criteria,
+                    allowed_paths=tuple(
+                        dict.fromkeys(
+                            [
+                                report_path,
+                                *(
+                                    path
+                                    for item in story_owners
+                                    for path in item.allowed_paths
+                                ),
+                            ]
+                        )
+                    ),
+                    story_refs=self.story_refs,
+                    story_validation=True,
+                )
+            )
+            ordered_allocations[integration_id] = (unit_id,)
+            graph = replace(
+                graph,
+                unit_edges=graph.unit_edges
+                + tuple(
+                    UnitDependencyEdge(
+                        parent,
+                        unit_id,
+                        "Integrated behavior",
+                        "Story validation follows implementation.",
+                        requirement_ids,
+                    )
+                    for parent in prerequisites
+                ),
+                item_edges=graph.item_edges
+                + tuple(
+                    ItemDependencyEdge(
+                        parent,
+                        integration_id,
+                        "Full-story validation follows implementation.",
+                        requirement_ids,
+                    )
+                    for parent in dependencies
+                ),
+                unit_order=graph.unit_order + (unit_id,),
+                item_order=graph.item_order + (integration_id,),
+                ready_item_ids=graph.ready_item_ids
+                or ((integration_id,) if not dependencies else ()),
+            )
+        elif story_owners:
+            plan_items = [
+                replace(item, story_validation=True) if item.story_refs else item
+                for item in plan_items
+            ]
         plan = ReviewedExecutionPlan(
             plan_id,
             tuple(plan_items),
@@ -1822,6 +1960,7 @@ class SourceLedgerQuestionMachine:
                     "dependencies": list(item.dependencies),
                     "allowed_paths": list(item.allowed_paths),
                     "acceptance_criteria": list(item.acceptance_criteria),
+                    "story_refs": [ref.to_data() for ref in item.story_refs],
                     "verification": test_designs[item.item_id],
                     "unit_ids": list(unit_ids),
                     "units": [units[unit_id] for unit_id in unit_ids],
@@ -2553,6 +2692,7 @@ class SourceLedgerQuestionMachine:
                 item.id
                 for item in ledger.requirements
                 if coverage_by_id[item.id].answer.status != "complete"
+                or item.story_refs
             ),
             tuple(
                 dict.fromkeys(
@@ -2645,6 +2785,15 @@ class SourceLedgerQuestionMachine:
                         "statement": requirement.statement,
                         "kind": requirement.kind,
                         "source_refs": list(requirement.source_refs),
+                        **(
+                            {
+                                "story_refs": [
+                                    ref.to_data() for ref in requirement.story_refs
+                                ]
+                            }
+                            if requirement.story_refs
+                            else {}
+                        ),
                         "related_requirement_ids": list(
                             requirement.related_requirement_ids
                         ),
@@ -2789,6 +2938,7 @@ class SourceLedgerQuestionMachine:
         requirements = tuple(
             replace(
                 requirement,
+                story_refs=self.story_refs if requirement.kind != "human_setup" else (),
                 related_requirement_ids=tuple(
                     dict.fromkeys(
                         related

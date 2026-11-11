@@ -6,6 +6,8 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
+from powdrr_service.planning.story_allocation import StoryPlanRef
+
 
 @dataclass(frozen=True, slots=True)
 class PlannedWorkItem:
@@ -24,6 +26,8 @@ class PlannedWorkItem:
     inline_adjustments: tuple[Mapping[str, Any], ...] = ()
     github_issue_number: int | None = None
     code_evidence: tuple[Mapping[str, Any], ...] = ()
+    story_refs: tuple[StoryPlanRef, ...] = ()
+    story_validation: bool = False
 
 
 @dataclass(frozen=True, slots=True)

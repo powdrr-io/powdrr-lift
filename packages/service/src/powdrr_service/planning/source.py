@@ -19,6 +19,7 @@ from powdrr_service.planning.questions import (
     QuestionRequest,
     SourceExcerpt,
 )
+from powdrr_service.planning.story_allocation import StoryPlanRef
 
 MAX_SOURCE_BLOCK_CHARS = 8_000
 MAX_CLAUSES_PER_SOURCE_BLOCK = 64
@@ -268,6 +269,7 @@ class Requirement:
     source_refs: tuple[str, ...]
     source_group_ids: tuple[str, ...]
     related_requirement_ids: tuple[str, ...]
+    story_refs: tuple[StoryPlanRef, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

@@ -3,10 +3,13 @@
 Status: story contracts, identity allocation, graph validation, digests,
 projection/rebase, bootstrap preservation and queries are implemented. The second
 slice adds interactive story authoring, bounded semantic readiness reviews,
-actual-user digest confirmation and proposal publication. Story allocation through
-planning, behavioral test authoring and execution evidence remain planned. See the
+actual-user digest confirmation and proposal publication. The third slice carries
+pinned stories through planning, multi-PR integration allocation, execution preflight
+and repair, with approved-amendment impact reports. Behavioral test authoring and
+execution evidence remain planned. See the
 [story contracts](../design/structrr-user-stories.md) and
-[interactive story design](../design/structrr-story-interview.md).
+[interactive story design](../design/structrr-story-interview.md) and
+[story planning](../design/structrr-story-planning.md).
 Date: 2026-11-06
 
 ## 1. Objective and accepted decisions

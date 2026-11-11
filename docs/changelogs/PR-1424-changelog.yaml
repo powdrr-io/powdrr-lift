@@ -1,0 +1,679 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1424
+title: Allocate confirmed stories through multi-PR planning and amendment impact
+intent:
+  problem: Confirmed stories can be dropped between source requirements, PR allocation,
+    workflow execution and plan repair.
+  goal: Preserve exact story and case revisions, require dependent full-story validation,
+    and route behavioral amendments through approved design.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/design/structrr-story-planning.md
+  type: added
+  span:
+    start_line: 1
+    end_line: 64
+  summary: Document story allocation, integration gates, impact and execution boundaries.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: docs/plans/structrr-user-stories-and-behavioral-testing.md
+  type: modified
+  span:
+    start_line: 6
+    end_line: 9
+  summary: Record implementation of the planning and approved evolution slice.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: docs/plans/structrr-user-stories-and-behavioral-testing.md
+  type: modified
+  span:
+    start_line: 11
+    end_line: 12
+  summary: Record implementation of the planning and approved evolution slice.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 39
+    end_line: 39
+  summary: Inherit typed story pins into work units and provide complete story context
+    to planning questions.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 267
+    end_line: 267
+  summary: Inherit typed story pins into work units and provide complete story context
+    to planning questions.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 282
+    end_line: 286
+  summary: Inherit typed story pins into work units and provide complete story context
+    to planning questions.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 317
+    end_line: 317
+  summary: Inherit typed story pins into work units and provide complete story context
+    to planning questions.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 909
+    end_line: 914
+  summary: Inherit typed story pins into work units and provide complete story context
+    to planning questions.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 1027
+    end_line: 1036
+  summary: Inherit typed story pins into work units and provide complete story context
+    to planning questions.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 1071
+    end_line: 1086
+  summary: Inherit typed story pins into work units and provide complete story context
+    to planning questions.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 1089
+    end_line: 1089
+  summary: Inherit typed story pins into work units and provide complete story context
+    to planning questions.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 1125
+    end_line: 1130
+  summary: Inherit typed story pins into work units and provide complete story context
+    to planning questions.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: packages/service/src/powdrr_service/planning/compiler.py
+  type: modified
+  span:
+    start_line: 25
+    end_line: 30
+  summary: Validate exact cross-artifact story ownership and dependent full-story
+    integration validation.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: packages/service/src/powdrr_service/planning/compiler.py
+  type: modified
+  span:
+    start_line: 126
+    end_line: 133
+  summary: Validate exact cross-artifact story ownership and dependent full-story
+    integration validation.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: packages/service/src/powdrr_service/planning/compiler.py
+  type: modified
+  span:
+    start_line: 272
+    end_line: 272
+  summary: Validate exact cross-artifact story ownership and dependent full-story
+    integration validation.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: packages/service/src/powdrr_service/planning/compiler.py
+  type: modified
+  span:
+    start_line: 287
+    end_line: 298
+  summary: Validate exact cross-artifact story ownership and dependent full-story
+    integration validation.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: packages/service/src/powdrr_service/planning/compiler.py
+  type: modified
+  span:
+    start_line: 325
+    end_line: 330
+  summary: Validate exact cross-artifact story ownership and dependent full-story
+    integration validation.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: packages/service/src/powdrr_service/planning/compiler.py
+  type: modified
+  span:
+    start_line: 393
+    end_line: 395
+  summary: Validate exact cross-artifact story ownership and dependent full-story
+    integration validation.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: packages/service/src/powdrr_service/planning/compiler.py
+  type: modified
+  span:
+    start_line: 417
+    end_line: 483
+  summary: Validate exact cross-artifact story ownership and dependent full-story
+    integration validation.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: packages/service/src/powdrr_service/planning/compiler.py
+  type: modified
+  span:
+    start_line: 881
+    end_line: 881
+  summary: Validate exact cross-artifact story ownership and dependent full-story
+    integration validation.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: packages/service/src/powdrr_service/planning/compiler.py
+  type: modified
+  span:
+    start_line: 933
+    end_line: 933
+  summary: Validate exact cross-artifact story ownership and dependent full-story
+    integration validation.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 20
+    end_line: 20
+  summary: Resolve approved source stories and compile persistent integration validation
+    units and items.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 47
+    end_line: 47
+  summary: Resolve approved source stories and compile persistent integration validation
+    units and items.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 82
+    end_line: 86
+  summary: Resolve approved source stories and compile persistent integration validation
+    units and items.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 528
+    end_line: 530
+  summary: Resolve approved source stories and compile persistent integration validation
+    units and items.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 1215
+    end_line: 1219
+  summary: Resolve approved source stories and compile persistent integration validation
+    units and items.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 1800
+    end_line: 1802
+  summary: Resolve approved source stories and compile persistent integration validation
+    units and items.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 1806
+    end_line: 1925
+  summary: Resolve approved source stories and compile persistent integration validation
+    units and items.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 1963
+    end_line: 1963
+  summary: Resolve approved source stories and compile persistent integration validation
+    units and items.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 2695
+    end_line: 2695
+  summary: Resolve approved source stories and compile persistent integration validation
+    units and items.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 2788
+    end_line: 2796
+  summary: Resolve approved source stories and compile persistent integration validation
+    units and items.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 2941
+    end_line: 2941
+  summary: Resolve approved source stories and compile persistent integration validation
+    units and items.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: packages/service/src/powdrr_service/planning/multipr_structrr.py
+  type: modified
+  span:
+    start_line: 8
+    end_line: 8
+  summary: Persist and reload item story pins and normalize compiled item projection
+    for execution.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: packages/service/src/powdrr_service/planning/multipr_structrr.py
+  type: modified
+  span:
+    start_line: 12
+    end_line: 16
+  summary: Persist and reload item story pins and normalize compiled item projection
+    for execution.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: packages/service/src/powdrr_service/planning/multipr_structrr.py
+  type: modified
+  span:
+    start_line: 47
+    end_line: 49
+  summary: Persist and reload item story pins and normalize compiled item projection
+    for execution.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: packages/service/src/powdrr_service/planning/multipr_structrr.py
+  type: modified
+  span:
+    start_line: 70
+    end_line: 74
+  summary: Persist and reload item story pins and normalize compiled item projection
+    for execution.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: packages/service/src/powdrr_service/planning/multipr_structrr.py
+  type: modified
+  span:
+    start_line: 296
+    end_line: 296
+  summary: Persist and reload item story pins and normalize compiled item projection
+    for execution.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: packages/service/src/powdrr_service/planning/multipr_structrr.py
+  type: modified
+  span:
+    start_line: 306
+    end_line: 310
+  summary: Persist and reload item story pins and normalize compiled item projection
+    for execution.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: packages/service/src/powdrr_service/planning/multipr_structrr.py
+  type: modified
+  span:
+    start_line: 386
+    end_line: 388
+  summary: Persist and reload item story pins and normalize compiled item projection
+    for execution.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: packages/service/src/powdrr_service/planning/multipr_structrr.py
+  type: modified
+  span:
+    start_line: 397
+    end_line: 399
+  summary: Persist and reload item story pins and normalize compiled item projection
+    for execution.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: packages/service/src/powdrr_service/planning/multipr_structrr.py
+  type: modified
+  span:
+    start_line: 412
+    end_line: 418
+  summary: Persist and reload item story pins and normalize compiled item projection
+    for execution.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: packages/service/src/powdrr_service/planning/multipr_structrr.py
+  type: modified
+  span:
+    start_line: 823
+    end_line: 823
+  summary: Persist and reload item story pins and normalize compiled item projection
+    for execution.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: packages/service/src/powdrr_service/planning/multipr_structrr.py
+  type: modified
+  span:
+    start_line: 831
+    end_line: 839
+  summary: Persist and reload item story pins and normalize compiled item projection
+    for execution.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: packages/service/src/powdrr_service/planning/plan_document.py
+  type: modified
+  span:
+    start_line: 14
+    end_line: 14
+  summary: Parse and serialize typed story references and story validation requirements.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: packages/service/src/powdrr_service/planning/plan_document.py
+  type: modified
+  span:
+    start_line: 94
+    end_line: 95
+  summary: Parse and serialize typed story references and story validation requirements.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: packages/service/src/powdrr_service/planning/plan_document.py
+  type: modified
+  span:
+    start_line: 149
+    end_line: 150
+  summary: Parse and serialize typed story references and story validation requirements.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: packages/service/src/powdrr_service/planning/plan_document.py
+  type: modified
+  span:
+    start_line: 152
+    end_line: 157
+  summary: Parse and serialize typed story references and story validation requirements.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: packages/service/src/powdrr_service/planning/plan_document.py
+  type: modified
+  span:
+    start_line: 233
+    end_line: 236
+  summary: Parse and serialize typed story references and story validation requirements.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: packages/service/src/powdrr_service/planning/plan_models.py
+  type: modified
+  span:
+    start_line: 9
+    end_line: 10
+  summary: Carry immutable story references and validation responsibility on reviewed
+    plan items.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: packages/service/src/powdrr_service/planning/plan_models.py
+  type: modified
+  span:
+    start_line: 29
+    end_line: 30
+  summary: Carry immutable story references and validation responsibility on reviewed
+    plan items.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: packages/service/src/powdrr_service/planning/repair.py
+  type: modified
+  span:
+    start_line: 212
+    end_line: 214
+  summary: Include story ownership and validation responsibility in repair input identity.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: packages/service/src/powdrr_service/planning/repair_service.py
+  type: modified
+  span:
+    start_line: 14
+    end_line: 17
+  summary: Preserve story pins through title repair and reject unapproved behavioral
+    or allocation changes.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: packages/service/src/powdrr_service/planning/repair_service.py
+  type: modified
+  span:
+    start_line: 171
+    end_line: 176
+  summary: Preserve story pins through title repair and reject unapproved behavioral
+    or allocation changes.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: packages/service/src/powdrr_service/planning/repair_service.py
+  type: modified
+  span:
+    start_line: 316
+    end_line: 336
+  summary: Preserve story pins through title repair and reject unapproved behavioral
+    or allocation changes.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: packages/service/src/powdrr_service/planning/repair_service.py
+  type: modified
+  span:
+    start_line: 441
+    end_line: 442
+  summary: Preserve story pins through title repair and reject unapproved behavioral
+    or allocation changes.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: packages/service/src/powdrr_service/planning/source.py
+  type: modified
+  span:
+    start_line: 22
+    end_line: 22
+  summary: Carry story pins alongside original requirement IDs and source anchors.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: packages/service/src/powdrr_service/planning/source.py
+  type: modified
+  span:
+    start_line: 272
+    end_line: 272
+  summary: Carry story pins alongside original requirement IDs and source anchors.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: packages/service/src/powdrr_service/planning/story_allocation.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 496
+  summary: Implement typed story ownership, readiness, scoped context, dependency
+    and case pins, and amendment impact.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: packages/service/src/powdrr_service/planning/workflow_instance.py
+  type: modified
+  span:
+    start_line: 17
+    end_line: 17
+  summary: Validate typed story ownership in execution workflow inputs.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: packages/service/src/powdrr_service/planning/workflow_instance.py
+  type: modified
+  span:
+    start_line: 104
+    end_line: 113
+  summary: Validate typed story ownership in execution workflow inputs.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: packages/service/src/powdrr_service/resources/processes/plan-execution.yaml
+  type: modified
+  span:
+    start_line: 6
+    end_line: 8
+  summary: Describe the enforced story allocation and integration gate in the native
+    planning process.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: packages/service/src/powdrr_service/resources/processes/plan-repair-execution.yaml
+  type: modified
+  span:
+    start_line: 5
+    end_line: 7
+  summary: Describe the story-preserving repair boundary and approved amendment route.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 56
+    end_line: 56
+  summary: Gate single-feature coding on current confirmed stories and preserve their
+    context in worker requests.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 983
+    end_line: 993
+  summary: Gate single-feature coding on current confirmed stories and preserve their
+    context in worker requests.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 2555
+    end_line: 2565
+  summary: Gate single-feature coding on current confirmed stories and preserve their
+    context in worker requests.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 3150
+    end_line: 3158
+  summary: Gate single-feature coding on current confirmed stories and preserve their
+    context in worker requests.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 1647
+    end_line: 1651
+  summary: Reject story-aware inputs in the legacy path rather than dropping allocation
+    and integration requirements.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 2378
+    end_line: 2382
+  summary: Reject story-aware inputs in the legacy path rather than dropping allocation
+    and integration requirements.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 38
+    end_line: 38
+  summary: Compare workflow pins with the proposal and current projected story context
+    before coding; report concrete amendment impact.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 45
+    end_line: 50
+  summary: Compare workflow pins with the proposal and current projected story context
+    before coding; report concrete amendment impact.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 810
+    end_line: 826
+  summary: Compare workflow pins with the proposal and current projected story context
+    before coding; report concrete amendment impact.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 3463
+    end_line: 3481
+  summary: Compare workflow pins with the proposal and current projected story context
+    before coding; report concrete amendment impact.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+- path: tests/test_story_planning.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 567
+  summary: Exercise native multi-PR compilation, artifact reload, confirmed step splits,
+    stale pins, worker conflicts and repair preservation.
+  rationale: Preserve approved behavioral identity and reject stale or incomplete
+    planning and execution context.
+entities:
+- id: structrr-story-plan-reference-v1
+  type: Class
+  action: added
+- id: structrr-story-amendment-impact-v1
+  type: Function
+  action: added
+entity_relationships: []
+invariants:
+- id: planning-preserves-confirmed-story-ownership
+  action: added
+  description: Requirement, work unit, item, workflow and proposal story references
+    retain current contract, case and dependency pins; missing or changed pins reject
+    compilation or execution.
+- id: full-story-validation-follows-all-implementation-owners
+  action: added
+  description: A complete story validation item must depend transitively on every
+    implementation owner; planned coverage and partial PR success do not establish
+    story verification.
+- id: story-amendment-impact-preserves-historical-receipts
+  action: added
+  description: A changed story reports affected primitives, observations, cases and
+    plan items; old receipts remain unchanged historical records and cannot approve
+    a changed contract.
+guidance: []

@@ -916,6 +916,15 @@ def run_worker_once(
                             if actual_prerequisite != expected_prerequisite
                             else None
                         )
+                        if (
+                            isinstance(context, Mapping)
+                            and context.get("source_reference_design_file")
+                            != item.source_reference_design_file
+                        ):
+                            detail = (
+                                "workflow source reference design does not match "
+                                "the pinned plan item"
+                            )
                 except (PlanGenerationError, KeyError) as error:
                     detail = f"invalid workflow definition: {error}"
                 if detail is not None:

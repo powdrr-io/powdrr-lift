@@ -334,6 +334,7 @@ def validate_compiled_plan(
                     ("execution_plan_file", compiled.plan_path),
                     ("structrr_proposal_file", compiled.proposal_path),
                     ("item_id", item.item_id),
+                    ("source_reference_design_file", item.source_reference_design_file),
                     ("title", item.title),
                     ("objective", item.objective),
                     ("scope", list(item.scope)),
@@ -388,6 +389,8 @@ def _workflow_definition(
         "structrr_item_id": item.item_id,
         "require_structrr_proposal": True,
     }
+    if item.source_reference_design_file is not None:
+        context["source_reference_design_file"] = item.source_reference_design_file
     if item.manual_prerequisite is not None:
         context["manual_prerequisite"] = dict(item.manual_prerequisite)
     if item.story_refs:

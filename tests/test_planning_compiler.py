@@ -617,3 +617,45 @@ def test_compiler_preserves_dependency_edges_and_manual_setup_context() -> None:
             verification_command="pytest -q",
             plan_path="docs/plans/bounded-plan.yaml",
         )
+
+
+def test_source_design_pointer_survives_compilation_and_detects_workflow_drift() -> (
+    None
+):
+    plan, manifest, proposal = _fixture()
+    item = replace(
+        plan.items[0], source_reference_design_file="docs/design/accepted.yaml"
+    )
+    plan = replace(plan, items=(item, *plan.items[1:]))
+    snapshot = {"source": manifest.data["source"], "base": manifest.data["base"]}
+    compiled = compile_plan(
+        plan=plan,
+        planning_manifest=manifest,
+        repository_snapshot=snapshot,
+        structrr_proposal=proposal,
+        verification_command="pytest -q",
+        plan_path="docs/plans/bounded-plan.yaml",
+    )
+    parsed = parse_reviewed_plan_yaml(compiled.files["docs/plans/bounded-plan.yaml"])
+    assert parsed.items[0].source_reference_design_file == "docs/design/accepted.yaml"
+    assert validate_compiled_plan(compiled, snapshot).valid
+    files = dict(compiled.files)
+    path = "docs/workflows/bounded-plan/item-01.yaml"
+    assert "source_reference_design_file: docs/design/accepted.yaml" in files[path]
+    files[path] = files[path].replace(
+        "docs/design/accepted.yaml", "docs/design/other.yaml"
+    )
+    altered = replace(compiled, files=files)
+    assert not validate_compiled_plan(altered, snapshot).valid
+
+
+@pytest.mark.parametrize(
+    "path", ["", "../intent.yaml", "/intent.yaml", "./intent.yaml"]
+)
+def test_plan_rejects_unsafe_source_design_pointer(path: str) -> None:
+    plan, _, _ = _fixture()
+    item = replace(plan.items[0], source_reference_design_file=path)
+    with pytest.raises(PlanDocumentError, match="source_reference_design_file"):
+        parse_reviewed_plan_yaml(
+            serialize_reviewed_plan_yaml(replace(plan, items=(item,)))
+        )

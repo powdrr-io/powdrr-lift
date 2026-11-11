@@ -101,6 +101,13 @@ def parse_plan_workflow_instance_yaml(text: str) -> PlanWorkflowInstance:
     context = inputs.get("proposed_pr_context")
     if not isinstance(context, Mapping):
         raise PlanWorkflowInstanceError("proposed_pr_context must be an object")
+    if "source_reference_design_file" in context:
+        from powdrr_service.planning.plan_models import source_reference_design_file
+
+        try:
+            source_reference_design_file(context["source_reference_design_file"])
+        except ValueError as error:
+            raise PlanWorkflowInstanceError(str(error)) from error
     try:
         refs = parse_story_refs(context.get("story_refs", []))
     except ValueError as error:

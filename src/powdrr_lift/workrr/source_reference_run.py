@@ -643,6 +643,17 @@ class SourceReferenceRun:
             )
         self._candidate_after_worker = self._candidate_state()
 
+    def verify_candidate(self) -> None:
+        """Require the exact post-worker bytes when handing off an accepted patch."""
+        self.verify_inputs()
+        if (
+            self._candidate_after_worker is None
+            or self._candidate_after_worker != self._candidate_state()
+        ):
+            raise SourceRunFailure(
+                "invalid_candidate", "Candidate changed after worker validation"
+            )
+
     def execute(
         self,
         inference_handler: Callable[[ChatCompletionRequest], ChatCompletionResponse],

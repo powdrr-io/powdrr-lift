@@ -351,5 +351,10 @@ def test_native_fake_model_end_to_end_protects_private_inputs_and_validates_owne
     trajectory = json.loads((run.public_root / f"{run.run_id}.traj.json").read_text())
     assert run.request.prompt in trajectory["messages"][1]["content"]
     assert (run.workspace_root / "retry.py").read_text().startswith(candidate)
+    if scenario == "success":
+        run.verify_candidate()
+        (run.workspace_root / "retry.py").write_text(candidate + "\n# later edit\n")
+        with pytest.raises(ValueError, match="Candidate changed"):
+            run.verify_candidate()
     with pytest.raises(ValueError, match="twice"):
         run.execute(infer)

@@ -440,6 +440,9 @@ def _planned_item(
         item_id=item_id,
         story_refs=current.story_refs if current else (),
         story_validation=current.story_validation if current else False,
+        source_reference_design_file=(
+            current.source_reference_design_file if current else None
+        ),
         title=str(value["title"]),
         objective=str(value["objective"]),
         scope=tuple(value["scope"]),

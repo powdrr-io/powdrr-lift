@@ -93,6 +93,7 @@ def parse_reviewed_plan_yaml(text: str) -> ReviewedExecutionPlan:
                 "code_evidence",
                 "story_refs",
                 "story_validation",
+                "source_reference_design_file",
             }
         ):
             raise PlanDocumentError(f"{field} has unknown or missing fields")
@@ -118,6 +119,16 @@ def parse_reviewed_plan_yaml(text: str) -> ReviewedExecutionPlan:
             raise PlanDocumentError(
                 f"{field}.workflow_id must be a stable safe identifier"
             )
+        design_file = None
+        if "source_reference_design_file" in raw:
+            from powdrr_service.planning.plan_models import source_reference_design_file
+
+            try:
+                design_file = source_reference_design_file(
+                    raw["source_reference_design_file"]
+                )
+            except ValueError as error:
+                raise PlanDocumentError(f"{field}: {error}") from error
         item = PlannedWorkItem(
             item_id=item_id,
             title=_required_text(raw, "title", field),
@@ -148,6 +159,7 @@ def parse_reviewed_plan_yaml(text: str) -> ReviewedExecutionPlan:
             ),
             story_refs=parse_story_refs(raw.get("story_refs", [])),
             story_validation=raw.get("story_validation", False),
+            source_reference_design_file=design_file,
         )
         if not isinstance(item.story_validation, bool) or (
             item.story_validation and not item.story_refs
@@ -232,6 +244,8 @@ def serialize_reviewed_plan_yaml(plan: ReviewedExecutionPlan) -> str:
             ]
         if item.story_refs:
             record["story_refs"] = [ref.to_data() for ref in item.story_refs]
+        if item.source_reference_design_file is not None:
+            record["source_reference_design_file"] = item.source_reference_design_file
         if item.story_validation:
             record["story_validation"] = True
         items.append(record)

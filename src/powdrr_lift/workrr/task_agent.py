@@ -3502,9 +3502,52 @@ class _TaskWorkflowExecutionStrategy:
                 "retryable": False,
                 "plan_defect_evidence": list(plan_defect_evidence),
             }
+        if (
+            any(
+                key in proposed
+                for key in (
+                    "source_reference_placements",
+                    "source_reference_preservations",
+                    "reference_definitions",
+                )
+            )
+            and "source_reference_design_file" not in proposed
+        ):
+            raise PowdrrExecutionError(
+                "Source reference intent requires a reviewed design file"
+            )
         request, validation_profile = _issue_worker_implementation_request(
             proposed, workflow_id=workflow_id, base_commit=base_commit
         )
+        if "source_reference_design_file" in proposed:
+            from powdrr_lift.workrr.source_reference_dispatch import (
+                dispatch_source_reference_task,
+            )
+
+            status = _execute_pr_test_install_worktree_status(
+                self.repo_root, self.config.workflow_dir
+            )
+            if status.returncode or status.stdout.strip():
+                raise PowdrrExecutionError(
+                    "Source reference dispatch requires a clean product checkout"
+                )
+            result = dispatch_source_reference_task(
+                repo_root=self.repo_root,
+                proposed=proposed,
+                base_commit=base_commit,
+                workflow_id=workflow_id,
+                task_id=self.task.task_id,
+                objective=request.objective,
+                allowed_paths=request.allowed_paths,
+                profile=validation_profile,
+                code_agent=self.config.code_agent,
+                model=self.config.minisweagent_model,
+                worker_timeout_seconds=self.config.coding_agent_timeout_seconds,
+                validation_timeout_seconds=self.config.coding_agent_validation_timeout_seconds,
+                review_client=self.client,
+            )
+            self.events.append({"kind": "coding_agent", "result": result})
+            return result
         structrr_context = _issue_worker_structrr_context(
             self.repo_root, proposed, base_commit=base_commit
         )

@@ -6,7 +6,7 @@ import os
 import shlex
 import signal
 import subprocess
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
@@ -149,10 +149,26 @@ def execute_coding_agent_attempt(
 ) -> CodingAgentExecutionResult:
     """Run one agent attempt and its common local validation gates."""
     attempt = runner.run(request, worktree_root=worktree_root, attempt_id=attempt_id)
+    execution = (
+        getattr(runner.provider, "source_reference_execution", None)
+        if request.source_reference_prompt is not None
+        else None
+    )
+    if execution is not None:
+        execution.finalize_worker(attempt)
+        if (
+            reference_context is not None
+            and reference_context is not execution.validation_context
+        ):
+            raise ValueError("Validation context differs from the prepared source run")
+        reference_context = execution.validation_context
     validation = ValidationRunner(
         profiles,
         timeout_seconds=validation_timeout_seconds,
         reference_context=reference_context,
+        command_wrapper=execution.protect_command if execution else None,
+        environment_overrides=execution.validation_environment() if execution else None,
+        reference_claims=execution.claims if execution else (),
     ).run(request, attempt, worktree_root=worktree_root)
     runner.store.save_validation_report(validation)
     diff_check = subprocess.run(
@@ -215,10 +231,16 @@ class ValidationRunner:
         *,
         timeout_seconds: float = 600.0,
         reference_context: SourceReferenceValidationContext | None = None,
+        command_wrapper: Callable[[tuple[str, ...]], Sequence[str]] | None = None,
+        environment_overrides: Mapping[str, str] | None = None,
+        reference_claims: tuple[dict[str, Any], ...] = (),
     ) -> None:
         self.profiles = dict(profiles)
         self.timeout_seconds = timeout_seconds
         self.reference_context = reference_context
+        self.command_wrapper = command_wrapper
+        self.environment_overrides = dict(environment_overrides or {})
+        self.reference_claims = reference_claims
 
     def run(
         self,
@@ -289,6 +311,11 @@ class ValidationRunner:
                 error="one or more validation profiles are not registered",
             )
 
+        # Candidate test programs can mutate files. Source evidence must describe
+        # the final bytes after every ordinary verification command has finished.
+        ordinary_results = tuple(
+            self._run_profile(profile, request, worktree_root) for profile in profiles
+        )
         reference_results: list[ValidationResult] = []
         if reference_required:
             reference_results.append(self._run_references(request, worktree_root))
@@ -304,10 +331,7 @@ class ValidationRunner:
                 )
         results = (
             *reference_results,
-            *(
-                self._run_profile(profile, request, worktree_root)
-                for profile in profiles
-            ),
+            *ordinary_results,
         )
         blocked = any(
             result.status is ValidationResultStatus.BLOCKED for result in results
@@ -346,7 +370,9 @@ class ValidationRunner:
             self.reference_context.handoff.require_matches(
                 request.source_reference_prompt
             )
-            report = self.reference_context.check(worktree_root)
+            report = self.reference_context.check(
+                worktree_root, claims=self.reference_claims
+            )
             status = {
                 "passed": ValidationResultStatus.PASSED,
                 "failed": ValidationResultStatus.FAILED,
@@ -405,8 +431,20 @@ class ValidationRunner:
             # environment belonging to the caller's checkout so uv resolves
             # the project from this worktree.
             environment.pop("VIRTUAL_ENV", None)
+            if request.source_reference_prompt is not None:
+                from powdrr_lift.workrr.coding_agent import _remove_provider_credentials
+
+                _remove_provider_credentials(environment)
+                for key in tuple(environment):
+                    if key.startswith("POWDRR_STRUCTRR_"):
+                        environment.pop(key)
+            environment.update(self.environment_overrides)
             process = subprocess.Popen(
-                list(profile.command),
+                list(
+                    self.command_wrapper(profile.command)
+                    if self.command_wrapper
+                    else profile.command
+                ),
                 cwd=worktree_root,
                 env=environment,
                 stdout=subprocess.PIPE,

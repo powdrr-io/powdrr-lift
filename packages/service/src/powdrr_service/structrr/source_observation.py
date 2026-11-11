@@ -163,5 +163,16 @@ class SourceObservationSession:
             "refs": [r["ref"] for r in data["references"]] if data else [],
             "diagnostics": diagnostics + (data["diagnostics"] if data else []),
             "delivered_context_digest": content_fingerprint(context),
+            "context_pages": [
+                {
+                    "ref": page["ref"],
+                    "offset": page["offset"],
+                    "end_offset": page["offset"] + len(page["text"]),
+                    "total_characters": page["total_characters"],
+                }
+                for page in data["context_pages"]
+            ]
+            if data
+            else [],
         }
         return {"context": context, "event": event}

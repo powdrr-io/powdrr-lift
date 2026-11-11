@@ -106,16 +106,14 @@ references disabled; they cannot carry new reference fields. New non-reference
 requests use explicit `off`. The legacy Structrr handoff adapter rejects designs
 containing reference placement/preservation records, preventing silent bypass.
 
-Reference-bearing requests are deliberately rejected before provider invocation
-until worker rollout binds the private validation context. Independent
-[placement validation](structrr-reference-validation.md) is now available, but
-does not itself enable provider execution. The common runner
-returns policy denied, and direct miniSWE/OpenCode adapters also reject them.
-The optional local check is rendered only when supplied; otherwise the prompt
-explicitly reports that the check is unavailable and cannot be claimed passing.
-Supplying a command is not evidence that its validator exists or has passed.
+Reference-bearing requests execute only through a prepared
+[SourceReferenceRun](structrr-reference-rollout.md), which binds the private
+validation context, frozen inputs, protected process adapter, and attempt metadata.
+The common runner and direct adapters reject an unbound request. OpenCode remains
+unsupported for this contract. The local check command is rendered when supplied;
+supplying it does not prove that validation passed.
 
-Environment integration is tracked separately in
-[PR #1418](https://github.com/powdrr-io/powdrr-lift/pull/1418), which was still open
-when this implementation began. Step 6 now supplies independent placement and
-preservation validation; step 7 binds immutable worker inputs and enables rollout.
+The rollout compiler also supplies the absolute candidate workspace and a structured
+completion protocol. The worker reports reference owners and design gaps as JSON.
+A design gap prevents acceptance; a new design must be accepted before another run.
+Older handoffs without the workspace field retain their original rendered bytes.

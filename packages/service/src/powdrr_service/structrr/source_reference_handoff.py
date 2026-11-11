@@ -265,8 +265,13 @@ def _normalize(contract: Mapping[str, Any]) -> dict[str, Any]:
         "obligations",
         "preservation",
     }
-    if set(contract) != fields:
+    if set(contract) - {"workspace_root"} != fields:
         raise ValueError("invalid source reference contract fields")
+    if "workspace_root" in contract:
+        workspace = required_text(contract["workspace_root"], "workspace_root")
+        parsed = PurePosixPath(workspace)
+        if not parsed.is_absolute() or ".." in parsed.parts or str(parsed) != workspace:
+            raise ValueError("rollout requires a normalized absolute workspace root")
     if not re.fullmatch(r"[a-f0-9]{40}|[a-f0-9]{64}", contract["base_commit"]):
         raise ValueError("source reference handoff requires a full base commit")
     for key in ("design_fingerprint", "accepted_document_digest", "catalog_digest"):
@@ -332,13 +337,25 @@ def _normalize(contract: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def _render(contract: Mapping[str, Any]) -> str:
+    workspace = contract.get("workspace_root")
     sections = (
         _json(contract["objective"]),
         _json(
             {
                 k: contract[k]
-                for k in ("base_commit", "design_fingerprint", "catalog_digest")
+                for k in (
+                    "base_commit",
+                    "design_fingerprint",
+                    "catalog_digest",
+                    *(("workspace_root",) if workspace else ()),
+                )
             }
+        )
+        + (
+            "\nBefore inspection run pwd and git rev-parse --show-toplevel; both "
+            "must identify this workspace. Do not read or edit another checkout."
+            if workspace
+            else ""
         ),
         _json(
             {
@@ -407,7 +424,16 @@ def _render(contract: Mapping[str, Any]) -> str:
         "write an additional repository artifact. Semantic owner selectors require "
         "independent review; worker claims never establish a passing binding. "
         "A design gap leaves the attempt incomplete and requires the normal design "
-        "workflow; the worker cannot approve its own amendment.",
+        "workflow; the worker cannot approve its own amendment."
+        + (
+            "\nSubmit a JSON object with "
+            "schema_version=structrr-reference-completion-v1, "
+            "reference_owners (a list of ref/path/kind/qualified_name objects), and "
+            "design_gaps (a list of location/consequence objects). Report every "
+            "unresolved gap; a nonempty list blocks acceptance. Do not commit or push."
+            if workspace
+            else ""
+        ),
     )
     return (
         "\n\n".join(
@@ -528,6 +554,7 @@ def compile_source_reference_handoff(
     verification_commands: tuple[tuple[str, ...], ...] = (),
     reference_check_command: tuple[str, ...] | None = None,
     private_validation_data: Mapping[str, Any] | None = None,
+    workspace_root: str | None = None,
 ) -> CompiledSourceReferenceHandoff:
     if catalog.accepted_document_digest != content_fingerprint(accepted_design):
         raise ValueError("accepted design and frozen catalog do not match")
@@ -544,6 +571,9 @@ def compile_source_reference_handoff(
         definitions.append(resolved.entry.reference.to_data())
     contract = _normalize(
         {
+            **(
+                {"workspace_root": workspace_root} if workspace_root is not None else {}
+            ),
             "base_commit": catalog.base_commit,
             "design_fingerprint": desired.fingerprint,
             "accepted_document_digest": catalog.accepted_document_digest,

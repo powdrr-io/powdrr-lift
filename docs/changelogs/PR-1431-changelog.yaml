@@ -1,0 +1,181 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1431
+title: Add protected Linux execution for Structrr source runs
+intent:
+  problem: Protected source-reference runs only support macOS, so Linux Workrr hosts
+    cannot execute accepted source tasks.
+  goal: Add a fail-closed bubblewrap adapter that hides private run inputs, confines
+    writes, and disables worker network access.
+human-decisions: []
+structured_files: []
+files:
+- path: .github/workflows/ci.yml
+  type: modified
+  span:
+    start_line: 82
+    end_line: 82
+  summary: Install bubblewrap on Linux runners for protected execution tests.
+  rationale: Run Linux isolation coverage in CI.
+- path: docs/design/structrr-reference-rollout.md
+  type: modified
+  span:
+    start_line: 21
+    end_line: 26
+  summary: Document the Linux bubblewrap adapter and its filesystem, private-input,
+    and network boundary.
+  rationale: Describe supported protected execution on Linux.
+- path: docs/design/structrr-reference-rollout.md
+  type: modified
+  span:
+    start_line: 30
+    end_line: 31
+  summary: Document the Linux bubblewrap adapter and its filesystem, private-input,
+    and network boundary.
+  rationale: Describe supported protected execution on Linux.
+- path: docs/design/structrr-reference-rollout.md
+  type: modified
+  span:
+    start_line: 80
+    end_line: 81
+  summary: Document the Linux bubblewrap adapter and its filesystem, private-input,
+    and network boundary.
+  rationale: Describe supported protected execution on Linux.
+- path: docs/design/structrr-source-task-dispatch.md
+  type: modified
+  span:
+    start_line: 80
+    end_line: 81
+  summary: Update task dispatch platform requirements to include Linux bubblewrap.
+  rationale: Keep the task contract aligned with supported adapters.
+- path: docs/plans/structrr-source-references.md
+  type: modified
+  span:
+    start_line: 30
+    end_line: 30
+  summary: Record Linux bubblewrap alongside macOS Seatbelt for the initial rollout.
+  rationale: Keep plan status accurate.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span:
+    start_line: 3
+    end_line: 4
+  summary: Select and probe platform-specific protected execution using Seatbelt or
+    bubblewrap.
+  rationale: Keep private inputs hidden, worker writes bounded, and unsupported hosts
+    fail closed.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span:
+    start_line: 298
+    end_line: 298
+  summary: Select and probe platform-specific protected execution using Seatbelt or
+    bubblewrap.
+  rationale: Keep private inputs hidden, worker writes bounded, and unsupported hosts
+    fail closed.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span:
+    start_line: 462
+    end_line: 489
+  summary: Select and probe platform-specific protected execution using Seatbelt or
+    bubblewrap.
+  rationale: Keep private inputs hidden, worker writes bounded, and unsupported hosts
+    fail closed.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span:
+    start_line: 491
+    end_line: 502
+  summary: Select and probe platform-specific protected execution using Seatbelt or
+    bubblewrap.
+  rationale: Keep private inputs hidden, worker writes bounded, and unsupported hosts
+    fail closed.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span:
+    start_line: 510
+    end_line: 510
+  summary: Select and probe platform-specific protected execution using Seatbelt or
+    bubblewrap.
+  rationale: Keep private inputs hidden, worker writes bounded, and unsupported hosts
+    fail closed.
+- path: tests/test_source_reference_dispatch.py
+  type: modified
+  span:
+    start_line: 175
+    end_line: 178
+  summary: Run native dispatch cases on Linux when bubblewrap is available and skip
+    when nested namespaces are blocked.
+  rationale: Exercise the Linux worker boundary in CI.
+- path: tests/test_source_reference_dispatch.py
+  type: modified
+  span:
+    start_line: 256
+    end_line: 262
+  summary: Run native dispatch cases on Linux when bubblewrap is available and skip
+    when nested namespaces are blocked.
+  rationale: Exercise the Linux worker boundary in CI.
+- path: tests/test_source_reference_run.py
+  type: modified
+  span:
+    start_line: 162
+    end_line: 163
+  summary: Test bubblewrap command construction, missing-adapter rejection, and native
+    sandbox cases.
+  rationale: Verify private-input hiding and write boundaries.
+- path: tests/test_source_reference_run.py
+  type: modified
+  span:
+    start_line: 240
+    end_line: 245
+  summary: Test bubblewrap command construction, missing-adapter rejection, and native
+    sandbox cases.
+  rationale: Verify private-input hiding and write boundaries.
+- path: tests/test_source_reference_run.py
+  type: modified
+  span:
+    start_line: 247
+    end_line: 247
+  summary: Test bubblewrap command construction, missing-adapter rejection, and native
+    sandbox cases.
+  rationale: Verify private-input hiding and write boundaries.
+- path: tests/test_source_reference_run.py
+  type: modified
+  span:
+    start_line: 251
+    end_line: 275
+  summary: Test bubblewrap command construction, missing-adapter rejection, and native
+    sandbox cases.
+  rationale: Verify private-input hiding and write boundaries.
+entities:
+- id: structrr-source-reference-run-v1
+  type: Class
+  action: added
+- id: structrr-linux-bubblewrap-adapter-v1
+  type: Function
+  action: added
+- id: structrr-protected-linux-worker-boundary-v1
+  type: Class
+  action: added
+entity_relationships:
+- id: structrr-source-run-selects-linux-isolation-v1
+  source: structrr-source-reference-run-v1
+  target: structrr-linux-bubblewrap-adapter-v1
+  relationship: uses
+  type: uses
+  action: added
+  description: Linux source runs wrap worker and validation commands with bubblewrap.
+  rationale: Apply the protected execution policy on Linux.
+invariants:
+- id: structrr-linux-private-run-inputs-hidden-v1
+  action: added
+  description: The Linux worker sees private artifacts through an empty temporary
+    mount and cannot access their host contents.
+- id: structrr-linux-worker-writes-confined-v1
+  action: added
+  description: Only candidate and public worker artifact directories are writable;
+    the rest of the host filesystem is read-only.
+- id: structrr-source-run-no-unprotected-fallback-v1
+  action: added
+  description: Missing or unusable platform isolation blocks before model invocation.
+guidance: []

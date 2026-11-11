@@ -388,6 +388,14 @@ def test_execute_proposed_pr_is_a_procedrr_workflow_process() -> None:
         "Never use the plan ID" in instruction
         for instruction in title_judge["instructions"]
     )
+    assert any(
+        "Never copy raw stdout, stderr, terminal logs" in instruction
+        for instruction in title_judge["instructions"]
+    )
+    assert any(
+        "one concise Markdown bullet per command" in instruction
+        for instruction in title_judge["instructions"]
+    )
     assert (
         title_judge["output"]["schema"]["properties"]["workflow_context"]["properties"][
             "feature-name"

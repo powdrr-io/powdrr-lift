@@ -49,6 +49,15 @@ verification command to prepare a [SourceReferenceRun](structrr-reference-rollou
 Mandatory references always use `enforce`; an explicit downgrade is rejected.
 Ordinary items without the selector retain the existing implementation flow.
 
+Implementation items may also carry pinned `story_refs`. Before dispatch, Workrr
+resolves those references against the reviewed plan proposal and current projected
+Structrr snapshot, then adds the selected story graph and cases to the protected
+worker objective. The normal handoff fingerprint therefore binds that context to
+the run. This is planning context, not story verification; implementation items
+must not claim whole-story completion. Items marked `story_validation: true` still
+require the dedicated story authoring, assertion review, and execution-receipt
+adapter and are rejected by this dispatch path until that adapter is connected.
+
 The worker runs once in a dedicated clean detached candidate worktree at the exact
 base. Workflow runtime files stay in the task checkout. Independent final validation
 uses the task's existing workflow review client for structured source evidence and
@@ -78,10 +87,10 @@ inspect its artifacts before accepting a new design revision. These temporary
 artifacts follow the host's retention policy and are not a permanent audit store.
 
 The protected adapters require macOS Seatbelt or Linux bubblewrap, plus miniSWE.
-Unsupported platforms and agents block without falling back. Story allocation/validation tasks
-also block until their test-authoring and coverage stages have a protected adapter;
-they cannot silently lose story proof by selecting this path. Legacy feature
-endpoint and CI-repair dispatch retain their own contracts.
+Unsupported platforms and agents block without falling back. Full story-validation
+tasks block until their test-authoring and coverage stages have a protected
+adapter; they cannot silently lose story proof by selecting this path. Legacy
+feature endpoint and CI-repair dispatch retain their own contracts.
 
 The offline native dispatch tests execute the real miniSWE environment, reader
 bridge, behavioral checks, semantic review interface, and accepted patch transfer.

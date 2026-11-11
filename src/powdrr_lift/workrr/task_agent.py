@@ -3675,6 +3675,28 @@ class _TaskWorkflowExecutionStrategy:
                 dispatch_source_reference_task,
             )
 
+            pinned_story_context = None
+            if proposed.get("story_refs"):
+                source_structrr_context = _issue_worker_structrr_context(
+                    self.repo_root, proposed, base_commit=base_commit
+                )
+                if source_structrr_context is None:
+                    raise PowdrrExecutionError(
+                        "source reference story work requires a reviewed Structrr "
+                        "proposal and pinned allocation"
+                    )
+                source_snapshot, source_item_proposal, _, _ = source_structrr_context
+                if source_item_proposal is None:
+                    raise PowdrrExecutionError(
+                        "source reference story work has no reviewed item proposal"
+                    )
+                source_story_snapshot = project_item_proposal(
+                    source_snapshot, source_item_proposal
+                )
+                pinned_story_context = story_planning_context(
+                    source_story_snapshot,
+                    parse_story_refs(proposed.get("story_refs", [])),
+                )
             status = _execute_pr_test_install_worktree_status(
                 self.repo_root, self.config.workflow_dir
             )
@@ -3696,6 +3718,7 @@ class _TaskWorkflowExecutionStrategy:
                 worker_timeout_seconds=self.config.coding_agent_timeout_seconds,
                 validation_timeout_seconds=self.config.coding_agent_validation_timeout_seconds,
                 review_client=self.client,
+                story_context=pinned_story_context,
             )
             self.events.append({"kind": "coding_agent", "result": result})
             return result
@@ -3784,7 +3807,7 @@ class _TaskWorkflowExecutionStrategy:
                 "pre-coding inherited-decision review needs a plan correction: "
                 + "; ".join(planning_findings)
             )
-        story_snapshot = (
+        story_snapshot: Mapping[str, Any] = (
             project_item_proposal(current_structrr or {}, item_proposal)
             if proposed.get("story_refs") and item_proposal is not None
             else current_structrr or {}

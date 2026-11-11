@@ -91,6 +91,7 @@ def dispatch_source_reference_task(
     worker_timeout_seconds: float,
     validation_timeout_seconds: float,
     review_client: WorkflowLLMClient,
+    story_context: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Run once in a clean candidate, then transfer only an accepted patch."""
     if proposed.get("source_reference_mode", "enforce") != "enforce":
@@ -99,13 +100,34 @@ def dispatch_source_reference_task(
         )
     if code_agent != "minisweagent" or not model:
         raise PowdrrExecutionError("Source reference tasks require miniSWE and a model")
-    if proposed.get("story_refs") or proposed.get("story_validation"):
+    if proposed.get("story_validation") is True:
         raise PowdrrExecutionError(
-            "Source reference tasks with story coverage require a protected adapter"
+            "Full story validation requires the story execution adapter; this source "
+            "reference path supports pinned story context for implementation items"
+        )
+    if proposed.get("story_refs") and not isinstance(story_context, Mapping):
+        raise PowdrrExecutionError(
+            "Source reference implementation items with story references require "
+            "validated pinned story context"
+        )
+    if not proposed.get("story_refs") and story_context is not None:
+        raise PowdrrExecutionError(
+            "Pinned story context requires reviewed story references"
         )
     design_path, design = load_reviewed_source_design(
         repo_root, proposed, base_commit=base_commit
     )
+    if story_context is not None:
+        objective = (
+            objective + "\n\nPinned customer story contract and selected cases "
+            "(planned coverage, not verification):\n"
+            + json.dumps(dict(story_context), indent=2, sort_keys=True)
+            + "\nPreserve these exact references. Report discoveries as "
+            "implementation_defect, environment_blocked, or "
+            "design_amendment_needed. A behavior amendment returns to "
+            "story-design-interview and a reviewed Structrr proposal; "
+            "the coding worker cannot approve it."
+        )
     identity = hashlib.sha256(
         json.dumps(
             [str(repo_root.resolve()), workflow_id, task_id, base_commit, design_path]

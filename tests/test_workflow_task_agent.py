@@ -475,6 +475,67 @@ def test_preflight_proposed_file_additions_ignores_files_outside_base_commit(
     assert findings == ()
 
 
+def test_preflight_proposed_file_addition_allows_plan_to_update_existing_path(
+    tmp_path: Path,
+) -> None:
+    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
+    candidate = tmp_path / ".github" / "workflows" / "ci.yml"
+    candidate.parent.mkdir(parents=True)
+    candidate.write_text("name: old\n", encoding="utf-8")
+    subprocess.run(["git", "add", str(candidate)], cwd=tmp_path, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.com",
+            "commit",
+            "-m",
+            "baseline",
+        ],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+    )
+    base_commit = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    proposal = ProposalRevision(
+        proposal_id="feature-pr-01",
+        structrr_baseline_fingerprint="sha256:baseline",
+        operations=(
+            ProposalOperation(
+                operation_id="add-ci-workflow",
+                section="files",
+                subject_id="ci-workflow",
+                action="add",
+                content={"path": ".github/workflows/ci.yml"},
+            ),
+        ),
+        acceptance_criteria=(),
+        must_preserve=(),
+        non_goals=(),
+        allowed_paths=(".github/workflows/ci.yml",),
+        source_refs=(),
+    )
+
+    findings = task_agent._preflight_proposed_file_additions(
+        tmp_path,
+        proposal,
+        base_commit=base_commit,
+        implementation_steps=(
+            "Create or update .github/workflows/ci.yml with the reviewed settings.",
+        ),
+    )
+
+    assert findings == ()
+
+
 def test_implementation_paths_include_committed_work_and_exclude_runtime_state(
     tmp_path: Path,
 ) -> None:

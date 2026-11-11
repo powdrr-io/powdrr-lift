@@ -260,6 +260,10 @@ def test_related_workflow_pr_lookup_includes_unique_publication_branches(
                         "state": "OPEN",
                         "headRefName": "powdrr/core-plan-amendment-run-456",
                     },
+                    {
+                        "state": "MERGED",
+                        "headRefName": "powdrr/core-correction-05",
+                    },
                 ]
             ),
             "",
@@ -273,8 +277,36 @@ def test_related_workflow_pr_lookup_includes_unique_publication_branches(
 
     assert error is None
     assert [item["headRefName"] for item in pull_requests] == [
-        "powdrr/core-implementation-run-123"
+        "powdrr/core-implementation-run-123",
+        "powdrr/core-correction-05",
     ]
+
+
+def test_workflow_dependency_accepts_merged_worker_correction_branch(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    state = WorkflowGitState(
+        proposed_pr_id="integration",
+        base_branch="main",
+        integration_branch="powdrr/integration-attempt-current",
+        workflow_relative_directory="docs/workflows/feature",
+        depends_on_workflows=("core",),
+    )
+    monkeypatch.setattr(
+        workflow_git,
+        "_related_pull_requests",
+        lambda *_args: ([{"state": "CLOSED"}], None),
+    )
+    monkeypatch.setattr(
+        workflow_git,
+        "_related_workflow_attempt_pull_requests",
+        lambda _repo, prefix: (
+            ([{"state": "MERGED", "headRefName": f"{prefix}-correction-05"}], None)
+        ),
+    )
+
+    assert workflow_dependencies_completion(tmp_path, state) == (True, ())
 
 
 def test_force_synchronization_resets_stale_integration_branch(

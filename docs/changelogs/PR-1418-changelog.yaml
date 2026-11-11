@@ -1,0 +1,62 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1418
+title: Recognize merged correction PRs in workflow dependencies
+intent:
+  problem: Workflow dependency checks miss completed worker corrections when their
+    published branch uses the correction suffix.
+  goal: Treat a merged correction branch as completed dependency evidence, just like
+    the existing attempt and implementation branch forms.
+human-decisions: []
+structured_files: []
+files:
+- path: src/powdrr_lift/workrr/git.py
+  type: modified
+  span:
+    start_line: 1417
+    end_line: 1417
+  summary: Match correction-suffixed worker PR branches during dependency lookup
+  rationale: Prevent downstream workflows from treating a merged correction PR as
+    unfinished work.
+- path: tests/test_workflow_git.py
+  type: modified
+  span:
+    start_line: 263
+    end_line: 266
+  summary: Add a merged correction branch to publication lookup coverage
+  rationale: Ensure the lookup includes the branch form used by published worker
+    corrections.
+- path: tests/test_workflow_git.py
+  type: modified
+  span:
+    start_line: 280
+    end_line: 281
+  summary: Assert correction branches appear in publication lookup results
+  rationale: Protect correction branch discovery alongside implementation branches.
+- path: tests/test_workflow_git.py
+  type: modified
+  span:
+    start_line: 285
+    end_line: 311
+  summary: Cover dependency completion through a merged correction branch
+  rationale: Ensure downstream workflows accept the completed dependency evidence.
+entities:
+- id: workflow-correction-dependency-discovery
+  type: Function
+  action: added
+- id: merged-correction-dependency-regression
+  type: Regression test
+  action: added
+entity_relationships:
+- id: correction-dependency-test-verifies-discovery
+  source: merged-correction-dependency-regression
+  target: workflow-correction-dependency-discovery
+  type: verifies
+  action: added
+  description: The regression test verifies a merged correction PR satisfies a
+    workflow dependency.
+invariants:
+- id: merged-correction-pr-completes-workflow-dependency
+  action: added
+  description: A merged worker PR on a branch ending in the correction suffix counts
+    as completion evidence for its workflow dependency.
+guidance: []

@@ -1,0 +1,236 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1430
+title: Dispatch reviewed Structrr source designs through protected Workrr runs
+intent:
+  problem: Normal task execution rewrites prompts and uses recovery, so it cannot
+    safely invoke the immutable source-reference handoff.
+  goal: Route reviewed source design tasks through one protected candidate and transfer
+    only independently validated source changes.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/design/structrr-reference-rollout.md
+  type: modified
+  span:
+    start_line: 82
+    end_line: 85
+  summary: Link the Workrr task dispatch contract.
+  rationale: Connect protected execution to its reviewed selector and transfer semantics.
+- path: docs/design/structrr-source-task-dispatch.md
+  type: added
+  span:
+    start_line: 1
+    end_line: 90
+  summary: Document committed design authority, single-attempt routing, isolated candidates,
+    accepted patch transfer, and supported task limits.
+  rationale: Make the new workflow path and failure behavior reviewable.
+- path: packages/service/src/powdrr_service/planning/compiler.py
+  type: modified
+  span:
+    start_line: 337
+    end_line: 337
+  summary: Preserve the source design pointer in generated workflows and detect pointer
+    drift.
+  rationale: Bind workflow execution to the reviewed plan selector.
+- path: packages/service/src/powdrr_service/planning/compiler.py
+  type: modified
+  span:
+    start_line: 392
+    end_line: 393
+  summary: Preserve the source design pointer in generated workflows and detect pointer
+    drift.
+  rationale: Bind workflow execution to the reviewed plan selector.
+- path: packages/service/src/powdrr_service/planning/plan_document.py
+  type: modified
+  span:
+    start_line: 96
+    end_line: 96
+  summary: Parse and serialize an optional normalized source design pointer on plan
+    items.
+  rationale: Carry reviewed source intent without silently losing enforcement.
+- path: packages/service/src/powdrr_service/planning/plan_document.py
+  type: modified
+  span:
+    start_line: 122
+    end_line: 131
+  summary: Parse and serialize an optional normalized source design pointer on plan
+    items.
+  rationale: Carry reviewed source intent without silently losing enforcement.
+- path: packages/service/src/powdrr_service/planning/plan_document.py
+  type: modified
+  span:
+    start_line: 162
+    end_line: 162
+  summary: Parse and serialize an optional normalized source design pointer on plan
+    items.
+  rationale: Carry reviewed source intent without silently losing enforcement.
+- path: packages/service/src/powdrr_service/planning/plan_document.py
+  type: modified
+  span:
+    start_line: 247
+    end_line: 248
+  summary: Parse and serialize an optional normalized source design pointer on plan
+    items.
+  rationale: Carry reviewed source intent without silently losing enforcement.
+- path: packages/service/src/powdrr_service/planning/plan_models.py
+  type: modified
+  span:
+    start_line: 7
+    end_line: 7
+  summary: Add the optional source design pointer and shared path validation.
+  rationale: Use the same normalized repository-relative contract across planning
+    layers.
+- path: packages/service/src/powdrr_service/planning/plan_models.py
+  type: modified
+  span:
+    start_line: 32
+    end_line: 32
+  summary: Add the optional source design pointer and shared path validation.
+  rationale: Use the same normalized repository-relative contract across planning
+    layers.
+- path: packages/service/src/powdrr_service/planning/plan_models.py
+  type: modified
+  span:
+    start_line: 44
+    end_line: 61
+  summary: Add the optional source design pointer and shared path validation.
+  rationale: Use the same normalized repository-relative contract across planning
+    layers.
+- path: packages/service/src/powdrr_service/planning/repair_service.py
+  type: modified
+  span:
+    start_line: 443
+    end_line: 445
+  summary: Preserve the source design pointer when reconstructing a repaired plan
+    item.
+  rationale: Prevent typed plan repair from silently downgrading source enforcement.
+- path: packages/service/src/powdrr_service/planning/workflow_instance.py
+  type: modified
+  span:
+    start_line: 104
+    end_line: 110
+  summary: Validate source design paths in workflow context.
+  rationale: Reject unsafe pointers before task execution.
+- path: scripts/smoke-source-reference-run.py
+  type: modified
+  span:
+    start_line: 82
+    end_line: 82
+  summary: Use the implements relationship for a feature reference.
+  rationale: Make the opt-in smoke fixture obey the handoff relationship contract.
+- path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 2500
+    end_line: 2508
+  summary: Emit source design pointers in local generated workflows.
+  rationale: Keep local and service workflow producers consistent.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span:
+    start_line: 919
+    end_line: 927
+  summary: Reject workflow source design pointers that differ from pinned plan items.
+  rationale: Keep queue dispatch bound to the reviewed selector.
+- path: src/powdrr_lift/workrr/source_reference_dispatch.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 230
+  summary: Load bounded regular design blobs from the exact base, execute one protected
+    candidate, export accepted bytes, and apply a checked patch.
+  rationale: Keep legacy recovery and mutable runtime state outside the reference
+    run and retain evidence on transfer failures.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span:
+    start_line: 646
+    end_line: 656
+  summary: Expose a frozen-input and candidate snapshot check for patch handoff.
+  rationale: Reject candidate mutation after validation and during export.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 3505
+    end_line: 3518
+  summary: Route selected source tasks before legacy authoring and recovery and reject
+    unbound inline intent.
+  rationale: Use the protected run automatically for reviewed source design tasks
+    without prompt rewriting.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 3522
+    end_line: 3550
+  summary: Route selected source tasks before legacy authoring and recovery and reject
+    unbound inline intent.
+  rationale: Use the protected run automatically for reviewed source design tasks
+    without prompt rewriting.
+- path: tests/test_planning_compiler.py
+  type: modified
+  span:
+    start_line: 620
+    end_line: 661
+  summary: Test pointer round trips, unsafe paths, and generated workflow drift.
+  rationale: Verify reviewed authority survives compilation and remains bound.
+- path: tests/test_source_reference_dispatch.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 273
+  summary: Test exact committed authority, routing, native patch transfer including
+    new files, failed behavior, concurrency, and duplicate dispatch.
+  rationale: Exercise the complete offline boundary without paid inference.
+- path: tests/test_source_reference_run.py
+  type: modified
+  span:
+    start_line: 354
+    end_line: 358
+  summary: Check that source mutation after validation invalidates patch handoff.
+  rationale: Keep transferred candidate bytes bound to final proof.
+entities:
+- id: structrr-source-task-dispatch-v1
+  type: Function
+  action: added
+- id: structrr-reviewed-source-task-loader-v1
+  type: Function
+  action: added
+- id: structrr-source-design-pointer-v1
+  type: Variable
+  action: added
+- id: structrr-accepted-candidate-snapshot-check-v1
+  type: Method
+  action: added
+entity_relationships:
+- id: structrr-source-dispatch-loads-reviewed-intent-v1
+  source: structrr-source-task-dispatch-v1
+  target: structrr-reviewed-source-task-loader-v1
+  relationship: uses
+  type: uses
+  action: added
+  description: Dispatch acquires accepted source intent from the exact committed design
+    blob.
+  rationale: Candidate files cannot redefine the accepted design.
+- id: structrr-source-dispatch-verifies-candidate-v1
+  source: structrr-source-task-dispatch-v1
+  target: structrr-accepted-candidate-snapshot-check-v1
+  relationship: uses
+  type: uses
+  action: added
+  description: Patch export verifies frozen inputs and the validated candidate before
+    and after reading source changes.
+  rationale: Transfer only the bytes bound to independent validation.
+invariants:
+- id: structrr-task-source-intent-is-committed-v1
+  action: added
+  description: The source design is a bounded regular committed blob at the exact
+    workflow base with matching plan and item identity.
+- id: structrr-task-source-dispatch-never-repairs-v1
+  action: added
+  description: Selected source tasks execute once in enforce mode before legacy authoring,
+    prompt augmentation, or automatic recovery.
+- id: structrr-task-transfer-requires-accepted-snapshot-v1
+  action: added
+  description: Failed validation or concurrent candidate or caller edits prevent patch
+    transfer and preserve caller changes.
+guidance: []

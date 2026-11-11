@@ -1,0 +1,110 @@
+version: 1
+name: story-design-interview
+description: Refine customer prose into a reviewed, exact-digest user-confirmed Structrr story and a normal proposal. Supports new stories and amendments to accepted stories.
+inputs:
+  - {name: work_item_name, type: string, required: true}
+  - {name: feature_description, type: string, required: true}
+  - name: story_options
+    type: object
+    required: true
+    properties:
+      story_mode: {type: string, enum: [create, amend]}
+      existing_story_ref: {type: string}
+outputs:
+  story_design:
+    type: object
+    required: [ready, story_id, contract_digest, input_path, proposal_path, paths]
+    properties:
+      ready: {type: boolean, const: true}
+      story_id: {type: string}
+      contract_digest: {type: string}
+      input_path: {type: string}
+      proposal_path: {type: string}
+      paths: {type: array, items: {type: string}}
+limits: {llm_activations: 180, tool_calls: 240, context_chars: 80000, context_value_chars: 48000}
+steps:
+  - operation:
+      tool: internal
+      command: [story_interview]
+      parameters:
+        action: start
+        work_item_name: {type: reference, value: work_item_name}
+        options: {type: reference, value: story_options}
+      bind: initial_story_context
+  - specialize:
+      process: generate-fragment
+      max_steps: 180
+      question: |
+        Conduct the interactive Structrr story interview using the service's typed
+        story_interview command. The original user request and actual earlier user
+        answers are already source records in initial_story_context. feature_description
+        is supplemental context, not authority to invent confirmed user behavior.
+        story_options may specify story_mode create or amend and an existing_story_ref.
+        Retrieve scoped existing stories and functionality from initial_story_context;
+        when amending or explicitly reusing an existing graph, select its exact ID.
+        One interview owns one customer goal. Keep unrelated stories separate.
+
+        Call the internal tool with command [story_interview] and these exact action
+        shapes (or invoke_tool with tool internal and the same parameters):
+        - {action: status} returns current catalog, known source records, graph
+          diagnostics, missing review dimensions and service-derived readiness.
+        - {action: context, keywords: [<scoped words>], module_ids: [<known IDs>]}
+          retrieves bounded existing stories, functionality and invariants. complete false
+          means narrow the query; omitted matches are not absent evidence.
+        - {action: select, story_id: <existing catalog ID>} selects an accepted story
+          before editing. Never reconstruct its graph from source symbols.
+        - {action: edit, checkpoint_key: <stable edit key>, edit: {section:
+          user_stories|user_story_steps|user_story_transitions|user_story_cases,
+          action: add|change|remove, story_id: <selected ID or empty for a new story>,
+          subject_id: <existing ID for change/remove>, content: <one record's fields>}}.
+          Add one story, then one step or transition at a time. The service allocates
+          IDs and observation IDs. Never supply new IDs, confirmation, or identity_state.
+          Select existing references from the returned catalog. Give every new record
+          source_refs from the supplied source catalog. New observations omit id.
+          Resolve endpoints after allocating their steps. Draft diagnostics may remain
+          while constructing a coherent graph; fix mechanical errors automatically.
+        - {action: ask, dimension: <one supported review dimension>, text: <one focused
+          question>, proposed_assumption: <optional concrete behavior and consequence>}
+          creates a durable question or returns its already-recorded answer. If answered
+          is false, call prompt_user with text equal to the returned text and
+          story_question_id equal to the returned question_id. Never put an answer,
+          confirmed flag or authority in a tool call. Only the real user channel can
+          record answers. Silence and elapsed time are not confirmation. A rejected or
+          changed assumption must be reflected in the draft using its actual answer ref.
+        - {action: review, dimension: <one member of review_dimensions>} runs a small
+          typed semantic decision and a separate explanation. Resolve every applicable
+          dimension. not_applicable needs a rationale, and source fidelity, step
+          atomicity and observability always apply. Review failures are unavailable,
+          never empty successes. Use each unresolved finding's focused question and
+          refine that neighborhood; do not ask again about unchanged accepted answers.
+        - {action: present} returns the complete readable graph, branch conditions,
+          outcomes, observations, state effects, assumptions and exact digest. When
+          answered is false, use prompt_user with that exact text and story_question_id.
+          The user must explicitly confirm this candidate. If changes are requested,
+          edit, review the new inputs, and present again. A changed graph cannot reuse
+          an old confirmation. A matching declaration or a model's status is not proof.
+
+        Establish actor, purpose, scope, preconditions, entry, primary path, alternative
+        and failure outcomes. Use short technical English and one concrete action per
+        step. Clarify state/persistence, retries/exit conditions, cancellation, timing,
+        authorization and dependency behavior where material. Relate real existing
+        functionality and invariants without forcing new implementation work. Preserve
+        accepted module scope and existing behavior. Semantic choices belong to the
+        user; do not substitute benchmark or normative defaults for confirmation.
+        Do not return a whole generated graph, invent IDs, author tests, code a feature,
+        or publish a pull request here. Do not write checkpoint or approval artifacts.
+        Finish the fragment only when action status reports ready true. The following
+        deterministic publish step independently enforces readiness and compiles the
+        normal Structrr proposal and interview seed. Empty output is not completion.
+      context: [work_item_name, feature_description, story_options, initial_story_context]
+      allowed_tools: [internal, invoke_tool, prompt_user, respond]
+      bind: story_interview_program
+  - call:
+      fragment: ${story_interview_program}
+      max_steps: 180
+  - operation:
+      tool: internal
+      command: [story_interview]
+      parameters: {action: publish}
+      bind: story_design
+  - terminal: succeeded

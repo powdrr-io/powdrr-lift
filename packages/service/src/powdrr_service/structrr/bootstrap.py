@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import json
 import os
 import re
 import shlex
@@ -170,6 +171,7 @@ def bootstrap_structrr(
     )
     spec_paths = tuple(path for path in tracked_files if is_specification_path(path))
     spec_documents = _load_spec_documents(root, spec_paths)
+    story_changes_seen: set[str] = set()
     document = _build_document(
         root=root,
         taxonomy=taxonomy,
@@ -181,13 +183,21 @@ def bootstrap_structrr(
         benchmark_mode=benchmark_mode,
         repository_name=repository_name,
         validation_files=validation_files,
+        story_changes_seen=story_changes_seen,
     )
     # Accepted changelist deltas extend canonical declarations; code discovery
     # cannot reconstruct or replace customer intent.
     for _, changelist in _load_story_changelists(root):
-        changes = parse_story_changes(changelist)
+        changes = tuple(
+            change
+            for change in parse_story_changes(changelist)
+            if json.dumps(change.to_data(), sort_keys=True) not in story_changes_seen
+        )
         if changes:
             document = project_story_changes(document, changes)
+            story_changes_seen.update(
+                json.dumps(change.to_data(), sort_keys=True) for change in changes
+            )
     source_revision_result = subprocess.run(
         ["git", "-C", str(root), "rev-parse", "HEAD"],
         capture_output=True,
@@ -1381,6 +1391,7 @@ def _build_document(
     benchmark_mode: bool = False,
     repository_name: str | None = None,
     validation_files: Sequence[str] = (),
+    story_changes_seen: set[str] | None = None,
 ) -> dict[str, Any]:
     from powdrr_service.structrr.active_intent import active_intent_section
     from powdrr_service.structrr.python_topology import discover_python_topology
@@ -1415,9 +1426,20 @@ def _build_document(
         entity_id = f"file:{relative}"
         entities[entity_id] = {"id": entity_id, "type": entity_type, "action": "added"}
 
+    story_deltas: list[tuple[str, Mapping[str, Any]]] = []
     for spec_path, spec in spec_documents:
+        is_delta = any(
+            isinstance(record, Mapping) and isinstance(record.get("action"), str)
+            for section in STORY_SECTIONS
+            for record in (
+                spec.get(section, []) if isinstance(spec.get(section), list) else []
+            )
+        )
+        if is_delta:
+            story_deltas.append((spec_path, spec))
+        declared = {} if is_delta else parse_story_catalog(spec).to_data()
         for section in STORY_SECTIONS:
-            for record in parse_story_catalog(spec).to_data()[section]:
+            for record in declared.get(section, []):
                 existing = story_records[section].get(record["id"])
                 if existing is not None and existing != record:
                     raise StoryContractError(
@@ -1543,7 +1565,7 @@ def _build_document(
             }
         )
 
-    return {
+    document = {
         **{
             section: list(records.values())
             for section, records in story_records.items()
@@ -1596,6 +1618,48 @@ def _build_document(
         "features": [],
         "proposed_prs": [],
     }
+    if story_deltas:
+        history = subprocess.run(
+            [
+                "git",
+                "-C",
+                str(root),
+                "log",
+                "--reverse",
+                "--topo-order",
+                "--diff-filter=A",
+                "--format=",
+                "--name-only",
+                "--",
+                "docs/current",
+                "docs/proposals",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        order = {
+            path: index
+            for index, path in enumerate(dict.fromkeys(history.stdout.splitlines()))
+        }
+        for _path, spec in sorted(
+            story_deltas, key=lambda item: (order.get(item[0], len(order)), item[0])
+        ):
+            changes = tuple(
+                change
+                for change in parse_story_changes(spec)
+                if story_changes_seen is None
+                or json.dumps(change.to_data(), sort_keys=True)
+                not in story_changes_seen
+            )
+            if changes:
+                document = project_story_changes(document, changes)
+                if story_changes_seen is not None:
+                    story_changes_seen.update(
+                        json.dumps(change.to_data(), sort_keys=True)
+                        for change in changes
+                    )
+    return document
 
 
 def _validation_tool_source(root: Path, tracked_files: Sequence[str]) -> str | None:

@@ -1,10 +1,12 @@
 # Structrr User Stories and Behavioral Testing
 
-Status: first implementation slice implements story contracts, identity allocation,
-graph validation, digests, projection/rebase, bootstrap preservation and queries.
-Interview readiness, story allocation through planning, behavioral test authoring,
-and execution evidence remain planned. See the
-[story contract implementation](../design/structrr-user-stories.md).
+Status: story contracts, identity allocation, graph validation, digests,
+projection/rebase, bootstrap preservation and queries are implemented. The second
+slice adds interactive story authoring, bounded semantic readiness reviews,
+actual-user digest confirmation and proposal publication. Story allocation through
+planning, behavioral test authoring and execution evidence remain planned. See the
+[story contracts](../design/structrr-user-stories.md) and
+[interactive story design](../design/structrr-story-interview.md).
 Date: 2026-11-06
 
 ## 1. Objective and accepted decisions

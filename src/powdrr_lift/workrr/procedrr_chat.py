@@ -26,6 +26,7 @@ from powdrr_service.providers.selection import (
     initial_model_for_provider,
     resolve_provider_roles,
 )
+from powdrr_service.structrr.story_semantic_review import StorySemanticReviewer
 
 from powdrr_lift.core import resolve_repo_root
 from powdrr_lift.errors import PowdrrExecutionError
@@ -58,6 +59,7 @@ from powdrr_lift.workrr.execution_state import (
 from powdrr_lift.workrr.paths import is_dedicated_worktree
 from powdrr_lift.workrr.provider_runtime import WorkflowClientRegistry
 from powdrr_lift.workrr.review_feedback import prepare_review_feedback_ledger
+from powdrr_lift.workrr.story_interview_operations import StoryInterviewOperations
 
 WORKFLOW_CHAT_WAITING_FOR_INPUT = 3
 
@@ -653,6 +655,13 @@ def run_procedrr_workflow_chat(
         stdout=stdout,
         stderr=stderr,
         event_emitter=chat_events,
+        execution_id=execution_id,
+        original_request=user_request,
+        resume_question_text=(
+            str(resume_manifest.get("pending_question"))
+            if resuming_interpreter and resume_manifest
+            else None
+        ),
     )
     operation_names = (
         "internal",
@@ -667,6 +676,8 @@ def run_procedrr_workflow_chat(
         "respond",
         "workflow_chat_snapshot",
         "workflow_chat_changes",
+        "procedrr_fragment_start",
+        "procedrr_fragment_apply_edit",
     )
 
     def operation_handler(name: str) -> Callable[[Mapping[str, Any]], Any]:
@@ -691,6 +702,9 @@ def run_procedrr_workflow_chat(
         )
         if decision_provider is not None
         else planning_client
+    )
+    operation_adapter.story_operations.reviewer = StorySemanticReviewer(
+        decision_judge_client, planning_client
     )
     judge_clients = {
         "planning": planning_client,
@@ -926,7 +940,8 @@ def _select_process(
     candidates = [
         process
         for process in catalog.list()
-        if process.name not in {"select-process", "generate-fragment"}
+        if process.name
+        not in {"select-process", "generate-fragment", "story-design-interview"}
     ]
     available = [
         {
@@ -1102,6 +1117,9 @@ class _ChatProcedrrOperations:
         stdout: TextIO,
         stderr: TextIO,
         event_emitter: WorkflowChatEventEmitter | None = None,
+        execution_id: str,
+        original_request: str,
+        resume_question_text: str | None = None,
     ) -> None:
         from powdrr_lift.workrr.chat_actions import _workflow_action_handlers
 
@@ -1114,22 +1132,107 @@ class _ChatProcedrrOperations:
         self.handlers = _workflow_action_handlers()
         self.pending_question: str | None = None
         self.assistant_messages: list[str] = []
+        self.resume_question_text = resume_question_text
+        self.resume_answer_available = resume_question_text is not None
+        self.story_operations = StoryInterviewOperations(
+            state, execution_id, original_request
+        )
 
     def execute(self, operation: str, parameters: Mapping[str, Any]) -> Any:
+        if operation == "procedrr_fragment_start":
+            from powdrr_service.procedrr.fragments import start_fragment
+
+            available, allowed = (
+                parameters.get("available_bindings"),
+                parameters.get("allowed_tools"),
+            )
+            if not isinstance(available, list) or not all(
+                isinstance(item, str) for item in available
+            ):
+                raise ValueError("fragment bindings require a string array")
+            if not isinstance(allowed, list) or not all(
+                isinstance(item, str) for item in allowed
+            ):
+                raise ValueError("fragment tools require a string array")
+            maximum = parameters.get("max_steps", 64)
+            if type(maximum) is not int or maximum < 1:
+                raise ValueError("fragment max_steps requires a positive integer")
+            return start_fragment(
+                name=str(parameters.get("name", "story-program")),
+                available_bindings=available,
+                allowed_tools=allowed,
+                max_steps=maximum,
+            )
+        if operation == "procedrr_fragment_apply_edit":
+            from powdrr_service.procedrr.fragments import apply_fragment_step_json
+
+            state, step_json = parameters.get("state"), parameters.get("step_json")
+            if not isinstance(state, Mapping) or not isinstance(step_json, str):
+                raise ValueError(
+                    "fragment apply requires a state and one step JSON string"
+                )
+            return apply_fragment_step_json(
+                state, step_json, evidence=parameters.get("evidence")
+            )
+        story_parameters = parameters
+        if operation == "invoke_tool" and parameters.get("tool") == "internal":
+            story_parameters = parameters.get("parameters", {})
+        if (
+            operation in {"internal", "invoke_tool"}
+            and isinstance(story_parameters, Mapping)
+            and story_parameters.get("command") == ["story_interview"]
+        ):
+            return self.story_operations.execute(story_parameters)
+        if (
+            operation == "invoke_tool"
+            and parameters.get("tool") == "gh"
+            and (self.state.root_process or self.state.selected_process).name
+            == "specify-a-feature"
+        ):
+            nested = parameters.get("parameters", {})
+            if isinstance(nested, Mapping) and nested.get("operation") in {
+                "pr_create",
+                "pr_publish_clean",
+            }:
+                if nested.get("operation") == "pr_publish_clean":
+                    files = nested.get("files_to_publish")
+                    if not isinstance(files, list):
+                        raise ValueError(
+                            "story publication requires an explicit "
+                            "files_to_publish list"
+                        )
+                    self.story_operations.require_publish_readiness(files)
+                else:
+                    self.story_operations.require_publish_readiness(
+                        require_committed=True
+                    )
+        if (
+            operation == "invoke_tool"
+            and parameters.get("tool") == "git"
+            and (self.state.root_process or self.state.selected_process).name
+            == "specify-a-feature"
+        ):
+            nested = parameters.get("parameters", {})
+            if isinstance(nested, Mapping) and nested.get("operation") == "push":
+                self.story_operations.require_publish_readiness(require_committed=True)
         if operation == "prompt_user":
+            if parameters.get("story_question_id") is not None:
+                self.story_operations.validate_question(parameters)
             resume = parameters.get("__procedrr_resume__")
             if isinstance(resume, Mapping):
-                resume_data = resume.get("data")
-                saved_state = (
-                    resume_data.get("workflow_state")
-                    if isinstance(resume_data, Mapping)
-                    else None
-                )
-                if isinstance(saved_state, Mapping):
-                    _restore_chat_state(self.state, saved_state)
                 answer = resume.get("value")
-                if not isinstance(answer, str):
-                    raise ValueError("resumed prompt_user requires a string answer")
+                if (
+                    not isinstance(answer, str)
+                    or self.config.resume_value is None
+                    or answer != self.config.resume_value
+                    or not self.resume_answer_available
+                    or parameters.get("text") != self.resume_question_text
+                ):
+                    raise ValueError(
+                        "resumed prompt_user requires the actual "
+                        "caller-supplied user answer"
+                    )
+                self.resume_answer_available = False
                 prompt = _string(parameters.get("text"), "text")
                 self.state.transcript.extend(
                     [
@@ -1145,7 +1248,7 @@ class _ChatProcedrrOperations:
                         "step_index": self.state.step_index,
                     }
                 )
-                return {"answer": answer}
+                return self.story_operations.record_user_answer(parameters, answer)
             if self.config.defer_user_input:
                 prompt = _string(parameters.get("text"), "text")
                 self.pending_question = prompt
@@ -1251,7 +1354,9 @@ class _ChatProcedrrOperations:
             if "result" in event:
                 return event["result"]
             if "answer" in event:
-                return {"answer": event["answer"]}
+                return self.story_operations.record_user_answer(
+                    parameters, event["answer"]
+                )
             if "outputs" in event:
                 return {"outputs": event["outputs"]}
         return {"ok": True}

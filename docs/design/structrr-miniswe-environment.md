@@ -47,8 +47,12 @@ is not automatically trusted by a worker session.
 
 ## Verification and delivery
 
-Each issued envelope is associated with its exact request in a bounded session
-cache (128 entries). When output contains an envelope, the service validates its
+The proxy returns a `structrr-issued-source-read-v1` receipt containing a unique
+session ticket and the reader's `structrr-source-read-v1` observation. Each ticket
+is associated with its exact request in a bounded session cache (128 entries).
+Distinct requests retain distinct tickets even if their observations are identical
+(for example, two searches with no matches). When output contains a receipt, the
+service validates the observation's
 schema and fingerprint, requires that the session issued it, and independently
 repeats the bounded request against the current workspace and trusted catalog.
 The entire observation must agree. This detects stale source, altered context,

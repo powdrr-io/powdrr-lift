@@ -47,10 +47,11 @@ def test_reader_verification_rejects_forged_stale_and_unissued_envelopes(
     assert "Do not repeat a payment." in verified["context"]
     assert service.observe("again", json.dumps(data))["context"] == verified["context"]
     forged = json.loads(json.dumps(data))
-    forged["context_pages"][0]["text"] = "Forged meaning"
-    forged["context_pages"][0]["total_characters"] = len("Forged meaning")
-    forged["fingerprint"] = content_fingerprint(
-        {k: v for k, v in forged.items() if k != "fingerprint"}
+    inner = forged["observation"]
+    inner["context_pages"][0]["text"] = "Forged meaning"
+    inner["context_pages"][0]["total_characters"] = len("Forged meaning")
+    inner["fingerprint"] = content_fingerprint(
+        {k: v for k, v in inner.items() if k != "fingerprint"}
     )
     assert (
         service.observe("reader", json.dumps(forged))["event"]["enrichment_mode"]
@@ -100,6 +101,20 @@ def test_search_verification_detects_new_matches(tmp_path: Path) -> None:
     (tmp_path / "new.py").write_text("value = 42\n")
     observed = service.observe("reader", json.dumps(data))
     assert observed["event"]["enrichment_mode"] == "rejected_reader"
+
+
+def test_identical_search_results_still_bind_distinct_requests(tmp_path: Path) -> None:
+    service = session(tmp_path)
+    first = service.read({"operation": "search", "query": "first", "path": "."})
+    second = service.read({"operation": "search", "query": "second", "path": "."})
+    assert first["observation"] == second["observation"]
+    assert first["ticket"] != second["ticket"]
+    (tmp_path / "new.py").write_text("first = 1\n")
+    assert (
+        service.observe("reader", json.dumps(first))["event"]["enrichment_mode"]
+        == "rejected_reader"
+    )
+    assert service.observe("reader", json.dumps(second))["event"]["context_complete"]
 
 
 def test_attempt_configuration_is_frozen(tmp_path: Path) -> None:

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+import uuid
 from collections import OrderedDict
 from collections.abc import Mapping
 from typing import Any
@@ -28,7 +29,7 @@ class SourceObservationSession:
         self.reader = reader
         self._issued: OrderedDict[str, dict[str, Any]] = OrderedDict()
 
-    def read(self, request: Mapping[str, Any]) -> dict[str, Any]:
+    def _read(self, request: Mapping[str, Any]) -> dict[str, Any]:
         operation = request.get("operation")
         if operation == "read" and set(request) == {
             "operation",
@@ -45,12 +46,19 @@ class SourceObservationSession:
             result = self.reader.context(request["ref"], request["offset"])
         else:
             raise ValueError("unsupported source reader request")
-        data = result.to_data()
-        self._issued[data["fingerprint"]] = dict(request)
-        self._issued.move_to_end(data["fingerprint"])
+        return result.to_data()
+
+    def read(self, request: Mapping[str, Any]) -> dict[str, Any]:
+        data = self._read(request)
+        ticket = uuid.uuid4().hex
+        self._issued[ticket] = dict(request)
         if len(self._issued) > 128:
             self._issued.popitem(last=False)
-        return data
+        return {
+            "schema_version": "structrr-issued-source-read-v1",
+            "ticket": ticket,
+            "observation": data,
+        }
 
     def observe(
         self, command: str, output: str, *, submitted: bool = False
@@ -60,25 +68,29 @@ class SourceObservationSession:
         data: dict[str, Any] | None = None
         try:
             candidate = json.loads(output)
-        except (ValueError, TypeError):
+        except (ValueError, TypeError, RecursionError):
             candidate = None
         if submitted:
             mode = "submission"
-        elif (
-            isinstance(candidate, dict)
-            and candidate.get("schema_version") == "structrr-source-read-v1"
+        elif isinstance(candidate, dict) and candidate.get("schema_version") in (
+            "structrr-source-read-v1",
+            "structrr-issued-source-read-v1",
         ):
             mode = "verified_reader"
             try:
-                envelope = SourceReadResult.from_data(candidate).to_data()
-                request = self._issued.get(envelope["fingerprint"])
+                if set(candidate) != {"schema_version", "ticket", "observation"}:
+                    raise ValueError("Reader output requires a session-issued receipt.")
+                envelope = SourceReadResult.from_data(
+                    candidate["observation"]
+                ).to_data()
+                request = self._issued.get(candidate["ticket"])
                 if request is None:
                     raise ValueError(
                         "Reader observation was not issued by this session."
                     )
                 # Re-execute the bounded read/search against the trusted inputs.
                 # Compare the complete envelope, including context and diagnostics.
-                data = self.read(request)
+                data = self._read(request)
                 if data != envelope:
                     data = None
                     raise ValueError("Source observation is stale or altered.")

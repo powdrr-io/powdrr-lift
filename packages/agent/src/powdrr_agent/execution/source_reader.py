@@ -58,7 +58,7 @@ def main(argv: list[str] | None = None) -> int:
     # Continuation commands must work inside the isolated worker distribution.
     # Keep the issued envelope exact; the formatter supplies adapted commands.
     print(json.dumps(response, ensure_ascii=False))
-    return 0 if response["status"] == "complete" else 1
+    return 0 if response["observation"]["status"] == "complete" else 1
 
 
 if __name__ == "__main__":

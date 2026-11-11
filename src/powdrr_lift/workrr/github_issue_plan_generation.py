@@ -1670,6 +1670,7 @@ def generate_execution_plan_yaml(
             "No recognized CI configuration files were found."
         )
     )
+    client_adoption_plan = _source_targets_client_repositories(source_plan)
     planning_context = {
         "task": "Propose an execution plan from this source document.",
         "plan_id": plan_id,
@@ -1677,6 +1678,7 @@ def generate_execution_plan_yaml(
         "repository_ci_context": repository_ci_context,
         "repository_code_context": repository_code_context,
         "verification_command": verification_command,
+        "client_adoption_plan": client_adoption_plan,
     }
     initial_response = complete_json(
         client,
@@ -1735,7 +1737,17 @@ def generate_execution_plan_yaml(
                     "verification with the behavior they establish. The first "
                     "item must be a useful, independently verifiable foundation. "
                     "Use the repository CI inventory and verification command in "
-                    "the user context. If CI is absent, make establishing a CI "
+                    "the user context. That CI inventory and command describe "
+                    "this checkout's validation, not the repositories that will "
+                    "consume the product. For a library or tool adopted by client "
+                    "repositories, keep client-owned configuration and workflows "
+                    "as distributable templates, examples, or installer behavior. "
+                    "Do not assign client-owned `.github` files to this checkout's "
+                    "root `.github/workflows/` paths or change this checkout's CI "
+                    "unless the source explicitly requires a change to this "
+                    "project's own CI. In particular, do not confuse a workflow "
+                    "that clients install with the workflow that validates this "
+                    "library. If CI is absent, make establishing a CI "
                     "workflow that runs the supplied verification command the "
                     "first item for a multi-item plan, keep it a small standalone "
                     "slice, and make every later item depend on it so only that "
@@ -1806,7 +1818,13 @@ def generate_execution_plan_yaml(
                     "IDs in dependency order. Keep `allowed_paths` as "
                     "repository-relative filesystem paths, separate from prose "
                     "scope. Verify the CI choice against repository_ci_context "
-                    "and verification_command. Compare each proposed item with "
+                    "and verification_command. That CI context is for this "
+                    "checkout. For library/client-adoption work, client-owned "
+                    "configuration and workflows belong in distributable "
+                    "template, example, or installer paths; do not map them to "
+                    "this checkout's root `.github/workflows/` or change its CI "
+                    "unless the source explicitly requires changing this "
+                    "project's CI. Compare each proposed item with "
                     "repository_code_context, remove already implemented work, "
                     "and split off only the remaining behavior for partial work. "
                     "Preserve every `manual_prerequisite` from the draft exactly "
@@ -1866,6 +1884,9 @@ def generate_execution_plan_yaml(
                 raw_items,
                 require_ci_bootstrap=has_ci_configuration is False,
                 verification_command=verification_command,
+                forbid_host_ci_changes=(
+                    client_adoption_plan and has_ci_configuration is True
+                ),
             )
         if not refinement_issues:
             break
@@ -1885,7 +1906,13 @@ def generate_execution_plan_yaml(
                         "When no CI is configured, add a small first CI bootstrap "
                         "item for multi-item plans using the supplied verification "
                         "command, put the CI workflow in allowed_paths, and make "
-                        "all later items depend on it. Keep all dependencies in "
+                        "all later items depend on it. The repository CI context "
+                        "describes this checkout. For client-adoption plans, keep "
+                        "client workflows in distributable template/example or "
+                        "installer paths; do not use this checkout's root "
+                        "`.github/workflows/` unless the source explicitly requires "
+                        "changing this project's CI. "
+                        "Keep all dependencies in "
                         "order. Compare planned items with repository code evidence; "
                         "remove completed work and narrow partial work, using tests "
                         "or other evidence before treating behavior as complete. "
@@ -1911,6 +1938,7 @@ def generate_execution_plan_yaml(
                             "repository_ci_context": repository_ci_context,
                             "repository_code_context": repository_code_context,
                             "verification_command": verification_command,
+                            "client_adoption_plan": client_adoption_plan,
                             "task": (
                                 "Split the violating items and repair dependencies."
                             ),
@@ -1940,6 +1968,7 @@ def generate_execution_plan_yaml(
         raw_items,
         require_ci_bootstrap=has_ci_configuration is False,
         verification_command=verification_command,
+        forbid_host_ci_changes=(client_adoption_plan and has_ci_configuration is True),
     )
     if remaining_issues:
         raise PlanGenerationError(
@@ -2069,7 +2098,12 @@ def generate_execution_plan_yaml(
                         "and split or combine items only when the evidence requires "
                         "it. Keep one small, independently reviewable deliverable "
                         "per item and maintain the required CI setup and exact "
-                        "verification command. Return the complete revised items "
+                        "verification command for this checkout. Client-adoption "
+                        "work must keep client-owned workflows in distributable "
+                        "template/example or installer paths, not this checkout's "
+                        "root `.github/workflows/`, unless the source explicitly "
+                        "requires changing this project's CI. Return the complete "
+                        "revised items "
                         "in the requested schema, preserving each existing "
                         "manual_prerequisite object on its owning item."
                     ),
@@ -2092,6 +2126,7 @@ def generate_execution_plan_yaml(
                                 draft_code_context
                             ),
                             "verification_command": verification_command,
+                            "client_adoption_plan": client_adoption_plan,
                         },
                         ensure_ascii=False,
                     ),
@@ -2132,6 +2167,9 @@ def generate_execution_plan_yaml(
             raw_items,
             require_ci_bootstrap=has_ci_configuration is False,
             verification_command=verification_command,
+            forbid_host_ci_changes=(
+                client_adoption_plan and has_ci_configuration is True
+            ),
         )
         if remaining_issues:
             raise PlanGenerationError(
@@ -2147,6 +2185,7 @@ def generate_execution_plan_yaml(
         raw_items,
         require_ci_bootstrap=has_ci_configuration is False,
         verification_command=verification_command,
+        forbid_host_ci_changes=(client_adoption_plan and has_ci_configuration is True),
     )
     if remaining_issues:
         raise PlanGenerationError(
@@ -2604,6 +2643,7 @@ def _plan_item_refinement_issues(
     *,
     require_ci_bootstrap: bool = False,
     verification_command: str | None = None,
+    forbid_host_ci_changes: bool = False,
 ) -> list[str]:
     issues: list[str] = []
     prerequisites_by_item: dict[str, str] = {}
@@ -2611,6 +2651,17 @@ def _plan_item_refinement_issues(
         if not isinstance(item, Mapping):
             continue
         item_id = str(item.get("id", "<unknown>"))
+        if forbid_host_ci_changes:
+            allowed_paths = item.get("allowed_paths", [])
+            if isinstance(allowed_paths, list) and any(
+                _is_root_github_workflow_path(path) for path in allowed_paths
+            ):
+                issues.append(
+                    f"{item_id} assigns client-owned workflow files to this "
+                    "repository's .github/workflows; use a distributable client "
+                    "template or installer path unless the source explicitly "
+                    "requires changing this project's own CI"
+                )
         # Acceptance criteria may intentionally compare outputs across languages;
         # only flag an item when its implementation scope or steps span runtimes.
         fields = (item.get("scope", []), item.get("implementation_steps", []))
@@ -2696,6 +2747,30 @@ def _plan_item_refinement_issues(
                         f"CI item {first_id}"
                     )
     return issues
+
+
+def _source_targets_client_repositories(source_plan: str) -> bool:
+    """Detect plans that describe client-side adoption of a library/tool."""
+    normalized = source_plan.casefold()
+    template_distribution = bool(
+        re.search(r"\bdistributable\s+templates?\b", normalized)
+        or re.search(r"\btemplates?\s+for\s+client\s+repositories\b", normalized)
+    )
+    client_adoption = bool(
+        re.search(r"\badoption\s+pr\b", normalized)
+        or re.search(r"\b(client|consumer)\s+repositories\b", normalized)
+        or re.search(r"\bclients?\s+of\s+this\s+(library|tool)\b", normalized)
+    )
+    return template_distribution and client_adoption
+
+
+def _is_root_github_workflow_path(value: Any) -> bool:
+    if not isinstance(value, str):
+        return False
+    normalized = value.replace("\\", "/").strip("/")
+    return normalized == ".github/workflows" or normalized.startswith(
+        ".github/workflows/"
+    )
 
 
 def _ensure_ci_bootstrap(

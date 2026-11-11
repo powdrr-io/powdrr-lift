@@ -21,6 +21,7 @@ class HealthFindingKind(StrEnum):
     STALE_EVIDENCE = "stale_evidence"
     UNAUTHORIZED_VERIFIER_CHANGE = "unauthorized_verifier_change"
     EXPIRED_WAIVER = "expired_waiver"
+    STORY_COVERAGE_INCOMPLETE = "story_coverage_incomplete"
 
 
 @dataclass(frozen=True, slots=True)
@@ -43,6 +44,7 @@ class VerificationHealthFinding:
 class VerificationHealthReport:
     mode: VerificationPolicyMode
     findings: tuple[VerificationHealthFinding, ...]
+    story_coverage: dict[str, Any] | None = None
 
     @property
     def passed(self) -> bool:
@@ -53,6 +55,11 @@ class VerificationHealthReport:
             "mode": self.mode.value,
             "passed": self.passed,
             "findings": [finding.to_data() for finding in self.findings],
+            **(
+                {"story_coverage": self.story_coverage}
+                if self.story_coverage is not None
+                else {}
+            ),
         }
 
 
@@ -67,6 +74,7 @@ def audit_verification_health(
     waivers: tuple[dict[str, Any], ...] = (),
     mode: VerificationPolicyMode = VerificationPolicyMode.REQUIRED_FOR_NEW,
     today: str | None = None,
+    story_coverage: dict[str, Any] | None = None,
 ) -> VerificationHealthReport:
     """Audit coverage without interpreting intent or invoking a model."""
     findings: list[VerificationHealthFinding] = []
@@ -183,7 +191,48 @@ def audit_verification_health(
                     structural=True,
                 )
             )
-    return VerificationHealthReport(mode, tuple(findings))
+    coverage = None
+    if story_coverage is not None:
+        from powdrr_service.verification.story_execution import (
+            StoryExecutionReceipt,
+            story_coverage_report,
+        )
+
+        context = dict(story_coverage["context"])
+        if candidate_tree is not None:
+            context["candidate_sha"] = candidate_tree
+        coverage = story_coverage_report(
+            story_coverage["snapshot"],
+            context=context,
+            manifest=story_coverage["manifest"],
+            receipts=tuple(
+                StoryExecutionReceipt.from_data(raw)
+                for raw in story_coverage["receipts"]
+            ),
+            story_ids=story_coverage.get("story_ids"),
+        )
+        if not coverage["stories"]:
+            findings.append(
+                _finding(
+                    HealthFindingKind.STORY_COVERAGE_INCOMPLETE,
+                    "story-coverage",
+                    "requested story verification contains no story cases",
+                    mode=mode,
+                    item={"materially_altered": True},
+                )
+            )
+        for story in coverage["stories"]:
+            if story["status"] != "verified":
+                findings.append(
+                    _finding(
+                        HealthFindingKind.STORY_COVERAGE_INCOMPLETE,
+                        story["story_id"],
+                        "required story cases lack current passing observations",
+                        mode=mode,
+                        item={"materially_altered": True},
+                    )
+                )
+    return VerificationHealthReport(mode, tuple(findings), coverage)
 
 
 def _finding(

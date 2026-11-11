@@ -3083,6 +3083,80 @@ def _run_code_agent_phase(
             allowed_commands=_allowed_validation_commands(state["validation_profiles"]),
             implementation_packet=worker_packet,
         )
+        if story_context and not config.capture_worker_prompts_only:
+            from powdrr_agent.execution.execute_pr_tests import (
+                install_frozen_test_files,
+            )
+
+            from powdrr_lift.workrr.task_agent import (
+                WorkflowTaskAgentConfig,
+                _author_execute_pr_tests,
+            )
+
+            if "story_test_authoring" not in state:
+                profile = next(
+                    (
+                        profile
+                        for profile in state["validation_profiles"]
+                        if any(
+                            token == "pytest" or token.endswith("/pytest")
+                            for token in profile.command
+                        )
+                    ),
+                    None,
+                )
+                if profile is None:
+                    raise PowdrrExecutionError(
+                        "story validation requires an available pytest profile"
+                    )
+                proposed = {
+                    **story_context,
+                    "story_validation": True,
+                    "title": work_item_name,
+                    "objective": feature_description,
+                    "acceptance_criteria": list(acceptance_criteria),
+                    "accepted_structrr_operations": [
+                        operation.to_data()
+                        for operation in proposal_revision.operations
+                    ],
+                }
+                sources, authoring = _author_execute_pr_tests(
+                    worktree,
+                    base_commit=base_commit,
+                    request=request,
+                    proposed=proposed,
+                    workflow_id=slug,
+                    config=WorkflowTaskAgentConfig(
+                        workflow_dir=output_root,
+                        repo_root=worktree,
+                        provider=config.verification_provider,
+                        base_url=config.verification_base_url,
+                        minisweagent_executable=config.minisweagent_executable,
+                        minisweagent_model=config.minisweagent_model,
+                        coding_agent_timeout_seconds=config.coding_agent_timeout_seconds,
+                        coding_agent_validation_timeout_seconds=config.coding_agent_validation_timeout_seconds,
+                    ),
+                    store_root=output_root / "story-tests",
+                    validation_profile=ValidationProfile(
+                        profile.name, tuple(profile.command)
+                    ),
+                    quality_review_service=config.verification_service,
+                )
+                state["story_test_authoring"] = authoring
+                state["story_test_sources"] = sources
+                state["story_validation_profile"] = ValidationProfile(
+                    profile.name, tuple(profile.command)
+                )
+            install_frozen_test_files(worktree, state["story_test_sources"])
+            request = replace(
+                request,
+                prompt=request.prompt
+                + "\n\nIndependent story tests are frozen; implement the approved "
+                "behavior without editing them.\n"
+                + json.dumps(
+                    state["story_test_authoring"]["story_test_links"], sort_keys=True
+                ),
+            )
         instruction_ledger_path = state.get("instruction_ledger_path")
         if (
             isinstance(instruction_ledger_path, Path)
@@ -3435,11 +3509,68 @@ def _run_code_agent_phase(
         attempts=tuple(attempts),
         attempt_store=attempt_store,
     )
+    if story_context:
+        handoff = DesignHandoff.compile(
+            baseline_document, proposal_revision, base_commit=base_commit
+        )
+        _validate_feature_story_execution(
+            config,
+            worktree=worktree,
+            output_root=output_root,
+            state=state,
+            snapshot=handoff.to_data()["desired"]["document"],
+        )
     return {
         "request_id": request.request_id,
         "attempt": attempt.to_data(),
         "attempts": [item.to_data() for item in attempts],
+        **({"story_execution": state["story_execution"]} if story_context else {}),
     }
+
+
+def _validate_feature_story_execution(
+    config: FeatureEndpointConfig,
+    *,
+    worktree: Path,
+    output_root: Path,
+    state: dict[str, Any],
+    snapshot: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Apply the same receipt gate to the single-feature execution endpoint."""
+    from powdrr_lift.workrr.story_execution_operations import (
+        execute_story_validation,
+    )
+
+    if any(
+        (worktree / path).read_text() != source
+        for path, source in state["story_test_sources"].items()
+    ):
+        raise PowdrrExecutionError("implementation changed frozen story tests")
+    excluded = [".powdrr/", "docs/structrr/diffs/"]
+    if output_root.resolve().is_relative_to(worktree.resolve()):
+        excluded.append(
+            output_root.resolve().relative_to(worktree.resolve()).as_posix() + "/"
+        )
+    evidence = execute_story_validation(
+        worktree,
+        snapshot=snapshot,
+        authoring={
+            **state["story_test_authoring"],
+            "test_sources": state["story_test_sources"],
+        },
+        profile=state["story_validation_profile"],
+        repository=config.repo_root.name,
+        artifact_root=output_root / "story-executions",
+        timeout_seconds=config.coding_agent_validation_timeout_seconds,
+        excluded_paths=excluded,
+    )
+    state["story_execution"] = evidence
+    if not evidence["story_coverage"]["verified"]:
+        raise PowdrrExecutionError(
+            "required story observations lack current passing execution receipts: "
+            + json.dumps(evidence["story_coverage"], sort_keys=True)
+        )
+    return evidence
 
 
 def _capture_worker_prompt(

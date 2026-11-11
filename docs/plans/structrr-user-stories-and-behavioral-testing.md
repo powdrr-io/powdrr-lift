@@ -7,12 +7,14 @@ actual-user digest confirmation and proposal publication. The third slice carrie
 pinned stories through planning, multi-PR integration allocation, execution preflight
 and repair, with approved-amendment impact reports. The fourth slice adds finite
 case discovery, pinned test obligations, pytest collection and assertion links,
-and required story test review through the existing author. Candidate-bound
-execution receipts and complete verification remain planned. See the
+and required story test review through the existing author. The fifth slice adds candidate-bound execution receipts, current coverage
+matrices, baseline classification, worker and feature completion gates, and a
+scripted prose-to-execution/amendment regression fixture. See the
 [story contracts](../design/structrr-user-stories.md) and
 [interactive story design](../design/structrr-story-interview.md) and
 [story planning](../design/structrr-story-planning.md) and
-[story test authoring](../design/structrr-story-test-authoring.md).
+[story test authoring](../design/structrr-story-test-authoring.md), and
+[story execution evidence](../design/structrr-story-execution.md).
 Date: 2026-11-06
 
 ## 1. Objective and accepted decisions

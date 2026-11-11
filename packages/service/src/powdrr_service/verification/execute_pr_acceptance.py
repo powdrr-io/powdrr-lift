@@ -27,6 +27,17 @@ def build_execute_pr_test_report(
             "generated test execution did not satisfy the coverage evidence "
             f"contract: {coverage_error}"
         )
+    if authoring.get("story_test_links"):
+        coverage = candidate_result.get("story_coverage", {})
+        required = (
+            "verified" if authoring.get("story_validation") else "assigned_verified"
+        )
+        if coverage.get(required) is not True or not candidate_result.get(
+            "story_receipts"
+        ):
+            findings.append(
+                "required story observations lack current passing execution receipts"
+            )
 
     correction_reviews = authoring.get("correction_quality_reviews", [])
     correction_reviews = (
@@ -59,8 +70,25 @@ def build_execute_pr_test_report(
         "baseline_execution_evidence": authoring.get("baseline_execution_evidence"),
         "authoring_attempts": authoring.get("authoring_attempts", []),
         "baseline": authoring["baseline_result"],
+        **(
+            {
+                "baseline_policy": authoring["baseline_policy"],
+                "baseline_classification": authoring["baseline_classification"],
+            }
+            if "baseline_policy" in authoring
+            else {}
+        ),
         "correction_baseline": authoring.get("correction_baseline"),
         "candidate": dict(candidate_result),
+        **(
+            {
+                "story_coverage": candidate_result.get("story_coverage"),
+                "story_receipts": candidate_result.get("story_receipts", []),
+                "execution_context": candidate_result.get("execution_context"),
+            }
+            if authoring.get("story_test_links")
+            else {}
+        ),
         **(
             {"story_test_links": authoring["story_test_links"]}
             if authoring.get("story_test_links")

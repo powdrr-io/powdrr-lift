@@ -1,0 +1,744 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1432
+title: Bind story verification to actual candidate execution and current receipts
+intent:
+  problem: Passing focused tests and completed partial PRs cannot establish every
+    confirmed customer story observation at the current candidate.
+  goal: Bind independently authored and semantically reviewed assertion links to actual
+    pytest execution, immutable candidate and runtime identities, and explicit current
+    coverage through existing worker, feature, artifact and health paths.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span:
+    start_line: 4100
+    end_line: 4138
+  summary: Assign receipt and baseline policy to the service and execution transport
+    to the local adapter.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: docs/design/structrr-story-execution.md
+  type: added
+  span:
+    start_line: 1
+    end_line: 59
+  summary: Document observed assertion evidence, immutable candidate trees, current
+    coverage queries and proof limitations.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: docs/plans/structrr-user-stories-and-behavioral-testing.md
+  type: modified
+  span:
+    start_line: 10
+    end_line: 12
+  summary: Record the execution evidence slice and link its operating contract.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: docs/plans/structrr-user-stories-and-behavioral-testing.md
+  type: modified
+  span:
+    start_line: 16
+    end_line: 17
+  summary: Record the execution evidence slice and link its operating contract.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: packages/agent/src/powdrr_agent/artifact_state.py
+  type: modified
+  span:
+    start_line: 55
+    end_line: 55
+  summary: Collect commit-pinned story execution artifacts through the existing snapshot
+    transport.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: packages/agent/src/powdrr_agent/artifact_state.py
+  type: modified
+  span:
+    start_line: 106
+    end_line: 109
+  summary: Collect commit-pinned story execution artifacts through the existing snapshot
+    transport.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: packages/agent/src/powdrr_agent/execution/story_test_collection.py
+  type: modified
+  span:
+    start_line: 9
+    end_line: 9
+  summary: Observe actual pytest calls, assertions, source bytes and runtime; capture
+    candidate Git trees without changing the real index.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: packages/agent/src/powdrr_agent/execution/story_test_collection.py
+  type: modified
+  span:
+    start_line: 18
+    end_line: 36
+  summary: Observe actual pytest calls, assertions, source bytes and runtime; capture
+    candidate Git trees without changing the real index.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: packages/agent/src/powdrr_agent/execution/story_test_collection.py
+  type: modified
+  span:
+    start_line: 51
+    end_line: 51
+  summary: Observe actual pytest calls, assertions, source bytes and runtime; capture
+    candidate Git trees without changing the real index.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: packages/agent/src/powdrr_agent/execution/story_test_collection.py
+  type: modified
+  span:
+    start_line: 54
+    end_line: 54
+  summary: Observe actual pytest calls, assertions, source bytes and runtime; capture
+    candidate Git trees without changing the real index.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: packages/agent/src/powdrr_agent/execution/story_test_collection.py
+  type: modified
+  span:
+    start_line: 124
+    end_line: 278
+  summary: Observe actual pytest calls, assertions, source bytes and runtime; capture
+    candidate Git trees without changing the real index.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: packages/agent/src/powdrr_agent/execution/story_test_collection.py
+  type: modified
+  span:
+    start_line: 282
+    end_line: 283
+  summary: Observe actual pytest calls, assertions, source bytes and runtime; capture
+    candidate Git trees without changing the real index.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: packages/agent/src/powdrr_agent/execution/story_test_collection.py
+  type: modified
+  span:
+    start_line: 285
+    end_line: 381
+  summary: Observe actual pytest calls, assertions, source bytes and runtime; capture
+    candidate Git trees without changing the real index.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: packages/service/src/powdrr_service/artifact_state.py
+  type: modified
+  span:
+    start_line: 58
+    end_line: 58
+  summary: Expose immutable story receipts as historical artifacts without asserting
+    current verification.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: packages/service/src/powdrr_service/artifact_state.py
+  type: modified
+  span:
+    start_line: 177
+    end_line: 200
+  summary: Expose immutable story receipts as historical artifacts without asserting
+    current verification.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: packages/service/src/powdrr_service/resources/processes/execute-proposed-pr.yaml
+  type: modified
+  span:
+    start_line: 44
+    end_line: 46
+  summary: Declare story execution report fields and baseline, review and whole-story
+    completion policy.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: packages/service/src/powdrr_service/resources/processes/execute-proposed-pr.yaml
+  type: modified
+  span:
+    start_line: 50
+    end_line: 53
+  summary: Declare story execution report fields and baseline, review and whole-story
+    completion policy.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: packages/service/src/powdrr_service/resources/processes/execute-proposed-pr.yaml
+  type: modified
+  span:
+    start_line: 56
+    end_line: 56
+  summary: Declare story execution report fields and baseline, review and whole-story
+    completion policy.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: packages/service/src/powdrr_service/resources/processes/execute-proposed-pr.yaml
+  type: modified
+  span:
+    start_line: 58
+    end_line: 64
+  summary: Declare story execution report fields and baseline, review and whole-story
+    completion policy.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: packages/service/src/powdrr_service/resources/processes/implement-feature.yaml
+  type: modified
+  span:
+    start_line: 9
+    end_line: 12
+  summary: Require current execution receipts for confirmed feature story completion.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: packages/service/src/powdrr_service/structrr/verification_health.py
+  type: modified
+  span:
+    start_line: 24
+    end_line: 24
+  summary: Audit current story observation matrices alongside existing verification
+    health findings.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: packages/service/src/powdrr_service/structrr/verification_health.py
+  type: modified
+  span:
+    start_line: 47
+    end_line: 47
+  summary: Audit current story observation matrices alongside existing verification
+    health findings.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: packages/service/src/powdrr_service/structrr/verification_health.py
+  type: modified
+  span:
+    start_line: 58
+    end_line: 62
+  summary: Audit current story observation matrices alongside existing verification
+    health findings.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: packages/service/src/powdrr_service/structrr/verification_health.py
+  type: modified
+  span:
+    start_line: 77
+    end_line: 77
+  summary: Audit current story observation matrices alongside existing verification
+    health findings.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: packages/service/src/powdrr_service/structrr/verification_health.py
+  type: modified
+  span:
+    start_line: 194
+    end_line: 235
+  summary: Audit current story observation matrices alongside existing verification
+    health findings.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: packages/service/src/powdrr_service/verification/execute_pr_acceptance.py
+  type: modified
+  span:
+    start_line: 30
+    end_line: 40
+  summary: Gate assigned and whole-story acceptance on current receipts and include
+    execution proof in reports.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: packages/service/src/powdrr_service/verification/execute_pr_acceptance.py
+  type: modified
+  span:
+    start_line: 73
+    end_line: 80
+  summary: Gate assigned and whole-story acceptance on current receipts and include
+    execution proof in reports.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: packages/service/src/powdrr_service/verification/execute_pr_acceptance.py
+  type: modified
+  span:
+    start_line: 83
+    end_line: 91
+  summary: Gate assigned and whole-story acceptance on current receipts and include
+    execution proof in reports.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: packages/service/src/powdrr_service/verification/execute_pr_test_authoring.py
+  type: modified
+  span:
+    start_line: 19
+    end_line: 19
+  summary: Tell the existing author when existing-behavior baseline success is valid.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: packages/service/src/powdrr_service/verification/execute_pr_test_authoring.py
+  type: modified
+  span:
+    start_line: 45
+    end_line: 57
+  summary: Tell the existing author when existing-behavior baseline success is valid.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: packages/service/src/powdrr_service/verification/execute_pr_test_quality.py
+  type: modified
+  span:
+    start_line: 51
+    end_line: 56
+  summary: Bind semantic review to its exact inputs and review unbound-step integration
+    justification.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: packages/service/src/powdrr_service/verification/execute_pr_test_quality.py
+  type: modified
+  span:
+    start_line: 570
+    end_line: 571
+  summary: Bind semantic review to its exact inputs and review unbound-step integration
+    justification.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: packages/service/src/powdrr_service/verification/execute_pr_test_quality.py
+  type: modified
+  span:
+    start_line: 578
+    end_line: 582
+  summary: Bind semantic review to its exact inputs and review unbound-step integration
+    justification.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: packages/service/src/powdrr_service/verification/story_baseline.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 116
+  summary: Classify actual behavioral failures, approved missing interfaces and existing-behavior
+    baseline success.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: packages/service/src/powdrr_service/verification/story_execution.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 505
+  summary: Compile immutable execution receipts and current case/observation matrices
+    with explicit stale and partial states.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 1216
+    end_line: 1216
+  summary: Expose story evidence inventory and coverage auditing through existing
+    CLI commands.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 5145
+    end_line: 5145
+  summary: Expose story evidence inventory and coverage auditing through existing
+    CLI commands.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 5886
+    end_line: 5886
+  summary: Expose story evidence inventory and coverage auditing through existing
+    CLI commands.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 3086
+    end_line: 3159
+  summary: Reuse the independent author and receipt gate for confirmed single-feature
+    stories.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 3512
+    end_line: 3522
+  summary: Reuse the independent author and receipt gate for confirmed single-feature
+    stories.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 3527
+    end_line: 3527
+  summary: Reuse the independent author and receipt gate for confirmed single-feature
+    stories.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 3531
+    end_line: 3575
+  summary: Reuse the independent author and receipt gate for confirmed single-feature
+    stories.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: src/powdrr_lift/workrr/story_execution_operations.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 161
+  summary: Transport actual test events to service receipt policy and retain per-run
+    evidence and health inputs.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 26
+    end_line: 29
+  summary: Retain exact author and correction reviews, execute observed story cases
+    and publish proof with the Structrr diff.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 110
+    end_line: 114
+  summary: Retain exact author and correction reviews, execute observed story cases
+    and publish proof with the Structrr diff.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 253
+    end_line: 256
+  summary: Retain exact author and correction reviews, execute observed story cases
+    and publish proof with the Structrr diff.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 1071
+    end_line: 1080
+  summary: Retain exact author and correction reviews, execute observed story cases
+    and publish proof with the Structrr diff.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 1390
+    end_line: 1411
+  summary: Retain exact author and correction reviews, execute observed story cases
+    and publish proof with the Structrr diff.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 1857
+    end_line: 1858
+  summary: Retain exact author and correction reviews, execute observed story cases
+    and publish proof with the Structrr diff.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 1906
+    end_line: 1906
+  summary: Retain exact author and correction reviews, execute observed story cases
+    and publish proof with the Structrr diff.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 1911
+    end_line: 1915
+  summary: Retain exact author and correction reviews, execute observed story cases
+    and publish proof with the Structrr diff.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 1918
+    end_line: 1934
+  summary: Retain exact author and correction reviews, execute observed story cases
+    and publish proof with the Structrr diff.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 1936
+    end_line: 1939
+  summary: Retain exact author and correction reviews, execute observed story cases
+    and publish proof with the Structrr diff.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 2076
+    end_line: 2080
+  summary: Retain exact author and correction reviews, execute observed story cases
+    and publish proof with the Structrr diff.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 2126
+    end_line: 2131
+  summary: Retain exact author and correction reviews, execute observed story cases
+    and publish proof with the Structrr diff.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 2165
+    end_line: 2167
+  summary: Retain exact author and correction reviews, execute observed story cases
+    and publish proof with the Structrr diff.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 2193
+    end_line: 2196
+  summary: Retain exact author and correction reviews, execute observed story cases
+    and publish proof with the Structrr diff.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 2264
+    end_line: 2303
+  summary: Retain exact author and correction reviews, execute observed story cases
+    and publish proof with the Structrr diff.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 2321
+    end_line: 2322
+  summary: Retain exact author and correction reviews, execute observed story cases
+    and publish proof with the Structrr diff.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 2328
+    end_line: 2328
+  summary: Retain exact author and correction reviews, execute observed story cases
+    and publish proof with the Structrr diff.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 2331
+    end_line: 2332
+  summary: Retain exact author and correction reviews, execute observed story cases
+    and publish proof with the Structrr diff.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 2377
+    end_line: 2377
+  summary: Retain exact author and correction reviews, execute observed story cases
+    and publish proof with the Structrr diff.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 2380
+    end_line: 2381
+  summary: Retain exact author and correction reviews, execute observed story cases
+    and publish proof with the Structrr diff.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 2407
+    end_line: 2409
+  summary: Retain exact author and correction reviews, execute observed story cases
+    and publish proof with the Structrr diff.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 2422
+    end_line: 2432
+  summary: Retain exact author and correction reviews, execute observed story cases
+    and publish proof with the Structrr diff.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 3787
+    end_line: 3791
+  summary: Retain exact author and correction reviews, execute observed story cases
+    and publish proof with the Structrr diff.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 3801
+    end_line: 3801
+  summary: Retain exact author and correction reviews, execute observed story cases
+    and publish proof with the Structrr diff.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 3828
+    end_line: 3828
+  summary: Retain exact author and correction reviews, execute observed story cases
+    and publish proof with the Structrr diff.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 3874
+    end_line: 3876
+  summary: Retain exact author and correction reviews, execute observed story cases
+    and publish proof with the Structrr diff.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 3881
+    end_line: 3883
+  summary: Retain exact author and correction reviews, execute observed story cases
+    and publish proof with the Structrr diff.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 3890
+    end_line: 3891
+  summary: Retain exact author and correction reviews, execute observed story cases
+    and publish proof with the Structrr diff.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 4000
+    end_line: 4003
+  summary: Retain exact author and correction reviews, execute observed story cases
+    and publish proof with the Structrr diff.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 4010
+    end_line: 4018
+  summary: Retain exact author and correction reviews, execute observed story cases
+    and publish proof with the Structrr diff.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 4020
+    end_line: 4020
+  summary: Retain exact author and correction reviews, execute observed story cases
+    and publish proof with the Structrr diff.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 4030
+    end_line: 4035
+  summary: Retain exact author and correction reviews, execute observed story cases
+    and publish proof with the Structrr diff.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 4060
+    end_line: 4082
+  summary: Retain exact author and correction reviews, execute observed story cases
+    and publish proof with the Structrr diff.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+- path: tests/test_story_execution.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 628
+  summary: Prove prose-to-plan execution, persistence defect sensitivity, repair,
+    amendment staleness, baseline policy and unavailable assertion states.
+  rationale: Require current candidate-bound execution and reviewed assertion evidence
+    while preserving approved story identity and historical results.
+entities:
+- id: story-execution-context-v1
+  type: Class
+  action: added
+- id: story-execution-receipt-v1
+  type: Class
+  action: added
+- id: story-execution-receipt-compiler-v1
+  type: Function
+  action: added
+- id: story-current-coverage-report-v1
+  type: Function
+  action: added
+- id: story-observed-pytest-execution-v1
+  type: Function
+  action: added
+- id: story-baseline-classification-v1
+  type: Function
+  action: added
+entity_relationships: []
+invariants:
+- id: story-proof-requires-actual-reviewed-assertion-execution
+  action: added
+  description: Only a collected test whose actual call and linked assertions execute
+    successfully under exact source-bound semantic review can establish a story observation;
+    skipped, xfail, unavailable, missing and setup or teardown failure evidence cannot
+    pass.
+- id: story-receipts-bind-current-contract-candidate-and-runtime
+  action: added
+  description: Receipts bind story and case references, dependencies, selector and
+    source digest, review and execution fingerprints, candidate Git tree, configuration
+    and runtime; mismatches remain historical stale results and cannot verify the
+    current story.
+- id: partial-pr-success-does-not-complete-story
+  action: added
+  description: Whole-story verification requires every declared case observation and
+    reviewed integration justification for unbound steps; assigned PR acceptance and
+    design readiness remain separate states.
+- id: story-baseline-policy-preserves-agreed-oracle
+  action: added
+  description: New behavior requires actual behavioral baseline failure or an approved
+    observed missing interface; existing-behavior integration may pass baseline. Corrections
+    retain the trusted policy and receive fresh source-bound review.
+guidance: []

@@ -30,6 +30,8 @@ DESIGN_SECTIONS = frozenset(
     {
         *STORY_SECTIONS,
         "reference_definitions",
+        "source_reference_placements",
+        "source_reference_preservations",
         "assumptions",
         "entities",
         "entity_relationships",
@@ -60,6 +62,11 @@ DESIGN_SECTIONS = frozenset(
 
 
 def subject_identity(section: str, record: Mapping[str, Any]) -> str:
+    if section == "source_reference_placements":
+        value = record.get("obligation_id")
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError("source reference placement requires obligation_id")
+        return value
     keys = (
         ("stable_key", "id", "path")
         if section in {"files", "source_subjects"}
@@ -304,7 +311,8 @@ class DesignHandoff:
         for operation in proposal.operations:
             content = dict(operation.content)
             if not any(
-                key in content for key in ("id", "stable_key", "clause_id", "path")
+                key in content
+                for key in ("id", "obligation_id", "stable_key", "clause_id", "path")
             ):
                 content["id"] = operation.subject_id
             if subject_identity(operation.section, content) != operation.subject_id:

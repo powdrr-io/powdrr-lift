@@ -32,11 +32,15 @@ from powdrr_agent.execution.opencode_monitor import run_opencode
 from powdrr_contracts.models import ChatCompletionRequest, ChatCompletionResponse
 from powdrr_service.behavior_contract import BehaviorScenario
 from powdrr_service.intent_packet import IntentPacket
+from powdrr_service.structrr.source_reference_handoff import (
+    CompiledSourceReferenceHandoff,
+    SourceReferencePrompt,
+)
 
 from powdrr_lift.core.execution_plan import ExecutionPlan, ExecutionUnit
 from powdrr_lift.core.implementation_packet import ImplementationPacket
 
-CODING_AGENT_REQUEST_SCHEMA_VERSION = "implementation-request-v2"
+CODING_AGENT_REQUEST_SCHEMA_VERSION = "implementation-request-v3"
 CODING_AGENT_ATTEMPT_SCHEMA_VERSION = "implementation-attempt-v2"
 MAX_SUPPORTING_EDIT_LINES = 20
 GitRunner = Callable[..., subprocess.CompletedProcess[Any]]
@@ -114,7 +118,76 @@ class ImplementationRequest:
     intent_packet: IntentPacket | None = None
     implementation_packet: ImplementationPacket | None = None
     allow_existing_changes: bool = False
+    source_reference_mode: str = "off"
+    source_reference_prompt: SourceReferencePrompt | None = None
     schema_version: str = CODING_AGENT_REQUEST_SCHEMA_VERSION
+
+    def __post_init__(self) -> None:
+        if self.schema_version not in {
+            "implementation-request-v1",
+            "implementation-request-v2",
+            CODING_AGENT_REQUEST_SCHEMA_VERSION,
+        }:
+            raise ValueError("unsupported implementation request schema")
+        if self.source_reference_mode not in {"off", "observe", "enforce"}:
+            raise ValueError("invalid source reference mode")
+        if self.source_reference_prompt is None:
+            if self.source_reference_mode != "off":
+                raise ValueError("enabled source references require a compiled prompt")
+            return
+        if self.schema_version != CODING_AGENT_REQUEST_SCHEMA_VERSION:
+            raise ValueError(
+                "legacy requests cannot carry source reference obligations"
+            )
+        data = SourceReferencePrompt.from_data(
+            self.source_reference_prompt.to_data()
+        ).to_data()
+        contract = data["contract"]
+        if self.source_reference_mode != "enforce":
+            raise ValueError("mandatory source placements require enforce mode")
+        if (
+            self.prompt != data["prompt"]
+            or self.base_commit != contract["base_commit"]
+            or self.plan_fingerprint != contract["design_fingerprint"]
+            or self.allowed_paths != tuple(contract["allowed_paths"])
+            or self.objective != contract["objective"]
+        ):
+            raise ValueError("request differs from compiled source reference prompt")
+
+    @classmethod
+    def from_source_reference_handoff(
+        cls,
+        handoff: CompiledSourceReferenceHandoff,
+        *,
+        request_id: str,
+        validation_profiles: tuple[str, ...] = (),
+    ) -> ImplementationRequest:
+        validated = CompiledSourceReferenceHandoff.from_data(handoff.to_data())
+        prompt = validated.worker_prompt
+        data = prompt.to_data()
+        contract = data["contract"]
+        return cls(
+            request_id=request_id,
+            objective=contract["objective"],
+            prompt=prompt.prompt,
+            base_commit=contract["base_commit"],
+            plan_fingerprint=contract["design_fingerprint"],
+            allowed_paths=tuple(contract["allowed_paths"]),
+            acceptance_criteria=tuple(
+                o["requirement"] for o in contract["obligations"]
+            ),
+            validation_profiles=validation_profiles,
+            context_refs=(f"source-reference-contract:{data['contract_fingerprint']}",),
+            source_reference_mode="enforce",
+            source_reference_prompt=prompt,
+        )
+
+    def require_supported_execution(self) -> None:
+        if self.source_reference_prompt is not None:
+            raise ValueError(
+                "Source-reference execution requires placement validation and "
+                "worker rollout, which are not integrated yet."
+            )
 
     @classmethod
     def from_structrr_handoff(
@@ -130,6 +203,16 @@ class ImplementationRequest:
 
         validated = DesignHandoff.from_data(handoff.to_data())
         data = validated.to_data()
+        if any(
+            data["desired"]["document"].get(section)
+            for section in (
+                "source_reference_placements",
+                "source_reference_preservations",
+            )
+        ):
+            raise ValueError(
+                "reference-bearing designs require the source reference compiler"
+            )
         proposal = ProposalRevision.from_data(data["proposal"])
         return cls(
             request_id=f"{proposal.proposal_id}-design",
@@ -149,6 +232,16 @@ class ImplementationRequest:
 
     def to_data(self) -> dict[str, Any]:
         return {
+            **(
+                {
+                    "source_reference_mode": self.source_reference_mode,
+                    "source_reference_prompt": self.source_reference_prompt.to_data()
+                    if self.source_reference_prompt is not None
+                    else None,
+                }
+                if self.schema_version == CODING_AGENT_REQUEST_SCHEMA_VERSION
+                else {}
+            ),
             "schema_version": self.schema_version,
             "request_id": self.request_id,
             "objective": self.objective,
@@ -186,6 +279,10 @@ class ImplementationRequest:
         The model sees the failed finding and the product acceptance contract
         needed to resolve it.
         """
+        if self.source_reference_prompt is not None:
+            raise ValueError(
+                "compiled source reference prompts require a new design revision"
+            )
         observed_issue = json.dumps(dict(issue), indent=2, sort_keys=True, default=str)
         paths = ", ".join(self.allowed_paths) or "none declared"
         commands = _render_allowed_command_forms(self.allowed_commands)
@@ -223,7 +320,22 @@ class ImplementationRequest:
 
     @classmethod
     def from_data(cls, data: Mapping[str, Any]) -> ImplementationRequest:
+        version = data["schema_version"]
+        if version != CODING_AGENT_REQUEST_SCHEMA_VERSION and any(
+            key in data for key in ("source_reference_mode", "source_reference_prompt")
+        ):
+            raise ValueError("legacy request cannot declare source reference fields")
+        if version == CODING_AGENT_REQUEST_SCHEMA_VERSION and not all(
+            key in data for key in ("source_reference_mode", "source_reference_prompt")
+        ):
+            raise ValueError("v3 request requires explicit source reference fields")
         return cls(
+            source_reference_mode=data.get("source_reference_mode", "off"),
+            source_reference_prompt=(
+                SourceReferencePrompt.from_data(data["source_reference_prompt"])
+                if data.get("source_reference_prompt") is not None
+                else None
+            ),
             request_id=cast(str, data["request_id"]),
             objective=cast(str, data["objective"]),
             prompt=cast(str, data["prompt"]),
@@ -705,6 +817,7 @@ class OpenCodeProvider:
     def run(
         self, request: ImplementationRequest, *, worktree_root: Path, attempt_id: str
     ) -> subprocess.CompletedProcess[str]:
+        request.require_supported_execution()
         environment = os.environ.copy()
         # Do not let a caller's activated environment point uv at another
         # checkout when the worker runs inside its own worktree.
@@ -792,6 +905,7 @@ class MiniSWEAgentProvider:
     def run(
         self, request: ImplementationRequest, *, worktree_root: Path, attempt_id: str
     ) -> subprocess.CompletedProcess[str]:
+        request.require_supported_execution()
         workspace_root = worktree_root.resolve()
         worker_prompt = request.prompt.replace(
             "{{powdrr_workspace_root}}", str(workspace_root)
@@ -1288,6 +1402,17 @@ def run_coding_agent(
     attempt_id: str,
 ) -> CodingAgentAttempt:
     """Run one worker and derive the result from the observed repository state."""
+    try:
+        request.require_supported_execution()
+    except ValueError as error:
+        return CodingAgentAttempt(
+            attempt_id,
+            request.request_id,
+            provider.provider_name,
+            CodingAgentStatus.POLICY_DENIED,
+            None,
+            error=str(error),
+        )
     before_head = _git_output(worktree_root, "rev-parse", "HEAD")
     based_on_request_base = subprocess.run(
         ["git", "merge-base", "--is-ancestor", request.base_commit, before_head],

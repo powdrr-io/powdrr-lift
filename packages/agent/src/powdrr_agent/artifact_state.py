@@ -52,6 +52,7 @@ def collect_artifact_state_snapshot(
         "plans",
         "changelogs",
         "pull_requests",
+        "story_evidence",
     }
     selected_areas = set(areas) if areas else available_areas
     unknown_areas = selected_areas - available_areas
@@ -102,6 +103,10 @@ def collect_artifact_state_snapshot(
 
 
 def _is_selected_source(path: str, areas: set[str]) -> bool:
+    if path.startswith("docs/structrr/diffs/") and path.endswith(
+        "/story-execution.json"
+    ):
+        return "story_evidence" in areas
     if path.startswith("docs/structrr/current/baseline-") and path.endswith(".yaml"):
         return bool(areas & {"bootstrap", "entities", "relationships"})
     if path.startswith("docs/changelogs/") and path.endswith(".yaml"):

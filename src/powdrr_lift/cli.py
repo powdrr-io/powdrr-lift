@@ -1213,6 +1213,7 @@ def build_parser() -> argparse.ArgumentParser:
         "workflows",
         "plans",
         "changelogs",
+        "story_evidence",
     ):
         artifact_state_parser.add_argument(
             f"--{area.replace('_', '-')}",
@@ -5141,6 +5142,7 @@ def _run_verification_health(args: argparse.Namespace) -> int:
         candidate_tree=args.candidate_tree,
         today=args.today,
         mode=VerificationPolicyMode(args.mode),
+        story_coverage=document.get("story_coverage"),
     )
     rendered = json.dumps(report.to_data(), indent=2, sort_keys=True) + "\n"
     if args.output is None:
@@ -5881,6 +5883,7 @@ def _run_artifact_state(args: argparse.Namespace) -> int:
             "workflows",
             "plans",
             "changelogs",
+            "story_evidence",
         )
         if getattr(args, area)
     ]

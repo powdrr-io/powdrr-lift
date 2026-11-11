@@ -49,6 +49,12 @@ QUALITY_CHECKS = (
 STORY_QUALITY_CHECKS = (
     *QUALITY_CHECKS,
     (
+        "implementation_mapping",
+        "For story steps lacking functionality bindings, is there no explicit "
+        "justification in the supplied public integration boundary and repository "
+        "evidence for validating those steps?",
+    ),
+    (
         "story_case_fidelity",
         "Does the test invent fixture requirements or observations that "
         "contradict or go beyond the pinned story case?",
@@ -561,12 +567,19 @@ def review_execute_pr_test_quality(
                     assessment["llm_error"] = str(error)
             assessments.append(assessment)
 
+    from powdrr_service.verification.story_execution import story_review_fingerprint
+
     return {
         "provider": getattr(decision_client, "provider_name", "decision-provider"),
         "outcome": "advisory",
         "assessments": assessments,
         "suggestions": suggestions,
         "notes": execute_pr_test_quality_notes(assessments),
+        **(
+            {"story_review_fingerprint": story_review_fingerprint(suite_evidence)}
+            if suite_evidence.get("story_test_links")
+            else {}
+        ),
     }
 
 

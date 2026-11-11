@@ -55,6 +55,7 @@ def build_artifact_state(
         "plans",
         "changelogs",
         "pull_requests",
+        "story_evidence",
     }
     selected_areas = set(areas) if areas else available_areas
     unknown_areas = selected_areas - available_areas
@@ -173,6 +174,30 @@ def build_artifact_state(
         "sha": commit,
         "selected_areas": sorted(selected_areas),
     }
+    if "story_evidence" in selected_areas:
+        from powdrr_service.verification.story_execution import StoryExecutionReceipt
+
+        historical = []
+        for path in paths:
+            if path.startswith("docs/structrr/diffs/") and path.endswith(
+                "/story-execution.json"
+            ):
+                document = json.loads(_git(root, "show", f"{commit}:{path}"))
+                receipts = [
+                    StoryExecutionReceipt.from_data(raw).to_data()
+                    for raw in document.get("receipts", [])
+                ]
+                historical.append(
+                    {
+                        "path": path,
+                        "source_commit": commit,
+                        "status": "historical",
+                        "context": document.get("context"),
+                        "receipts": receipts,
+                        "coverage_at_execution": document.get("coverage_at_execution"),
+                    }
+                )
+        result["story_evidence"] = historical
     if "bootstrap" in selected_areas:
         result["bootstrap"] = {
             "path": bootstrap_path,

@@ -41,17 +41,27 @@ outputs:
           baseline: {type: object}
           correction_baseline: {type: [object, "null"]}
           candidate: {type: object}
+          story_coverage: {type: object}
+          story_receipts: {type: array, items: {type: object}}
+          execution_context: {type: object}
           repair_findings: {type: array, items: {type: string}}
       validation: {type: object}
 description: >-
-  Have MiniSWE author independent integration tests before coding and prove
-  they fail by behavioral assertion on the untouched baseline. Implement one
+  Have MiniSWE author independent integration tests before coding. For new story
+  behavior require a behavioral failure or a classified approved missing public
+  interface on baseline; the compiler-owned existing-behavior integration item
+  may pass on baseline. Preserve the agreed oracle. Implement one
   reviewed plan item. Permit one bounded correction to generated tests when
   they conflict with their linked criterion or repository evidence; require
-  each corrected test to remain behaviorally red on a fresh baseline and pass
+  each corrected test to satisfy its original baseline policy and pass
   on the candidate, then review each test with the configured decision provider
-  and the LLM. Keep test-quality
-  findings advisory and include unresolved concerns in the PR. Validate the
+  and the LLM. Story assertion quality must explicitly pass before receipts count;
+  legacy acceptance-criterion quality findings remain advisory. Bind actual
+  executed assertion evidence to the candidate tree, test source, story and case
+  digests, configuration and runtime. Retain failed, blocked, not-run and stale
+  evidence separately. A partial PR cannot complete the whole story; the final
+  integration item requires every declared case observation. Publish the coverage
+  matrix and immutable receipts alongside the existing Structrr diff. Validate the
   re-bootstrapped candidate against its accepted Structrr diff and inherited
   decision reviews.
 limits: {max_epochs: 1, context_chars: 12000, context_value_chars: 4000}

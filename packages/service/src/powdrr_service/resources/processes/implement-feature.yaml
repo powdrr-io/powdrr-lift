@@ -6,7 +6,10 @@ description: >-
   baseline evidence, and independently verifiable code tasks. Every review asks
   one question about one subject. Workrr owns evidence collection and
   deterministic evaluation; a coding agent is invoked only for an accepted task
-  that requires repository edits.
+  that requires repository edits. Confirmed stories reuse the independent MiniSWE
+  author and actual pytest assertion observer. Final story completion requires
+  current receipts for every declared case observation, with semantic review
+  bound to the exact test sources; design readiness alone cannot complete it.
 inputs:
   - {name: feature_description, type: string, required: true}
   - {name: work_item_name, type: string, required: true}

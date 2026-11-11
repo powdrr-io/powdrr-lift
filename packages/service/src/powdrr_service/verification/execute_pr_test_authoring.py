@@ -16,6 +16,7 @@ def build_execute_pr_test_author_prompt(
     obligations: Sequence[Mapping[str, Any]],
 ) -> str:
     """Build the private authoring prompt without receiving a repository path."""
+    existing = plan_context.get("baseline_policy") == "existing_behavior"
     return (
         "Write independent executable pytest integration or end-to-end tests "
         "for this reviewed PR before implementation starts. The exact, only "
@@ -41,10 +42,19 @@ def build_execute_pr_test_author_prompt(
         "not stage `__pycache__`, `.pytest_cache`, or `.pyc` files; stage only "
         "authored Python test files. Do not commit. Stop after creating "
         "the tests.\n\n"
-        "The implementation is intentionally absent. Tests must execute "
-        "against the baseline and fail through a behavioral assertion, not "
-        "through syntax, import, collection, or environment errors.\n\n"
-        "Reviewed PR contract:\n"
+        + (
+            "This is integrated or existing behavior validation. Baseline tests "
+            "may pass. Preserve the agreed oracle and record the actual result; "
+            "never manufacture a baseline failure. Semantic review and appropriate "
+            "negative controls establish assertion sensitivity.\n\n"
+            if existing
+            else "The implementation is intentionally absent. Tests must execute "
+            "against the baseline and fail through a behavioral assertion. A "
+            "declared new public module may be classified as a missing interface "
+            "only during an actual test call. Syntax, collection and dependency "
+            "environment errors are not behavioral failures.\n\n"
+        )
+        + "Reviewed PR contract:\n"
         f"{json.dumps(plan_context, indent=2, sort_keys=True)}\n"
         "Deterministic test obligations. IDs are assigned in acceptance-criterion "
         "order. Every authored test must identify the criterion or criteria it "

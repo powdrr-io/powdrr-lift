@@ -23,7 +23,10 @@ from powdrr_agent.execution.execute_pr_tests import (
     install_frozen_test_files,
     run_generated_pytest,
 )
-from powdrr_agent.execution.story_test_collection import collect_story_tests
+from powdrr_agent.execution.story_test_collection import (
+    collect_story_tests,
+    run_story_tests,
+)
 from powdrr_contracts.models import OperationRequest
 from powdrr_local import (
     JsonServiceBridge,
@@ -103,6 +106,11 @@ from powdrr_service.verification.execute_pr_test_validation import (
     validate_coverage_references,
     validate_generated_test_files,
     validate_test_correction,
+)
+from powdrr_service.verification.story_baseline import (
+    missing_interface_catalog,
+    require_story_baseline,
+    story_baseline_policy,
 )
 from powdrr_service.verification.story_test_authoring import (
     prepare_story_test_obligations,
@@ -241,6 +249,10 @@ from powdrr_lift.workrr.provider_runtime import (
     build_provider_client,
     maybe_record_llm_exchanges,
     resolve_workflow_provider,
+)
+from powdrr_lift.workrr.story_execution_operations import (
+    assertion_line_catalog,
+    execute_story_validation,
 )
 
 _TASK_PROMPT_PLACEHOLDER_RE = re.compile(r"<([A-Za-z0-9_-]+)>")
@@ -1365,7 +1377,28 @@ def _write_issue_worker_structrr_diff_artifacts(
         ) from error
     output_path = artifact_root / "structrr-diff.yaml"
     output_path.write_text(structrr_diff_text, encoding="utf-8")
-    return ((relative_directory / output_path.name).as_posix(),)
+    outputs = [(relative_directory / output_path.name).as_posix()]
+    if integration_test_report.get("story_receipts"):
+        evidence_path = artifact_root / "story-execution.json"
+        evidence_path.write_text(
+            json.dumps(
+                {
+                    "schema_version": "story-execution-evidence-v1",
+                    "context": integration_test_report["execution_context"],
+                    "manifest": integration_test_report["story_test_links"],
+                    "receipts": integration_test_report["story_receipts"],
+                    "coverage_at_execution": integration_test_report["story_coverage"],
+                    "execution": integration_test_report.get("candidate", {}),
+                    "quality_review": integration_test_report.get("quality_review"),
+                },
+                indent=2,
+                sort_keys=True,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+        outputs.append((relative_directory / evidence_path.name).as_posix())
+    return tuple(outputs)
 
 
 def _merge_structrr_decision_sections(
@@ -1811,6 +1844,8 @@ def _validate_execute_pr_test_correction(
     baseline_worktree: Path,
     validation_profile: ValidationProfile,
     timeout_seconds: float,
+    baseline_policy: str = "new_behavior",
+    approved_operations: Sequence[Mapping[str, Any]] = (),
 ) -> tuple[dict[str, str], dict[str, list[str]], dict[str, Any]]:
     """Accept only corrections that preserve coverage and remain baseline-red."""
     validated, coverage = validate_test_correction(
@@ -1858,17 +1893,40 @@ def _validate_execute_pr_test_correction(
                 ),
             )
             coverage.update(story_link_coverage(story_links))
-        baseline_result = run_generated_pytest(
+        baseline_result = (run_story_tests if story_links else run_generated_pytest)(
             validation_profile,
             root=baseline_worktree,
             paths=tuple(validated),
             timeout_seconds=timeout_seconds,
-        )
-        require_execute_pr_test_correction_baseline(
-            baseline_result, corrected_test_ids=corrected_test_ids
+            **(
+                {"assertion_lines": assertion_line_catalog(story_links)}
+                if story_links
+                else {}
+            ),
         )
         if story_links:
+            require_story_baseline(
+                baseline_result,
+                policy=baseline_policy,
+                missing_interfaces=missing_interface_catalog(
+                    approved_operations,
+                    [
+                        {
+                            "path": operation.get("content", {}).get("path"),
+                            "exists": (
+                                baseline_worktree
+                                / str(operation.get("content", {}).get("path", ""))
+                            ).exists(),
+                        }
+                        for operation in approved_operations
+                    ],
+                ),
+            )
             baseline_result["story_test_links"] = story_links
+        else:
+            require_execute_pr_test_correction_baseline(
+                baseline_result, corrected_test_ids=corrected_test_ids
+            )
         return validated, coverage, baseline_result
     finally:
         shutil.rmtree(baseline_worktree, ignore_errors=True)
@@ -2005,6 +2063,11 @@ def _author_execute_pr_tests(
             )
         obligations = acceptance_criteria_contract(acceptance_criteria)
         story_obligations = prepare_story_test_obligations(plan_context)
+        baseline_policy = (
+            story_baseline_policy(proposed) if story_obligations else "new_behavior"
+        )
+        if story_obligations:
+            plan_context["baseline_policy"] = baseline_policy
         require_supported_story_author(
             tuple(validation_profile.command), story_obligations
         )
@@ -2050,7 +2113,12 @@ def _author_execute_pr_tests(
             acceptance_criteria=(
                 "Add pytest tests for observable PR acceptance criteria.",
                 "Do not modify implementation or existing tests.",
-                "New tests fail on the untouched baseline through behavior assertions.",
+                (
+                    "Existing story behavior may pass on the untouched baseline."
+                    if baseline_policy == "existing_behavior"
+                    else "New tests fail on baseline through behavior assertions "
+                    "or a classified approved missing public interface."
+                ),
             ),
             validation_profiles=(),
             context_refs=request.context_refs,
@@ -2084,6 +2152,9 @@ def _author_execute_pr_tests(
         quality_report: dict[str, Any] | None = None
         coverage_references: dict[str, list[str]] = {}
         story_links: dict[str, Any] = {}
+        accepted_story_review: dict[str, Any] = {}
+        story_review_evidence: dict[str, Any] = {}
+        baseline_classification = "behavioral_failure"
         for attempt_number in range(1, 4):
             if attempt_number > 1:
                 # A repair starts from the baseline. Reusing a rejected
@@ -2109,8 +2180,10 @@ def _author_execute_pr_tests(
                         + str(validation_error)
                         + f"\nRewrite only `{test_path}`. Do not create other "
                         "files. "
-                        "Every test must run and fail on the untouched baseline "
-                        "through an assertion about requested behavior. Repair any "
+                        "Every test must run under the supplied baseline policy. "
+                        "Existing behavior may pass; new behavior requires a "
+                        "behavioral failure or an approved missing interface. "
+                        "Repair any "
                         "coverage-plan or independent-review findings with additional "
                         "real cases; do not weaken the contract. Do not commit or "
                         "edit implementation files."
@@ -2178,13 +2251,46 @@ def _author_execute_pr_tests(
                         raise ExecutePrTestError(
                             f"integration test must be new, not replace {path}"
                         )
-                baseline_report = run_generated_pytest(
-                    validation_profile,
-                    root=authoring_worktree,
-                    paths=tuple(test_sources),
-                    timeout_seconds=config.coding_agent_validation_timeout_seconds,
-                )
-                require_behavioral_red_result(baseline_report)
+                if story_links:
+                    if test_sources != raw_sources:
+                        raise StoryCoverageError(
+                            "story test sources must use a canonical final newline "
+                            "without trailing blank lines"
+                        )
+                    baseline_report = run_story_tests(
+                        validation_profile,
+                        root=authoring_worktree,
+                        paths=tuple(test_sources),
+                        assertion_lines=assertion_line_catalog(story_links),
+                        timeout_seconds=config.coding_agent_validation_timeout_seconds,
+                    )
+                    missing_files = [
+                        {
+                            "path": operation.get("content", {}).get("path"),
+                            "exists": (
+                                authoring_worktree / operation["content"]["path"]
+                            ).exists(),
+                        }
+                        for operation in plan_context["accepted_structrr_operations"]
+                        if operation.get("section") == "files"
+                        and operation.get("action") in {"add", "added"}
+                        and isinstance(operation.get("content", {}).get("path"), str)
+                    ]
+                    baseline_classification = require_story_baseline(
+                        baseline_report,
+                        policy=baseline_policy,
+                        missing_interfaces=missing_interface_catalog(
+                            plan_context["accepted_structrr_operations"], missing_files
+                        ),
+                    )
+                else:
+                    baseline_report = run_generated_pytest(
+                        validation_profile,
+                        root=authoring_worktree,
+                        paths=tuple(test_sources),
+                        timeout_seconds=config.coding_agent_validation_timeout_seconds,
+                    )
+                    require_behavioral_red_result(baseline_report)
                 suite_evidence = {
                     "contract": plan_context,
                     "test_obligations": obligations,
@@ -2202,13 +2308,18 @@ def _author_execute_pr_tests(
                 quality_reviews.append(quality_report)
                 if story_links:
                     require_story_test_quality(quality_report, story_links)
+                    accepted_story_review = quality_report
+                    story_review_evidence = suite_evidence
                 suggestions = quality_report.get("suggestions", [])
                 if suggestions and not quality_repair_attempted:
                     quality_repair_fallback = {
                         "test_sources": dict(test_sources),
                         "baseline_result": baseline_report,
+                        "baseline_classification": baseline_classification,
                         "coverage_references": dict(coverage_references),
                         "story_test_links": story_links,
+                        "accepted_story_review": accepted_story_review,
+                        "story_review_evidence": story_review_evidence,
                     }
                     validation_error = (
                         "Independent per-test review suggested these targeted "
@@ -2253,8 +2364,11 @@ def _author_execute_pr_tests(
                 )
             test_sources = quality_repair_fallback["test_sources"]
             baseline_report = quality_repair_fallback["baseline_result"]
+            baseline_classification = quality_repair_fallback["baseline_classification"]
             coverage_references = quality_repair_fallback["coverage_references"]
             story_links = quality_repair_fallback["story_test_links"]
+            accepted_story_review = quality_repair_fallback["accepted_story_review"]
+            story_review_evidence = quality_repair_fallback["story_review_evidence"]
             quality_reviews.append(
                 {
                     "provider": "decision-provider",
@@ -2280,7 +2394,9 @@ def _author_execute_pr_tests(
         artifact = {
             "schema_version": "execute-pr-integration-tests-v1",
             "generation_method": "miniswe_pre_coding",
-            "status": "baseline_red",
+            "status": "baseline_existing"
+            if baseline_classification == "existing_behavior_pass"
+            else "baseline_red",
             "base_commit": base_commit,
             "test_root": test_root_relative,
             "paths": sorted(test_sources),
@@ -2293,6 +2409,17 @@ def _author_execute_pr_tests(
             "baseline_execution_evidence": pytest_execution_evidence(baseline_report),
             "authoring_attempts": attempts,
             **({"story_test_links": story_links} if story_links else {}),
+            **(
+                {
+                    "baseline_policy": baseline_policy,
+                    "story_validation": proposed.get("story_validation", False),
+                    "baseline_classification": baseline_classification,
+                    "accepted_story_review": accepted_story_review,
+                    "story_review_evidence": story_review_evidence,
+                }
+                if story_links
+                else {}
+            ),
         }
         (test_root / "suite.json").write_text(
             json.dumps(artifact, indent=2, sort_keys=True) + "\n",
@@ -3647,6 +3774,11 @@ class _TaskWorkflowExecutionStrategy:
                 "pre-coding inherited-decision review needs a plan correction: "
                 + "; ".join(planning_findings)
             )
+        story_snapshot = (
+            project_item_proposal(current_structrr or {}, item_proposal)
+            if proposed.get("story_refs") and item_proposal is not None
+            else current_structrr or {}
+        )
         request = replace(
             request,
             prompt=(
@@ -3656,7 +3788,7 @@ class _TaskWorkflowExecutionStrategy:
                     "(planned coverage, not verification):\n"
                     + json.dumps(
                         story_planning_context(
-                            current_structrr or {},
+                            story_snapshot,
                             parse_story_refs(proposed.get("story_refs", [])),
                         ),
                         indent=2,
@@ -3683,7 +3815,7 @@ class _TaskWorkflowExecutionStrategy:
         test_authoring_context = dict(proposed)
         if proposed.get("story_refs"):
             test_authoring_context["story_context"] = story_planning_context(
-                current_structrr or {}, parse_story_refs(proposed["story_refs"])
+                story_snapshot, parse_story_refs(proposed["story_refs"])
             )
         test_authoring_context["accepted_structrr_operations"] = accepted_operations
         if item_proposal is not None:
@@ -3729,18 +3861,24 @@ class _TaskWorkflowExecutionStrategy:
                 dict.fromkeys((*request.allowed_paths, *integration_test_sources))
             ),
         )
+        baseline_classification = integration_test_authoring.get(
+            "baseline_classification", "behavioral_failure"
+        )
         rendered_tests = [
             "## Independent pre-coding integration tests",
             "A separate MiniSWE test author created these tests before the "
             "implementation. They were run against the untouched baseline and "
-            "failed through behavior assertions. The workflow has installed them "
+            "classified as "
+            f"{baseline_classification}. "
+            "The workflow has installed them "
             "in the worktree. Make the implementation satisfy the accepted "
             "criteria. You may correct these generated test files only when the "
             "test contradicts its linked criterion or repository evidence. Keep "
             "all acceptance criteria covered; do not skip, xfail, remove cases, "
             "or weaken assertions merely to make the implementation pass. Any "
             "correction is checked against a fresh baseline and the candidate, "
-            "then reviewed per test. Test-quality review findings are advisory.",
+            "then reviewed per test. Story quality review is mandatory; legacy "
+            "acceptance-criterion quality findings remain advisory.",
             "Baseline test command: `"
             + " ".join(
                 str(token)
@@ -3849,24 +3987,27 @@ class _TaskWorkflowExecutionStrategy:
                         obligations=integration_test_authoring["test_obligations"],
                         test_root=str(integration_test_authoring["test_root"]),
                         baseline_worktree=baseline_worktree,
+                        baseline_policy=story_baseline_policy(test_authoring_context),
+                        approved_operations=test_authoring_context.get(
+                            "accepted_structrr_operations", []
+                        ),
                         validation_profile=validation_profile,
                         timeout_seconds=(
                             self.config.coding_agent_validation_timeout_seconds
                         ),
                     )
                     if corrected_baseline.get("story_test_links"):
+                        correction_evidence = {
+                            "contract": test_authoring_context,
+                            "test_obligations": integration_test_authoring[
+                                "test_obligations"
+                            ],
+                            "test_sources": corrected_test_sources,
+                            "baseline_result": corrected_baseline,
+                            "story_test_links": corrected_baseline["story_test_links"],
+                        }
                         correction_review = _review_execute_pr_test_quality(
-                            {
-                                "contract": test_authoring_context,
-                                "test_obligations": integration_test_authoring[
-                                    "test_obligations"
-                                ],
-                                "test_sources": corrected_test_sources,
-                                "baseline_result": corrected_baseline,
-                                "story_test_links": corrected_baseline[
-                                    "story_test_links"
-                                ],
-                            },
+                            correction_evidence,
                             config=self.config,
                             suggest_tests=False,
                         )
@@ -3875,6 +4016,12 @@ class _TaskWorkflowExecutionStrategy:
                         )
                         integration_test_authoring["story_test_links"] = (
                             corrected_baseline["story_test_links"]
+                        )
+                        integration_test_authoring["accepted_story_review"] = (
+                            correction_review
+                        )
+                        integration_test_authoring["story_review_evidence"] = (
+                            correction_evidence
                         )
                     integration_test_sources.clear()
                     integration_test_sources.update(corrected_test_sources)
@@ -3900,12 +4047,27 @@ class _TaskWorkflowExecutionStrategy:
                 install_frozen_test_files(self.repo_root, integration_test_sources)
             except ExecutePrTestError as error:
                 raise PowdrrExecutionError(str(error)) from error
-            integration_test_result = run_generated_pytest(
-                validation_profile,
-                root=self.repo_root,
-                paths=tuple(integration_test_sources),
-                timeout_seconds=self.config.coding_agent_validation_timeout_seconds,
-            )
+            if integration_test_authoring.get("story_test_links"):
+                integration_test_result = execute_story_validation(
+                    self.repo_root,
+                    snapshot=story_snapshot,
+                    authoring={
+                        **integration_test_authoring,
+                        "test_sources": integration_test_sources,
+                    },
+                    profile=validation_profile,
+                    repository=_issue_worker_repository_name(self.repo_root),
+                    artifact_root=store_root / "story-executions",
+                    timeout_seconds=self.config.coding_agent_validation_timeout_seconds,
+                    excluded_paths=_issue_worker_structrr_artifact_exclusions(proposed),
+                )
+            else:
+                integration_test_result = run_generated_pytest(
+                    validation_profile,
+                    root=self.repo_root,
+                    paths=tuple(integration_test_sources),
+                    timeout_seconds=self.config.coding_agent_validation_timeout_seconds,
+                )
             if test_correction_error:
                 integration_test_result["test_correction_rejected"] = (
                     test_correction_error

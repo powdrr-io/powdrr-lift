@@ -134,6 +134,7 @@ def _install_and_import(wheels: Path, temporary_root: Path) -> None:
         "powdrr_agent.execution.minisweagent_session",
         "--help",
     )
+    _run(str(python), "-I", "-m", "powdrr_agent.execution.source_reader", "--help")
 
 
 def _expected_agent_sources(repository: Path) -> set[str]:

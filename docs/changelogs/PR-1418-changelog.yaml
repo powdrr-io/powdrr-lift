@@ -1,62 +1,274 @@
 schema: https://powdrr.io/schema/changelog-v2
-change_id: 1418
-title: Recognize merged correction PRs in workflow dependencies
+change_id: PR-1418
+title: Deliver verified Structrr context through miniSWE observations
 intent:
-  problem: Workflow dependency checks miss completed worker corrections when their
-    published branch uses the correction suffix.
-  goal: Treat a merged correction branch as completed dependency evidence, just like
-    the existing attempt and implementation branch forms.
+  problem: MiniSWE cannot yet obtain independently verified accepted context while
+    inspecting source in its isolated agent runtime.
+  goal: Deliver exact service-owned context through actual model formatting while
+    preserving execution and submission behavior.
 human-decisions: []
 structured_files: []
 files:
-- path: src/powdrr_lift/workrr/git.py
+- path: docs/architecture/agent-service-module-ownership.json
   type: modified
   span:
-    start_line: 1417
-    end_line: 1417
-  summary: Match correction-suffixed worker PR branches during dependency lookup
-  rationale: Prevent downstream workflows from treating a merged correction PR as
-    unfinished work.
-- path: tests/test_workflow_git.py
+    start_line: 4033
+    end_line: 4050
+  summary: Inventory the isolated agent environment and source-reader proxy modules.
+  rationale: Keep distribution contents aligned with module ownership.
+- path: docs/design/structrr-miniswe-environment.md
+  type: added
+  span:
+    start_line: 1
+    end_line: 99
+  summary: Document service verification, IPC composition, formatter delivery, modes,
+    and attempt evidence.
+  rationale: State the implemented guarantee and remaining placement, validation,
+    and deployment boundaries.
+- path: docs/design/structrr-source-reader.md
   type: modified
   span:
-    start_line: 263
-    end_line: 266
-  summary: Add a merged correction branch to publication lookup coverage
-  rationale: Ensure the lookup includes the branch form used by published worker
-    corrections.
-- path: tests/test_workflow_git.py
+    start_line: 18
+    end_line: 21
+  summary: Link the environment contract and describe the isolated worker proxy.
+  rationale: Distinguish local reader configuration from session-verified worker observations.
+- path: docs/plans/structrr-source-references.md
   type: modified
   span:
-    start_line: 280
-    end_line: 281
-  summary: Assert correction branches appear in publication lookup results
-  rationale: Protect correction branch discovery alongside implementation branches.
-- path: tests/test_workflow_git.py
+    start_line: 15
+    end_line: 23
+  summary: Record completed environment integration and the remaining implementation
+    sequence.
+  rationale: Keep completed integration distinct from pending placement validation
+    and rollout.
+- path: docs/plans/structrr-source-references.md
   type: modified
   span:
-    start_line: 285
-    end_line: 311
-  summary: Cover dependency completion through a merged correction branch
-  rationale: Ensure downstream workflows accept the completed dependency evidence.
+    start_line: 25
+    end_line: 26
+  summary: Record completed environment integration and the remaining implementation
+    sequence.
+  rationale: Keep completed integration distinct from pending placement validation
+    and rollout.
+- path: packages/agent/src/powdrr_agent/execution/minisweagent_environment.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 146
+  summary: Add source context configuration, environment enrichment, and post-formatter
+    delivery.
+  rationale: Preserve base command and submission behavior while making context survive
+    truncation.
+- path: packages/agent/src/powdrr_agent/execution/minisweagent_session.py
+  type: modified
+  span:
+    start_line: 18
+    end_line: 22
+  summary: Configure source environment and formatter wrapping before normal or resumed
+    agent execution.
+  rationale: Use the same observation path for inline tasks, task files, and continuation
+    sessions.
+- path: packages/agent/src/powdrr_agent/execution/minisweagent_session.py
+  type: modified
+  span:
+    start_line: 74
+    end_line: 74
+  summary: Configure source environment and formatter wrapping before normal or resumed
+    agent execution.
+  rationale: Use the same observation path for inline tasks, task files, and continuation
+    sessions.
+- path: packages/agent/src/powdrr_agent/execution/minisweagent_session.py
+  type: modified
+  span:
+    start_line: 76
+    end_line: 77
+  summary: Configure source environment and formatter wrapping before normal or resumed
+    agent execution.
+  rationale: Use the same observation path for inline tasks, task files, and continuation
+    sessions.
+- path: packages/agent/src/powdrr_agent/execution/source_reader.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 65
+  summary: Expose a bounded source inspection proxy over local IPC without service
+    imports.
+  rationale: Keep accepted meaning and catalog files outside the isolated worker distribution.
+- path: packages/local/src/powdrr_local/structrr_context.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 125
+  summary: Compose the source observation socket bridge and write attempt input and
+    event artifacts.
+  rationale: Connect isolated execution to service-owned verification with explicit
+    mode and input identities.
+- path: packages/service/src/powdrr_service/structrr/source_observation.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 167
+  summary: Verify issued envelopes against fresh trusted reads and resolve visible-marker
+    context.
+  rationale: Reject stale or forged observations and distinguish complete reader coverage
+    from visible-only discovery.
+- path: packages/service/src/powdrr_service/structrr/source_reader.py
+  type: modified
+  span:
+    start_line: 548
+    end_line: 559
+  summary: Add multi-reference context resolution under one shared character budget.
+  rationale: Bound visible-marker enrichment consistently with reader pagination.
+- path: scripts/verify-agent-distribution.py
+  type: modified
+  span:
+    start_line: 137
+    end_line: 137
+  summary: Smoke-test the reader proxy command in the isolated installed agent distribution.
+  rationale: Verify package importability without private service dependencies.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 19
+    end_line: 19
+  summary: Compose enabled source sessions in miniSWE provider launches and preserve
+    legacy off mode.
+  rationale: Bind workspace, catalog, limits, endpoint, and diagnostics before worker
+    execution.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 34
+    end_line: 34
+  summary: Compose enabled source sessions in miniSWE provider launches and preserve
+    legacy off mode.
+  rationale: Bind workspace, catalog, limits, endpoint, and diagnostics before worker
+    execution.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 37
+    end_line: 39
+  summary: Compose enabled source sessions in miniSWE provider launches and preserve
+    legacy off mode.
+  rationale: Bind workspace, catalog, limits, endpoint, and diagnostics before worker
+    execution.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 906
+    end_line: 908
+  summary: Compose enabled source sessions in miniSWE provider launches and preserve
+    legacy off mode.
+  rationale: Bind workspace, catalog, limits, endpoint, and diagnostics before worker
+    execution.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 918
+    end_line: 925
+  summary: Compose enabled source sessions in miniSWE provider launches and preserve
+    legacy off mode.
+  rationale: Bind workspace, catalog, limits, endpoint, and diagnostics before worker
+    execution.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 939
+    end_line: 946
+  summary: Compose enabled source sessions in miniSWE provider launches and preserve
+    legacy off mode.
+  rationale: Bind workspace, catalog, limits, endpoint, and diagnostics before worker
+    execution.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 948
+    end_line: 951
+  summary: Compose enabled source sessions in miniSWE provider launches and preserve
+    legacy off mode.
+  rationale: Bind workspace, catalog, limits, endpoint, and diagnostics before worker
+    execution.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 1069
+    end_line: 1109
+  summary: Compose enabled source sessions in miniSWE provider launches and preserve
+    legacy off mode.
+  rationale: Bind workspace, catalog, limits, endpoint, and diagnostics before worker
+    execution.
+- path: tests/test_coding_agent.py
+  type: modified
+  span:
+    start_line: 13
+    end_line: 14
+  summary: Test fake-model context delivery in normal, task-file, and resumed launches
+    and reject missing enforced inputs.
+  rationale: Verify the actual provider and default formatter with long accepted requirements.
+- path: tests/test_coding_agent.py
+  type: modified
+  span:
+    start_line: 186
+    end_line: 268
+  summary: Test fake-model context delivery in normal, task-file, and resumed launches
+    and reject missing enforced inputs.
+  rationale: Verify the actual provider and default formatter with long accepted requirements.
+- path: tests/test_minisweagent_environment.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 270
+  summary: Test spoof and stale detection, visible-only coverage, execution preservation,
+    context truncation, IPC, and frozen attempt inputs.
+  rationale: Exercise trust and delivery boundaries without paid model calls.
 entities:
-- id: workflow-correction-dependency-discovery
-  type: Function
+- id: structrr-miniswe-environment-v1
+  type: Class
   action: added
-- id: merged-correction-dependency-regression
-  type: Regression test
+- id: structrr-observation-model-wrapper-v1
+  type: Class
+  action: added
+- id: structrr-source-observation-session-v1
+  type: Class
+  action: added
+- id: structrr-local-context-bridge-v1
+  type: Class
+  action: added
+- id: structrr-isolated-reader-command-v1
+  type: Command
   action: added
 entity_relationships:
-- id: correction-dependency-test-verifies-discovery
-  source: merged-correction-dependency-regression
-  target: workflow-correction-dependency-discovery
-  type: verifies
+- id: structrr-environment-uses-context-bridge
+  source: structrr-miniswe-environment-v1
+  target: structrr-local-context-bridge-v1
+  relationship: uses
+  type: uses
   action: added
-  description: The regression test verifies a merged correction PR satisfies a
-    workflow dependency.
+  description: The agent environment requests observation verification over the local
+    bridge.
+  rationale: Keep private catalog meaning in the service while executing from the
+    isolated agent package.
+- id: structrr-context-bridge-uses-observation-session
+  source: structrr-local-context-bridge-v1
+  target: structrr-source-observation-session-v1
+  relationship: uses
+  type: uses
+  action: added
+  description: The bridge delegates reader issuance and independent observation checks
+    to the service session.
+  rationale: Avoid trusting catalog or context supplied in command output.
 invariants:
-- id: merged-correction-pr-completes-workflow-dependency
+- id: structrr-observations-require-fresh-service-verification
   action: added
-  description: A merged worker PR on a branch ending in the correction suffix counts
-    as completion evidence for its workflow dependency.
+  description: Reader output must match a session-issued request repeated against
+    current workspace bytes and the trusted frozen catalog.
+- id: structrr-context-survives-source-truncation
+  action: added
+  description: The session appends exact context after the configured formatter processes
+    the original source view.
+- id: structrr-submission-artifacts-remain-unchanged
+  action: added
+  description: Base submission detection passes final artifact content through unchanged
+    and records a digest-only event.
 guidance: []

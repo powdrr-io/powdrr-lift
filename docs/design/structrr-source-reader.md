@@ -15,8 +15,10 @@ The caller supplies `POWDRR_STRUCTRR_WORKSPACE` and
 `POWDRR_STRUCTRR_READER_LIMITS` contains the versioned `ReaderLimits` JSON.
 There are no command flags for choosing another workspace or catalog. These
 environment variables are configuration, not isolation or authorization. The
-miniSWE environment integration remains a separate implementation step and must
-independently verify the observation's source bytes and trusted catalog.
+miniSWE environment integration independently verifies observations through a
+service-owned IPC session; see [its contract](structrr-miniswe-environment.md).
+The isolated worker uses `powdrr_agent.execution.source_reader` so it does not
+need the private service package or a catalog path.
 
 ## Observation contract
 

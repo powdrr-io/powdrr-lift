@@ -12,16 +12,18 @@ adapters, and the caller's authorization responsibility. Step 3 (bounded source
 reader, literal search, context pagination, and digest-keyed cache) is implemented
 in the service's `structrr/source_reader.py`, with the compatibility command in
 `powdrr_lift.structrr.source_reader` and tests in `tests/test_structrr_source_reader.py`.
-See [the reader contract](../design/structrr-source-reader.md). Step 5 (placement
-handoffs, shared prompt/validator contracts, and versioned request serialization)
-is implemented in the service's `structrr/source_reference_handoff.py`, with
-compatibility exports under `powdrr_lift.workrr.source_reference_handoff` and tests
-in `tests/test_source_reference_handoff.py`. See
+See [the reader contract](../design/structrr-source-reader.md). Step 4 (miniSWE
+environment integration and independent observation verification) is implemented
+through the agent's `execution/minisweagent_environment.py`, the local IPC bridge,
+and the service's `structrr/source_observation.py`. See
+[the environment contract](../design/structrr-miniswe-environment.md).
+Step 5 (placement handoffs, shared prompt/validator contracts, and versioned request
+serialization) is implemented in the service's `structrr/source_reference_handoff.py`,
+with compatibility exports under `powdrr_lift.workrr.source_reference_handoff` and
+tests in `tests/test_source_reference_handoff.py`. See
 [the handoff contract](../design/structrr-source-reference-handoff.md).
-Step 4 environment integration is tracked separately in
-[PR #1418](https://github.com/powdrr-io/powdrr-lift/pull/1418). Independent placement
-validation and worker rollout remain planned; reference-bearing requests cannot
-execute until they are integrated. The modules
+Independent placement validation and worker rollout remain planned;
+reference-bearing requests cannot execute until they are integrated. The modules
 marked **new** below are planned. Legacy module paths refer to the service-owned
 responsibilities described in section 12.4.
 

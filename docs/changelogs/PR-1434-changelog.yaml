@@ -1,0 +1,252 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1434
+title: Freeze local validation attestation schemas and fixtures
+intent:
+  problem: The local validation attestation protocol needs stable cross-language wire formats and digest rules before service or signature verification is implemented.
+  goal: Define versioned schemas, strict Python and Swift policy parsing, deterministic cryptographic and snapshot vectors, and standalone package verification for the first implementation slice.
+human-decisions: []
+structured_files: []
+files:
+- path: attestation/README.md
+  type: added
+  span: {start_line: 1, end_line: 22}
+  summary: Explain protocol boundaries, fixtures, and the test-only signing seed.
+  rationale: Keep the schema slice's guarantees and limitations explicit.
+- path: attestation/examples/attestors.yaml
+  type: added
+  span: {start_line: 1, end_line: 12}
+  summary: Provide a sample Ed25519 attestor registry.
+  rationale: Make the registry wire format concrete for parser consumers.
+- path: attestation/examples/local-validation.yaml
+  type: added
+  span: {start_line: 1, end_line: 16}
+  summary: Provide a sample ordered validation policy.
+  rationale: Freeze a policy example shared by the protocol implementations.
+- path: attestation/fixtures/crypto/ed25519-private-seed.TEST-ONLY.hex
+  type: added
+  span: {start_line: 1, end_line: 1}
+  summary: Store the deterministic Ed25519 test seed.
+  rationale: Reproduce signatures in tests without production key material.
+- path: attestation/fixtures/crypto/ed25519-public-key.hex
+  type: added
+  span: {start_line: 1, end_line: 1}
+  summary: Store the raw public key for the signed fixture.
+  rationale: Let independent implementations verify the golden signature.
+- path: attestation/fixtures/crypto/ed25519-signature.hex
+  type: added
+  span: {start_line: 1, end_line: 1}
+  summary: Store the deterministic DSSE signature.
+  rationale: Freeze the signature bytes over the PAE fixture.
+- path: attestation/fixtures/crypto/envelope.json
+  type: added
+  span: {start_line: 1, end_line: 10}
+  summary: Provide the signed DSSE envelope fixture.
+  rationale: Give future verifier implementations a reproducible valid envelope.
+- path: attestation/fixtures/crypto/pae.hex
+  type: added
+  span: {start_line: 1, end_line: 1}
+  summary: Store the exact DSSE pre-authentication encoding bytes.
+  rationale: Freeze signature input independently of serialization libraries.
+- path: attestation/fixtures/crypto/statement.json
+  type: added
+  span: {start_line: 1, end_line: 1}
+  summary: Store the compact in-toto statement payload.
+  rationale: Bind the envelope fixture to the versioned predicate shape.
+- path: attestation/fixtures/invalid/README.md
+  type: added
+  span: {start_line: 1, end_line: 10}
+  summary: Document the invalid YAML cases exercised by both parsers.
+  rationale: Keep shared rejection coverage discoverable.
+- path: attestation/fixtures/invalid/alias.yaml
+  type: added
+  span: {start_line: 1, end_line: 3}
+  summary: Provide an alias-bearing YAML rejection fixture.
+  rationale: Prevent YAML alias expansion and cross-parser ambiguity.
+- path: attestation/fixtures/invalid/custom-tag.yaml
+  type: added
+  span: {start_line: 1, end_line: 1}
+  summary: Provide an explicit custom-tag rejection fixture.
+  rationale: Restrict policy input to the shared YAML subset.
+- path: attestation/fixtures/invalid/duplicate-key.yaml
+  type: added
+  span: {start_line: 1, end_line: 2}
+  summary: Provide a duplicate mapping key rejection fixture.
+  rationale: Avoid parser-dependent meaning for repeated keys.
+- path: attestation/fixtures/invalid/float-timeout.yaml
+  type: added
+  span: {start_line: 1, end_line: 5}
+  summary: Provide a floating-point timeout rejection fixture.
+  rationale: Keep timeout semantics integral across languages.
+- path: attestation/fixtures/invalid/non-string-env.yaml
+  type: added
+  span: {start_line: 1, end_line: 5}
+  summary: Provide a non-string environment value rejection fixture.
+  rationale: Prevent YAML scalar coercion from changing process environments.
+- path: attestation/fixtures/invalid/unknown-field.yaml
+  type: added
+  span: {start_line: 1, end_line: 6}
+  summary: Provide an unknown policy field rejection fixture.
+  rationale: Reject silent schema drift.
+- path: attestation/fixtures/snapshot-vectors.json
+  type: added
+  span: {start_line: 1, end_line: 36}
+  summary: Freeze snapshot, raw policy, and step-definition digest vectors.
+  rationale: Verify identical digest bytes in Python and Swift.
+- path: attestation/fixtures/valid/attestors.yaml
+  type: added
+  span: {start_line: 1, end_line: 12}
+  summary: Provide a valid registry fixture tied to the deterministic public key.
+  rationale: Exercise registry parsing and key fingerprint checks.
+- path: attestation/fixtures/valid/policy-formatted.yaml
+  type: added
+  span: {start_line: 1, end_line: 16}
+  summary: Provide formatting-different YAML with the same policy meaning.
+  rationale: Prove policy digests bind exact source bytes.
+- path: attestation/fixtures/valid/policy.yaml
+  type: added
+  span: {start_line: 1, end_line: 16}
+  summary: Provide the shared ordered Make and shell policy fixture.
+  rationale: Verify typed parsing and step order across implementations.
+- path: attestation/macos/Package.resolved
+  type: added
+  span: {start_line: 1, end_line: 15}
+  summary: Pin the resolved Yams dependency revision.
+  rationale: Make the native protocol parser dependency reproducible.
+- path: attestation/macos/Package.swift
+  type: added
+  span: {start_line: 1, end_line: 14}
+  summary: Define the standalone Swift protocol library and test target.
+  rationale: Keep native protocol code independently buildable.
+- path: attestation/macos/Sources/AttestationProtocol/Digests.swift
+  type: added
+  span: {start_line: 1, end_line: 64}
+  summary: Implement raw policy, step, and snapshot SHA256 digests.
+  rationale: Match the frozen byte encodings across Python and Swift.
+- path: attestation/macos/Sources/AttestationProtocol/Records.swift
+  type: added
+  span: {start_line: 1, end_line: 69}
+  summary: Define typed Swift policy and provider records.
+  rationale: Provide native protocol models for future service work.
+- path: attestation/macos/Sources/AttestationProtocol/StrictYAML.swift
+  type: added
+  span: {start_line: 1, end_line: 127}
+  summary: Bound YAML input and reject aliases, duplicate keys, unknown fields, and invalid policy values.
+  rationale: Keep native parsing aligned with the portable verifier contract.
+- path: attestation/macos/Tests/AttestationProtocolTests/RecordTests.swift
+  type: added
+  span: {start_line: 1, end_line: 103}
+  summary: Verify valid samples, shared rejection fixtures, and golden digest agreement.
+  rationale: Prevent Swift and Python protocol behavior from drifting.
+- path: attestation/schemas/attestors-v1.schema.json
+  type: added
+  span: {start_line: 1, end_line: 15}
+  summary: Define the public key registry v1 shape.
+  rationale: Publish the authorization data contract for independent tooling.
+- path: attestation/schemas/envelope-v1.schema.json
+  type: added
+  span: {start_line: 1, end_line: 12}
+  summary: Define the bounded single-signature DSSE envelope shape.
+  rationale: Freeze the signed transport structure.
+- path: attestation/schemas/ipc-v1.schema.json
+  type: added
+  span: {start_line: 1, end_line: 25}
+  summary: Define versioned bounded local IPC request fields.
+  rationale: Make the future service method envelope explicit before implementation.
+- path: attestation/schemas/policy-v1.schema.json
+  type: added
+  span: {start_line: 1, end_line: 33}
+  summary: Define policy v1 fields, commands, limits, and step shape.
+  rationale: Freeze the validation policy wire contract.
+- path: attestation/schemas/predicate-v1.schema.json
+  type: added
+  span: {start_line: 1, end_line: 26}
+  summary: Define the in-toto statement and local validation predicate.
+  rationale: Freeze signed evidence field names and digest formats.
+- path: attestation/scripts/generate-fixtures.py
+  type: added
+  span: {start_line: 1, end_line: 186}
+  summary: Regenerate deterministic policy, registry, DSSE, key, and snapshot fixtures.
+  rationale: Keep golden protocol vectors reproducible from fixed test inputs.
+- path: attestation/scripts/verify-all.sh
+  type: added
+  span: {start_line: 1, end_line: 26}
+  summary: Run portable parser checks, static checks, wheel build, and isolated import verification.
+  rationale: Validate the package without importing Powdrr runtime modules.
+- path: attestation/verifier/pyproject.toml
+  type: added
+  span: {start_line: 1, end_line: 24}
+  summary: Define the pinned independent Python verifier package and tooling settings.
+  rationale: Keep portable protocol parsing separate from application dependencies.
+- path: attestation/verifier/src/powdrr_attestation/__init__.py
+  type: added
+  span: {start_line: 1, end_line: 17}
+  summary: Expose the protocol package version.
+  rationale: Give the standalone verifier a minimal import boundary.
+- path: attestation/verifier/src/powdrr_attestation/configuration.py
+  type: added
+  span: {start_line: 1, end_line: 372}
+  summary: Parse bounded policy and registry YAML with strict types, duplicate detection, and raw byte hashing.
+  rationale: Reject ambiguous configuration and bind evidence to exact policy bytes.
+- path: attestation/verifier/src/powdrr_attestation/snapshot.py
+  type: added
+  span: {start_line: 1, end_line: 52}
+  summary: Encode snapshot records and step-definition digests per the frozen protocol.
+  rationale: Make source and command identity reproducible across languages.
+- path: attestation/verifier/tests/test_configuration.py
+  type: added
+  span: {start_line: 1, end_line: 152}
+  summary: Cover policy, registry, formatting, resource-limit, and invalid YAML behavior.
+  rationale: Lock strict parser semantics and key fingerprint checks.
+- path: attestation/verifier/tests/test_crypto_fixtures.py
+  type: added
+  span: {start_line: 1, end_line: 35}
+  summary: Verify the golden DSSE PAE bytes and Ed25519 signature.
+  rationale: Ensure fixture signatures cover the exact transport bytes.
+- path: attestation/verifier/tests/test_snapshot.py
+  type: added
+  span: {start_line: 1, end_line: 71}
+  summary: Check shared snapshot, raw policy, and step-definition digest vectors.
+  rationale: Detect cross-language byte encoding regressions.
+entities:
+- id: attestation-policy-v1-parser
+  type: Function
+  action: added
+- id: attestation-registry-v1-parser
+  type: Function
+  action: added
+- id: attestation-snapshot-digest-v1
+  type: Function
+  action: added
+- id: attestation-step-definition-digest-v1
+  type: Function
+  action: added
+- id: attestation-protocol-records-swift
+  type: Struct
+  action: added
+- id: attestation-verifier-python-package
+  type: Package
+  action: added
+- id: attestation-protocol-schemas-v1
+  type: Technical specification
+  action: added
+- id: attestation-shared-golden-fixtures
+  type: Test fixture
+  action: added
+- id: attestation-portable-verification-script
+  type: Script
+  action: added
+entity_relationships: []
+invariants:
+- id: attestation-policy-digest-binds-original-bytes
+  action: added
+  description: Policy hashes cover the original bounded UTF-8 YAML bytes, so formatting changes alter the digest even when parsed values match.
+- id: attestation-parsers-reject-ambiguous-yaml
+  action: added
+  description: Policy and registry parsers reject duplicate keys, aliases, custom tags, unknown properties, non-string environment values, and invalid limits.
+- id: attestation-digests-match-across-languages
+  action: added
+  description: Swift and Python implementations produce the same policy, step-definition, and byte-sorted snapshot SHA256 vectors.
+- id: attestation-fixture-private-key-is-test-only
+  action: added
+  description: The deterministic Ed25519 private seed exists only to regenerate test fixtures and is never used by production provider code.
+guidance: []

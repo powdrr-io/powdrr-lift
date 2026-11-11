@@ -77,8 +77,8 @@ If the process is interrupted, the reserved identity prevents an implicit restar
 inspect its artifacts before accepting a new design revision. These temporary
 artifacts follow the host's retention policy and are not a permanent audit store.
 
-The current protected adapter requires macOS Seatbelt and miniSWE. Unsupported
-platforms and agents block without falling back. Story allocation/validation tasks
+The protected adapters require macOS Seatbelt or Linux bubblewrap, plus miniSWE.
+Unsupported platforms and agents block without falling back. Story allocation/validation tasks
 also block until their test-authoring and coverage stages have a protected adapter;
 they cannot silently lose story proof by selecting this path. Legacy feature
 endpoint and CI-repair dispatch retain their own contracts.

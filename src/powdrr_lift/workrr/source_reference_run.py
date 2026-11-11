@@ -1,7 +1,7 @@
 """One protected, immutable Workrr implementation run for accepted references.
 
-This local rollout uses macOS Seatbelt. Unsupported protection fails before a
-model invocation; callers must not substitute a prompt-only isolation promise.
+Protected runs use macOS Seatbelt or Linux bubblewrap. Unsupported protection
+fails before a model invocation; there is no prompt-only fallback.
 """
 
 from __future__ import annotations
@@ -295,7 +295,7 @@ class SourceReferenceRun:
             "worker_timeout_seconds": worker_timeout_seconds,
             "validation_timeout_seconds": validation_timeout_seconds,
             "limits_digest": self.reader_limits.digest,
-            "isolation": "macos-seatbelt",
+            "isolation": self._isolation_name(),
             "profiles": {name: p.to_data() for name, p in self.profiles.items()},
         }
         payloads = {
@@ -459,12 +459,47 @@ class SourceReferenceRun:
 
     def protect_command(self, command: tuple[str, ...]) -> tuple[str, ...]:
         self.verify_inputs()
-        if sys.platform != "darwin" or not Path("/usr/bin/sandbox-exec").is_file():
-            raise ValueError(
-                "Source execution requires macOS Seatbelt; "
-                "no unprotected fallback is permitted"
+        if sys.platform == "darwin" and Path("/usr/bin/sandbox-exec").is_file():
+            return ("/usr/bin/sandbox-exec", "-f", str(self.profile_path), *command)
+        bwrap = Path("/usr/bin/bwrap")
+        if sys.platform.startswith("linux") and bwrap.is_file():
+            return (
+                str(bwrap),
+                "--die-with-parent",
+                "--new-session",
+                "--unshare-user",
+                "--unshare-pid",
+                "--unshare-net",
+                "--ro-bind",
+                "/",
+                "/",
+                "--dev",
+                "/dev",
+                "--proc",
+                "/proc",
+                "--bind",
+                str(self.workspace_root),
+                str(self.workspace_root),
+                "--bind",
+                str(self.public_root),
+                str(self.public_root),
+                "--tmpfs",
+                str(self.private_root),
+                "--",
+                *command,
             )
-        return ("/usr/bin/sandbox-exec", "-f", str(self.profile_path), *command)
+        raise ValueError(
+            "Source execution requires macOS Seatbelt or Linux bubblewrap; "
+            "no unprotected fallback is permitted"
+        )
+
+    @staticmethod
+    def _isolation_name() -> str:
+        if sys.platform == "darwin" and Path("/usr/bin/sandbox-exec").is_file():
+            return "macos-seatbelt"
+        if sys.platform.startswith("linux") and Path("/usr/bin/bwrap").is_file():
+            return "linux-bubblewrap"
+        return "unsupported"
 
     def _probe_protection(self) -> None:
         code = (
@@ -472,7 +507,7 @@ class SourceReferenceRun:
             "q=pathlib.Path(sys.argv[2]);\n"
             "for mode in ('rb','r+b'):\n"
             " try:\n  f=p.open(mode); f.close(); sys.exit(11)\n"
-            " except PermissionError: pass\n"
+            " except (PermissionError, FileNotFoundError): pass\n"
             "q.write_text('probe'); q.unlink()\n"
         )
         result = subprocess.run(

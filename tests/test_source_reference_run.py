@@ -159,8 +159,8 @@ def prepare(
         )
     except ValueError as error:
         if native and (
-            sys.platform != "darwin"
-            or "sandbox_apply: Operation not permitted" in str(error)
+            "Operation not permitted" in str(error)
+            or "No permissions to create a new namespace" in str(error)
         ):
             pytest.skip(
                 "Native source protection is unavailable in the outer test environment"
@@ -237,9 +237,40 @@ def test_unsupported_protection_has_no_plain_fallback(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     run = prepare(tmp_path, monkeypatch)
+    original_is_file = Path.is_file
+    monkeypatch.setattr(
+        Path,
+        "is_file",
+        lambda self: False if str(self) == "/usr/bin/bwrap" else original_is_file(self),
+    )
     monkeypatch.setattr(sys, "platform", "linux")
-    with pytest.raises(ValueError, match="Seatbelt"):
+    with pytest.raises(ValueError, match="bubblewrap"):
         run.protect_command((sys.executable, "-c", "pass"))
+
+
+def test_linux_bubblewrap_command_hides_private_and_bounds_writes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    run = prepare(tmp_path, monkeypatch)
+    monkeypatch.setattr(sys, "platform", "linux")
+    original_is_file = Path.is_file
+    monkeypatch.setattr(
+        Path,
+        "is_file",
+        lambda self: True if str(self) == "/usr/bin/bwrap" else original_is_file(self),
+    )
+    command = run.protect_command((sys.executable, "-c", "pass"))
+    assert command[:2] == ("/usr/bin/bwrap", "--die-with-parent")
+    assert "--unshare-net" in command
+    assert command[command.index("--ro-bind") + 1 : command.index("--ro-bind") + 3] == (
+        "/",
+        "/",
+    )
+    assert command[command.index("--tmpfs") + 1] == str(run.private_root)
+    assert command[command.index("--bind") + 1 : command.index("--bind") + 3] == (
+        str(run.workspace_root),
+        str(run.workspace_root),
+    )
 
 
 @pytest.mark.parametrize(

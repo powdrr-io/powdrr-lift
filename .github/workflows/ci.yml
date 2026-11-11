@@ -79,7 +79,7 @@ jobs:
       - name: Install ripgrep
         run: |
           sudo apt-get update
-          sudo apt-get install --yes ripgrep
+          sudo apt-get install --yes bubblewrap ripgrep
 
       - name: Install uv
         uses: astral-sh/setup-uv@v3

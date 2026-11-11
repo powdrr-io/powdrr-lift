@@ -18,15 +18,17 @@ execution and validation. Configuration includes explicit `enforce` mode, model,
 budgets, reader limits, validation commands, dependency version, and request identity.
 Changing these inputs invalidates the run.
 
-The supported adapter is macOS `sandbox-exec` with Seatbelt. Preparation probes the
-actual protection before authorizing execution. Worker and behavioral validation
-processes cannot read private artifacts. Their writes are confined to the candidate
-workspace and worker artifact directory, with Git metadata additionally protected.
+The supported adapters are macOS `sandbox-exec` with Seatbelt and Linux
+`bubblewrap`. Preparation probes the actual protection before authorizing execution.
+On Linux, bubblewrap mounts the host filesystem read-only, binds only the candidate
+workspace and worker artifact directory as writable, hides private inputs with a
+temporary filesystem, and disables network access. Worker and behavioral validation
+processes cannot read private artifacts. Git metadata remains read-only.
 Temporary and cache directories are redirected into worker artifacts. Parent-side
 inference credentials and private reference configuration are removed from validation
 environments. Unsupported platforms, unavailable protection, and unbound requests
-fail before worker invocation; there is no unprotected fallback. Linux, containers,
-and OpenCode need equivalent adapters before they can execute this contract.
+fail before worker invocation; there is no unprotected fallback. Containers and
+OpenCode need equivalent adapters before they can execute this contract.
 
 This is a private-input and write boundary, not a general filesystem secrecy policy.
 Other host files remain readable under the existing local execution model. The
@@ -75,8 +77,8 @@ their original prompt serialization.
 `tests/test_source_reference_run.py` runs an offline fake-model relocation through
 the real miniSWE environment, reader bridge, Seatbelt boundary, and final validators.
 It also exercises incorrect ownership, missing verified context, reported design
-gaps, and validation that mutates source. Native integration cases require macOS
-and permission to create the nested sandbox. They make no provider calls.
+gaps, and validation that mutates source. Native integration cases require the platform adapter and permission to create the
+nested sandbox. They make no provider calls.
 The optional `scripts/smoke-source-reference-run.py` requires both `--live` and
 `POWDRR_LIVE_SOURCE_REFERENCE_SMOKE=1`; it is never part of routine verification.
 

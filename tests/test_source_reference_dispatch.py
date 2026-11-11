@@ -172,8 +172,10 @@ def test_task_routes_before_legacy_authorship_and_recovery(
 def test_native_dispatch_validates_before_applying_candidate(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, scenario: str
 ) -> None:
-    if sys.platform != "darwin":
-        pytest.skip("Native source dispatch requires macOS Seatbelt")
+    if sys.platform == "linux" and not Path("/usr/bin/bwrap").is_file():
+        pytest.skip("Native Linux source dispatch requires bubblewrap")
+    if sys.platform not in {"darwin", "linux"}:
+        pytest.skip("Native source dispatch requires macOS or Linux")
     repo, base, proposed = fixture(tmp_path)
     monkeypatch.setattr(dispatch.tempfile, "gettempdir", lambda: str(tmp_path))
     monkeypatch.setenv("MSWEA_COST_TRACKING", "ignore_errors")
@@ -251,7 +253,13 @@ def test_native_dispatch_validates_before_applying_candidate(
         review_client=Reviewer(),
     )
     result = dispatch.dispatch_source_reference_task(**parameters)
-    if "sandbox_apply: Operation not permitted" in (result.get("error") or ""):
+    if any(
+        message in (result.get("error") or "")
+        for message in (
+            "sandbox_apply: Operation not permitted",
+            "No permissions to create a new namespace",
+        )
+    ):
         pytest.skip("Outer environment prevents nested native sandbox")
     assert result["passed"] is (scenario == "success"), result
     assert result["continuations"] == 0

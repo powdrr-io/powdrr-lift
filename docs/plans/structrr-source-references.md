@@ -27,7 +27,7 @@ local checks, and validation-report integration) is implemented in the service's
 `structrr/reference_validation.py` and Workrr's `source_reference_validation.py`.
 See [the validation contract](../design/structrr-reference-validation.md) and
 `tests/test_structrr_reference_validation.py`. Step 7 supplies the initial local
-macOS rollout through `workrr/source_reference_run.py`: immutable private inputs,
+macOS/Linux rollout through `workrr/source_reference_run.py`: immutable private inputs,
 one protected miniSWE invocation, verified context coverage, independent final
 validation, and terminal artifacts. See [the rollout contract](../design/structrr-reference-rollout.md).
 Other platforms require a protection adapter and fail closed today. The modules

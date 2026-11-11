@@ -5,13 +5,14 @@ from __future__ import annotations
 import base64
 import hashlib
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Mapping
+from typing import Any
 
 import yaml
 from yaml.events import AliasEvent
-from yaml.tokens import AnchorToken, AliasToken, TagToken
+from yaml.tokens import AliasToken, AnchorToken, TagToken
 
 POLICY_MAX_BYTES = 64 * 1024
 REGISTRY_MAX_BYTES = 256 * 1024
@@ -354,7 +355,7 @@ def _timestamp(
     if not isinstance(raw, str) or not raw.endswith("Z"):
         raise ConfigurationError(f"INVALID_TIMESTAMP:{key}")
     try:
-        parsed = datetime.fromisoformat(raw[:-1] + "+00:00")
+        parsed = datetime.fromisoformat(raw)
     except ValueError as error:
         raise ConfigurationError(f"INVALID_TIMESTAMP:{key}") from error
     offset = parsed.utcoffset()

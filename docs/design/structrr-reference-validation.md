@@ -130,7 +130,11 @@ the private context and workspace. Missing configuration fails explicitly. The
 response includes the public report, not the manifest or private validation data.
 Automatic provider construction of this callback is part of step 7.
 
-For a trusted local host, `python -m powdrr_lift.structrr.source_reader check`
+The compatibility reader command
+`python -m powdrr_lift.structrr.source_reader check` uses that same IPC proxy;
+the Structrr language wrapper does not import Workrr orchestration.
+
+For a trusted local host, `python -m powdrr_lift.workrr.source_reference_validation`
 loads `POWDRR_STRUCTRR_WORKSPACE`, `POWDRR_STRUCTRR_CATALOG`,
 `POWDRR_STRUCTRR_HANDOFF`, and `POWDRR_STRUCTRR_VALIDATION_INPUTS` (the latter three
 are serialized file paths). This host command's environment is configuration,

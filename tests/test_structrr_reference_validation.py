@@ -566,7 +566,8 @@ def test_reference_report_is_separate_from_behavior_and_missing_context_blocks(
 def test_local_check_cli_and_isolated_proxy_use_only_trusted_configuration(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    from powdrr_lift.structrr.source_reader import main
+    from powdrr_lift.structrr.source_reader import main as reader_main
+    from powdrr_lift.workrr.source_reference_validation import main_check
 
     handoff, catalog = repository(tmp_path)
     for name, value in (
@@ -578,7 +579,7 @@ def test_local_check_cli_and_isolated_proxy_use_only_trusted_configuration(
         path.write_text(json.dumps(value))
         monkeypatch.setenv("POWDRR_STRUCTRR_" + name, str(path))
     monkeypatch.setenv("POWDRR_STRUCTRR_WORKSPACE", str(tmp_path))
-    assert main(["check"]) == 0
+    assert main_check([]) == 0
     assert json.loads(capsys.readouterr().out)["status"] == "passed"
     trusted = context(handoff, catalog)
     with StructrrContextBridge(
@@ -587,6 +588,9 @@ def test_local_check_cli_and_isolated_proxy_use_only_trusted_configuration(
         "enforce",
         reference_check=lambda: trusted.check(tmp_path),
     ) as bridge:
+        monkeypatch.setenv("POWDRR_STRUCTRR_ENDPOINT", bridge.endpoint)
+        assert reader_main(["check"]) == 0
+        assert json.loads(capsys.readouterr().out)["status"] == "passed"
         result = subprocess.run(
             [sys.executable, "-m", "powdrr_agent.execution.source_reader", "check"],
             env=os.environ | {"POWDRR_STRUCTRR_ENDPOINT": bridge.endpoint},

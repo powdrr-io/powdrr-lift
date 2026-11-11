@@ -5,9 +5,9 @@ from powdrr_service.structrr.source_reader import main as reader_main
 
 def main(argv: list[str] | None = None) -> int:
     def check() -> int:
-        from powdrr_lift.workrr.source_reference_validation import main_check
+        from powdrr_agent.execution.source_reader import main as proxy_main
 
-        return main_check([])
+        return proxy_main(["check"])
 
     return reader_main(argv, reference_check=check)
 

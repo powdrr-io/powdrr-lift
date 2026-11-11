@@ -322,3 +322,7 @@ def main_check(argv: list[str] | None = None) -> int:
         return 2
     print(json.dumps(report.to_data(), ensure_ascii=False))
     return 0 if report.status == "passed" else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main_check())

@@ -37,6 +37,19 @@ def test_reviewed_plan_does_not_flag_references_or_missing_base_files() -> None:
     assert findings == ()
 
 
+def test_reviewed_plan_allows_explicit_create_or_update_of_existing_file() -> None:
+    findings = reviewed_file_creation_conflicts(
+        allowed_paths=(".github/workflows/ci.yml",),
+        implementation_steps=(
+            "Create or update .github/workflows/ci.yml with the reviewed settings.",
+        ),
+        base_commit="abc123",
+        existing_file_sha256={".github/workflows/ci.yml": "workflow-digest"},
+    )
+
+    assert findings == ()
+
+
 def test_reviewed_plan_ignores_unsafe_paths() -> None:
     findings = reviewed_file_creation_conflicts(
         allowed_paths=("../outside.py", "/absolute.py"),

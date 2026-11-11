@@ -52,10 +52,13 @@ def implementation_step_creates_path(step: str, raw_path: str) -> bool:
         r"\b(?:and|then|that|which|while|when|runs?|executes?|references?|calls?)\b",
         re.I,
     )
+    update_alternative = re.compile(r"\bor\s+(?:update|modify|edit|reuse)\b", re.I)
     for path_match in path_pattern.finditer(step):
         prefix = step[: path_match.start()]
         for creation_match in reversed(tuple(creation_pattern.finditer(prefix))):
             between = prefix[creation_match.end() :]
+            if update_alternative.search(between):
+                continue
             if len(between) > 96 or clause_break.search(between):
                 continue
             return True

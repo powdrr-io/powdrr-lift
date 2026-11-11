@@ -20,6 +20,7 @@ steps:
         - Describe one concrete discovery and the directly affected subjects. Do not widen impact to the whole plan.
         - Prefer a dependency correction when an existing dependency is missing or wrong. Use update_item only when the reviewed item text itself prevents correct execution.
         - For update_item, return a complete replacement item for the same item ID, preserving its workflow ID and workflow file. Do not invent a new ID or change requirement allocation.
+        - "Each operation object must use the exact key `operation` (never `op`) and one of: add_item, update_item, retire_item, set_dependency, update_requirement, assign_setup."
         - Preserve dependencies, planned paths, implementation steps, setup instructions, and inline adjustments unless the cited evidence establishes that one is defective.
         - Return no setup, requirement, unit, or Structrr replacements unless concrete evidence and supplied IDs require them.
         - If the evidence does not support a concrete typed correction, return an empty operations list; the repair operation will reject it for human review.
@@ -55,7 +56,11 @@ steps:
                   reason: {type: string, minLength: 1}
             operations:
               type: array
-              items: {type: object}
+              items:
+                type: object
+                required: [operation]
+                properties:
+                  operation: {type: string, enum: [add_item, update_item, retire_item, set_dependency, update_requirement, assign_setup]}
             replacement_items:
               type: object
               additionalProperties:

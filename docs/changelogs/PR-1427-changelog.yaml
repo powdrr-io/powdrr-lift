@@ -1,0 +1,439 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1427
+title: Enable protected Structrr source reference runs in Workrr
+intent:
+  problem: Reference-bearing handoffs cannot safely execute without bound private
+    authority, verified context delivery, and independent final validation.
+  goal: Enable one protected local implementation invocation with immutable inputs
+    and separate behavioral and source proof.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/design/structrr-reference-rollout.md
+  type: added
+  span:
+    start_line: 1
+    end_line: 81
+  summary: Document protected run authority, single invocation, artifacts, supported
+    platform, and proof boundaries.
+  rationale: Make the initial local rollout and its limits reviewable.
+- path: docs/design/structrr-reference-validation.md
+  type: modified
+  span:
+    start_line: 9
+    end_line: 13
+  summary: Describe protected orchestration and final source validation after behavioral
+    commands.
+  rationale: Keep the validation contract aligned with implemented execution.
+- path: docs/design/structrr-source-reference-handoff.md
+  type: modified
+  span:
+    start_line: 109
+    end_line: 119
+  summary: Describe prepared execution, workspace binding, and structured owner/gap
+    completion.
+  rationale: Replace the completed rollout prerequisite with the actual authorization
+    boundary.
+- path: docs/plans/structrr-source-references.md
+  type: modified
+  span:
+    start_line: 29
+    end_line: 34
+  summary: Record the initial macOS implementation of the final orchestration stage.
+  rationale: Track delivered protection without claiming unsupported adapters.
+- path: packages/service/src/powdrr_service/structrr/source_observation.py
+  type: modified
+  span:
+    start_line: 166
+    end_line: 176
+  summary: Record verified canonical-context page intervals in private observation
+    events.
+  rationale: Prove complete delivery without storing raw definitions in event metadata.
+- path: packages/service/src/powdrr_service/structrr/source_reference_handoff.py
+  type: modified
+  span:
+    start_line: 268
+    end_line: 268
+  summary: Optionally bind an absolute workspace and structured completion protocol
+    into compiled public prompts.
+  rationale: Preserve historical prompt bytes while making new protected runs unambiguous.
+- path: packages/service/src/powdrr_service/structrr/source_reference_handoff.py
+  type: modified
+  span:
+    start_line: 270
+    end_line: 274
+  summary: Optionally bind an absolute workspace and structured completion protocol
+    into compiled public prompts.
+  rationale: Preserve historical prompt bytes while making new protected runs unambiguous.
+- path: packages/service/src/powdrr_service/structrr/source_reference_handoff.py
+  type: modified
+  span:
+    start_line: 340
+    end_line: 340
+  summary: Optionally bind an absolute workspace and structured completion protocol
+    into compiled public prompts.
+  rationale: Preserve historical prompt bytes while making new protected runs unambiguous.
+- path: packages/service/src/powdrr_service/structrr/source_reference_handoff.py
+  type: modified
+  span:
+    start_line: 346
+    end_line: 351
+  summary: Optionally bind an absolute workspace and structured completion protocol
+    into compiled public prompts.
+  rationale: Preserve historical prompt bytes while making new protected runs unambiguous.
+- path: packages/service/src/powdrr_service/structrr/source_reference_handoff.py
+  type: modified
+  span:
+    start_line: 353
+    end_line: 358
+  summary: Optionally bind an absolute workspace and structured completion protocol
+    into compiled public prompts.
+  rationale: Preserve historical prompt bytes while making new protected runs unambiguous.
+- path: packages/service/src/powdrr_service/structrr/source_reference_handoff.py
+  type: modified
+  span:
+    start_line: 427
+    end_line: 436
+  summary: Optionally bind an absolute workspace and structured completion protocol
+    into compiled public prompts.
+  rationale: Preserve historical prompt bytes while making new protected runs unambiguous.
+- path: packages/service/src/powdrr_service/structrr/source_reference_handoff.py
+  type: modified
+  span:
+    start_line: 557
+    end_line: 557
+  summary: Optionally bind an absolute workspace and structured completion protocol
+    into compiled public prompts.
+  rationale: Preserve historical prompt bytes while making new protected runs unambiguous.
+- path: packages/service/src/powdrr_service/structrr/source_reference_handoff.py
+  type: modified
+  span:
+    start_line: 574
+    end_line: 576
+  summary: Optionally bind an absolute workspace and structured completion protocol
+    into compiled public prompts.
+  rationale: Preserve historical prompt bytes while making new protected runs unambiguous.
+- path: scripts/smoke-source-reference-run.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 118
+  summary: Provide an explicitly opted-in live-provider source annotation smoke with
+    independent semantic review.
+  rationale: Allow manual provider verification without paid calls in routine tests.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 28
+    end_line: 29
+  summary: Authorize prepared runs, retain exact prompt bytes, isolate worker files
+    and commands, and disable resume for reference runs.
+  rationale: Bind execution to frozen authority while retaining legacy non-reference
+    behavior.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 192
+    end_line: 194
+  summary: Authorize prepared runs, retain exact prompt bytes, isolate worker files
+    and commands, and disable resume for reference runs.
+  rationale: Bind execution to frozen authority while retaining legacy non-reference
+    behavior.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 196
+    end_line: 203
+  summary: Authorize prepared runs, retain exact prompt bytes, isolate worker files
+    and commands, and disable resume for reference runs.
+  rationale: Bind execution to frozen authority while retaining legacy non-reference
+    behavior.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 917
+    end_line: 919
+  summary: Authorize prepared runs, retain exact prompt bytes, isolate worker files
+    and commands, and disable resume for reference runs.
+  rationale: Bind execution to frozen authority while retaining legacy non-reference
+    behavior.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 927
+    end_line: 927
+  summary: Authorize prepared runs, retain exact prompt bytes, isolate worker files
+    and commands, and disable resume for reference runs.
+  rationale: Bind execution to frozen authority while retaining legacy non-reference
+    behavior.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 929
+    end_line: 933
+  summary: Authorize prepared runs, retain exact prompt bytes, isolate worker files
+    and commands, and disable resume for reference runs.
+  rationale: Bind execution to frozen authority while retaining legacy non-reference
+    behavior.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 963
+    end_line: 967
+  summary: Authorize prepared runs, retain exact prompt bytes, isolate worker files
+    and commands, and disable resume for reference runs.
+  rationale: Bind execution to frozen authority while retaining legacy non-reference
+    behavior.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 980
+    end_line: 987
+  summary: Authorize prepared runs, retain exact prompt bytes, isolate worker files
+    and commands, and disable resume for reference runs.
+  rationale: Bind execution to frozen authority while retaining legacy non-reference
+    behavior.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 997
+    end_line: 998
+  summary: Authorize prepared runs, retain exact prompt bytes, isolate worker files
+    and commands, and disable resume for reference runs.
+  rationale: Bind execution to frozen authority while retaining legacy non-reference
+    behavior.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 1017
+    end_line: 1017
+  summary: Authorize prepared runs, retain exact prompt bytes, isolate worker files
+    and commands, and disable resume for reference runs.
+  rationale: Bind execution to frozen authority while retaining legacy non-reference
+    behavior.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 1075
+    end_line: 1075
+  summary: Authorize prepared runs, retain exact prompt bytes, isolate worker files
+    and commands, and disable resume for reference runs.
+  rationale: Bind execution to frozen authority while retaining legacy non-reference
+    behavior.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 1099
+    end_line: 1100
+  summary: Authorize prepared runs, retain exact prompt bytes, isolate worker files
+    and commands, and disable resume for reference runs.
+  rationale: Bind execution to frozen authority while retaining legacy non-reference
+    behavior.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 1118
+    end_line: 1118
+  summary: Authorize prepared runs, retain exact prompt bytes, isolate worker files
+    and commands, and disable resume for reference runs.
+  rationale: Bind execution to frozen authority while retaining legacy non-reference
+    behavior.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 1124
+    end_line: 1126
+  summary: Authorize prepared runs, retain exact prompt bytes, isolate worker files
+    and commands, and disable resume for reference runs.
+  rationale: Bind execution to frozen authority while retaining legacy non-reference
+    behavior.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 1155
+    end_line: 1156
+  summary: Authorize prepared runs, retain exact prompt bytes, isolate worker files
+    and commands, and disable resume for reference runs.
+  rationale: Bind execution to frozen authority while retaining legacy non-reference
+    behavior.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 1158
+    end_line: 1160
+  summary: Authorize prepared runs, retain exact prompt bytes, isolate worker files
+    and commands, and disable resume for reference runs.
+  rationale: Bind execution to frozen authority while retaining legacy non-reference
+    behavior.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 1174
+    end_line: 1175
+  summary: Authorize prepared runs, retain exact prompt bytes, isolate worker files
+    and commands, and disable resume for reference runs.
+  rationale: Bind execution to frozen authority while retaining legacy non-reference
+    behavior.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 1494
+    end_line: 1494
+  summary: Authorize prepared runs, retain exact prompt bytes, isolate worker files
+    and commands, and disable resume for reference runs.
+  rationale: Bind execution to frozen authority while retaining legacy non-reference
+    behavior.
+- path: src/powdrr_lift/workrr/coding_agent_validation.py
+  type: modified
+  span:
+    start_line: 9
+    end_line: 9
+  summary: Bind private context and owner claims, protect behavioral commands, and
+    run source validation last.
+  rationale: Require independent behavioral and placement proof against the final
+    candidate.
+- path: src/powdrr_lift/workrr/coding_agent_validation.py
+  type: modified
+  span:
+    start_line: 152
+    end_line: 164
+  summary: Bind private context and owner claims, protect behavioral commands, and
+    run source validation last.
+  rationale: Require independent behavioral and placement proof against the final
+    candidate.
+- path: src/powdrr_lift/workrr/coding_agent_validation.py
+  type: modified
+  span:
+    start_line: 169
+    end_line: 171
+  summary: Bind private context and owner claims, protect behavioral commands, and
+    run source validation last.
+  rationale: Require independent behavioral and placement proof against the final
+    candidate.
+- path: src/powdrr_lift/workrr/coding_agent_validation.py
+  type: modified
+  span:
+    start_line: 234
+    end_line: 236
+  summary: Bind private context and owner claims, protect behavioral commands, and
+    run source validation last.
+  rationale: Require independent behavioral and placement proof against the final
+    candidate.
+- path: src/powdrr_lift/workrr/coding_agent_validation.py
+  type: modified
+  span:
+    start_line: 241
+    end_line: 243
+  summary: Bind private context and owner claims, protect behavioral commands, and
+    run source validation last.
+  rationale: Require independent behavioral and placement proof against the final
+    candidate.
+- path: src/powdrr_lift/workrr/coding_agent_validation.py
+  type: modified
+  span:
+    start_line: 314
+    end_line: 318
+  summary: Bind private context and owner claims, protect behavioral commands, and
+    run source validation last.
+  rationale: Require independent behavioral and placement proof against the final
+    candidate.
+- path: src/powdrr_lift/workrr/coding_agent_validation.py
+  type: modified
+  span:
+    start_line: 334
+    end_line: 334
+  summary: Bind private context and owner claims, protect behavioral commands, and
+    run source validation last.
+  rationale: Require independent behavioral and placement proof against the final
+    candidate.
+- path: src/powdrr_lift/workrr/coding_agent_validation.py
+  type: modified
+  span:
+    start_line: 373
+    end_line: 375
+  summary: Bind private context and owner claims, protect behavioral commands, and
+    run source validation last.
+  rationale: Require independent behavioral and placement proof against the final
+    candidate.
+- path: src/powdrr_lift/workrr/coding_agent_validation.py
+  type: modified
+  span:
+    start_line: 434
+    end_line: 441
+  summary: Bind private context and owner claims, protect behavioral commands, and
+    run source validation last.
+  rationale: Require independent behavioral and placement proof against the final
+    candidate.
+- path: src/powdrr_lift/workrr/coding_agent_validation.py
+  type: modified
+  span:
+    start_line: 443
+    end_line: 447
+  summary: Bind private context and owner claims, protect behavioral commands, and
+    run source validation last.
+  rationale: Require independent behavioral and placement proof against the final
+    candidate.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 727
+  summary: Prepare sealed source inputs, probe native isolation, execute one protected
+    attempt, verify context delivery and completion, and persist terminal results.
+  rationale: Fail closed on changed authority, missing evidence, unsupported protection,
+    source mutation, or invalid ownership.
+- path: tests/test_source_reference_run.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 355
+  summary: Exercise frozen inputs, authorization, page coverage, unsupported adapters,
+    and native offline success and failure scenarios.
+  rationale: Verify real worker isolation and reject incorrect ownership, missing
+    context, design gaps, and candidate mutation.
+entities:
+- id: structrr-protected-source-run-v1
+  type: Class
+  action: added
+- id: structrr-source-run-terminal-v1
+  type: Class
+  action: added
+- id: structrr-context-delivery-check-v1
+  type: Function
+  action: added
+- id: structrr-source-run-live-smoke-v1
+  type: Script
+  action: added
+entity_relationships:
+- id: structrr-protected-run-produces-terminal-v1
+  source: structrr-protected-source-run-v1
+  target: structrr-source-run-terminal-v1
+  relationship: creates
+  type: creates
+  action: added
+  description: Protected execution produces a fingerprinted terminal result with input
+    identities and independent validation.
+  rationale: Retain attributable evidence for both accepted and failed attempts.
+- id: structrr-protected-run-verifies-delivery-v1
+  source: structrr-protected-source-run-v1
+  target: structrr-context-delivery-check-v1
+  relationship: uses
+  type: uses
+  action: added
+  description: The run reconstructs full canonical-context coverage from trusted page
+    events.
+  rationale: Prevent visible markers and partial reads from claiming delivered context.
+invariants:
+- id: structrr-source-run-private-inputs-immutable-v1
+  action: added
+  description: Frozen private inputs are unreadable to worker and validation processes
+    and changes invalidate the run.
+- id: structrr-source-run-single-enforced-attempt-v1
+  action: added
+  description: Mandatory references execute once in enforce mode with no repair, resume,
+    downgrade, or unprotected fallback.
+- id: structrr-source-run-independent-final-proof-v1
+  action: added
+  description: Acceptance requires complete verified context, no design gaps, behavioral
+    success, correct final source ownership, and an unchanged post-worker candidate.
+guidance: []

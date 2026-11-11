@@ -42,7 +42,10 @@ from powdrr_service.planning.multipr_structrr import (
     reconcile_item_candidate,
     structural_repair_findings,
 )
-from powdrr_service.planning.reviewed_plan import reviewed_file_creation_conflicts
+from powdrr_service.planning.reviewed_plan import (
+    implementation_step_updates_path,
+    reviewed_file_creation_conflicts,
+)
 from powdrr_service.planning.story_allocation import (
     parse_story_refs,
     story_amendment_impact,
@@ -797,7 +800,12 @@ def _issue_worker_structrr_context(
         )
 
     file_overlap_findings = _preflight_proposed_file_additions(
-        repo_root, item_proposal, base_commit=base_commit
+        repo_root,
+        item_proposal,
+        base_commit=base_commit,
+        implementation_steps=_issue_worker_string_list(
+            proposed.get("implementation_steps")
+        ),
     )
     if file_overlap_findings:
         raise PowdrrExecutionError(
@@ -1407,6 +1415,7 @@ def _preflight_proposed_file_additions(
     proposal: ProposalRevision,
     *,
     base_commit: str,
+    implementation_steps: Sequence[str] = (),
 ) -> tuple[str, ...]:
     """Find accepted file additions that already collide with the base tree."""
     root = repo_root.resolve()
@@ -1420,6 +1429,11 @@ def _preflight_proposed_file_additions(
             findings.append(
                 f"{operation.operation_id} has no repository-relative file path"
             )
+            continue
+        if any(
+            implementation_step_updates_path(step, raw_path)
+            for step in implementation_steps
+        ):
             continue
         relative_path = PurePosixPath(raw_path)
         if relative_path.is_absolute() or ".." in relative_path.parts:

@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from powdrr_service.planning.reviewed_plan import reviewed_file_creation_conflicts
+from powdrr_service.planning.reviewed_plan import (
+    implementation_step_updates_path,
+    reviewed_file_creation_conflicts,
+)
 
 
 def test_reviewed_plan_flags_only_existing_paths_explicitly_to_be_created() -> None:
@@ -48,6 +51,21 @@ def test_reviewed_plan_allows_explicit_create_or_update_of_existing_file() -> No
     )
 
     assert findings == ()
+
+
+def test_implementation_step_updates_path_recognizes_explicit_update_language() -> None:
+    assert implementation_step_updates_path(
+        "Create or update .github/workflows/ci.yml with the reviewed settings.",
+        ".github/workflows/ci.yml",
+    )
+    assert implementation_step_updates_path(
+        "Update the existing .github/workflows/ci.yml with the reviewed settings.",
+        ".github/workflows/ci.yml",
+    )
+    assert not implementation_step_updates_path(
+        "Create .github/workflows/ci.yml with the reviewed settings.",
+        ".github/workflows/ci.yml",
+    )
 
 
 def test_reviewed_plan_ignores_unsafe_paths() -> None:

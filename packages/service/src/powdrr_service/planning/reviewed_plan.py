@@ -65,4 +65,26 @@ def implementation_step_creates_path(step: str, raw_path: str) -> bool:
     return False
 
 
-__all__ = ["implementation_step_creates_path", "reviewed_file_creation_conflicts"]
+def implementation_step_updates_path(step: str, raw_path: str) -> bool:
+    """Return whether an implementation step explicitly updates this path."""
+    path_pattern = re.compile(rf"(?<![\w./-]){re.escape(raw_path)}(?![\w./-])")
+    update_pattern = re.compile(r"\b(?:update|modify|edit|reuse)\b", re.I)
+    clause_break = re.compile(
+        r"\b(?:and|then|that|which|while|when|runs?|executes?|references?|calls?)\b",
+        re.I,
+    )
+    for path_match in path_pattern.finditer(step):
+        prefix = step[: path_match.start()]
+        for update_match in reversed(tuple(update_pattern.finditer(prefix))):
+            between = prefix[update_match.end() :]
+            if len(between) <= 96 and not clause_break.search(between):
+                return True
+            break
+    return False
+
+
+__all__ = [
+    "implementation_step_creates_path",
+    "implementation_step_updates_path",
+    "reviewed_file_creation_conflicts",
+]

@@ -1348,7 +1348,7 @@ def test_issue_worker_blocks_structrr_subject_changed_since_plan(
         )
 
 
-def test_issue_worker_continues_after_nontrivial_validation_failure(
+def test_issue_worker_rejects_unreviewed_legacy_implementation(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -1603,57 +1603,12 @@ def test_issue_worker_continues_after_nontrivial_validation_failure(
         repair_fallback_model=None,
     )
 
-    result = strategy._run_coding_agent()
-    assert result["passed"] is True
-    assert result["continuations"] == 1
-    assert len(result["attempts"]) == 2
-    assert result["attempts"][0]["validation"]["status"] == "failed"
-    assert result["attempts"][1]["validation"]["status"] == "passed"
-    assert result["structrr"]["passed"] is True
-    structrr_artifact_paths = result["structrr"]["artifact_paths"]
-    assert structrr_artifact_paths == [
-        "docs/structrr/diffs/feature-v1/feature-v1-pr-01/structrr-diff.yaml",
-    ]
-    assert set(structrr_artifact_paths) <= set(result["changed_paths"])
-    assert all((tmp_path / path).is_file() for path in structrr_artifact_paths)
-    assert result["integration_tests"]["passed"] is True
-    assert result["integration_tests"]["generation_method"] == "miniswe_pre_coding"
-    assert result["integration_tests"]["test_sha256"] == {
-        "tests/integration/test_feature_e2e.py": "a" * 64
-    }
-    assert result["integration_tests"]["authoring_attempts"] == [
-        {"status": "completed"}
-    ]
-    assert result["integration_tests"]["paths"] == [
-        "tests/integration/test_feature_e2e.py"
-    ]
-    assert result["attempts"][0]["structrr"]["passed"] is False
-    assert reconciled_allowed_paths == [("src",), ("src",)]
-    assert (
-        bootstrap_exclusions.count(
-            (
-                "docs/plans/feature-v1-execution-plan.yaml",
-                "docs/plans/feature-v1-structrr-proposal.json",
-                "docs/workflows/feature-v1/",
-                "docs/structrr/diffs",
-                "tests/integration/test_feature_e2e.py",
-            )
-        )
-        == 2
-    )
-    assert review_phases == ["planning", "implementation", "implementation"]
-    assert "Observed issue:" in provider_requests[1].prompt
-    assert "active_intent:api-stable" in provider_requests[1].prompt
-    assert "inherited decision" in provider_requests[1].prompt
-    assert "validation" in provider_requests[1].prompt
-    assert "Set the feature value to 42." in provider_requests[1].prompt
-    assert "Advisory test-review notes for the pull request" in (
-        provider_requests[0].prompt
-    )
-    assert "No unresolved test-quality concerns were reported." in (
-        provider_requests[0].prompt
-    )
-    assert provider_timeouts == [1800.0]
+    with pytest.raises(
+        PowdrrExecutionError, match="Legacy issue-worker implementation is unsupported"
+    ):
+        strategy._run_coding_agent()
+    assert provider_requests == []
+    assert provider_timeouts == []
 
 
 @pytest.mark.parametrize("plan_amendment", [False, True])

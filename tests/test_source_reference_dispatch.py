@@ -167,6 +167,11 @@ def test_task_routes_before_legacy_authorship_and_recovery(
     proposed["source_reference_placements"] = []
     with pytest.raises(PowdrrExecutionError, match="reviewed design file"):
         task_agent._TaskWorkflowExecutionStrategy._run_coding_agent(typed_strategy)
+    proposed.pop("source_reference_placements")
+    with pytest.raises(
+        PowdrrExecutionError, match="Legacy issue-worker implementation"
+    ):
+        task_agent._TaskWorkflowExecutionStrategy._run_coding_agent(typed_strategy)
 
 
 def test_story_implementation_dispatch_requires_validated_context(

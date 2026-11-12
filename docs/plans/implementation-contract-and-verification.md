@@ -3,7 +3,7 @@
 Status: Proposed consolidation. Existing capabilities below are implemented;
 remaining milestones require implementation and acceptance evidence.
 
-Audited code baseline: `360983f4572ed5269b677c744c0dcd3d93a6101a`.
+Audited code baseline for this inventory: `feafe5b7b22bf7cd98dee9b06797ea87af558a4c`.
 
 This plan replaces the intent-linked verification, evidence-backed prompt
 contract closure, and bounded coding-worker plans in `superseded/`. Those
@@ -58,6 +58,13 @@ existing route behavior until its replacement is accepted.
 Acceptance: executable fixtures demonstrate the selected route for each entry
 point and reject missing authority or silent enforcement downgrade. The matrix
 identifies recovery/provider behavior that still differs from the target boundary.
+
+Initial route audit: [implementation-route-matrix.md](implementation-route-matrix.md).
+It records the current issue-worker selector and protected/legacy boundary,
+plus the live feature, CI repair, CLI, and Harbor/Pier delegation paths. The
+existing source-reference selector fixture proves protected dispatch and
+fail-closed handling for missing reviewed authority. Cross-entry-point route
+fixtures are still required before this milestone meets its acceptance criteria.
 
 ### 2. Compile one complete, source-backed obligation closure
 

@@ -54,7 +54,7 @@ approved proposal. Existing item input digests include the story/case pins.
 These artifacts record planned coverage. Partial implementation or a passing PR
 command cannot verify a whole story. Finite-case generation, assertion linkage,
 execution receipts and current verification status are implemented in later slices
-of the [user stories plan](../plans/structrr-user-stories-and-behavioral-testing.md).
+of the [user stories plan](../plans/completed/structrr-user-stories-and-behavioral-testing.md).
 
 The deterministic integration test runs the native planning process with a scripted
 provider, splits one story across Python and TypeScript implementation items, adds

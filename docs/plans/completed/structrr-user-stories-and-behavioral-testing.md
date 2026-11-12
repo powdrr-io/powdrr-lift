@@ -7,11 +7,11 @@ execution evidence with completion gates. Protected source-task dispatch now
 carries pinned stories through validation and patch transfer. Deterministic
 end-to-end verification is complete. A live MiniSWE authoring smoke run remains
 opt-in and is not required for plan completion. See the
-[story contracts](../design/structrr-user-stories.md) and
-[interactive story design](../design/structrr-story-interview.md) and
-[story planning](../design/structrr-story-planning.md) and
-[story test authoring](../design/structrr-story-test-authoring.md), and
-[story execution evidence](../design/structrr-story-execution.md).
+[story contracts](../../design/structrr-user-stories.md) and
+[interactive story design](../../design/structrr-story-interview.md) and
+[story planning](../../design/structrr-story-planning.md) and
+[story test authoring](../../design/structrr-story-test-authoring.md), and
+[story execution evidence](../../design/structrr-story-execution.md).
 Date: 2026-11-06
 
 ## 1. Objective and accepted decisions

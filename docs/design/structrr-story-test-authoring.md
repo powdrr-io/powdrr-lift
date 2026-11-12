@@ -84,7 +84,7 @@ review diagnostics and attempted link manifest. Successful runs retain a standal
 The existing baseline policy remains in force for this authoring slice. Integration
 and existing-behavior baseline policies, candidate/environment-bound story receipts,
 coverage status and the complete amendment-to-execution proof belong to the final
-slice of the [user stories plan](../plans/structrr-user-stories-and-behavioral-testing.md).
+slice of the [user stories plan](../plans/completed/structrr-user-stories-and-behavioral-testing.md).
 No story is marked verified by the existence of these links or a green unrelated
 command.
 

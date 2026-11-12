@@ -496,6 +496,7 @@ class SubQDecisionProvider(_DecisionApiSemanticClassifierClient):
     default_model = SUBQ_MODEL
     default_endpoint = SUBQ_DEFAULT_BASE_URL
     fallback_on_error = False
+    max_batch_size = 8
 
     def __init__(
         self,
@@ -521,6 +522,49 @@ class SubQDecisionProvider(_DecisionApiSemanticClassifierClient):
         self, request_data: Mapping[str, Any], api_key: str, endpoint: str
     ) -> Mapping[str, Any]:
         return _call_subq(request_data, api_key, endpoint, self._model)
+
+    def complete_json_batch(
+        self,
+        requests: list[tuple[list[dict[str, str]], Mapping[str, Any]]],
+    ) -> list[dict[str, Any]]:
+        """Complete independent classifier requests in bounded SubQ batches."""
+        results: list[dict[str, Any] | None] = [None] * len(requests)
+        pending: list[_PendingDecision] = []
+        if not self._api_key:
+            raise RuntimeError("SubQ classifier requires an API key")
+        for index, (messages, response_schema) in enumerate(requests):
+            request_id = uuid.uuid4().hex
+            request_data = _classifier_request(messages, response_schema)
+            if request_data is None:
+                raise ValueError("SubQ does not support this classifier request")
+            pending.append(
+                _PendingDecision(
+                    result_index=index,
+                    request_id=request_id,
+                    request_data=request_data,
+                    messages=messages,
+                    response_schema=response_schema,
+                    started_at=time.monotonic(),
+                    future=Future(),
+                )
+            )
+
+        for offset in range(0, len(pending), self.max_batch_size):
+            batch = pending[offset : offset + self.max_batch_size]
+            self._execute_batch(batch)
+            for item in batch:
+                results[item.result_index] = item.future.result()
+        if any(result is None for result in results):
+            raise RuntimeError("SubQ batch did not produce every requested result")
+        return [result for result in results if result is not None]
+
+    def _call_batch(
+        self,
+        batch: list[_PendingDecision],
+        api_key: str,
+        endpoint: str,
+    ) -> Mapping[str, Any]:
+        return _call_subq_batch(batch, api_key, endpoint, self._model)
 
 
 class DrexDecisionProvider(_DecisionApiSemanticClassifierClient):
@@ -966,6 +1010,41 @@ def _call_subq(
 ) -> Mapping[str, Any]:
     """Call SubQ's Decisions endpoint and normalize its typed answer."""
     return _call_decision_api(classifier, api_key, endpoint, model)
+
+
+def _call_subq_batch(
+    batch: list[_PendingDecision],
+    api_key: str,
+    endpoint: str,
+    model: str = SUBQ_MODEL,
+) -> Mapping[str, Any]:
+    """Call SubQ's Decisions endpoint once for multiple independent questions."""
+    items = {item.request_id: item.request_data for item in batch}
+    state = {item_id: item_data["state"] for item_id, item_data in items.items()}
+    questions = {
+        item_id: _decision_question(item_data, item_id=item_id)
+        for item_id, item_data in items.items()
+    }
+    body = {"model": model, "state": {"items": state}, "questions": questions}
+    request = Request(
+        endpoint,
+        data=json.dumps(body, ensure_ascii=False).encode("utf-8"),
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+    with urlopen(request, timeout=10) as response:
+        result = json.loads(response.read().decode("utf-8"))
+    answers = result.get("answers")
+    if not isinstance(answers, Mapping):
+        raise ValueError("SubQ batch response has no answers object")
+    return {
+        "answers": answers,
+        "model": result.get("model", model),
+        "usage": result.get("usage"),
+    }
 
 
 def _call_drex(

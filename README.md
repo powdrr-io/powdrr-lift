@@ -220,15 +220,25 @@ values for the corresponding feature run.
 ### Try Powdrr on a project
 
 Powdrr uses Git to create a separate branch and worktree for each task. Start
-from a clean checkout. A bootstrap run creates a validated Structrr snapshot and
-opens a pull request containing the onboarding artifacts. If the local
-repository has no commits, bootstrap creates an empty base commit. When the
-remote is also empty, it pushes that base branch so the onboarding pull request
-has a target; the generated onboarding artifacts remain in the pull request:
+from a clean checkout. A bootstrap run creates a Structrr snapshot, runs the
+discovered local validation commands, and opens a pull request containing the
+onboarding artifacts. If checks fail, time out, or are blocked, bootstrap keeps
+the snapshot and recorded results; an opened PR remains subject to downstream
+readiness checks. If no applicable checks are discovered, bootstrap marks the
+run unverified and does not open a PR. If the local repository has no commits,
+bootstrap creates an empty base commit. When the remote is also empty, it pushes
+that base branch so an onboarding pull request has a target:
 
 ```bash
 powdrr-lift bootstrap --repo-root . --open-pr
 ```
+
+The `bootstrap` exit code is `0` when applicable checks pass, `1` when bootstrap
+or artifact creation fails, `2` when a validation check fails, is blocked, or
+times out, and `3` when the snapshot is valid but unverified because no checks
+were discovered. A failed-check PR can therefore be opened for downstream
+review while the command returns `2`; use the recorded check results when
+assessing PR readiness.
 
 Review and merge that pull request, then update your local checkout before
 asking Powdrr to implement a feature. Put the request in a Markdown or text file

@@ -354,15 +354,21 @@ class _DecisionApiSemanticClassifierClient(DecisionProvider):
             if self.fallback_on_error
             else f"{self.provider}_FAILED"
         )
+        error_detail = (
+            str(error)[:160]
+            if phase == "response_mapping" and isinstance(error, ValueError)
+            else ""
+        )
         LOGGER.warning(
             "%s request_id=%s batch_id=%s endpoint_host=%s "
-            "phase=%s error_type=%s http_status=%s duration_ms=%d",
+            "phase=%s error_type=%s error_detail=%s http_status=%s duration_ms=%d",
             event,
             item.request_id,
             batch_id,
             endpoint_host,
             phase,
             type(error).__name__,
+            error_detail,
             getattr(error, "code", "none"),
             round((time.monotonic() - started_at) * 1000),
         )
@@ -939,9 +945,18 @@ def _format_classifier_result(
     allowed = classifier["allowed_values"]
     output_property = classifier["output_property"]
     if output_property and output_property.get("type") == "boolean":
-        if choice in {"true", "false"}:
-            return {output_property["name"]: choice == "true"}
-        raise ValueError("Decision API returned an unsupported boolean classification")
+        if type(choice) is bool:
+            return {output_property["name"]: choice}
+        if isinstance(choice, str):
+            normalized_choice = choice.strip().casefold()
+            if normalized_choice in {"true", "false"}:
+                return {output_property["name"]: normalized_choice == "true"}
+            if normalized_choice == "unresolved":
+                raise ValueError("Decision API abstained on a boolean classification")
+        raise ValueError(
+            "Decision API returned an unsupported boolean classification "
+            f"(answer type: {type(choice).__name__})"
+        )
     if choice == "unresolved":
         if output_property and output_property["name"] != "value":
             raise ValueError("Decision API abstained on a single-field classification")

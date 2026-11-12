@@ -283,6 +283,46 @@ def test_subq_batches_independent_decisions_in_one_api_request(
     assert fallback.calls == 0
 
 
+def test_subq_batch_maps_native_boolean_choices(monkeypatch: Any) -> None:
+    fallback = _Fallback()
+
+    def call_batch(
+        batch: list[Any], api_key: str, endpoint: str, model: str
+    ) -> dict[str, Any]:
+        assert len(batch) == 2
+        return {
+            "answers": {
+                item.request_id: {"choice": choice}
+                for item, choice in zip(batch, (True, False), strict=True)
+            }
+        }
+
+    monkeypatch.setattr(jev_classifier, "_call_subq_batch", call_batch)
+    client = SubQDecisionProvider(fallback, api_key="subq-key")
+    messages = [
+        {"role": "system", "content": "Return JSON."},
+        {
+            "role": "user",
+            "content": (
+                "Instructions:\n- Return true when there are multiple requirements."
+                "\n\nQuestion:\nAre there multiple requirements?"
+                '\n\nContext:\n{"clause": {"text": "Return a value and '
+                'emit an event."}}'
+            ),
+        },
+    ]
+    schema = {
+        "type": "object",
+        "required": ["multiple"],
+        "properties": {"multiple": {"type": "boolean"}},
+    }
+
+    results = client.complete_json_batch([(messages, schema), (messages, schema)])
+
+    assert results == [{"multiple": True}, {"multiple": False}]
+    assert fallback.calls == 0
+
+
 def test_subq_batches_are_bounded_to_eight_questions(monkeypatch: Any) -> None:
     fallback = _Fallback()
     batch_sizes: list[int] = []

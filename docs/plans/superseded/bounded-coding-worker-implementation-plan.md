@@ -1,6 +1,6 @@
 # Bounded Coding Worker Implementation Plan
 
-Status: proposed
+Status: Superseded by [Implementation contract and verification](../implementation-contract-and-verification.md). Retained as historical design; use the consolidated plan for new work.
 
 ## Purpose
 
@@ -22,7 +22,7 @@ The governing rule is:
 
 This plan complements `docs/plans/superseded/bounded-llm-instruction-compiler.md`,
 `docs/design/source-anchored-semantic-contract-compilation.md`, and
-`docs/plans/intent-linked-verification-implementation-plan.md`. The
+`docs/plans/superseded/intent-linked-verification-implementation-plan.md`. The
 source-anchored design is normative for instruction disposition, semantic
 dimensions, cross-contract interactions, contrast cases, and prompt
 projection. This plan must not accept merely present obligations and test

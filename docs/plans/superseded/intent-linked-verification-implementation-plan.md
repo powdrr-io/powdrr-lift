@@ -1,6 +1,6 @@
 # Intent-Linked Verification Implementation Plan
 
-Status: proposed
+Status: Superseded by [Implementation contract and verification](../implementation-contract-and-verification.md). Retained as historical design; use the consolidated plan for new work.
 
 ## Purpose
 

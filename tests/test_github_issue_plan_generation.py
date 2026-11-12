@@ -1916,6 +1916,46 @@ def test_plan_cli_creates_tracking_issue_and_publishes_compiled_artifacts(
     assert not hasattr(issue_client, "create_work_item_issue")
     assert len(machine_values) == 1
     assert machine_values[0][1]["verification_command"] == "scripts/verify-all.sh"
+    analysis_calls: list[tuple[str, ...]] = []
+
+    def search_analysis(
+        _root: Any, _commit: str, paths: tuple[str, ...]
+    ) -> tuple[dict[str, list[Any]], dict[str, tuple[str, ...]], str]:
+        analysis_calls.append(paths)
+        return {}, {"src/a.py": ("src/b.py",)}, "complete"
+
+    monkeypatch.setattr(
+        planning_session, "search_structural_document_analysis", search_analysis
+    )
+    machine_kwargs = machine_values[0][1]
+    units = (
+        SimpleNamespace(
+            id="producer",
+            planned_writes=(SimpleNamespace(path="src/a.py"),),
+        ),
+        SimpleNamespace(
+            id="consumer",
+            planned_writes=(SimpleNamespace(path="src/b.py"),),
+        ),
+    )
+    assert machine_kwargs["dependency_reference_search"](units) == {
+        ("producer", "consumer"): ("src/a.py -> src/b.py",)
+    }
+    assert machine_kwargs["structural_reference_search"](("src/a.py", "src/b.py")) == {
+        "src/a.py": ("src/b.py",)
+    }
+    assert analysis_calls == [("src/a.py", "src/b.py")]
+    assert (
+        machine_kwargs["dependency_reference_search"](
+            (
+                SimpleNamespace(
+                    id="docs", planned_writes=(SimpleNamespace(path="README.md"),)
+                ),
+            )
+        )
+        == {}
+    )
+    assert analysis_calls == [("src/a.py", "src/b.py")]
     options = process_calls[0]["options"]
     assert isinstance(options.decision_client, jev_classifier.SubQDecisionProvider)
     assert options.decision_provider == "SUBQ"

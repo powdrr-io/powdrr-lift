@@ -236,6 +236,7 @@ def run_planning_session(
         dependency_reference_cache_key: tuple[Any, ...] | None = None
         dependency_reference_cache: Mapping[tuple[str, str], tuple[str, ...]] = {}
         structural_analysis_cache_key: tuple[str, ...] | None = None
+        structural_reference_analysis_cache_key: tuple[str, ...] | None = None
         structural_symbol_cache: Mapping[str, Sequence[Mapping[str, Any]]] = {}
         structural_reference_cache: Mapping[str, Sequence[str]] = {}
 
@@ -244,6 +245,7 @@ def run_planning_session(
         ) -> Mapping[tuple[str, str], tuple[str, ...]]:
             nonlocal dependency_reference_cache_key, dependency_reference_cache
             nonlocal structural_analysis_cache_key
+            nonlocal structural_reference_analysis_cache_key
             nonlocal structural_symbol_cache, structural_reference_cache
             paths_by_unit = {
                 unit.id: tuple(
@@ -261,6 +263,14 @@ def run_planning_session(
                         if path.casefold().endswith((".py", ".pyi")):
                             owners_by_path.setdefault(path, set()).add(unit_id)
                 analysis_paths = tuple(sorted(owners_by_path))
+                if not analysis_paths:
+                    structural_analysis_cache_key = ()
+                    structural_reference_analysis_cache_key = ()
+                    structural_symbol_cache = {}
+                    structural_reference_cache = {}
+                    dependency_reference_cache = {}
+                    dependency_reference_cache_key = cache_key
+                    return dependency_reference_cache
                 (
                     structural_symbol_cache,
                     structural_reference_cache,
@@ -268,6 +278,7 @@ def run_planning_session(
                 ) = search_structural_document_analysis(
                     repo_root, base_commit, analysis_paths
                 )
+                structural_reference_analysis_cache_key = analysis_paths
                 if reference_status != "complete":
                     print(
                         "BasedPyright reference lookup is "
@@ -297,6 +308,7 @@ def run_planning_session(
                 )
                 dependency_reference_cache = {}
                 structural_analysis_cache_key = None
+                structural_reference_analysis_cache_key = None
                 structural_symbol_cache = {}
                 structural_reference_cache = {}
             dependency_reference_cache_key = cache_key
@@ -306,6 +318,7 @@ def run_planning_session(
             paths: Sequence[str],
         ) -> Mapping[str, Sequence[Mapping[str, Any]]]:
             nonlocal structural_analysis_cache_key
+            nonlocal structural_reference_analysis_cache_key
             nonlocal structural_symbol_cache, structural_reference_cache
             cache_key = tuple(sorted(set(paths)))
             if cache_key == structural_analysis_cache_key:
@@ -315,6 +328,7 @@ def run_planning_session(
                     repo_root, base_commit, cache_key
                 )
                 structural_reference_cache = {}
+                structural_reference_analysis_cache_key = None
             except EvidenceError as error:
                 print(
                     "BasedPyright Structrr document analysis unavailable; "
@@ -323,14 +337,19 @@ def run_planning_session(
                 )
                 structural_symbol_cache = {}
                 structural_reference_cache = {}
+                structural_reference_analysis_cache_key = None
             structural_analysis_cache_key = cache_key
             return structural_symbol_cache
 
         def search_structural_references(
             paths: Sequence[str],
         ) -> Mapping[str, Sequence[str]]:
-            nonlocal structural_reference_cache
+            nonlocal structural_analysis_cache_key
+            nonlocal structural_reference_analysis_cache_key
+            nonlocal structural_symbol_cache, structural_reference_cache
             cache_key = tuple(sorted(set(paths)))
+            if cache_key == structural_reference_analysis_cache_key:
+                return structural_reference_cache
             try:
                 (
                     structural_symbol_cache,
@@ -346,6 +365,7 @@ def run_planning_session(
                         "symbol/location evidence remains available.",
                         file=stream,
                     )
+                structural_analysis_cache_key = cache_key
             except EvidenceError as error:
                 structural_reference_cache = {}
                 print(
@@ -353,6 +373,7 @@ def run_planning_session(
                     f"symbol/location evidence remains available: {error}",
                     file=stream,
                 )
+            structural_reference_analysis_cache_key = cache_key
             return structural_reference_cache
 
         machine = SourceLedgerQuestionMachine(

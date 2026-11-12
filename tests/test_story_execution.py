@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import json
+import shlex
 import subprocess
 from pathlib import Path
 from typing import Any
@@ -15,9 +16,11 @@ from powdrr_agent.execution.story_test_collection import (
     collect_story_tests,
     run_story_tests,
 )
+from powdrr_contracts.models import ChatCompletionRequest, ChatCompletionResponse
 from powdrr_local import JsonServiceBridge, LocalPowdrrService
 from powdrr_service.planning.story_allocation import pin_story, story_planning_context
 from powdrr_service.structrr.design import DesignHandoff
+from powdrr_service.structrr.reference_definitions import ReferenceDefinition
 from powdrr_service.structrr.story_coverage import (
     StoryCoverageError,
     story_case_obligations,
@@ -42,13 +45,14 @@ from test_story_test_authoring import (
     NoShortcoming,
 )
 
-from powdrr_lift.workrr import task_agent
+from powdrr_lift.workrr import source_reference_dispatch, task_agent
 from powdrr_lift.workrr.coding_agent import ImplementationRequest
 from powdrr_lift.workrr.feature_endpoint import (
     FeatureEndpointConfig,
     _validate_feature_story_execution,
 )
 from powdrr_lift.workrr.llm import PowdrrExecutionError
+from powdrr_lift.workrr.source_reference_run import SourceReferenceRun
 from powdrr_lift.workrr.story_execution_operations import (
     execute_story_validation,
 )
@@ -626,3 +630,171 @@ def test_missing_interface_baseline_requires_actual_declared_absence(
             policy="new_behavior",
             missing_interfaces=[{"module": "planned_public_module", "exists": False}],
         )
+
+
+def test_protected_source_dispatch_proves_story_before_patch_transfer(
+    graph: dict[str, Any], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Exercise the full dispatch and receipt path hermetically. OS write
+    # protection itself is covered by the test for protected story support files.
+    monkeypatch.setattr(SourceReferenceRun, "_probe_protection", lambda _self: None)
+    monkeypatch.setattr(
+        SourceReferenceRun, "protect_command", lambda _self, command: command
+    )
+    monkeypatch.setenv("MSWEA_COST_TRACKING", "ignore_errors")
+
+    identity = graph["user_stories"][0]["id"]
+    ref = pin_story(graph, identity)
+    story_context = story_planning_context(graph, (ref,))
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "app.py").write_text(
+        "def resume(path, available):\n"
+        "    return {'outcome': 'unavailable', 'accepted': []}\n"
+    )
+    design = {
+        "schema_version": source_reference_dispatch.DESIGN_SCHEMA,
+        "plan_id": "story-plan",
+        "item_id": "story-integration-validation",
+        "design": {
+            "reference_definitions": [
+                ReferenceDefinition(
+                    "feature:resume",
+                    "feature",
+                    "Resume and preserve accepted decisions.",
+                    identity,
+                ).to_data()
+            ],
+            "source_reference_placements": [
+                {
+                    "obligation_id": "place:resume",
+                    "ref": "feature:resume",
+                    "relationship": "implements",
+                    "requirement": "Resume and preserve accepted decisions.",
+                    "owner": {
+                        "path": "app.py",
+                        "kind": "function",
+                        "qualified_name": "resume",
+                    },
+                    "cardinality": "exactly_one",
+                    "verification_refs": [ref.case_ids[0]],
+                }
+            ],
+            "source_reference_preservations": [],
+        },
+    }
+    (repo / "design.yaml").write_text(yaml.safe_dump(design, sort_keys=False))
+    base = initialize(repo)
+    author_repo = tmp_path / "author-repo"
+    subprocess.run(
+        ["git", "clone", str(repo), str(author_repo)], check=True, capture_output=True
+    )
+    authoring = author(
+        author_repo,
+        base,
+        graph,
+        tmp_path / "story-authoring",
+        monkeypatch,
+    )
+    candidate_source = (
+        "import json\n"
+        "# structrr: feature:resume\n"
+        "def resume(path, available):\n"
+        "    state = json.loads(path.read_text())\n"
+        "    result = {'outcome': 'published' if available else 'unavailable', "
+        "'accepted': state['accepted']}\n"
+        "    if available:\n"
+        "        state['answers'] = ['completed']\n"
+        "        path.write_text(json.dumps(state))\n"
+        "    return result\n"
+    )
+    calls: list[ChatCompletionRequest] = []
+
+    def infer(request: ChatCompletionRequest) -> ChatCompletionResponse:
+        calls.append(request)
+        completion = {
+            "schema_version": "structrr-reference-completion-v1",
+            "reference_owners": [
+                {
+                    "ref": "feature:resume",
+                    "path": "app.py",
+                    "kind": "function",
+                    "qualified_name": "resume",
+                }
+            ],
+            "design_gaps": [],
+        }
+        edit = (
+            "from pathlib import Path; Path('app.py').write_text("
+            + repr(candidate_source)
+            + ")"
+        )
+        commands = [
+            "python -m powdrr_agent.execution.source_reader context "
+            "--ref feature:resume",
+            "python -c " + shlex.quote(edit),
+            "printf '%s\\n' COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT "
+            + shlex.quote(json.dumps(completion)),
+        ]
+        call = {
+            "id": f"call-{len(calls)}",
+            "type": "function",
+            "function": {
+                "name": "bash",
+                "arguments": json.dumps({"command": commands[min(len(calls) - 1, 2)]}),
+            },
+        }
+        return ChatCompletionResponse(
+            content=None, tool_calls=(call,), finish_reason="tool_calls"
+        )
+
+    monkeypatch.setattr(
+        source_reference_dispatch,
+        "create_miniswe_inference_handler",
+        lambda _timeout: infer,
+    )
+    monkeypatch.setattr(
+        source_reference_dispatch.tempfile, "gettempdir", lambda: str(tmp_path)
+    )
+    proposed = {
+        "plan_id": "story-plan",
+        "item_id": "story-integration-validation",
+        "source_reference_design_file": "design.yaml",
+        "story_refs": [ref.to_data()],
+        "story_validation": True,
+        "source_reference_mode": "enforce",
+    }
+    result = source_reference_dispatch.dispatch_source_reference_task(
+        repo_root=repo,
+        proposed=proposed,
+        base_commit=base,
+        workflow_id="story-proof",
+        task_id="story-integration-validation",
+        objective="Validate the confirmed resume story.",
+        allowed_paths=("app.py",),
+        profile=PROFILE,
+        code_agent="minisweagent",
+        model="test",
+        worker_timeout_seconds=30,
+        validation_timeout_seconds=60,
+        review_client=NoShortcoming(),
+        story_context=story_context,
+        story_validation_bundle={
+            "snapshot": graph,
+            "test_sources": authoring["test_sources"],
+            "authoring": authoring,
+        },
+    )
+    assert result["passed"] is True, {
+        "status": result.get("status"),
+        "error": result.get("error"),
+        "attempt": (result.get("attempts") or [{}])[0].get("attempt"),
+        "run_error": (result.get("attempts") or [{}])[0].get("error"),
+        "attempt_result": (result.get("attempts") or [{}])[0],
+        "worker_error": (result.get("attempts") or [{}])[0]
+        .get("attempt", {})
+        .get("error"),
+    }
+    assert result["story_validation"]["story_coverage"]["verified"] is True
+    assert "app.py" in result["changed_paths"]
+    assert any(path.startswith("tests/") for path in result["changed_paths"])

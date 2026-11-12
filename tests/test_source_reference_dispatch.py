@@ -168,6 +168,149 @@ def test_task_routes_before_legacy_authorship_and_recovery(
         task_agent._TaskWorkflowExecutionStrategy._run_coding_agent(typed_strategy)
 
 
+def test_story_implementation_dispatch_requires_validated_context(
+    tmp_path: Path,
+) -> None:
+    repo, base, proposed = fixture(tmp_path)
+    proposed["story_refs"] = [{"story_id": "story:resume"}]
+    arguments: dict[str, Any] = {
+        "repo_root": repo,
+        "proposed": proposed,
+        "base_commit": base,
+        "workflow_id": "workflow-1",
+        "task_id": "implementation",
+        "objective": "Implement the pinned behavior.",
+        "allowed_paths": ("twice.py",),
+        "profile": ValidationProfile("behavior", (sys.executable, "-c", "pass")),
+        "code_agent": "minisweagent",
+        "model": "test",
+        "worker_timeout_seconds": 30,
+        "validation_timeout_seconds": 30,
+        "review_client": Reviewer(),
+    }
+
+    with pytest.raises(PowdrrExecutionError, match="validated pinned story context"):
+        dispatch.dispatch_source_reference_task(**arguments)
+
+    with pytest.raises(
+        PowdrrExecutionError, match="requires independently authored tests"
+    ):
+        full_validation: dict[str, Any] = dict(arguments)
+        full_validation["proposed"] = {**proposed, "story_validation": True}
+        dispatch.dispatch_source_reference_task(
+            **full_validation,
+            story_context={"story_id": "story:resume"},
+        )
+
+
+def test_story_context_is_bound_into_protected_source_objective(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo, base, proposed = fixture(tmp_path)
+    proposed["story_refs"] = [{"story_id": "story:resume"}]
+    captured: dict[str, Any] = {}
+
+    class Run:
+        private_root = tmp_path / "private"
+        public_root = tmp_path / "public"
+
+        def __init__(self) -> None:
+            self.public_root.mkdir()
+
+        def execute(self, _handler: Any) -> Any:
+            return SimpleNamespace(
+                accepted=True,
+                to_data=lambda: {
+                    "outcome": "accepted",
+                    "attempt": {
+                        "attempt_id": "run-1",
+                        "status": "completed",
+                        "changed_paths": [],
+                    },
+                    "validation": {"status": "passed"},
+                    "error": None,
+                },
+            )
+
+        def verify_candidate(self) -> None:
+            return None
+
+        def protect_command(self, command: tuple[str, ...]) -> tuple[str, ...]:
+            return command
+
+        def validation_environment(self) -> dict[str, str]:
+            return {}
+
+    def prepare(**kwargs: Any) -> Run:
+        captured.update(kwargs)
+        return Run()
+
+    def fake_git(_root: Path, *arguments: str, data: bytes | None = None) -> bytes:
+        if arguments[:2] == ("rev-parse", "HEAD"):
+            return base.encode()
+        if arguments[0] in {"diff", "ls-files", "status", "apply", "worktree"}:
+            return b""
+        pytest.fail(f"unexpected git command: {arguments}")
+
+    monkeypatch.setattr(
+        dispatch, "load_reviewed_source_design", lambda *_a, **_k: ("design.yaml", {})
+    )
+    monkeypatch.setattr(dispatch, "_git", fake_git)
+    monkeypatch.setattr(dispatch.SourceReferenceRun, "prepare", prepare)
+    monkeypatch.setattr(dispatch, "create_miniswe_inference_handler", lambda _t: None)
+    monkeypatch.setattr(dispatch.tempfile, "gettempdir", lambda: str(tmp_path / "tmp"))
+    monkeypatch.setattr(
+        dispatch,
+        "execute_story_validation",
+        lambda *_a, **kwargs: {
+            "passed": True,
+            "story_coverage": {"verified": True},
+            "coverage_evidence_error": None,
+        },
+    )
+    story_context = {
+        "stories": [{"id": "story:resume", "contract_digest": "sha256:abc"}],
+        "cases": [{"id": "story:resume:case:1"}],
+    }
+
+    result = dispatch.dispatch_source_reference_task(
+        repo_root=repo,
+        proposed={**proposed, "story_validation": True},
+        base_commit=base,
+        workflow_id="workflow-1",
+        task_id="implementation",
+        objective="Implement the pinned behavior.",
+        allowed_paths=("twice.py",),
+        profile=ValidationProfile("behavior", (sys.executable, "-c", "pass")),
+        code_agent="minisweagent",
+        model="test",
+        worker_timeout_seconds=30,
+        validation_timeout_seconds=30,
+        review_client=Reviewer(),
+        story_context=story_context,
+        story_validation_bundle={
+            "snapshot": {"user_stories": []},
+            "test_sources": {"tests/test_story.py": "def test_story(): pass\n"},
+            "authoring": {
+                "story_test_links": {"links": [{"selector": "test_story"}]},
+                "accepted_story_review": {},
+                "story_review_evidence": {},
+                "test_sha256": dispatch.fingerprint_test_files(
+                    {"tests/test_story.py": "def test_story(): pass\n"}
+                ),
+            },
+        },
+    )
+
+    assert result["passed"] is True, result.get("error")
+    assert "Pinned customer story contract and selected cases" in captured["objective"]
+    assert "story:resume:case:1" in captured["objective"]
+    assert captured["readonly_support_files"] == {
+        "tests/test_story.py": "def test_story(): pass\n"
+    }
+    assert "story-validation" in captured["profiles"]
+
+
 @pytest.mark.parametrize("scenario", ["success", "behavior_failure", "parent_conflict"])
 def test_native_dispatch_validates_before_applying_candidate(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, scenario: str

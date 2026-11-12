@@ -1,0 +1,69 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1444
+title: Archive completed plans and finish Structrr source-reference documentation
+intent:
+  problem: Completed plans remain mixed with active proposals, and the source-reference plan still reads as unfinished despite all implementation stages being integrated.
+  goal: Archive all plans that state their scope is complete, update active links, and document the shipped source-reference implementation and its supported scope.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/plans/completed/README.md
+  type: added
+  span:
+    start_line: 1
+    end_line: 11
+  summary: Index plans and implementation audits whose stated scope is complete.
+  rationale: Make the completed-plan archive discoverable and distinguish it from active proposals.
+- path: docs/plans/completed/structrr-source-references.md
+  type: modified
+  span:
+    start_line: 1
+    end_line: 814
+  summary: Mark the source-reference plan complete and map its stages to shipped modules, regression coverage, merged PRs, and supported platform scope.
+  rationale: Make the document accurately describe the implemented Python source-reference workflow and its limits.
+- path: docs/plans/completed/structrr-user-stories-and-behavioral-testing.md
+  type: modified
+  span:
+    start_line: 1
+    end_line: 806
+  summary: Move the completed Structrr user-stories plan into the archive and repair its relative design links.
+  rationale: Keep completed planning history together while preserving working links.
+- path: docs/design/structrr-reference-catalog.md
+  type: modified
+  span:
+    start_line: 3
+    end_line: 3
+  summary: Point to the archived source-reference plan.
+  rationale: Keep the design contract's plan link valid after moving the document.
+- path: docs/design/structrr-story-interview.md
+  type: modified
+  span:
+    start_line: 11
+    end_line: 11
+  summary: Point to the archived user-stories plan.
+  rationale: Keep the design contract's plan link valid after moving the document.
+- path: docs/design/structrr-story-planning.md
+  type: modified
+  span:
+    start_line: 57
+    end_line: 57
+  summary: Point to the archived user-stories plan.
+  rationale: Keep the design contract's plan link valid after moving the document.
+- path: docs/design/structrr-story-test-authoring.md
+  type: modified
+  span:
+    start_line: 87
+    end_line: 87
+  summary: Point to the archived user-stories plan.
+  rationale: Keep the design contract's plan link valid after moving the document.
+- path: docs/design/structrr-user-stories.md
+  type: modified
+  span:
+    start_line: 6
+    end_line: 6
+  summary: Point to the archived user-stories plan.
+  rationale: Keep the design contract's plan link valid after moving the document.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []

@@ -1007,6 +1007,18 @@ def build_structural_change_request(
                 if isinstance(value, str)
             }
     excerpts = _source_excerpts(source, subject.source_refs) if source else ()
+    relevant_planned_paths = planned_paths
+    if subject.section == "files":
+        unit_planned_paths = {
+            write.path
+            for unit in units
+            if unit.id in subject.unit_ids
+            for write in unit.planned_writes
+        }
+        if subject.planned_path is not None:
+            unit_planned_paths.add(subject.planned_path)
+        if unit_planned_paths:
+            relevant_planned_paths = unit_planned_paths
     facts = [
         ContextRecord(
             f"subject:{subject.section}:{subject.subject_id}", subject.to_data()
@@ -1030,7 +1042,9 @@ def build_structural_change_request(
             )
         )
     if subject.section == "files":
-        facts.append(ContextRecord("planned-paths", {"paths": sorted(planned_paths)}))
+        facts.append(
+            ContextRecord("planned-paths", {"paths": sorted(relevant_planned_paths)})
+        )
     if subject.section == "entity_relationships":
         facts.append(
             ContextRecord("entity-identities", {"ids": sorted(relevant_entity_ids)})
@@ -1071,7 +1085,7 @@ def build_structural_change_request(
                         if subject.section == "entities"
                         else []
                     ),
-                    "paths": sorted(planned_paths)
+                    "paths": sorted(relevant_planned_paths)
                     if subject.section == "files"
                     else [],
                     "entity_ids": (
@@ -1152,7 +1166,7 @@ def build_structural_change_request(
             value,
             subject=subject,
             taxonomy_entity_types=set(taxonomy_entity_types),
-            planned_paths=planned_paths,
+            planned_paths=relevant_planned_paths,
             known_entity_ids=relevant_entity_ids,
         ),
     )

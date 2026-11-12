@@ -1,0 +1,382 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1455
+title: Remove orphaned CI repair workflow
+intent:
+  problem: The CI repair workflow remained registered with code-writing helpers and retry operations after the command was reduced to observation.
+  goal: Remove CI repair implementation paths and keep CI observation/reporting without a coding worker.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 3968, end_line: 3988}
+  summary: Remove the deleted CI repair module entries from the ownership inventory.
+  rationale: Keep architecture metadata aligned with the source tree.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 3983, end_line: 3983}
+  summary: Remove deleted CI repair module entries from the ownership inventory.
+  rationale: Keep architecture metadata aligned with the source tree.
+- path: docs/plans/implementation-contract-and-verification.md
+  type: modified
+  span: {start_line: 42, end_line: 42}
+  summary: Update the current route boundary to identify removed CI repair implementation.
+  rationale: Keep the consolidated plan consistent with merged code and this cleanup.
+- path: docs/plans/implementation-contract-and-verification.md
+  type: modified
+  span: {start_line: 72, end_line: 72}
+  summary: Record the CI repair implementation removal.
+  rationale: Keep the remaining milestone state current.
+- path: docs/plans/implementation-contract-and-verification.md
+  type: modified
+  span: {start_line: 75, end_line: 80}
+  summary: Record CI repair removal and the remaining route cleanup work.
+  rationale: Preserve the actual milestone state and outstanding route gaps.
+- path: docs/plans/implementation-route-matrix.md
+  type: modified
+  span: {start_line: 18, end_line: 18}
+  summary: Mark CI repair mode explicitly rejected after removing its implementation.
+  rationale: Distinguish the defensive rejection from the deleted worker path.
+- path: docs/plans/implementation-route-matrix.md
+  type: modified
+  span: {start_line: 23, end_line: 23}
+  summary: Describe the CI command and Procedrr process as observation-only.
+  rationale: Document that no CI repair worker is dispatched.
+- path: docs/plans/implementation-route-matrix.md
+  type: modified
+  span: {start_line: 52, end_line: 52}
+  summary: Record the removal of the historical CI repair process declarations.
+  rationale: Keep the route inventory accurate.
+- path: docs/plans/implementation-route-matrix.md
+  type: modified
+  span: {start_line: 54, end_line: 58}
+  summary: Update route evidence and remaining gaps after deleting CI repair processes.
+  rationale: Avoid claiming milestone completion while plan amendment and candidate correction remain.
+- path: packages/service/src/powdrr_service/ci_response/__init__.py
+  type: modified
+  span: {start_line: 3, end_line: 9}
+  summary: Remove repair orchestration exports from the CI observation package.
+  rationale: Expose only the remaining observation capabilities.
+- path: packages/service/src/powdrr_service/ci_response/__init__.py
+  type: modified
+  span: {start_line: 17, end_line: 23}
+  summary: Remove repair contract exports.
+  rationale: No repair worker consumes these APIs.
+- path: packages/service/src/powdrr_service/ci_response/__init__.py
+  type: modified
+  span: {start_line: 25, end_line: 29}
+  summary: Remove research and repair exports.
+  rationale: Keep the service package surface limited to supported functionality.
+- path: packages/service/src/powdrr_service/ci_response/__init__.py
+  type: modified
+  span: {start_line: 34, end_line: 36}
+  summary: Remove repair compiler exports.
+  rationale: Avoid advertising removed service behavior.
+- path: packages/service/src/powdrr_service/ci_response/__init__.py
+  type: modified
+  span: {start_line: 40, end_line: 40}
+  summary: Remove a retry API export.
+  rationale: Remove the orphaned repair API.
+- path: packages/service/src/powdrr_service/ci_response/__init__.py
+  type: modified
+  span: {start_line: 42, end_line: 50}
+  summary: Remove remaining research and patch validation exports.
+  rationale: Keep the package interface aligned with observation-only use.
+  summary: Remove repair and external research exports from the CI observation package.
+  rationale: Expose only observation, evidence, checkpoint, and reproduction capabilities.
+- path: packages/service/src/powdrr_service/ci_response/bridge.py
+  type: deleted
+  span: {start_line: 1, end_line: 405}
+  summary: Delete service orchestration that researched CI failures and compiled repair requests.
+  rationale: Remove the unsupported code-writing route and its repair handoff.
+- path: packages/service/src/powdrr_service/ci_response/repair.py
+  type: deleted
+  span: {start_line: 1, end_line: 398}
+  summary: Delete repair prompt compilation, patch validation, and CI repair contract logic.
+  rationale: No CI repair worker remains to consume these services.
+- path: packages/service/src/powdrr_service/ci_response/research.py
+  type: deleted
+  span: {start_line: 1, end_line: 196}
+  summary: Delete external research helpers dedicated to the CI repair pipeline.
+  rationale: Remove unused repair-only research code.
+- path: packages/service/src/powdrr_service/procedrr/parser.py
+  type: modified
+  span: {start_line: 35, end_line: 40}
+  summary: Remove CI repair operation names from the Procedrr tool catalog.
+  rationale: Prevent process definitions from dispatching deleted repair handlers.
+- path: packages/service/src/powdrr_service/resources/processes/execute-ci-repair.yaml
+  type: deleted
+  span: {start_line: 1, end_line: 31}
+  summary: Delete the process that dispatched prepared CI repairs to a coding worker.
+  rationale: Remove a registered implementation entry point with no supported authority.
+- path: packages/service/src/powdrr_service/resources/processes/execute-proposed-pr-workflow.yaml
+  type: modified
+  span: {start_line: 11, end_line: 13}
+  summary: Remove the repair preparation output from the proposed-PR workflow.
+  rationale: CI observation no longer produces a repair request.
+- path: packages/service/src/powdrr_service/resources/processes/execute-proposed-pr-workflow.yaml
+  type: modified
+  span: {start_line: 43, end_line: 44}
+  summary: Remove repair inputs from the successful implementation CI observation call.
+  rationale: Keep post-publication behavior observation-only.
+- path: packages/service/src/powdrr_service/resources/processes/execute-proposed-pr-workflow.yaml
+  type: modified
+  span: {start_line: 47, end_line: 47}
+  summary: Remove the repair preparation result binding.
+  rationale: Do not expose a result that is no longer produced.
+- path: packages/service/src/powdrr_service/resources/processes/execute-proposed-pr-workflow.yaml
+  type: modified
+  span: {start_line: 100, end_line: 101}
+  summary: Remove repair inputs from the plan-amendment CI observation call.
+  rationale: Keep both post-publication routes observation-only.
+- path: packages/service/src/powdrr_service/resources/processes/execute-proposed-pr-workflow.yaml
+  type: modified
+  span: {start_line: 104, end_line: 104}
+  summary: Remove the obsolete repair result binding.
+  rationale: No repair preparation process is called.
+  summary: Remove repair preparation inputs and outputs from post-publication CI observation.
+  rationale: Keep PR workflow execution observation-only.
+- path: packages/service/src/powdrr_service/resources/processes/prepare-ci-repair.yaml
+  type: deleted
+  span: {start_line: 1, end_line: 203}
+  summary: Delete the CI repair classification, worker, validation, and retry process.
+  rationale: Remove the legacy repair route rather than migrating it.
+- path: packages/service/src/powdrr_service/resources/processes/respond-to-pr-ci.yaml
+  type: modified
+  span: {start_line: 3, end_line: 3}
+  summary: Describe the CI process as observation-only.
+  rationale: Report its supported behavior accurately.
+- path: packages/service/src/powdrr_service/resources/processes/respond-to-pr-ci.yaml
+  type: modified
+  span: {start_line: 9, end_line: 9}
+  summary: Remove implementation context from CI observation inputs.
+  rationale: Observation no longer prepares code-writing work.
+- path: packages/service/src/powdrr_service/resources/processes/respond-to-pr-ci.yaml
+  type: modified
+  span: {start_line: 14, end_line: 16}
+  summary: Remove the repair preparation output.
+  rationale: Return only observed CI evidence.
+- path: packages/service/src/powdrr_service/resources/processes/respond-to-pr-ci.yaml
+  type: modified
+  span: {start_line: 28, end_line: 36}
+  summary: Return CI observation evidence without calling the repair preparation process.
+  rationale: Ensure the registered CI response process cannot launch a coding worker.
+- path: packages/service/src/powdrr_service/resources/processes/run-ci-repair-from-observation.yaml
+  type: deleted
+  span: {start_line: 1, end_line: 25}
+  summary: Delete the task wrapper for the removed CI repair process.
+  rationale: Remove the last catalogued repair workflow entry point.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 364, end_line: 364}
+  summary: Update CI response CLI help to describe observation and reproduction only.
+  rationale: Present the supported behavior accurately.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 3034, end_line: 3034}
+  summary: Rename the CI response worktree helper to describe its observation purpose.
+  rationale: Remove stale repair terminology from the observation command.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 3114, end_line: 3120}
+  summary: Remove the unsupported repair workflow status from CLI output.
+  rationale: Report only work the command actually performs.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 3128, end_line: 3128}
+  summary: Rename the CI response worktree helper for observation.
+  rationale: Remove stale repair terminology.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 3135, end_line: 3135}
+  summary: Update the observation worktree helper description.
+  rationale: Make its behavior clear.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 3153, end_line: 3153}
+  summary: Update the clone failure message for observation.
+  rationale: Remove obsolete repair terminology.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 3221, end_line: 3222}
+  summary: Rename the exact-head repository worktree helper and its diagnostics for observation.
+  rationale: Keep its purpose clear after deleting automatic repair.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 494, end_line: 604}
+  summary: Delete CI repair request compilation and dirty-check helpers.
+  rationale: Remove worker-only policy that had no supported dispatch path.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 2680, end_line: 2680}
+  summary: Remove CI repair path tracking from workflow execution state.
+  rationale: Stop retaining state for a deleted workflow.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 3516, end_line: 3517}
+  summary: Clarify that CI repair code-writing was removed while retaining a dispatch guard.
+  rationale: Fail safely if an obsolete workflow requests the former mode.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 4913, end_line: 4913}
+  summary: Remove the CI repair research handler.
+  rationale: Delete dormant provider and recovery behavior.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 4941, end_line: 5130}
+  summary: Delete Workrr CI repair compilation, validation, finalization, and retry handlers.
+  rationale: Remove dormant provider and recovery behavior.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 5885, end_line: 5890}
+  summary: Remove repair operation names from the task operation registry.
+  rationale: Keep Workrr dispatch limited to supported operations.
+- path: tests/test_ci_response_cli.py
+  type: modified
+  span: {start_line: 76, end_line: 76}
+  summary: Assert CI response emits observation data.
+  rationale: Lock down the observation-only CLI contract.
+- path: tests/test_ci_response_cli.py
+  type: modified
+  span: {start_line: 89, end_line: 89}
+  summary: Remove repair status assertions from the observation result.
+  rationale: Keep CLI expectations limited to supported output.
+- path: tests/test_ci_response_cli.py
+  type: modified
+  span: {start_line: 107, end_line: 107}
+  summary: Remove the obsolete repair result assertion.
+  rationale: Verify observation remains repeatable without repair output.
+- path: tests/test_ci_response_cli.py
+  type: modified
+  span: {start_line: 198, end_line: 198}
+  summary: Use the renamed exact-head observation worktree helper in the reproduction fixture.
+  rationale: Keep tests aligned with the observation implementation.
+- path: tests/test_ci_response_policy.py
+  type: modified
+  span: {start_line: 4, end_line: 7}
+  summary: Remove imports used only by deleted CI repair and research tests.
+  rationale: Keep observation tests dependent only on live service APIs.
+- path: tests/test_ci_response_policy.py
+  type: modified
+  span: {start_line: 17, end_line: 17}
+  summary: Remove a repair-only test import.
+  rationale: Drop unused repair machinery.
+- path: tests/test_ci_response_policy.py
+  type: modified
+  span: {start_line: 20, end_line: 24}
+  summary: Remove repair contract and compilation imports.
+  rationale: Keep tests scoped to supported behavior.
+- path: tests/test_ci_response_policy.py
+  type: modified
+  span: {start_line: 27, end_line: 30}
+  summary: Remove repair research imports.
+  rationale: Research helpers were dedicated to the deleted repair process.
+- path: tests/test_ci_response_policy.py
+  type: modified
+  span: {start_line: 32, end_line: 32}
+  summary: Remove the repair failure fixture import.
+  rationale: Delete the repair test harness.
+- path: tests/test_ci_response_policy.py
+  type: modified
+  span: {start_line: 191, end_line: 1231}
+  summary: Assert CI response emits observation data without a repair status field.
+  rationale: Lock down the observation-only CLI contract.
+- path: tests/test_procedrr_chat.py
+  type: modified
+  span: {start_line: 94, end_line: 94}
+  summary: Remove the deleted repair process from the supported catalog list.
+  rationale: Keep tests aligned with registered workflows.
+- path: tests/test_procedrr_chat.py
+  type: modified
+  span: {start_line: 102, end_line: 102}
+  summary: Remove another deleted repair process name from the catalog expectations.
+  rationale: Prevent stale workflow registration expectations.
+- path: tests/test_procedrr_chat.py
+  type: modified
+  span: {start_line: 107, end_line: 107}
+  summary: Remove the deleted observation-to-repair wrapper from the catalog expectations.
+  rationale: Confirm the obsolete wrapper is not supported.
+- path: tests/test_procedrr_chat.py
+  type: modified
+  span: {start_line: 114, end_line: 121}
+  summary: Assert removed CI repair processes are absent from the catalog.
+  rationale: Prevent re-registration of deleted repair routes.
+- path: tests/test_procedrr_chat.py
+  type: modified
+  span: {start_line: 133, end_line: 137}
+  summary: Assert the CI response process returns after observation.
+  rationale: Verify it does not call a repair process.
+- path: tests/test_procedrr_chat.py
+  type: modified
+  span: {start_line: 161, end_line: 165}
+  summary: Assert post-publication CI observation has no implementation context input.
+  rationale: Remove repair-only state from the observation route.
+- path: tests/test_procedrr_chat.py
+  type: modified
+  span: {start_line: 163, end_line: 230}
+  summary: Remove CI repair process expectations and assert repair processes are absent from the catalog.
+  rationale: Prevent re-registration of deleted repair routes.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span: {start_line: 493, end_line: 493}
+  summary: Remove implementation context from the observation fixture inputs.
+  rationale: The CI process no longer prepares code-writing work.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span: {start_line: 496, end_line: 496}
+  summary: Remove the repair preparation fixture output.
+  rationale: Model the supported observation-only output.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span: {start_line: 507, end_line: 512}
+  summary: Make the evaluator fixture for respond-to-pr-ci observation-only.
+  rationale: Keep process tests aligned with the supported contract.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span: {start_line: 823, end_line: 824}
+  summary: Remove repair preparation from the proposed-PR workflow evaluator fixture.
+  rationale: Assert that publication is followed by observation only.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span: {start_line: 899, end_line: 899}
+  summary: Remove the obsolete repair operation from the workflow call trace.
+  rationale: Verify there is no automatic repair after observation.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span: {start_line: 973, end_line: 973}
+  summary: Update the call trace after removing CI repair preparation.
+  rationale: Verify post-publication behavior stops after observation.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span: {start_line: 980, end_line: 980}
+  summary: Update plan-amendment workflow expectations after removing CI repair preparation.
+  rationale: Preserve publication assertions without the deleted worker path.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span: {start_line: 1044, end_line: 1044}
+  summary: Update implementation workflow call trace after CI observation.
+  rationale: Keep process expectations accurate.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span: {start_line: 1049, end_line: 1049}
+  summary: Update implementation workflow expectations to end after CI observation.
+  rationale: Keep evaluator results consistent with observation-only behavior.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span: {start_line: 51, end_line: 51}
+  summary: Remove an import used only by deleted CI repair tests.
+  rationale: Keep test dependencies scoped to supported task behavior.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span: {start_line: 4385, end_line: 4385}
+  summary: Update the CI repair dispatch guard assertion to the removed-route wording.
+  rationale: Preserve an explicit rejection boundary for obsolete task payloads.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span: {start_line: 4391, end_line: 4507}
+  summary: Delete worker helper tests for the removed CI repair request flow.
+  rationale: Remove tests for behavior that is no longer supported.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []

@@ -1,6 +1,10 @@
 # Planning Code-Symbol Evidence
 
-Status: proposed implementation plan  
+Status: Complete for the defined scope. The revision-pinned Structrr symbol
+artifact, BasedPyright producer, both planning callers, and end-to-end planning
+scenarios are implemented and covered by merged PR #1367. Diagnostics,
+post-implementation analysis, reviewer diffs, and non-Python providers remain
+future work outside this plan's scope.
 Date: 2026-11-04  
 Owner: Powdrr-Lift planning
 

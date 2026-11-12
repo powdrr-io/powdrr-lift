@@ -1,5 +1,8 @@
 # Static Workflow Liveness Plan Audit
 
+Status: Complete. This audit maps the implementation in merged PR #596 to the
+planned areas and records regression evidence for each area.
+
 This audit maps the liveness plan to the implementation in PR #596. The
 analyzer is intentionally execution-free: template instantiation and prompt
 rendering are represented by pure static substitutions/contracts, so validation

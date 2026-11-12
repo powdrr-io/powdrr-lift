@@ -48,7 +48,6 @@ from powdrr_lift.process.tasks import (
 )
 from powdrr_lift.workrr import task_agent
 from powdrr_lift.workrr.actions import WorkflowEdit
-from powdrr_lift.workrr.coding_agent import ImplementationRequest
 from powdrr_lift.workrr.git import (
     WorkflowGitInconsistency,
     WorkflowGitState,
@@ -4383,125 +4382,8 @@ def test_ci_repair_mode_rejects_legacy_code_writing() -> None:
     )
     with pytest.raises(
         PowdrrExecutionError,
-        match="Legacy CI repair code-writing is unsupported",
+        match="CI repair code-writing was removed",
     ):
         task_agent._TaskWorkflowExecutionStrategy._run_coding_agent(
             strategy, mode="ci-repair"
-        )
-
-
-def test_ci_repair_request_is_pinned_and_scoped() -> None:
-    base = "a" * 40
-    request = task_agent._ci_repair_implementation_request(
-        {
-            "head_sha": base,
-            "failure_id": "ci-failure-01",
-            "prompt": "Fix the one observed Actions runner failure.",
-            "contract_fingerprint": "b" * 64,
-            "allowed_paths": [".github/workflows/ci.yml"],
-            "protected_paths": ["tests"],
-            "acceptance_command": ["pytest", "tests/test_ci.py"],
-        },
-        base_commit=base,
-    )
-
-    assert request.request_id.startswith("ci-repair-")
-    assert request.base_commit == base
-    assert request.plan_fingerprint == "b" * 64
-    assert request.allowed_paths == (".github/workflows/ci.yml",)
-    assert request.protected_paths == ("tests",)
-    assert request.allowed_commands == ("pytest tests/test_ci.py",)
-
-
-def test_ci_repair_request_rejects_stale_head_and_path_escape() -> None:
-    base = "a" * 40
-    request = {
-        "head_sha": "c" * 40,
-        "failure_id": "ci-failure-01",
-        "prompt": "Fix one failure.",
-        "contract_fingerprint": "b" * 64,
-        "allowed_paths": ["../outside"],
-        "protected_paths": [],
-        "acceptance_command": ["pytest"],
-    }
-
-    with pytest.raises(task_agent.PowdrrExecutionError, match="head"):
-        task_agent._ci_repair_implementation_request(request, base_commit=base)
-    request["head_sha"] = base
-    with pytest.raises(task_agent.PowdrrExecutionError, match="repository-relative"):
-        task_agent._ci_repair_implementation_request(request, base_commit=base)
-
-
-def test_ci_repair_allows_only_its_durable_procedrr_run_files(
-    tmp_path: Path,
-) -> None:
-    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
-    run_directory = tmp_path / ".powdrr/procedrr-runs"
-    run_directory.mkdir(parents=True)
-    manifest = run_directory / "task-001.json"
-    events = run_directory / "task-001.events.jsonl"
-    manifest.write_text('{"state":"running"}\n', encoding="utf-8")
-    events.write_text('{"event":"started"}\n', encoding="utf-8")
-    subprocess.run(["git", "add", "."], cwd=tmp_path, check=True)
-    subprocess.run(
-        [
-            "git",
-            "-c",
-            "user.name=Test",
-            "-c",
-            "user.email=test@example.invalid",
-            "commit",
-            "-m",
-            "base",
-        ],
-        cwd=tmp_path,
-        check=True,
-        capture_output=True,
-    )
-    manifest.write_text('{"state":"running","step":2}\n', encoding="utf-8")
-    events.write_text('{"event":"started"}\n{"event":"tool_call"}\n', encoding="utf-8")
-    request = ImplementationRequest(
-        request_id="ci-repair-test",
-        objective="Repair CI.",
-        prompt="Fix the selected CI failure.",
-        base_commit="a" * 40,
-        plan_fingerprint="b" * 64,
-        allowed_paths=(".github/workflows/ci.yml",),
-        acceptance_criteria=("The workflow uses a supported runner.",),
-        validation_profiles=(),
-    )
-
-    prepared = task_agent._ci_repair_request_with_runtime_state(
-        request,
-        repo_root=tmp_path,
-        task_id="task-001",
-    )
-
-    assert prepared.allow_existing_changes is True
-    assert prepared.ephemeral_paths == (
-        ".powdrr/procedrr-runs/task-001.events.jsonl",
-        ".powdrr/procedrr-runs/task-001.json",
-    )
-    assert prepared.allowed_paths == request.allowed_paths
-
-
-def test_ci_repair_rejects_unrelated_dirty_worker_files(tmp_path: Path) -> None:
-    subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
-    (tmp_path / "README.md").write_text("uncommitted\n", encoding="utf-8")
-    request = ImplementationRequest(
-        request_id="ci-repair-test",
-        objective="Repair CI.",
-        prompt="Fix the selected CI failure.",
-        base_commit="a" * 40,
-        plan_fingerprint="b" * 64,
-        allowed_paths=(".github/workflows/ci.yml",),
-        acceptance_criteria=("The workflow uses a supported runner.",),
-        validation_profiles=(),
-    )
-
-    with pytest.raises(PowdrrExecutionError, match="unrelated changes: README.md"):
-        task_agent._ci_repair_request_with_runtime_state(
-            request,
-            repo_root=tmp_path,
-            task_id="task-001",
         )

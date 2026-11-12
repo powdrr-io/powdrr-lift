@@ -73,7 +73,7 @@ def test_response_command_writes_idempotent_runner_failure_checkpoint(
     monkeypatch.setattr(cli, "GitHubActionsClient", FakeClient)
     monkeypatch.setattr(
         cli,
-        "_prepare_ci_response_worktree",
+        "_prepare_ci_observation_worktree",
         lambda *_args, **_kwargs: (cli.Path.cwd(), cli.Path.cwd()),
     )
     args = Namespace(
@@ -86,7 +86,6 @@ def test_response_command_writes_idempotent_runner_failure_checkpoint(
     assert cli._run_respond_to_pr_ci(args) == 0
     first = json.loads(capsys.readouterr().out)
     assert first["checkpoint_written"] is True
-    assert first["repair_workflow"]["status"] == "unsupported"
     assert first["failures"][0]["phase"] == "runner_provisioning"
     assert (
         first["failures"][0]["local_reproduction"]["status"] == "not_executable_locally"
@@ -105,8 +104,7 @@ def test_response_command_writes_idempotent_runner_failure_checkpoint(
     assert len(comment_bodies) == 1
 
     assert cli._run_respond_to_pr_ci(args) == 0
-    unsupported = json.loads(capsys.readouterr().out)
-    assert unsupported["repair_workflow"]["status"] == "unsupported"
+    json.loads(capsys.readouterr().out)
     assert len(comment_bodies) == 1
 
     url_args = Namespace(
@@ -197,7 +195,7 @@ def test_response_command_reproduces_matching_failure_at_exact_pr_head(
     monkeypatch.setattr(cli, "GitHubActionsClient", FakeClient)
     monkeypatch.setattr(
         cli,
-        "_prepare_ci_response_worktree",
+        "_prepare_ci_observation_worktree",
         lambda *_args, **_kwargs: (cli.Path.cwd(), cli.Path.cwd()),
     )
     monkeypatch.setattr(cli, "execute_pinned_local_command", run_pinned)

@@ -361,7 +361,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     ci_response_parser = subparsers.add_parser(
         "respond-to-pr-ci",
-        help="Observe PR CI, reproduce failures, and run the scoped repair workflow.",
+        help="Observe PR CI and reproduce failures at the exact PR head.",
     )
     ci_response_parser.add_argument("--repository", required=True)
     ci_response_parser.add_argument("--pr", type=int)
@@ -3031,7 +3031,7 @@ def _run_respond_to_pr_ci(args: argparse.Namespace) -> int:
         if not isinstance(head_sha, str):
             raise GitHubActionsError("GitHub did not return the current PR head SHA")
         head_ref = head.get("ref") if isinstance(head, Mapping) else None
-        clone_root, worker_root = _prepare_ci_response_worktree(
+        clone_root, worker_root = _prepare_ci_observation_worktree(
             args.repository, pr_number, head_sha, head_ref=head_ref
         )
         base = snapshot.pull_request.get("base")
@@ -3111,13 +3111,6 @@ def _run_respond_to_pr_ci(args: argparse.Namespace) -> int:
                 for item in failures
             ],
         }
-        result["repair_workflow"] = {
-            "status": "unsupported",
-            "message": (
-                "Legacy CI repair code-writing is unsupported; CI failure "
-                "observation was recorded without invoking a coding worker"
-            ),
-        }
     except (
         GitHubActionsError,
         GitHubIssueQueueError,
@@ -3132,14 +3125,14 @@ def _run_respond_to_pr_ci(args: argparse.Namespace) -> int:
     return 0
 
 
-def _prepare_ci_response_worktree(
+def _prepare_ci_observation_worktree(
     repository: str,
     pull_request_number: int,
     head_sha: str,
     *,
     head_ref: str | None,
 ) -> tuple[Path, Path]:
-    """Create or reuse the CLI-owned target-repository clone and exact-head worktree."""
+    """Create or reuse a target-repository clone pinned to the observed PR head."""
     root = (
         Path(tempfile.gettempdir())
         / "powdrr-lift-ci-response"
@@ -3157,7 +3150,7 @@ def _prepare_ci_response_worktree(
         )
         if clone.returncode:
             raise GitHubActionsError(
-                "could not create the isolated CI repair repository: "
+                "could not create the isolated CI observation repository: "
                 + (clone.stderr.strip() or clone.stdout.strip())[-2000:]
             )
     fetch = subprocess.run(
@@ -3225,7 +3218,8 @@ def _prepare_ci_response_worktree(
     )
     if actual_head.returncode or actual_head.stdout.strip() != head_sha:
         raise GitHubActionsError(
-            f"existing CI repair worktree is not pinned to observed head {head_sha}"
+            "existing CI observation worktree is not pinned to observed head "
+            f"{head_sha}"
         )
     return clone_root, worker_root
 

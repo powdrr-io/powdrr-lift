@@ -108,6 +108,39 @@ def _symbol(name: str, path: str, start: int, end: int) -> dict[str, Any]:
     }
 
 
+def test_planning_symbol_component_identity_is_stable_across_worktree_names(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(
+        evidence_module,
+        "_git_repository_identity",
+        lambda _root: "git@github.com:powdrr-io/powdrr-gaterr.git",
+    )
+
+    first = evidence_module._stable_repository_component_id(tmp_path / "planner-run")
+    resumed = evidence_module._stable_repository_component_id(
+        tmp_path / "planner-resume"
+    )
+
+    assert first == resumed == "component:python:github.com-powdrr-io-powdrr-gaterr"
+
+
+def test_planning_symbol_component_identity_falls_back_to_shared_git_dir(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(evidence_module, "_git_repository_identity", lambda _root: None)
+    monkeypatch.setattr(
+        evidence_module,
+        "_git_common_dir",
+        lambda _root: tmp_path / "gaterr" / ".git",
+    )
+
+    first = evidence_module._stable_repository_component_id(tmp_path / "run-one")
+    resumed = evidence_module._stable_repository_component_id(tmp_path / "run-two")
+
+    assert first == resumed == "component:python:gaterr"
+
+
 def test_dependency_reference_evidence_maps_planned_paths_to_units(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

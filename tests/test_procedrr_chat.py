@@ -91,7 +91,6 @@ def test_all_supported_workflow_names_have_procedrr_processes() -> None:
         "create-pull-request",
         "dead-code-review",
         "design-interview",
-        "execute-ci-repair",
         "feature-functionality-review",
         "feature-test-coverage-review",
         "finish-pr-prep",
@@ -99,12 +98,10 @@ def test_all_supported_workflow_names_have_procedrr_processes() -> None:
         "fix-merge-conflicts",
         "handle-ad-hoc",
         "independent-skill-workflow-review",
-        "prepare-ci-repair",
         "review-architecture",
         "review-skill-workflow",
         "review-system",
         "run-tests-and-fix",
-        "run-ci-repair-from-observation",
         "respond-to-pr-ci",
         "security-review",
         "spec-v1-design-review",
@@ -114,6 +111,14 @@ def test_all_supported_workflow_names_have_procedrr_processes() -> None:
         "specify-system",
         "start-implementing-feature",
     } <= names
+    assert (
+        not {
+            "execute-ci-repair",
+            "prepare-ci-repair",
+            "run-ci-repair-from-observation",
+        }
+        & names
+    )
 
 
 def test_ci_response_procedure_runs_declared_verification_at_pinned_head() -> None:
@@ -125,9 +130,11 @@ def test_ci_response_procedure_runs_declared_verification_at_pinned_head() -> No
         "type": "reference",
         "value": "verification_command",
     }
-    assert process.document["steps"][1]["call"]["process"] == "prepare-ci-repair"
-    assert process.document["outputs"]["repair_preparation"]["type"] == "object"
-    assert process.document["inputs"][-1]["name"] == "implementation_context"
+    assert len(process.document["steps"]) == 2
+    assert process.document["steps"][-1] == {"terminal": "succeeded"}
+    assert all(
+        item["name"] != "implementation_context" for item in process.document["inputs"]
+    )
     execute = ProcessCatalog.load(bundled_process_directory()).get(
         "execute-proposed-pr-workflow"
     )
@@ -151,81 +158,15 @@ def test_ci_response_procedure_runs_declared_verification_at_pinned_head() -> No
         "type": "reference",
         "value": "task_context.input_state.proposed_pr_context.verification_command",
     }
-    assert ci_inputs["implementation_context"] == {
-        "type": "reference",
-        "value": "task_context.input_state.proposed_pr_context",
+    assert set(ci_inputs) == {
+        "repository",
+        "issue_number",
+        "pull_request_url",
+        "verification_command",
     }
     serialized_execute = yaml.safe_dump(execute.document)
     assert serialized_execute.count("task_context.input_state.github_repository") == 2
     assert serialized_execute.count("task_context.input_state.github_issue_number") == 2
-
-
-def test_ci_repair_task_wrapper_adapts_task_context_to_service_process(
-    tmp_path: Path,
-) -> None:
-    from powdrr_lift.process.templates import instantiate_procedrr_process_workflow
-
-    workflow_dir, (task,) = instantiate_procedrr_process_workflow(
-        process_id="run-ci-repair-from-observation",
-        process_directory=bundled_process_directory(),
-        input_state={
-            "ci_observation_result": {"head_sha": "a" * 40},
-            "pull_request_url": "https://github.com/example/repo/pull/7",
-            "implementation_context": {"objective": "repair CI"},
-            "verification_command": "pytest -q",
-        },
-        work_item_name="ci-response-pr-7",
-        output_root=tmp_path / "workflow",
-    )
-
-    wrapper = ProcessCatalog.load(bundled_process_directory()).get(
-        "run-ci-repair-from-observation"
-    )
-    call = wrapper.document["steps"][0]["call"]
-    assert task.process_id == "run-ci-repair-from-observation"
-    assert workflow_dir.is_dir()
-    assert call["inputs"]["ci_observation_result"]["value"] == (
-        "task_context.input_state.ci_observation_result"
-    )
-    assert call["outputs"]["repair_preparation"] == "repair_preparation"
-
-
-def test_ci_repair_preparation_uses_service_operations_and_one_targeted_question() -> (
-    None
-):
-    process = ProcessCatalog.load(bundled_process_directory()).get("prepare-ci-repair")
-    assert process.document["limits"]["tool_calls"] >= 32
-    steps = process.document["steps"]
-
-    assert steps[0]["operation"]["tool"] == "ci_repair_research"
-    failure_steps = steps[1]["branch"]["cases"]["failure_selected"]
-    decision = failure_steps[0]["judge"]
-    assert decision["output"]["schema"]["properties"]["target_paths"]["maxItems"] == 3
-    assert "manual_prerequisite" in decision["output"]["schema"]["required"]
-    assert "failure_id" not in decision["output"]["schema"]["properties"]
-    assert failure_steps[1]["operation"]["tool"] == "ci_repair_compile"
-    disposition_branch = steps[2]["branch"]
-    assert (
-        disposition_branch["cases"]["human_prerequisite"][0]["operation"]["tool"]
-        == "task_handoff"
-    )
-    repair_branch = disposition_branch["cases"]["repository_change"]
-    assert repair_branch[1]["repeat"]["max_iterations"] == 2
-
-
-def test_ci_repair_process_dispatches_only_the_prepared_repair_request() -> None:
-    process = ProcessCatalog.load(bundled_process_directory()).get("execute-ci-repair")
-    operation = process.document["steps"][0]["operation"]
-    parameters = operation["parameters"]["parameters"]
-
-    assert process.document["inputs"] == [
-        {"name": "repair_request", "type": "object", "required": True}
-    ]
-    assert parameters["mode"] == "ci-repair"
-    assert parameters["repair_request"] == {
-        "type": "reference",
-        "value": "repair_request",
-    }
 
 
 def test_specify_feature_interviews_until_structured_spec_has_no_open_assumptions() -> (

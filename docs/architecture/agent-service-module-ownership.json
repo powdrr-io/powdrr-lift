@@ -3967,27 +3967,6 @@
     },
     {
       "extraction_pr": "1381",
-      "internal_imports": [
-        "powdrr_contracts.ci",
-        "powdrr_service.ci_response.evidence"
-      ],
-      "kind": "python_module",
-      "owner": "service",
-      "path": "packages/service/src/powdrr_service/ci_response/repair.py",
-      "rationale": "service-owned pinned repair contract, scoped MiniSWE prompt, and deterministic patch checks",
-      "reviewed": false
-    },
-    {
-      "extraction_pr": "1381",
-      "internal_imports": [],
-      "kind": "python_module",
-      "owner": "service",
-      "path": "packages/service/src/powdrr_service/ci_response/research.py",
-      "rationale": "bounded GitHub Actions research query generation and official-source filtering",
-      "reviewed": false
-    },
-    {
-      "extraction_pr": "1381",
       "internal_imports": [],
       "kind": "python_module",
       "owner": "agent",
@@ -4001,16 +3980,7 @@
       "kind": "python_module",
       "owner": "agent",
       "path": "src/powdrr_lift/workrr/task_agent.py",
-      "rationale": "MiniSWE dispatch adapter for service-compiled CI repair requests",
-      "reviewed": false
-    },
-    {
-      "extraction_pr": "1381",
-      "internal_imports": [],
-      "kind": "resource",
-      "owner": "service",
-      "path": "packages/service/src/powdrr_service/resources/processes/execute-ci-repair.yaml",
-      "rationale": "Procedrr dispatch of one prepared CI repair to the generic coding-agent boundary",
+      "rationale": "workflow task dispatch and protected source-reference execution",
       "reviewed": false
     },
     {

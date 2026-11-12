@@ -8,9 +8,6 @@ outputs:
     type: string
     minLength: 1
     pattern: ^https?://[^ ]+/pull/[0-9]+$
-  repair_preparation:
-    type: object
-    additionalProperties: true
 limits: {context_chars: 60000, context_value_chars: 16000}
 steps:
   - call:
@@ -40,11 +37,8 @@ steps:
                 pull_request_url: {type: reference, value: pull_request_url}
                 verification_command:
                   {type: reference, value: task_context.input_state.proposed_pr_context.verification_command}
-                implementation_context:
-                  {type: reference, value: task_context.input_state.proposed_pr_context}
               outputs:
                 ci_observation_result: ci_observation_result
-                repair_preparation: repair_preparation
       default:
         - judge:
             kind: construct_one
@@ -97,11 +91,8 @@ steps:
                       pull_request_url: {type: reference, value: pull_request_url}
                       verification_command:
                         {type: reference, value: task_context.input_state.proposed_pr_context.verification_command}
-                      implementation_context:
-                        {type: reference, value: task_context.input_state.proposed_pr_context}
                     outputs:
                       ci_observation_result: ci_observation_result
-                      repair_preparation: repair_preparation
               implementation_defect:
                 - terminal: failed
               unclear:

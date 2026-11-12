@@ -491,117 +491,6 @@ def _issue_worker_implementation_request(
     )
 
 
-def _ci_repair_implementation_request(
-    repair_request: Mapping[str, Any], *, base_commit: str
-) -> ImplementationRequest:
-    """Validate the service-compiled CI request at the worker boundary."""
-    head_sha = repair_request.get("head_sha")
-    failure_id = repair_request.get("failure_id")
-    prompt = repair_request.get("prompt")
-    contract_fingerprint = repair_request.get("contract_fingerprint")
-    if not isinstance(head_sha, str) or not head_sha.strip():
-        raise PowdrrExecutionError("CI repair request requires a head SHA")
-    if not isinstance(failure_id, str) or not failure_id.strip():
-        raise PowdrrExecutionError("CI repair request requires a failure ID")
-    if not isinstance(prompt, str) or not prompt.strip():
-        raise PowdrrExecutionError("CI repair request requires a prompt")
-    if not isinstance(contract_fingerprint, str) or not contract_fingerprint.strip():
-        raise PowdrrExecutionError("CI repair request requires a contract fingerprint")
-    if head_sha != base_commit:
-        raise PowdrrExecutionError(
-            "CI repair request head does not match the current worker base"
-        )
-    allowed_paths = repair_request.get("allowed_paths")
-    protected_paths = repair_request.get("protected_paths", [])
-    acceptance_command = repair_request.get("acceptance_command")
-    if (
-        not isinstance(allowed_paths, list)
-        or not allowed_paths
-        or any(not isinstance(path, str) or not path.strip() for path in allowed_paths)
-    ):
-        raise PowdrrExecutionError("CI repair request has no valid allowed paths")
-    if not isinstance(protected_paths, list) or any(
-        not isinstance(path, str) or not path.strip() for path in protected_paths
-    ):
-        raise PowdrrExecutionError("CI repair request has invalid protected paths")
-    if (
-        not isinstance(acceptance_command, list)
-        or not acceptance_command
-        or any(not isinstance(token, str) or not token for token in acceptance_command)
-    ):
-        raise PowdrrExecutionError(
-            "CI repair request requires an explicit acceptance command"
-        )
-    for path in (*allowed_paths, *protected_paths):
-        relative = Path(path)
-        if relative.is_absolute() or ".." in relative.parts or not relative.parts:
-            raise PowdrrExecutionError("CI repair paths must be repository-relative")
-    if set(allowed_paths) & set(protected_paths):
-        raise PowdrrExecutionError("CI repair path is both allowed and protected")
-    request_id = "ci-repair-" + hashlib.sha256(failure_id.encode()).hexdigest()[:16]
-    return ImplementationRequest(
-        request_id=request_id,
-        objective=f"Repair CI failure {failure_id}",
-        prompt=prompt,
-        base_commit=base_commit,
-        plan_fingerprint=contract_fingerprint,
-        allowed_paths=tuple(allowed_paths),
-        protected_paths=tuple(protected_paths),
-        acceptance_criteria=(
-            "Address only the pinned CI failure described by the service prompt.",
-            "Preserve protected tests and verification behavior.",
-        ),
-        validation_profiles=(),
-        allowed_commands=(" ".join(acceptance_command),),
-    )
-
-
-def _ci_repair_request_with_runtime_state(
-    request: ImplementationRequest,
-    *,
-    repo_root: Path,
-    task_id: str,
-) -> ImplementationRequest:
-    """Allow only this task's durable Procedrr files beside the worker attempt."""
-    if not task_id or Path(task_id).name != task_id:
-        raise PowdrrExecutionError("CI repair task ID is not a safe file name")
-    runtime_paths = {
-        f".powdrr/procedrr-runs/{task_id}.json",
-        f".powdrr/procedrr-runs/{task_id}.events.jsonl",
-    }
-    dirty_paths: set[str] = set()
-    for arguments in (
-        ("diff", "--name-only"),
-        ("diff", "--cached", "--name-only"),
-        ("ls-files", "--others", "--exclude-standard"),
-    ):
-        result = subprocess.run(
-            ["git", *arguments],
-            cwd=repo_root,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        if result.returncode != 0:
-            raise PowdrrExecutionError(
-                "could not inspect CI repair worker checkout status"
-            )
-        dirty_paths.update(line for line in result.stdout.splitlines() if line)
-    unexpected = dirty_paths - runtime_paths
-    if unexpected:
-        raise PowdrrExecutionError(
-            "CI repair worker checkout has unrelated changes: "
-            + ", ".join(sorted(unexpected)[:8])
-        )
-    if not dirty_paths:
-        return request
-    return replace(
-        request,
-        allow_existing_changes=True,
-        ephemeral_paths=tuple(sorted(set(request.ephemeral_paths) | dirty_paths)),
-    )
-
-
 def _issue_worker_plan_amendment_paths(
     repo_root: Path, proposed: Mapping[str, Any], *, workflow_id: str
 ) -> tuple[str, ...]:
@@ -2677,7 +2566,6 @@ class _TaskWorkflowExecutionStrategy:
     stalled_actions: dict[str, object] = field(default_factory=dict)
     clean_room_repair_pending: bool = False
     clean_room_repair_used: bool = False
-    ci_repair_changed_paths: set[str] = field(default_factory=set)
     repair_prompt_manifest: RepairPromptManifest | None = None
     terminalized: bool = False
     terminal_exit_code: int | None = None
@@ -3625,8 +3513,8 @@ class _TaskWorkflowExecutionStrategy:
     ) -> dict[str, Any]:
         if mode == "ci-repair":
             raise PowdrrExecutionError(
-                "Legacy CI repair code-writing is unsupported; use CI observation "
-                "to record the failure and prepare a reviewed source-reference plan"
+                "CI repair code-writing was removed; use CI observation to record "
+                "the failure and prepare a reviewed source-reference plan"
             )
         if mode == "plan-amendment":
             return self._run_plan_amendment_agent(mode_context or {})
@@ -4910,7 +4798,6 @@ class _TaskProcedrrOperations:
                     str(values["pull_request_url"]),
                     "--issue",
                     str(values["issue_number"]),
-                    "--observe-only",
                     "--verification-command",
                     str(values["verification_command"]),
                 ],
@@ -4938,196 +4825,6 @@ class _TaskProcedrrOperations:
                 {"kind": "ci_observation", "result": normalized}
             )
             return normalized
-        if operation == "ci_repair_research":
-            from powdrr_service.ci_response import research_observed_ci_failure
-
-            observation = parameters.get("observation")
-            if not isinstance(observation, Mapping):
-                raise PowdrrExecutionError(
-                    "CI repair research requires an observation object"
-                )
-            result = research_observed_ci_failure(
-                observation,
-                api_key=os.environ.get("TAVILY_API_KEY"),
-            )
-            self.strategy.events.append(
-                {"kind": "ci_repair_research", "result": result}
-            )
-            return result
-        if operation == "ci_repair_compile":
-            from powdrr_service.ci_response import (
-                compile_observed_ci_repair_request,
-            )
-
-            observation = parameters.get("observation")
-            research_result = parameters.get("research_result")
-            decision = parameters.get("decision")
-            verification_command = parameters.get("verification_command")
-            if (
-                not isinstance(observation, Mapping)
-                or not isinstance(research_result, Mapping)
-                or not isinstance(decision, Mapping)
-                or not isinstance(verification_command, str)
-            ):
-                raise PowdrrExecutionError(
-                    "CI repair compilation requires observation, research, decision, "
-                    "and verification command inputs"
-                )
-            result = compile_observed_ci_repair_request(
-                observation=observation,
-                research_result=research_result,
-                decision=decision,
-                verification_command=verification_command,
-            )
-            self.strategy.events.append({"kind": "ci_repair_compile", "result": result})
-            return result
-        if operation == "ci_repair_validate":
-            from powdrr_service.ci_response import validate_ci_repair_attempt
-
-            repair_request = parameters.get("repair_request")
-            attempt = parameters.get("attempt")
-            if not isinstance(repair_request, Mapping) or not isinstance(
-                attempt, Mapping
-            ):
-                raise PowdrrExecutionError(
-                    "CI repair validation requires the compiled request and "
-                    "worker attempt"
-                )
-            changed_paths = attempt.get("changed_paths")
-            if not isinstance(changed_paths, list) or not all(
-                isinstance(path, str) for path in changed_paths
-            ):
-                raise PowdrrExecutionError("CI repair worker omitted its changed paths")
-            changed_files: dict[str, str] = {}
-            root = self.strategy.repo_root.resolve()
-            for relative in changed_paths:
-                candidate = (root / relative).resolve()
-                try:
-                    candidate.relative_to(root)
-                except ValueError:
-                    continue
-                if candidate.is_file():
-                    changed_files[relative] = candidate.read_text(encoding="utf-8")
-            validation = validate_ci_repair_attempt(
-                repair_request=repair_request,
-                attempt=attempt,
-                changed_files=changed_files,
-            )
-            if validation["passed"] is True:
-                command = repair_request.get("acceptance_command")
-                if (
-                    not isinstance(command, list)
-                    or not command
-                    or not all(isinstance(part, str) and part for part in command)
-                ):
-                    raise PowdrrExecutionError(
-                        "compiled CI repair request has no valid acceptance command"
-                    )
-                try:
-                    check = subprocess.run(
-                        command,
-                        cwd=root,
-                        capture_output=True,
-                        text=True,
-                        timeout=600,
-                        check=False,
-                    )
-                    validation["acceptance"] = {
-                        "command": command,
-                        "exit_code": check.returncode,
-                        "stdout_sha256": hashlib.sha256(
-                            check.stdout.encode("utf-8")
-                        ).hexdigest(),
-                        "stderr_sha256": hashlib.sha256(
-                            check.stderr.encode("utf-8")
-                        ).hexdigest(),
-                    }
-                    if check.returncode != 0:
-                        validation["passed"] = False
-                        findings = validation.get("findings")
-                        validation["findings"] = [
-                            *(findings if isinstance(findings, list) else []),
-                            "declared acceptance command failed after the CI repair",
-                        ]
-                except subprocess.TimeoutExpired:
-                    validation["passed"] = False
-                    findings = validation.get("findings")
-                    validation["findings"] = [
-                        *(findings if isinstance(findings, list) else []),
-                        "declared acceptance command timed out after the CI repair",
-                    ]
-            self.strategy.events.append(
-                {"kind": "ci_repair_validation", "result": validation}
-            )
-            return validation
-        if operation == "ci_repair_finalize":
-            from powdrr_service.ci_response import finalize_ci_repair_result
-
-            preparation = parameters.get("preparation")
-            attempt = parameters.get("attempt")
-            final_validation = parameters.get("validation")
-            if (
-                not isinstance(preparation, Mapping)
-                or not isinstance(attempt, Mapping)
-                or not isinstance(final_validation, Mapping)
-            ):
-                raise PowdrrExecutionError(
-                    "CI repair finalization requires preparation, attempt, and "
-                    "validation"
-                )
-            publication_url = parameters.get("publication_url")
-            follow_up = parameters.get("follow_up_observation")
-            if publication_url is not None and not isinstance(publication_url, str):
-                raise PowdrrExecutionError("CI repair publication URL is malformed")
-            if follow_up is not None and not isinstance(follow_up, Mapping):
-                raise PowdrrExecutionError(
-                    "CI repair follow-up observation is malformed"
-                )
-            result = finalize_ci_repair_result(
-                preparation=preparation,
-                attempt=attempt,
-                validation=final_validation,
-                publication_url=publication_url,
-                follow_up_observation=follow_up,
-            )
-            self.strategy.events.append(
-                {"kind": "ci_repair_finalization", "result": result}
-            )
-            return result
-        if operation == "ci_repair_retry_start":
-            from powdrr_service.ci_response import start_ci_repair_attempts
-
-            repair_request = parameters.get("repair_request")
-            if not isinstance(repair_request, Mapping):
-                raise PowdrrExecutionError(
-                    "CI repair retry initialization requires a compiled request"
-                )
-            return start_ci_repair_attempts(repair_request)
-        if operation == "ci_repair_retry":
-            from powdrr_service.ci_response import prepare_ci_repair_retry
-
-            repair_request = parameters.get("repair_request")
-            attempt = parameters.get("attempt")
-            retry_validation = parameters.get("validation")
-            max_attempts = parameters.get("max_attempts", 2)
-            if (
-                not isinstance(repair_request, Mapping)
-                or not isinstance(attempt, Mapping)
-                or not isinstance(retry_validation, Mapping)
-                or not isinstance(max_attempts, int)
-                or isinstance(max_attempts, bool)
-            ):
-                raise PowdrrExecutionError(
-                    "CI repair retry requires its request, attempt, and validation"
-                )
-            result = prepare_ci_repair_retry(
-                repair_request=repair_request,
-                attempt=attempt,
-                validation=retry_validation,
-                max_attempts=max_attempts,
-            )
-            self.strategy.events.append({"kind": "ci_repair_retry", "result": result})
-            return result
         if operation == "procedrr_fragment_start":
             from powdrr_service.procedrr.fragments import start_fragment
 
@@ -5882,12 +5579,6 @@ def run_workflow_task(
         )
         operation_names = (
             "ci_observe",
-            "ci_repair_research",
-            "ci_repair_compile",
-            "ci_repair_validate",
-            "ci_repair_finalize",
-            "ci_repair_retry_start",
-            "ci_repair_retry",
             "procedrr_fragment_start",
             "procedrr_fragment_apply_edit",
             "internal",

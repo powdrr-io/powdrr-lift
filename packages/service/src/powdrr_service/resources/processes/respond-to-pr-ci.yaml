@@ -1,17 +1,13 @@
 version: 1
 name: respond-to-pr-ci
-description: Observe the current PR head, reproduce failures, checkpoint evidence, and prepare one scoped repair request from service-owned policy.
+description: Observe the current PR head, reproduce failures, and checkpoint evidence without starting a repair worker.
 inputs:
   - {name: repository, type: string, required: true}
   - {name: issue_number, type: integer, required: true}
   - {name: pull_request_url, type: string, required: true}
   - {name: verification_command, type: string, required: true}
-  - {name: implementation_context, type: object, required: true}
 outputs:
   ci_observation_result:
-    type: object
-    additionalProperties: true
-  repair_preparation:
     type: object
     additionalProperties: true
 limits: {llm_activations: 1, tool_calls: 32, context_chars: 12000, context_value_chars: 5000}
@@ -25,13 +21,4 @@ steps:
         verification_command: {type: reference, value: verification_command}
       returns: {type: object, additionalProperties: true}
       bind: ci_observation_result
-  - call:
-      process: prepare-ci-repair
-      inputs:
-        ci_observation_result: {type: reference, value: ci_observation_result}
-        pull_request_url: {type: reference, value: pull_request_url}
-        implementation_context: {type: reference, value: implementation_context}
-        verification_command: {type: reference, value: verification_command}
-      outputs:
-        repair_preparation: repair_preparation
   - terminal: succeeded

@@ -184,19 +184,11 @@ steps:
         - task_run_process
         step_type: governed
         llm_type: standard_reasoning
-        pre_step:
-          action: invoke_tool
-          template:
-            tool: shell
-            command:
-            - test
-            - -f
-            - docs/project_structure/project-structure.yaml
-        details: 'The engine-owned pre-step result is authoritative; do not reread it. If the artifact exists,
-          emit one next_step action and reuse it. If it is missing, emit one task_run_process action for the
-          exact process id `bootstrap-code-structure`; after that action returns, emit next_step in the following
-          turn. The nested process is project-wide and must not ask for a feature or target module. Never invoke
-          bootstrap merely because this step is present: the gate result is authoritative.'
+        details: 'Always invoke the exact process id `bootstrap-code-structure`. It checks freshness of the
+          existing project-structure artifact and the paired Structrr YAML and Markdown before reuse. If all
+          outputs are fresh and valid, it completes with the reuse evidence; otherwise it refreshes them from
+          repository evidence. After the nested process returns, emit next_step in the following turn. The process
+          is project-wide and must not ask for a feature or target module.'
       - id: confirm-project-structure
         description: Confirm the project-structure artifact is available.
         actions: []

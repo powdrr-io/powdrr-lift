@@ -1,9 +1,7 @@
 version: 1
 name: bootstrap-code-structure
-description: When implementation is about to begin and the project's code structure needs
-  current codebase evidence. When the workflow needs reliable application modules, test modules,
-  tools, and validation commands for the whole repository. When no project-structure artifact
-  exists and a durable template should be created under docs/project_structure.
+description: When implementation is about to begin and the project-wide code structure needs current evidence.
+  Use when project-structure or Structrr snapshot/report artifacts are missing or stale.
 inputs:
 - name: user_request
   type: string
@@ -20,127 +18,140 @@ steps:
 - specialize:
     process: generate-fragment
     max_steps: 120
-    question: "Execute this named workflow for the supplied user request. Treat the embedded\
-      \ workflow document as task-specific requirements and preserve its ordering, gates,\
-      \ outputs, and user-facing questions. Map its actions to the allowed Procedrr operation\
-      \ tools. Replace legacy nested-process requests with calls to matching declared Procedrr\
-      \ processes. Use only current bindings and evidence. Do not invent results or claim\
-      \ an operation succeeded without its returned result.\n\nEmbedded workflow document:\n\
-      ---\nname: bootstrap-code-structure\nwhen_to_use:\n- When implementation is about to\
-      \ begin and the project's code structure needs current codebase evidence.\n- When the\
-      \ workflow needs reliable application modules, test modules, tools, and validation commands\
-      \ for the whole repository.\n- When no project-structure artifact exists and a durable\
-      \ template should be created under docs/project_structure.\nsteps:\n- description: Check\
-      \ whether the project-structure artifact already exists.\n  actions: [gather_context,\
-      \ edit, yaml_edit, file_management, read_document, complete]\n  step_type: governed\n\
-      \  prompt_catalogs: [context_types]\n  llm_type: simple_task\n  details: >-\n    Use\
-      \ the gather_context workflow action with types [modules, tools] and no\n    keywords\
-      \ or filters. Inspect the returned match paths specifically for\n    docs/project_structure/project-structure.yaml.\
-      \ If that artifact exists,\n    preserve it, include its exact path and the reuse decision\
-      \ in\n    decisions_and_context, and choose complete immediately. Do not inspect the\n\
-      \    source tree, run discovery commands, generate a template, edit the\n    artifact,\
-      \ validate it, stage it, or invoke any nested process. If the artifact\n    does not exist,\
-      \ record that result and choose next_step so the discovery\n    step can begin. Return\
-      \ exactly one of these actions:\n    {\"action\":\"complete\",\"text\":\"Reused the\
-      \ existing project-structure artifact.\"}\n    or {\"action\":\"next_step\"}.\n- description:\
-      \ Discover the project-wide modules, tools, tests, and development commands.\n  actions:\
-      \ [invoke_tool, edit, yaml_edit, read_document]\n  step_type: governed\n  llm_type:\
-      \ long_context\n  details: >-\n    Treat the repository as the scope. Do not ask the\
-      \ user to identify a\n    feature, work item, or target module. Inspect the complete\
-      \ source and test\n    layout, existing project-structure documents, configuration,\
-      \ build files,\n    CI workflows, scripts, and documentation. Identify application modules,\n\
-      \    test modules, their relationships and locations, and the commands used for\n  \
-      \  tests, formatting, linting, type checking, packaging, and other repository\n    validation.\
-      \ Use basedpyright-symbol and basedpyright-structure for Python\n    source when available.\
-      \ Record paths, symbols, commands, and evidence in\n    decisions_and_context before\
-      \ continuing. The initial existence check has\n    already confirmed that no project-structure\
-      \ artifact exists. After\n    discovering each tool, try its command\n    with the smallest\
-      \ safe invocation that exercises its syntax and working\n    directory. For commands\
-      \ that require project inputs, use a read-only,\n    help, dry-run, or otherwise non-destructive\
-      \ invocation. If a discovered\n    tool fails because of command syntax, flags, paths,\
-      \ working directory, or\n    invocation shape, inspect the error, correct the command,\
-      \ and retry it\n    before recording the tool. Do not pass an untested or failing command\
-      \ to\n    the next step; record the successful command, required inputs, and\n    validation\
-      \ evidence in decisions_and_context.\n  tool_invocations:\n  - tool: shell\n    command:\n\
-      \    - rg\n    - --files\n    - src\n    - tests\n    - scripts\n    - .github\n   \
-      \ - docs/project_structure\n  - tool: shell\n    command:\n    - rg\n    - -n\n    -\
-      \ \"pytest|ruff|mypy|pyright|basedpyright|uv run|make |npm test|cargo test|go test\"\
-      \n    - pyproject.toml\n    - Makefile\n    - .github\n    - scripts\n    - README.md\n\
-      - description: Reuse an existing project-structure artifact or create its template.\n\
-      \  actions: [invoke_tool, edit, yaml_edit, read_document]\n  step_type: governed\n \
-      \ prompt_catalogs: [context_types]\n  llm_type: simple_task\n  details: >-\n    If docs/project_structure\
-      \ contains an existing project-structure document,\n    inspect and reuse it without\
-      \ overwriting it. If it does not exist, invoke\n    the shell tool with command [powdrr-lift,\
-      \ project-structure]. The CLI\n    creates both the parent directory and the template.\
-      \ The template must\n    use the repository's `https://powdrr.io/schemas/specification-v1`\
-      \ schema.\n    Generate the template with the CLI and follow its instructions. Use only\n\
-      \    the specification sections needed by the project structure; all sections\n    are\
-      \ optional.\n    Do not create a feature-specific architecture specification and do\
-      \ not ask\n    a question merely because the project-structure document is absent. Pass\n\
-      \    the exact artifact path to the next step. Use the prior gather_context\n    result\
-      \ to decide whether the artifact exists.\n  tool_invocations:\n  - tool: internal\n\
-      \    command:\n    - powdrr-lift\n    - project-structure\n- description: Populate the\
-      \ project-structure artifact from codebase evidence.\n  actions: [edit, yaml_edit, file_management,\
-      \ read_document]\n  step_type: governed\n  llm_type: high_reasoning\n  details: >-\n\
-      \    Compare the discovered repository structure with the existing artifact or\n   \
-      \ template. Add or update project-wide module entries for application,\n    test, tooling,\
-      \ configuration, and integration areas, including stable ids,\n    paths, parent/related\
-      \ modules, and purpose. Add or update tool\n    entries for test, formatting, linting,\
-      \ type-check, build, and relevant\n    development commands, including stable ids, related\
-      \ modules, labels,\n    when_to_use, template, how_to_use, and evidence. Every tool\
-      \ entry MUST\n    include a non-empty `labels` list with at least one meaningful, stable\n\
-      \    category label. Never leave `labels` out and never use `labels: []`.\n    Choose\
-      \ labels that describe the tool's role, such as `test`, `format`,\n    `lint`, `type-check`,\
-      \ `build`, or `development`; add all labels supported\n    by repository evidence. Include\
-      \ the `pr-prep` label on every testing,\n    linting, and formatting tool so finish-pr-prep\
-      \ can discover it. Omit only\n    `pr-prep` when repository evidence shows that the\
-      \ tool is intended for ad\n    hoc or one-off use, and record that rationale in the\
-      \ tool entry's\n    evidence. Preserve accurate existing ids and descriptions. Do not\
-      \ invent\n    modules or tools unsupported by repository evidence. Verify every tool\n\
-      \    command against the successful invocation evidence from the discovery\n    step,\
-      \ including its working directory and required arguments. Use the edit\n    action to\
-      \ write the artifact, for example:\n    {\"action\":\"edit\",\"file_path\":\"docs/project_structure/project-structure.yaml\"\
+    question: "Execute this named workflow for the supplied user request. Treat the embedded workflow\
+      \ document as task-specific requirements and preserve its ordering, gates, outputs, and user-facing\
+      \ questions. Map its actions to the allowed Procedrr operation tools. Replace legacy nested-process\
+      \ requests with calls to matching declared Procedrr processes. Use only current bindings and evidence.\
+      \ Do not invent results or claim an operation succeeded without its returned result.\n\nEmbedded\
+      \ workflow document:\n---\nname: bootstrap-code-structure\nwhen_to_use:\n- When implementation is\
+      \ about to begin and the project's code structure needs current codebase evidence.\n- When the workflow\
+      \ needs reliable application modules, test modules, tools, and validation commands for\n  the whole\
+      \ repository.\n- When no fresh project-structure artifact and current Structrr snapshot/report pair\
+      \ exist, or any of\n  those artifacts is stale.\nsteps:\n- description: Inspect project-structure\
+      \ and Structrr artifact freshness before reuse.\n  actions:\n  - gather_context\n  - invoke_tool\n\
+      \  - edit\n  - yaml_edit\n  - file_management\n  - read_document\n  - complete\n  step_type: governed\n\
+      \  prompt_catalogs:\n  - context_types\n  llm_type: simple_task\n  details: 'Use the gather_context\
+      \ workflow action with types [modules, tools] and no keywords or filters.\n    Inspect the returned\
+      \ match paths for docs/project_structure/project-structure.yaml and docs/structrr/current/baseline-*.yaml\n\
+      \    plus each matching .md report. Do not reuse files based on existence alone.\n\n\n    For project-structure.yaml,\
+      \ run `git log -1 --format=%H -- docs/project_structure/project-structure.yaml`.\n    If it has\
+      \ no committed revision, treat it as stale. Compare the source tree, tests, scripts, CI, and\n \
+      \   build/configuration files between that revision and HEAD with `git diff --quiet <artifact-commit>\n\
+      \    HEAD -- src tests scripts .github pyproject.toml Makefile tox.ini noxfile.py package.json Cargo.toml\n\
+      \    go.mod`; also run `git status --short --untracked-files=all -- src tests scripts .github pyproject.toml\n\
+      \    Makefile tox.ini noxfile.py package.json Cargo.toml go.mod` and treat modified, deleted, or\
+      \ untracked\n    inputs as stale. Any relevant change means the project-structure artifact is stale.\n\
+      \n\n    For Structrr, select the baseline YAML whose short SHA matches `git rev-parse --short HEAD`,\
+      \ require\n    the sibling Markdown report to exist, and inspect the YAML source_manifest. Reuse\
+      \ the pair only when\n    source_revision matches HEAD, coverage_complete is true, both files exist,\
+      \ and the report identifies\n    the same revision. If either artifact is missing, stale, incomplete,\
+      \ or cannot be checked, record\n    the evidence and choose next_step. If all three artifacts are\
+      \ fresh and valid, include their exact\n    paths and freshness evidence in decisions_and_context\
+      \ and choose complete. Return complete only for\n    that fresh reuse case; otherwise return next_step.'\n\
+      - description: Discover the project-wide modules, tools, tests, and development commands.\n  actions:\n\
+      \  - invoke_tool\n  - edit\n  - yaml_edit\n  - read_document\n  step_type: governed\n  llm_type:\
+      \ long_context\n  details: 'Treat the repository as the scope. Do not ask the user to identify a\
+      \ feature, work item, or\n    target module. Inspect the complete source and test layout, existing\
+      \ project-structure documents,\n    configuration, build files, CI workflows, scripts, and documentation.\
+      \ Identify application modules,\n    test modules, their relationships and locations, and the commands\
+      \ used for tests, formatting, linting,\n    type checking, packaging, and other repository validation.\
+      \ Use basedpyright-symbol and basedpyright-structure\n    for Python source when available. Record\
+      \ paths, symbols, each command exactly as declared, its working\n    directory, selectors, environment,\
+      \ prerequisites, applicability, and source evidence in decisions_and_context\n    before continuing.\n\
+      \n\n    Treat discovery and probing as separate records. A help or version invocation confirms only\
+      \ that the\n    CLI accepts that invocation; it never confirms that a test suite or project validation\
+      \ passed. If\n    the current Powdrr provider exposes a supported probe for a discovered check,\
+      \ request that probe using\n    its declared recipe and recorded environment. Do not invent a probe\
+      \ or replace the project''s native\n    command with an adapted command. If a probe is unavailable,\
+      \ unsupported, blocked, fails, or times\n    out, retain the original native command and record\
+      \ the probe status and reason. Keep failed or unrunnable\n    checks in the artifact; never discard\
+      \ a real project command because its baseline did not pass.'\n  tool_invocations:\n  - tool: shell\n\
+      \    command:\n    - rg\n    - --files\n    - src\n    - tests\n    - scripts\n    - .github\n \
+      \   - docs/project_structure\n  - tool: shell\n    command:\n    - rg\n    - -n\n    - pytest|ruff|mypy|pyright|basedpyright|uv\
+      \ run|make |npm test|cargo test|go test\n    - pyproject.toml\n    - Makefile\n    - .github\n \
+      \   - scripts\n    - README.md\n- description: Reuse an existing project-structure artifact or create\
+      \ its template.\n  actions:\n  - invoke_tool\n  - edit\n  - yaml_edit\n  - read_document\n  step_type:\
+      \ governed\n  prompt_catalogs:\n  - context_types\n  llm_type: simple_task\n  details: If docs/project_structure\
+      \ contains an existing project-structure document, reuse it as the\n    starting point and preserve\
+      \ stable ids and valid evidence references. If it is stale, update it from\n    current source evidence;\
+      \ do not treat staleness as a reason to overwrite it with a blank template.\n    If it does not\
+      \ exist, invoke the shell tool with command [powdrr-lift, project-structure]. The CLI\n    creates\
+      \ both the parent directory and the template. The template must use the repository's `https://powdrr.io/schemas/specification-v1`\n\
+      \    schema. Generate the template with the CLI and follow its instructions. Use only the specification\n\
+      \    sections needed by the project structure; all sections are optional. Do not create a feature-specific\n\
+      \    architecture specification and do not ask a question merely because the project-structure document\n\
+      \    is absent. Pass the exact artifact path and freshness decision onward.\n  tool_invocations:\n\
+      \  - tool: internal\n    command:\n    - powdrr-lift\n    - project-structure\n- description: Populate\
+      \ the project-structure artifact from codebase evidence.\n  actions:\n  - edit\n  - yaml_edit\n\
+      \  - file_management\n  - read_document\n  step_type: governed\n  llm_type: high_reasoning\n  details:\
+      \ 'Compare the discovered repository structure with the existing artifact or template. Add or\n\
+      \    update project-wide module entries for application, test, tooling, configuration, and integration\n\
+      \    areas, including stable ids, paths, parent/related modules, and purpose. Add or update tool\
+      \ entries\n    for test, formatting, linting, type-check, build, and relevant development commands,\
+      \ including stable\n    ids, related modules, labels, when_to_use, template, how_to_use, and evidence.\
+      \ Every tool entry MUST\n    include a non-empty `labels` list with at least one meaningful, stable\
+      \ category label. Never leave\n    `labels` out and never use `labels: []`. Choose labels that describe\
+      \ the tool''s role, such as `test`,\n    `format`, `lint`, `type-check`, `build`, or `development`;\
+      \ add all labels supported by repository\n    evidence. Include the `pr-prep` label on every testing,\
+      \ linting, and formatting tool so finish-pr-prep\n    can discover it. Omit only `pr-prep` when\
+      \ repository evidence shows that the tool is intended for\n    ad hoc or one-off use, and record\
+      \ that rationale in the tool entry''s evidence. Preserve accurate\n    existing ids and descriptions.\
+      \ Do not invent modules or tools unsupported by repository evidence.\n    Record the exact native\
+      \ validation command and its source evidence even when a probe failed or could\n    not run. Keep\
+      \ probe outcomes and reasons separate from the command declaration. Use the edit action\n    to\
+      \ write the artifact, for example: {\"action\":\"edit\",\"file_path\":\"docs/project_structure/project-structure.yaml\"\
       ,\"edits\":[{\"kind\":\"replace\",\"start_line\":1,\"end_line\":1,\"text\":\"<project-structure-yaml>\"\
-      }]}. If a\n    command cannot be run safely, document the exact reason and the safest\n\
-      \    verified syntax instead of guessing. Use the edit action to write the\n    artifact\
-      \ and pass the changed path and edit summary onward.\n- description: Validate the project-structure\
-      \ artifact and discovery evidence.\n  actions: [invoke_tool, edit, yaml_edit, read_document]\n\
-      \  step_type: governed\n  llm_type: fast_iteration\n  details: >-\n    Run [powdrr-lift,\
-      \ validate-project-structure, --input,\n    docs/project_structure/project-structure.yaml]\
-      \ and require a successful\n    specification-v1 schema report. Confirm that the artifact\
-      \ contains the\n    discovered project-wide module and tool records, uses paths that\
-      \ exist or\n    are explicitly documented as generated, and has no conflict markers.\
-      \ Check\n    that every listed tool has a command, a non-empty `labels` list, and every\n\
-      \    module has a purpose and location. Confirm that testing, linting, and\n    formatting\
-      \ tools have the `pr-prep` label unless their evidence explicitly\n    supports ad hoc\
-      \ or one-off use. Invoke the validator once for the current\n    artifact, then run\
-      \ the conflict-marker and diff checks once. If any check\n    fails, edit or restage\
-      \ the affected artifact before rerunning that check;\n    never repeat an unchanged\
-      \ command. After all checks succeed, record the\n    results and choose `next_step`\
-      \ immediately. Return {\"action\":\"next_step\"}\n    after recording the results. Do\
-      \ not run a\n    feature-specific architecture validator or require a feature/work-item\n\
-      \    name.\n  tool_invocations:\n  - tool: internal\n    command:\n    - powdrr-lift\n\
-      \    - validate-project-structure\n    - --input\n    - docs/project_structure/project-structure.yaml\n\
-      \  - tool: shell\n    command:\n    - rg\n    - -n\n    - \"^(<<<<<<<|=======|>>>>>>>)\"\
-      \n    - docs/project_structure/project-structure.yaml\n  - tool: shell\n    command:\n\
-      \    - git\n    - diff\n    - --check\n  - tool: internal\n    command:\n    - powdrr-lift\n\
-      \    - repository-state\n- description: Stage the validated project-structure artifact.\n\
-      \  step_type: invoke_tool\n  llm_type: simple_task\n  pre_step:\n    action: invoke_tool\n\
-      \    template:\n      tool: git\n      operation: add\n      paths: [docs/project_structure/project-structure.yaml]\n\
-      - description: Run finish-pr-prep on the validated project-structure artifact.\n  step_type:\
-      \ uses_process\n  llm_type: fast_iteration\n  details: >-\n    Invoke finish-pr-prep after\
-      \ the validated project-structure artifact is\n    staged. After it returns, choose\
-      \ next_step only after its required\n    readiness outputs are present. If cleanup changes\
-      \ files, restage only\n    docs/project_structure/project-structure.yaml before continuing.\
-      \ Return\n    {\"action\":\"next_step\"} after the nested process returns. Do not include\n\
-      \    unrelated files or begin feature implementation.\n  uses_process:\n    process: finish-pr-prep\n\
-      - description: Commit the project-structure artifact and open a draft pull request.\n\
-      \  step_type: uses_process\n  llm_type: simple_task\n  details: >-\n    Invoke create-pull-request\
-      \ with pr-kind `project-structure`, commit\n    message `Add project structure artifact`,\
-      \ and pull-request title\n    `<pull-request-title>`. Pass `files_to_publish` containing\
-      \ exactly\n    `docs/project_structure/project-structure.yaml`, along with the generated\n\
-      \    artifact and its discovery evidence as context. The nested process must\n    stage\
-      \ exactly that path.\n  uses_process:\n    process: create-pull-request"
+      }]}.\n    If a command cannot be run safely, document the exact reason and its declared syntax instead\
+      \ of guessing.\n    Use the edit action to write the artifact and pass the changed path and edit\
+      \ summary onward.'\n- description: Generate the Structrr snapshot and Markdown findings report.\n\
+      \  actions:\n  - invoke_tool\n  - read_document\n  step_type: governed\n  llm_type: simple_task\n\
+      \  details: 'Invoke `powdrr-lift bootstrap-structrr --json` from the repository root after recording\
+      \ discovery\n    and probe evidence. This snapshot command validates and writes the Structrr YAML\
+      \ plus its paired Markdown\n    report; parse its JSON stdout and record the exact `output_path`\
+      \ and `report_path`. The command is\n    snapshot-only: preserve `baseline_status: not_run` and\
+      \ `probe_mode: not_run` unless a supported probe\n    was actually executed and its result is represented\
+      \ by the command. Do not claim help, static discovery,\n    or a probe is a passing baseline. Retain\
+      \ discovered checks and unresolved or failed-probe reasons\n    in decisions_and_context. If the\
+      \ command fails or either output is missing, record the exact failure\n    and do not claim the\
+      \ paired outputs were produced.'\n  tool_invocations:\n  - tool: shell\n    command:\n    - powdrr-lift\n\
+      \    - bootstrap-structrr\n    - --json\n- description: Validate the project-structure artifact\
+      \ and discovery evidence.\n  actions:\n  - invoke_tool\n  - edit\n  - yaml_edit\n  - read_document\n\
+      \  step_type: governed\n  llm_type: fast_iteration\n  details: 'Run [powdrr-lift, validate-project-structure,\
+      \ --input, docs/project_structure/project-structure.yaml]\n    and require a successful specification-v1\
+      \ schema report. Confirm that the artifact contains the discovered\n    project-wide module and\
+      \ tool records, uses paths that exist or are explicitly documented as generated,\n    and has no\
+      \ conflict markers. Check that every listed tool has a command, a non-empty `labels` list,\n   \
+      \ and every module has a purpose and location. Confirm that testing, linting, and formatting tools\
+      \ have\n    the `pr-prep` label unless their evidence explicitly supports ad hoc or one-off use.\
+      \ Also verify the\n    `bootstrap-structrr` JSON summary identified the YAML and Markdown paths,\
+      \ both output files exist,\n    and the Markdown report includes the same source revision and discovered\
+      \ checks as the Structrr snapshot.\n    The snapshot command validates its YAML before writing it;\
+      \ do not treat `baseline_status: not_run`\n    as a pass. Invoke each validator once for the current\
+      \ artifacts, then run the conflict-marker and\n    diff checks once. If any check fails, edit or\
+      \ restage the affected artifact before rerunning that\n    check; never repeat an unchanged command.\
+      \ After all checks succeed, record the results and choose\n    next_step immediately. Do not run\
+      \ a feature-specific architecture validator or require a feature/work-item\n    name.'\n  tool_invocations:\n\
+      \  - tool: internal\n    command:\n    - powdrr-lift\n    - validate-project-structure\n    - --input\n\
+      \    - docs/project_structure/project-structure.yaml\n  - tool: shell\n    command:\n    - rg\n\
+      \    - -n\n    - ^(<<<<<<<|=======|>>>>>>>)\n    - docs/project_structure/project-structure.yaml\n\
+      \  - tool: shell\n    command:\n    - git\n    - diff\n    - --check\n  - tool: internal\n    command:\n\
+      \    - powdrr-lift\n    - repository-state\n- description: Stage the validated project-structure\
+      \ and Structrr output files.\n  actions:\n  - invoke_tool\n  step_type: governed\n  llm_type: simple_task\n\
+      \  details: Use git add to stage exactly docs/project_structure/project-structure.yaml and the Structrr\n\
+      \    YAML and Markdown paths returned by bootstrap-structrr. Do not stage unrelated files.\n- description:\
+      \ Run finish-pr-prep on the validated bootstrap outputs.\n  step_type: uses_process\n  llm_type:\
+      \ fast_iteration\n  details: Invoke finish-pr-prep after the project-structure file, Structrr YAML,\
+      \ and Markdown report\n    are staged. After it returns, choose next_step only after its required\
+      \ readiness outputs are present.\n    If cleanup changes files, restage only those exact three artifact\
+      \ paths. Return {\"action\":\"next_step\"}\n    after the nested process returns. Do not include\
+      \ unrelated files or begin feature implementation.\n  uses_process:\n    process: finish-pr-prep\n\
+      - description: Commit the validated project-structure and Structrr bootstrap outputs and open a\
+      \ draft\n    pull request.\n  step_type: uses_process\n  llm_type: simple_task\n  details: Invoke\
+      \ create-pull-request with pr-kind `project-structure`, commit message `Add project structure\n\
+      \    artifact`, and a title describing the bootstrap outputs. Pass files_to_publish containing exactly\n\
+      \    docs/project_structure/project-structure.yaml plus the Structrr YAML and Markdown paths returned\
+      \ by\n    bootstrap-structrr, along with the generated artifacts and their discovery/probe evidence.\
+      \ The nested\n    process must stage exactly those paths.\n  uses_process:\n    process: create-pull-request\n"
     context:
     - user_request
     - workflow_context

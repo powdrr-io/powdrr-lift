@@ -1,0 +1,203 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1436
+title: Finish Structrr source reference reconciliation
+intent:
+  problem: Structrr semantic source bindings and code annotations need a bounded,
+    auditable reconciliation path that does not infer applicability from either
+    artifact alone.
+  goal: Compare both representations, record fingerprinted provider decisions,
+    apply deterministic metadata edits transactionally, and support bootstrap and
+    post-worker reconciliation.
+human-decisions: []
+structured_files: []
+files:
+- path: packages/service/src/powdrr_service/planning/semantic_decision.py
+  type: modified
+  span:
+    start_line: 94
+    end_line: 94
+  summary: Register source-link existence decisions and decision-provider provenance.
+  rationale: Give each exact reference-to-owner link its own allowed result and auditable provider identity.
+- path: packages/service/src/powdrr_service/planning/semantic_decision.py
+  type: modified
+  span:
+    start_line: 135
+    end_line: 141
+  summary: Register source-link existence decisions and decision-provider provenance.
+  rationale: Give each exact reference-to-owner link its own allowed result and auditable provider identity.
+- path: packages/service/src/powdrr_service/structrr/reference_reconciliation.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 777
+  summary: Normalize reciprocal edges, prepare narrow decisions, record fallback attempts, and compile deterministic operations.
+  rationale: Make link consistency and semantic decisions explicit, fingerprinted, and reusable only for matching inputs.
+- path: packages/service/src/powdrr_service/structrr/reference_editing.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 613
+  summary: Edit Python annotations and Structrr bindings, validate staged results, and publish recoverable transactions.
+  rationale: Apply accepted source-link decisions without changing Python ASTs or losing recoverable preimages.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 6
+    end_line: 6
+  summary: Load hashing and UTC support for reconciliation fingerprints.
+  rationale: Bind semantic decision identity and provenance to exact plan inputs.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 19
+    end_line: 19
+  summary: Load hashing and UTC support for reconciliation fingerprints.
+  rationale: Bind semantic decision identity and provenance to exact plan inputs.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 700
+    end_line: 707
+  summary: Add an opt-in bootstrap annotation reconciliation flag.
+  rationale: Keep source backfill explicit and provider-backed.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 710
+    end_line: 752
+  summary: Add explicit reciprocal reference check and reconciliation commands with opt-in provider resolution.
+  rationale: Keep consistency checks read-only and make provider calls explicit and auditable.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 4841
+    end_line: 5411
+  summary: Load source-reference inputs, build reconciliation plans, validate decision fingerprints, and apply operations.
+  rationale: Reject stale plans and require a fresh reciprocal scan after checked artifact edits.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 5414
+    end_line: 5422
+  summary: Add bootstrap annotation reconciliation using the same plan, provider, and apply path.
+  rationale: Keep bootstrap backfill behavior consistent with standalone reconciliation.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 5503
+    end_line: 5535
+  summary: Add bootstrap annotation reconciliation using the same plan, provider, and apply path.
+  rationale: Keep bootstrap backfill behavior consistent with standalone reconciliation.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 5549
+    end_line: 5549
+  summary: Add bootstrap annotation reconciliation using the same plan, provider, and apply path.
+  rationale: Keep bootstrap backfill behavior consistent with standalone reconciliation.
+- path: src/powdrr_lift/workrr/coding_agent_validation.py
+  type: modified
+  span:
+    start_line: 159
+    end_line: 161
+  summary: Run the trusted metadata correction hook after worker finalization and before independent validation.
+  rationale: Reconcile metadata without starting a second coding-agent invocation.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span:
+    start_line: 175
+    end_line: 178
+  summary: Accept and record an optional trusted post-worker reconciler in immutable run configuration.
+  rationale: Make correction behavior part of the recorded Workrr run setup.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span:
+    start_line: 200
+    end_line: 201
+  summary: Accept and record an optional trusted post-worker reconciler in immutable run configuration.
+  rationale: Make correction behavior part of the recorded Workrr run setup.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span:
+    start_line: 292
+    end_line: 293
+  summary: Retain reconciliation callback state and its configured status.
+  rationale: Keep the worker correction stage visible in protected run artifacts.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span:
+    start_line: 308
+    end_line: 308
+  summary: Retain reconciliation callback state and its configured status.
+  rationale: Keep the worker correction stage visible in protected run artifacts.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span:
+    start_line: 701
+    end_line: 749
+  summary: Verify post-worker Python AST preservation and refresh candidate identity.
+  rationale: Attribute metadata corrections separately while preserving frozen inputs and product syntax.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span:
+    start_line: 770
+    end_line: 770
+  summary: Record the post-worker reconciliation receipt in the terminal artifact.
+  rationale: Keep correction outcomes reviewable with the implementation run.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span:
+    start_line: 799
+    end_line: 799
+  summary: Verify post-worker Python AST preservation, refresh candidate identity, and record the correction receipt.
+  rationale: Attribute metadata corrections separately while preserving the frozen catalog and worker product syntax.
+- path: tests/test_structrr_reference_reconciliation.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 480
+  summary: Cover edge comparison, decision fallback, fingerprint reuse, deterministic editing, rollback receipts, and idempotence.
+  rationale: Exercise reciprocal-link behavior without paid provider calls.
+- path: tests/test_source_reference_run.py
+  type: modified
+  span:
+    start_line: 58
+    end_line: 58
+  summary: Verify the optional post-worker correction integration.
+  rationale: Ensure the Workrr seam can receive a trusted reconciler.
+- path: tests/test_source_reference_run.py
+  type: modified
+  span:
+    start_line: 158
+    end_line: 158
+  summary: Verify the optional post-worker correction integration.
+  rationale: Ensure the Workrr seam can receive a trusted reconciler.
+- path: tests/test_source_reference_run.py
+  type: modified
+  span:
+    start_line: 394
+    end_line: 446
+  summary: Verify post-worker metadata edits preserve Python ASTs and product edits are rejected.
+  rationale: Protect the Workrr correction boundary.
+entities:
+- id: structrr-source-reference-reconciliation
+  type: Feature
+  action: added
+- id: structrr-link-reconciliation-v1
+  type: Module
+  action: added
+- id: structrr-reference-editing-v1
+  type: Module
+  action: added
+entity_relationships: []
+invariants:
+- id: source-link-decisions-bind-exact-inputs-and-provenance
+  action: added
+  description: A source-link existence decision names one exact canonical reference and owner, binds the complete evidence fingerprint, records provider revisions, and permits only exists, absent, or unresolved results. One configured LLM fallback may run only after an unresolved primary result.
+- id: link-apply-rechecks-and-preserves-recoverable-preimages
+  action: added
+  description: Reconciliation rechecks source and document digests, validates staged reciprocal edges, and records recoverable preimages before publishing edits. A fresh read-only consistency scan follows application.
+- id: post-worker-correction-preserves-python-ast-and-frozen-catalog
+  action: added
+  description: A trusted Workrr correction callback runs after worker finalization and before independent validation. It cannot change Python ASTs or the frozen catalog, and its receipt is recorded separately.
+guidance: []

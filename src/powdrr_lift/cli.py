@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import contextlib
 import difflib
+import hashlib
 import io
 import json
 import math
@@ -15,6 +16,7 @@ import tempfile
 import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import replace
+from datetime import UTC
 from pathlib import Path
 from typing import Any
 
@@ -695,7 +697,58 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Emit the validated bootstrap summary as JSON.",
     )
+    bootstrap_structrr_parser.add_argument(
+        "--annotate-source",
+        action="store_true",
+        help=(
+            "Reconcile semantic source bindings using configured decision and "
+            "LLM providers after generating the snapshot."
+        ),
+    )
     bootstrap_structrr_parser.set_defaults(func=_run_bootstrap_structrr)
+
+    structrr_parser = subparsers.add_parser(
+        "structrr", help="Inspect and reconcile Structrr source references."
+    )
+    structrr_commands = structrr_parser.add_subparsers(
+        dest="structrr_command", required=True
+    )
+    references_parser = structrr_commands.add_parser(
+        "references", help="Check reciprocal source reference metadata."
+    )
+    references_commands = references_parser.add_subparsers(
+        dest="references_command", required=True
+    )
+    references_check = references_commands.add_parser(
+        "check", help="Read-only reciprocal-link consistency scan."
+    )
+    references_check.add_argument("--repo-root", type=Path)
+    references_check.add_argument("--document", type=Path, required=True)
+    references_check.set_defaults(func=_run_structrr_reference_check)
+    references_plan = references_commands.add_parser(
+        "reconcile", help="Prepare a deterministic semantic decision plan."
+    )
+    references_plan.add_argument("--repo-root", type=Path)
+    references_plan.add_argument("--document", type=Path)
+    reconcile_mode = references_plan.add_mutually_exclusive_group(required=True)
+    reconcile_mode.add_argument("--plan", action="store_true")
+    reconcile_mode.add_argument("--apply", type=Path, metavar="PLAN")
+    references_plan.add_argument("--output", type=Path)
+    references_plan.add_argument(
+        "--resolve",
+        action="store_true",
+        help=(
+            "Run configured semantic providers for candidate edges and write their "
+            "fingerprinted results into the plan."
+        ),
+    )
+    references_plan.add_argument(
+        "--reassess-reference",
+        action="append",
+        default=[],
+        help="Include currently reciprocal edges for this canonical reference ID.",
+    )
+    references_plan.set_defaults(func=_run_structrr_reference_plan)
 
     bootstrap_parser = subparsers.add_parser(
         "bootstrap",
@@ -4785,8 +4838,588 @@ def _run_init_from_plan_diff(args: argparse.Namespace) -> int:
     return 0
 
 
+def _load_source_reference_inputs(
+    repo_root: Path, document_path: Path
+) -> tuple[
+    Path,
+    Path,
+    bytes,
+    Mapping[str, Any],
+    dict[str, Any],
+    dict[str, Any],
+]:
+    import yaml
+    from powdrr_service.structrr.reference_definitions import (
+        REFERENCE_KINDS,
+        ReferenceDefinition,
+    )
+    from powdrr_service.structrr.source_references import index_python_source
+
+    root = repo_root.resolve()
+    path = document_path if document_path.is_absolute() else root / document_path
+    path = path.resolve()
+    if not path.is_relative_to(root) or not path.is_file():
+        raise ValueError(
+            "Structrr document must be an existing file inside the repository"
+        )
+    raw_document = path.read_bytes()
+    document = yaml.safe_load(raw_document)
+    if not isinstance(document, Mapping):
+        raise ValueError("Structrr document must contain a YAML mapping")
+    definitions: dict[str, ReferenceDefinition] = {}
+    explicit = document.get("reference_definitions", [])
+    if not isinstance(explicit, list):
+        raise ValueError("reference_definitions must be a list")
+    for raw in explicit:
+        if not isinstance(raw, Mapping):
+            raise ValueError("reference definition records must be mappings")
+        definition = ReferenceDefinition.from_data(raw)
+        definitions[definition.id] = definition
+    for section, fallback_kind in (
+        ("features", "feature"),
+        ("decisions", "decision"),
+        ("invariants", "invariant"),
+        ("assumptions", "assumption"),
+        ("procedures", "procedure"),
+        ("guidance", "guidance"),
+    ):
+        records = document.get(section, [])
+        if not isinstance(records, list):
+            continue
+        for raw in records:
+            if not isinstance(raw, Mapping):
+                continue
+            kind = raw.get("declared_kind", fallback_kind)
+            if kind not in REFERENCE_KINDS:
+                # Taxonomy labels and free-form classifications are not
+                # canonical source-reference kinds.
+                continue
+            reference_id = raw.get("clause_id", raw.get("id"))
+            statement = raw.get("statement", raw.get("summary", raw.get("description")))
+            if not isinstance(reference_id, str) or not isinstance(statement, str):
+                continue
+            lifecycle = raw.get("lifecycle", "active")
+            if raw.get("active") is False:
+                lifecycle = "retired"
+            definition = ReferenceDefinition(
+                id=reference_id,
+                kind=kind,
+                statement=statement,
+                source_ref=str(
+                    raw.get("source_ref", raw.get("source", f"document:{reference_id}"))
+                ),
+                version=raw.get("version", 1),
+                lifecycle=lifecycle,
+                rationale=raw.get("rationale"),
+                invalidation_triggers=tuple(raw.get("invalidation_triggers", [])),
+                evidence_refs=tuple(raw.get("evidence_refs", [])),
+                successor=raw.get("successor"),
+            )
+            prior = definitions.get(definition.id)
+            if prior is not None and prior != definition:
+                raise ValueError(
+                    f"conflicting canonical reference ID {definition.id!r}"
+                )
+            definitions[definition.id] = definition
+    tracked = subprocess.run(
+        ["git", "-C", str(root), "ls-files", "-z", "--", "*.py"],
+        capture_output=True,
+        check=True,
+    ).stdout.split(b"\0")
+    indexes = {}
+    for raw_path in tracked:
+        if not raw_path:
+            continue
+        relative = raw_path.decode("utf-8")
+        source_path = root / relative
+        if source_path.is_symlink() or not source_path.is_file():
+            continue
+        try:
+            indexes[relative] = index_python_source(relative, source_path.read_bytes())
+        except OSError:
+            continue
+    return root, path, raw_document, document, definitions, indexes
+
+
+def _source_reference_output(
+    args: argparse.Namespace, *, include_plan: bool
+) -> tuple[Path, dict[str, Any]]:
+    from powdrr_service.structrr.reference_reconciliation import (
+        prepare_source_link_decision,
+        reconcile_source_references,
+    )
+
+    repo_root = resolve_repo_root(args.repo_root)
+    (
+        root,
+        document_path,
+        raw_document,
+        document,
+        definitions,
+        indexes,
+    ) = _load_source_reference_inputs(repo_root, args.document)
+    report = reconcile_source_references(
+        document=document,
+        definitions=definitions,
+        source_indexes=indexes,
+        document_digest="sha256:" + hashlib.sha256(raw_document).hexdigest(),
+    )
+    output: dict[str, Any] = report.to_data()
+    output["document_path"] = document_path.relative_to(root).as_posix()
+    if include_plan:
+        mismatches = set(report.structrr_only) | set(report.source_only)
+        reassess_ids = set(getattr(args, "reassess_reference", ()))
+        reassessed = {
+            edge
+            for edge in set(report.structrr_edges) & set(report.source_edges)
+            if edge.reference_id in reassess_ids
+        }
+        candidates = sorted(mismatches | reassessed)
+        specs = []
+        for edge in candidates:
+            definition = definitions.get(edge.reference_id)
+            index = indexes.get(edge.owner.path)
+            if definition is None or index is None:
+                continue
+            owner = next(
+                (
+                    item
+                    for item in index.owners
+                    if (item.kind, item.qualified_name)
+                    == (edge.owner.kind, edge.owner.qualified_name)
+                ),
+                None,
+            )
+            if owner is None:
+                continue
+            source_path = root / edge.owner.path
+            raw = source_path.read_bytes()
+            import io
+            import tokenize
+
+            encoding, _ = tokenize.detect_encoding(io.BytesIO(raw).readline)
+            text = raw.decode(encoding)
+            source_lines = text.splitlines()
+            owner_text = "\n".join(source_lines[owner.start_line - 1 : owner.end_line])
+            spec = prepare_source_link_decision(
+                edge=edge,
+                definition=definition,
+                source_text=owner_text,
+                source_fingerprint=index.source_sha256,
+                observed_representations={
+                    "structrr": edge in report.structrr_edges,
+                    "source": edge in report.source_edges,
+                },
+                context_text=(
+                    f"Owner: {edge.owner.kind} {edge.owner.qualified_name}\n"
+                    f"Source path: {edge.owner.path}\n"
+                    f"Canonical statement: {definition.statement}"
+                ),
+            )
+            specs.append({"edge": edge.to_data(), "specification": spec.to_data()})
+        output["decision_specs"] = specs
+        output["decision_runs"] = []
+        output["operations"] = []
+        output["candidate_edges"] = [edge.to_data() for edge in candidates]
+        output["reassess_reference_ids"] = sorted(reassess_ids)
+        output["before_after_digests"] = {
+            "before": {
+                "document": report.document_digest,
+                "sources": dict(report.source_digests),
+            },
+            "after": None,
+        }
+        output["validation_receipt"] = None
+        output["unresolved"] = [item.to_data() for item in report.findings]
+        output["status"] = (
+            "needs_decisions"
+            if specs
+            else ("consistent" if report.consistent else "unresolved")
+        )
+    return root, output
+
+
+def _run_structrr_reference_check(args: argparse.Namespace) -> int:
+    try:
+        _, output = _source_reference_output(args, include_plan=False)
+    except (OSError, ValueError, subprocess.CalledProcessError) as error:
+        print(str(error), file=sys.stderr)
+        return 2
+    print(json.dumps(output, indent=2, ensure_ascii=False))
+    return 0 if output["consistent"] else 1
+
+
+def _run_structrr_reference_plan(args: argparse.Namespace) -> int:
+    if args.apply is not None:
+        return _run_structrr_reference_apply(args)
+    if args.document is None:
+        print("--document is required with --plan", file=sys.stderr)
+        return 2
+    try:
+        root, output = _source_reference_output(args, include_plan=True)
+        if args.resolve:
+            _resolve_structrr_source_link_decisions(root, output)
+        output_path = args.output
+        if output_path is not None:
+            target = (
+                (root / output_path).resolve()
+                if not output_path.is_absolute()
+                else output_path.resolve()
+            )
+            if not target.is_relative_to(root):
+                raise ValueError(
+                    "reconciliation plan output must stay inside the repository"
+                )
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(
+                json.dumps(output, indent=2, ensure_ascii=False) + "\n",
+                encoding="utf-8",
+            )
+    except (OSError, ValueError, subprocess.CalledProcessError) as error:
+        print(str(error), file=sys.stderr)
+        return 2
+    print(json.dumps(output, indent=2, ensure_ascii=False))
+    if args.resolve and output.get("status") == "unresolved":
+        return 1
+    return 0 if output.get("decision_specs") or output.get("consistent") else 1
+
+
+def _resolve_structrr_source_link_decisions(
+    repo_root: Path, output: dict[str, Any]
+) -> None:
+    from datetime import datetime
+
+    from powdrr_service.decision_classifier import DecisionProviderFactory
+    from powdrr_service.planning.semantic_decision import (
+        SemanticDecisionProvider,
+        SemanticDecisionSpec,
+    )
+    from powdrr_service.providers.config import default_llm_mappings
+    from powdrr_service.providers.credentials import resolve_provider_credentials
+    from powdrr_service.structrr.reference_reconciliation import (
+        LogicalSourceEdge,
+        run_source_link_decision,
+    )
+
+    from powdrr_lift.workrr.provider_runtime import (
+        build_workflow_client,
+        resolve_workflow_provider,
+    )
+
+    specs = output.get("decision_specs")
+    if not isinstance(specs, list):
+        raise ValueError("reconciliation plan has invalid decision specifications")
+    fallback_name = resolve_workflow_provider("auto")
+    fallback_mapping = default_llm_mappings(fallback_name)["standard_reasoning"]
+    fallback_credentials = resolve_provider_credentials(fallback_name, None, None)
+    fallback_client = build_workflow_client(
+        fallback_credentials,
+        model=fallback_mapping.model,
+        model_cache_dir=repo_root / ".powdrr" / "models",
+        progress_stream=sys.stderr,
+    )
+    factory = DecisionProviderFactory()
+    primary_client = factory.create(fallback_client, fail_closed=True)
+    if primary_client is None:
+        raise ValueError(
+            "--resolve requires a configured POWDRR_DECISION_PROVIDER credential"
+        )
+
+    def call(client: Any, spec: SemanticDecisionSpec) -> Mapping[str, Any]:
+        context = {
+            "spec": spec.to_data(),
+            "source_text": spec.context_text or spec.proposition_text,
+            "question": spec.proposition_text,
+            "instructions": [
+                "Decide only whether this exact reference-to-owner "
+                "relationship exists.",
+                "Use unresolved when supplied evidence is insufficient or conflicting.",
+            ],
+            "allowed_values": ["exists", "absent", "unresolved"],
+            "criteria": {
+                "exists": "The accepted intent applies to this exact code owner.",
+                "absent": "The accepted intent does not apply to this "
+                "exact code owner.",
+                "unresolved": "Evidence is insufficient or conflicting.",
+            },
+        }
+        schema = {
+            "type": "object",
+            "properties": {
+                "status": {"type": "string", "enum": ["resolved", "unresolved"]},
+                "value": {
+                    "type": ["string", "null"],
+                    "enum": ["exists", "absent", None],
+                },
+                "reason_code": {
+                    "type": ["string", "null"],
+                    "enum": [
+                        "source_ambiguous",
+                        "source_underspecified",
+                        "no_candidate",
+                        "multiple_candidates",
+                        "repository_evidence_missing",
+                        "unsupported_concept",
+                        "classifier_abstained",
+                        "invalid_response",
+                        "conflicting_evidence",
+                        None,
+                    ],
+                },
+            },
+            "required": ["status", "value", "reason_code"],
+            "additionalProperties": False,
+        }
+        response = client.complete_json(
+            [
+                {
+                    "role": "system",
+                    "content": "Return only the structured semantic decision.",
+                },
+                {"role": "user", "content": json.dumps(context, sort_keys=True)},
+            ],
+            response_schema=schema,
+        )
+        if "answer" in response and isinstance(response["answer"], Mapping):
+            return response["answer"]
+        return response
+
+    primary_provider = SemanticDecisionProvider(
+        kind="decision-provider",
+        name=factory.provider_name or "configured-decision-provider",
+        model_revision=getattr(primary_client, "model", "unknown"),
+    )
+    fallback_provider = SemanticDecisionProvider(
+        kind="planning-llm",
+        name=fallback_name,
+        model_revision=fallback_mapping.model,
+    )
+    runs: list[dict[str, Any]] = []
+    for record in specs:
+        if not isinstance(record, Mapping) or not isinstance(
+            record.get("edge"), Mapping
+        ):
+            raise ValueError("invalid source-link decision specification")
+        edge = LogicalSourceEdge.from_data(record["edge"])
+        raw_spec = record.get("specification")
+        if not isinstance(raw_spec, Mapping):
+            raise ValueError("invalid source-link decision specification")
+        spec = SemanticDecisionSpec.from_data(raw_spec)
+        run = run_source_link_decision(
+            specification=spec,
+            primary=(primary_provider, lambda item: call(primary_client, item)),
+            fallback=(fallback_provider, lambda item: call(fallback_client, item)),
+            evidence_refs=(
+                f"source-link:{edge.reference_id}:{edge.owner.path}:{edge.owner.qualified_name}",
+                spec.input_fingerprint,
+            ),
+            created_at=datetime.now(UTC).isoformat(),
+        )
+        runs.append({"edge": edge.to_data(), "run": run.to_data()})
+    output["decision_runs"] = runs
+    output["status"] = (
+        "resolved"
+        if all(
+            isinstance(record.get("run"), Mapping)
+            and isinstance(record["run"].get("final_decision"), Mapping)
+            and record["run"]["final_decision"].get("result", {}).get("status")
+            == "resolved"
+            for record in runs
+        )
+        else "unresolved"
+    )
+
+
+def _run_structrr_reference_apply(args: argparse.Namespace) -> int:
+    from powdrr_service.planning.semantic_decision import SemanticDecisionSpec
+    from powdrr_service.structrr.reference_editing import (
+        apply_reconciliation_operations,
+    )
+    from powdrr_service.structrr.reference_reconciliation import (
+        LogicalSourceEdge,
+        SourceLinkDecisionRun,
+        compile_reconciliation_operations,
+        reconcile_source_references,
+    )
+
+    try:
+        root = resolve_repo_root(args.repo_root).resolve()
+        plan_path = args.apply if args.apply.is_absolute() else root / args.apply
+        plan_path = plan_path.resolve()
+        if not plan_path.is_relative_to(root):
+            raise ValueError("reconciliation plan must be inside the repository")
+        plan = json.loads(plan_path.read_text(encoding="utf-8"))
+        if (
+            not isinstance(plan, Mapping)
+            or plan.get("schema_version") != "structrr-link-reconciliation-v1"
+        ):
+            raise ValueError("unsupported source-link reconciliation plan")
+        document_relative = plan.get("document_path")
+        if not isinstance(document_relative, str):
+            raise ValueError("reconciliation plan has no document path")
+        document_path = root / document_relative
+        loaded = _load_source_reference_inputs(root, document_path)
+        _, resolved_document_path, raw_document, document, definitions, indexes = loaded
+        current = reconcile_source_references(
+            document=document,
+            definitions=definitions,
+            source_indexes=indexes,
+            document_digest="sha256:" + hashlib.sha256(raw_document).hexdigest(),
+        )
+        if current.document_digest != plan.get("document_digest"):
+            raise ValueError(
+                "Structrr document changed; regenerate the reconciliation plan"
+            )
+        if current.source_digests != plan.get("source_digests"):
+            raise ValueError(
+                "source inputs changed; regenerate the reconciliation plan"
+            )
+        _, current_plan = _source_reference_output(
+            argparse.Namespace(
+                repo_root=root,
+                document=Path(document_relative),
+                reassess_reference=plan.get("reassess_reference_ids", []),
+            ),
+            include_plan=True,
+        )
+        if current_plan.get("decision_specs") != plan.get("decision_specs"):
+            raise ValueError(
+                "decision inputs changed; regenerate the reconciliation plan"
+            )
+
+        spec_records = plan.get("decision_specs")
+        run_records = plan.get("decision_runs")
+        if not isinstance(spec_records, list) or not isinstance(run_records, list):
+            raise ValueError(
+                "reconciliation plan is missing decision specifications or runs"
+            )
+        specifications = {}
+        for record in spec_records:
+            if not isinstance(record, Mapping) or not isinstance(
+                record.get("edge"), Mapping
+            ):
+                raise ValueError("invalid edge decision specification")
+            edge = LogicalSourceEdge.from_data(record["edge"])
+            raw_spec = record.get("specification")
+            if not isinstance(raw_spec, Mapping):
+                raise ValueError("invalid edge decision specification")
+            specifications[edge] = SemanticDecisionSpec.from_data(raw_spec)
+        decisions = {}
+        for record in run_records:
+            if not isinstance(record, Mapping) or not isinstance(
+                record.get("edge"), Mapping
+            ):
+                raise ValueError("invalid source-link decision run")
+            edge = LogicalSourceEdge.from_data(record["edge"])
+            run_raw = record.get("run")
+            if not isinstance(run_raw, Mapping):
+                raise ValueError("source-link decision run is missing")
+            run = SourceLinkDecisionRun.from_data(run_raw)
+            spec = specifications.get(edge)
+            if spec is None or run.primary_specification != spec:
+                raise ValueError(
+                    "decision run does not match its planned edge fingerprint"
+                )
+            decisions[edge] = run
+        candidates = set(specifications)
+        if set(decisions) != candidates:
+            raise ValueError("each mismatched edge requires exactly one decision run")
+        if any(
+            run.final_decision.result.status != "resolved" for run in decisions.values()
+        ):
+            raise ValueError("unresolved source-link decisions prevent apply")
+        operations = compile_reconciliation_operations(
+            report=current, specifications=specifications, decisions=decisions
+        )
+        if not operations:
+            raise ValueError("reconciliation plan has no applicable operations")
+        placements = document.get("source_reference_placements", [])
+        mandatory_conflicts = []
+        if isinstance(placements, list):
+            for edge, run in decisions.items():
+                if run.final_decision.result.value != "absent":
+                    continue
+                for placement in placements:
+                    if not isinstance(placement, Mapping):
+                        continue
+                    if (
+                        placement.get("ref") != edge.reference_id
+                        or placement.get("relationship") != edge.relationship
+                    ):
+                        continue
+                    owner = placement.get("owner")
+                    if not isinstance(owner, Mapping):
+                        continue
+                    exact_owner = (
+                        owner.get("path") == edge.owner.path
+                        and owner.get("kind") == edge.owner.kind
+                        and owner.get("qualified_name") == edge.owner.qualified_name
+                    )
+                    allowed_paths = owner.get("allowed_paths", [])
+                    allowed_owner = isinstance(allowed_paths, list) and any(
+                        isinstance(path, str)
+                        and (
+                            path == "."
+                            or edge.owner.path == path
+                            or edge.owner.path.startswith(path + "/")
+                        )
+                        for path in allowed_paths
+                    )
+                    if exact_owner or allowed_owner:
+                        mandatory_conflicts.append(placement.get("obligation_id"))
+        receipt_path = plan_path.with_suffix(".receipt.json")
+        receipt = apply_reconciliation_operations(
+            repo_root=root,
+            document_path=resolved_document_path,
+            operations=operations,
+            source_indexes=indexes,
+            definitions=definitions,
+            receipt_path=receipt_path,
+        )
+        args.document = Path(document_relative)
+        _, after = _source_reference_output(args, include_plan=False)
+    except (
+        OSError,
+        ValueError,
+        TypeError,
+        KeyError,
+        subprocess.CalledProcessError,
+    ) as error:
+        print(str(error), file=sys.stderr)
+        return 2
+    post_status = (
+        "blocked_required_placement"
+        if mandatory_conflicts
+        else "passed"
+        if not after["structrr_only"] and not after["source_only"]
+        else "failed"
+    )
+    print(
+        json.dumps(
+            {
+                "receipt": receipt,
+                "post_apply_status": post_status,
+                "mandatory_conflicts": mandatory_conflicts,
+                "post_apply": after,
+            },
+            indent=2,
+            ensure_ascii=False,
+        )
+    )
+    return 0 if post_status == "passed" else 1
+
+
 def _run_bootstrap_structrr(args: argparse.Namespace) -> int:
     repo_root = resolve_repo_root(args.repo_root)
+    if getattr(args, "annotate_source", False) and (
+        args.output is not None
+        and not _repository_relative_option(repo_root, args.output, None)
+    ):
+        print(
+            "--annotate-source requires an output path inside the repository.",
+            file=sys.stderr,
+        )
+        return 2
     requested_output = _repository_relative_option(repo_root, args.output, None)
     requested_taxonomy = _repository_relative_option(
         repo_root, args.taxonomy, "software_development_entity_taxonomy.md"
@@ -4867,6 +5500,39 @@ def _run_bootstrap_structrr(args: argparse.Namespace) -> int:
             materialize_artifact(
                 repo_root, outputs[relative_path], expected_digest=prior_digest
             )
+        reconciliation_receipt = None
+        if getattr(args, "annotate_source", False):
+            plan_relative = str(
+                Path(output_path).with_suffix(".source-reconciliation.json")
+            )
+            plan_args = argparse.Namespace(
+                repo_root=repo_root,
+                document=Path(output_path),
+                reassess_reference=[],
+                resolve=True,
+                output=Path(plan_relative),
+                apply=None,
+            )
+            if _run_structrr_reference_plan(plan_args) != 0:
+                print(
+                    "Structrr source annotation reconciliation needs review.",
+                    file=sys.stderr,
+                )
+                return 1
+            plan_data = json.loads((repo_root / plan_relative).read_text())
+            if plan_data.get("decision_specs"):
+                apply_args = argparse.Namespace(
+                    repo_root=repo_root,
+                    apply=Path(plan_relative),
+                    document=None,
+                )
+                if _run_structrr_reference_apply(apply_args) != 0:
+                    print(
+                        "Structrr source annotation reconciliation did not pass.",
+                        file=sys.stderr,
+                    )
+                    return 1
+            reconciliation_receipt = str(repo_root / plan_relative)
     except (OSError, ValueError, subprocess.SubprocessError) as error:
         print(f"Could not build Structrr bootstrap: {error}", file=sys.stderr)
         return 1
@@ -4880,6 +5546,7 @@ def _run_bootstrap_structrr(args: argparse.Namespace) -> int:
         "source_anchor_count": len(document.get("files", [])),
         "source_subject_count": len(document.get("source_subjects", [])),
         "source_binding_count": len(document.get("source_bindings", [])),
+        "source_reconciliation_plan": reconciliation_receipt,
     }
     if args.json:
         print(json.dumps(summary, sort_keys=True))

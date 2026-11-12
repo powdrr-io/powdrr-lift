@@ -57,6 +57,7 @@ def prepare(
     native: bool = False,
     run_id: str = "run-1",
     profile_code: str | None = None,
+    post_worker_reconciler: Any = None,
     readonly_support_files: dict[str, str] | None = None,
 ) -> SourceReferenceRun:
     root = tmp_path / "repo"
@@ -157,9 +158,10 @@ def prepare(
             },
             private_validation_data={"oracle": "PRIVATE-ORACLE"},
             review_client=Reviewer(),
+            readonly_support_files=readonly_support_files,
+            post_worker_reconciler=post_worker_reconciler,
             worker_timeout_seconds=30,
             validation_timeout_seconds=30,
-            readonly_support_files=readonly_support_files,
         )
     except ValueError as error:
         if native and (
@@ -449,3 +451,56 @@ def test_native_fake_model_end_to_end_protects_private_inputs_and_validates_owne
             run.verify_candidate()
     with pytest.raises(ValueError, match="twice"):
         run.execute(infer)
+
+
+def test_post_worker_reconciliation_allows_metadata_edits_and_records_receipt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def reconcile(run: SourceReferenceRun) -> dict[str, str]:
+        source = run.workspace_root / "retry.py"
+        source.write_text("# reconciled metadata\n" + source.read_text())
+        return {"status": "passed", "revision": "candidate-2"}
+
+    run = prepare(
+        tmp_path,
+        monkeypatch,
+        run_id="metadata-reconcile",
+        post_worker_reconciler=reconcile,
+    )
+    (run.workspace_root / "retry.py").write_text(CANDIDATE)
+    frozen_catalog = run.catalog.digest
+    run._candidate_after_worker = run._candidate_state()
+
+    run.reconcile_after_worker()
+
+    assert run.reconciliation == {"status": "passed", "revision": "candidate-2"}
+    assert run.catalog.digest == frozen_catalog
+    assert (
+        (run.workspace_root / "retry.py")
+        .read_text()
+        .startswith("# reconciled metadata\n")
+    )
+    run.verify_candidate()
+
+
+def test_post_worker_reconciliation_rejects_product_ast_changes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def reconcile(run: SourceReferenceRun) -> dict[str, str]:
+        source = run.workspace_root / "retry.py"
+        source.write_text(
+            source.read_text().replace("return helper(value)", "return value")
+        )
+        return {"status": "passed"}
+
+    run = prepare(
+        tmp_path,
+        monkeypatch,
+        run_id="product-mutation",
+        post_worker_reconciler=reconcile,
+    )
+    (run.workspace_root / "retry.py").write_text(CANDIDATE)
+    run._candidate_after_worker = run._candidate_state()
+
+    with pytest.raises(ValueError, match="changed Python product syntax"):
+        run.reconcile_after_worker()

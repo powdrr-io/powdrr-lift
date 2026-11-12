@@ -96,6 +96,16 @@ def test_bootstrap_cli_uses_boundary_and_materializes_service_outputs(
     assert output_path.is_file()
     assert report_path.is_file()
     assert summary["entity_count"] == 3
+    document = yaml.safe_load(output_path.read_text(encoding="utf-8"))
+    context = document["validation_context"]
+    inventory = document["validation_inventory"]
+    assert summary["validation_check_count"] == len(inventory)
+    assert summary["discovery_status"] == context["discovery_status"]
+    assert summary["discovery_complete"] is (context["discovery_status"] == "complete")
+    assert summary["unresolved_count"] == len(context.get("diagnostics", [])) + sum(
+        len(item.get("unresolved", [])) for item in inventory
+    )
+    assert summary["probe_mode"] == "not_run"
     assert "## Code structure" in report_path.read_text(encoding="utf-8")
     assert captured.err == ""
 

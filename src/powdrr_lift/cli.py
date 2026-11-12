@@ -5547,6 +5547,7 @@ def _run_bootstrap_structrr(args: argparse.Namespace) -> int:
         "source_subject_count": len(document.get("source_subjects", [])),
         "source_binding_count": len(document.get("source_bindings", [])),
         "source_reconciliation_plan": reconciliation_receipt,
+        **_bootstrap_validation_summary(document),
     }
     if args.json:
         print(json.dumps(summary, sort_keys=True))
@@ -5574,6 +5575,32 @@ def _repository_relative_option(
         return None
 
 
+def _bootstrap_validation_summary(document: dict[str, Any]) -> dict[str, Any]:
+    inventory = document.get("validation_inventory", [])
+    checks = (
+        [item for item in inventory if isinstance(item, dict)]
+        if isinstance(inventory, list)
+        else []
+    )
+    context = document.get("validation_context", {})
+    if not isinstance(context, dict):
+        context = {}
+    discovery_status = context.get("discovery_status", "unknown")
+    diagnostics = context.get("diagnostics", [])
+    unresolved_count = len(diagnostics) if isinstance(diagnostics, list) else 0
+    for check in checks:
+        unresolved = check.get("unresolved", [])
+        if isinstance(unresolved, list):
+            unresolved_count += len(unresolved)
+    return {
+        "validation_check_count": len(checks),
+        "discovery_status": discovery_status,
+        "discovery_complete": discovery_status == "complete",
+        "unresolved_count": unresolved_count,
+        "probe_mode": "not_run",
+    }
+
+
 def _run_legacy_bootstrap_structrr(args: argparse.Namespace, repo_root: Path) -> int:
     """Preserve explicit out-of-repository output and taxonomy paths."""
     result = bootstrap_structrr(
@@ -5598,6 +5625,7 @@ def _run_legacy_bootstrap_structrr(args: argparse.Namespace, repo_root: Path) ->
         "source_anchor_count": len(result.document["files"]),
         "source_subject_count": len(result.document["source_subjects"]),
         "source_binding_count": len(result.document["source_bindings"]),
+        **_bootstrap_validation_summary(result.document),
     }
     if args.json:
         print(json.dumps(summary, sort_keys=True))

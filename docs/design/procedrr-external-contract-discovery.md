@@ -14,7 +14,7 @@ and projection into the one worker prompt. Workrr may execute an authorized
 network or repository-read operation for Procedrr; it must not independently
 decide what to research or add requirements to the prompt.
 
-This extends [evidence-backed contract closure](../plans/evidence-backed-prompt-contract-closure.md).
+This extends [evidence-backed contract closure](../plans/implementation-contract-and-verification.md).
 That closure maps requirements to repository surfaces and observable flows.
 External discovery supplies evidence and candidate requirements to that map;
 it does not create a second instruction compiler or an agent-side browsing

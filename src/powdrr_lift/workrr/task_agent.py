@@ -3671,6 +3671,11 @@ class _TaskWorkflowExecutionStrategy:
             raise PowdrrExecutionError(
                 "Source reference intent requires a reviewed design file"
             )
+        if "source_reference_design_file" not in proposed:
+            raise PowdrrExecutionError(
+                "Legacy issue-worker implementation is unsupported; code changes "
+                "require a reviewed source-reference design"
+            )
         request, validation_profile = _issue_worker_implementation_request(
             proposed, workflow_id=workflow_id, base_commit=base_commit
         )

@@ -114,7 +114,7 @@ files:
   rationale: Finalization has no correction attempts to report.
 - path: tests/test_minisweagent_monitor.py
   type: modified
-  span: {start_line: 161, end_line: 161}
+  span: {start_line: 161, end_line: 163}
   summary: Give the continuous-progress monitor test enough startup tolerance for loaded CI workers.
   rationale: Prevent process startup delays from being mistaken for a stalled worker.
 entities: []

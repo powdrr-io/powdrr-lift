@@ -7055,9 +7055,14 @@ def _compile_initial_worker_prompt(
             validation_profiles=profile_names,
             acceptance_criteria=(
                 *(item["description"] for item in tests),
-                "Preserve existing public defaults and compatibility behavior. "
-                "Do not rewrite or weaken existing tests; add new tests for the "
-                "requested feature instead.",
+                "Review relevant existing tests for assumptions about the behavior "
+                "being changed. When the requested feature intentionally replaces "
+                "old behavior, update the affected tests to assert the new contract "
+                "while retaining coverage for unaffected guarantees, then add new "
+                "coverage for new cases as appropriate. Do not alter tests for "
+                "unrelated behavior or weaken coverage just to pass validation; "
+                "name each intentionally updated test file and test in its linked "
+                "acceptance criterion.",
             ),
             planned_additions=tuple(planned_additions),
             planned_deletions=tuple(planned_deletions),

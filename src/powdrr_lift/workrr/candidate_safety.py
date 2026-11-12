@@ -16,8 +16,9 @@ def existing_test_contract_changes(
     """Find edits to existing tests that are not explicitly part of the request.
 
     Added tests are allowed. Existing test functions, fixtures, imports, and
-    class bases/decorators must remain stable so an implementation cannot make
-    its local validation pass by rewriting the repository's compatibility suite.
+    class bases/decorators stay protected unless the accepted contract names the
+    affected file or test. This permits intentional updates for superseded
+    behavior while preventing unrelated edits from weakening the test suite.
     """
     try:
         baseline = ast.parse(baseline_source, filename=path)

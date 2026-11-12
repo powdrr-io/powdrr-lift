@@ -277,7 +277,27 @@ def render_bootstrap_markdown(
     document: Mapping[str, Any], *, report_path: Path, root: Path
 ) -> str:
     """Render a concise code structure overview and evidence-backed checks."""
-    lines = ["# Bootstrap findings", "", "## Code structure", ""]
+    context = document.get("validation_context", {})
+    context = context if isinstance(context, Mapping) else {}
+    source_manifest = document.get("source_manifest", {})
+    source_manifest = source_manifest if isinstance(source_manifest, Mapping) else {}
+    source_revision = source_manifest.get("source_revision", "unavailable")
+    discovery_status = context.get("discovery_status", "unknown")
+    coverage = context.get("coverage", [])
+    coverage_text = (
+        ", ".join(str(item) for item in coverage)
+        if isinstance(coverage, list) and coverage
+        else "not recorded"
+    )
+    lines = [
+        "# Project bootstrap findings",
+        "",
+        f"Source revision: `{source_revision}`. Discovery: **{discovery_status}**.",
+        f"Discovery coverage: {coverage_text}.",
+        "",
+        "## Code structure",
+        "",
+    ]
     files = document.get("files", [])
     paths = [str(item.get("path", "")) for item in files if isinstance(item, Mapping)]
     top_dirs = sorted({path.split("/", 1)[0] for path in paths if "/" in path})
@@ -305,6 +325,37 @@ def render_bootstrap_markdown(
         )
     lines.extend(["", "## Validation commands", ""])
     checks = document.get("validation_inventory", [])
+    evidence_paths = {
+        str(item["id"]): str(item["path"])
+        for item in context.get("evidence", [])
+        if isinstance(item, Mapping)
+        and isinstance(item.get("id"), str)
+        and isinstance(item.get("path"), str)
+    }
+    environments = {
+        str(item["id"]): item
+        for item in context.get("environments", [])
+        if isinstance(item, Mapping) and isinstance(item.get("id"), str)
+    }
+
+    def inline_code(value: object) -> str:
+        return "`" + str(value).replace("`", "\\`") + "`"
+
+    def evidence_link(path: str) -> str:
+        evidence_path = Path(path)
+        absolute = (
+            evidence_path if evidence_path.is_absolute() else root / evidence_path
+        )
+        try:
+            resolved = absolute.resolve(strict=True)
+            resolved.relative_to(root.resolve())
+        except (OSError, ValueError):
+            return inline_code(path)
+        if not resolved.is_file():
+            return inline_code(path)
+        target = Path(os.path.relpath(resolved, report_path.parent)).as_posix()
+        return f"[{inline_code(path)}]({target})"
+
     if not checks:
         lines.append(
             "No validation commands were detected in the inspected project files."
@@ -312,9 +363,9 @@ def render_bootstrap_markdown(
     for check in checks:
         if not isinstance(check, Mapping):
             continue
-        lines.extend(
-            [f"### {check.get('profile', check.get('id', 'Validation check'))}", ""]
-        )
+        check_id = str(check.get("id", "validation:unknown"))
+        purpose = str(check.get("purpose") or "Validation check")
+        lines.extend([f"### {purpose} ({inline_code(check_id)})", ""])
         execution = check.get("execution", {})
         execution = execution if isinstance(execution, Mapping) else {}
         command = check.get("command", [])
@@ -327,17 +378,40 @@ def render_bootstrap_markdown(
                 "Command is declared through a task runner; see evidence below."
             )
         details = [
-            f"Purpose: {check.get('purpose') or 'not stated'}",
-            f"Working directory: `{execution.get('cwd', '.')}`",
+            f"Provider: {inline_code(check.get('provider', 'unknown'))}",
+            f"Working directory: {inline_code(execution.get('cwd', '.'))}",
         ]
         if execution.get("shell"):
-            details.append(f"Shell: `{execution['shell']}`")
+            details.append(f"Shell: {inline_code(execution['shell'])}")
+        environment_id = check.get("environment")
+        if isinstance(environment_id, str):
+            environment = environments.get(environment_id, {})
+            environment_details = [environment_id]
+            manager = environment.get("manager")
+            if manager:
+                environment_details.append(f"manager={manager}")
+            python = environment.get("python")
+            if isinstance(python, Mapping):
+                version = python.get("version_file") or python.get("requires_python")
+                if version:
+                    environment_details.append(f"Python {version}")
+            details.append(
+                "Environment and prerequisites: "
+                + inline_code(", ".join(str(value) for value in environment_details))
+            )
+        dependencies = check.get("depends_on", [])
+        if isinstance(dependencies, list) and dependencies:
+            details.append(
+                "Prerequisite checks: "
+                + ", ".join(inline_code(item) for item in dependencies)
+            )
         applicability = check.get("applicability", {})
         if isinstance(applicability, Mapping):
             details.append(
-                "Applicability: "
-                f"local `{applicability.get('local', 'unknown')}`, "
-                f"evaluation `{applicability.get('evaluation', 'unknown')}`"
+                "Applies when: "
+                + inline_code(
+                    yaml.safe_dump(dict(applicability), default_flow_style=True).strip()
+                )
             )
         settings = check.get("settings", {})
         if isinstance(settings, Mapping) and settings:
@@ -348,7 +422,9 @@ def render_bootstrap_markdown(
             )
         requiredness = check.get("requiredness", {})
         if isinstance(requiredness, Mapping):
-            details.append(f"Requiredness: `{requiredness.get('status', 'unknown')}`")
+            details.append(
+                f"Requiredness: {inline_code(requiredness.get('status', 'unknown'))}"
+            )
         lines.append("  ".join(details))
         evidence: list[str] = []
         provenance = check.get("provenance", {})
@@ -356,6 +432,10 @@ def render_bootstrap_markdown(
             provenance.get("evidence"), list
         ):
             evidence.extend(str(item) for item in provenance["evidence"])
+        if isinstance(requiredness, Mapping) and isinstance(
+            requiredness.get("evidence"), list
+        ):
+            evidence.extend(str(item) for item in requiredness["evidence"])
         config_files = check.get("config_files", [])
         if isinstance(config_files, list):
             evidence.extend(str(item) for item in config_files)
@@ -397,14 +477,54 @@ def render_bootstrap_markdown(
             unique_evidence = list(dict.fromkeys(evidence))
             links = []
             for item in unique_evidence:
-                absolute = root / item
-                target = Path(os.path.relpath(absolute, report_path.parent)).as_posix()
-                links.append(f"[`{item}`]({target})")
+                path = evidence_paths.get(item, item)
+                if path.startswith("validation-input:"):
+                    path = path.removeprefix("validation-input:")
+                links.append(evidence_link(path))
             lines.append("Evidence: " + ", ".join(links) + ".")
+        confirmation = check.get("confirmation", {})
+        baseline = check.get("baseline", {})
+        if isinstance(confirmation, Mapping) or isinstance(baseline, Mapping):
+            confirmation_level = (
+                confirmation.get("level", "unknown")
+                if isinstance(confirmation, Mapping)
+                else "unknown"
+            )
+            baseline_status = (
+                baseline.get("status", "not_run")
+                if isinstance(baseline, Mapping)
+                else "not_run"
+            )
+            lines.append(
+                "Confirmation: "
+                f"{inline_code(confirmation_level)}; baseline result: "
+                f"{inline_code(baseline_status)}."
+            )
         unresolved = check.get("unresolved", [])
         if isinstance(unresolved, list) and unresolved:
-            lines.append("Unresolved: " + "; ".join(str(item) for item in unresolved))
+            lines.append(
+                "Unresolved requirements: "
+                + "; ".join(str(item) for item in unresolved)
+            )
+        else:
+            lines.append("Unresolved requirements: none recorded.")
         lines.append("")
+    diagnostics = context.get("diagnostics", [])
+    if isinstance(diagnostics, list) and diagnostics:
+        lines.extend(["## Discovery diagnostics", ""])
+        for diagnostic in diagnostics:
+            if not isinstance(diagnostic, Mapping):
+                continue
+            code = diagnostic.get("code", "discovery")
+            message = diagnostic.get("message", "No diagnostic details recorded.")
+            diagnostic_path = diagnostic.get("path")
+            if isinstance(diagnostic_path, str):
+                lines.append(
+                    f"- {inline_code(code)}: {message} "
+                    f"({evidence_link(diagnostic_path)})"
+                )
+                continue
+            lines.append(f"- {inline_code(code)}: {message}")
     return "\n".join(lines).rstrip() + "\n"
 
 

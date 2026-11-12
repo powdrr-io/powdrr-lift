@@ -1430,37 +1430,14 @@ def test_parse_validation_profile_uses_argv_not_shell() -> None:
     assert profile.command == ("python", "-m", "pytest", "tests", "-q")
 
 
-def test_run_coding_agent_cli_persists_and_reports_attempt(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+@pytest.mark.parametrize("command", ["run-coding-agent", "run_coding_agent"])
+def test_run_coding_agent_cli_is_removed(
+    command: str, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    worktree = _git_repo(tmp_path / "repo")
-    request_path = tmp_path / "request.json"
-    request_path.write_text(_request(_head(worktree)).to_json(), encoding="utf-8")
-    monkeypatch.setattr(
-        "powdrr_lift.cli.build_coding_agent_provider",
-        lambda *_args, **_kwargs: FakeProvider("allowed"),
-    )
-
-    result = main(
-        [
-            "run-coding-agent",
-            "--request",
-            str(request_path),
-            "--worktree",
-            str(worktree),
-            "--output-dir",
-            str(tmp_path / "artifacts"),
-            "--attempt-id",
-            "attempt-cli",
-            "--validation-profile",
-            "python=python3 -c \"print('ok')\"",
-        ]
-    )
-
-    assert result == 0
-    output = json.loads(capsys.readouterr().out)
-    assert output["status"] == "completed"
-    assert output["validation"]["status"] == "passed"
+    with pytest.raises(SystemExit) as error:
+        main([command])
+    assert error.value.code == 2
+    assert "invalid choice" in capsys.readouterr().err
 
 
 def test_compile_implementation_request_cli_writes_selected_unit(

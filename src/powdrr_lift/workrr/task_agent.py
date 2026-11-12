@@ -3624,7 +3624,10 @@ class _TaskWorkflowExecutionStrategy:
         mode_context: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
         if mode == "ci-repair":
-            return self._run_ci_repair_agent(mode_context or {})
+            raise PowdrrExecutionError(
+                "Legacy CI repair code-writing is unsupported; use CI observation "
+                "to record the failure and prepare a reviewed source-reference plan"
+            )
         if mode == "plan-amendment":
             return self._run_plan_amendment_agent(mode_context or {})
         if mode != "implementation":
@@ -4639,101 +4642,6 @@ class _TaskWorkflowExecutionStrategy:
             "continuations": len(attempt_records) - 1,
         }
         self.events.append({"kind": "coding_agent", "result": result})
-        return result
-
-    def _run_ci_repair_agent(self, mode_context: Mapping[str, Any]) -> dict[str, Any]:
-        """Dispatch one bounded service-compiled CI repair attempt to MiniSWE."""
-        repair_request = mode_context.get("repair_request")
-        if not isinstance(repair_request, Mapping):
-            raise PowdrrExecutionError("CI repair mode requires repair_request data")
-        current_head = subprocess.run(
-            ["git", "rev-parse", "HEAD"],
-            cwd=self.repo_root,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        if current_head.returncode:
-            raise PowdrrExecutionError("could not identify the CI repair base commit")
-        observed_head = repair_request.get("head_sha")
-        if not isinstance(observed_head, str) or not re.fullmatch(
-            r"[0-9a-f]{40,64}", observed_head
-        ):
-            raise PowdrrExecutionError("CI repair request has an invalid observed head")
-        base_commit = observed_head
-        ancestry = subprocess.run(
-            [
-                "git",
-                "merge-base",
-                "--is-ancestor",
-                base_commit,
-                current_head.stdout.strip(),
-            ],
-            cwd=self.repo_root,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        if ancestry.returncode != 0:
-            raise PowdrrExecutionError(
-                "current CI repair worktree is not based on the observed PR head"
-            )
-        attempt_number = repair_request.get("attempt_number", 1)
-        if (
-            not isinstance(attempt_number, int)
-            or isinstance(attempt_number, bool)
-            or attempt_number < 1
-        ):
-            raise PowdrrExecutionError(
-                "CI repair request has an invalid attempt number"
-            )
-        request = _ci_repair_implementation_request(
-            repair_request, base_commit=base_commit
-        )
-        request = _ci_repair_request_with_runtime_state(
-            request,
-            repo_root=self.repo_root,
-            task_id=self.task.task_id,
-        )
-        request_store = (
-            Path(tempfile.gettempdir())
-            / "powdrr-lift-ci-repair"
-            / request.plan_fingerprint[:24]
-        )
-        attempt_id = request.request_id + f"-attempt-{attempt_number:02d}"
-        provider = MiniSWEAgentProvider(
-            inference_handler=create_miniswe_inference_handler(
-                self.config.coding_agent_timeout_seconds
-            ),
-            executable=self.config.minisweagent_executable,
-            model=self.config.minisweagent_model,
-            timeout_seconds=self.config.coding_agent_timeout_seconds,
-            diagnostics_root=request_store / "diagnostics",
-        )
-        runner = CodingAgentRunner(
-            provider=provider,
-            store=CodingAgentAttemptStore(request_store / "attempts"),
-        )
-        attempt = runner.run(
-            request,
-            worktree_root=self.repo_root,
-            attempt_id=attempt_id,
-        )
-        self.ci_repair_changed_paths.update(attempt.changed_paths)
-        result = {
-            "passed": attempt.status.value == "completed",
-            "attempt_id": attempt.attempt_id,
-            "status": attempt.status.value,
-            "head_sha": base_commit,
-            "failure_id": repair_request["failure_id"],
-            "changed_paths": sorted(self.ci_repair_changed_paths),
-            "protected_paths": list(request.protected_paths),
-            "error": attempt.error,
-            "diff_fingerprint": attempt.diff_fingerprint,
-            "worker_committed": attempt.worker_committed,
-            "attempt_number": attempt_number,
-        }
-        self.events.append({"kind": "ci_repair_coding_agent", "result": result})
         return result
 
     def record_action_error(self, action: WorkflowAction, error: Exception) -> None:

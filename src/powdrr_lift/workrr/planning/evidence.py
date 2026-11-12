@@ -18,6 +18,7 @@ from functools import lru_cache
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path, PurePosixPath
 from typing import Any, Literal, Protocol
+from urllib.parse import urlsplit
 
 import yaml
 from powdrr_agent.repository import (
@@ -511,7 +512,7 @@ def search_structural_document_symbols(
     root = Path(repository_root).resolve()
     normalized_paths = tuple(sorted(set(paths)))
     _, reference, document = _load_or_build_pinned_symbol_artifact(root, base_commit)
-    snapshot_id = _planning_structrr_snapshot_id(root, base_commit, reference)
+    snapshot_id = _planning_structrr_snapshot_id(base_commit, reference)
     selected: list[Mapping[str, Any]] = []
     query_results: dict[str, Mapping[str, Any]] = {}
     for path in normalized_paths:
@@ -607,7 +608,7 @@ def _load_or_build_symbol_artifact(
     except PackageNotFoundError as error:
         raise EvidenceError("BasedPyright provider is not installed") from error
     config_fingerprint = _python_configuration_fingerprint(source_root)
-    component_id = f"component:python:{repository_root.name}"
+    component_id = _stable_repository_component_id(repository_root)
     python_paths = tuple(
         sorted(
             path.relative_to(source_root).as_posix()
@@ -888,12 +889,84 @@ def _write_atomically(path: Path, content: bytes) -> None:
 
 
 def _planning_structrr_snapshot_id(
-    repository_root: Path, base_commit: str, reference: CodeSymbolArtifact
+    base_commit: str, reference: CodeSymbolArtifact
 ) -> str:
     fingerprint = hashlib.sha256(
-        f"{repository_root.name}\0{base_commit}\0{reference.source_tree_digest}\0{reference.artifact_id}".encode()
+        f"{reference.component_id}\0{base_commit}\0{reference.source_tree_digest}\0{reference.artifact_id}".encode()
     ).hexdigest()
     return f"structrr:sha256:{fingerprint}"
+
+
+def _stable_repository_component_id(repository_root: Path) -> str:
+    """Identify the repository consistently across differently named worktrees."""
+    remote = _git_repository_identity(repository_root)
+    identity = _normalized_remote_identity(remote) if remote else None
+    if identity is None:
+        common_dir = _git_common_dir(repository_root)
+        if common_dir is not None:
+            identity = (
+                common_dir.parent.name
+                if common_dir.name == ".git"
+                else common_dir.stem or common_dir.name
+            )
+        else:
+            identity = repository_root.name
+    slug = re.sub(r"[^a-z0-9._-]+", "-", identity.casefold()).strip("-")
+    return f"component:python:{slug or 'repository'}"
+
+
+def _git_repository_identity(repository_root: Path) -> str | None:
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(repository_root), "remote", "get-url", "origin"],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except OSError:
+        return None
+    if result.returncode != 0:
+        return None
+    return result.stdout.strip() or None
+
+
+def _git_common_dir(repository_root: Path) -> Path | None:
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(repository_root), "rev-parse", "--git-common-dir"],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+    except OSError:
+        return None
+    if result.returncode != 0 or not result.stdout.strip():
+        return None
+    common_dir = Path(result.stdout.strip())
+    if not common_dir.is_absolute():
+        common_dir = repository_root / common_dir
+    return common_dir.resolve()
+
+
+def _normalized_remote_identity(remote: str) -> str | None:
+    if "://" in remote:
+        parsed = urlsplit(remote)
+        host = parsed.hostname or ""
+        path = parsed.path
+    else:
+        scp_remote = re.fullmatch(r"(?:[^@]+@)?([^:]+):(.+)", remote)
+        if scp_remote is not None:
+            host, path = scp_remote.groups()
+        else:
+            host, path = "", remote
+    path = path.strip("/")
+    if path.endswith(".git"):
+        path = path[:-4]
+    parts = [part for part in path.split("/") if part and part not in {".", ".."}]
+    if not host:
+        parts = parts[-2:]
+    identity = "/".join(([host.casefold()] if host else []) + parts)
+    return identity or None
 
 
 def _index_symbol_to_provider_record(
@@ -1005,7 +1078,7 @@ def search_pinned_workspace_symbols(
         root, base_commit
     )
     del content
-    snapshot_id = _planning_structrr_snapshot_id(root, base_commit, reference)
+    snapshot_id = _planning_structrr_snapshot_id(base_commit, reference)
     return _query_symbol_artifact(
         document,
         reference,
@@ -1035,7 +1108,7 @@ def search_workspace_symbols_from_worktree(
     _, reference, document = _load_or_build_symbol_artifact(
         root, root, source_revision=revision
     )
-    snapshot_id = _planning_structrr_snapshot_id(root, revision, reference)
+    snapshot_id = _planning_structrr_snapshot_id(revision, reference)
     return _query_symbol_artifact(
         document,
         reference,
@@ -1096,7 +1169,7 @@ def pinned_code_symbol_artifact_reference(
     _, reference, _ = _load_or_build_pinned_symbol_artifact(root, base_commit)
     return (
         reference.to_data(),
-        _planning_structrr_snapshot_id(root, base_commit, reference),
+        _planning_structrr_snapshot_id(base_commit, reference),
     )
 
 
@@ -1114,7 +1187,7 @@ def search_structural_document_analysis(
     analysis_root = _pinned_analysis_root(root, base_commit)
     normalized_paths = tuple(sorted(set(paths)))
     _, reference, document = _load_or_build_pinned_symbol_artifact(root, base_commit)
-    snapshot_id = _planning_structrr_snapshot_id(root, base_commit, reference)
+    snapshot_id = _planning_structrr_snapshot_id(base_commit, reference)
     selected_symbols: list[Mapping[str, Any]] = []
     symbol_query_results: dict[str, Mapping[str, Any]] = {}
     for path in normalized_paths:

@@ -131,7 +131,7 @@ agreement contracts are described in
 [`Structrr as the intended source design`](docs/design/structrr-desired-source-design.md).
 
 The proposed service boundary is detailed in
-[`docs/plans/hosted-instruction-compiler.md`](docs/plans/hosted-instruction-compiler.md).
+[`docs/plans/research/hosted-instruction-compiler.md`](docs/plans/research/hosted-instruction-compiler.md).
 It moves instruction interpretation, design compilation, prompt assembly, and
 acceptance policy into a service while keeping repository access and
 mini-SWE-agent execution local.

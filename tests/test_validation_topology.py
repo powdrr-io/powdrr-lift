@@ -3,7 +3,10 @@ from __future__ import annotations
 import subprocess
 from pathlib import Path
 
-from powdrr_service.structrr.bootstrap import bootstrap_structrr
+from powdrr_service.structrr.bootstrap import (
+    bootstrap_structrr,
+    render_bootstrap_markdown,
+)
 from powdrr_service.structrr.python_topology import discover_python_topology
 
 
@@ -103,7 +106,11 @@ def test_bootstrap_normalizes_tox_evidence_references(tmp_path: Path) -> None:
     subprocess.run(["git", "-C", str(repo), "init", "-q"], check=True)
     subprocess.run(["git", "-C", str(repo), "add", "."], check=True)
 
-    result = bootstrap_structrr(repo, output_path=tmp_path / "result.yaml")
+    result = bootstrap_structrr(
+        repo,
+        output_path=tmp_path / "result.yaml",
+        source_revision="fixture-revision",
+    )
 
     assert result.validation.successful
     context_ids = {
@@ -120,3 +127,45 @@ def test_bootstrap_normalizes_tox_evidence_references(tmp_path: Path) -> None:
         for check in tox_checks
         for evidence in check["provenance"]["evidence"]
     )
+    assert result.report_path is not None and result.report_path.is_file()
+    report = result.report_path.read_text(encoding="utf-8")
+    assert "# Project bootstrap findings" in report
+    assert "Source revision: `fixture-revision`. Discovery: **partial**." in report
+    assert "Discovery coverage:" in report
+    assert "[`tox.ini`](repo/tox.ini)" in report
+    assert "repo/.github/workflows/ci.yml" in report
+    assert "validation-input:tox.ini" not in report
+    for check in tox_checks:
+        assert f"{check['purpose']} (`{check['id']}`)" in report
+    assert "Confirmation: `static`; baseline result: `not_run`." in report
+
+
+def test_bootstrap_report_renders_diagnostic_with_relative_evidence_link(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "pyproject.toml").write_text("[project]\nname = 'sample'\n")
+    report = render_bootstrap_markdown(
+        {
+            "validation_context": {
+                "discovery_status": "partial",
+                "coverage": ["Python manifests"],
+                "diagnostics": [
+                    {
+                        "code": "python_project_config_invalid",
+                        "path": "pyproject.toml",
+                        "message": "A project setting could not be read.",
+                    }
+                ],
+            },
+            "validation_inventory": [],
+            "files": [],
+        },
+        report_path=tmp_path / "reports" / "bootstrap.md",
+        root=tmp_path,
+    )
+
+    assert "## Discovery diagnostics" in report
+    assert (
+        "`python_project_config_invalid`: A project setting could not be read. "
+        "([`pyproject.toml`](../pyproject.toml))"
+    ) in report

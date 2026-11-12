@@ -1,0 +1,135 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1448
+title: Complete bootstrap validation Markdown report details
+intent:
+  problem: Bootstrap Markdown reports omit stable validation IDs and discovery state, and validation evidence IDs can be rendered as broken file links.
+  goal: Render the report from the normalized validation inventory with traceable check IDs, discovery coverage, execution and baseline details, and safe relative evidence links.
+human-decisions: []
+structured_files: []
+files:
+- path: packages/service/src/powdrr_service/structrr/bootstrap.py
+  type: modified
+  span:
+    start_line: 280
+    end_line: 300
+  summary: Render source revision, discovery status and coverage, stable check IDs, execution context, requiredness, confirmation, baseline results, unresolved requirements, and discovery diagnostics; resolve evidence IDs to safe relative links.
+  rationale: Make the human-readable report consistent with the validated Structrr inventory and keep evidence navigation useful for custom report locations.
+- path: packages/service/src/powdrr_service/structrr/bootstrap.py
+  type: modified
+  span:
+    start_line: 328
+    end_line: 358
+  summary: Resolve evidence records and environment records for report rendering.
+  rationale: Render source paths for canonical validation evidence IDs.
+- path: packages/service/src/powdrr_service/structrr/bootstrap.py
+  type: modified
+  span:
+    start_line: 366
+    end_line: 368
+  summary: Display validation purpose and stable check ID in each report heading.
+  rationale: Let readers match each human-readable check to the Structrr inventory.
+- path: packages/service/src/powdrr_service/structrr/bootstrap.py
+  type: modified
+  span:
+    start_line: 381
+    end_line: 382
+  summary: Display provider and execution directory for every check.
+  rationale: Preserve the check's execution context in the report.
+- path: packages/service/src/powdrr_service/structrr/bootstrap.py
+  type: modified
+  span:
+    start_line: 385
+    end_line: 407
+  summary: Include shell, environment, Python constraints, and prerequisite checks.
+  rationale: Explain what setup and execution context a discovered check needs.
+- path: packages/service/src/powdrr_service/structrr/bootstrap.py
+  type: modified
+  span:
+    start_line: 411
+    end_line: 414
+  summary: Render complete applicability settings.
+  rationale: Preserve the inventory's declared applicability in human-readable output.
+- path: packages/service/src/powdrr_service/structrr/bootstrap.py
+  type: modified
+  span:
+    start_line: 425
+    end_line: 427
+  summary: Render requiredness from the normalized check record.
+  rationale: Keep requiredness visible without inferring it from command names.
+- path: packages/service/src/powdrr_service/structrr/bootstrap.py
+  type: modified
+  span:
+    start_line: 435
+    end_line: 438
+  summary: Add requiredness evidence to each check's linked evidence.
+  rationale: Make the basis for requiredness inspectable.
+- path: packages/service/src/powdrr_service/structrr/bootstrap.py
+  type: modified
+  span:
+    start_line: 480
+    end_line: 483
+  summary: Resolve evidence IDs to paths and create safe relative links.
+  rationale: Avoid broken links from synthetic validation evidence IDs.
+- path: packages/service/src/powdrr_service/structrr/bootstrap.py
+  type: modified
+  span:
+    start_line: 485
+    end_line: 502
+  summary: Include confirmation level and baseline status for each check.
+  rationale: Distinguish static discovery from actual validation results.
+- path: packages/service/src/powdrr_service/structrr/bootstrap.py
+  type: modified
+  span:
+    start_line: 505
+    end_line: 510
+  summary: Label and include unresolved requirements for each check.
+  rationale: Keep incomplete discovery visible in the report.
+- path: packages/service/src/powdrr_service/structrr/bootstrap.py
+  type: modified
+  span:
+    start_line: 512
+    end_line: 527
+  summary: Render repository-level discovery diagnostics with safe evidence links.
+  rationale: Make configuration and discovery limitations visible and traceable.
+- path: tests/fixtures/structrr/golden-python-symbols.yaml
+  type: modified
+  span:
+    start_line: 8
+    end_line: 8
+  summary: Refresh source spans for the expanded bootstrap report renderer.
+  rationale: Keep the golden repository-symbol fixture aligned with the changed source file.
+- path: tests/fixtures/structrr/golden-python-symbols.yaml
+  type: modified
+  span:
+    start_line: 21
+    end_line: 22
+  summary: Refresh the changed source span for the extraction helper.
+  rationale: Keep the golden source-location assertion aligned with the expanded report renderer.
+- path: tests/test_validation_topology.py
+  type: modified
+  span:
+    start_line: 6
+    end_line: 9
+  summary: Verify tox evidence IDs render as valid source links with matching check IDs, revision and discovery metadata; verify diagnostic links from nested report paths.
+  rationale: Prevent regressions in agreement between the normalized inventory and its Markdown report.
+- path: tests/test_validation_topology.py
+  type: modified
+  span:
+    start_line: 109
+    end_line: 113
+  summary: Supply a deterministic source revision to the bootstrap report fixture.
+  rationale: Verify the report identifies the snapshot it describes.
+- path: tests/test_validation_topology.py
+  type: modified
+  span:
+    start_line: 130
+    end_line: 171
+  summary: Verify report metadata, stable IDs, normalized evidence links, confirmation state, and diagnostic paths.
+  rationale: Prevent regressions in agreement between the normalized inventory and its Markdown report.
+entities:
+- id: bootstrap-markdown-report-renderer
+  type: Function
+  action: added
+entity_relationships: []
+invariants: []
+guidance: []

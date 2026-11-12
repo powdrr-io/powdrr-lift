@@ -225,7 +225,9 @@ def test_readonly_support_files_are_scoped_and_frozen(
     )
     path = run.workspace_root / "tests/test_story_contract.py"
     assert path.read_text() == "def test_story(): pass\n"
-    assert "tests/test_story_contract.py" in run.request.allowed_paths
+    assert "tests/test_story_contract.py" not in run.request.allowed_paths
+    assert "tests/test_story_contract.py" in run.request.protected_paths
+    assert run.request.allow_existing_changes is True
     assert str(path) in run._sandbox_profile()
     run.verify_inputs()
 

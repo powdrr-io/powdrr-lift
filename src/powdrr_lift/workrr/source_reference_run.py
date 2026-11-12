@@ -263,7 +263,6 @@ class SourceReferenceRun:
         if support_files:
             _git(self.workspace_root, "add", "-f", "--", *sorted(support_files))
         self.readonly_support_files = dict(sorted(support_files.items()))
-        allowed_paths = tuple(dict.fromkeys((*allowed_paths, *support_files)))
         self.catalog = compile_reference_catalog(
             accepted_design,
             base_commit=base_commit,
@@ -289,6 +288,8 @@ class SourceReferenceRun:
             allowed_commands=tuple(
                 shlex.join(p.command) for p in self.profiles.values()
             ),
+            protected_paths=tuple(support_files),
+            allow_existing_changes=bool(support_files),
         )
         self.model = model
         self.worker_timeout_seconds = worker_timeout_seconds
@@ -440,10 +441,31 @@ class SourceReferenceRun:
             raise ValueError(
                 "Provider configuration differs from the sealed source run"
             )
-        if _git(
-            self.workspace_root, "rev-parse", "HEAD"
-        ).decode().strip() != self.catalog.base_commit or _working_paths(
-            self.workspace_root, output=_paths_output
+        staged_paths = set(
+            _paths_output(
+                self.workspace_root, "diff", "--cached", "--name-only"
+            ).splitlines()
+        )
+        unstaged_paths = set(
+            _paths_output(self.workspace_root, "diff", "--name-only").splitlines()
+        )
+        untracked_paths = set(
+            _paths_output(
+                self.workspace_root,
+                "ls-files",
+                "--others",
+                "--exclude-standard",
+            ).splitlines()
+        )
+        expected_support_paths = set(self.readonly_support_files)
+        if (
+            _git(self.workspace_root, "rev-parse", "HEAD").decode().strip()
+            != self.catalog.base_commit
+            or _working_paths(self.workspace_root, output=_paths_output)
+            != expected_support_paths
+            or staged_paths != expected_support_paths
+            or unstaged_paths
+            or untracked_paths
         ):
             raise ValueError(
                 "Source implementation must start from its clean exact base"

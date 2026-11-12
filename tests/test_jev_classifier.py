@@ -232,6 +232,96 @@ def test_subq_uses_typed_choice_and_maps_to_workflow_result(monkeypatch: Any) ->
     ]
 
 
+def test_subq_batches_independent_decisions_in_one_api_request(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import io
+
+    fallback = _Fallback()
+    captured: dict[str, Any] = {}
+
+    def open_request(request: Request, *, timeout: float) -> io.BytesIO:
+        captured["url"] = request.full_url
+        captured["timeout"] = timeout
+        request_data = request.data
+        assert isinstance(request_data, bytes)
+        body = json.loads(request_data)
+        captured["body"] = body
+        answers = {
+            item_id: {"choice": choice}
+            for item_id, choice in zip(
+                body["questions"], ("absent", "present"), strict=True
+            )
+        }
+        return io.BytesIO(
+            json.dumps({"model": "subq-test", "answers": answers}).encode()
+        )
+
+    monkeypatch.setattr(jev_classifier, "urlopen", open_request)
+    client = SubQDecisionProvider(fallback, api_key="subq-key")
+
+    results = client.complete_json_batch(
+        [
+            (_messages("has_exception"), _decision_schema()),
+            (_messages("has_exception"), _decision_schema()),
+        ]
+    )
+
+    body = captured["body"]
+    item_ids = list(body["questions"])
+    assert captured["url"] == "https://api.subq.ai/v1/systemone"
+    assert captured["timeout"] == 10
+    assert body["model"] == "subq-snap-preview"
+    assert set(body["state"]["items"]) == set(item_ids)
+    assert len(item_ids) == 2
+    for item_id in item_ids:
+        assert f"state.items.{item_id}" in body["questions"][item_id]["instructions"]
+    assert results == [
+        {"status": "resolved", "value": "absent", "reason_code": None},
+        {"status": "resolved", "value": "present", "reason_code": None},
+    ]
+    assert fallback.calls == 0
+
+
+def test_subq_batches_are_bounded_to_eight_questions(monkeypatch: Any) -> None:
+    fallback = _Fallback()
+    batch_sizes: list[int] = []
+    single_calls = 0
+
+    def call_batch(
+        batch: list[Any], api_key: str, endpoint: str, model: str
+    ) -> dict[str, Any]:
+        batch_sizes.append(len(batch))
+        return {
+            "answers": {item.request_id: {"choice": "absent"} for item in batch},
+            "model": model,
+        }
+
+    def call_single(
+        request: Mapping[str, Any], api_key: str, endpoint: str, model: str
+    ) -> dict[str, Any]:
+        nonlocal single_calls
+        single_calls += 1
+        return {"choice": "absent", "model": model}
+
+    monkeypatch.setattr(jev_classifier, "_call_subq_batch", call_batch)
+    monkeypatch.setattr(jev_classifier, "_call_subq", call_single)
+    client = SubQDecisionProvider(fallback, api_key="subq-key")
+
+    results = client.complete_json_batch(
+        [
+            (_messages("has_exception"), _decision_schema())
+            for _ in range(client.max_batch_size + 1)
+        ]
+    )
+
+    assert batch_sizes == [8]
+    assert single_calls == 1
+    assert len(results) == 9
+    assert all(result["value"] == "absent" for result in results)
+    assert fallback.calls == 0
+
+
 def test_subq_bad_request_fails_without_planning_fallback(
     monkeypatch: Any,
 ) -> None:

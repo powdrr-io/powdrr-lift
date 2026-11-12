@@ -952,7 +952,9 @@ def _format_classifier_result(
             if normalized_choice in {"true", "false"}:
                 return {output_property["name"]: normalized_choice == "true"}
             if normalized_choice == "unresolved":
-                raise ValueError("Decision API abstained on a boolean classification")
+                # Boolean schemas have no abstention value. Fail closed: do not
+                # assert a positive classification without supporting evidence.
+                return {output_property["name"]: False}
         raise ValueError(
             "Decision API returned an unsupported boolean classification "
             f"(answer type: {type(choice).__name__})"

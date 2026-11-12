@@ -283,17 +283,17 @@ def test_subq_batches_independent_decisions_in_one_api_request(
     assert fallback.calls == 0
 
 
-def test_subq_batch_maps_native_boolean_choices(monkeypatch: Any) -> None:
+def test_subq_batch_maps_boolean_choices_and_abstentions(monkeypatch: Any) -> None:
     fallback = _Fallback()
 
     def call_batch(
         batch: list[Any], api_key: str, endpoint: str, model: str
     ) -> dict[str, Any]:
-        assert len(batch) == 2
+        assert len(batch) == 3
         return {
             "answers": {
                 item.request_id: {"choice": choice}
-                for item, choice in zip(batch, (True, False), strict=True)
+                for item, choice in zip(batch, (True, False, "unresolved"), strict=True)
             }
         }
 
@@ -317,9 +317,15 @@ def test_subq_batch_maps_native_boolean_choices(monkeypatch: Any) -> None:
         "properties": {"multiple": {"type": "boolean"}},
     }
 
-    results = client.complete_json_batch([(messages, schema), (messages, schema)])
+    results = client.complete_json_batch(
+        [(messages, schema), (messages, schema), (messages, schema)]
+    )
 
-    assert results == [{"multiple": True}, {"multiple": False}]
+    assert results == [
+        {"multiple": True},
+        {"multiple": False},
+        {"multiple": False},
+    ]
     assert fallback.calls == 0
 
 

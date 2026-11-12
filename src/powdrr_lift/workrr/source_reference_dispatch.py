@@ -24,6 +24,7 @@ from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.workrr.coding_agent import _remove_provider_credentials
 from powdrr_lift.workrr.coding_agent_validation import ValidationProfile
 from powdrr_lift.workrr.llm import WorkflowLLMClient, complete_json
+from powdrr_lift.workrr.source_reference_postrun import reconcile_source_task
 from powdrr_lift.workrr.source_reference_run import SourceReferenceRun
 from powdrr_lift.workrr.story_execution_operations import execute_story_validation
 
@@ -239,6 +240,9 @@ def dispatch_source_reference_task(
             validation_timeout_seconds=validation_timeout_seconds,
             review_client=_ReferenceReviewer(review_client),
             readonly_support_files=test_sources,
+            post_worker_reconciler=lambda current_run: reconcile_source_task(
+                current_run, _ReferenceReviewer(review_client)
+            ),
         )
         outcome = run.execute(create_miniswe_inference_handler(worker_timeout_seconds))
         data = outcome.to_data()

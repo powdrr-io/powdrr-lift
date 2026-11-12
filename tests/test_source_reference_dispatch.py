@@ -17,6 +17,7 @@ from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.workrr import source_reference_dispatch as dispatch
 from powdrr_lift.workrr import task_agent
 from powdrr_lift.workrr.coding_agent_validation import ValidationProfile
+from powdrr_lift.workrr.source_reference_postrun import reconcile_source_task
 
 BASELINE = "# structrr: feature:twice\ndef twice(value):\n    return value\n"
 CANDIDATE = BASELINE.replace("return value", "return value * 2")
@@ -309,6 +310,102 @@ def test_story_context_is_bound_into_protected_source_objective(
         "tests/test_story.py": "def test_story(): pass\n"
     }
     assert "story-validation" in captured["profiles"]
+    assert callable(captured["post_worker_reconciler"])
+
+
+@pytest.mark.parametrize(
+    (
+        "initial_source",
+        "has_accepted_placement",
+        "response",
+        "expected_status",
+        "expected_source",
+    ),
+    [
+        (
+            "def twice(value):\n    return value\n",
+            True,
+            {"status": "resolved", "value": "exists", "reason_code": None},
+            "passed",
+            "# structrr: feature:twice\ndef twice(value):\n    return value\n",
+        ),
+        (
+            "def twice(value):\n    return value\n",
+            True,
+            {"status": "resolved", "value": "absent", "reason_code": None},
+            "blocked",
+            "def twice(value):\n    return value\n",
+        ),
+        (
+            "# structrr: feature:twice\ndef twice(value):\n    return value\n",
+            False,
+            {"status": "resolved", "value": "absent", "reason_code": None},
+            "passed",
+            "def twice(value):\n    return value\n",
+        ),
+    ],
+)
+def test_post_worker_reconciliation_uses_decision_and_changes_only_annotation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    initial_source: str,
+    has_accepted_placement: bool,
+    response: dict[str, Any],
+    expected_status: str,
+    expected_source: str,
+) -> None:
+    monkeypatch.setattr(
+        "powdrr_lift.workrr.source_reference_postrun.DecisionProviderFactory.create",
+        lambda *_args, **_kwargs: None,
+    )
+    (tmp_path / "twice.py").write_text(initial_source)
+    definition = ReferenceDefinition(
+        "feature:twice", "feature", "Return twice the input.", "spec:1"
+    )
+    placement = {
+        "obligation_id": "place:twice",
+        "ref": "feature:twice",
+        "relationship": "implements",
+        "requirement": "Return twice the input.",
+        "owner": {
+            "path": "twice.py",
+            "kind": "function",
+            "qualified_name": "twice",
+            "binding": "exact",
+            "role": "implementation",
+        },
+        "cardinality": "exactly_one",
+    }
+    contract = {
+        "obligations": [placement] if has_accepted_placement else [],
+        "preservation": [],
+        "accepted_document_digest": "sha256:" + "a" * 64,
+    }
+    prompt = SimpleNamespace(to_data=lambda: {"contract": contract})
+    run = SimpleNamespace(
+        workspace_root=tmp_path,
+        private_root=tmp_path / "private",
+        handoff=SimpleNamespace(worker_prompt=prompt),
+        catalog=SimpleNamespace(
+            entries=(SimpleNamespace(reference=definition),),
+        ),
+        _last_attempt=SimpleNamespace(changed_paths=("twice.py",)),
+    )
+
+    class DecisionReviewer:
+        def complete_json(
+            self, _messages: list[dict[str, str]], *, response_schema: Any = None
+        ) -> dict[str, Any]:
+            return response
+
+    receipt = reconcile_source_task(run, DecisionReviewer())
+    assert receipt["status"] == expected_status
+    assert (tmp_path / "twice.py").read_text() == expected_source
+    if expected_status == "passed":
+        assert (
+            receipt["decisions"][0]["attempts"][0]["decision"]["result"]["value"]
+            == response["value"]
+        )
 
 
 @pytest.mark.parametrize("scenario", ["success", "behavior_failure", "parent_conflict"])

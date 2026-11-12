@@ -1,0 +1,105 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1440
+title: Reconcile Structrr annotations during Workrr source tasks
+intent:
+  problem: Reviewed source-task placements can be accepted while their required source annotations remain missing or conflict with the edited candidate.
+  goal: Reconcile source comments against frozen accepted intent before independent validation, retain provider decisions, and block conflicting outcomes.
+human-decisions: []
+structured_files: []
+files:
+- path: src/powdrr_lift/workrr/source_reference_dispatch.py
+  type: modified
+  span:
+    start_line: 27
+    end_line: 27
+  summary: Import the Workrr source-task reconciler.
+  rationale: Connect production dispatch to the trusted post-worker reconciliation stage.
+- path: src/powdrr_lift/workrr/source_reference_dispatch.py
+  type: modified
+  span:
+    start_line: 243
+    end_line: 245
+  summary: Provide the reconciler to each protected source-reference run.
+  rationale: Reconcile source annotations after worker finalization and before independent validation.
+- path: src/powdrr_lift/workrr/source_reference_postrun.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 390
+  summary: Decide annotation mismatches against frozen placements and apply token-preserving comment edits with a protected receipt.
+  rationale: Repair missing accepted placements, remove reviewed source-only links, and block unresolved or conflicting decisions without changing product syntax.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span:
+    start_line: 796
+    end_line: 801
+  summary: Retain structured reconciliation receipts immediately after the callback.
+  rationale: Preserve a blocked decision record even when reconciliation rejects the candidate.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span:
+    start_line: 807
+    end_line: 807
+  summary: Replace receipt-shape validation with the reconciliation status gate.
+  rationale: Stop runs whose trusted post-worker reconciliation did not pass.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span:
+    start_line: 808
+    end_line: 811
+  summary: Require a passing reconciliation receipt before candidate validation continues.
+  rationale: Prevent later validation and patch transfer from accepting conflicting metadata.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span:
+    start_line: 813
+    end_line: 814
+  summary: Report blocked source reconciliation as a distinct run outcome.
+  rationale: Make accepted-intent conflicts visible to callers.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span:
+    start_line: 914
+    end_line: 914
+  summary: Include reconciliation outcome in the terminal run artifact.
+  rationale: Preserve blocked and successful correction outcomes for audit.
+- path: tests/test_source_reference_dispatch.py
+  type: modified
+  span:
+    start_line: 20
+    end_line: 20
+  summary: Import post-worker reconciliation for focused tests.
+  rationale: Verify production wiring and metadata-only correction behavior.
+- path: tests/test_source_reference_dispatch.py
+  type: modified
+  span:
+    start_line: 313
+    end_line: 408
+  summary: Cover accepted annotation insertion, mandatory-placement conflicts, and reviewed removal of source-only annotations.
+  rationale: Exercise decision-bound reconciliation without live provider calls.
+- path: tests/test_source_reference_run.py
+  type: modified
+  span:
+    start_line: 507
+    end_line: 530
+  summary: Verify blocked reconciliation receipts are retained and stop the run.
+  rationale: Keep rejected corrections visible and prevent later validation from proceeding.
+entities:
+- id: structrr-source-reference-reconciliation
+  type: Feature
+  action: modified
+- id: workrr-source-reference-postrun-reconciliation
+  type: Module
+  action: added
+- id: reconcile-source-task
+  type: Function
+  action: added
+entity_relationships: []
+invariants:
+- id: workrr-source-reconciliation-precedes-independent-validation
+  action: added
+  description: Each protected source task reconciles indexed annotations with its frozen exact placements after worker finalization and before independent validation.
+- id: source-reconciliation-cannot-overrule-accepted-intent
+  action: added
+  description: A decision that rejects an accepted placement or affirms a source-only link blocks the run and preserves its decision receipt; only annotation comments may be edited.
+guidance: []

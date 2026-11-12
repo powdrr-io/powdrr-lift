@@ -603,28 +603,51 @@ def run_question[AnswerT](
         except QuestionInputTooLarge:
             if last_error is None:
                 raise
-            if len(request.batch_members) > 1:
-                return _retry_split_batch_after_oversized_correction(
-                    client,
-                    request,
-                    model=model,
-                    stderr=stderr,
-                    max_transport_retries=max_transport_retries,
-                    transport_backoff_seconds=transport_backoff_seconds,
-                    use_provider_schema=use_provider_schema,
-                    prior_attempts=attempt - 1,
+            previous_answer_size = len(
+                json.dumps(
+                    previous_answer,
+                    ensure_ascii=False,
+                    separators=(",", ":"),
                 )
-            assert last_error is not None
-            return NeedsQuestionAnswer(
-                question=replace(request.question, attempt=attempt - 1),
-                attempts=attempt - 1,
-                error=PlanningContractError(
-                    last_error.json_pointer,
-                    "correction context exceeds the input bound; "
-                    "subdivide this question",
-                ),
-                previous_answer=previous_answer,
             )
+            messages = None
+            if (
+                not request.batch_members
+                and previous_answer
+                and previous_answer_size <= request.max_answer_chars
+            ):
+                try:
+                    messages = build_question_messages(
+                        request,
+                        attempt=attempt,
+                        correction=last_error,
+                        previous_answer={},
+                        schema_in_response=use_provider_schema,
+                    )
+                except QuestionInputTooLarge:
+                    pass
+            if messages is None:
+                if len(request.batch_members) > 1:
+                    return _retry_split_batch_after_oversized_correction(
+                        client,
+                        request,
+                        model=model,
+                        stderr=stderr,
+                        max_transport_retries=max_transport_retries,
+                        transport_backoff_seconds=transport_backoff_seconds,
+                        use_provider_schema=use_provider_schema,
+                        prior_attempts=attempt - 1,
+                    )
+                return NeedsQuestionAnswer(
+                    question=replace(request.question, attempt=attempt - 1),
+                    attempts=attempt - 1,
+                    error=PlanningContractError(
+                        last_error.json_pointer,
+                        "correction context exceeds the input bound; "
+                        "subdivide this question",
+                    ),
+                    previous_answer=previous_answer,
+                )
 
         try:
             raw_answer = complete_json_with_timeout_retry(

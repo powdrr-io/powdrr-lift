@@ -237,7 +237,6 @@ def test_provider_schema_is_not_duplicated_in_correction_prompt() -> None:
         "json_schema"
         not in json.loads(corrected_messages[1]["content"])["answer_fields"]
     )
-
     client = _ScriptedClient(
         {
             ("extract_requirements", "block-01"): [
@@ -264,6 +263,88 @@ def test_provider_schema_is_not_duplicated_in_correction_prompt() -> None:
     assert initial["answer_fields"]["json_schema"] == schema
     assert "json_schema" not in correction["answer_fields"]
     assert client.schemas["q-000001"] == [schema, schema]
+
+
+def test_oversized_correction_retries_without_echoing_bounded_previous_answer() -> None:
+    fact = ContextRecord("fact-01", {"body": "x" * 20_000})
+    sizing_request = replace(
+        _request(_question("q-000001", "block-01", ("fact-01",))),
+        accepted_facts=(fact,),
+        max_input_chars=100_000,
+    )
+    previous_answer = {
+        "records": [],
+        "has_more": False,
+        "next_anchor": None,
+        "extra": "x" * 2_400,
+    }
+    correction = PlanningContractError("/", "unexpected answer field")
+
+    def serialized_size(messages: list[dict[str, str]]) -> int:
+        return len(
+            json.dumps(
+                {
+                    "messages": messages,
+                    "response_schema": sizing_request.answer_schema,
+                },
+                ensure_ascii=False,
+                separators=(",", ":"),
+            )
+        )
+
+    initial_size = serialized_size(
+        build_question_messages(sizing_request, schema_in_response=True)
+    )
+    correction_with_answer_size = serialized_size(
+        build_question_messages(
+            sizing_request,
+            attempt=2,
+            correction=correction,
+            previous_answer=previous_answer,
+            schema_in_response=True,
+        )
+    )
+    correction_without_answer_size = serialized_size(
+        build_question_messages(
+            sizing_request,
+            attempt=2,
+            correction=correction,
+            previous_answer={},
+            schema_in_response=True,
+        )
+    )
+    assert initial_size <= MAX_QUESTION_INPUT_CHARS
+    assert correction_without_answer_size <= MAX_QUESTION_INPUT_CHARS
+    assert correction_with_answer_size > MAX_QUESTION_INPUT_CHARS
+
+    request = replace(sizing_request, max_input_chars=MAX_QUESTION_INPUT_CHARS)
+    client = _ScriptedClient(
+        {
+            ("extract_requirements", "block-01"): [
+                previous_answer,
+                _VALID_PAGE,
+            ]
+        }
+    )
+
+    result = run_question(
+        client,
+        request,
+        model="deepinfra-cheap",
+        stderr=None,
+        max_transport_retries=0,
+        transport_backoff_seconds=0,
+    )
+
+    assert not isinstance(result, NeedsQuestionAnswer)
+    assert result.raw_answer == _VALID_PAGE
+    assert client.calls[("extract_requirements", "block-01")] == 2
+    correction_packet = json.loads(client.messages["q-000001"][1][1]["content"])
+    assert correction_packet["correction"]["json_pointer_error"] == {
+        "json_pointer": "/extra",
+        "message": "unknown field",
+    }
+    assert correction_packet["correction"]["previous_answer"] == {}
 
 
 def test_batch_question_request_preserves_each_question_schema_and_identity() -> None:

@@ -7988,10 +7988,6 @@ def _prepare_final_implementation_review(
             if isinstance(state.get("postrun_probe_artifact_root"), Path)
             else None,
         },
-        "candidate_correction_attempts": int(
-            state.get("candidate_correction_attempts", 0)
-        ),
-        "candidate_correction_limit": config.max_repair_attempts,
         "proposal_fingerprint": proposal.fingerprint,
         "diff_fingerprint": diff_fingerprint,
         "observed_diff": diff,
@@ -8251,171 +8247,12 @@ def _instruction_coverage_gaps(
     return gaps
 
 
-def _instruction_text(specification: Mapping[str, Any]) -> str:
-    clause = specification.get("clause")
-    text = clause.get("text") if isinstance(clause, Mapping) else None
-    return text if isinstance(text, str) else ""
-
-
 def _coverage_contract(specification: Mapping[str, Any]) -> Mapping[str, Any] | None:
     evidence = specification.get("obligation_evidence")
     if not isinstance(evidence, Mapping):
         return None
     contract = evidence.get("evidence_contract", evidence)
     return contract if isinstance(contract, Mapping) else None
-
-
-def _coverage_expectation(specification: Mapping[str, Any]) -> str:
-    evidence = _coverage_contract(specification)
-    if not isinstance(evidence, Mapping):
-        return "unknown"
-    return (
-        f"{evidence.get('normative_strength', 'unknown')}/"
-        f"{evidence.get('diff_expectation', 'unknown')}"
-    )
-
-
-def _code_task_agent_parameters(state: Mapping[str, Any]) -> dict[str, Any]:
-    """Return the resolved inputs from the original code-task invocation."""
-    parameters = state.get("code_task_agent_parameters")
-    if not isinstance(parameters, Mapping):
-        raise PowdrrExecutionError(
-            "candidate correction has no original code-task parameters"
-        )
-    return dict(parameters)
-
-
-def _correct_candidate_from_structrr_diff(
-    parameters: Mapping[str, Any],
-    *,
-    config: FeatureEndpointConfig,
-    worktree: Path,
-    runner: Runner,
-    output_root: Path,
-    branch: str,
-    slug: str,
-    state: dict[str, Any],
-    **_: Any,
-) -> dict[str, Any]:
-    """Use the existing coding-agent session for at most two focused repairs."""
-    review = parameters.get("review")
-    if not isinstance(review, Mapping):
-        raise PowdrrExecutionError("candidate correction has no structural review")
-    attempts = int(state.get("candidate_correction_attempts", 0))
-    if attempts >= config.max_repair_attempts:
-        return {"done": True, "review": dict(review)}
-
-    coverage_specs = _flow_items(
-        (review.get("instruction_coverage_worklist") or {}).get("specifications")
-        if isinstance(review.get("instruction_coverage_worklist"), Mapping)
-        else None
-    )
-    coverage_decisions = _flow_items(parameters.get("instruction_coverage_decisions"))
-    coverage_gaps = _instruction_coverage_gaps(coverage_specs, coverage_decisions)
-    structural_gaps = review.get("candidate_comparison_blockers", [])
-    behavior_probe_findings = _flow_items(review.get("behavior_probe_findings"))
-    if (
-        review.get("candidate_structural_gate_passed") is True
-        and not coverage_gaps
-        and not behavior_probe_findings
-    ):
-        return {"done": True, "review": dict(review), "attempts": attempts}
-
-    correction_items = [
-        *(f"Structrr comparison: {item}" for item in structural_gaps),
-        *(
-            "Instruction obligation "
-            f"{specification.get('clause_id')}: "
-            f"source instruction={_instruction_text(specification)}; "
-            f"acceptance criterion={specification.get('acceptance_criterion')}; "
-            f"evidence expectation={_coverage_expectation(specification)}; "
-            f"(review outcome: {decision.get('outcome')}; "
-            f"evidence assessment: {decision.get('explanation')})"
-            for specification, decision in coverage_gaps
-        ),
-        *(
-            "Instruction-derived test probe "
-            f"{finding.get('scenario_id')}: {finding.get('reason')}. Derive a "
-            "concrete setup, operation, and observable assertion from the source "
-            "instruction, then add and run a focused test."
-            for finding in behavior_probe_findings
-        ),
-    ]
-    prompt = (
-        "Correct the current feature implementation to address the reported gaps "
-        "against its accepted Structrr proposal and original instruction obligations. "
-        "Keep the existing coding-agent session and current worktree; preserve "
-        "correct changes and edit only the reported gaps. Do not re-plan or restart "
-        "the feature. Equivalent implementations and behavior already present in "
-        "the candidate do not need to be changed. After focused corrections, run "
-        "the relevant validation commands.\n\n"
-        f"Attempt {attempts + 1} of {config.max_repair_attempts}.\n"
-        f"Comparison artifact: {review.get('candidate_comparison_path', '')}\n"
-        f"Actual diff artifact: {review.get('actual_diff_path', '')}\n"
-        "Reported gaps:\n" + "\n".join(f"- {item}" for item in correction_items)
-    )
-    accepted_proposal = state.get("proposal_revision")
-    if not isinstance(accepted_proposal, ProposalRevision):
-        raise PowdrrExecutionError(
-            "candidate correction requires the accepted proposal revision"
-        )
-    state["candidate_correction_attempts"] = attempts + 1
-    _run_code_agent_phase(
-        config,
-        runner=runner,
-        worktree=worktree,
-        output_root=output_root / "candidate-corrections",
-        branch=branch,
-        slug=f"{slug}-structrr-correction-{attempts + 1}",
-        state=state,
-        parameters={
-            **_code_task_agent_parameters(state),
-            "repair_request": prompt,
-        },
-    )
-    profiles = state.get("validation_profiles", ())
-    validation_results = [
-        _run_validation_profile(
-            {"profile": {"name": profile.name, "command": list(profile.command)}},
-            worktree=worktree,
-            state=state,
-        )
-        for profile in profiles
-        if isinstance(profile, DiscoveredValidationProfile)
-    ]
-    validation = _aggregate_validation(
-        {"results": validation_results}, worktree=worktree, state=state
-    )
-    refreshed = _prepare_final_implementation_review(
-        {"validation": validation, "task_receipts": []},
-        worktree=worktree,
-        runner=runner,
-        output_root=output_root,
-        state=state,
-        config=config,
-    )
-    state["latest_candidate_review"] = refreshed
-    # Coverage is judged again from the refreshed worklist on the next loop
-    # iteration. Stop when both review routes pass or the repair budget is spent.
-    done = attempts + 1 >= config.max_repair_attempts
-    return {
-        "done": done,
-        "review": refreshed,
-        "attempts": attempts + 1,
-        "correction_reasons": correction_items,
-    }
-
-
-def _get_candidate_correction_review(state: Mapping[str, Any]) -> dict[str, Any]:
-    review = state.get("latest_candidate_review")
-    if not isinstance(review, Mapping):
-        raise PowdrrExecutionError("candidate correction did not produce a review")
-    return dict(review)
-
-
-def _start_candidate_correction(state: Mapping[str, Any]) -> dict[str, Any]:
-    """Initialize the bounded correction loop with the current candidate review."""
-    return {"done": False, "review": _get_candidate_correction_review(state)}
 
 
 def _candidate_structural_gate(
@@ -8590,9 +8427,6 @@ def _finalize_implementation_review(
     )
     if len(specifications) != len(semantic):
         raise PowdrrExecutionError("actualization decisions are incomplete")
-    correction_limit = review.get("candidate_correction_limit", 2)
-    if not isinstance(correction_limit, int) or isinstance(correction_limit, bool):
-        raise PowdrrExecutionError("candidate correction limit is malformed")
     if review.get("candidate_structural_gate_passed") is False:
         result["accepted"] = False
     source_agreement = review.get("source_design_agreement")
@@ -8723,10 +8557,6 @@ def _finalize_implementation_review(
         "reviewable_additions_by_path", []
     )
     result["validation_expectations"] = review.get("validation_expectations", [])
-    result["candidate_correction_attempts"] = int(
-        review.get("candidate_correction_attempts", 0)
-    )
-    result["candidate_correction_limit"] = correction_limit
     result["postrun_probe_generation"] = review.get(
         "postrun_probe_generation", {"status": "not_run"}
     )

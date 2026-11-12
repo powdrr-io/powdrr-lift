@@ -71,7 +71,6 @@ from powdrr_lift.workrr.feature_endpoint import (
     _compile_initial_worker_prompt,
     _compile_obligation_verification_plans,
     _compile_required_test_case_edits,
-    _correct_candidate_from_structrr_diff,
     _create_pr_changelog,
     _derive_feature_test_contracts,
     _ensure_current_baseline,
@@ -3179,8 +3178,9 @@ def test_feature_flow_is_shared_and_validated() -> None:
     assert "kind: verify_candidate_invariant" in flow
     assert "command: [prepare_final_implementation_review]" in flow
     assert "candidate_structural_gate_passed" in flow
-    assert "max_iterations: 2" in flow
-    assert "correct_candidate_from_structrr_diff" in flow
+    assert "correct_candidate_from_structrr_diff" not in flow
+    assert "start_candidate_correction" not in flow
+    assert "get_candidate_correction_review" not in flow
 
 
 @pytest.mark.parametrize(
@@ -3399,217 +3399,6 @@ def test_candidate_validation_expectations_do_not_require_test_file_changes() ->
     assert result[1]["id"] == "collection-atomicity"
 
 
-@pytest.mark.parametrize(
-    ("review_outcomes", "expected_agent_attempts", "repair_limit"),
-    [([True], 1, 2), ([False, False], 2, 2), ([False], 1, 1)],
-)
-def test_candidate_correction_obeys_configured_repair_limit(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    review_outcomes: list[bool],
-    expected_agent_attempts: int,
-    repair_limit: int,
-) -> None:
-    import powdrr_lift.workrr.feature_endpoint as endpoint
-
-    state: dict[str, Any] = {
-        "latest_candidate_review": {
-            "candidate_structural_gate_passed": False,
-            "candidate_comparison_blockers": ["missing proposed entity"],
-            "candidate_comparison_path": "comparison.json",
-            "actual_diff_path": "actual-diff.json",
-        },
-        "validation_profiles": (),
-        "proposal_revision": compile_proposal_revision(
-            "candidate-correction",
-            {},
-            {},
-            acceptance_criteria=(),
-            must_preserve=(),
-            non_goals=(),
-            allowed_paths=(),
-            source_refs=(),
-        ),
-        "code_task_agent_parameters": {
-            "baseline": str(tmp_path / "baseline.yaml"),
-            "plan": str(tmp_path / "structrr-diff.yaml"),
-            "feature_description": "Add the proposed entity.",
-            "work_item_name": "candidate-correction",
-            "proposal_review_receipt": str(tmp_path / "proposal-review.json"),
-            "obligations": {
-                "path": str(tmp_path / "obligations.json"),
-                "obligations": [{"description": "Add the proposed entity."}],
-            },
-        },
-    }
-    agent_attempts: list[dict[str, Any]] = []
-    agent_slugs: list[str] = []
-    generated_reviews = iter(review_outcomes)
-
-    def run_agent(*args: Any, **kwargs: Any) -> dict[str, Any]:
-        del args
-        agent_attempts.append(kwargs["parameters"])
-        agent_slugs.append(kwargs["slug"])
-        return {"attempt": {"status": "completed"}}
-
-    def prepare_review(*args: Any, **kwargs: Any) -> dict[str, Any]:
-        del args
-        passed = next(generated_reviews)
-        review = {
-            "candidate_structural_gate_passed": passed,
-            "candidate_comparison_blockers": [] if passed else ["still missing"],
-            "candidate_comparison_path": "comparison.json",
-            "actual_diff_path": "actual-diff.json",
-        }
-        kwargs["state"]["latest_candidate_review"] = review
-        return review
-
-    monkeypatch.setattr(endpoint, "_run_code_agent_phase", run_agent)
-    monkeypatch.setattr(
-        endpoint, "_aggregate_validation", lambda *a, **k: {"passed": True}
-    )
-    monkeypatch.setattr(
-        endpoint, "_prepare_final_implementation_review", prepare_review
-    )
-    config = FeatureEndpointConfig(
-        feature_description="Add the proposed entity.",
-        work_item_name="candidate-correction",
-        repo_root=tmp_path,
-        allowed_paths=("src",),
-        max_repair_attempts=repair_limit,
-    )
-
-    result: dict[str, Any] = {}
-    for _ in range(repair_limit):
-        result = _correct_candidate_from_structrr_diff(
-            {"review": state["latest_candidate_review"]},
-            config=config,
-            worktree=tmp_path,
-            runner=lambda *_args, **_kwargs: subprocess.CompletedProcess([], 0, "", ""),
-            output_root=tmp_path,
-            branch="feature",
-            slug="candidate-correction",
-            state=state,
-        )
-        if result["done"]:
-            break
-
-    assert len(agent_attempts) == expected_agent_attempts
-    assert agent_slugs == [
-        f"candidate-correction-structrr-correction-{index}"
-        for index in range(1, expected_agent_attempts + 1)
-    ]
-    assert result["done"] is True
-    assert result["review"]["candidate_structural_gate_passed"] is (review_outcomes[-1])
-
-
-def test_candidate_correction_repairs_unmet_instruction_after_structural_pass(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    import powdrr_lift.workrr.feature_endpoint as endpoint
-
-    specification = {
-        "clause_id": "clause-1",
-        "acceptance_criterion": "The command preserves both greetings.",
-        "obligation_evidence": {"normative_strength": "must"},
-    }
-    review = {
-        "candidate_structural_gate_passed": True,
-        "candidate_comparison_blockers": [],
-        "candidate_comparison_path": "comparison.json",
-        "actual_diff_path": "actual-diff.json",
-        "instruction_coverage_worklist": {"specifications": [specification]},
-        "behavior_probe_findings": [
-            {
-                "scenario_id": "scenario-1",
-                "reason": "probe failed: expected second greeting, observed none",
-            }
-        ],
-    }
-    state: dict[str, Any] = {
-        "latest_candidate_review": review,
-        "validation_profiles": (),
-        "proposal_revision": compile_proposal_revision(
-            "instruction-repair",
-            {},
-            {},
-            acceptance_criteria=(),
-            must_preserve=(),
-            non_goals=(),
-            allowed_paths=(),
-            source_refs=(),
-        ),
-        "code_task_agent_parameters": {
-            "baseline": str(tmp_path / "baseline.yaml"),
-            "plan": str(tmp_path / "structrr-diff.yaml"),
-            "feature_description": "Preserve both greetings.",
-            "work_item_name": "instruction-repair",
-            "proposal_review_receipt": str(tmp_path / "proposal-review.json"),
-            "obligations": {
-                "path": str(tmp_path / "obligations.json"),
-                "obligations": [{"description": "Preserve both greetings."}],
-            },
-        },
-    }
-    agent_calls: list[dict[str, Any]] = []
-    agent_slugs: list[str] = []
-
-    def run_agent(*args: Any, **kwargs: Any) -> dict[str, Any]:
-        del args
-        agent_calls.append(kwargs["parameters"])
-        agent_slugs.append(kwargs["slug"])
-        return {"attempt": {"status": "completed"}}
-
-    def prepare_review(*args: Any, **kwargs: Any) -> dict[str, Any]:
-        del args
-        refreshed = dict(review)
-        kwargs["state"]["latest_candidate_review"] = refreshed
-        return refreshed
-
-    monkeypatch.setattr(endpoint, "_run_code_agent_phase", run_agent)
-    monkeypatch.setattr(
-        endpoint, "_aggregate_validation", lambda *a, **k: {"passed": True}
-    )
-    monkeypatch.setattr(
-        endpoint, "_prepare_final_implementation_review", prepare_review
-    )
-
-    result = _correct_candidate_from_structrr_diff(
-        {
-            "review": review,
-            "instruction_coverage_decisions": [
-                {"outcome": "unmet", "explanation": "The second greeting is missing."}
-            ],
-        },
-        config=FeatureEndpointConfig(
-            feature_description="Preserve both greetings.",
-            work_item_name="instruction-repair",
-            repo_root=tmp_path,
-            allowed_paths=("src",),
-        ),
-        worktree=tmp_path,
-        runner=lambda *_args, **_kwargs: subprocess.CompletedProcess([], 0, "", ""),
-        output_root=tmp_path,
-        branch="feature",
-        slug="instruction-repair",
-        state=state,
-    )
-
-    assert len(agent_calls) == 1
-    assert agent_slugs == ["instruction-repair-structrr-correction-1"]
-    assert agent_calls[0]["baseline"] == str(tmp_path / "baseline.yaml")
-    assert agent_calls[0]["plan"] == str(tmp_path / "structrr-diff.yaml")
-    assert agent_calls[0]["proposal_review_receipt"] == str(
-        tmp_path / "proposal-review.json"
-    )
-    assert agent_calls[0]["obligations"]["obligations"]
-    assert "The command preserves both greetings." in agent_calls[0]["repair_request"]
-    assert "The second greeting is missing." in agent_calls[0]["repair_request"]
-    assert "scenario-1" in agent_calls[0]["repair_request"]
-    assert "expected second greeting, observed none" in agent_calls[0]["repair_request"]
-    assert result["done"] is False
-
-
 def test_code_agent_phase_revalidates_correction_against_accepted_proposal_id(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -3753,7 +3542,6 @@ def test_structural_comparison_mismatch_blocks_finalization_after_exhaustion(
         "proposal_fingerprint": "sha256:proposal",
         "diff_fingerprint": "sha256:candidate",
         "candidate_structural_gate_passed": False,
-        "candidate_correction_attempts": 2,
         "semantic_worklist": {
             "specifications": [
                 {
@@ -3783,7 +3571,7 @@ def test_structural_comparison_mismatch_blocks_finalization_after_exhaustion(
 
     assert result["accepted"] is False
     assert result["candidate_structural_gate_passed"] is False
-    assert result["candidate_correction_attempts"] == 2
+    assert "candidate_correction_attempts" not in result
     assert result["actualization_passed"] is False
 
 

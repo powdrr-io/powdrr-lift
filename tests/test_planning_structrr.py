@@ -1208,6 +1208,78 @@ def test_file_structural_change_scopes_planned_paths_to_assigned_units() -> None
         )
 
 
+def test_new_relationship_change_scopes_known_entities_to_identity_endpoints() -> None:
+    hashing_entity = "entity:python-module-hashing"
+    policy_entity = "entity:python-module-policy"
+    unrelated_entity = "entity:python-module-unrelated"
+    subject = BoundStructuralSubject(
+        "plan:plan-01:relationship:relationship-hashing-module-imports-from-policy-module:abc123",
+        "entity_relationships",
+        "item-0001",
+        "added",
+        ("req-01",),
+        ("unit-0001",),
+        ("anchor-01",),
+        True,
+        identity_description=(
+            "Relationship: hashing module imports from policy module"
+        ),
+    )
+    known_entity_ids = {
+        hashing_entity,
+        policy_entity,
+        unrelated_entity,
+        *(
+            f"plan:plan-01:entity:unrelated-module-{index:04d}"
+            for index in range(2_000)
+        ),
+    }
+    request = build_structural_change_request(
+        subject,
+        projected_baseline={"entities": [], "entity_relationships": [], "files": []},
+        taxonomy_entity_types=("Python module",),
+        planned_paths=set(),
+        known_entity_ids=known_entity_ids,
+        valid_example={"result": "unchanged", "reason": "Already satisfied."},
+    )
+
+    serialized_input = build_question_messages(request)[1]["content"]
+    identity_fact = next(
+        fact for fact in request.accepted_facts if fact.ref_id == "entity-identities"
+    )
+
+    assert len(serialized_input) < 24_000
+    assert set(identity_fact.value["ids"]) == {hashing_entity, policy_entity}
+    assert subject.identity_description is not None
+    assert subject.identity_description in serialized_input
+    request.parse_answer(
+        {
+            "result": "change",
+            "desired_content": {
+                "source": hashing_entity,
+                "target": policy_entity,
+                "relationship": "imports",
+            },
+            "reason": "The planned module imports from policy.",
+        }
+    )
+    with pytest.raises(
+        PlanningContractError,
+        match="relationship endpoints must be known projected entities",
+    ):
+        request.parse_answer(
+            {
+                "result": "change",
+                "desired_content": {
+                    "source": hashing_entity,
+                    "target": unrelated_entity,
+                    "relationship": "imports",
+                },
+                "reason": "Unrelated endpoint.",
+            }
+        )
+
+
 def test_structural_change_question_digest_binds_symbol_evidence() -> None:
     baseline = {
         "entities": [{"id": "entity:parse", "type": "Function", "name": "parse"}],
@@ -1637,6 +1709,26 @@ def test_file_subject_can_reference_projected_file_entity_id() -> None:
 
     assert len(page.records) == 1
     assert page.records[0].subject_id == "path::src/existing.py"
+
+
+def test_new_relationship_subject_retains_identity_description() -> None:
+    description = "Relationship: hashing module imports from policy module"
+    record = {
+        "section": "entity_relationships",
+        "subject_ref": None,
+        "new_identity_description": description,
+        "action": "added",
+        "requirement_ids": ["req-01"],
+        "unit_ids": ["unit-01"],
+        "source_refs": ["anchor-01"],
+    }
+
+    page = _parse_page(
+        _candidate_page([record], has_more=False, next_anchor=None),
+    )
+
+    assert len(page.records) == 1
+    assert page.records[0].identity_description == description
 
 
 @pytest.mark.parametrize("reference_prefix", ["path::", "file:"])

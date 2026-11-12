@@ -35,6 +35,23 @@ _SECTIONS = frozenset({"entities", "entity_relationships", "files"})
 _ACTIONS = frozenset({"added", "changed", "deleted", "removed"})
 _IDENTITY_FIELDS = frozenset({"id", "stable_key", "action", "operation_id", "item_id"})
 _SLUG = re.compile(r"[^a-z0-9]+")
+_RELATIONSHIP_DESCRIPTION_STOP_WORDS = frozenset(
+    {
+        "a",
+        "and",
+        "from",
+        "has",
+        "implements",
+        "import",
+        "imports",
+        "module",
+        "of",
+        "relationship",
+        "the",
+        "to",
+        "uses",
+    }
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -60,6 +77,7 @@ class BoundStructuralSubject:
     is_new: bool
     planned_path: str | None = None
     code_evidence: tuple[Mapping[str, Any], ...] = ()
+    identity_description: str | None = None
 
     def to_data(self) -> dict[str, Any]:
         data = {
@@ -75,6 +93,8 @@ class BoundStructuralSubject:
         }
         if self.code_evidence:
             data["code_evidence"] = [dict(item) for item in self.code_evidence]
+        if self.identity_description is not None:
+            data["identity_description"] = self.identity_description
         return data
 
 
@@ -148,6 +168,7 @@ def _merge_duplicate_planned_file_subject(
         existing.is_new,
         existing.planned_path,
         _merge_code_evidence(existing.code_evidence, duplicate.code_evidence),
+        existing.identity_description,
     )
 
 
@@ -163,6 +184,7 @@ def _merge_duplicate_subject_in_page(
         or existing.action != duplicate.action
         or existing.is_new != duplicate.is_new
         or existing.planned_path != duplicate.planned_path
+        or existing.identity_description != duplicate.identity_description
     ):
         return None
     return BoundStructuralSubject(
@@ -176,6 +198,7 @@ def _merge_duplicate_subject_in_page(
         existing.is_new,
         existing.planned_path,
         _merge_code_evidence(existing.code_evidence, duplicate.code_evidence),
+        existing.identity_description,
     )
 
 
@@ -190,6 +213,35 @@ def _merge_code_evidence(
         for item in collection
     }
     return tuple(unique[key] for key in sorted(unique))
+
+
+def _relationship_endpoint_terms(description: str | None) -> set[str]:
+    if not description:
+        return set()
+    return set(_SLUG.sub(" ", description.casefold()).split()) - set(
+        _RELATIONSHIP_DESCRIPTION_STOP_WORDS
+    )
+
+
+def _relationship_endpoint_entity_ids(
+    description: str | None, known_entity_ids: set[str]
+) -> set[str]:
+    terms = _relationship_endpoint_terms(description)
+    if not terms:
+        return set()
+    matching_ids = set()
+    for entity_id in known_entity_ids:
+        entity_identity = entity_id.casefold()
+        if ":entity:" in entity_identity:
+            entity_identity = entity_identity.rsplit(":entity:", 1)[1]
+        elif "entity:" in entity_identity:
+            entity_identity = entity_identity.rsplit("entity:", 1)[1]
+        elif "::" in entity_identity:
+            entity_identity = entity_identity.rsplit("::", 1)[1]
+        identity_terms = set(_SLUG.sub(" ", entity_identity).split())
+        if terms & identity_terms:
+            matching_ids.add(entity_id)
+    return matching_ids
 
 
 def coalesce_structural_subjects(
@@ -262,6 +314,7 @@ def parse_structural_subject_page(
             raw["new_identity_description"],
             f"{pointer}/new_identity_description",
         )
+        identity_description = new_description if section != "files" else None
         if (subject_ref is None) == (new_description is None):
             raise PlanningContractError(
                 pointer,
@@ -413,6 +466,7 @@ def parse_structural_subject_page(
                     refs,
                     is_new,
                     planned_path,
+                    identity_description=identity_description,
                 ),
             )
             if merged is None:
@@ -434,6 +488,7 @@ def parse_structural_subject_page(
                 refs,
                 is_new,
                 planned_path,
+                identity_description=identity_description,
             )
         )
     has_more = value["has_more"]
@@ -998,14 +1053,24 @@ def build_structural_change_request(
     baseline_index = baseline_index or index_structural_baseline(projected_baseline)
     baseline_digest = baseline_digest or baseline_index.fingerprint
     relevant_entity_ids = known_entity_ids
-    if subject.section == "entity_relationships" and not subject.is_new:
-        relationship = baseline_index.relationships_by_id.get(subject.subject_id)
-        if relationship is not None:
-            relevant_entity_ids = {
-                value
-                for value in (relationship.get("source"), relationship.get("target"))
-                if isinstance(value, str)
-            }
+    if subject.section == "entity_relationships":
+        if not subject.is_new:
+            relationship = baseline_index.relationships_by_id.get(subject.subject_id)
+            if relationship is not None:
+                relevant_entity_ids = {
+                    value
+                    for value in (
+                        relationship.get("source"),
+                        relationship.get("target"),
+                    )
+                    if isinstance(value, str)
+                }
+        else:
+            described_entity_ids = _relationship_endpoint_entity_ids(
+                subject.identity_description, known_entity_ids
+            )
+            if described_entity_ids:
+                relevant_entity_ids = described_entity_ids
     excerpts = _source_excerpts(source, subject.source_refs) if source else ()
     relevant_planned_paths = planned_paths
     if subject.section == "files":
@@ -1089,7 +1154,7 @@ def build_structural_change_request(
                     if subject.section == "files"
                     else [],
                     "entity_ids": (
-                        sorted(known_entity_ids)
+                        sorted(relevant_entity_ids)
                         if subject.section == "entity_relationships"
                         else []
                     ),
@@ -1109,6 +1174,12 @@ def build_structural_change_request(
             "characters; "
             "do not include deliberation. Do not return IDs, action, item assignment, "
             "operation ID, or another subject."
+            + (
+                " For a new relationship, use the supplied identity description to "
+                "select endpoints only from the matching known entity IDs."
+                if subject.section == "entity_relationships" and subject.is_new
+                else ""
+            )
         ),
         answer_field_definitions={
             "result": "unchanged or change.",

@@ -1,0 +1,65 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1450
+title: Report validation discovery in Structrr CLI summary
+intent:
+  problem: Structrr bootstrap JSON summaries omit validation discovery completeness, check counts, unresolved items, and whether probes ran.
+  goal: Add consistent validation discovery metadata to service-backed and legacy Structrr bootstrap summaries while preserving existing fields.
+human-decisions: []
+structured_files: []
+files:
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 5550
+    end_line: 5550
+  summary: Add discovery summary metadata to the service-backed Structrr JSON summary.
+  rationale: Report the validation inventory and probe mode alongside existing snapshot counts.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 5578
+    end_line: 5603
+  summary: Derive validation check count, discovery status and completeness, unresolved count, and probe mode from the Structrr document.
+  rationale: Keep summary metadata consistent across the service-backed and legacy CLI paths.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 5628
+    end_line: 5628
+  summary: Add discovery summary metadata to the legacy Structrr JSON summary.
+  rationale: Preserve the same JSON contract when callers use explicit out-of-repository paths.
+- path: tests/test_cli.py
+  type: modified
+  span:
+    start_line: 543
+    end_line: 544
+  summary: Assert the JSON summary retains existing fields and reports partial discovery, zero checks, unresolved diagnostics, and probes not run.
+  rationale: Lock down the snapshot-only CLI summary contract for repositories with limited discovery.
+- path: tests/test_cli.py
+  type: modified
+  span:
+    start_line: 546
+    end_line: 546
+  summary: Assert the JSON summary identifies that probes were not run.
+  rationale: Keep the snapshot-only probe state explicit in machine-readable output.
+- path: tests/test_cli.py
+  type: modified
+  span:
+    start_line: 551
+    end_line: 552
+  summary: Assert unresolved and validation check counts in the JSON summary.
+  rationale: Prevent regressions in the summary counts exposed to CLI consumers.
+- path: tests/test_agent_service_repository_capabilities.py
+  type: modified
+  span:
+    start_line: 99
+    end_line: 108
+  summary: Compare service-backed CLI summary metadata with the generated validation context and inventory.
+  rationale: Verify the summary counts reflect the exact discovery artifact emitted by the service path.
+entities:
+- id: bootstrap-validation-summary
+  type: Function
+  action: added
+entity_relationships: []
+invariants: []
+guidance: []

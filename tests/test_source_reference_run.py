@@ -504,3 +504,27 @@ def test_post_worker_reconciliation_rejects_product_ast_changes(
 
     with pytest.raises(ValueError, match="changed Python product syntax"):
         run.reconcile_after_worker()
+
+
+def test_post_worker_reconciliation_blocks_and_preserves_blocked_receipt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def reconcile(_run: SourceReferenceRun) -> dict[str, str]:
+        return {"status": "blocked", "reason": "conflicting accepted placement"}
+
+    run = prepare(
+        tmp_path,
+        monkeypatch,
+        run_id="blocked-reconcile",
+        post_worker_reconciler=reconcile,
+    )
+    (run.workspace_root / "retry.py").write_text(CANDIDATE)
+    run._candidate_after_worker = run._candidate_state()
+
+    with pytest.raises(ValueError, match="reconciliation did not pass"):
+        run.reconcile_after_worker()
+
+    assert run.reconciliation == {
+        "status": "blocked",
+        "reason": "conflicting accepted placement",
+    }

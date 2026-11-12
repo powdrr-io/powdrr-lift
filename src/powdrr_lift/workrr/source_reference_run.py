@@ -793,18 +793,26 @@ class SourceReferenceRun:
         self.verify_candidate()
         before = self._python_ast_snapshot()
         receipt = self._post_worker_reconciler(self)
-        after = self._python_ast_snapshot()
-        if before != after:
-            raise SourceRunFailure(
-                "policy_violation",
-                "Post-worker reconciliation changed Python product syntax",
-            )
         if receipt is not None and not isinstance(receipt, Mapping):
             raise SourceRunFailure(
                 "invalid_reconciliation",
                 "Post-worker reconciler must return a structured receipt",
             )
         self.reconciliation = dict(receipt) if receipt is not None else None
+        after = self._python_ast_snapshot()
+        if before != after:
+            raise SourceRunFailure(
+                "policy_violation",
+                "Post-worker reconciliation changed Python product syntax",
+            )
+        if (
+            self.reconciliation is not None
+            and self.reconciliation.get("status") != "passed"
+        ):
+            raise SourceRunFailure(
+                "source_reconciliation_blocked",
+                "Source-reference reconciliation did not pass",
+            )
         self._candidate_after_worker = self._candidate_state()
 
     def _python_ast_snapshot(self) -> dict[str, str]:
@@ -903,6 +911,7 @@ class SourceReferenceRun:
             )
             result["error"] = str(error)
         finally:
+            result["reconciliation"] = self.reconciliation
             result["attempt"] = result["attempt"] or (
                 self._last_attempt.to_data() if self._last_attempt else None
             )

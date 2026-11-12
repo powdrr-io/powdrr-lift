@@ -194,7 +194,6 @@ from powdrr_lift.openai_proxy import (
 )
 from powdrr_lift.process.tasks import (
     HumanRole,
-    WorkflowInstance,
     validate_workflow_task_directory,
 )
 from powdrr_lift.process.templates import (
@@ -218,19 +217,7 @@ from powdrr_lift.structrr.intent import (
 )
 from powdrr_lift.workrr.chat_config import WorkflowChatConfig
 from powdrr_lift.workrr.chat_tui import run_workflow_chat_tui
-from powdrr_lift.workrr.coding_agent import (
-    CodingAgentAttemptStore,
-    CodingAgentRunner,
-    CodingAgentStatus,
-    ImplementationRequest,
-    OpenCodePermissionPolicy,
-    build_coding_agent_provider,
-)
-from powdrr_lift.workrr.coding_agent_validation import (
-    ValidationReportStatus,
-    ValidationRunner,
-    parse_validation_profile,
-)
+from powdrr_lift.workrr.coding_agent import ImplementationRequest
 from powdrr_lift.workrr.credential_check import (
     check_coding_executable,
     check_decision_provider_access,
@@ -380,29 +367,6 @@ def build_parser() -> argparse.ArgumentParser:
     ci_response_parser.add_argument("--pr", type=int)
     ci_response_parser.add_argument("--pr-url")
     ci_response_parser.add_argument("--issue", type=int, required=True)
-    ci_response_parser.add_argument(
-        "--provider", choices=["auto", *ALL_PROVIDERS], default="deepinfra-cheap"
-    )
-    ci_response_parser.add_argument("--api-key")
-    ci_response_parser.add_argument("--base-url")
-    ci_response_parser.add_argument("--max-roundtrips", type=int, default=128)
-    ci_response_parser.add_argument(
-        "--context-compaction-threshold", type=float, default=0.75
-    )
-    ci_response_parser.add_argument("--minisweagent-executable", default="mini")
-    ci_response_parser.add_argument(
-        "--minisweagent-model",
-        default="deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731",
-    )
-    ci_response_parser.add_argument(
-        "--coding-agent-timeout-seconds", type=float, default=1800.0
-    )
-    ci_response_parser.add_argument("--verbose", action="store_true")
-    ci_response_parser.add_argument(
-        "--observe-only",
-        action="store_true",
-        help="Record CI evidence without launching the repair workflow.",
-    )
     ci_response_parser.add_argument(
         "--verification-command",
         help="Run the task's declared verification command at the exact PR head.",
@@ -2596,70 +2560,6 @@ def build_parser() -> argparse.ArgumentParser:
     )
     request_parser.set_defaults(func=_run_compile_implementation_request)
 
-    coding_agent_parser = subparsers.add_parser(
-        "run-coding-agent",
-        aliases=["run_coding_agent"],
-        help="Run one bounded external coding-agent implementation attempt.",
-    )
-    coding_agent_parser.add_argument(
-        "--request",
-        type=Path,
-        required=True,
-        help="Implementation request JSON produced from a validated execution unit.",
-    )
-    coding_agent_parser.add_argument(
-        "--worktree",
-        type=Path,
-        required=True,
-        help="Clean dedicated worktree in which the worker may edit.",
-    )
-    coding_agent_parser.add_argument(
-        "--output-dir",
-        type=Path,
-        required=True,
-        help="Directory for persisted request and attempt artifacts.",
-    )
-    coding_agent_parser.add_argument("--attempt-id", required=True)
-    coding_agent_parser.add_argument(
-        "--validation-profile",
-        action="append",
-        default=[],
-        metavar="NAME=COMMAND",
-        help="Registered validation profile, repeatable; COMMAND is parsed as argv.",
-    )
-    coding_agent_parser.add_argument(
-        "--opencode-executable",
-        default="opencode",
-        help="OpenCode executable name or path.",
-    )
-    coding_agent_parser.add_argument(
-        "--opencode-model",
-        help=(
-            "OpenCode model reference in provider/model form, for example "
-            "deepinfra/deepseek-flash."
-        ),
-    )
-    coding_agent_parser.add_argument(
-        "--code-agent", choices=("opencode", "minisweagent"), default="minisweagent"
-    )
-    coding_agent_parser.add_argument("--minisweagent-executable", default="mini")
-    coding_agent_parser.add_argument(
-        "--minisweagent-model",
-        default="deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731",
-    )
-    coding_agent_parser.add_argument("--code-agent-prompt-prefix", default="")
-    coding_agent_parser.add_argument("--code-agent-prompt-suffix", default="")
-    coding_agent_parser.add_argument(
-        "--timeout-seconds",
-        type=float,
-        default=300.0,
-        help="Maximum seconds without Procedrr or code-agent activity (default: 300).",
-    )
-    coding_agent_parser.add_argument(
-        "--validation-timeout-seconds", type=float, default=600.0
-    )
-    coding_agent_parser.set_defaults(func=_run_coding_agent)
-
     workflow_recovery_parser = subparsers.add_parser(
         "workflow-recovery",
         aliases=["workflow_recovery"],
@@ -3211,17 +3111,13 @@ def _run_respond_to_pr_ci(args: argparse.Namespace) -> int:
                 for item in failures
             ],
         }
-        if not getattr(args, "observe_only", False):
-            result["repair_workflow"] = _launch_ci_repair_workflow(
-                args=args,
-                client=client,
-                issue=issue,
-                prior_comments=prior,
-                observation=result,
-                head_sha=head_sha,
-                clone_root=clone_root,
-                worker_root=worker_root,
-            )
+        result["repair_workflow"] = {
+            "status": "unsupported",
+            "message": (
+                "Legacy CI repair code-writing is unsupported; CI failure "
+                "observation was recorded without invoking a coding worker"
+            ),
+        }
     except (
         GitHubActionsError,
         GitHubIssueQueueError,
@@ -3234,289 +3130,6 @@ def _run_respond_to_pr_ci(args: argparse.Namespace) -> int:
         return 2
     print(json.dumps(result, indent=2))
     return 0
-
-
-def _launch_ci_repair_workflow(
-    *,
-    args: argparse.Namespace,
-    client: Any,
-    issue: Mapping[str, Any],
-    prior_comments: Sequence[Mapping[str, Any]],
-    observation: Mapping[str, Any],
-    head_sha: str,
-    clone_root: Path,
-    worker_root: Path,
-) -> dict[str, Any]:
-    """Create and run a durable Procedrr CI repair task from this CLI command."""
-    from powdrr_lift.workrr.github_issue_queue import (
-        load_reviewed_plan_at_commit,
-        parse_issue_pointer,
-    )
-
-    issue_body = issue.get("body")
-    pointer = parse_issue_pointer(issue_body) if isinstance(issue_body, str) else None
-    if pointer is None:
-        raise GitHubActionsError(
-            f"issue #{args.issue} does not contain a Powdrr plan pointer; "
-            "cannot derive the implementation context for CI repair"
-        )
-
-    root = clone_root.parent
-
-    plan = load_reviewed_plan_at_commit(
-        pointer["plan_path"], pointer["plan_commit"], repo_root=worker_root
-    )
-    item = next(
-        (
-            candidate
-            for candidate in plan.items
-            if candidate.item_id == pointer["item_id"]
-        ),
-        None,
-    )
-    if item is None:
-        raise GitHubActionsError(
-            f"pinned plan {plan.plan_id!r} has no item {pointer['item_id']!r}"
-        )
-    implementation_context = {
-        "plan_id": plan.plan_id,
-        "item_id": item.item_id,
-        "title": item.title,
-        "objective": item.objective,
-        "scope": list(item.scope),
-        "allowed_paths": list(item.allowed_paths),
-        "implementation_steps": list(item.implementation_steps),
-        "acceptance_criteria": list(item.acceptance_criteria),
-        "dependencies": list(item.dependencies),
-    }
-    verification_command = getattr(args, "verification_command", None)
-    if not isinstance(verification_command, str) or not verification_command.strip():
-        verification_command = ""
-        workflow_path = item.workflow_file
-        if workflow_path:
-            workflow_file = worker_root / workflow_path
-            try:
-                workflow_definition = yaml.safe_load(
-                    workflow_file.read_text(encoding="utf-8")
-                )
-            except (OSError, yaml.YAMLError):
-                workflow_definition = None
-            inputs = (
-                workflow_definition.get("inputs")
-                if isinstance(workflow_definition, Mapping)
-                else None
-            )
-            context = (
-                inputs.get("proposed_pr_context")
-                if isinstance(inputs, Mapping)
-                else None
-            )
-            if isinstance(context, Mapping) and isinstance(
-                context.get("verification_command"), str
-            ):
-                verification_command = context["verification_command"]
-    if not verification_command:
-        raise GitHubActionsError(
-            "the pinned plan workflow does not declare a verification command; "
-            "provide --verification-command"
-        )
-
-    workflow_id = f"ci-response-pr-{observation['pull_request']}-{head_sha[:12]}"
-    pr_url = f"https://github.com/{args.repository}/pull/{observation['pull_request']}"
-    workflow_output = root / "workflow"
-    workflow_dir = workflow_output / slugify_workflow_id(workflow_id)
-    if workflow_dir.is_dir() and any(workflow_dir.glob("*.yaml")):
-        tasks = WorkflowInstance.from_directory(workflow_dir).tasks
-        if len(tasks) != 1 or tasks[0].process_id != "run-ci-repair-from-observation":
-            raise GitHubActionsError(
-                f"existing CI response workflow is malformed: {workflow_dir}"
-            )
-    else:
-        workflow_dir, tasks = instantiate_procedrr_process_workflow(
-            process_id="run-ci-repair-from-observation",
-            process_directory=bundled_process_directory(),
-            input_state={
-                "ci_observation_result": dict(observation),
-                "pull_request_url": pr_url,
-                "implementation_context": implementation_context,
-                "verification_command": verification_command,
-            },
-            work_item_name=workflow_id,
-            workflow_instance_name=workflow_id,
-            output_root=workflow_output,
-        )
-    task = tasks[0]
-    prior_bodies = [
-        str(comment.get("body", ""))
-        for comment in prior_comments
-        if isinstance(comment, Mapping)
-    ]
-    run_prefix = f"<!-- powdrr-ci-response-run:{workflow_id}:"
-    attempt_statuses: dict[int, str] = {}
-    for body in prior_bodies:
-        match = re.search(re.escape(run_prefix) + r"([0-9]+) -->", body)
-        if match is None:
-            continue
-        try:
-            payload_text = body.split("```json\n", 1)[1].split("\n```", 1)[0]
-            prior_payload = json.loads(payload_text)
-        except (IndexError, json.JSONDecodeError):
-            continue
-        status = (
-            prior_payload.get("status") if isinstance(prior_payload, Mapping) else None
-        )
-        if isinstance(status, str):
-            attempt_statuses[int(match.group(1))] = status
-    for previous_attempt, status in attempt_statuses.items():
-        if status == "running":
-            interrupted_marker = f"{run_prefix}{previous_attempt} -->"
-            interrupted_payload = {
-                "workflow_id": workflow_id,
-                "task_id": task.task_id,
-                "process_id": "run-ci-repair-from-observation",
-                "attempt": previous_attempt,
-                "status": "interrupted",
-                "head_sha": head_sha,
-                "detail": (
-                    "The previous CLI invocation ended without a terminal checkpoint."
-                ),
-            }
-            client.add_issue_comment(
-                args.issue,
-                interrupted_marker
-                + "\n```json\n"
-                + json.dumps(interrupted_payload, indent=2, sort_keys=True)
-                + "\n```",
-            )
-    attempt_number = max(attempt_statuses, default=0) + 1
-    run_marker = f"{run_prefix}{attempt_number} -->"
-    run_payload = {
-        "workflow_id": workflow_id,
-        "task_id": task.task_id,
-        "process_id": "run-ci-repair-from-observation",
-        "attempt": attempt_number,
-        "status": "running",
-        "head_sha": head_sha,
-    }
-    run_comment = (
-        run_marker
-        + "\n```json\n"
-        + json.dumps(run_payload, indent=2, sort_keys=True)
-        + "\n```"
-    )
-    client.add_issue_comment(args.issue, run_comment)
-
-    def checkpoint_callback(
-        task_id: str, output_state_type: str, output_state: Any, commit_sha: str | None
-    ) -> None:
-        marker = (
-            f"<!-- powdrr-ci-response-checkpoint:{workflow_id}:"
-            f"{attempt_number}:{task_id} -->"
-        )
-        payload = {
-            "workflow_id": workflow_id,
-            "task_id": task_id,
-            "attempt": attempt_number,
-            "status": output_state_type,
-            "output_state": output_state,
-            "commit_sha": commit_sha,
-            "head_sha": head_sha,
-        }
-        body = (
-            marker
-            + "\n```json\n"
-            + json.dumps(payload, indent=2, sort_keys=True)
-            + "\n```"
-        )
-        if not any(str(comment.get("body", "")) == body for comment in prior_comments):
-            client.add_issue_comment(args.issue, body)
-
-    from powdrr_lift.workrr.task_agent import WorkflowTaskAgentConfig, run_workflow_task
-
-    try:
-        exit_code = run_workflow_task(
-            WorkflowTaskAgentConfig(
-                workflow_dir=workflow_dir,
-                repo_root=worker_root,
-                provider=getattr(args, "provider", "deepinfra-cheap"),
-                workflow_id=workflow_id,
-                task_id=task.task_id,
-                api_key=getattr(args, "api_key", None),
-                base_url=getattr(args, "base_url", None),
-                max_roundtrips=getattr(args, "max_roundtrips", 128),
-                context_compaction_threshold=getattr(
-                    args, "context_compaction_threshold", 0.75
-                ),
-                verbose=getattr(args, "verbose", False),
-                minisweagent_executable=getattr(
-                    args, "minisweagent_executable", "mini"
-                ),
-                minisweagent_model=getattr(
-                    args,
-                    "minisweagent_model",
-                    "deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731",
-                ),
-                coding_agent_timeout_seconds=getattr(
-                    args, "coding_agent_timeout_seconds", 1800.0
-                ),
-                allow_unmanaged_git=True,
-                publish_workflow_progress=False,
-                resume_locked_task=True,
-                task_checkpoint_callback=checkpoint_callback,
-                github_issue_number=args.issue,
-                github_repository=args.repository,
-            ),
-            stdout=sys.stdout,
-            stderr=sys.stderr,
-        )
-    except Exception as error:
-        failure_payload = {
-            **run_payload,
-            "status": "failed",
-            "failure": f"{type(error).__name__}: {error}",
-        }
-        client.add_issue_comment(
-            args.issue,
-            run_marker
-            + "\n```json\n"
-            + json.dumps(failure_payload, indent=2, sort_keys=True)
-            + "\n```",
-        )
-        raise
-    manifest_path = worker_root / ".powdrr" / "procedrr-runs" / f"{task.task_id}.json"
-    try:
-        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        manifest = {}
-    terminal_status = manifest.get("status") if isinstance(manifest, Mapping) else None
-    final_status = (
-        terminal_status
-        if isinstance(terminal_status, str)
-        else ("completed" if exit_code == 0 else "failed")
-    )
-    final_payload = {
-        **run_payload,
-        "status": final_status,
-        "exit_code": exit_code,
-    }
-    failure = manifest.get("failure") if isinstance(manifest, Mapping) else None
-    if isinstance(failure, str):
-        final_payload["failure"] = failure
-    client.add_issue_comment(
-        args.issue,
-        run_marker
-        + "\n```json\n"
-        + json.dumps(final_payload, indent=2, sort_keys=True)
-        + "\n```",
-    )
-    return {
-        "workflow_id": workflow_id,
-        "task_id": task.task_id,
-        "workflow_directory": str(workflow_dir),
-        "worktree": str(worker_root),
-        "exit_code": exit_code,
-        "status": final_status,
-    }
 
 
 def _prepare_ci_response_worktree(
@@ -4559,51 +4172,6 @@ def _run_compile_execution_plan(args: argparse.Namespace) -> int:
         )
     )
     return 0
-
-
-def _run_coding_agent(args: argparse.Namespace) -> int:
-    request_data = _load_structured_mapping(args.request)
-    request = ImplementationRequest.from_data(request_data)
-    try:
-        provider = build_coding_agent_provider(
-            args.code_agent,
-            opencode_executable=args.opencode_executable,
-            opencode_model=args.opencode_model,
-            minisweagent_executable=args.minisweagent_executable,
-            minisweagent_model=args.minisweagent_model,
-            timeout_seconds=args.timeout_seconds,
-            diagnostics_root=args.output_dir / args.code_agent,
-            prompt_prefix=args.code_agent_prompt_prefix,
-            prompt_suffix=args.code_agent_prompt_suffix,
-            permission_policy=OpenCodePermissionPolicy(request.allowed_commands),
-        )
-    except ValueError as error:
-        raise SystemExit(str(error)) from error
-    runner = CodingAgentRunner(
-        provider=provider,
-        store=CodingAgentAttemptStore(args.output_dir),
-    )
-    store = runner.store
-    attempt = runner.run(
-        request,
-        worktree_root=args.worktree,
-        attempt_id=args.attempt_id,
-    )
-    profiles = {}
-    for value in args.validation_profile:
-        profile = parse_validation_profile(value)
-        profiles[profile.name] = profile
-    validation = ValidationRunner(
-        profiles, timeout_seconds=args.validation_timeout_seconds
-    ).run(request, attempt, worktree_root=args.worktree)
-    store.save_validation_report(validation)
-    output = attempt.to_data()
-    output["validation"] = validation.to_data()
-    print(json.dumps(output, indent=2, sort_keys=True))
-    return int(
-        attempt.status is not CodingAgentStatus.COMPLETED
-        or validation.status is not ValidationReportStatus.PASSED
-    )
 
 
 def _run_compile_structrr_handoff(args: argparse.Namespace) -> int:

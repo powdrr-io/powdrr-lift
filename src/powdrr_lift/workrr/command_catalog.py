@@ -3342,22 +3342,15 @@ class FeatureCommandRuntime:
                 parameters, state=state
             )
         if name == "run_code_agent":
-            result = feature_endpoint._run_code_agent_phase(
-                config,
-                runner=runner,
-                worktree=worktree,
-                output_root=output_root,
-                branch=branch,
-                slug=slug,
-                state=state,
-                parameters=parameters,
+            raise PowdrrExecutionError(
+                "Legacy feature endpoint code-writing is unsupported; code changes "
+                "require a reviewed source-reference design"
             )
-            _persist_worker_uncertainty_events(
-                result,
-                state=state,
-                uncertainty_policy=uncertainty_policy(),
+        if name in {"run_code_task_agent", "correct_candidate_from_structrr_diff"}:
+            raise PowdrrExecutionError(
+                "Legacy feature endpoint code-writing is unsupported; code changes "
+                "require a reviewed source-reference design"
             )
-            return result
         if name in {
             "compile_obligation_verification_plans",
             "resolve_obligation_populations",
@@ -3384,17 +3377,6 @@ class FeatureCommandRuntime:
             if name == "prepare_final_implementation_review":
                 state["latest_candidate_review"] = result
             return result
-        if name == "correct_candidate_from_structrr_diff":
-            return feature_endpoint._correct_candidate_from_structrr_diff(
-                parameters,
-                config=config,
-                runner=runner,
-                worktree=worktree,
-                output_root=output_root,
-                branch=branch,
-                slug=slug,
-                state=state,
-            )
         if name == "get_candidate_correction_review":
             return feature_endpoint._get_candidate_correction_review(state)
         if name == "start_candidate_correction":

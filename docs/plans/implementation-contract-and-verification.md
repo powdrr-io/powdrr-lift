@@ -39,7 +39,7 @@ new models, a new test-generation pipeline, or benchmark-specific product rules.
 | Metadata reconciliation | `SourceReferenceRun.reconcile_after_worker` accepts a trusted reconciliation receipt, verifies the candidate, compares Python AST snapshots, and rejects product syntax changes. | Reconciliation must preserve frozen authority and separately identify corrected metadata. |
 | Story evidence | Service `verification/story_execution.py` compiles receipts and coverage reports. Dispatch authors and freezes story tests, executes protected checks, and requires verified pinned coverage before patch transfer. | The observer uses the pytest adapter; other frameworks and unsupported environments block. |
 | Retained intent and verification models | Service `structrr/verification_contract.py`, `verification_obligations.py`, `verification_health.py`, `obligation_evidence.py`, and `invariant_review.py` provide contracts and freshness/review machinery. | Their existence does not prove that every production entry point invokes every applicable gate. |
-| Attempt-local progress and scope | `workrr/coding_agent.py::run_coding_agent` compares before/after snapshots, detects protected/out-of-scope edits and rewritten history, and records attempt status. | The same module still exposes OpenCode, recovery, execution-unit requests, and repair prompts. Legacy flows remain active. |
+| Attempt-local progress and scope | `workrr/coding_agent.py::run_coding_agent` compares before/after snapshots, detects protected/out-of-scope edits and rewritten history, and records attempt status. | The issue-worker generic fallback is rejected; feature endpoint and CI repair entry points are being removed or rejected. Private legacy helpers remain and must not be confused with the protected boundary. |
 | Accepted patch transfer | Protected dispatch checks candidate identity, exports and checks the patch, and rejects conflicting caller state before application. | Temporary run artifacts are not a permanent audit store. |
 
 Regression evidence includes `tests/test_source_reference_dispatch.py`,
@@ -70,10 +70,13 @@ unreachable. The matrix records any retained non-implementation workflow path.
 Initial route audit: [implementation-route-matrix.md](implementation-route-matrix.md).
 It records the current issue-worker selector and the legacy routes slated for
 removal or explicit rejection, plus feature, CI repair, CLI, and Harbor/Pier
-delegation paths. The existing source-reference selector fixture proves
-protected dispatch and fail-closed handling for missing reviewed authority.
-Cross-entry-point route fixtures and legacy-route removal are required before
-this milestone meets its acceptance criteria.
+delegation paths. The issue-worker generic fallback is now rejected, the
+feature endpoint's code-writing task body was removed and its command entry
+points reject, CI repair mode rejects and its provider method/CLI launcher were
+removed, and the standalone generic coding-agent CLI was removed. CI
+observation remains without auto-repair. Cross-entry-point route fixtures and
+pruning the still-registered historical CI service process declarations remain
+before this milestone meets its acceptance criteria.
 
 ### 2. Compile one complete, source-backed obligation closure
 

@@ -142,7 +142,6 @@ from powdrr_lift.workrr.coding_agent import (
     DEFAULT_CODING_AGENT_VALIDATION_TIMEOUT_SECONDS,
     CodingAgentAttempt,
     CodingAgentAttemptStore,
-    CodingAgentRecoveryDecision,
     CodingAgentRunner,
     CodingAgentStatus,
     ImplementationRequest,
@@ -150,7 +149,6 @@ from powdrr_lift.workrr.coding_agent import (
     OpenCodePermissionPolicy,
     OpenCodeProvider,
     build_coding_agent_provider,
-    run_coding_agent_recovery,
 )
 from powdrr_lift.workrr.coding_agent_validation import (
     ValidationProfile,
@@ -7453,184 +7451,11 @@ def _capture_code_task_before_state(
     return {"path": path, "fingerprint": fingerprint, **document}
 
 
-def _run_code_task_agent(
-    parameters: Mapping[str, Any],
-    *,
-    config: Any,
-    runner: Runner,
-    worktree: Path,
-    output_root: Path,
-    branch: str,
-    slug: str,
-    state: dict[str, Any],
-    **_: Any,
-) -> dict[str, Any]:
-    task = parameters.get("task")
-    forwarded = dict(parameters)
-    forwarded.setdefault("baseline", str(state.get("baseline_path", "")))
-    forwarded.setdefault("plan", str(state.get("plan_path", "")))
-    forwarded.setdefault("feature_description", config.feature_description)
-    forwarded.setdefault("work_item_name", config.work_item_name)
-    forwarded.setdefault(
-        "proposal_review_receipt", str(state.get("proposal_review_receipt_path", ""))
+def _run_code_task_agent(*_args: Any, **_kwargs: Any) -> dict[str, Any]:
+    raise PowdrrExecutionError(
+        "Legacy feature endpoint code-writing is unsupported; code changes require "
+        "a reviewed source-reference design"
     )
-    canonical_path = state.get("canonical_feature_design_path")
-    if "obligations" not in forwarded and isinstance(canonical_path, Path):
-        try:
-            canonical = json.loads(canonical_path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError) as error:
-            raise PowdrrExecutionError(
-                f"canonical feature design cannot be loaded for code task: {error}"
-            ) from error
-        if isinstance(canonical, Mapping):
-            obligations = canonical.get("obligations")
-            if (
-                not isinstance(obligations, list)
-                or not obligations
-                or any(not isinstance(item, Mapping) for item in obligations)
-            ):
-                raise PowdrrExecutionError(
-                    "canonical feature design has no valid obligations for code task"
-                )
-            forwarded["obligations"] = {
-                "path": str(canonical_path),
-                "obligations": obligations,
-            }
-    compilation = state.get("verification_obligations")
-    if "obligations" not in forwarded and isinstance(
-        compilation, VerificationObligationCompilation
-    ):
-        forwarded["obligations"] = {
-            "path": str(state.get("feature_obligations_path", "")),
-            "obligations": [item.to_data() for item in compilation.obligations],
-        }
-    if isinstance(task, Mapping):
-        forwarded.setdefault(
-            "obligations",
-            {"obligations": [{"description": task.get("objective", "")}], "path": ""},
-        )
-    # Keep the fully resolved implementation inputs so the later bounded
-    # candidate-correction phase can resume the same task with a tailored
-    # repair request. Passing only `repair_request` to _run_code_agent_phase
-    # loses the baseline, plan, obligations, and proposal receipt bindings.
-    state["code_task_agent_parameters"] = dict(forwarded)
-
-    # A provider timeout is not a completed coding task.  It also must not
-    # discard useful partial edits: the next session needs to inspect the
-    # current tree and continue from the actual failure.  Keep this recovery
-    # local to the coding-task operation so Procedrr can still make one
-    # bounded decision about the resulting receipt.
-    def run_attempt(
-        attempt_number: int, recovery_issue: Mapping[str, Any] | None
-    ) -> dict[str, Any]:
-        del attempt_number
-        current_parameters = dict(forwarded)
-        if recovery_issue is not None:
-            current_parameters["repair_issue"] = dict(recovery_issue)
-        return _run_code_agent_phase(
-            config,
-            runner=runner,
-            worktree=worktree,
-            output_root=output_root,
-            branch=branch,
-            slug=slug,
-            state=state,
-            parameters=current_parameters,
-        )
-
-    def evaluate_attempt(
-        result: dict[str, Any],
-    ) -> CodingAgentRecoveryDecision:
-        if getattr(config, "capture_worker_prompts_only", False):
-            return CodingAgentRecoveryDecision(passed=True, terminal=True)
-        attempt = result.get("attempt")
-        checkpoints = state.get("operation_checkpoints", ())
-        checkpoint = checkpoints[-1] if checkpoints else None
-        focused_validation = _run_code_task_focused_validation(
-            state,
-            worktree=worktree,
-            timeout_seconds=getattr(
-                config,
-                "coding_agent_validation_timeout_seconds",
-                DEFAULT_CODING_AGENT_VALIDATION_TIMEOUT_SECONDS,
-            ),
-        )
-        if focused_validation is not None:
-            result = {**result, "coding_validation": focused_validation}
-        no_op = (
-            isinstance(checkpoint, Mapping)
-            and checkpoint.get("passed") is not True
-            and checkpoint.get("error")
-            == "operation produced no material worktree changes"
-            and isinstance(focused_validation, Mapping)
-            and focused_validation.get("status") == ValidationReportStatus.PASSED.value
-        )
-        if no_op:
-            # A later bounded task may already be satisfied by an earlier task
-            # in the same worktree. Treat that as skipped only when validation
-            # passes; an empty task with failing validation remains a failure.
-            skipped_checkpoint = dict(cast(Mapping[str, Any], checkpoint))
-            skipped_checkpoint.update(
-                error=None,
-                passed=True,
-                status="skipped",
-                no_op=True,
-            )
-            checkpoint_list = list(state.get("operation_checkpoints", ()))
-            if checkpoint_list:
-                checkpoint_list[-1] = skipped_checkpoint
-                state["operation_checkpoints"] = checkpoint_list
-            checkpoint = skipped_checkpoint
-            result = {**result, "no_op": True}
-        latest_result.clear()
-        latest_result.update(result)
-        if (
-            isinstance(attempt, Mapping)
-            and attempt.get("status") == CodingAgentStatus.COMPLETED.value
-            and isinstance(checkpoint, Mapping)
-            and checkpoint.get("passed") is True
-            and (
-                focused_validation is None
-                or focused_validation.get("status")
-                == ValidationReportStatus.PASSED.value
-            )
-        ):
-            return CodingAgentRecoveryDecision(passed=True)
-        if not isinstance(attempt, Mapping):
-            return CodingAgentRecoveryDecision(passed=False, terminal=True)
-        if attempt.get("status") == CodingAgentStatus.POLICY_DENIED.value:
-            return CodingAgentRecoveryDecision(passed=False, terminal=True)
-        return CodingAgentRecoveryDecision(
-            passed=False,
-            issue={
-                "category": "coding_attempt_incomplete",
-                "status": attempt.get("status"),
-                "error": attempt.get("error"),
-                "changed_paths": attempt.get("changed_paths", []),
-                "validation": focused_validation,
-                "instruction": (
-                    "Continue the existing implementation from the current worktree. "
-                    "Inspect what the previous session changed, preserve correct "
-                    "edits, "
-                    "and finish the requested task. Do not restart or re-plan "
-                    "unrelated work."
-                ),
-            },
-        )
-
-    latest_result: dict[str, Any] = {}
-    recovery = run_coding_agent_recovery(run_attempt, evaluate_attempt)
-    final = latest_result or cast(dict[str, Any], recovery.attempts[-1])
-    return {
-        **final,
-        "attempts": [
-            attempt
-            for item in recovery.attempts
-            for attempt in item.get("attempts", [])
-            if isinstance(attempt, Mapping)
-        ],
-        "continuations": recovery.continuations,
-    }
 
 
 def _run_code_task_focused_validation(

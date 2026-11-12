@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import stat
 import subprocess
 import sys
 from pathlib import Path
@@ -41,21 +40,6 @@ def _head(path: Path) -> str:
         capture_output=True,
         text=True,
     ).stdout.strip()
-
-
-def _fake_opencode(path: Path) -> Path:
-    path.write_text(
-        f"""#!{sys.executable}
-import json
-from pathlib import Path
-
-Path("hello_world.py").write_text('print("Hello, world!")\\n', encoding="utf-8")
-print(json.dumps({{"type": "session.completed"}}))
-""",
-        encoding="utf-8",
-    )
-    path.chmod(path.stat().st_mode | stat.S_IEXEC)
-    return path
 
 
 def _plan(path: Path) -> Path:
@@ -118,7 +102,6 @@ def test_cli_compiles_and_runs_a_complete_coding_agent_handoff(
     repo = _git_repo(tmp_path / "repo")
     plan = _plan(tmp_path / "plan.json")
     request = tmp_path / "request.json"
-    fake = _fake_opencode(tmp_path / "fake-opencode")
     allowed_command = f"{sys.executable} *"
     base_commit = _compile_request(repo, plan, request, allowed_command=allowed_command)
     compiled_output = json.loads(capsys.readouterr().out)
@@ -128,89 +111,18 @@ def test_cli_compiles_and_runs_a_complete_coding_agent_handoff(
     assert compiled_output["validation_profiles"] == ["hello-world-output"]
 
     artifacts = tmp_path / "artifacts"
-    result = main(
-        [
-            "run-coding-agent",
-            "--request",
-            str(request),
-            "--worktree",
-            str(repo),
-            "--output-dir",
-            str(artifacts),
-            "--attempt-id",
-            "hello-attempt",
-            "--code-agent",
-            "opencode",
-            "--opencode-executable",
-            str(fake),
-            "--validation-profile",
-            f"hello-world-output={sys.executable} hello_world.py",
-            "--timeout-seconds",
-            "30",
-            "--validation-timeout-seconds",
-            "30",
-        ]
-    )
-
-    assert result == 0
-    output = json.loads(capsys.readouterr().out)
-    assert output["status"] == "completed"
-    assert output["changed_paths"] == ["hello_world.py"]
-    assert output["out_of_scope_paths"] == []
-    assert output["validation"]["status"] == "passed"
-    assert output["validation"]["results"][0]["stdout"] == "Hello, world!\n"
-    assert (repo / "hello_world.py").read_text(encoding="utf-8") == (
-        'print("Hello, world!")\n'
-    )
-    assert (
-        subprocess.run(
-            ["git", "status", "--short"],
-            cwd=repo,
-            check=True,
-            capture_output=True,
-            text=True,
-        ).stdout
-        == "?? hello_world.py\n"
-    )
-    assert (artifacts / "requests" / "hello-request.json").exists()
-    assert (artifacts / "attempts" / "hello-attempt.json").exists()
-    assert (artifacts / "validations" / "hello-attempt.json").exists()
+    with pytest.raises(SystemExit) as error:
+        main(["run-coding-agent"])
+    assert error.value.code == 2
+    assert "invalid choice" in capsys.readouterr().err
+    assert not (repo / "hello_world.py").exists()
+    assert not artifacts.exists()
 
 
-def test_cli_fails_closed_when_declared_validation_fails(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+def test_cli_rejects_legacy_coding_agent_command(
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
-    repo = _git_repo(tmp_path / "repo")
-    plan = _plan(tmp_path / "plan.json")
-    request = tmp_path / "request.json"
-    fake = _fake_opencode(tmp_path / "fake-opencode")
-    _compile_request(repo, plan, request, allowed_command=f"{sys.executable} *")
-    capsys.readouterr()
-
-    artifacts = tmp_path / "artifacts"
-    result = main(
-        [
-            "run-coding-agent",
-            "--request",
-            str(request),
-            "--worktree",
-            str(repo),
-            "--output-dir",
-            str(artifacts),
-            "--attempt-id",
-            "hello-attempt",
-            "--code-agent",
-            "opencode",
-            "--opencode-executable",
-            str(fake),
-            "--validation-profile",
-            f'hello-world-output={sys.executable} -c "import sys; sys.exit(3)"',
-        ]
-    )
-
-    assert result == 1
-    output = json.loads(capsys.readouterr().out)
-    assert output["status"] == "completed"
-    assert output["validation"]["status"] == "failed"
-    assert output["validation"]["results"][0]["returncode"] == 3
-    assert (artifacts / "validations" / "hello-attempt.json").exists()
+    with pytest.raises(SystemExit) as error:
+        main(["run-coding-agent"])
+    assert error.value.code == 2
+    assert "invalid choice" in capsys.readouterr().err

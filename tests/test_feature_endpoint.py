@@ -4699,7 +4699,7 @@ def test_operation_checkpoint_accepts_prevalidated_supporting_edit(
     assert checkpoint["supporting_edit_paths"] == ["docs/validation.md"]
 
 
-def test_code_task_agent_continues_after_timed_out_attempt(
+def test_code_task_agent_rejects_legacy_feature_implementation(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     attempt_results: list[dict[str, Any]] = [
@@ -4739,32 +4739,28 @@ def test_code_task_agent_continues_after_timed_out_attempt(
     monkeypatch.setattr(
         "powdrr_lift.workrr.feature_endpoint._run_code_agent_phase", fake_phase
     )
-    result = _run_code_task_agent(
-        {"task": {"task_id": "task-1", "objective": "Implement the feature."}},
-        config=SimpleNamespace(
-            feature_description="Implement the feature.",
-            work_item_name="feature",
-        ),
-        runner=lambda *args, **kwargs: subprocess.CompletedProcess(args[0], 0, "", ""),
-        worktree=tmp_path,
-        output_root=tmp_path / "output",
-        branch="feature",
-        slug="feature",
-        state={},
-    )
-
-    assert result["attempt"]["status"] == CodingAgentStatus.COMPLETED.value
-    assert result["continuations"] == 1
-    assert len(calls) == 2
-    assert calls[0].get("repair_issue") is None
-    assert calls[1]["repair_issue"]["category"] == "coding_attempt_incomplete"
-    assert (
-        "Continue the existing implementation"
-        in calls[1]["repair_issue"]["instruction"]
-    )
+    with pytest.raises(
+        PowdrrExecutionError, match="Legacy feature endpoint code-writing"
+    ):
+        _run_code_task_agent(
+            {"task": {"task_id": "task-1", "objective": "Implement the feature."}},
+            config=SimpleNamespace(
+                feature_description="Implement the feature.",
+                work_item_name="feature",
+            ),
+            runner=lambda *args, **kwargs: subprocess.CompletedProcess(
+                args[0], 0, "", ""
+            ),
+            worktree=tmp_path,
+            output_root=tmp_path / "output",
+            branch="feature",
+            slug="feature",
+            state={},
+        )
+    assert calls == []
 
 
-def test_prompt_capture_does_not_enter_coding_attempt_recovery_loop(
+def test_prompt_capture_does_not_enable_legacy_feature_implementation(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     calls: list[Mapping[str, Any]] = []
@@ -4779,25 +4775,26 @@ def test_prompt_capture_does_not_enter_coding_attempt_recovery_loop(
     monkeypatch.setattr(
         "powdrr_lift.workrr.feature_endpoint._run_code_agent_phase", capture_phase
     )
-    result = _run_code_task_agent(
-        {"task": {"task_id": "task-1", "objective": "Implement the feature."}},
-        config=SimpleNamespace(
-            capture_worker_prompts_only=True,
-            feature_description="Implement the feature.",
-            work_item_name="feature",
-        ),
-        runner=lambda *args, **kwargs: subprocess.CompletedProcess(args[0], 0, "", ""),
-        worktree=tmp_path,
-        output_root=tmp_path / "output",
-        branch="feature",
-        slug="feature",
-        state={},
-    )
-
-    assert result["attempt"]["status"] == "prompt_captured"
-    assert result["continuations"] == 0
-    assert len(calls) == 1
-    assert "repair_issue" not in calls[0]
+    with pytest.raises(
+        PowdrrExecutionError, match="Legacy feature endpoint code-writing"
+    ):
+        _run_code_task_agent(
+            {"task": {"task_id": "task-1", "objective": "Implement the feature."}},
+            config=SimpleNamespace(
+                capture_worker_prompts_only=True,
+                feature_description="Implement the feature.",
+                work_item_name="feature",
+            ),
+            runner=lambda *args, **kwargs: subprocess.CompletedProcess(
+                args[0], 0, "", ""
+            ),
+            worktree=tmp_path,
+            output_root=tmp_path / "output",
+            branch="feature",
+            slug="feature",
+            state={},
+        )
+    assert calls == []
 
 
 def test_benchmark_mode_selects_normative_defaults_automatically(
@@ -4921,7 +4918,7 @@ def test_prompt_capture_persists_provider_ready_prompt_without_running_worker(
     assert saved_request["prompt"] == result["prompt_path"].read_text(encoding="utf-8")
 
 
-def test_code_task_agent_forwards_canonical_design_obligations(
+def test_canonical_design_does_not_enable_legacy_feature_implementation(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     canonical = tmp_path / "canonical-feature-design.json"
@@ -4955,30 +4952,25 @@ def test_code_task_agent_forwards_canonical_design_obligations(
     monkeypatch.setattr(
         "powdrr_lift.workrr.feature_endpoint._run_code_agent_phase", fake_phase
     )
-    result = _run_code_task_agent(
-        {"task": {"task_id": "state-data", "objective": "Implement state data."}},
-        config=SimpleNamespace(
-            feature_description="Implement state data.",
-            work_item_name="state-data",
-        ),
-        runner=lambda *args, **kwargs: subprocess.CompletedProcess(args[0], 0, "", ""),
-        worktree=tmp_path,
-        output_root=tmp_path / "output",
-        branch="state-data",
-        slug="state-data",
-        state={"canonical_feature_design_path": canonical},
-    )
-
-    assert result["attempt"]["status"] == CodingAgentStatus.COMPLETED.value
-    assert calls[0]["obligations"] == {
-        "path": str(canonical),
-        "obligations": [
-            {
-                "id": "state-data",
-                "description": "State data resets on re-entry.",
-            }
-        ],
-    }
+    with pytest.raises(
+        PowdrrExecutionError, match="Legacy feature endpoint code-writing"
+    ):
+        _run_code_task_agent(
+            {"task": {"task_id": "state-data", "objective": "Implement state data."}},
+            config=SimpleNamespace(
+                feature_description="Implement state data.",
+                work_item_name="state-data",
+            ),
+            runner=lambda *args, **kwargs: subprocess.CompletedProcess(
+                args[0], 0, "", ""
+            ),
+            worktree=tmp_path,
+            output_root=tmp_path / "output",
+            branch="state-data",
+            slug="state-data",
+            state={"canonical_feature_design_path": canonical},
+        )
+    assert calls == []
 
 
 def test_code_task_agent_rejects_canonical_design_without_obligations(
@@ -4989,7 +4981,7 @@ def test_code_task_agent_rejects_canonical_design_without_obligations(
 
     with pytest.raises(
         PowdrrExecutionError,
-        match="canonical feature design has no valid obligations",
+        match="Legacy feature endpoint code-writing",
     ):
         _run_code_task_agent(
             {
@@ -5011,6 +5003,31 @@ def test_code_task_agent_rejects_canonical_design_without_obligations(
             slug="empty-design",
             state={"canonical_feature_design_path": canonical},
         )
+
+
+@pytest.mark.parametrize(
+    "operation",
+    ["run_code_agent", "run_code_task_agent", "correct_candidate_from_structrr_diff"],
+)
+def test_feature_command_runtime_rejects_legacy_code_writing(
+    tmp_path: Path, operation: str
+) -> None:
+    runtime = FeatureCommandRuntime(
+        config=SimpleNamespace(),
+        runner=None,
+        worktree=tmp_path,
+        output_root=tmp_path,
+        branch="feature",
+        slug="feature",
+        state={},
+        catalog=feature_command_catalog(),
+    )
+
+    with pytest.raises(
+        PowdrrExecutionError,
+        match="Legacy feature endpoint code-writing is unsupported",
+    ):
+        runtime.dispatch(operation, [operation], {})
 
 
 @pytest.mark.parametrize(

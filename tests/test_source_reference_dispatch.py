@@ -193,7 +193,7 @@ def test_story_implementation_dispatch_requires_validated_context(
         dispatch.dispatch_source_reference_task(**arguments)
 
     with pytest.raises(
-        PowdrrExecutionError, match="requires the story execution adapter"
+        PowdrrExecutionError, match="requires independently authored tests"
     ):
         full_validation: dict[str, Any] = dict(arguments)
         full_validation["proposed"] = {**proposed, "story_validation": True}
@@ -212,6 +212,10 @@ def test_story_context_is_bound_into_protected_source_objective(
 
     class Run:
         private_root = tmp_path / "private"
+        public_root = tmp_path / "public"
+
+        def __init__(self) -> None:
+            self.public_root.mkdir()
 
         def execute(self, _handler: Any) -> Any:
             return SimpleNamespace(
@@ -231,6 +235,12 @@ def test_story_context_is_bound_into_protected_source_objective(
         def verify_candidate(self) -> None:
             return None
 
+        def protect_command(self, command: tuple[str, ...]) -> tuple[str, ...]:
+            return command
+
+        def validation_environment(self) -> dict[str, str]:
+            return {}
+
     def prepare(**kwargs: Any) -> Run:
         captured.update(kwargs)
         return Run()
@@ -249,6 +259,15 @@ def test_story_context_is_bound_into_protected_source_objective(
     monkeypatch.setattr(dispatch.SourceReferenceRun, "prepare", prepare)
     monkeypatch.setattr(dispatch, "create_miniswe_inference_handler", lambda _t: None)
     monkeypatch.setattr(dispatch.tempfile, "gettempdir", lambda: str(tmp_path / "tmp"))
+    monkeypatch.setattr(
+        dispatch,
+        "execute_story_validation",
+        lambda *_a, **kwargs: {
+            "passed": True,
+            "story_coverage": {"verified": True},
+            "coverage_evidence_error": None,
+        },
+    )
     story_context = {
         "stories": [{"id": "story:resume", "contract_digest": "sha256:abc"}],
         "cases": [{"id": "story:resume:case:1"}],
@@ -256,7 +275,7 @@ def test_story_context_is_bound_into_protected_source_objective(
 
     result = dispatch.dispatch_source_reference_task(
         repo_root=repo,
-        proposed=proposed,
+        proposed={**proposed, "story_validation": True},
         base_commit=base,
         workflow_id="workflow-1",
         task_id="implementation",
@@ -269,11 +288,27 @@ def test_story_context_is_bound_into_protected_source_objective(
         validation_timeout_seconds=30,
         review_client=Reviewer(),
         story_context=story_context,
+        story_validation_bundle={
+            "snapshot": {"user_stories": []},
+            "test_sources": {"tests/test_story.py": "def test_story(): pass\n"},
+            "authoring": {
+                "story_test_links": {"links": [{"selector": "test_story"}]},
+                "accepted_story_review": {},
+                "story_review_evidence": {},
+                "test_sha256": dispatch.fingerprint_test_files(
+                    {"tests/test_story.py": "def test_story(): pass\n"}
+                ),
+            },
+        },
     )
 
     assert result["passed"] is True, result.get("error")
     assert "Pinned customer story contract and selected cases" in captured["objective"]
     assert "story:resume:case:1" in captured["objective"]
+    assert captured["readonly_support_files"] == {
+        "tests/test_story.py": "def test_story(): pass\n"
+    }
+    assert "story-validation" in captured["profiles"]
 
 
 @pytest.mark.parametrize("scenario", ["success", "behavior_failure", "parent_conflict"])

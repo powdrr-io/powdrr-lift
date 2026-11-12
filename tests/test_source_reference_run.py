@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shlex
 import subprocess
 import sys
@@ -16,6 +17,7 @@ from powdrr_lift.workrr.coding_agent import MiniSWEAgentProvider
 from powdrr_lift.workrr.coding_agent_validation import ValidationProfile
 from powdrr_lift.workrr.source_reference_run import (
     SourceReferenceRun,
+    SourceRunFailure,
     context_delivery_status,
 )
 
@@ -55,6 +57,7 @@ def prepare(
     native: bool = False,
     run_id: str = "run-1",
     profile_code: str | None = None,
+    readonly_support_files: dict[str, str] | None = None,
 ) -> SourceReferenceRun:
     root = tmp_path / "repo"
     if not root.exists():
@@ -156,6 +159,7 @@ def prepare(
             review_client=Reviewer(),
             worker_timeout_seconds=30,
             validation_timeout_seconds=30,
+            readonly_support_files=readonly_support_files,
         )
     except ValueError as error:
         if native and (
@@ -207,6 +211,60 @@ def test_prepared_inputs_are_bound_and_cannot_be_reused_or_mutated(
         run.verify_inputs()
     with pytest.raises(FileExistsError):
         prepare(tmp_path, monkeypatch)
+
+
+def test_readonly_support_files_are_scoped_and_frozen(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    run = prepare(
+        tmp_path,
+        monkeypatch,
+        readonly_support_files={
+            "tests/test_story_contract.py": "def test_story(): pass\n"
+        },
+    )
+    path = run.workspace_root / "tests/test_story_contract.py"
+    assert path.read_text() == "def test_story(): pass\n"
+    assert "tests/test_story_contract.py" in run.request.allowed_paths
+    assert str(path) in run._sandbox_profile()
+    run.verify_inputs()
+
+    path.write_text("changed test oracle\n")
+    with pytest.raises(SourceRunFailure, match="Read-only support files changed"):
+        run.verify_inputs()
+
+
+def test_protected_process_cannot_write_story_support_files(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    run = prepare(
+        tmp_path,
+        monkeypatch,
+        native=True,
+        readonly_support_files={
+            "tests/test_story_contract.py": "def test_story(): pass\n"
+        },
+    )
+    path = run.workspace_root / "tests/test_story_contract.py"
+    result = subprocess.run(
+        run.protect_command(
+            (
+                sys.executable,
+                "-c",
+                "from pathlib import Path; import sys; "
+                "Path(sys.argv[1]).write_text('changed')",
+                str(path),
+            )
+        ),
+        cwd=run.workspace_root,
+        env=os.environ | run.validation_environment(),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode != 0
+    assert path.read_text() == "def test_story(): pass\n"
+    run.verify_inputs()
 
 
 def test_context_delivery_requires_every_exact_page_and_trusted_catalog() -> None:

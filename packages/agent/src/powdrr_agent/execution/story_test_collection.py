@@ -6,7 +6,7 @@ import json
 import os
 import subprocess
 import tempfile
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -60,9 +60,14 @@ def collect_story_tests(
     root: Path,
     paths: Sequence[str],
     timeout_seconds: float,
+    command_wrapper: Callable[[tuple[str, ...]], tuple[str, ...]] | None = None,
+    environment_overrides: Mapping[str, str] | None = None,
+    artifact_directory: Path | None = None,
 ) -> dict[str, Any]:
     """A failed or absent collection report never authorizes an invented selector."""
-    with tempfile.TemporaryDirectory(prefix="powdrr-story-collection-") as directory:
+    with tempfile.TemporaryDirectory(
+        prefix="powdrr-story-collection-", dir=artifact_directory
+    ) as directory:
         temporary = Path(directory)
         plugin = temporary / "_powdrr_story_collection.py"
         plugin.write_text(_PLUGIN, encoding="utf-8")
@@ -74,13 +79,13 @@ def collect_story_tests(
             "-p",
             "_powdrr_story_collection",
         )
+        if command_wrapper is not None:
+            command = command_wrapper(command)
         environment = os.environ.copy()
         environment["POWDRR_STORY_COLLECTION_REPORT"] = str(report)
         environment["POWDRR_STORY_COLLECTION_ROOT"] = str(root.resolve())
+        environment.update(environment_overrides or {})
         environment.pop("VIRTUAL_ENV", None)
-        environment["PYTHONPATH"] = os.pathsep.join(
-            [directory, str(root), str(root / "src"), environment.get("PYTHONPATH", "")]
-        )
         nested_sources = []
         for raw_path in paths:
             parts = Path(raw_path).parts
@@ -90,7 +95,13 @@ def collect_story_tests(
                     if nested.is_dir():
                         nested_sources.append(str(nested))
         environment["PYTHONPATH"] = os.pathsep.join(
-            [*nested_sources, environment["PYTHONPATH"]]
+            [
+                directory,
+                str(root),
+                str(root / "src"),
+                *nested_sources,
+                environment.get("PYTHONPATH", ""),
+            ]
         )
         try:
             completed = subprocess.run(
@@ -220,9 +231,14 @@ def run_story_tests(
     paths: Sequence[str],
     assertion_lines: dict[str, list[int]],
     timeout_seconds: float,
+    command_wrapper: Callable[[tuple[str, ...]], tuple[str, ...]] | None = None,
+    environment_overrides: Mapping[str, str] | None = None,
+    artifact_directory: Path | None = None,
 ) -> dict[str, Any]:
     """Observe pytest phases and assertion execution without editing tests."""
-    with tempfile.TemporaryDirectory(prefix="powdrr-story-execution-") as directory:
+    with tempfile.TemporaryDirectory(
+        prefix="powdrr-story-execution-", dir=artifact_directory
+    ) as directory:
         temporary = Path(directory)
         (temporary / "_powdrr_story_execution.py").write_text(_EXECUTION_PLUGIN)
         inputs = temporary / "inputs.json"
@@ -235,6 +251,8 @@ def run_story_tests(
             "-p",
             "_powdrr_story_execution",
         )
+        if command_wrapper is not None:
+            command = command_wrapper(command)
         environment = os.environ.copy()
         environment.pop("VIRTUAL_ENV", None)
         environment.update(
@@ -242,6 +260,7 @@ def run_story_tests(
             POWDRR_STORY_EXECUTION_INPUT=str(inputs),
             POWDRR_STORY_EXECUTION_REPORT=str(report),
         )
+        environment.update(environment_overrides or {})
         search = [directory, str(root), str(root / "src")]
         for raw_path in paths:
             parts = Path(raw_path).parts

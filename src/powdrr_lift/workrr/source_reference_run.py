@@ -171,6 +171,7 @@ class SourceReferenceRun:
     claims: tuple[dict[str, Any], ...]
     completion: dict[str, Any] | None
     delivery: dict[str, Any] | None
+    readonly_support_files: dict[str, str]
     _candidate_after_worker: str | None
 
     @classmethod
@@ -193,6 +194,7 @@ class SourceReferenceRun:
         review_client: ReferenceReviewClient | None = None,
         test_collection_evidence: dict[str, Any] | None = None,
         reader_limits: ReaderLimits | None = None,
+        readonly_support_files: Mapping[str, str] | None = None,
     ) -> SourceReferenceRun:
         if not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", run_id):
             raise ValueError("run_id must be a simple stable run identity")
@@ -229,6 +231,39 @@ class SourceReferenceRun:
             != self.workspace_root
         ):
             raise ValueError("Reference runs require the repository workspace root")
+        support_files: dict[str, str] = {}
+        for raw_path, content in (readonly_support_files or {}).items():
+            relative = Path(raw_path)
+            if (
+                relative.is_absolute()
+                or not relative.parts
+                or ".." in relative.parts
+                or not isinstance(content, str)
+            ):
+                raise ValueError("Protected support files require safe relative paths")
+            target = self.workspace_root / relative
+            if any(
+                parent.is_symlink()
+                for parent in target.parents
+                if parent != self.workspace_root
+                and parent.is_relative_to(self.workspace_root)
+            ):
+                raise ValueError("Protected support files cannot traverse symlinks")
+            if not target.resolve(strict=False).is_relative_to(self.workspace_root):
+                raise ValueError(
+                    "Protected support file resolves outside the workspace"
+                )
+            if target.exists() or target.is_symlink():
+                raise ValueError(f"Protected support file already exists: {raw_path}")
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(content, encoding="utf-8")
+            support_files[relative.as_posix()] = hashlib.sha256(
+                content.encode("utf-8")
+            ).hexdigest()
+        if support_files:
+            _git(self.workspace_root, "add", "-f", "--", *sorted(support_files))
+        self.readonly_support_files = dict(sorted(support_files.items()))
+        allowed_paths = tuple(dict.fromkeys((*allowed_paths, *support_files)))
         self.catalog = compile_reference_catalog(
             accepted_design,
             base_commit=base_commit,
@@ -297,6 +332,7 @@ class SourceReferenceRun:
             "limits_digest": self.reader_limits.digest,
             "isolation": self._isolation_name(),
             "profiles": {name: p.to_data() for name, p in self.profiles.items()},
+            "readonly_support_files": self.readonly_support_files,
         }
         payloads = {
             "catalog.json": self.catalog.to_data(),
@@ -359,6 +395,16 @@ class SourceReferenceRun:
             raise SourceRunFailure(
                 "invalid_inputs", "Trusted run configuration changed"
             )
+        for relative, expected in self.readonly_support_files.items():
+            target = self.workspace_root / relative
+            if (
+                target.is_symlink()
+                or not target.is_file()
+                or _digest(target) != expected
+            ):
+                raise SourceRunFailure(
+                    "invalid_inputs", "Read-only support files changed during the run"
+                )
 
     def authorize(
         self,
@@ -455,6 +501,12 @@ class SourceReferenceRun:
             f"(deny file-write* (subpath {json.dumps(path)}))"
             for path in sorted(denied)
         )
+        rules.extend(
+            "(deny file-write* (literal "
+            + json.dumps(str(self.workspace_root / path))
+            + "))"
+            for path in self.readonly_support_files
+        )
         return "\n".join(rules) + "\n"
 
     def protect_command(self, command: tuple[str, ...]) -> tuple[str, ...]:
@@ -480,6 +532,15 @@ class SourceReferenceRun:
                 "--bind",
                 str(self.workspace_root),
                 str(self.workspace_root),
+                *[
+                    argument
+                    for path in self.readonly_support_files
+                    for argument in (
+                        "--ro-bind",
+                        str(self.workspace_root / path),
+                        str(self.workspace_root / path),
+                    )
+                ],
                 "--bind",
                 str(self.public_root),
                 str(self.public_root),

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import time
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -41,6 +41,9 @@ def execute_story_validation(
     timeout_seconds: float,
     excluded_paths: Sequence[str] = (),
     report_path: str | None = None,
+    command_wrapper: Callable[[tuple[str, ...]], tuple[str, ...]] | None = None,
+    environment_overrides: Mapping[str, str] | None = None,
+    artifact_directory: Path | None = None,
 ) -> dict[str, Any]:
     """Capture actual observations, delegate proof decisions, retain every run."""
     manifest = authoring["story_test_links"]
@@ -50,7 +53,13 @@ def execute_story_validation(
         excluded_paths = (*excluded_paths, report_path)
     paths = tuple(authoring["test_sources"])
     collection = collect_story_tests(
-        profile, root=root, paths=paths, timeout_seconds=timeout_seconds
+        profile,
+        root=root,
+        paths=paths,
+        timeout_seconds=timeout_seconds,
+        command_wrapper=command_wrapper,
+        environment_overrides=environment_overrides,
+        artifact_directory=artifact_directory,
     )
     runtime = collection.get("runtime", {"status": "unavailable"})
     before = capture_story_execution_context(
@@ -67,6 +76,9 @@ def execute_story_validation(
             paths=paths,
             assertion_lines=assertion_line_catalog(manifest),
             timeout_seconds=timeout_seconds,
+            command_wrapper=command_wrapper,
+            environment_overrides=environment_overrides,
+            artifact_directory=artifact_directory,
         )
     else:
         result = {

@@ -1903,17 +1903,21 @@ def _validate_execute_pr_test_correction(
                 ),
             )
             coverage.update(story_link_coverage(story_links))
-        baseline_result = (run_story_tests if story_links else run_generated_pytest)(
-            validation_profile,
-            root=baseline_worktree,
-            paths=tuple(validated),
-            timeout_seconds=timeout_seconds,
-            **(
-                {"assertion_lines": assertion_line_catalog(story_links)}
-                if story_links
-                else {}
-            ),
-        )
+        if story_links:
+            baseline_result = run_story_tests(
+                validation_profile,
+                root=baseline_worktree,
+                paths=tuple(validated),
+                assertion_lines=assertion_line_catalog(story_links),
+                timeout_seconds=timeout_seconds,
+            )
+        else:
+            baseline_result = run_generated_pytest(
+                validation_profile,
+                root=baseline_worktree,
+                paths=tuple(validated),
+                timeout_seconds=timeout_seconds,
+            )
         if story_links:
             require_story_baseline(
                 baseline_result,
@@ -3676,6 +3680,7 @@ class _TaskWorkflowExecutionStrategy:
             )
 
             pinned_story_context = None
+            story_validation_bundle = None
             if proposed.get("story_refs"):
                 source_structrr_context = _issue_worker_structrr_context(
                     self.repo_root, proposed, base_commit=base_commit
@@ -3697,6 +3702,45 @@ class _TaskWorkflowExecutionStrategy:
                     source_story_snapshot,
                     parse_story_refs(proposed.get("story_refs", [])),
                 )
+                if proposed.get("story_validation") is True:
+                    test_authoring_context = dict(proposed)
+                    test_authoring_context.update(
+                        story_context=pinned_story_context,
+                        accepted_structrr_operations=[
+                            operation.to_data()
+                            for operation in source_item_proposal.operations
+                        ],
+                        public_entrypoint_evidence=list(
+                            source_item_proposal.code_evidence
+                        ),
+                        planned_test_cases=source_item_proposal.verification.get(
+                            "required_test_cases", []
+                        ),
+                    )
+                    story_store = (
+                        Path(tempfile.gettempdir())
+                        / "powdrr-lift-issue-worker"
+                        / workflow_id
+                        / "source-reference-story-validation"
+                        / hashlib.sha256(self.task.task_id.encode("utf-8")).hexdigest()[
+                            :24
+                        ]
+                    )
+                    test_sources, authoring = _author_execute_pr_tests(
+                        self.repo_root,
+                        base_commit=base_commit,
+                        request=request,
+                        proposed=test_authoring_context,
+                        workflow_id=f"{workflow_id}-{self.task.task_id}-source-story",
+                        config=self.config,
+                        store_root=story_store,
+                        validation_profile=validation_profile,
+                    )
+                    story_validation_bundle = {
+                        "snapshot": source_story_snapshot,
+                        "test_sources": test_sources,
+                        "authoring": authoring,
+                    }
             status = _execute_pr_test_install_worktree_status(
                 self.repo_root, self.config.workflow_dir
             )
@@ -3719,6 +3763,7 @@ class _TaskWorkflowExecutionStrategy:
                 validation_timeout_seconds=self.config.coding_agent_validation_timeout_seconds,
                 review_client=self.client,
                 story_context=pinned_story_context,
+                story_validation_bundle=story_validation_bundle,
             )
             self.events.append({"kind": "coding_agent", "result": result})
             return result

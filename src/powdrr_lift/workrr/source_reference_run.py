@@ -172,6 +172,10 @@ class SourceReferenceRun:
     completion: dict[str, Any] | None
     delivery: dict[str, Any] | None
     _candidate_after_worker: str | None
+    _post_worker_reconciler: (
+        Callable[[SourceReferenceRun], Mapping[str, Any] | None] | None
+    )
+    reconciliation: Mapping[str, Any] | None
 
     @classmethod
     def prepare(
@@ -193,6 +197,8 @@ class SourceReferenceRun:
         review_client: ReferenceReviewClient | None = None,
         test_collection_evidence: dict[str, Any] | None = None,
         reader_limits: ReaderLimits | None = None,
+        post_worker_reconciler: Callable[[SourceReferenceRun], Mapping[str, Any] | None]
+        | None = None,
     ) -> SourceReferenceRun:
         if not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", run_id):
             raise ValueError("run_id must be a simple stable run identity")
@@ -283,6 +289,8 @@ class SourceReferenceRun:
         self.completion = None
         self.delivery = None
         self._candidate_after_worker = None
+        self._post_worker_reconciler = post_worker_reconciler
+        self.reconciliation = None
         self._configuration = {
             "schema_version": POLICY,
             "mode": "enforce",
@@ -297,6 +305,7 @@ class SourceReferenceRun:
             "limits_digest": self.reader_limits.digest,
             "isolation": self._isolation_name(),
             "profiles": {name: p.to_data() for name, p in self.profiles.items()},
+            "post_worker_reconciliation": post_worker_reconciler is not None,
         }
         payloads = {
             "catalog.json": self.catalog.to_data(),
@@ -689,6 +698,55 @@ class SourceReferenceRun:
                 "invalid_candidate", "Candidate changed after worker validation"
             )
 
+    def reconcile_after_worker(self) -> None:
+        """Apply trusted metadata-only corrections before independent validation."""
+        if self._post_worker_reconciler is None:
+            return
+        if self._candidate_after_worker is None:
+            raise SourceRunFailure(
+                "invalid_candidate", "Worker candidate was not finalized"
+            )
+        self.verify_candidate()
+        before = self._python_ast_snapshot()
+        receipt = self._post_worker_reconciler(self)
+        after = self._python_ast_snapshot()
+        if before != after:
+            raise SourceRunFailure(
+                "policy_violation",
+                "Post-worker reconciliation changed Python product syntax",
+            )
+        if receipt is not None and not isinstance(receipt, Mapping):
+            raise SourceRunFailure(
+                "invalid_reconciliation",
+                "Post-worker reconciler must return a structured receipt",
+            )
+        self.reconciliation = dict(receipt) if receipt is not None else None
+        self._candidate_after_worker = self._candidate_state()
+
+    def _python_ast_snapshot(self) -> dict[str, str]:
+        import ast
+
+        head = _git(self.workspace_root, "rev-parse", "HEAD").decode().strip()
+        paths = _committed_paths(
+            self.workspace_root, self.catalog.base_commit, head, output=_paths_output
+        ) | _working_paths(self.workspace_root, output=_paths_output)
+        snapshot: dict[str, str] = {}
+        for relative in sorted(paths):
+            if not relative.endswith(".py"):
+                continue
+            path = self.workspace_root / relative
+            if not path.is_file() or path.is_symlink():
+                continue
+            try:
+                tree = ast.parse(path.read_bytes(), filename=relative)
+            except (SyntaxError, UnicodeError) as error:
+                raise SourceRunFailure(
+                    "invalid_candidate",
+                    f"Cannot compare Python syntax for {relative}: {error}",
+                ) from error
+            snapshot[relative] = ast.dump(tree, include_attributes=False)
+        return snapshot
+
     def execute(
         self,
         inference_handler: Callable[[ChatCompletionRequest], ChatCompletionResponse],
@@ -709,6 +767,7 @@ class SourceReferenceRun:
             "validation": None,
             "completion": None,
             "context_delivery": None,
+            "reconciliation": None,
         }
         try:
             self.verify_inputs()
@@ -737,6 +796,7 @@ class SourceReferenceRun:
                 execution.attempt.to_data(),
                 execution.validation.to_data(),
             )
+            result["reconciliation"] = self.reconciliation
             if execution.attempt.status is not CodingAgentStatus.COMPLETED:
                 result["outcome"] = classify_coding_agent_attempt(
                     execution.attempt

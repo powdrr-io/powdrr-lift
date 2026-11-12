@@ -91,6 +91,7 @@ DECISION_VALUES: dict[str, frozenset[str]] = {
     "candidate_relation": frozenset(
         {"matches", "does_not_match", "insufficient_evidence"}
     ),
+    "source_link_existence": frozenset({"exists", "absent"}),
     "entailment": frozenset({"entailed", "contradicted", "not_stated"}),
     "proposition_coverage": frozenset(
         {
@@ -131,7 +132,13 @@ UNRESOLVED_REASON_CODES = frozenset(
 )
 
 PROVIDER_KINDS = frozenset(
-    {"planning-llm", "local-classifier", "deterministic-rule", "human"}
+    {
+        "planning-llm",
+        "local-classifier",
+        "decision-provider",
+        "deterministic-rule",
+        "human",
+    }
 )
 
 

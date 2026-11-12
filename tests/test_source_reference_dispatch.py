@@ -393,7 +393,9 @@ def test_post_worker_reconciliation_uses_decision_and_changes_only_annotation(
     )
 
     class DecisionReviewer:
-        def complete_json(self, _messages: list[dict[str, str]]) -> dict[str, Any]:
+        def complete_json(
+            self, _messages: list[dict[str, str]], *, response_schema: Any = None
+        ) -> dict[str, Any]:
             return response
 
     receipt = reconcile_source_task(run, DecisionReviewer())

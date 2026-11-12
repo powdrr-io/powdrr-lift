@@ -89,8 +89,6 @@ def _source_text(
 def _provider_response(
     provider: Any,
     spec: SemanticDecisionSpec,
-    *,
-    decision_provider: bool,
 ) -> Mapping[str, Any]:
     question = (
         "Should this exact Structrr reference relationship exist for this code owner? "
@@ -126,13 +124,7 @@ def _provider_response(
         "required": ["status", "value", "reason_code"],
         "additionalProperties": False,
     }
-    complete = provider.complete_json
-    if decision_provider:
-        return complete(messages, response_schema=schema)
-    try:
-        return complete(messages, response_schema=schema)
-    except TypeError:
-        return complete(messages)
+    return provider.complete_json(messages, response_schema=schema)
 
 
 def reconcile_source_task(run: Any, review_client: Any) -> dict[str, Any]:
@@ -250,11 +242,10 @@ def reconcile_source_task(run: Any, review_client: Any) -> dict[str, Any]:
         return _provider_response(
             configured or review_client,
             spec,
-            decision_provider=configured is not None,
         )
 
     def fallback_call(spec: SemanticDecisionSpec) -> Mapping[str, Any]:
-        return _provider_response(review_client, spec, decision_provider=False)
+        return _provider_response(review_client, spec)
 
     decisions: dict[LogicalSourceEdge, Any] = {}
     records: list[dict[str, Any]] = []

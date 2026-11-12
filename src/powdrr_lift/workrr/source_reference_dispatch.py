@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
 import subprocess
 import tempfile
@@ -12,13 +13,19 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from powdrr_agent.execution.execute_pr_tests import (
+    fingerprint_test_files,
+    pytest_command_for_files,
+)
 from powdrr_local.miniswe_inference import create_miniswe_inference_handler
 from powdrr_service.planning.plan_models import source_reference_design_file
 
 from powdrr_lift.errors import PowdrrExecutionError
+from powdrr_lift.workrr.coding_agent import _remove_provider_credentials
 from powdrr_lift.workrr.coding_agent_validation import ValidationProfile
 from powdrr_lift.workrr.llm import WorkflowLLMClient, complete_json
 from powdrr_lift.workrr.source_reference_run import SourceReferenceRun
+from powdrr_lift.workrr.story_execution_operations import execute_story_validation
 
 DESIGN_SCHEMA = "structrr-source-reference-task-v1"
 MAX_DESIGN_BYTES = 1_000_000
@@ -91,6 +98,8 @@ def dispatch_source_reference_task(
     worker_timeout_seconds: float,
     validation_timeout_seconds: float,
     review_client: WorkflowLLMClient,
+    story_context: Mapping[str, Any] | None = None,
+    story_validation_bundle: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Run once in a clean candidate, then transfer only an accepted patch."""
     if proposed.get("source_reference_mode", "enforce") != "enforce":
@@ -99,16 +108,60 @@ def dispatch_source_reference_task(
         )
     if code_agent != "minisweagent" or not model:
         raise PowdrrExecutionError("Source reference tasks require miniSWE and a model")
-    if proposed.get("story_refs") or proposed.get("story_validation"):
+    story_validation = proposed.get("story_validation") is True
+    if story_validation and not proposed.get("story_refs"):
         raise PowdrrExecutionError(
-            "Source reference tasks with story coverage require a protected adapter"
+            "Story validation requires reviewed story references"
+        )
+    if story_validation and story_validation_bundle is None:
+        raise PowdrrExecutionError(
+            "Full story validation requires independently authored tests and a "
+            "pinned story execution bundle"
+        )
+    if not story_validation and story_validation_bundle is not None:
+        raise PowdrrExecutionError(
+            "A story execution bundle requires a reviewed story-validation item"
+        )
+    if proposed.get("story_refs") and not isinstance(story_context, Mapping):
+        raise PowdrrExecutionError(
+            "Source reference implementation items with story references require "
+            "validated pinned story context"
+        )
+    if not proposed.get("story_refs") and story_context is not None:
+        raise PowdrrExecutionError(
+            "Pinned story context requires reviewed story references"
         )
     design_path, design = load_reviewed_source_design(
         repo_root, proposed, base_commit=base_commit
     )
+    if story_context is not None:
+        objective = (
+            objective + "\n\nPinned customer story contract and selected cases "
+            "(planned coverage, not verification):\n"
+            + json.dumps(dict(story_context), indent=2, sort_keys=True)
+            + "\nPreserve these exact references. Report discoveries as "
+            "implementation_defect, environment_blocked, or "
+            "design_amendment_needed. A behavior amendment returns to "
+            "story-design-interview and a reviewed Structrr proposal; "
+            "the coding worker cannot approve it."
+        )
+        if story_validation_bundle is not None:
+            objective += (
+                "\nThe independently authored story tests are present in the "
+                "workspace as read-only files. Run them as needed, preserve their "
+                "bytes, and do not weaken or replace their assertions."
+            )
     identity = hashlib.sha256(
         json.dumps(
-            [str(repo_root.resolve()), workflow_id, task_id, base_commit, design_path]
+            [
+                str(repo_root.resolve()),
+                workflow_id,
+                task_id,
+                base_commit,
+                design_path,
+                dict(story_context) if story_context is not None else None,
+            ],
+            sort_keys=True,
         ).encode()
     ).hexdigest()
     root = Path(tempfile.gettempdir()) / "powdrr-source-tasks" / identity
@@ -121,6 +174,44 @@ def dispatch_source_reference_task(
             "Accept a new design revision before another implementation attempt."
         ) from error
     candidate = root / "candidate"
+    profiles: dict[str, ValidationProfile] = {profile.name: profile}
+    test_sources: dict[str, str] = {}
+    story_snapshot: Mapping[str, Any] | None = None
+    story_authoring: Mapping[str, Any] | None = None
+    story_profile: ValidationProfile | None = None
+    if story_validation_bundle is not None:
+        raw_sources = story_validation_bundle.get("test_sources")
+        raw_snapshot = story_validation_bundle.get("snapshot")
+        raw_authoring = story_validation_bundle.get("authoring")
+        if (
+            not isinstance(raw_sources, Mapping)
+            or not raw_sources
+            or any(
+                not isinstance(path, str) or not isinstance(source, str)
+                for path, source in raw_sources.items()
+            )
+            or not isinstance(raw_snapshot, Mapping)
+            or not isinstance(raw_authoring, Mapping)
+            or not isinstance(raw_authoring.get("story_test_links"), Mapping)
+            or not raw_authoring["story_test_links"].get("links")
+            or not isinstance(raw_authoring.get("accepted_story_review"), Mapping)
+            or not isinstance(raw_authoring.get("story_review_evidence"), Mapping)
+        ):
+            raise PowdrrExecutionError("Story validation bundle is incomplete")
+        test_sources = dict(raw_sources)
+        if raw_authoring.get("test_sha256") != fingerprint_test_files(test_sources):
+            raise PowdrrExecutionError(
+                "Story validation test sources differ from reviewed authoring"
+            )
+        story_snapshot = raw_snapshot
+        story_authoring = raw_authoring
+        story_profile = ValidationProfile(
+            name="story-validation",
+            command=pytest_command_for_files(profile, tuple(sorted(test_sources))),
+        )
+        if story_profile.name == profile.name:
+            raise PowdrrExecutionError("Story validation profile name collides")
+        profiles[story_profile.name] = story_profile
     result: dict[str, Any] = {
         "passed": False,
         "retryable": False,
@@ -140,13 +231,14 @@ def dispatch_source_reference_task(
             base_commit=base_commit,
             objective=objective,
             allowed_paths=allowed_paths,
-            profiles={profile.name: profile},
+            profiles=profiles,
             artifact_root=root / "runs",
             run_id="implementation",
             model=model,
             worker_timeout_seconds=worker_timeout_seconds,
             validation_timeout_seconds=validation_timeout_seconds,
             review_client=_ReferenceReviewer(review_client),
+            readonly_support_files=test_sources,
         )
         outcome = run.execute(create_miniswe_inference_handler(worker_timeout_seconds))
         data = outcome.to_data()
@@ -163,7 +255,57 @@ def dispatch_source_reference_task(
         if not outcome.accepted:
             return result
         run.verify_candidate()
-        changed = tuple(attempt["changed_paths"])
+        if story_validation_bundle is not None:
+            assert story_profile is not None
+            assert story_snapshot is not None
+            assert story_authoring is not None
+            story_artifacts = run.public_root / "story-validation"
+            story_artifacts.mkdir()
+            story_environment = os.environ.copy()
+            _remove_provider_credentials(story_environment)
+            for key in tuple(story_environment):
+                if key.startswith("POWDRR_STRUCTRR_"):
+                    story_environment.pop(key)
+            story_result = execute_story_validation(
+                candidate,
+                snapshot=story_snapshot,
+                authoring={**story_authoring, "test_sources": test_sources},
+                profile=profile,
+                repository=str(repo_root.resolve()),
+                artifact_root=run.private_root / "story-executions",
+                timeout_seconds=validation_timeout_seconds,
+                command_wrapper=run.protect_command,
+                environment_overrides=story_environment
+                | run.validation_environment()
+                | {
+                    "PYTHONDONTWRITEBYTECODE": "1",
+                    "PYTEST_ADDOPTS": "-p no:cacheprovider",
+                },
+                artifact_directory=story_artifacts,
+            )
+            run.verify_candidate()
+            coverage = story_result.get("story_coverage", {})
+            if (
+                not story_result.get("passed")
+                or story_result.get("coverage_evidence_error")
+                or not isinstance(coverage, Mapping)
+                or coverage.get("verified") is not True
+            ):
+                result.update(
+                    status="story_validation_failed",
+                    story_validation=story_result,
+                    error=(
+                        "Candidate did not establish the pinned story contract: "
+                        + str(
+                            story_result.get("coverage_evidence_error")
+                            or story_result.get("error")
+                            or coverage.get("stories")
+                        )
+                    ),
+                )
+                return result
+            result["story_validation"] = story_result
+        changed = tuple(sorted(set(attempt["changed_paths"]) | set(test_sources)))
         # The reviewed intent and task metadata are never implementation output.
         reserved = {
             design_path,

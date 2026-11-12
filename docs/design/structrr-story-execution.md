@@ -50,6 +50,12 @@ identities classify old receipts as stale while preserving their recorded result
 An approved amendment needs refreshed authoring, review, and execution before it
 can complete the changed story.
 
+Reviewed source-reference tasks use the same receipts inside the OS-protected
+candidate flow. Their test-author output is frozen into read-only workspace files;
+pytest collection and assertion observation run through the prepared Seatbelt or
+bubblewrap adapter. The source patch transfers only after reference validation,
+task checks, and complete story coverage all pass for that candidate.
+
 `tests/test_story_execution.py` connects a prose interview and confirmed assumption
 to a normal proposal, two implementation allocations plus integration, independent
 scripted MiniSWE authoring, actual execution, implementation repair, and approved

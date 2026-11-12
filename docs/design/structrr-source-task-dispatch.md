@@ -49,6 +49,22 @@ verification command to prepare a [SourceReferenceRun](structrr-reference-rollou
 Mandatory references always use `enforce`; an explicit downgrade is rejected.
 Ordinary items without the selector retain the existing implementation flow.
 
+Items may carry pinned `story_refs`. Before dispatch, Workrr resolves them against
+the reviewed plan proposal and current projected Structrr snapshot, then adds the
+selected story graph and cases to the protected worker objective. The normal
+handoff fingerprint binds that context to the run. Partial implementation items
+use the references as planning context and cannot claim whole-story completion.
+
+For items marked `story_validation: true`, Workrr uses the existing independent
+test author and quality review, then installs the reviewed test sources into the
+candidate before the implementation run. The OS sandbox makes those files
+read-only to the coding worker and to validation processes. The protected run
+executes the task checks and story tests; a second protected observation pass
+collects selectors, assertion events, candidate identity and story receipts. The
+patch transfers only when the story coverage report is verified for every pinned
+case and observation. Missing authoring, a non-pytest validation profile, sandbox
+failure, changed test bytes, stale pins, or incomplete receipts blocks transfer.
+
 The worker runs once in a dedicated clean detached candidate worktree at the exact
 base. Workflow runtime files stay in the task checkout. Independent final validation
 uses the task's existing workflow review client for structured source evidence and
@@ -78,10 +94,10 @@ inspect its artifacts before accepting a new design revision. These temporary
 artifacts follow the host's retention policy and are not a permanent audit store.
 
 The protected adapters require macOS Seatbelt or Linux bubblewrap, plus miniSWE.
-Unsupported platforms and agents block without falling back. Story allocation/validation tasks
-also block until their test-authoring and coverage stages have a protected adapter;
-they cannot silently lose story proof by selecting this path. Legacy feature
-endpoint and CI-repair dispatch retain their own contracts.
+Unsupported platforms and agents block without falling back. Story execution uses
+the repository's pytest adapter; other test frameworks need their own protected
+collection and execution adapter. Legacy feature endpoint and CI-repair dispatch
+retain their own contracts.
 
 The offline native dispatch tests execute the real miniSWE environment, reader
 bridge, behavioral checks, semantic review interface, and accepted patch transfer.

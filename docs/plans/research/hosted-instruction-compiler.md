@@ -22,10 +22,10 @@ described below.
 
 Preserve the semantic and execution guarantees in:
 
-- [Source-anchored semantic contract compilation](../design/source-anchored-semantic-contract-compilation.md).
-- [Single-prompt mini-SWE-agent boundary](../design/external-coding-agent-boundary.md).
-- [Structrr, Procedrr, and Workrr integration](../design/structrr-procedrr-workrr-integration.md).
-- [Bounded-LLM instruction compiler plan](bounded-llm-instruction-compiler.md),
+- [Source-anchored semantic contract compilation](../../design/source-anchored-semantic-contract-compilation.md).
+- [Single-prompt mini-SWE-agent boundary](../../design/external-coding-agent-boundary.md).
+- [Structrr, Procedrr, and Workrr integration](../../design/structrr-procedrr-workrr-integration.md).
+- [Bounded-LLM instruction compiler plan](../superseded/bounded-llm-instruction-compiler.md),
   only for its still-normative source capture and atomic-clause production.
 
 The deployment boundary must preserve those authorities: Structrr owns product

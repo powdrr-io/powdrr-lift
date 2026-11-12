@@ -78,7 +78,7 @@ The template catalog includes public-interface and structural-property criteria 
 
 Treat the proposed diff as a **separate structural acceptance criterion at the end**. With baseline `B0`, proposed operations `P`, and independently observed candidate snapshot `B1`, compute the actual diff `A = semantic_diff(B0, B1)`. Verify required structural consequences from `P` against `A` and the snapshots, while separately verifying the feature criteria on that same candidate. Do not require literal equality of operation lists: already-satisfied properties, equivalent implementations, and necessary incidental changes need appropriate evidence and scope review. A body change alone does not establish the requested behavior.
 
-Use the comparison concepts in the [Structrr diff and invariant repair plan](structrr-diff-and-invariant-repair-loop.md) when implementing this verification. This proposal retains its nonblocking prompt-generation rule: missing baseline evidence or an unresolved proposed operation is recorded, and prompt generation continues with the feature criteria and retained requirements. Unknown structural evidence cannot be reported as a passed final check. Failure of a candidate must lead to correction or an explicit unresolved verification result, rather than redefining either contract to fit the candidate.
+Use the comparison concepts in the [Structrr diff and invariant repair plan](../structrr-diff-and-invariant-repair-loop.md) when implementing this verification. This proposal retains its nonblocking prompt-generation rule: missing baseline evidence or an unresolved proposed operation is recorded, and prompt generation continues with the feature criteria and retained requirements. Unknown structural evidence cannot be reported as a passed final check. Failure of a candidate must lead to correction or an explicit unresolved verification result, rather than redefining either contract to fit the candidate.
 
 ### Research informing this design
 
@@ -91,7 +91,7 @@ Use the comparison concepts in the [Structrr diff and invariant repair plan](str
 
 ## 3. DeepSWE evidence and limits
 
-The local corpus contains 114 task instruction files. This proposal draws on **12 complete instructions**, patch structure, and selected solution and validation hunks. It does not claim exhaustive patch review or execution of these tasks. The [evidence manifest](acceptance-criteria-template-evidence.json) records the artifact paths and hashes used for this research.
+The local corpus contains 114 task instruction files. This proposal draws on **12 complete instructions**, patch structure, and selected solution and validation hunks. It does not claim exhaustive patch review or execution of these tasks. The [evidence manifest](../acceptance-criteria-template-evidence.json) records the artifact paths and hashes used for this research.
 
 All paths below are relative to `~/code/powdrr-deep-swe/tasks/`. Each task has `instruction.md`, `solution/solution.patch`, and `tests/test.patch`. Patch line references below refer to lines in the patch file, not lines in the patched repository.
 

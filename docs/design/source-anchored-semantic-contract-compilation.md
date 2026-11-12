@@ -63,7 +63,7 @@ design-to-implementation boundary.
 
 ## Related documents
 
-- `docs/plans/bounded-llm-instruction-compiler.md` owns source capture,
+- `docs/plans/superseded/bounded-llm-instruction-compiler.md` owns source capture,
   sentence segmentation, and atomic-clause production.
 - `docs/design/single-decision-feature-development.md` defines the governing
   single-decision normal form.

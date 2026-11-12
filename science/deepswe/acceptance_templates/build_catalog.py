@@ -10,7 +10,9 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[3]
-DEFAULT_PROPOSAL = ROOT / "docs/plans/acceptance-criteria-template-catalog-proposal.md"
+DEFAULT_PROPOSAL = (
+    ROOT / "docs/plans/research/acceptance-criteria-template-catalog-proposal.md"
+)
 DEFAULT_CATALOG = Path(__file__).with_name("catalog.json")
 
 PREREQUISITES = {

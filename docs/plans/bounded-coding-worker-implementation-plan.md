@@ -20,7 +20,7 @@ The governing rule is:
 > Model activity is not progress, a worker exit is not success, and an existing
 > dirty diff is not evidence that the current work unit changed anything.
 
-This plan complements `docs/plans/bounded-llm-instruction-compiler.md`,
+This plan complements `docs/plans/superseded/bounded-llm-instruction-compiler.md`,
 `docs/design/source-anchored-semantic-contract-compilation.md`, and
 `docs/plans/intent-linked-verification-implementation-plan.md`. The
 source-anchored design is normative for instruction disposition, semantic

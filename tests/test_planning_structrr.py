@@ -1156,6 +1156,58 @@ def test_file_structural_change_omits_unrelated_entity_identity_index() -> None:
     assert len(serialized_input) < 24_000
 
 
+def test_file_structural_change_scopes_planned_paths_to_assigned_units() -> None:
+    target_path = "attestation/scripts/verify-all.sh"
+    subject = BoundStructuralSubject(
+        target_path,
+        "files",
+        "item-0001",
+        "added",
+        ("req-01",),
+        ("unit-0001",),
+        ("anchor-01",),
+        False,
+        target_path,
+    )
+    unit = _unit(
+        "unit-0001",
+        writes=(PlannedWrite(target_path, "implementation", "python", (), ()),),
+    )
+    planned_paths = {target_path} | {
+        f"src/unrelated-generated-module-{index:04d}.py" for index in range(800)
+    }
+    request = build_structural_change_request(
+        subject,
+        projected_baseline={"entities": [], "entity_relationships": [], "files": []},
+        taxonomy_entity_types=("Source file",),
+        planned_paths=planned_paths,
+        known_entity_ids=set(),
+        valid_example={"result": "unchanged", "reason": "Already satisfied."},
+        units=(unit,),
+    )
+
+    serialized_input = build_question_messages(request)[1]["content"]
+
+    assert len(serialized_input) < 24_000
+    assert target_path in serialized_input
+    assert "src/unrelated-generated-module-0000.py" not in serialized_input
+    request.parse_answer(
+        {
+            "result": "change",
+            "desired_content": {"path": target_path},
+            "reason": "The planned file needs to be added.",
+        }
+    )
+    with pytest.raises(PlanningContractError, match="must name a planned write path"):
+        request.parse_answer(
+            {
+                "result": "change",
+                "desired_content": {"path": "src/unrelated-generated-module-0000.py"},
+                "reason": "Unrelated path.",
+            }
+        )
+
+
 def test_structural_change_question_digest_binds_symbol_evidence() -> None:
     baseline = {
         "entities": [{"id": "entity:parse", "type": "Function", "name": "parse"}],

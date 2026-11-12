@@ -717,6 +717,18 @@ def build_parser() -> argparse.ArgumentParser:
     bootstrap_parser = subparsers.add_parser(
         "bootstrap",
         help="Create a validated project context snapshot in an agent worktree.",
+        description=(
+            "Create a Structrr snapshot and run discovered local validation checks. "
+            "The snapshot and check results are retained when checks fail. A run "
+            "with no applicable local checks is unverified and cannot open a PR."
+        ),
+        epilog=(
+            "Exit codes: 0 means checks passed (or no changes were needed); "
+            "1 means bootstrap or artifact creation failed; 2 means one or more "
+            "validation checks failed, were blocked, or timed out; 3 means the "
+            "snapshot is valid but unverified because no checks were discovered. "
+            "A PR may be opened with recorded failed checks for downstream review."
+        ),
     )
     bootstrap_parser.add_argument(
         "--repo-root",
@@ -5249,7 +5261,23 @@ def _run_bootstrap(args: argparse.Namespace) -> int:
             print(f"Report: {result.report_markdown_path}")
         if result.error:
             print(f"Error: {result.error}", file=sys.stderr)
-    return 0 if result.status in {"completed_local", "pr_opened", "no_op"} else 1
+    return _bootstrap_exit_code(result)
+
+
+def _bootstrap_exit_code(result: Any) -> int:
+    if result.status in {"failed", "validation_incomplete"}:
+        return 1
+    if result.status == "completed_unverified":
+        return 3
+    if result.status == "validation_failed" or result.validation_status in {
+        "failed",
+        "blocked",
+        "timed_out",
+    }:
+        return 2
+    if result.status in {"completed_local", "pr_opened", "no_op"}:
+        return 0
+    return 1
 
 
 def _run_check_credentials(args: argparse.Namespace) -> int:

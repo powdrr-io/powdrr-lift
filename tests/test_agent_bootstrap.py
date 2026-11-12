@@ -11,7 +11,11 @@ from typing import Any
 
 import pytest
 
-from powdrr_lift.agent_bootstrap import BootstrapTaskConfig, run_bootstrap_task
+from powdrr_lift.agent_bootstrap import (
+    BootstrapTaskConfig,
+    BootstrapTaskResult,
+    run_bootstrap_task,
+)
 from powdrr_lift.cli import main
 
 
@@ -108,7 +112,7 @@ def test_bootstrap_initializes_an_unborn_local_repository(tmp_path: Path) -> Non
     assert _git(root, "status", "--porcelain") == ""
 
 
-def test_bootstrap_opens_pr_from_an_unborn_repository_and_empty_remote(
+def test_bootstrap_keeps_unverified_unborn_repository_local(
     tmp_path: Path,
 ) -> None:
     root = _empty_repository(tmp_path / "repo")
@@ -142,11 +146,11 @@ def test_bootstrap_opens_pr_from_an_unborn_repository_and_empty_remote(
         runner=runner,
     )
 
-    assert result.status == "pr_opened"
-    assert result.pull_request_url == "https://github.com/acme/repo/pull/77"
+    assert result.status == "completed_unverified"
+    assert result.pull_request_url is None
     assert result.task is not None
     assert result.task.base_branch == "main"
-    assert len(gh_calls) == 1
+    assert not gh_calls
     assert _git(root, "log", "-1", "--format=%s") == (
         "Initialize repository for Powdrr bootstrap"
     )
@@ -386,7 +390,7 @@ def test_bootstrap_cli_emits_one_json_result(tmp_path: Path) -> None:
             ]
         )
 
-    assert exit_code == 1
+    assert exit_code == 3
     result = json.loads(stdout.getvalue())
     assert result["status"] == "completed_unverified"
     assert result["branch"].startswith("powdrr/sample-onboarding-")
@@ -412,7 +416,7 @@ def test_bootstrap_cli_prints_live_progress_for_text_output(tmp_path: Path) -> N
         )
 
     output = stdout.getvalue()
-    assert exit_code == 1
+    assert exit_code == 3
     assert "Bootstrap: Preparing an isolated worktree." in output
     assert "Bootstrap: Scanning repository sources" in output
     assert "Bootstrap: No applicable local validation checks found." in output
@@ -488,7 +492,7 @@ def test_bootstrap_open_pr_publishes_only_onboarding_changes(tmp_path: Path) -> 
     assert set(changed_paths) == set(result.changed_paths)
 
 
-def test_bootstrap_opens_pr_when_no_validation_checks_are_discovered(
+def test_bootstrap_does_not_open_pr_when_no_validation_checks_are_discovered(
     tmp_path: Path,
 ) -> None:
     root = _repository(tmp_path / "repo")
@@ -525,6 +529,61 @@ def test_bootstrap_opens_pr_when_no_validation_checks_are_discovered(
     )
 
     assert result.validation_status == "no_checks"
-    assert result.status == "pr_opened"
-    assert result.pull_request_url == "https://github.com/acme/repo/pull/43"
-    assert len(gh_calls) == 1
+    assert result.status == "completed_unverified"
+    assert result.pull_request_url is None
+    assert not gh_calls
+
+
+@pytest.mark.parametrize(
+    ("status", "validation_status", "expected_exit_code"),
+    [
+        ("completed_local", "passed", 0),
+        ("pr_opened", "passed", 0),
+        ("pr_opened", "failed", 2),
+        ("validation_failed", "blocked", 2),
+        ("completed_unverified", "no_checks", 3),
+        ("failed", None, 1),
+    ],
+)
+def test_bootstrap_cli_exit_codes_reflect_bootstrap_outcome(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    status: str,
+    validation_status: str | None,
+    expected_exit_code: int,
+) -> None:
+    root = _repository(tmp_path / "repo")
+    result = BootstrapTaskResult(
+        status=status,
+        task=None,
+        bootstrap=None,
+        changed_paths=(),
+        pull_request_url=None,
+        report_json_path=None,
+        report_markdown_path=None,
+        validation_status=validation_status,
+    )
+    monkeypatch.setattr(
+        "powdrr_lift.cli.run_bootstrap_task",
+        lambda *_args, **_kwargs: result,
+    )
+    stdout = io.StringIO()
+
+    with redirect_stdout(stdout):
+        exit_code = main(["bootstrap", "--repo-root", str(root), "--json"])
+
+    assert exit_code == expected_exit_code
+    assert json.loads(stdout.getvalue())["status"] == status
+
+
+def test_bootstrap_help_documents_exit_codes_and_unverified_behavior(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    with pytest.raises(SystemExit) as error:
+        main(["bootstrap", "--help"])
+
+    assert error.value.code == 0
+    help_text = " ".join(capsys.readouterr().out.split())
+    assert "no applicable local checks is unverified" in help_text
+    assert "Exit codes: 0 means checks passed" in help_text
+    assert "A PR may be opened with recorded failed checks" in help_text

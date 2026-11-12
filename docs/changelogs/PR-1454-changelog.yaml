@@ -1,0 +1,107 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1454
+title: Enforce bootstrap validation exit outcomes
+intent:
+  problem: Bootstrap can open a PR when no local checks were discovered, and the CLI does not distinguish unverified runs or failed validation from operational failures.
+  goal: Prevent publication of unverified no-check snapshots, expose distinct bootstrap exit outcomes, and document downstream handling of recorded failed checks.
+human-decisions: []
+structured_files: []
+files:
+- path: README.md
+  type: modified
+  span:
+    start_line: 223
+    end_line: 230
+  summary: Explain that bootstrap runs discovered checks, retains failed results, and does not open a PR when no applicable checks exist.
+  rationale: Set accurate expectations for the onboarding workflow and publication behavior.
+- path: README.md
+  type: modified
+  span:
+    start_line: 236
+    end_line: 242
+  summary: Document bootstrap exit codes for success, operational failure, validation failure, and unverified no-check runs.
+  rationale: Let callers interpret command outcomes without treating exit status as the downstream PR readiness decision.
+- path: src/powdrr_lift/agent_bootstrap.py
+  type: modified
+  span:
+    start_line: 295
+    end_line: 295
+  summary: Skip bootstrap PR publication when no local validation checks were found.
+  rationale: Keep unverified snapshots local until a check baseline can be established.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 720
+    end_line: 731
+  summary: Describe bootstrap verification and publication behavior and list CLI exit codes in command help.
+  rationale: Make outcome semantics visible to CLI users.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 5264
+    end_line: 5280
+  summary: Map bootstrap outcomes to success, operational failure, validation failure, or unverified exit codes.
+  rationale: Distinguish valid snapshots with failing checks from artifacts that could not be produced.
+- path: tests/test_agent_bootstrap.py
+  type: modified
+  span:
+    start_line: 14
+    end_line: 18
+  summary: Import the bootstrap result model for CLI outcome tests.
+  rationale: Construct controlled bootstrap outcomes without rerunning the task for each exit-code case.
+- path: tests/test_agent_bootstrap.py
+  type: modified
+  span:
+    start_line: 115
+    end_line: 115
+  summary: Rename the unborn repository test to describe its unverified local result.
+  rationale: Align the test name with the no-check publication rule.
+- path: tests/test_agent_bootstrap.py
+  type: modified
+  span:
+    start_line: 149
+    end_line: 150
+  summary: Assert an unborn repository with no checks is unverified and has no pull request URL.
+  rationale: Prevent publication when the baseline is unverified.
+- path: tests/test_agent_bootstrap.py
+  type: modified
+  span:
+    start_line: 153
+    end_line: 153
+  summary: Assert no GitHub PR creation was attempted for the unverified run.
+  rationale: Verify the no-check path remains local.
+- path: tests/test_agent_bootstrap.py
+  type: modified
+  span:
+    start_line: 393
+    end_line: 393
+  summary: Assert a no-check JSON bootstrap returns the unverified exit code.
+  rationale: Keep machine-readable invocations consistent with the exit-code contract.
+- path: tests/test_agent_bootstrap.py
+  type: modified
+  span:
+    start_line: 419
+    end_line: 419
+  summary: Assert human-readable no-check bootstrap returns the unverified exit code.
+  rationale: Keep text-mode invocations consistent with the exit-code contract.
+- path: tests/test_agent_bootstrap.py
+  type: modified
+  span:
+    start_line: 495
+    end_line: 495
+  summary: Rename the no-check publication test to describe that no PR is opened.
+  rationale: Clarify the intended behavior for incomplete validation discovery.
+- path: tests/test_agent_bootstrap.py
+  type: modified
+  span:
+    start_line: 532
+    end_line: 589
+  summary: Assert no-check bootstrap does not call GitHub PR creation; cover CLI exit-code mapping for successful, failed, unverified, and operational outcomes; and verify help text documents the contract.
+  rationale: Prevent regressions in the publication gate and keep exit semantics aligned with their user-facing documentation.
+entities:
+- id: bootstrap-cli-exit-code-mapping
+  type: Function
+  action: added
+entity_relationships: []
+invariants: []
+guidance: []

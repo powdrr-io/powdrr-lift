@@ -292,7 +292,7 @@ def run_bootstrap_task(
             "Bootstrap repository structure",
             runner=runner,
         )
-        if config.open_pr and has_commit:
+        if config.open_pr and has_commit and validation_status != "no_checks":
             failure_stage = "publication"
             _emit_bootstrap_progress(progress, "Opening the bootstrap pull request.")
             pull_request_url = publish_pull_request(

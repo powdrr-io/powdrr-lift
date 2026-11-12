@@ -1,6 +1,6 @@
 # Frozen Structrr reference catalog
 
-Step 2 of the [source references plan](../plans/structrr-source-references.md)
+Step 2 of the [source references plan](../plans/completed/structrr-source-references.md)
 implements a pure, immutable worker-context projection. It does not read source
 files, call providers, install accepted state, or infer meaning from annotations.
 

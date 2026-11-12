@@ -3,7 +3,7 @@
 The service represents customer behavior with four version 1 collections:
 `user_stories`, `user_story_steps`, `user_story_transitions`, and
 `user_story_cases`. They are optional in older documents. Omitting them declares
-no story coverage. See the [implementation plan](../plans/structrr-user-stories-and-behavioral-testing.md)
+no story coverage. See the [implementation plan](../plans/completed/structrr-user-stories-and-behavioral-testing.md)
 for the normative fields and later interview, planning, and verification work.
 
 The first implementation slice provides typed declarations, strict parsing,

@@ -1,38 +1,34 @@
 # Structrr references in source and automatic miniSWE context
 
-Status: implementation in progress. Step 1 (Python parser and scope index) is
-implemented in `packages/service/src/powdrr_service/structrr/source_references.py`
-with tests in `tests/test_structrr_source_references.py`. Step 2 (frozen catalog,
-canonical definitions, lifecycle resolution, and authorized amendments) is
-implemented in the service's `structrr/reference_catalog.py` and
-`structrr/reference_definitions.py`, with tests in
-`tests/test_structrr_reference_catalog.py`. See
-[the catalog contract](../design/structrr-reference-catalog.md) for schemas,
-adapters, and the caller's authorization responsibility. Step 3 (bounded source
-reader, literal search, context pagination, and digest-keyed cache) is implemented
-in the service's `structrr/source_reader.py`, with the compatibility command in
-`powdrr_lift.structrr.source_reader` and tests in `tests/test_structrr_source_reader.py`.
-See [the reader contract](../design/structrr-source-reader.md). Step 4 (miniSWE
-environment integration and independent observation verification) is implemented
-through the agent's `execution/minisweagent_environment.py`, the local IPC bridge,
-and the service's `structrr/source_observation.py`. See
-[the environment contract](../design/structrr-miniswe-environment.md).
-Step 5 (placement handoffs, shared prompt/validator contracts, and versioned request
-serialization) is implemented in the service's `structrr/source_reference_handoff.py`,
-with compatibility exports under `powdrr_lift.workrr.source_reference_handoff` and
-tests in `tests/test_source_reference_handoff.py`. See
-[the handoff contract](../design/structrr-source-reference-handoff.md).
-Step 6 (independent placement/preservation validation, structured owner review,
-local checks, and validation-report integration) is implemented in the service's
-`structrr/reference_validation.py` and Workrr's `source_reference_validation.py`.
-See [the validation contract](../design/structrr-reference-validation.md) and
-`tests/test_structrr_reference_validation.py`. Step 7 supplies the initial local
-macOS/Linux rollout through `workrr/source_reference_run.py`: immutable private inputs,
-one protected miniSWE invocation, verified context coverage, independent final
-validation, and terminal artifacts. See [the rollout contract](../design/structrr-reference-rollout.md).
-Other platforms require a protection adapter and fail closed today. The modules
-marked **new** below identify the original implementation stages. Legacy module paths refer to the service-owned
-responsibilities described in section 12.4.
+Status: **Complete** for the planned Python source-reference scope on supported
+macOS and Linux protection adapters. The seven implementation stages and the
+section 12 reconciliation workflow are integrated. The last production gap—wiring
+post-worker reconciliation into normal Workrr source-task dispatch—merged in
+[PR #1440](https://github.com/powdrr-io/powdrr-lift/pull/1440); the shared
+reconciliation engine, CLI, and deterministic edit path merged in
+[PR #1436](https://github.com/powdrr-io/powdrr-lift/pull/1436).
+
+| Stage | Current implementation | Regression coverage |
+| --- | --- | --- |
+| Python annotation parsing and owner indexing | `packages/service/src/powdrr_service/structrr/source_references.py` | `tests/test_structrr_source_references.py` |
+| Frozen canonical catalog and lifecycle resolution | `packages/service/src/powdrr_service/structrr/reference_catalog.py`, `reference_definitions.py` | `tests/test_structrr_reference_catalog.py` |
+| Bounded source reader and context enrichment | `packages/service/src/powdrr_service/structrr/source_reader.py`, agent environment and observation adapters | `tests/test_structrr_source_reader.py`, `tests/test_minisweagent_environment.py` |
+| Placement handoff and immutable request contract | `packages/service/src/powdrr_service/structrr/source_reference_handoff.py` | `tests/test_source_reference_handoff.py` |
+| Independent placement and preservation validation | `packages/service/src/powdrr_service/structrr/reference_validation.py`, `src/powdrr_lift/workrr/source_reference_validation.py` | `tests/test_structrr_reference_validation.py` |
+| Protected Workrr execution and patch transfer | `src/powdrr_lift/workrr/source_reference_run.py`, `source_reference_dispatch.py` | `tests/test_source_reference_run.py`, `tests/test_source_reference_dispatch.py` |
+| Reciprocal reconciliation and deterministic annotation edits | `packages/service/src/powdrr_service/structrr/reference_reconciliation.py`, `reference_editing.py`, `src/powdrr_lift/workrr/source_reference_postrun.py` | `tests/test_structrr_reference_reconciliation.py`, `tests/test_source_reference_dispatch.py` |
+
+The bootstrap and standalone check/reconcile commands are implemented in
+`src/powdrr_lift/cli.py`. The design contracts remain linked below. The completed
+implementation supports Python on macOS and Linux protection adapters.
+Unsupported platforms and other languages fail closed or remain future work, as
+described by the design.
+Contract references: [catalog](../../design/structrr-reference-catalog.md),
+[reader](../../design/structrr-source-reader.md),
+[environment](../../design/structrr-miniswe-environment.md),
+[handoff](../../design/structrr-source-reference-handoff.md),
+[validation](../../design/structrr-reference-validation.md), and
+[rollout](../../design/structrr-reference-rollout.md).
 
 The pure parser exposes `index_python_source`, `applicable_references`, and
 `find_owner`, with versioned `SourceReferenceIndex` serialization. Parse status
@@ -62,21 +58,30 @@ language-specific comment and scope adapters; do not apply Python token rules to
 them. Bootstrap can backfill references using the reconciliation phase in
 section 12; the same phase can run independently on an existing Structrr document.
 
-## 2. Boundaries and existing implementation
+## 2. Boundaries and implementation ownership
 
-Read these files before changing code:
+The implementation is split across the service, agent, and Workrr packages.
+These are the current entry points and adjacent systems with which source
+references integrate:
 
-| Existing file | Relevant responsibility |
+| Current file | Responsibility |
 | --- | --- |
-| `src/powdrr_lift/workrr/coding_agent.py` | `ImplementationRequest`, prompt rendering, `MiniSWEAgentProvider.run`, configuration and trajectory handling |
-| `src/powdrr_lift/minisweagent_session.py` | Large-task and continuation entry point; constructs environment through `get_environment` |
-| `src/powdrr_lift/structrr/intent.py` | Canonical intent sources, clauses, versions, source wording, supersession |
-| `src/powdrr_lift/structrr/active_intent.py` | `resolve_active_intent`, `ActiveIntentReference`, baseline and feature-overlay semantics |
-| `src/powdrr_lift/structrr/source_manifest.py` | Source fingerprints and comparisons |
+| `src/powdrr_lift/workrr/coding_agent.py` | `ImplementationRequest`, prompt rendering, provider invocation, configuration and trajectory handling |
+| `packages/agent/src/powdrr_agent/execution/minisweagent_session.py` | Large-task and continuation entry point; constructs the configured environment |
+| `src/powdrr_lift/structrr/intent.py` | Compatibility-facing intent source and clause types |
+| `packages/service/src/powdrr_service/structrr/active_intent.py` | Active-intent resolution and baseline/feature-overlay semantics |
+| `packages/service/src/powdrr_service/structrr/source_manifest.py` | Source fingerprints and comparisons |
 | `src/powdrr_lift/workrr/coding_agent_validation.py` | Independent attempt validation and reports |
-| `src/powdrr_lift/workrr/task_agent.py` | Current worker orchestration and inherited-intent checks |
-| `docs/design/external-coding-agent-boundary.md` | Target single-prompt execution and private validation manifest |
-| `docs/design/source-anchored-semantic-contract-compilation.md` | Target design-to-implementation compilation |
+| `src/powdrr_lift/workrr/task_agent.py` | Worker orchestration and inherited-intent checks |
+| `packages/agent/src/powdrr_agent/execution/minisweagent_environment.py` | miniSWE local-environment interception and observation enrichment |
+| `packages/service/src/powdrr_service/structrr/source_references.py` | Python source parsing, owner indexing, marker discovery and applicability |
+| `packages/service/src/powdrr_service/structrr/reference_catalog.py` | Frozen canonical catalog and lifecycle resolution |
+| `packages/service/src/powdrr_service/structrr/reference_reconciliation.py` | Reciprocal reconciliation of source markers and accepted obligations |
+
+The source-reference-specific modules and their tests are indexed at the top of
+this document. The boundary and compilation designs are linked in the contract
+references above; their current paths are `docs/design/external-coding-agent-boundary.md`
+and `docs/design/source-anchored-semantic-contract-compilation.md`.
 
 Observed mini-swe-agent 2.4.6 behavior:
 
@@ -102,7 +107,9 @@ This plan explicitly extends the target boundary's restriction on internal IDs:
 source reference IDs are actionable implementation inputs. Include those IDs
 and resolved statements, but keep private validation manifests, raw Structrr
 snapshots, classifier output and internal workflow state out of worker context.
-Update that boundary document when implementing the handoff integration.
+The handoff integration updated
+`docs/design/external-coding-agent-boundary.md` to document the shared request
+contract and private validation boundary.
 
 ## 3. Annotation syntax and scope
 
@@ -160,11 +167,14 @@ obligation. Do not repeat a feature ID on every helper or put all IDs at a file'
 top to satisfy coverage. A cross-cutting requirement may legitimately have
 multiple explicit owners, specified by the handoff.
 
-## 4. Canonical catalog and lifecycle
+## 4. Canonical catalog and lifecycle (implemented)
 
-Add **new** `src/powdrr_lift/structrr/source_references.py` for immutable models,
-annotation parsing, scope binding and resolution. Add **new**
-`src/powdrr_lift/structrr/reference_catalog.py` for the frozen worker projection.
+The parser and immutable index are implemented in
+`packages/service/src/powdrr_service/structrr/source_references.py`; the frozen
+worker catalog is implemented in
+`packages/service/src/powdrr_service/structrr/reference_catalog.py` and
+`reference_definitions.py`. Compatibility exports remain under
+`src/powdrr_lift/structrr/`.
 Use dataclasses and explicit `to_data`/`from_data` validation consistent with the
 repository. Reject unsupported schema versions and conflicting duplicate IDs.
 
@@ -184,13 +194,12 @@ Define these versioned contracts:
   references, and separate statuses for each check category.
 
 The catalog is a projection of canonical Structrr records, not another writable
-intent store. Adapt existing active clauses using `clause_id` as their ID.
-Add explicit adapters for canonical feature, decision and assumption records in
-the accepted design data. Do not pretend `IntentKind` already supports features
-and assumptions: it currently lists decision, invariant, procedure and guidance.
-If a required kind has no canonical representation, add that representation and
-round-trip validation before enabling its adapter. Never infer an assumption or
-accepted human decision from code comments.
+intent store. Existing active clauses use `clause_id` as their ID. Explicit
+adapters project canonical feature, decision and assumption records from the
+accepted design data; these types are not represented by `IntentKind`, which
+continues to list decision, invariant, procedure and guidance. Each adapter is
+backed by canonical representation and round-trip validation. The catalog never
+infers an assumption or accepted human decision from code comments.
 
 Use the following public API boundaries. Define the named immutable result types
 in their owning modules; keep parsing/resolution free of filesystem side effects.
@@ -253,9 +262,11 @@ active obligation referencing them fails preflight. Post-run affected code
 must replace them through the accepted amendment process. Historical provenance
 belongs in history; v1 source annotations express current applicability.
 
-## 5. Source reader with automatic context
+## 5. Source reader with automatic context (implemented)
 
-Add **new** `src/powdrr_lift/structrr/source_reader.py`, callable as:
+The reader is implemented in
+`packages/service/src/powdrr_service/structrr/source_reader.py`, with a CLI
+compatibility module at `src/powdrr_lift/structrr/source_reader.py`:
 
 ```text
 python -m powdrr_lift.structrr.source_reader read payments/retry.py --start 15 --end 35
@@ -300,19 +311,21 @@ comment discovery can continue when tokenization permits it, but do not claim
 complete inherited context. Binary/encoding failures are explicit diagnostics.
 The reader has no write behavior and does not execute repository code.
 
-## 6. miniSWE environment interception and coverage limits
+## 6. miniSWE environment interception and coverage limits (implemented)
 
-Add **new** `src/powdrr_lift/minisweagent_environment.py` containing
-`StructrrLocalEnvironment`, based on miniSWE's `LocalEnvironment`. Configure:
+`StructrrLocalEnvironment` is implemented in
+`packages/agent/src/powdrr_agent/execution/minisweagent_environment.py`, based on
+miniSWE's `LocalEnvironment`. Its configured import path is:
 
 ```text
-environment.environment_class=powdrr_lift.minisweagent_environment.StructrrLocalEnvironment
+environment.environment_class=powdrr_agent.execution.minisweagent_environment.StructrrLocalEnvironment
 ```
 
 Pass workspace, frozen catalog and event-log paths through validated environment
 configuration fields. Preserve normal miniSWE environment options. Extend the
 configuration model explicitly rather than passing unknown fields to the base.
-Apply it in both CLI launch and `minisweagent_session.py` entry paths, including
+The configured environment is used by both CLI launch and
+`packages/agent/src/powdrr_agent/execution/minisweagent_session.py`, including
 large task files. Verify package importability in Harbor/container runs. Never
 depend on a worktree-local virtual environment or a user-global mini config.
 
@@ -350,12 +363,14 @@ Do not claim a prompt instruction or PATH wrappers enforce that guarantee. This
 implementation makes the reader the default, records coverage, and reports its
 limits honestly.
 
-## 7. Making miniSWE write the references
+## 7. Making miniSWE write the references (implemented)
 
-Add **new** `src/powdrr_lift/workrr/source_reference_handoff.py`. Compile placement
-obligations from the accepted design, atomically with the worker prompt and the
-private validation data. Do not derive mandatory IDs by guessing from a diff.
-The same canonical obligation set must drive prompt rendering and validation.
+Placement handoffs are implemented in
+`packages/service/src/powdrr_service/structrr/source_reference_handoff.py`, with
+compatibility exports at `src/powdrr_lift/workrr/source_reference_handoff.py`.
+The compiler derives obligations from the accepted design and shares the same
+canonical contract between prompt rendering and private validation data. It does
+not infer mandatory IDs from a diff.
 
 Each placement obligation contains:
 
@@ -413,12 +428,14 @@ workflow decides any amendment. A worker cannot self-approve it. Local checks
 during the invocation are allowed; Workrr does not start a second coding process
 or append a repair prompt after post-run validation.
 
-## 8. Independent validation and preservation
+## 8. Independent validation and preservation (implemented)
 
-Add **new** `src/powdrr_lift/structrr/reference_validation.py`. Expose a read-only
-`check` command through the new source-reader module, with catalog and obligation
-inputs supplied by trusted run configuration. Wire its result into the existing
-validation report; references are a separate category from behavioral evidence.
+Independent validation is implemented in
+`packages/service/src/powdrr_service/structrr/reference_validation.py`, with
+Workrr orchestration in `src/powdrr_lift/workrr/source_reference_validation.py`
+and a compatibility export in `src/powdrr_lift/structrr/reference_validation.py`.
+Trusted run configuration supplies catalog and obligation inputs; reference
+findings remain separate from behavioral evidence.
 
 Validation sequence:
 
@@ -472,41 +489,45 @@ reported to the worker; final Python parse failure is a validation failure.
 Context overflow resolved by pagination is not itself a failed implementation;
 an incomplete required retrieval remains visible in telemetry and review.
 
-## 9. Implementation sequence
+## 9. Implementation sequence (complete)
 
-Implement in this order; each step includes its tests before the next integration.
-Use feature branches/worktrees and PRs, following repository instructions.
+The implementation followed this order; all seven steps are complete and their
+current code ownership and regression coverage are summarized at the top of this
+document. The detailed acceptance criteria remain here as the record of intended
+behavior and verification.
 
-1. **Parser and scope index.** Add `source_references.py` and tests. Exit when
-   all scope and false-positive cases in section 10 pass without model calls.
-2. **Frozen catalog adapters.** Add `reference_catalog.py`, canonical kind adapters,
-   lifecycle lookup and round-trip/digest tests. Exit when accepted authority and
-   authorized amendments cannot be confused with candidate edits.
-3. **Reader and search.** Add `source_reader.py` and fixture-based CLI tests.
-   Exit when a body-only read supplies parent context and stale indexes refresh.
-4. **Environment integration.** Add `minisweagent_environment.py`; configure every
-   miniSWE entry path in `coding_agent.py` and `minisweagent_session.py`. Exit when
-   fake-model trajectories show context delivered through the actual formatter
-   and baseline command/submission behavior remains intact.
-5. **Handoff.** Add `source_reference_handoff.py`, placement compilation and prompt
-   rendering. Extend versioned request serialization explicitly, retaining legacy
-   reads with references disabled. Update boundary design docs. Exit when prompt
-   and validator obligations share fingerprints and no private manifest leaks.
-6. **Validation.** Add `reference_validation.py`, baseline preservation comparison,
-   structured semantic-review integration and validation-profile wiring. Exit
-   when wrong-owner ID stuffing fails and legitimate relocation passes.
-7. **Worker orchestration and rollout.** Integrate immutable catalog creation,
-   trusted configuration, artifact recording and terminal results in Workrr.
-   Add offline end-to-end coverage, then an opt-in live-provider smoke test.
+1. **Parser and scope index.** Implemented `source_references.py` and tests; the
+   scope and false-positive cases pass without model calls.
+2. **Frozen catalog adapters.** Implemented `reference_catalog.py`, canonical kind
+   adapters, lifecycle lookup and round-trip/digest tests; accepted authority is
+   distinguished from candidate edits.
+3. **Reader and search.** Implemented `source_reader.py` and fixture-based CLI
+   tests; body-only reads supply parent context and stale indexes refresh.
+4. **Environment integration.** Implemented `minisweagent_environment.py` and
+   configured miniSWE entry paths in `coding_agent.py` and
+   `packages/agent/src/powdrr_agent/execution/minisweagent_session.py`. Fake-model
+   trajectories verify context delivery through the actual formatter and
+   preserve baseline command/submission behavior.
+5. **Handoff.** Implemented `source_reference_handoff.py`, placement compilation,
+   prompt rendering and versioned request serialization, retaining legacy reads
+   with references disabled. The boundary design documents the shared obligations;
+   prompt and validator inputs share fingerprints without exposing private manifests.
+6. **Validation.** Implemented `reference_validation.py`, baseline preservation
+   comparison, structured semantic-review integration and validation-profile
+   wiring; wrong-owner ID stuffing fails and legitimate relocation passes.
+7. **Worker orchestration and rollout.** Integrated immutable catalog creation,
+   trusted configuration, artifact recording and terminal results in Workrr, with
+   offline end-to-end coverage and an opt-in live-provider smoke test.
 
 Add `source_reference_mode` with values `off`, `observe`, `enforce`; default `off`
 for legacy requests lacking a catalog. `observe` enriches reads and records
 findings without gating acceptance. `enforce` requires valid frozen inputs and
 all required reference validations. New requests declaring mandatory placement
 obligations must use `enforce`; they cannot downgrade to `observe` or `off`.
-Record the mode in immutable attempt metadata. Enable enforcement for newly
-compiled reference-bearing tasks after offline acceptance passes. No silent
-fallback to a plain environment if reference initialization fails in enforce mode.
+The mode is recorded in immutable attempt metadata. Newly compiled
+reference-bearing tasks use enforcement after offline acceptance passes. There
+is no silent fallback to a plain environment if reference initialization fails
+in enforce mode.
 
 ## 10. Required verification matrix
 
@@ -573,7 +594,7 @@ Do not claim universal interception of arbitrary shell reads, support for
 unimplemented languages, or semantic correctness established by ID presence.
 Those claims are outside this implementation's guarantees.
 
-## 12. Bootstrap annotation and bidirectional link reconciliation
+## 12. Bootstrap annotation and bidirectional link reconciliation (complete)
 
 ### 12.1. One logical relationship, two artifact representations
 
@@ -706,13 +727,13 @@ change. Existing correct annotations are no-ops; a second run produces no diff.
 
 ### 12.4. Apply as a checked artifact transaction
 
-Add **new** `packages/service/src/powdrr_service/structrr/reference_reconciliation.py` for edge
-normalization, mismatch detection, decision preparation and operation compilation.
-Add **new** `packages/service/src/powdrr_service/structrr/reference_editing.py` for deterministic source
-edits and staged artifact application. Keep provider invocation in orchestration.
-These paths reflect the current service package layout; earlier sections' legacy
-`src/powdrr_lift/structrr/` paths refer to the same responsibilities now owned by
-`packages/service/src/powdrr_service/structrr/`.
+Edge normalization, mismatch detection, decision preparation, and operation
+compilation are implemented in
+`packages/service/src/powdrr_service/structrr/reference_reconciliation.py`.
+Deterministic source edits and staged artifact application are implemented in
+`packages/service/src/powdrr_service/structrr/reference_editing.py`; provider
+invocation remains in orchestration. Earlier sections' legacy
+`src/powdrr_lift/structrr/` paths refer to these service-owned responsibilities.
 
 Persist `structrr-link-reconciliation-v1` with source/document/base digests,
 eligibility-policy version, candidate edges, decisions and their fingerprints,
@@ -740,45 +761,44 @@ edges, reciprocal representations, unchanged Python ASTs and satisfied independe
 placement/behavior obligations. Finish with a fresh read-only consistency scan;
 do not recursively trigger more semantic decisions during that scan.
 
-### 12.5. Bootstrap and later validation entry points
+### 12.5. Bootstrap and later validation entry points (implemented)
 
-Proposed CLI surface:
+Implemented CLI surface:
 
 ```text
-structrr bootstrap --annotate-source
-structrr references reconcile --plan
-structrr references reconcile --apply PLAN
-structrr references check
+powdrr-lift bootstrap-structrr --annotate-source
+powdrr-lift structrr references reconcile --document DOCUMENT --plan
+powdrr-lift structrr references reconcile --document DOCUMENT --apply PLAN
+powdrr-lift structrr references check --document DOCUMENT
 ```
 
-Bootstrap first discovers source subjects and validates/stabilizes canonical IDs,
+Bootstrap discovers source subjects and validates/stabilizes canonical IDs,
 then plans candidate links, asks narrow existence decisions, applies deterministic
-edits, re-indexes and validates the result. The standalone command runs exactly
-the same phase on an existing document. `check` reports findings without mutations
-or provider calls. Reconciliation is explicit, auditable and repeatable.
+edits, re-indexes, and validates the result. The standalone command runs the same
+reconciliation phase on an existing document. `check` reports findings without
+mutations or provider calls. Reconciliation is explicit, auditable, and repeatable.
 
-During later implementation validation, detect inconsistencies and prepare the
-same narrow decisions. Apply accepted corrections through Workrr after miniSWE
-returns, without another coding-agent invocation or repair prompt. This is a
-controlled annotation/binding correction stage, with a separately attributable
-diff. Preserve the original worker diff; rerun affected structural checks after
-correction and verify product-code ASTs remain unchanged. Resolve canonical input
-documents into a new candidate artifact revision rather than mutating the frozen
-worker catalog or private validation manifest. Final reports name both the frozen
-implementation inputs and reconciled output revision.
+Later implementation validation detects mismatches after miniSWE returns and
+applies accepted annotation corrections through Workrr before independent
+validation, without another coding-agent invocation or repair prompt. The
+correction receipt is separately attributable. Workrr rechecks the source digest,
+preserves the worker's product-code AST, and leaves frozen catalog and private
+validation inputs unchanged. A source-only link that would require a new accepted
+placement blocks for a reviewed design amendment; reconciliation cannot create or
+alter accepted intent.
 
-Apply the section 9 modes: `observe` may propose decisions and operations but
+The section 9 modes are enforced: `observe` may propose decisions and operations but
 does not mutate artifacts; `enforce` may apply validated annotation/binding
 corrections and blocks on unresolved required inconsistencies. Correction is
 limited to applicability metadata; canonical intent amendments remain separate.
 
-### 12.6. Implementation order and acceptance cases
+### 12.6. Implementation order and acceptance cases (complete)
 
-After the section 9 parser/catalog work, implement edge normalization and a
-read-only consistency checker. Next add the narrow semantic-decision adapter,
-then deterministic operation compilation and token editing. Finally integrate
-bootstrap, existing-document backfill and post-worker validation. Test with fake
-providers before an opt-in live Jev test.
+After the section 9 parser/catalog work, edge normalization and the read-only
+consistency checker were added, followed by the narrow semantic-decision adapter,
+deterministic operation compilation, token editing, bootstrap integration,
+existing-document backfill, and post-worker validation. Provider behavior is
+covered by fake-provider tests; live provider tests remain opt-in.
 
 Required cases: Structrr-only and source-only links for both `exists` and
 `absent`; duplicate links; missing endpoints; unsupported binding kinds;

@@ -8,7 +8,7 @@ actual user confirmation. The headless `design-interview` semantic compiler
 continues to compile obligations; it does not grant user-confirmation authority.
 
 This implements the second slice of the
-[user stories plan](../plans/structrr-user-stories-and-behavioral-testing.md).
+[user stories plan](../plans/completed/structrr-user-stories-and-behavioral-testing.md).
 Story allocation through implementation plans, behavioral test authoring and
 execution receipts remain later slices.
 

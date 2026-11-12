@@ -1,15 +1,12 @@
 # Structrr User Stories and Behavioral Testing
 
-Status: story contracts, identity allocation, graph validation, digests,
-projection/rebase, bootstrap preservation and queries are implemented. The second
-slice adds interactive story authoring, bounded semantic readiness reviews,
-actual-user digest confirmation and proposal publication. The third slice carries
-pinned stories through planning, multi-PR integration allocation, execution preflight
-and repair, with approved-amendment impact reports. The fourth slice adds finite
-case discovery, pinned test obligations, pytest collection and assertion links,
-and required story test review through the existing author. The fifth slice adds candidate-bound execution receipts, current coverage
-matrices, baseline classification, worker and feature completion gates, and a
-scripted prose-to-execution/amendment regression fixture. See the
+Status: Complete. All five planned implementation slices are integrated:
+Structrr story contracts and diffs; interactive story design; planning and
+approved amendments; story cases and test authoring; and candidate-bound
+execution evidence with completion gates. Protected source-task dispatch now
+carries pinned stories through validation and patch transfer. Deterministic
+end-to-end verification is complete. A live MiniSWE authoring smoke run remains
+opt-in and is not required for plan completion. See the
 [story contracts](../design/structrr-user-stories.md) and
 [interactive story design](../design/structrr-story-interview.md) and
 [story planning](../design/structrr-story-planning.md) and

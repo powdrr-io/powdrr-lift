@@ -1,0 +1,36 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1474
+title: Keep empty validation runs pending
+intent:
+  problem: An empty validation aggregate is treated as passed, so missing check results can satisfy the feature review gate.
+  goal: Keep an aggregate with no validation results pending and report why readiness is unresolved.
+human-decisions: []
+structured_files: []
+files:
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span: {start_line: 4950, end_line: 4951}
+  summary: Mark empty validation aggregates pending and attach a diagnostic error.
+  rationale: Prevent absent check results from satisfying the final review gate.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span: {start_line: 4970, end_line: 4970}
+  summary: Add the empty-result diagnostic to the validation report.
+  rationale: Explain why an aggregate remains pending when it contains no check results.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span: {start_line: 3393, end_line: 3412}
+  summary: Add regression coverage for empty validation aggregates.
+  rationale: Assert missing results stay pending in the stored and returned reports.
+- path: docs/plans/bootstrap-validation-discovery.md
+  type: modified
+  span: {start_line: 13, end_line: 15}
+  summary: Record the empty-result readiness guard and remaining WP8 work.
+  rationale: Keep plan progress aligned with the implemented gate behavior.
+entities: []
+entity_relationships: []
+invariants:
+- id: empty-validation-results-remain-pending
+  description: An aggregate with no validation results cannot report passed readiness.
+  action: added
+guidance: []

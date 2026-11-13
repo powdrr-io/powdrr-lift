@@ -1,0 +1,48 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1465
+title: Constrain structural source references
+intent:
+  problem: Structural subject enumeration exposed BasedPyright reference evidence beside source excerpts, and the model could use the evidence record ID in source_refs even though only source anchors are valid there.
+  goal: Restrict source_refs to supplied source anchors and make the distinction from repository evidence explicit.
+human-decisions: []
+structured_files: []
+files:
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span: {start_line: 889, end_line: 892}
+  summary: Clarify that source_refs must cite source excerpt anchors, not accepted-fact IDs.
+  rationale: Keep BasedPyright path evidence from being mistaken for a source citation.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span: {start_line: 921, end_line: 924}
+  summary: Define source_refs as exact source excerpt reference IDs.
+  rationale: Make the answer field's provenance contract explicit.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span: {start_line: 937, end_line: 938}
+  summary: Pass the allowed source anchors into the structural subject response schema.
+  rationale: Constrain model output to source references valid for the current item.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span: {start_line: 1640, end_line: 1642}
+  summary: Add item-specific source anchors to the schema builder.
+  rationale: Restrict references using the current enumeration scope.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span: {start_line: 1644, end_line: 1652}
+  summary: Define a unique, bounded array of allowed source anchor IDs.
+  rationale: Keep response values within the current scope's source anchors.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span: {start_line: 1656, end_line: 1656}
+  summary: Restrict source_refs to unique supplied anchors in the JSON schema.
+  rationale: Rejects invalid evidence IDs before they can block planning.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span: {start_line: 193, end_line: 215}
+  summary: Verify the schema allows only source anchors and rejects a BasedPyright evidence ID as source_refs.
+  rationale: Prevent regression of the structural enumeration reference mapping failure.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []

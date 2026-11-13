@@ -190,6 +190,29 @@ def test_structural_questions_send_only_relevant_baseline_subjects(
     enumeration_messages = build_question_messages(enumeration)
     enumeration_input = enumeration_messages[1]["content"]
     assert "unindexed path as evidence" in enumeration.exact_question
+    assert "accepted-fact IDs" in enumeration.exact_question
+    source_refs_item_schema = enumeration.answer_schema["properties"]["records"][
+        "items"
+    ]["properties"]["source_refs"]["items"]
+    assert source_refs_item_schema["enum"] == [source_ref]
+    with pytest.raises(PlanningContractError, match="unknown references"):
+        enumeration.parse_answer(
+            {
+                "records": [
+                    {
+                        "section": "entity_relationships",
+                        "subject_ref": None,
+                        "new_identity_description": "Relevant imports projected module",
+                        "action": "added",
+                        "requirement_ids": ["req-01"],
+                        "unit_ids": [unit.id],
+                        "source_refs": ["basedpyright-reference-paths:item-0001"],
+                    }
+                ],
+                "has_more": False,
+                "next_anchor": None,
+            }
+        )
     assert any(
         fact.value.get("code_symbol_coverage", {}).get("status") == "partial"
         for fact in enumeration.accepted_facts

@@ -886,7 +886,10 @@ def build_subject_enumeration_request(
             "relationship identity. Do not infer relationships from shared paths "
             "or names alone. "
             "Cite the requirements, units, and source anchors that "
-            "justify each subject. Omit implementation details that do not change "
+            "justify each subject. For source_refs, copy only exact ref_id values "
+            "from source_excerpts; accepted-fact IDs, including the BasedPyright "
+            "reference-path fact, are not source anchors. Omit implementation "
+            "details that do not change "
             "Structrr. "
             "For an existing subject, copy exactly one supplied subject_ref "
             "from accepted facts; never combine or construct identifiers. "
@@ -915,7 +918,10 @@ def build_subject_enumeration_request(
                 "Supplied requirements affected by the structural change."
             ),
             "unit_ids": "Supplied work units that own the structural change.",
-            "source_refs": "Supplied source anchors justifying the change.",
+            "source_refs": (
+                "Exact source_excerpts ref_id values justifying the change; never "
+                "use accepted-fact IDs."
+            ),
             "has_more": "True when another subject page is required.",
             "next_anchor": (
                 "Copy next_anchor_if_more from accepted facts when has_more is "
@@ -928,7 +934,8 @@ def build_subject_enumeration_request(
         valid_example=valid_example,
         empty_example={"records": [], "has_more": False, "next_anchor": None},
         answer_schema=_subject_page_schema(
-            sections=("entities", "entity_relationships")
+            sections=("entities", "entity_relationships"),
+            source_refs=source_refs,
         ),
         parse_answer=parse,
     )
@@ -1630,12 +1637,23 @@ def _scope_code_symbol_coverage(
 
 
 def _subject_page_schema(
-    *, sections: Sequence[str] = tuple(sorted(_SECTIONS))
+    *,
+    sections: Sequence[str] = tuple(sorted(_SECTIONS)),
+    source_refs: Sequence[str] | None = None,
 ) -> dict[str, Any]:
+    properties = dict(SUBJECT_RECORD_SCHEMA["properties"])
+    if source_refs is not None:
+        properties["source_refs"] = {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": len(source_refs),
+            "uniqueItems": True,
+            "items": {"type": "string", "enum": list(source_refs)},
+        }
     record_schema = {
         **SUBJECT_RECORD_SCHEMA,
         "properties": {
-            **SUBJECT_RECORD_SCHEMA["properties"],
+            **properties,
             "section": {"type": "string", "enum": list(sections)},
             "subject_ref": {
                 "type": ["string", "null"],

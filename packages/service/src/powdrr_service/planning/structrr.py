@@ -1081,8 +1081,11 @@ def build_structural_change_request(
             for write in unit.planned_writes
         }
         if subject.planned_path is not None:
-            unit_planned_paths.add(subject.planned_path)
-        if unit_planned_paths:
+            # This question reviews one file candidate. Other paths from the
+            # same multi-output unit are reviewed independently and only bloat
+            # this question's context.
+            relevant_planned_paths = {subject.planned_path}
+        elif unit_planned_paths:
             relevant_planned_paths = unit_planned_paths
     facts = [
         ContextRecord(
@@ -1095,7 +1098,10 @@ def build_structural_change_request(
             ),
         ),
         *(
-            ContextRecord(f"unit:{unit.id}", unit.to_data())
+            ContextRecord(
+                f"unit:{unit.id}",
+                _structural_change_unit_context(unit, subject),
+            )
             for unit in units
             if unit.id in subject.unit_ids
         ),
@@ -1757,6 +1763,21 @@ def _structural_change_baseline_context(
             for record in relevant_source_subjects
         ],
     }
+
+
+def _structural_change_unit_context(
+    unit: WorkUnit,
+    subject: BoundStructuralSubject,
+) -> dict[str, Any]:
+    """Keep only the candidate file's write in a single-file review context."""
+    data = unit.to_data()
+    if subject.section == "files" and subject.planned_path is not None:
+        data["planned_writes"] = [
+            write.to_data()
+            for write in unit.planned_writes
+            if write.path == subject.planned_path
+        ]
+    return data
 
 
 def _mapping_records(value: Any) -> list[Mapping[str, Any]]:

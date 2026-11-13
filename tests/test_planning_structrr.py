@@ -1169,13 +1169,20 @@ def test_file_structural_change_scopes_planned_paths_to_assigned_units() -> None
         False,
         target_path,
     )
+    unrelated_paths = tuple(
+        f"src/unrelated-generated-module-{index:04d}.py" for index in range(800)
+    )
     unit = _unit(
         "unit-0001",
-        writes=(PlannedWrite(target_path, "implementation", "python", (), ()),),
+        writes=(
+            PlannedWrite(target_path, "implementation", "python", (), ()),
+            *(
+                PlannedWrite(path, "implementation", "python", (), ())
+                for path in unrelated_paths
+            ),
+        ),
     )
-    planned_paths = {target_path} | {
-        f"src/unrelated-generated-module-{index:04d}.py" for index in range(800)
-    }
+    planned_paths = {target_path, *unrelated_paths}
     request = build_structural_change_request(
         subject,
         projected_baseline={"entities": [], "entity_relationships": [], "files": []},

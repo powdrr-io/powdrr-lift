@@ -25,6 +25,7 @@ from urllib.parse import quote
 import yaml
 from powdrr_local.file_lock import Timeout, file_lock
 from powdrr_service.planning.checkpoints import has_complete_checkpoint_archive
+from powdrr_service.decision_obligation import content_fingerprint
 from powdrr_service.planning.plan_document import (
     MANUAL_PREREQUISITE_TRIGGER,  # noqa: F401 - legacy public re-export
     QUEUE_SCHEMA,  # noqa: F401 - legacy public re-export
@@ -2558,8 +2559,9 @@ _CI_OUTCOME_MARKER = "<!-- powdrr-ci-outcome:v1 -->"
 def _read_repository_validation_inventory(
     repo_root: str | Path,
 ) -> dict[str, Any] | None:
-    """Load typed validation obligations from the committed Structrr baseline."""
-    path = Path(repo_root) / "docs/structrr/current/baseline-bootstrap.yaml"
+    """Load typed validation obligations only from a fresh committed baseline."""
+    root = Path(repo_root)
+    path = root / "docs/structrr/current/baseline-bootstrap.yaml"
     try:
         raw = path.read_bytes()
         document = yaml.safe_load(raw)
@@ -2570,6 +2572,56 @@ def _read_repository_validation_inventory(
     inventory = document.get("validation_inventory")
     if not isinstance(inventory, list):
         return None
+    context = document.get("validation_context")
+    if not isinstance(context, Mapping):
+        return None
+    input_fingerprints = context.get("input_fingerprints")
+    if not isinstance(input_fingerprints, list):
+        return None
+    report_path = path.with_suffix(".md")
+    freshness_path = path.with_suffix(".freshness.json")
+    try:
+        report_digest = _sha256_file(report_path)
+        baseline_digest = "sha256:" + hashlib.sha256(raw).hexdigest()
+        freshness = json.loads(freshness_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(freshness, Mapping):
+        return None
+    if (
+        freshness.get("schema_version") != "structrr-baseline-freshness-v1"
+        or freshness.get("baseline_digest") != baseline_digest
+        or freshness.get("report_digest") != report_digest
+        or freshness.get("validation_input_fingerprint")
+        != content_fingerprint(
+            {
+                "validation_inventory": inventory,
+                "validation_context": context,
+            }
+        )
+    ):
+        return None
+    for fingerprint in input_fingerprints:
+        if not isinstance(fingerprint, Mapping):
+            return None
+        input_path = fingerprint.get("path")
+        input_digest = fingerprint.get("digest")
+        if (
+            not isinstance(input_path, str)
+            or not input_path
+            or Path(input_path).is_absolute()
+            or ".." in Path(input_path).parts
+            or not isinstance(input_digest, str)
+        ):
+            return None
+        try:
+            resolved_input = (root / input_path).resolve(strict=True)
+            resolved_input.relative_to(root.resolve())
+            actual_digest = _sha256_file(resolved_input)
+        except (OSError, ValueError):
+            return None
+        if actual_digest != input_digest:
+            return None
     try:
         checks = tuple(
             ValidationCheck.from_data(value).to_data()
@@ -2582,8 +2634,12 @@ def _read_repository_validation_inventory(
         return None
     return {
         "checks": checks,
-        "digest": "sha256:" + hashlib.sha256(raw).hexdigest(),
+        "digest": baseline_digest,
     }
+
+
+def _sha256_file(path: Path) -> str:
+    return "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def _match_required_check_to_inventory(
@@ -2595,7 +2651,7 @@ def _match_required_check_to_inventory(
         return {
             "status": "unavailable",
             "profile_ids": [],
-            "reason": "repository validation inventory is unavailable or invalid",
+            "reason": "fresh repository validation inventory is unavailable",
         }
     check_name = required_check.get("name")
     workflow = required_check.get("workflow")
@@ -2795,7 +2851,7 @@ def _observe_required_ci_outcome(
         )
     if validation_inventory is None:
         outcome = "blocked"
-        reason = "repository validation inventory is unavailable or invalid"
+        reason = "committed validation inventory is missing, invalid, or stale"
     elif not checks or any(not item["name"] for item in checks):
         outcome = "blocked"
         reason = "GitHub returned incomplete required-check data"

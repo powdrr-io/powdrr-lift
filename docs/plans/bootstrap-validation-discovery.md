@@ -19,9 +19,11 @@ request head. Each required check must also match a discovered workflow job in
 the committed validation inventory; missing, ambiguous, and unknown matches
 block review. The inventory digest is retained with the CI outcome checkpoint.
 The feature review aggregate and core validation runner keep empty result sets
-pending, so missing results cannot satisfy the gate. This remains a partial
-implementation of WP8: broader baseline freshness and remote observation
-identity requirements are still outstanding.
+pending, so missing results cannot satisfy the gate. The PR readiness gate
+also verifies the baseline YAML, Markdown report, freshness metadata, and
+fingerprinted validation inputs before using the inventory. This remains a
+partial implementation of WP8: detecting newly added validation inputs and
+the full runtime observation identity are still outstanding.
 The core validation runner also keeps an empty profile selection pending.
 
 ## Objective and delivery contract

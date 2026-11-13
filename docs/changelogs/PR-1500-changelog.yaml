@@ -1,0 +1,103 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1500
+title: Reject out-of-scope source worker delivery
+intent:
+  problem: The protected source route needs explicit boundary evidence that failed or out-of-scope work cannot become a delivered patch and that caller checkout changes cannot count as worker progress.
+  goal: Reject completed worker attempts with out-of-scope edits, retain terminal findings for timeout and policy denial, and prove clean-base progress and verification gates before patch transfer.
+human-decisions: []
+structured_files: []
+files:
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span: {start_line: 1069, end_line: 1074}
+  summary: Reject completed source worker attempts that report out-of-scope paths.
+  rationale: Enforce accepted path scope at the prepared run boundary and preserve the violation as a policy finding.
+- path: tests/test_source_reference_run.py
+  type: modified
+  span: {start_line: 16, end_line: 27}
+  summary: Import protected-run outcome and validation types used by the new acceptance fixtures.
+  rationale: Construct terminal failure receipts at the prepared source-run boundary.
+- path: tests/test_source_reference_run.py
+  type: modified
+  span: {start_line: 475, end_line: 542}
+  summary: Cover out-of-scope completion and non-completed timeout or policy-denial terminal outcomes.
+  rationale: Prove failed protected invocations remain unaccepted and retain attributable terminal receipts.
+- path: tests/test_source_reference_dispatch.py
+  type: modified
+  span: {start_line: 613, end_line: 621}
+  summary: Add a native dispatch scenario for a dirty caller checkout with a no-progress worker.
+  rationale: Exercise the reviewed-base candidate boundary through protected dispatch.
+- path: tests/test_source_reference_dispatch.py
+  type: modified
+  span: {start_line: 635, end_line: 637}
+  summary: Seed a pre-existing caller edit before protected dispatch.
+  rationale: Ensure the caller’s uncommitted state is not included in the worker candidate.
+- path: tests/test_source_reference_dispatch.py
+  type: modified
+  span: {start_line: 645, end_line: 646}
+  summary: Assert the isolated candidate begins from the reviewed baseline.
+  rationale: Prove caller changes cannot be mistaken for worker progress.
+- path: tests/test_source_reference_dispatch.py
+  type: modified
+  span: {start_line: 671, end_line: 672}
+  summary: Make the no-progress fixture leave the candidate unchanged.
+  rationale: Verify unchanged source work does not produce an accepted patch.
+- path: tests/test_source_reference_dispatch.py
+  type: modified
+  span: {start_line: 732, end_line: 736}
+  summary: Assert no-progress preserves the caller edit and exports no patch.
+  rationale: Ensure pre-existing caller changes survive without satisfying worker progress.
+- path: tests/test_source_reference_dispatch.py
+  type: modified
+  span: {start_line: 742, end_line: 743}
+  summary: Assert failed behavior verification blocks patch transfer.
+  rationale: Keep local validation as a required delivery gate.
+- path: docs/plans/implementation-contract-and-verification.md
+  type: modified
+  span: {start_line: 3, end_line: 6}
+  summary: Mark milestones 1–4 accepted and milestone 5 remaining.
+  rationale: Align plan status with the accepted protected source route.
+- path: docs/plans/implementation-contract-and-verification.md
+  type: modified
+  span: {start_line: 21, end_line: 21}
+  summary: Identify milestone 5 as the remaining milestone.
+  rationale: Keep the plan’s completion inventory current.
+- path: docs/plans/implementation-contract-and-verification.md
+  type: modified
+  span: {start_line: 24, end_line: 24}
+  summary: Record PR #1497 as the latest merged implementation baseline.
+  rationale: Anchor the plan to the reviewed source state.
+- path: docs/plans/implementation-contract-and-verification.md
+  type: modified
+  span: {start_line: 102, end_line: 102}
+  summary: Remove stale milestone status from the route inventory.
+  rationale: Avoid contradicting the current accepted milestone state.
+- path: docs/plans/implementation-contract-and-verification.md
+  type: modified
+  span: {start_line: 200, end_line: 207}
+  summary: Record milestone 4 safeguards and acceptance evidence.
+  rationale: Document scope enforcement, terminal failure outcomes, and reviewed-base progress evidence.
+- path: docs/plans/implementation-contract-and-verification.md
+  type: modified
+  span: {start_line: 230, end_line: 232}
+  summary: Keep the plan active until milestone 5 and final route/evidence inventory acceptance.
+  rationale: Keep plan status and implementation evidence aligned with the protected source route.
+entities:
+- id: source-run-delivery-boundary-fixtures
+  type: Integration test
+  action: added
+- id: protected-source-worker-scope-enforcement
+  type: Policy-as-code rule
+  action: added
+invariants:
+- id: out-of-scope-source-edits-block-delivery
+  description: A completed protected source worker attempt with changes outside accepted scope is a policy violation and cannot be accepted.
+  action: added
+- id: caller-checkout-edits-are-not-worker-progress
+  description: Source candidates start from the reviewed base, so pre-existing caller changes cannot satisfy worker progress or enter the candidate patch.
+  action: added
+guidance:
+- id: persist-failed-protected-run-receipts
+  description: Retain timeout, policy-denial, and validation findings in the terminal artifact and require a new reviewed run for retry.
+  action: added
+entity_relationships: []

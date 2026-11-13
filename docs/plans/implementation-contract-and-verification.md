@@ -8,12 +8,14 @@ handoff and audits story receipts in enforce mode against the execution
 candidate; it requires that report before patch transfer. Protected source runs
 now emit candidate-tree-bound route records, including explicit `not_collected`
 outcomes for behavior and review routes without connected evidence adapters.
-Those records are not yet an acceptance gate. Retained-intent gates and
-candidate-bound receipts for each route remain.
+Exact route reconciliation rejects missing, duplicate, unlinked, stale, and
+non-passing records. The reconciled result is not yet an acceptance gate.
+Retained-intent gates and trusted candidate-bound receipts for the remaining
+routes remain.
 Milestones 4–5 remain.
 
 Audited code baseline for this inventory: `feafe5b7b22bf7cd98dee9b06797ea87af558a4c`.
-Latest implementation review baseline: `03edeafc` (PR #1474).
+Latest implementation review baseline: `5a72076933b50f994b2774fa879a8f9432f50c5b` (PR #1475).
 
 This plan replaces the intent-linked verification, evidence-backed prompt
 contract closure, and bounded coding-worker plans in `superseded/`. Those
@@ -137,10 +139,13 @@ to pass before transferring the patch. Protected source runs now persist one
 route record per compiled route against the final candidate identity.
 Structural routes report changed accepted owner paths; routes without a trusted
 producer report `not_collected`, so an unrelated passing command cannot be
-misrepresented as route evidence. This report is not yet consumed by the
-acceptance decision. Add trusted producers and exact receipt reconciliation,
-then gate acceptance on complete route coverage. Fixtures for unlinked and
-duplicate evidence and body-only regressions remain.
+misrepresented as route evidence. Exact route reconciliation now requires one
+passing record for each compiled obligation-route pair on the candidate and
+rejects missing, duplicate, unlinked, stale, and non-passing records. This
+reconciliation is not yet consumed by the acceptance decision. Add trusted
+producers for the remaining routes, then gate acceptance on complete route
+coverage. New reconciliation fixtures reject missing, duplicate, unlinked, stale,
+and non-passing route records. A body-only regression fixture remains.
 
 ### 4. Finish bounded execution and delivery migration
 

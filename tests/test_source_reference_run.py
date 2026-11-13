@@ -218,6 +218,11 @@ def test_candidate_route_evidence_is_scoped_and_marks_uncollected_routes(
 
     assert result["candidate_tree"] == "sha256:candidate-tree"
     assert result["complete"] is False
+    assert result["reconciliation"]["passed"] is False
+    assert result["reconciliation"]["expected_route_count"] == len(result["routes"])
+    assert "not_collected" in {
+        issue["kind"] for issue in result["reconciliation"]["issues"]
+    }
     routes = {(item["obligation_id"], item["route"]): item for item in result["routes"]}
     assert routes[("place:helper", "structural_diff")]["status"] == "passed"
     assert routes[("place:helper", "structural_diff")]["evidence_paths"] == ["retry.py"]

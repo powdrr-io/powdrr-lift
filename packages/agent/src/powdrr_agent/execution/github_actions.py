@@ -8,6 +8,8 @@ import subprocess
 import tempfile
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
+from datetime import UTC, datetime
+from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
@@ -24,6 +26,159 @@ class GitHubActionsSnapshot:
     jobs_by_run: Mapping[str, tuple[Mapping[str, Any], ...]]
     annotations_by_check_run: Mapping[str, tuple[Mapping[str, Any], ...]]
     changed_paths: tuple[str, ...] = ()
+    observed_at: str | None = None
+
+
+class RemoteCheckObservationStatus(StrEnum):
+    PASSED = "passed"
+    FAILED = "failed"
+    PENDING = "pending"
+    UNKNOWN = "unknown"
+
+
+@dataclass(frozen=True, slots=True)
+class RemoteCheckObservation:
+    """A current-head observation for one declared workflow job."""
+
+    profile: str
+    workflow: str
+    job_name: str
+    status: RemoteCheckObservationStatus
+    head_sha: str | None
+    observed_at: str | None
+    run_id: int | None = None
+    check_run_id: int | None = None
+    conclusion: str | None = None
+    reason: str | None = None
+
+    def to_data(self) -> dict[str, Any]:
+        return {
+            "profile": self.profile,
+            "workflow": self.workflow,
+            "job_name": self.job_name,
+            "status": self.status.value,
+            "head_sha": self.head_sha,
+            "observed_at": self.observed_at,
+            "run_id": self.run_id,
+            "check_run_id": self.check_run_id,
+            "conclusion": self.conclusion,
+            "reason": self.reason,
+        }
+
+
+def observe_required_checks(
+    snapshot: GitHubActionsSnapshot,
+    expected_checks: Sequence[Mapping[str, str]],
+) -> tuple[RemoteCheckObservation, ...]:
+    """Match required checks to workflow jobs on the snapshot's current PR head."""
+    pull_request_head = snapshot.pull_request.get("head")
+    head_sha = (
+        pull_request_head.get("sha") if isinstance(pull_request_head, Mapping) else None
+    )
+    if not isinstance(head_sha, str) or not head_sha:
+        head_sha = None
+
+    observations: list[RemoteCheckObservation] = []
+    for expected in expected_checks:
+        profile = expected.get("profile", "")
+        workflow = expected.get("workflow", "")
+        job_name = expected.get("job_name", "")
+        base = {
+            "profile": profile,
+            "workflow": workflow,
+            "job_name": job_name,
+            "head_sha": head_sha,
+            "observed_at": snapshot.observed_at,
+        }
+        if not all(
+            isinstance(value, str) and value.strip()
+            for value in (profile, workflow, job_name)
+        ):
+            observations.append(
+                RemoteCheckObservation(
+                    **base,
+                    status=RemoteCheckObservationStatus.UNKNOWN,
+                    reason="required check identity is incomplete",
+                )
+            )
+            continue
+        if head_sha is None:
+            observations.append(
+                RemoteCheckObservation(
+                    **base,
+                    status=RemoteCheckObservationStatus.UNKNOWN,
+                    reason="pull request head SHA is unavailable",
+                )
+            )
+            continue
+
+        matching_runs = [
+            run
+            for run in snapshot.runs
+            if run.get("head_sha") == head_sha and run.get("path") == workflow
+        ]
+        latest_run = max(
+            matching_runs,
+            key=lambda run: (
+                str(run.get("updated_at", run.get("created_at", ""))),
+                int(run.get("id", 0)) if isinstance(run.get("id"), int) else 0,
+            ),
+            default=None,
+        )
+        run_id = latest_run.get("id") if latest_run else None
+        jobs = snapshot.jobs_by_run.get(str(run_id), ()) if run_id is not None else ()
+        matching_jobs = [job for job in jobs if job.get("name") == job_name]
+        if len(matching_jobs) != 1:
+            observations.append(
+                RemoteCheckObservation(
+                    **base,
+                    status=RemoteCheckObservationStatus.UNKNOWN,
+                    run_id=run_id if isinstance(run_id, int) else None,
+                    reason=(
+                        "no matching job was observed on the current head"
+                        if not matching_jobs
+                        else "multiple jobs matched the declared identity"
+                    ),
+                )
+            )
+            continue
+
+        job = matching_jobs[0]
+        raw_status = job.get("status")
+        conclusion = job.get("conclusion")
+        if raw_status != "completed":
+            status = RemoteCheckObservationStatus.PENDING
+            reason = f"remote job status is {raw_status or 'unknown'}"
+        elif conclusion == "success":
+            status = RemoteCheckObservationStatus.PASSED
+            reason = None
+        elif conclusion in {
+            "failure",
+            "cancelled",
+            "timed_out",
+            "action_required",
+            "startup_failure",
+        }:
+            status = RemoteCheckObservationStatus.FAILED
+            reason = f"remote job concluded {conclusion}"
+        else:
+            status = RemoteCheckObservationStatus.UNKNOWN
+            reason = (
+                f"remote job conclusion {conclusion or 'is unavailable'} "
+                "is not a success"
+            )
+        check_run_id = job.get("id")
+        observations.append(
+            RemoteCheckObservation(
+                **base,
+                status=status,
+                run_id=run_id if isinstance(run_id, int) else None,
+                check_run_id=check_run_id if isinstance(check_run_id, int) else None,
+                conclusion=conclusion if isinstance(conclusion, str) else None,
+                reason=reason,
+            )
+        )
+    return tuple(observations)
 
 
 @dataclass(frozen=True, slots=True)
@@ -140,6 +295,7 @@ class GitHubActionsClient:
             jobs_by_run=jobs_by_run,
             annotations_by_check_run=annotations,
             changed_paths=changed_paths,
+            observed_at=datetime.now(UTC).isoformat(),
         )
 
     def get_issue(self, issue_number: int) -> Mapping[str, Any]:
@@ -348,5 +504,8 @@ __all__ = [
     "GitHubActionsError",
     "GitHubActionsSnapshot",
     "LocalCommandRun",
+    "RemoteCheckObservation",
+    "RemoteCheckObservationStatus",
     "execute_pinned_local_command",
+    "observe_required_checks",
 ]

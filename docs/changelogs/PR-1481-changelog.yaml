@@ -1,0 +1,69 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1481
+title: Observe remote validation checks
+intent:
+  problem: Remote GitHub Actions outcomes are not yet represented as validation evidence tied to the current pull request head.
+  goal: Normalize declared workflow job observations into explicit passed, failed, pending, or unknown records with provenance.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/plans/bootstrap-validation-discovery.md
+  type: modified
+  span: {start_line: 16, end_line: 20}
+  summary: Record current-head job observation support and the remaining readiness integration work.
+  rationale: Keep WP8 status aligned with the implemented remote observation boundary.
+- path: packages/agent/src/powdrr_agent/execution/github_actions.py
+  type: modified
+  span: {start_line: 11, end_line: 12}
+  summary: Import UTC timestamps and the status enum used by remote observations.
+  rationale: Support timestamped, typed outcomes for declared remote checks.
+- path: packages/agent/src/powdrr_agent/execution/github_actions.py
+  type: modified
+  span: {start_line: 29, end_line: 181}
+  summary: Add timestamped remote check observations matched by workflow, job, and current pull request head.
+  rationale: Preserve remote outcomes and their provenance while keeping stale, missing, ambiguous, and non-success conclusions unresolved.
+- path: packages/agent/src/powdrr_agent/execution/github_actions.py
+  type: modified
+  span: {start_line: 298, end_line: 298}
+  summary: Timestamp GitHub Actions snapshots when they are observed.
+  rationale: Make the age of remote validation evidence explicit.
+- path: packages/agent/src/powdrr_agent/execution/github_actions.py
+  type: modified
+  span: {start_line: 507, end_line: 508}
+  summary: Export the remote observation records and normalization function.
+  rationale: Make the new observation boundary available to callers.
+- path: packages/agent/src/powdrr_agent/execution/github_actions.py
+  type: modified
+  span: {start_line: 510, end_line: 510}
+  summary: Export the required check observation function.
+  rationale: Make the normalizer available to callers.
+- path: tests/test_github_actions_transport.py
+  type: modified
+  span: {start_line: 11, end_line: 12}
+  summary: Import the snapshot and observation status used in transport tests.
+  rationale: Exercise the remote outcome normalization contract.
+- path: tests/test_github_actions_transport.py
+  type: modified
+  span: {start_line: 14, end_line: 14}
+  summary: Import the required check observation function for coverage.
+  rationale: Test the current-head matcher directly.
+- path: tests/test_github_actions_transport.py
+  type: modified
+  span: {start_line: 87, end_line: 87}
+  summary: Assert GitHub Actions snapshots include an observation timestamp.
+  rationale: Verify observation provenance is captured during snapshot collection.
+- path: tests/test_github_actions_transport.py
+  type: modified
+  span: {start_line: 91, end_line: 175}
+  summary: Cover successful, failed, pending, skipped, missing, and stale-head required check observations.
+  rationale: Ensure only a unique successful job on the current pull request head is marked passed.
+entities: []
+entity_relationships: []
+invariants:
+- id: remote-checks-current-head-only
+  description: A remote check is passed only when its unique matching job succeeded on the current pull request head.
+  action: added
+- id: unknown-remote-validation-unresolved
+  description: Missing, ambiguous, skipped, and unsupported remote outcomes remain unresolved.
+  action: added
+guidance: []

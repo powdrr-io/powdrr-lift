@@ -14,6 +14,7 @@ import pytest
 from powdrr_lift.agent_bootstrap import (
     BootstrapTaskConfig,
     BootstrapTaskResult,
+    _validation_runtime_identity,
     run_bootstrap_task,
 )
 from powdrr_lift.cli import main
@@ -232,6 +233,77 @@ def test_bootstrap_runs_discovered_validation_and_records_pass(
     )
     assert check["baseline"]["status"] == "passed"
     assert check["confirmation"]["level"] == "execution"
+    observation = check["baseline"]["observation"]
+    identity = observation["runtime_identity"]
+    assert identity["schema_version"] == "validation-runtime-identity-v1"
+    assert identity["source"]["product_digest"]
+    assert identity["check"]["command"] == check["command"]
+    assert identity["runtime"]["python_version"]
+    assert identity["runtime"]["interpreter_version"]["status"] == "observed"
+    assert identity["runtime"]["tool_version"]["status"] == "observed"
+    assert identity["fingerprint"].startswith("sha256:")
+    assert result.bootstrap.report_path is not None
+    assert identity["fingerprint"] in result.bootstrap.report_path.read_text(
+        encoding="utf-8"
+    )
+
+
+def test_validation_runtime_identity_changes_with_source_inputs_and_tool_version(
+    tmp_path: Path,
+) -> None:
+    worktree = tmp_path / "repo"
+    worktree.mkdir()
+    check = {
+        "id": "validation:ruff-check",
+        "provider": "ruff",
+        "command": ["ruff", "check", "."],
+        "execution": {"kind": "argv", "cwd": "."},
+        "environment": "uv:root",
+        "component": "python-component:root",
+        "selectors": ["."],
+        "config_files": ["pyproject.toml", "uv.lock"],
+        "settings": {},
+        "depends_on": [],
+    }
+    document: dict[str, Any] = {
+        "source_manifest": {"product_digest": "sha256:source-one"},
+        "validation_context": {
+            "environments": [{"id": "uv:root", "manager": "uv"}],
+            "input_fingerprints": [{"path": "uv.lock", "digest": "sha256:lock-one"}],
+        },
+    }
+    tool_version = "ruff 1.0.0"
+
+    def runner(
+        command: Sequence[str], **kwargs: Any
+    ) -> subprocess.CompletedProcess[str]:
+        del kwargs
+        return subprocess.CompletedProcess(list(command), 0, tool_version + "\n", "")
+
+    def identity() -> dict[str, Any]:
+        return _validation_runtime_identity(
+            check,
+            document,
+            worktree=worktree,
+            cwd=worktree,
+            environment={"PATH": "/usr/bin"},
+            runner=runner,
+            timeout_seconds=10,
+        )
+
+    original = identity()["fingerprint"]
+    tool_version = "ruff 2.0.0"
+    assert identity()["fingerprint"] != original
+
+    tool_version = "ruff 1.0.0"
+    document["source_manifest"]["product_digest"] = "sha256:source-two"
+    assert identity()["fingerprint"] != original
+
+    document["source_manifest"]["product_digest"] = "sha256:source-one"
+    document["validation_context"]["input_fingerprints"][0]["digest"] = (
+        "sha256:lock-two"
+    )
+    assert identity()["fingerprint"] != original
 
 
 def test_bootstrap_reports_validation_failure_and_keeps_snapshot(

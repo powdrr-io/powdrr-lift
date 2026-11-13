@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import shlex
 import shutil
 import subprocess
 import threading
@@ -3082,6 +3083,7 @@ def _run_code_agent_phase(
             plan_fingerprint=plan.proposed_pr_fingerprint,
             context_refs=unit.source_refs,
             allowed_commands=_allowed_validation_commands(state["validation_profiles"]),
+            allowed_command_argv=_allowed_validation_argv(state["validation_profiles"]),
             implementation_packet=worker_packet,
         )
         if story_context and not config.capture_worker_prompts_only:
@@ -4794,7 +4796,25 @@ def _plan_text_values(value: Any) -> tuple[str, ...]:
 def _allowed_validation_commands(
     profiles: Sequence[DiscoveredValidationProfile],
 ) -> tuple[str, ...]:
-    return tuple(" ".join(profile.command) for profile in profiles if profile.command)
+    return tuple(
+        shlex.join(profile.command)
+        for profile in profiles
+        if profile.command and profile.execution_kind in {None, "argv"}
+    )
+
+
+def _allowed_validation_argv(
+    profiles: Sequence[DiscoveredValidationProfile],
+) -> tuple[tuple[str, ...], ...]:
+    """Build the exact argv allowlist used by the validation runner."""
+    return tuple(
+        tuple(profile.command)
+        for profile in profiles
+        if profile.command
+        and profile.execution_kind in {None, "argv"}
+        and not profile.shell
+        and not profile.script
+    )
 
 
 def _runtime_validation_profile(
@@ -4804,6 +4824,8 @@ def _runtime_validation_profile(
     return ValidationProfile(
         name=profile.name,
         command=tuple(profile.command),
+        source=profile.source,
+        provider=profile.provider,
         cwd=profile.cwd,
         environment_id=profile.environment_id,
         component=profile.component,
@@ -4814,6 +4836,15 @@ def _runtime_validation_profile(
         selectors=profile.selectors,
         config_files=profile.config_files,
         settings=dict(profile.settings or {}),
+        purpose=profile.purpose,
+        roles=profile.roles,
+        requiredness=dict(profile.requiredness or {}),
+        declaration=profile.declaration,
+        evidence=profile.evidence,
+        confirmation=dict(profile.confirmation or {}),
+        depends_on=profile.depends_on,
+        local_reproducibility=profile.local_reproducibility,
+        baseline=dict(profile.baseline or {}),
         unresolved=profile.unresolved,
     )
 
@@ -4828,28 +4859,29 @@ def _run_validation_profile(
     profile = parameters.get("profile")
     if not isinstance(profile, Mapping):
         raise PowdrrExecutionError("validation profile must be a mapping")
-    name = profile.get("name")
-    command = profile.get("command")
-    if not isinstance(name, str) or not name.strip():
-        raise PowdrrExecutionError("validation profile name is malformed")
-    if not isinstance(command, list) or not all(
-        isinstance(item, str) and item for item in command
-    ):
-        raise PowdrrExecutionError("validation profile command is malformed")
+    try:
+        runtime_profile = ValidationProfile.from_data(profile)
+    except ValueError as error:
+        raise PowdrrExecutionError(
+            f"validation profile is malformed: {error}"
+        ) from error
+    name = runtime_profile.name
     # The Procedrr flow runs one profile per loop iteration. Narrow the
     # request as well as the runner registry; ValidationRunner otherwise
     # resolves every declared profile and returns a multi-result report for
     # this single-profile operation.
     request = replace(state["request"], validation_profiles=(name,))
     report = ValidationRunner(
-        {name: ValidationProfile(name, tuple(command))},
+        {name: runtime_profile},
         timeout_seconds=timeout_seconds,
     ).run(request, state["attempt"], worktree_root=worktree)
     if len(report.results) != 1:
         raise PowdrrExecutionError(
             f"validation profile {name!r} did not produce one result"
         )
-    return report.results[0].to_data()
+    result = report.results[0].to_data()
+    result["profile_context"] = runtime_profile.to_data()
+    return result
 
 
 def _aggregate_validation(
@@ -4893,6 +4925,11 @@ def _aggregate_validation(
             else ValidationReportStatus.PASSED
         ),
         results=results,
+        profile_contexts=tuple(
+            item["profile_context"]
+            for item in collected_results
+            if isinstance(item.get("profile_context"), Mapping)
+        ),
     )
     failed_checkpoints = [
         checkpoint
@@ -4919,6 +4956,7 @@ def _aggregate_validation(
                 ),
             ),
             error="one or more operation checkpoints failed",
+            profile_contexts=validation.profile_contexts,
         )
     state["attempt_store"].save_validation_report(validation)
     state["validation"] = validation
@@ -7183,6 +7221,7 @@ def _compile_initial_worker_prompt(
             base_commit=base_commit,
             plan_fingerprint=content_fingerprint(canonical_design),
             allowed_commands=_allowed_validation_commands(validation_profiles),
+            allowed_command_argv=_allowed_validation_argv(validation_profiles),
             implementation_packet=packet,
         )
     except ValueError as error:

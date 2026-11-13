@@ -285,10 +285,13 @@ def test_execution_unit_compiles_to_worker_request() -> None:
         base_commit="abc123",
         plan_fingerprint="plan-1",
         context_refs=("entity:worker-adapter",),
+        allowed_command_argv=(("pytest", "tests", "test with spaces.py"),),
     )
 
     assert request.allowed_paths == ("src/powdrr_lift/workrr",)
     assert request.context_refs == ("entity:worker-adapter",)
+    assert request.allowed_command_argv == (("pytest", "tests", "test with spaces.py"),)
+    assert ImplementationRequest.from_data(request.to_data()) == request
     assert "unit-1" not in request.prompt
     assert "Product contract:" in request.prompt
     assert "Worker policy:" in request.prompt
@@ -1398,6 +1401,36 @@ def test_validation_runner_uses_and_reports_declared_working_directory(
     assert report.status is ValidationReportStatus.PASSED
     assert report.profile_contexts == (profile.to_data(),)
     assert report.to_data()["profile_contexts"][0]["environment_id"] == "uv:component"
+    assert ValidationProfile.from_data(profile.to_data()) == profile
+
+
+def test_validation_runner_matches_exact_argv_with_space_containing_argument(
+    tmp_path: Path,
+) -> None:
+    worktree = _git_repo(tmp_path / "repo")
+    command = (
+        "python3",
+        "-c",
+        "import sys; assert sys.argv[1] == 'value with spaces'",
+        "value with spaces",
+    )
+    request = replace(
+        _request(_head(worktree)),
+        allowed_commands=(),
+        allowed_command_argv=(command,),
+    )
+    attempt = run_coding_agent(
+        FakeProvider("allowed"),
+        request,
+        worktree_root=worktree,
+        attempt_id="argv-check",
+    )
+
+    report = ValidationRunner({"python": ValidationProfile("python", command)}).run(
+        request, attempt, worktree_root=worktree
+    )
+
+    assert report.status is ValidationReportStatus.PASSED
 
 
 def test_validation_runner_keeps_unsupported_shell_context_blocked(

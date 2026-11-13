@@ -42,6 +42,8 @@ class ValidationReportStatus(StrEnum):
 class ValidationProfile:
     name: str
     command: tuple[str, ...]
+    source: str = ""
+    provider: str | None = None
     cwd: str = "."
     environment_id: str | None = None
     component: str | None = None
@@ -52,24 +54,114 @@ class ValidationProfile:
     selectors: tuple[str, ...] = ()
     config_files: tuple[str, ...] = ()
     settings: Mapping[str, Any] | None = None
+    purpose: str = ""
+    roles: tuple[str, ...] = ()
+    requiredness: Mapping[str, Any] | None = None
+    declaration: str = "unknown"
+    evidence: tuple[str, ...] = ()
+    confirmation: Mapping[str, Any] | None = None
+    depends_on: tuple[str, ...] = ()
+    local_reproducibility: str = "unknown"
+    baseline: Mapping[str, Any] | None = None
     unresolved: tuple[str, ...] = ()
 
     def to_data(self) -> dict[str, Any]:
         return {
             "name": self.name,
             "command": list(self.command),
+            "source": self.source,
+            "provider": self.provider,
             "cwd": self.cwd,
             "environment_id": self.environment_id,
             "component": self.component,
             "execution_kind": self.execution_kind,
             "shell": self.shell,
             "script": self.script,
-            "applicability": dict(self.applicability or {}),
+            "applicability": (
+                dict(self.applicability) if self.applicability is not None else None
+            ),
             "selectors": list(self.selectors),
             "config_files": list(self.config_files),
-            "settings": dict(self.settings or {}),
+            "settings": dict(self.settings) if self.settings is not None else None,
+            "purpose": self.purpose,
+            "roles": list(self.roles),
+            "requiredness": (
+                dict(self.requiredness) if self.requiredness is not None else None
+            ),
+            "declaration": self.declaration,
+            "evidence": list(self.evidence),
+            "confirmation": (
+                dict(self.confirmation) if self.confirmation is not None else None
+            ),
+            "depends_on": list(self.depends_on),
+            "local_reproducibility": self.local_reproducibility,
+            "baseline": dict(self.baseline) if self.baseline is not None else None,
             "unresolved": list(self.unresolved),
         }
+
+    @classmethod
+    def from_data(cls, data: Mapping[str, Any]) -> ValidationProfile:
+        name = data.get("name")
+        command = data.get("command")
+        if not isinstance(name, str) or not name.strip():
+            raise ValueError("validation profile name must be non-empty")
+        if not isinstance(command, list) or not all(
+            isinstance(part, str) and part for part in command
+        ):
+            raise ValueError("validation profile command must be an argv list")
+
+        def strings(key: str) -> tuple[str, ...]:
+            value = data.get(key, [])
+            if not isinstance(value, list) or not all(
+                isinstance(item, str) for item in value
+            ):
+                raise ValueError(f"validation profile {key} must be a string list")
+            return tuple(value)
+
+        def mapping(key: str) -> Mapping[str, Any] | None:
+            value = data.get(key)
+            if value is None:
+                return None
+            if not isinstance(value, Mapping):
+                raise ValueError(f"validation profile {key} must be a mapping")
+            return dict(value)
+
+        return cls(
+            name=name,
+            command=tuple(command),
+            source=str(data.get("source", "")),
+            provider=(
+                data.get("provider") if isinstance(data.get("provider"), str) else None
+            ),
+            cwd=str(data.get("cwd", ".")),
+            environment_id=(
+                data.get("environment_id")
+                if isinstance(data.get("environment_id"), str)
+                else None
+            ),
+            component=(
+                data.get("component")
+                if isinstance(data.get("component"), str)
+                else None
+            ),
+            execution_kind=str(data.get("execution_kind", "argv")),
+            shell=data.get("shell") if isinstance(data.get("shell"), str) else None,
+            script=data.get("script") if isinstance(data.get("script"), str) else None,
+            applicability=mapping("applicability"),
+            selectors=strings("selectors"),
+            config_files=strings("config_files"),
+            settings=mapping("settings"),
+            purpose=str(data.get("purpose", "")),
+            roles=strings("roles"),
+            requiredness=mapping("requiredness"),
+            declaration=str(data.get("declaration", "unknown")),
+            evidence=strings("evidence"),
+            confirmation=mapping("confirmation"),
+            depends_on=strings("depends_on"),
+            local_reproducibility=str(data.get("local_reproducibility", "unknown")),
+            baseline=mapping("baseline"),
+            unresolved=strings("unresolved"),
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -488,10 +580,15 @@ class ValidationRunner:
                 returncode=None,
                 error=f"validation profile cwd does not exist: {profile.cwd}",
             )
-        if not any(
+        argv_allowed = any(
+            profile.command[: len(allowed)] == allowed
+            for allowed in request.allowed_command_argv
+        )
+        legacy_allowed = not request.allowed_command_argv and any(
             _command_matches(profile.command, allowed)
             for allowed in request.allowed_commands
-        ):
+        )
+        if not argv_allowed and not legacy_allowed:
             return ValidationResult(
                 profile=profile.name,
                 command=profile.command,

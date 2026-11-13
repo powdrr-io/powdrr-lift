@@ -118,6 +118,7 @@ class ImplementationRequest:
     validation_profiles: tuple[str, ...]
     context_refs: tuple[str, ...] = ()
     allowed_commands: tuple[str, ...] = ()
+    allowed_command_argv: tuple[tuple[str, ...], ...] = ()
     ephemeral_paths: tuple[str, ...] = ()
     planned_additions: tuple[Mapping[str, Any], ...] = ()
     planned_deletions: tuple[Mapping[str, Any], ...] = ()
@@ -266,6 +267,9 @@ class ImplementationRequest:
             "validation_profiles": list(self.validation_profiles),
             "context_refs": list(self.context_refs),
             "allowed_commands": list(self.allowed_commands),
+            "allowed_command_argv": [
+                list(command) for command in self.allowed_command_argv
+            ],
             "ephemeral_paths": list(self.ephemeral_paths),
             "planned_additions": [dict(item) for item in self.planned_additions],
             "planned_deletions": [dict(item) for item in self.planned_deletions],
@@ -359,6 +363,9 @@ class ImplementationRequest:
             validation_profiles=tuple(cast(list[str], data["validation_profiles"])),
             context_refs=tuple(cast(list[str], data.get("context_refs", []))),
             allowed_commands=tuple(cast(list[str], data.get("allowed_commands", []))),
+            allowed_command_argv=_parse_allowed_command_argv(
+                data.get("allowed_command_argv", [])
+            ),
             ephemeral_paths=tuple(cast(list[str], data.get("ephemeral_paths", []))),
             planned_additions=tuple(
                 cast(list[Mapping[str, Any]], data.get("planned_additions", []))
@@ -391,6 +398,7 @@ class ImplementationRequest:
         plan_fingerprint: str,
         context_refs: tuple[str, ...] = (),
         allowed_commands: tuple[str, ...] = (),
+        allowed_command_argv: tuple[tuple[str, ...], ...] = (),
         implementation_packet: ImplementationPacket | None = None,
     ) -> ImplementationRequest:
         """Compile one validated execution unit into a worker handoff."""
@@ -530,6 +538,7 @@ class ImplementationRequest:
             validation_profiles=unit.validation_profiles,
             context_refs=context_refs,
             allowed_commands=allowed_commands,
+            allowed_command_argv=allowed_command_argv,
             ephemeral_paths=unit.ephemeral_paths,
             planned_additions=unit.planned_additions,
             planned_deletions=unit.planned_deletions,
@@ -547,6 +556,7 @@ class ImplementationRequest:
         base_commit: str,
         context_refs: tuple[str, ...] = (),
         allowed_commands: tuple[str, ...] = (),
+        allowed_command_argv: tuple[tuple[str, ...], ...] = (),
         implementation_packet: ImplementationPacket | None = None,
     ) -> ImplementationRequest:
         """Compile one unit from a typed execution plan into a worker handoff."""
@@ -561,6 +571,7 @@ class ImplementationRequest:
             plan_fingerprint=plan.proposed_pr_fingerprint,
             context_refs=context_refs,
             allowed_commands=allowed_commands,
+            allowed_command_argv=allowed_command_argv,
             implementation_packet=implementation_packet,
         )
 
@@ -675,6 +686,21 @@ def _render_allowed_command_forms(commands: Sequence[str]) -> str:
     return "Discovered validation command prefixes:\n" + "\n".join(
         f"- {command}" for command in commands
     )
+
+
+def _parse_allowed_command_argv(value: Any) -> tuple[tuple[str, ...], ...]:
+    if not isinstance(value, list):
+        raise ValueError("allowed_command_argv must be a list of argv lists")
+    commands: list[tuple[str, ...]] = []
+    for index, command in enumerate(value):
+        if (
+            not isinstance(command, list)
+            or not command
+            or not all(isinstance(part, str) and part for part in command)
+        ):
+            raise ValueError(f"allowed_command_argv[{index}] must be non-empty argv")
+        commands.append(tuple(command))
+    return tuple(commands)
 
 
 class CodingAgentStatus(StrEnum):

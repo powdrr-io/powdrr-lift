@@ -59,6 +59,9 @@ from powdrr_lift.workrr.feature_endpoint import (
     FeatureEndpointResult,
     _aggregate_category_edits,
     _aggregate_intent_review,
+    _aggregate_validation,
+    _allowed_validation_argv,
+    _allowed_validation_commands,
     _apply_sentence_design_trace,
     _assert_feature_design_ready_for_implementation,
     _bootstrap_validation_profiles,
@@ -94,6 +97,8 @@ from powdrr_lift.workrr.feature_endpoint import (
     _resolve_bootstrap_subject_binding,
     _run_code_agent_phase,
     _run_code_task_agent,
+    _run_validation_profile,
+    _runtime_validation_profile,
     _structrr_taxonomy_path,
     _task_structrr_changes,
     _update_plan_from_sentence_trace,
@@ -3239,6 +3244,123 @@ def test_bootstrap_profiles_merge_explicit_and_typed_repository_checks(
         )
         == ()
     )
+
+
+def test_validation_profile_command_handoff_preserves_argv_and_context() -> None:
+    discovered = DiscoveredValidationProfile(
+        "component-tests",
+        ("pytest", "tests", "test with spaces.py"),
+        "pyproject.toml",
+        provider_name="pytest",
+        component="python-component:api",
+        environment_id="uv:api",
+        cwd="packages/api",
+        applicability={"local": True, "evaluation": "unknown"},
+        requiredness={"status": "required", "evidence": ["workflow:ci"]},
+        declaration="declared",
+        evidence=("evidence:pyproject",),
+    )
+
+    runtime = _runtime_validation_profile(discovered)
+
+    assert runtime.command == ("pytest", "tests", "test with spaces.py")
+    assert runtime.cwd == "packages/api"
+    assert runtime.environment_id == "uv:api"
+    assert runtime.applicability == {"local": True, "evaluation": "unknown"}
+    assert _allowed_validation_argv((discovered,)) == (runtime.command,)
+    assert _allowed_validation_commands((discovered,)) == (
+        "pytest tests 'test with spaces.py'",
+    )
+
+
+def test_single_profile_operation_round_trips_runtime_context(tmp_path: Path) -> None:
+    component = tmp_path / "component"
+    component.mkdir()
+    command = (
+        "python3",
+        "-c",
+        "import os, sys\n"
+        "assert os.getcwd().endswith('component')\n"
+        "assert sys.argv[1] == 'a b'",
+        "a b",
+    )
+    discovered = DiscoveredValidationProfile(
+        "component-tests",
+        command,
+        "pyproject.toml",
+        provider_name="pytest",
+        environment_id="uv:api",
+        cwd="component",
+        applicability={"local": True, "evaluation": "unknown"},
+    )
+    runtime = _runtime_validation_profile(discovered)
+    request = ImplementationRequest(
+        request_id="request",
+        objective="check profile handoff",
+        prompt="run the check",
+        base_commit="base",
+        plan_fingerprint="plan",
+        allowed_paths=("src",),
+        acceptance_criteria=(),
+        validation_profiles=(runtime.name,),
+        allowed_command_argv=(command,),
+    )
+    attempt = CodingAgentAttempt(
+        attempt_id="attempt",
+        request_id=request.request_id,
+        provider="test",
+        status=CodingAgentStatus.COMPLETED,
+        exit_code=0,
+    )
+
+    result = _run_validation_profile(
+        {"profile": runtime.to_data()},
+        worktree=tmp_path,
+        state={"request": request, "attempt": attempt},
+    )
+
+    assert result["status"] == "passed"
+    assert result["profile_context"]["cwd"] == "component"
+    assert result["profile_context"]["environment_id"] == "uv:api"
+
+
+def test_aggregate_validation_persists_profile_context() -> None:
+    profile_context = {
+        "name": "component-tests",
+        "command": ["pytest", "tests"],
+        "cwd": "packages/api",
+        "environment_id": "uv:api",
+    }
+    stored: list[ValidationReport] = []
+
+    class AttemptStore:
+        def save_validation_report(self, report: ValidationReport) -> None:
+            stored.append(report)
+
+    state = {
+        "attempt": SimpleNamespace(attempt_id="attempt"),
+        "request": SimpleNamespace(request_id="request"),
+        "attempt_store": AttemptStore(),
+    }
+
+    result = _aggregate_validation(
+        {
+            "results": [
+                {
+                    "profile": "component-tests",
+                    "command": ["pytest", "tests"],
+                    "status": "passed",
+                    "returncode": 0,
+                    "profile_context": profile_context,
+                }
+            ]
+        },
+        worktree=Path("."),
+        state=state,
+    )
+
+    assert result["profile_contexts"] == [profile_context]
+    assert stored[0].profile_contexts == (profile_context,)
 
 
 def test_feature_flow_is_shared_and_validated() -> None:

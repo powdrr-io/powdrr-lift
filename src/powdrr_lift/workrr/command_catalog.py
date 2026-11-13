@@ -1127,11 +1127,7 @@ class FeatureCommandRuntime:
             return {"path": str(state["baseline_path"])}
         if name == "discover_validation_profiles":
             return [
-                {
-                    "name": profile.name,
-                    "command": list(profile.command),
-                    "source": profile.source,
-                }
+                feature_endpoint._runtime_validation_profile(profile).to_data()
                 for profile in state["validation_profiles"]
             ]
         if name == "capture_external_contract_sources":

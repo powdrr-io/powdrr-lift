@@ -148,6 +148,7 @@ def _candidate_route_evidence(
     placements = {item["obligation_id"]: item for item in contract["obligations"]}
     preservation = {item["id"]: item for item in contract["preservation"]}
     changed = set(changed_paths)
+    allowed_paths = tuple(contract["allowed_paths"])
     results: list[dict[str, Any]] = []
     for raw in private["obligation_evidence_contracts"]:
         obligation_id = raw["obligation_id"]
@@ -181,6 +182,15 @@ def _candidate_route_evidence(
                     if evidence
                     else "candidate diff does not touch an accepted owner scope"
                 )
+            elif route == "scope_review":
+                out_of_scope = _out_of_scope_paths(changed, allowed_paths)
+                evidence = out_of_scope
+                status = "failed" if out_of_scope else "passed"
+                reason = (
+                    "candidate changes remain within accepted scope"
+                    if not out_of_scope
+                    else "candidate changes include paths outside accepted scope"
+                )
             results.append(
                 {
                     "obligation_id": obligation_id,
@@ -206,6 +216,19 @@ def _candidate_route_evidence(
     result["complete"] = reconciliation["passed"]
     result["fingerprint"] = content_fingerprint(result)
     return result
+
+
+def _out_of_scope_paths(
+    changed_paths: set[str], allowed_paths: tuple[str, ...]
+) -> list[str]:
+    return sorted(
+        path
+        for path in changed_paths
+        if not any(
+            scope == "." or path == scope or path.startswith(scope.rstrip("/") + "/")
+            for scope in allowed_paths
+        )
+    )
 
 
 def bind_story_route_evidence(
@@ -1194,11 +1217,17 @@ class SourceReferenceRun:
                 None,
             )
             if reference_result is not None and reference_result.stdout:
-                reference_report = json.loads(reference_result.stdout)
+                head = _git(self.workspace_root, "rev-parse", "HEAD").decode().strip()
+                changed_paths = _committed_paths(
+                    self.workspace_root,
+                    self.catalog.base_commit,
+                    head,
+                    output=_paths_output,
+                ) | _working_paths(self.workspace_root, output=_paths_output)
                 result["obligation_route_evidence"] = _candidate_route_evidence(
                     self.handoff,
                     candidate_tree=self._candidate_state(),
-                    changed_paths=tuple(reference_report.get("changed_paths", ())),
+                    changed_paths=tuple(sorted(changed_paths)),
                 )
             result["reconciliation"] = self.reconciliation
             if execution.attempt.status is not CodingAgentStatus.COMPLETED:

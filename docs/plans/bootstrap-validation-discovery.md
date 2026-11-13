@@ -6,9 +6,10 @@ acceptance gate below remain incomplete.
 
 Current WP8 progress: Workrr now evaluates discovered applicability against the
 feature run's target event, base branch, and changed paths. Missing context,
-unsupported condition expressions, negated path patterns, and checks that are
-not locally reproducible remain pending; filters that provably do not match
-are recorded as not applicable. This is a partial implementation of step 6.
+unsupported condition expressions, negative-only path filters, and checks that
+are not locally reproducible remain pending; ordered positive and negative path
+filters now exclude and re-include matching paths. Filters that provably do not
+match are recorded as not applicable. This is a partial implementation of step 6.
 The evaluator also supports GitHub condition equality/inequality, boolean
 operators, and grouping for event-name and base-branch values. Unsupported
 functions and unavailable context remain pending. Full GitHub expression

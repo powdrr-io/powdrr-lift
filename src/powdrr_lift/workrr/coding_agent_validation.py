@@ -288,22 +288,29 @@ def evaluate_validation_applicability(
             return ValidationApplicabilityStatus.PENDING, (
                 "paths applicability filter is malformed"
             )
-        if any(pattern.startswith("!") for pattern in declared_paths):
+        if any(pattern == "!" for pattern in declared_paths) or not any(
+            not pattern.startswith("!") for pattern in declared_paths
+        ):
             return ValidationApplicabilityStatus.PENDING, (
-                "negative path patterns are not supported by the "
-                "applicability evaluator"
+                "paths applicability filter must contain a positive pattern"
             )
         if context.changed_paths is None:
             return ValidationApplicabilityStatus.PENDING, (
                 "actual changed paths are unavailable"
             )
-        if not any(
-            fnmatchcase(path, pattern)
-            for path in context.changed_paths
-            for pattern in declared_paths
-        ):
+
+        def path_is_included(path: str) -> bool:
+            included = False
+            for pattern in declared_paths:
+                excluded = pattern.startswith("!")
+                glob = pattern[1:] if excluded else pattern
+                if fnmatchcase(path, glob):
+                    included = not excluded
+            return included
+
+        if not any(path_is_included(path) for path in context.changed_paths):
             return ValidationApplicabilityStatus.NOT_APPLICABLE, (
-                "no changed path matches the declared path filter"
+                "no changed path remains included by the declared path filter"
             )
         constraints.append("changed paths matched")
 

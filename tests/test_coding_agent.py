@@ -1543,6 +1543,63 @@ def test_validation_applicability_conditions_resolve_false_or_remain_pending() -
     assert "unavailable context" in unknown_reason
 
 
+def test_validation_applicability_applies_ordered_negative_path_patterns() -> None:
+    excluded_profile = ValidationProfile(
+        "ci-tests",
+        ("pytest",),
+        applicability={
+            "local": True,
+            "evaluation": "unknown",
+            "paths": ["src/**", "!src/generated/**"],
+        },
+    )
+    re_included_profile = ValidationProfile(
+        "ci-tests",
+        ("pytest",),
+        applicability={
+            "local": True,
+            "evaluation": "unknown",
+            "paths": ["src/**", "!src/generated/**", "src/generated/required.py"],
+        },
+    )
+    context = ValidationApplicabilityContext(
+        event="pull_request",
+        changed_paths=("src/generated/required.py",),
+    )
+
+    excluded, excluded_reason = evaluate_validation_applicability(
+        excluded_profile, context
+    )
+    re_included, re_included_reason = evaluate_validation_applicability(
+        re_included_profile, context
+    )
+
+    assert excluded is ValidationApplicabilityStatus.NOT_APPLICABLE
+    assert "remains included" in excluded_reason
+    assert re_included is ValidationApplicabilityStatus.APPLICABLE
+    assert re_included_reason == "changed paths matched"
+
+
+def test_validation_applicability_rejects_negative_only_path_filters() -> None:
+    profile = ValidationProfile(
+        "ci-tests",
+        ("pytest",),
+        applicability={
+            "local": True,
+            "evaluation": "unknown",
+            "paths": ["!docs/**"],
+        },
+    )
+
+    status, reason = evaluate_validation_applicability(
+        profile,
+        ValidationApplicabilityContext(changed_paths=("src/app.py",)),
+    )
+
+    assert status is ValidationApplicabilityStatus.PENDING
+    assert reason == "paths applicability filter must contain a positive pattern"
+
+
 def test_unknown_validation_applicability_is_pending_not_skipped(
     tmp_path: Path,
 ) -> None:

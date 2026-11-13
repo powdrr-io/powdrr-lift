@@ -1,0 +1,165 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1465
+title: Bind source handoffs to accepted behavior closure
+intent:
+  problem: Source-reference placements could point to unvalidated verification labels, while the protected run did not bind accepted behavior cases to repository evidence.
+  goal: Require typed, source-faithful behavior cases, include them in the immutable handoff, and capture a validated private repository closure from the exact clean base.
+human-decisions: []
+structured_files: []
+files:
+- path: packages/service/src/powdrr_service/structrr/source_reference_handoff.py
+  type: modified
+  span: {start_line: 16, end_line: 20}
+  summary: Import the typed behavior contract compiler.
+  rationale: Reuse Structrr's validated behavior scenario representation.
+- path: packages/service/src/powdrr_service/structrr/source_reference_handoff.py
+  type: modified
+  span: {start_line: 259, end_line: 321}
+  summary: Compile accepted behavior cases, require provenance, and resolve placement verification references.
+  rationale: Prevent missing or unresolved behavior obligations from entering implementation.
+- path: packages/service/src/powdrr_service/structrr/source_reference_handoff.py
+  type: modified
+  span: {start_line: 335, end_line: 335}
+  summary: Add behavior scenarios to the normalized contract schema.
+  rationale: Bind the accepted cases to the immutable handoff.
+- path: packages/service/src/powdrr_service/structrr/source_reference_handoff.py
+  type: modified
+  span: {start_line: 366, end_line: 374}
+  summary: Normalize and validate behavior scenario records.
+  rationale: Reject malformed or incomplete contract scenarios.
+- path: packages/service/src/powdrr_service/structrr/source_reference_handoff.py
+  type: modified
+  span: {start_line: 414, end_line: 416}
+  summary: Sort behavior scenarios into canonical contract order.
+  rationale: Keep fingerprints stable across equivalent accepted input orderings.
+- path: packages/service/src/powdrr_service/structrr/source_reference_handoff.py
+  type: modified
+  span: {start_line: 452, end_line: 452}
+  summary: Render behavior scenarios in the public Required behavior section.
+  rationale: Make observable accepted cases available to implementation.
+- path: packages/service/src/powdrr_service/structrr/source_reference_handoff.py
+  type: modified
+  span: {start_line: 644, end_line: 644}
+  summary: Compile accepted scenarios before constructing the handoff.
+  rationale: Block handoff when accepted behavior closure is absent.
+- path: packages/service/src/powdrr_service/structrr/source_reference_handoff.py
+  type: modified
+  span: {start_line: 673, end_line: 675}
+  summary: Include typed scenarios in the normalized source-reference contract.
+  rationale: Bind prompt identity to accepted observable behavior.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span: {start_line: 37, end_line: 37}
+  summary: Import the accepted behavior scenario compiler.
+  rationale: Use the same validated scenarios for public and private contract compilation.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span: {start_line: 41, end_line: 45}
+  summary: Import repository evidence and closure compilers.
+  rationale: Capture and verify source-backed contract lineage.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span: {start_line: 284, end_line: 324}
+  summary: Collect Python evidence at the accepted base and validate a private contract closure before worker invocation.
+  rationale: Bind private source evidence to the accepted design and exact repository revision.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span: {start_line: 333, end_line: 333}
+  summary: Add evidence and closure artifacts to private validation inputs.
+  rationale: Keep evidence private while binding it into handoff fingerprints.
+- path: docs/design/structrr-source-reference-handoff.md
+  type: modified
+  span: {start_line: 6, end_line: 11}
+  summary: Clarify the service compiler and Workrr repository evidence boundary.
+  rationale: Describe the separation between handoff compilation and base capture.
+- path: docs/design/structrr-source-reference-handoff.md
+  type: modified
+  span: {start_line: 20, end_line: 27}
+  summary: Specify required behavior cases and verification-reference resolution.
+  rationale: Document the new fail-closed design requirement.
+- path: docs/design/structrr-source-reference-handoff.md
+  type: modified
+  span: {start_line: 81, end_line: 82}
+  summary: Add typed behavior scenarios to the canonical contract description.
+  rationale: Keep the public and private handoff schema documentation accurate.
+- path: docs/design/structrr-source-reference-handoff.md
+  type: modified
+  span: {start_line: 92, end_line: 96}
+  summary: Document private base-bound evidence and closure artifacts.
+  rationale: Explain privacy and static analysis limits.
+- path: docs/plans/implementation-contract-and-verification.md
+  type: modified
+  span: {start_line: 3, end_line: 6}
+  summary: Record milestone 2 implementation progress and its remaining acceptance fixtures.
+  rationale: Make the plan's completion state match the current implementation.
+- path: docs/plans/implementation-contract-and-verification.md
+  type: modified
+  span: {start_line: 39, end_line: 39}
+  summary: Add the source-backed behavior closure capability and remaining limits.
+  rationale: Keep the plan inventory tied to current code and open acceptance work.
+- path: docs/plans/implementation-contract-and-verification.md
+  type: modified
+  span: {start_line: 49, end_line: 49}
+  summary: Include handoff and contract closure regression evidence.
+  rationale: Make the plan's verification inventory complete.
+- path: tests/test_source_reference_handoff.py
+  type: modified
+  span: {start_line: 52, end_line: 72}
+  summary: Add an accepted typed scenario to the source-reference fixture.
+  rationale: Exercise handoffs with the new behavior closure requirement.
+- path: tests/test_source_reference_handoff.py
+  type: modified
+  span: {start_line: 87, end_line: 87}
+  summary: Attach the accepted case to the fixture design.
+  rationale: Keep case identity available for verification-reference checks.
+- path: tests/test_source_reference_handoff.py
+  type: modified
+  span: {start_line: 124, end_line: 126}
+  summary: Assert the public contract includes the accepted scenario.
+  rationale: Protect prompt and manifest contract parity.
+- path: tests/test_source_reference_handoff.py
+  type: modified
+  span: {start_line: 158, end_line: 163}
+  summary: Reject placements that point to an unknown behavior case.
+  rationale: Fail closed when verification references have no accepted behavior.
+- path: tests/test_source_reference_run.py
+  type: modified
+  span: {start_line: 131, end_line: 156}
+  summary: Add an accepted typed retry scenario to the protected-run fixture.
+  rationale: Exercise source closure compilation with reviewed observable behavior.
+- path: tests/test_source_reference_run.py
+  type: modified
+  span: {start_line: 213, end_line: 222}
+  summary: Verify base-bound evidence and closure remain private to the validation manifest.
+  rationale: Prevent worker access to private validation artifacts while preserving revision lineage.
+- path: tests/test_source_reference_dispatch.py
+  type: modified
+  span: {start_line: 65, end_line: 90}
+  summary: Add accepted typed behavior provenance to protected dispatch fixtures.
+  rationale: Exercise the required case contract through production dispatch.
+- path: tests/test_story_execution.py
+  type: modified
+  span: {start_line: 684, end_line: 709}
+  summary: Supply a typed story behavior case to the protected source dispatch fixture.
+  rationale: Keep story proof coverage valid under the stricter handoff contract.
+- path: tests/test_structrr_reference_validation.py
+  type: modified
+  span: {start_line: 82, end_line: 107}
+  summary: Add a reviewed behavior case to shared reference-validation fixtures.
+  rationale: Preserve placement validation coverage with explicit behavior provenance.
+entities:
+- id: compile-accepted-behavior-scenarios
+  type: Function
+  action: added
+- id: source-backed-obligation-closure-tests
+  type: Unit test
+  action: added
+entity_relationships: []
+invariants:
+- id: verification-reference-has-accepted-case
+  description: Every source placement verification reference resolves to an accepted behavior case or scenario ID before handoff compilation.
+  action: added
+- id: private-closure-is-base-bound
+  description: Repository evidence and the validated behavior closure are captured from the clean accepted base and remain in private validation data.
+  action: added
+guidance: []

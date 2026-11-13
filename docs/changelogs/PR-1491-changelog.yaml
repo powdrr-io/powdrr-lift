@@ -1,0 +1,94 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1491
+title: Record runtime identity for validation baselines
+intent:
+  problem: Local bootstrap validation results do not identify the source content, check recipe, or runtime that produced a pass.
+  goal: Bind each baseline observation to its source, environment, interpreter, tool version, and execution recipe, then expose the identity in the report.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/plans/bootstrap-validation-discovery.md
+  type: modified
+  span: {start_line: 26, end_line: 30}
+  summary: Record runtime identity capture and the remaining freshness enforcement work.
+  rationale: Keep WP8 progress aligned with the implemented observation contract.
+- path: packages/service/src/powdrr_service/structrr/bootstrap.py
+  type: modified
+  span: {start_line: 503, end_line: 520}
+  summary: Render a validation observation's identity fingerprint in the Structrr report.
+  rationale: Make the runtime provenance of baseline results visible during review.
+- path: src/powdrr_lift/agent_bootstrap.py
+  type: modified
+  span: {start_line: 6, end_line: 6}
+  summary: Import JSON serialization for stable runtime identity fingerprints.
+  rationale: Hash canonical identity payloads deterministically.
+- path: src/powdrr_lift/agent_bootstrap.py
+  type: modified
+  span: {start_line: 8, end_line: 8}
+  summary: Import platform details for baseline runtime identity.
+  rationale: Bind observed results to the platform that executed the check.
+- path: src/powdrr_lift/agent_bootstrap.py
+  type: modified
+  span: {start_line: 11, end_line: 11}
+  summary: Import Python runtime metadata for baseline identity.
+  rationale: Record the interpreter used by the bootstrap process.
+- path: src/powdrr_lift/agent_bootstrap.py
+  type: modified
+  span: {start_line: 23, end_line: 23}
+  summary: Import the Structrr Markdown renderer for refreshed reports.
+  rationale: Regenerate the companion report after validation outcomes are persisted.
+- path: src/powdrr_lift/agent_bootstrap.py
+  type: modified
+  span: {start_line: 265, end_line: 273}
+  summary: Rewrite the Markdown companion after source manifest and baseline results are finalized.
+  rationale: Keep the report synchronized with the saved validation observation identity.
+- path: src/powdrr_lift/agent_bootstrap.py
+  type: modified
+  span: {start_line: 692, end_line: 692}
+  summary: Initialize runtime identity separately for each local validation check.
+  rationale: Avoid reusing identity from a prior check when the current check cannot execute.
+- path: src/powdrr_lift/agent_bootstrap.py
+  type: modified
+  span: {start_line: 740, end_line: 748}
+  summary: Capture runtime identity before executing each supported baseline command.
+  rationale: Tie the observed outcome to the source and runtime present at execution time.
+- path: src/powdrr_lift/agent_bootstrap.py
+  type: modified
+  span: {start_line: 779, end_line: 779}
+  summary: Persist runtime identity with the baseline observation.
+  rationale: Preserve the inputs needed to determine whether a result is still current.
+- path: src/powdrr_lift/agent_bootstrap.py
+  type: modified
+  span: {start_line: 800, end_line: 977}
+  summary: Build a stable identity from source and validation input digests, check recipe, environment, interpreter, platform, and tool version.
+  rationale: Make changes to code, lockfiles, check configuration, or runtime produce a distinct observation fingerprint.
+- path: tests/fixtures/structrr/golden-python-symbols.yaml
+  type: modified
+  span: {start_line: 8, end_line: 8}
+  summary: Update the expected module end line after the Structrr report renderer grew.
+  rationale: Keep the golden source symbol span aligned with the implementation.
+- path: tests/fixtures/structrr/golden-python-symbols.yaml
+  type: modified
+  span: {start_line: 21, end_line: 22}
+  summary: Update the expected source extractor span after the report renderer grew.
+  rationale: Keep golden symbol locations accurate after preceding source lines were added.
+- path: tests/test_agent_bootstrap.py
+  type: modified
+  span: {start_line: 17, end_line: 17}
+  summary: Import the runtime identity builder for focused behavior coverage.
+  rationale: Verify identity changes without invoking a full repository bootstrap.
+- path: tests/test_agent_bootstrap.py
+  type: modified
+  span: {start_line: 236, end_line: 306}
+  summary: Assert baseline results retain and render runtime identity, and that source, lockfile, and tool-version changes alter the fingerprint.
+  rationale: Ensure pass evidence records the execution basis and changes when its identity inputs change.
+entities: []
+entity_relationships: []
+invariants:
+- id: baseline-observation-binds-runtime-identity
+  description: Every executable local baseline observation records a fingerprint over source content, validation inputs, check recipe, environment, interpreter, and tool version.
+  action: added
+- id: markdown-renders-saved-observation-identity
+  description: The Structrr Markdown report displays the fingerprint persisted with the final baseline observation.
+  action: added
+guidance: []

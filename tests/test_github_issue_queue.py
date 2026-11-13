@@ -2247,3 +2247,41 @@ def test_required_ci_observation_rejects_head_change_during_check_read() -> None
 
     assert observation["outcome"] == "blocked"
     assert "head changed" in observation["reason"]
+
+
+def test_required_ci_readiness_uses_timestamped_normalized_current_head_checks() -> (
+    None
+):
+    client = FakeIssueClient()
+    client.required_checks = [
+        {"name": "unit", "state": "success", "workflow": "ci"},
+        {"name": "integration", "state": "pending", "workflow": "ci"},
+        {"name": "docs", "state": "skipping", "workflow": "ci"},
+    ]
+
+    observation = github_issue_queue._observe_required_ci_outcome(
+        client,  # type: ignore[arg-type]
+        "https://github.com/example/project/pull/123",
+    )
+
+    assert observation["outcome"] == "awaiting_ci"
+    assert observation["head_sha"] == client.pr_head
+    assert observation["observed_at"].endswith("+00:00")
+    assert [item["status"] for item in observation["checks"]] == [
+        "passed",
+        "pending",
+        "unknown",
+    ]
+    assert all(item["head_sha"] == client.pr_head for item in observation["checks"])
+    assert all(
+        item["observed_at"] == observation["observed_at"]
+        for item in observation["checks"]
+    )
+
+    checkpoint = github_issue_queue._render_ci_outcome_checkpoint(
+        pull_request_url="https://github.com/example/project/pull/123",
+        observation=observation,
+    )
+
+    assert '"observed_at"' in checkpoint
+    assert '"status": "unknown"' in checkpoint

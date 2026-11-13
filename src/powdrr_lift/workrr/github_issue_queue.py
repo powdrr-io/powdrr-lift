@@ -16,6 +16,7 @@ import tempfile
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, replace
+from datetime import UTC, datetime
 from pathlib import Path
 from time import sleep, time
 from typing import Any
@@ -2532,31 +2533,35 @@ def _observe_required_ci_outcome(
     client: GitHubIssueClient, pull_request_url: str | None
 ) -> dict[str, Any]:
     """Classify only current-PR required checks reported by GitHub CLI."""
+    observed_at = datetime.now(UTC).isoformat()
     if pull_request_url is None:
-        return {
-            "outcome": "blocked",
-            "head_sha": None,
-            "checks": [],
-            "reason": "the completed workflow did not checkpoint a pull request URL",
-        }
+        return _ci_outcome_observation(
+            "blocked",
+            None,
+            (),
+            "the completed workflow did not checkpoint a pull request URL",
+            observed_at,
+        )
     number = _same_repository_pull_request_number(pull_request_url, client.repository)
     if number is None:
-        return {
-            "outcome": "blocked",
-            "head_sha": None,
-            "checks": [],
-            "reason": "the checkpointed PR URL does not belong to this repository",
-        }
+        return _ci_outcome_observation(
+            "blocked",
+            None,
+            (),
+            "the checkpointed PR URL does not belong to this repository",
+            observed_at,
+        )
     head_result = client._invoke(
         ["pr", "view", str(number), "--json", "headRefOid"], check=False
     )
     if head_result.returncode != 0:
-        return {
-            "outcome": "blocked",
-            "head_sha": None,
-            "checks": [],
-            "reason": "GitHub could not report the current PR head",
-        }
+        return _ci_outcome_observation(
+            "blocked",
+            None,
+            (),
+            "GitHub could not report the current PR head",
+            observed_at,
+        )
     try:
         head_value = json.loads(head_result.stdout)
     except json.JSONDecodeError:
@@ -2566,12 +2571,13 @@ def _observe_required_ci_outcome(
         not isinstance(head_sha, str)
         or re.fullmatch(r"[0-9a-f]{40,64}", head_sha) is None
     ):
-        return {
-            "outcome": "blocked",
-            "head_sha": None,
-            "checks": [],
-            "reason": "GitHub returned no valid current PR head SHA",
-        }
+        return _ci_outcome_observation(
+            "blocked",
+            None,
+            (),
+            "GitHub returned no valid current PR head SHA",
+            observed_at,
+        )
     checks_result = client._invoke(
         [
             "pr",
@@ -2584,28 +2590,33 @@ def _observe_required_ci_outcome(
         check=False,
     )
     if checks_result.returncode != 0:
-        return {
-            "outcome": "blocked",
-            "head_sha": head_sha,
-            "checks": [],
-            "reason": "GitHub could not report required check states: "
+        return _ci_outcome_observation(
+            "blocked",
+            head_sha,
+            (),
+            "GitHub could not report required check states: "
             + checks_result.stderr.strip()[:500],
-        }
+            observed_at,
+        )
     try:
         raw_checks = json.loads(checks_result.stdout)
     except json.JSONDecodeError:
         raw_checks = None
     if not isinstance(raw_checks, list) or not raw_checks:
-        return {
-            "outcome": "blocked",
-            "head_sha": head_sha,
-            "checks": [],
-            "reason": "GitHub reported no required checks; review readiness is unknown",
-        }
+        return _ci_outcome_observation(
+            "blocked",
+            head_sha,
+            (),
+            "GitHub reported no required checks; review readiness is unknown",
+            observed_at,
+        )
     checks = [
         {
             "name": str(value.get("name", "")),
             "state": str(value.get("state", "unknown")).casefold(),
+            "status": _normalized_required_check_status(
+                str(value.get("state", "unknown")).casefold()
+            ),
             "workflow": (
                 str(value["workflow"]) if value.get("workflow") is not None else None
             ),
@@ -2626,33 +2637,57 @@ def _observe_required_ci_outcome(
         else None
     )
     if confirmed_result.returncode != 0 or confirmed_sha != head_sha:
-        return {
-            "outcome": "blocked",
-            "head_sha": head_sha,
-            "checks": checks,
-            "reason": "the PR head changed while required checks were being observed",
-        }
+        return _ci_outcome_observation(
+            "blocked",
+            head_sha,
+            checks,
+            "the PR head changed while required checks were being observed",
+            observed_at,
+        )
     if not checks or any(not item["name"] for item in checks):
         outcome = "blocked"
         reason = "GitHub returned incomplete required-check data"
-    elif any(
-        item["state"] in {"fail", "failure", "cancel", "skipping"} for item in checks
-    ):
+    elif any(item["status"] == "failed" for item in checks):
         outcome = "blocked"
-        reason = "one or more required checks failed, were canceled, or were skipped"
-    elif all(item["state"] in {"pass", "success"} for item in checks):
+        reason = "one or more required checks failed or were canceled"
+    elif all(item["status"] == "passed" for item in checks):
         outcome = "awaiting_review"
         reason = "all required checks passed for the current PR head"
-    elif any(item["state"] in {"pending", "queued", "in_progress"} for item in checks):
+    elif any(item["status"] == "pending" for item in checks):
         outcome = "awaiting_ci"
         reason = "one or more required checks are still pending for the current PR head"
     else:
         outcome = "blocked"
         reason = "GitHub returned an unrecognized required-check state"
+    return _ci_outcome_observation(outcome, head_sha, checks, reason, observed_at)
+
+
+def _normalized_required_check_status(state: str) -> str:
+    if state in {"pass", "success"}:
+        return "passed"
+    if state in {"fail", "failure", "cancel", "cancelled", "timed_out"}:
+        return "failed"
+    if state in {"pending", "queued", "in_progress"}:
+        return "pending"
+    return "unknown"
+
+
+def _ci_outcome_observation(
+    outcome: str,
+    head_sha: str | None,
+    checks: Sequence[Mapping[str, Any]],
+    reason: str,
+    observed_at: str,
+) -> dict[str, Any]:
+    """Return a dated observation set tied to the PR head reviewed by the gate."""
+    head_checks = [
+        {**check, "head_sha": head_sha, "observed_at": observed_at} for check in checks
+    ]
     return {
         "outcome": outcome,
         "head_sha": head_sha,
-        "checks": checks,
+        "observed_at": observed_at,
+        "checks": head_checks,
         "reason": reason,
     }
 
@@ -2672,6 +2707,7 @@ def _render_ci_outcome_checkpoint(
         "schema": "https://powdrr.io/schemas/ci-outcome-checkpoint-v1",
         "pull_request_url": pull_request_url,
         "head_sha": observation.get("head_sha"),
+        "observed_at": observation.get("observed_at"),
         "outcome": observation.get("outcome"),
         "required_checks": observation.get("checks", []),
         "reason": observation.get("reason", ""),

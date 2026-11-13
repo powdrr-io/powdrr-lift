@@ -1,0 +1,99 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1464
+title: Load feature validation from typed inventory
+intent:
+  problem: Workrr rebuilds validation profiles from legacy tool records, discards repository checks when an explicit test is set, and inserts a successful no-op when discovery is empty.
+  goal: Load typed validation inventory records, preserve their execution metadata, run explicit and discovered checks together, and report empty discovery as unknown.
+human-decisions: []
+structured_files: []
+files:
+- path: packages/service/src/powdrr_service/structrr/validation.py
+  type: modified
+  span: {start_line: 10, end_line: 10}
+  summary: Import mapping support for typed validation inventory records.
+  rationale: Validate inventory entries before converting them to Workrr profiles.
+- path: packages/service/src/powdrr_service/structrr/validation.py
+  type: modified
+  span: {start_line: 113, end_line: 113}
+  summary: Name the empty-discovery diagnostic as unknown validation.
+  rationale: Avoid implying readiness when no validation obligation is known.
+- path: packages/service/src/powdrr_service/structrr/validation.py
+  type: modified
+  span: {start_line: 115, end_line: 116}
+  summary: Explain that zero discovered checks leaves readiness unknown.
+  rationale: Tell users what evidence is missing.
+- path: packages/service/src/powdrr_service/structrr/validation.py
+  type: modified
+  span: {start_line: 121, end_line: 121}
+  summary: Set empty validation discovery status to unknown.
+  rationale: Preserve uncertainty in the machine-readable Structrr context.
+- path: packages/service/src/powdrr_service/structrr/validation.py
+  type: modified
+  span: {start_line: 141, end_line: 202}
+  summary: Load typed validation records into profiles while retaining commands and execution metadata.
+  rationale: Keep inventory provenance and execution context available to Workrr.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span: {start_line: 103, end_line: 103}
+  summary: Import the typed validation inventory loader.
+  rationale: Adapt Structrr inventory records directly for feature validation.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span: {start_line: 652, end_line: 653}
+  summary: Fail closed with an explicit unknown-discovery message when no check is available.
+  rationale: Prevent feature implementation from treating missing validation as success.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span: {start_line: 6349, end_line: 6353}
+  summary: Load repository checks from the typed validation inventory.
+  rationale: Replace reconstruction from legacy tool declarations.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span: {start_line: 6355, end_line: 6356}
+  summary: Add the explicit feature command alongside repository checks.
+  rationale: Ensure a feature-specific test does not hide project-level checks.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span: {start_line: 6361, end_line: 6362}
+  summary: Remove the fake successful command fallback.
+  rationale: Keep absent validation visible instead of manufacturing a pass.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span: {start_line: 6364, end_line: 6369}
+  summary: Preserve profiles with colliding names under unique runtime names.
+  rationale: Keep explicit and discovered obligations distinct.
+- path: tests/test_cli.py
+  type: modified
+  span: {start_line: 544, end_line: 544}
+  summary: Expect unknown discovery status when the bootstrap finds no checks.
+  rationale: Match the CLI contract to the new fail-closed state.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span: {start_line: 64, end_line: 64}
+  summary: Import validation profile discovery coverage.
+  rationale: Test the typed inventory adaptation in the endpoint.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span: {start_line: 3179, end_line: 3243}
+  summary: Verify explicit and repository checks are both retained and empty discovery adds no no-op command.
+  rationale: Prevent lost repository obligations and synthetic successful validation.
+- path: tests/test_validation_discovery.py
+  type: modified
+  span: {start_line: 5, end_line: 10}
+  summary: Import typed inventory conversion and context helpers for coverage.
+  rationale: Test validation profile serialization at the service boundary.
+- path: tests/test_validation_discovery.py
+  type: modified
+  span: {start_line: 71, end_line: 120}
+  summary: Verify inventory fields survive loading and empty discovery is marked unknown.
+  rationale: Preserve execution metadata and prevent unknown readiness from being reported as partial success.
+entities:
+- id: typed-validation-profile-loader
+  type: Function
+  action: added
+- id: typed-validation-inventory-tests
+  type: Unit test
+  action: added
+entity_relationships: []
+invariants: []
+guidance: []

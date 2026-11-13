@@ -1,11 +1,12 @@
 # Implementation contract and verification
 
-Status: Active implementation. Milestone 1 route inventory and fixture
-acceptance are implemented. Milestone 2 now binds typed accepted behavior cases
-to the public handoff and compiles a base-bound private repository evidence
-closure in Workrr; its full acceptance fixture set and milestones 3–5 remain.
+Status: Active implementation. Milestones 1 and 2 are implemented with fixture
+acceptance. The source-reference route binds typed behavior cases to the public
+handoff and compiles a base-bound private repository evidence closure. Milestones
+3–5 remain.
 
 Audited code baseline for this inventory: `feafe5b7b22bf7cd98dee9b06797ea87af558a4c`.
+Latest implementation review baseline: `91a2cbbc644db93d9f9b26c4b2c46f8aa5bac339` (PR #1467).
 
 This plan replaces the intent-linked verification, evidence-backed prompt
 contract closure, and bounded coding-worker plans in `superseded/`. Those
@@ -36,7 +37,7 @@ new models, a new test-generation pipeline, or benchmark-specific product rules.
 | Capability | Current code and evidence | Limit that remains |
 | --- | --- | --- |
 | Accepted source authority | `workrr/source_reference_dispatch.py::load_reviewed_source_design` reads a bounded regular blob from the exact Git base and validates plan/item identity. | This route requires the explicit reviewed `source_reference_design_file` selector. |
-| Source-backed behavior closure | Service handoff requires typed accepted behavior scenarios with source-faithfulness provenance and resolves placement verification refs to case/scenario IDs. `SourceReferenceRun.prepare` collects tracked Python evidence at the clean base and validates a private closure tied to the accepted document digest. | Milestone 2 remains open: add fixtures for omitted optional arguments, nested error continuation, unsupported operations, negative requirements, conditional behavior, and shared interfaces; demonstrate complete per-field provenance and blocked missing closure. The closure is pre-implementation static evidence, not a runtime call graph. |
+| Source-backed behavior closure | Service handoff requires typed accepted behavior scenarios with source-faithfulness provenance, resolves placement verification refs to case/scenario IDs, and serializes the case-to-scenario map. `SourceReferenceRun.prepare` collects tracked Python evidence at the clean base and validates a private closure tied to the accepted document digest. Fixtures cover omitted optional arguments, nested error continuation, unsupported operations, negative requirements, conditional behavior, shared interfaces, required-field provenance, and missing-closure rejection. | Static source links remain evidence candidates and cannot establish dynamic runtime behavior; milestone 3 connects independent candidate-bound execution evidence. |
 | Immutable handoff and isolated execution | `SourceReferenceRun.prepare`, `authorize`, `claim_invocation`, and `execute` seal inputs and invoke MiniSWE once under Seatbelt or bubblewrap. | This guarantee applies to prepared source-reference runs, not every provider or legacy entry point. |
 | Source context and placement checks | Service `structrr/source_reader.py`, `source_observation.py`, `reference_validation.py`, and Workrr source-reference validation bind reads, owners, and canonical definitions. | Mechanical annotation coverage cannot establish behavioral correctness. |
 | Metadata reconciliation | `SourceReferenceRun.reconcile_after_worker` accepts a trusted reconciliation receipt, verifies the candidate, compares Python AST snapshots, and rejects product syntax changes. | Reconciliation must preserve frozen authority and separately identify corrected metadata. |
@@ -84,7 +85,7 @@ as typed non-code-writing service repairs. Route fixtures now trace selected
 authority through the CLI issue-worker, planned-workflow, and benchmark
 task-scenario adapters, and exercise explicit rejection or observation at the
 other implementation-capable boundaries. Milestone 1 acceptance is complete;
-milestones 2–5 remain.
+milestones 3–5 remain.
 
 ### 2. Compile one complete, source-backed obligation closure
 
@@ -99,6 +100,12 @@ Acceptance: fixtures cover omitted optional arguments, nested error continuation
 unsupported operations, negative requirements, conditional behavior, and shared
 interfaces. Each required field has provenance; missing closure blocks handoff.
 No solution patch or hidden verifier enters production compilation.
+
+Acceptance evidence: `test_handoff_covers_behavior_closure_dimensions_and_case_identity`
+covers the scenario classes and case mapping; provenance omission and missing-
+closure fixtures reject incomplete designs. `test_contract_closure_retains_provenance_and_excludes_validator_commands`
+checks that accepted evidence and faithfulness references survive private closure
+compilation while validator commands stay out of the repository source inventory.
 
 ### 3. Connect retained-intent gates on the selected production routes
 

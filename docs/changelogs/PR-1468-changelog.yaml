@@ -1,0 +1,135 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1468
+title: Complete source-backed behavior closure
+intent:
+  problem: Placement references resolved to accepted case IDs but the worker contract did not show which scenario each case named, and private source closure dropped accepted evidence provenance.
+  goal: Preserve case-to-scenario identity and the accepted provenance needed to review each compiled behavior obligation, with explicit acceptance fixtures for the required behavior classes.
+human-decisions: []
+structured_files: []
+files:
+- path: packages/service/src/powdrr_service/structrr/source_reference_handoff.py
+  type: modified
+  span: {start_line: 263, end_line: 268}
+  summary: Return compiled scenarios with their accepted case ID mapping.
+  rationale: Carry exact accepted case identity into both public and private handoff contracts.
+- path: packages/service/src/powdrr_service/structrr/source_reference_handoff.py
+  type: modified
+  span: {start_line: 287, end_line: 291}
+  summary: Bind each scenario ID to its accepted case IDs.
+  rationale: Make verification references interpretable without inferring scenario identity.
+- path: packages/service/src/powdrr_service/structrr/source_reference_handoff.py
+  type: modified
+  span: {start_line: 303, end_line: 305}
+  summary: Return the normalized scenario-to-case mapping.
+  rationale: Keep case links stable and sorted.
+- path: packages/service/src/powdrr_service/structrr/source_reference_handoff.py
+  type: modified
+  span: {start_line: 349, end_line: 349}
+  summary: Require the case ID map in the canonical contract schema.
+  rationale: Prevent contracts from silently losing accepted verification identities.
+- path: packages/service/src/powdrr_service/structrr/source_reference_handoff.py
+  type: modified
+  span: {start_line: 389, end_line: 402}
+  summary: Validate that every scenario has a nonempty, unique case ID list.
+  rationale: Reject malformed or incomplete handoff identity links.
+- path: packages/service/src/powdrr_service/structrr/source_reference_handoff.py
+  type: modified
+  span: {start_line: 445, end_line: 448}
+  summary: Serialize case links in canonical scenario order.
+  rationale: Preserve deterministic handoff fingerprints.
+- path: packages/service/src/powdrr_service/structrr/source_reference_handoff.py
+  type: modified
+  span: {start_line: 485, end_line: 485}
+  summary: Render case-to-scenario links in required behavior.
+  rationale: Let workers follow placement references to their accepted scenario.
+- path: packages/service/src/powdrr_service/structrr/source_reference_handoff.py
+  type: modified
+  span: {start_line: 677, end_line: 679}
+  summary: Compile accepted scenarios and their case links together.
+  rationale: Derive both views from the same reviewed design revision.
+- path: packages/service/src/powdrr_service/structrr/source_reference_handoff.py
+  type: modified
+  span: {start_line: 711, end_line: 711}
+  summary: Include the case mapping in the normalized contract input.
+  rationale: Bind case identity into the public and private contract fingerprints.
+- path: src/powdrr_lift/core/contract_closure.py
+  type: modified
+  span: {start_line: 360, end_line: 372}
+  summary: Retain behavior evidence, requirement links, faithfulness references, and semantic provenance in the private closure.
+  rationale: Preserve source lineage while excluding validator commands from the repository source inventory.
+- path: docs/design/structrr-source-reference-handoff.md
+  type: modified
+  span: {start_line: 26, end_line: 28}
+  summary: Document the normalized case-to-scenario map.
+  rationale: Explain how public verification references resolve to accepted behavior.
+- path: docs/design/structrr-source-reference-handoff.md
+  type: modified
+  span: {start_line: 97, end_line: 99}
+  summary: Document retained provenance and validator privacy in the private closure.
+  rationale: Keep the design boundary accurate for implementation and review.
+- path: docs/plans/implementation-contract-and-verification.md
+  type: modified
+  span: {start_line: 3, end_line: 6}
+  summary: Record milestone 2 acceptance and the remaining milestones.
+  rationale: Keep the active plan status aligned with verified implementation.
+- path: docs/plans/implementation-contract-and-verification.md
+  type: modified
+  span: {start_line: 9, end_line: 9}
+  summary: Record the latest reviewed implementation baseline.
+  rationale: Identify the code revision used for the milestone assessment.
+- path: docs/plans/implementation-contract-and-verification.md
+  type: modified
+  span: {start_line: 40, end_line: 40}
+  summary: Record behavior closure coverage and its remaining static analysis limit.
+  rationale: Distinguish completed closure work from milestone 3 runtime evidence gates.
+- path: docs/plans/implementation-contract-and-verification.md
+  type: modified
+  span: {start_line: 88, end_line: 88}
+  summary: Mark milestones 1 and 2 accepted.
+  rationale: Keep the remaining work sequence accurate.
+- path: docs/plans/implementation-contract-and-verification.md
+  type: modified
+  span: {start_line: 104, end_line: 109}
+  summary: Link explicit acceptance fixtures for behavior classes, provenance, and missing closure.
+  rationale: Make the milestone completion claim reviewable.
+- path: tests/test_contract_closure.py
+  type: modified
+  span: {start_line: 109, end_line: 149}
+  summary: Verify provenance is retained while validator commands stay out of the source inventory.
+  rationale: Protect the private closure's evidence and privacy boundary.
+- path: tests/test_source_reference_handoff.py
+  type: modified
+  span: {start_line: 11, end_line: 11}
+  summary: Import the behavior dimension schema for completeness assertions.
+  rationale: Verify the handoff preserves every required behavior dimension.
+- path: tests/test_source_reference_handoff.py
+  type: modified
+  span: {start_line: 165, end_line: 291}
+  summary: Cover omitted optional arguments, nested errors, unsupported and negative behavior, conditional behavior, shared interfaces, provenance, case identity, and missing closure.
+  rationale: Exercise the complete milestone 2 handoff acceptance set.
+- path: tests/test_source_reference_run.py
+  type: modified
+  span: {start_line: 213, end_line: 213}
+  summary: Assert case-to-scenario links survive Workrr preparation.
+  rationale: Protect accepted identity across the production handoff boundary.
+- path: tests/test_source_reference_run.py
+  type: modified
+  span: {start_line: 223, end_line: 228}
+  summary: Assert evidence and faithfulness provenance remain private and validator commands are excluded.
+  rationale: Protect private closure integrity and separation.
+entities:
+- id: compile-accepted-behavior-design
+  type: Function
+  action: added
+- id: behavior-closure-acceptance-fixtures
+  type: Unit test
+  action: added
+entity_relationships: []
+invariants:
+- id: behavior-case-identity-is-preserved
+  description: Every accepted behavior scenario remains linked to the case IDs referenced by source placements in the compiled handoff.
+  action: altered
+- id: private-closure-retains-source-provenance
+  description: The private repository closure retains accepted evidence and faithfulness provenance but excludes validator commands.
+  action: altered
+guidance: []

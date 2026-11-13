@@ -357,6 +357,19 @@ def compile_contract_closure(
                     "when": scenario.get("when"),
                     "then": scenario.get("then"),
                     "dimensions": dict(scenario.get("dimensions", {})),
+                    "evidence": list(_text_values(scenario.get("evidence"))),
+                    "related_requirements": list(
+                        _text_values(scenario.get("related_requirements"))
+                    ),
+                    "faithfulness_ref": dict(scenario.get("faithfulness_ref", {})),
+                    "source_dimensions": dict(scenario.get("source_dimensions", {})),
+                    "semantic_dimension_applicability": dict(
+                        scenario.get("semantic_dimension_applicability", {})
+                    ),
+                    "unresolved_dimensions": list(
+                        _text_values(scenario.get("unresolved_dimensions"))
+                    ),
+                    "routing": str(scenario.get("routing", "include")),
                     "assumptions": [
                         dict(item)
                         for item in scenario.get("assumptions", [])

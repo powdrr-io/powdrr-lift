@@ -3444,7 +3444,7 @@ def _run_code_agent_phase(
         attempt_number = int(state.get("opencode_attempt_number", 0)) + 1
         state["opencode_attempt_number"] = attempt_number
         validation_profiles = {
-            profile.name: ValidationProfile(profile.name, tuple(profile.command))
+            profile.name: _runtime_validation_profile(profile)
             for profile in state.get("validation_profiles", ())
             if isinstance(profile, DiscoveredValidationProfile)
         }
@@ -4795,6 +4795,27 @@ def _allowed_validation_commands(
     profiles: Sequence[DiscoveredValidationProfile],
 ) -> tuple[str, ...]:
     return tuple(" ".join(profile.command) for profile in profiles if profile.command)
+
+
+def _runtime_validation_profile(
+    profile: DiscoveredValidationProfile,
+) -> ValidationProfile:
+    """Carry the discovered validation context into the coding-agent runner."""
+    return ValidationProfile(
+        name=profile.name,
+        command=tuple(profile.command),
+        cwd=profile.cwd,
+        environment_id=profile.environment_id,
+        component=profile.component,
+        execution_kind=profile.execution_kind or "argv",
+        shell=profile.shell,
+        script=profile.script,
+        applicability=dict(profile.applicability or {}),
+        selectors=profile.selectors,
+        config_files=profile.config_files,
+        settings=dict(profile.settings or {}),
+        unresolved=profile.unresolved,
+    )
 
 
 def _run_validation_profile(
@@ -7565,7 +7586,7 @@ def _run_code_task_focused_validation(
     ):
         return cached_report.to_data()
     discovered = {
-        profile.name: ValidationProfile(profile.name, tuple(profile.command))
+        profile.name: _runtime_validation_profile(profile)
         for profile in profiles
         if isinstance(profile, DiscoveredValidationProfile)
     }

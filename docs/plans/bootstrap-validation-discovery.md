@@ -9,10 +9,12 @@ feature run's target event, base branch, and changed paths. Missing context,
 unsupported condition expressions, negated path patterns, and checks that are
 not locally reproducible remain pending; filters that provably do not match
 are recorded as not applicable. This is a partial implementation of step 6.
-Full GitHub expression evaluation, remote-only check observations, and the
-readiness gate in step 8 remain outstanding. The feature review aggregate also
-keeps an empty validation result set pending, so missing results cannot satisfy
-the gate.
+The evaluator also supports GitHub condition equality/inequality, boolean
+operators, and grouping for event-name and base-branch values. Unsupported
+functions and unavailable context remain pending. Full GitHub expression
+evaluation, remote-only check observations, and the readiness gate in step 8
+remain outstanding. The feature review aggregate also keeps an empty validation
+result set pending, so missing results cannot satisfy the gate.
 
 ## Objective and delivery contract
 

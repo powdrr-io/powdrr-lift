@@ -43,6 +43,9 @@ PLAN_COMMIT = "a" * 40
 
 
 def _write_test_validation_inventory(root: Path) -> None:
+    workflow_path = root / ".github/workflows/ci.yml"
+    workflow_path.parent.mkdir(parents=True, exist_ok=True)
+    workflow_path.write_text("name: CI\njobs: {}\n", encoding="utf-8")
     checks = []
     for job in ("test", "unit", "integration", "docs"):
         checks.append(
@@ -75,9 +78,37 @@ def _write_test_validation_inventory(root: Path) -> None:
                 ],
             }
         )
+    document = {
+        "validation_inventory": checks,
+        "validation_context": {
+            "input_fingerprints": [
+                {
+                    "path": ".github/workflows/ci.yml",
+                    "digest": github_issue_queue._sha256_file(workflow_path),
+                }
+            ]
+        },
+    }
     path = root / "docs/structrr/current/baseline-bootstrap.yaml"
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps({"validation_inventory": checks}), encoding="utf-8")
+    raw = json.dumps(document, sort_keys=True).encode("utf-8")
+    path.write_bytes(raw)
+    report_path = path.with_suffix(".md")
+    report_path.write_text("# Validation baseline\n", encoding="utf-8")
+    metadata = {
+        "schema_version": "structrr-baseline-freshness-v1",
+        "baseline_digest": github_issue_queue._sha256_file(path),
+        "report_digest": github_issue_queue._sha256_file(report_path),
+        "validation_input_fingerprint": github_issue_queue.content_fingerprint(
+            {
+                "validation_inventory": checks,
+                "validation_context": document["validation_context"],
+            }
+        ),
+    }
+    path.with_suffix(".freshness.json").write_text(
+        json.dumps(metadata, sort_keys=True), encoding="utf-8"
+    )
 
 
 def _test_validation_checks(root: Path) -> tuple[Mapping[str, Any], ...]:
@@ -2362,8 +2393,24 @@ def test_required_ci_readiness_blocks_when_validation_inventory_is_missing() -> 
     )
 
     assert observation["outcome"] == "blocked"
-    assert "inventory is unavailable" in observation["reason"]
+    assert "inventory is missing" in observation["reason"]
     assert observation["checks"][0]["inventory_match"]["status"] == "unavailable"
+
+
+def test_inventory_loader_rejects_tampered_report_and_stale_input(
+    tmp_path: Path,
+) -> None:
+    _test_validation_checks(tmp_path)
+    baseline = tmp_path / "docs/structrr/current/baseline-bootstrap.yaml"
+    report = baseline.with_suffix(".md")
+    workflow = tmp_path / ".github/workflows/ci.yml"
+
+    report.write_text("# changed report\n", encoding="utf-8")
+    assert github_issue_queue._read_repository_validation_inventory(tmp_path) is None
+
+    _write_test_validation_inventory(tmp_path)
+    workflow.write_text("name: CI\njobs:\n  extra: {}\n", encoding="utf-8")
+    assert github_issue_queue._read_repository_validation_inventory(tmp_path) is None
 
 
 def test_required_ci_readiness_blocks_unmatched_discovered_job(

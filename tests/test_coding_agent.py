@@ -1375,6 +1375,22 @@ def test_validation_runner_executes_every_declared_profile_and_persists_report(
     assert store.load_validation_report("attempt-validation") == report
 
 
+def test_validation_runner_with_no_selected_profiles_cannot_pass(
+    tmp_path: Path,
+) -> None:
+    worktree = _git_repo(tmp_path / "repo")
+    request = replace(_request(_head(worktree)), validation_profiles=())
+    attempt = run_coding_agent(
+        FakeProvider("allowed"), request, worktree_root=worktree, attempt_id="empty"
+    )
+
+    report = ValidationRunner({}).run(request, attempt, worktree_root=worktree)
+
+    assert report.status is ValidationReportStatus.PENDING
+    assert report.results == ()
+    assert report.error == "no validation profiles produced results"
+
+
 def test_validation_runner_uses_and_reports_declared_working_directory(
     tmp_path: Path,
 ) -> None:

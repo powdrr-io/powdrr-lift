@@ -1,0 +1,36 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1480
+title: Keep empty validation selections pending
+intent:
+  problem: The core validation runner reports passed when no validation profiles are selected and no other evidence is required.
+  goal: Keep runs without validation results pending and provide a diagnostic explaining the missing evidence.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/plans/bootstrap-validation-discovery.md
+  type: modified
+  span: {start_line: 19, end_line: 19}
+  summary: Record that an empty core validation selection remains pending.
+  rationale: Keep WP8 progress aligned with the runtime readiness safeguard.
+- path: src/powdrr_lift/workrr/coding_agent_validation.py
+  type: modified
+  span: {start_line: 783, end_line: 786}
+  summary: Select pending status when the validation runner has no results.
+  rationale: Prevent an empty profile selection from satisfying readiness.
+- path: src/powdrr_lift/workrr/coding_agent_validation.py
+  type: modified
+  span: {start_line: 806, end_line: 806}
+  summary: Add a diagnostic for validation runs with no results.
+  rationale: Explain why the report cannot claim readiness.
+- path: tests/test_coding_agent.py
+  type: modified
+  span: {start_line: 1378, end_line: 1393}
+  summary: Add regression coverage for an empty validation profile selection.
+  rationale: Assert the runner stores no results as pending rather than passed.
+entities: []
+entity_relationships: []
+invariants:
+- id: empty-validation-selection-pending
+  description: A validation report with no profile results cannot report passed status.
+  action: added
+guidance: []

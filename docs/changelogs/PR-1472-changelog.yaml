@@ -1,0 +1,70 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1472
+title: Compile source-reference evidence routes
+intent:
+  problem: Accepted source-reference placements and preservation rules did not carry explicit service-compiled evidence-route contracts in their private validation handoff.
+  goal: Compile a fingerprinted evidence contract for every accepted placement and preservation rule and reject handoffs whose private contract set differs from the accepted obligations.
+human-decisions: []
+structured_files: []
+files:
+  - path: packages/service/src/powdrr_service/structrr/source_reference_handoff.py
+    type: modified
+    span: {start_line: 23, end_line: 26}
+    summary: Import the existing obligation evidence compiler and completeness check.
+    rationale: Reuse service-owned route classification for protected source-reference work.
+  - path: packages/service/src/powdrr_service/structrr/source_reference_handoff.py
+    type: modified
+    span: {start_line: 339, end_line: 381}
+    summary: Compile placement and preservation rules into typed evidence-route contracts with exact obligation coverage.
+    rationale: Make applicable structural, behavior, invariant, and guidance review routes explicit in the private handoff.
+  - path: packages/service/src/powdrr_service/structrr/source_reference_handoff.py
+    type: modified
+    span: {start_line: 693, end_line: 702}
+    summary: Recompute evidence contracts when constructing or loading a handoff bundle.
+    rationale: Reject missing or mismatched private route contracts even when validating a serialized handoff.
+  - path: packages/service/src/powdrr_service/structrr/source_reference_handoff.py
+    type: modified
+    span: {start_line: 739, end_line: 739}
+    summary: Retain canonical definitions keyed by reference identity during compilation.
+    rationale: Classify each placement from its accepted canonical reference kind.
+  - path: packages/service/src/powdrr_service/structrr/source_reference_handoff.py
+    type: modified
+    span: {start_line: 748, end_line: 748}
+    summary: Populate the canonical definition lookup for referenced obligations.
+    rationale: Supply accepted reference meaning to the evidence-route compiler.
+  - path: packages/service/src/powdrr_service/structrr/source_reference_handoff.py
+    type: modified
+    span: {start_line: 774, end_line: 778}
+    summary: Reserve and populate the private evidence-contract key.
+    rationale: Bind compiler-generated route expectations into the existing private validation fingerprint.
+  - path: tests/test_source_reference_handoff.py
+    type: modified
+    span: {start_line: 411, end_line: 441}
+    summary: Verify exact evidence contract coverage and route selection for invariant preservation and feature placement.
+    rationale: Protect the mapping from accepted obligations to their compiled evidence routes.
+  - path: docs/plans/implementation-contract-and-verification.md
+    type: modified
+    span: {start_line: 6, end_line: 10}
+    summary: Record evidence-route compilation as a partial milestone 3 implementation.
+    rationale: Keep plan status aligned with the protected handoff implementation.
+  - path: docs/plans/implementation-contract-and-verification.md
+    type: modified
+    span: {start_line: 13, end_line: 13}
+    summary: Update the latest implementation review baseline to merged PR 1470.
+    rationale: Tie the plan's current-state inventory to the latest merged implementation.
+  - path: docs/plans/implementation-contract-and-verification.md
+    type: modified
+    span: {start_line: 127, end_line: 136}
+    summary: Describe compiled evidence routes and identify the remaining candidate-bound route results.
+    rationale: Distinguish route compilation from incomplete verification execution and acceptance.
+entities:
+  - id: source-reference-evidence-route-compilation
+    type: Code quality gate
+    action: added
+entity_relationships: []
+invariants:
+  - id: private-evidence-contracts-cover-exact-obligations
+    action: added
+    description: Each accepted source-reference placement and preservation rule has exactly one private evidence contract, and a loaded handoff must recompute to the same contract set.
+    rationale: Keep evidence-route expectations bound to the accepted canonical design and reject incomplete or altered private closure.
+guidance: []

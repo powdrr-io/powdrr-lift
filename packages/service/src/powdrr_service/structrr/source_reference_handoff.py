@@ -20,6 +20,10 @@ from powdrr_service.behavior_contract import (
 )
 from powdrr_service.decision_obligation import content_fingerprint
 from powdrr_service.structrr.design import DesiredState
+from powdrr_service.structrr.obligation_evidence import (
+    assert_obligation_evidence_complete,
+    compile_obligation_evidence_contract,
+)
 from powdrr_service.structrr.reference_catalog import (
     ReferenceCatalog,
     resolve_reference,
@@ -330,6 +334,49 @@ def _compile_behavior_scenario_data(
                 "faithfulness provenance"
             )
     return compiled
+
+
+def _compile_obligation_evidence_contracts(
+    placements: list[dict[str, Any]],
+    preservation: list[dict[str, Any]],
+    definitions: Mapping[str, ReferenceDefinition],
+) -> list[dict[str, Any]]:
+    contracts = []
+    for placement in placements:
+        definition = definitions[placement["ref"]]
+        kind = (
+            "invariant"
+            if placement["relationship"] == "preserves"
+            or definition.kind == "invariant"
+            else "guidance"
+            if definition.kind in {"assumption", "procedure", "guidance"}
+            else "feature"
+        )
+        contracts.append(
+            compile_obligation_evidence_contract(
+                obligation_id=placement["obligation_id"],
+                clause_id=placement["ref"],
+                requirement_strength="must",
+                kind=kind,
+                polarity="required",
+            )
+        )
+    for rule in preservation:
+        contracts.append(
+            compile_obligation_evidence_contract(
+                obligation_id=rule["id"],
+                clause_id=rule["ref"],
+                requirement_strength="must",
+                kind="invariant",
+                polarity="required",
+            )
+        )
+    expected_ids = [
+        *(item["obligation_id"] for item in placements),
+        *(item["id"] for item in preservation),
+    ]
+    assert_obligation_evidence_complete(contracts, expected_ids)
+    return [item.to_data() for item in contracts]
 
 
 def _normalize(contract: Mapping[str, Any]) -> dict[str, Any]:
@@ -643,6 +690,16 @@ class CompiledSourceReferenceHandoff:
 def _bundle(prompt: dict[str, Any], private: Mapping[str, Any]) -> dict[str, Any]:
     if prompt["private_validation_digest"] != content_fingerprint(dict(private)):
         raise ValueError("private validation inputs differ from the compiled prompt")
+    contract = prompt["contract"]
+    definitions = {
+        item["id"]: ReferenceDefinition.from_data(item)
+        for item in contract["definitions"]
+    }
+    expected_evidence_contracts = _compile_obligation_evidence_contracts(
+        contract["obligations"], contract["preservation"], definitions
+    )
+    if private.get("obligation_evidence_contracts") != expected_evidence_contracts:
+        raise ValueError("private obligation evidence contracts do not match handoff")
     manifest = {
         "schema_version": MANIFEST_SCHEMA,
         "compiler_revision": COMPILER_REVISION,
@@ -679,6 +736,7 @@ def compile_source_reference_handoff(
     )
     placements = desired.document.get("source_reference_placements", [])
     preservation = desired.document.get("source_reference_preservations", [])
+    definitions_by_id: dict[str, ReferenceDefinition] = {}
     refs = {p["ref"] for p in placements} | {p["ref"] for p in preservation}
     refs.update(p["successor"] for p in preservation if p.get("successor") is not None)
     definitions = []
@@ -687,6 +745,7 @@ def compile_source_reference_handoff(
         if resolved.entry is None:
             raise ValueError(f"unresolved placement/preservation reference: {ref}")
         definitions.append(resolved.entry.reference.to_data())
+        definitions_by_id[ref] = resolved.entry.reference
     contract = _normalize(
         {
             **(
@@ -712,6 +771,11 @@ def compile_source_reference_handoff(
         }
     )
     private = dict(private_validation_data or {})
+    if "obligation_evidence_contracts" in private:
+        raise ValueError("private validation data uses a reserved contract key")
+    private["obligation_evidence_contracts"] = _compile_obligation_evidence_contracts(
+        placements, preservation, definitions_by_id
+    )
     return CompiledSourceReferenceHandoff(
         _json(_bundle(_prompt(contract, content_fingerprint(private)), private))
     )

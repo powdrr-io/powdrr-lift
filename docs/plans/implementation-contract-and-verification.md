@@ -1,6 +1,6 @@
 # Implementation contract and verification
 
-Status: Active implementation. Milestones 1 and 2 are implemented with fixture
+Status: Active implementation. Milestones 1–3 are implemented with fixture
 acceptance. The source-reference route binds typed behavior cases to the public
 handoff and compiles a base-bound private repository evidence closure. Milestone
 3 compiles per-placement and preservation evidence routes into the private
@@ -15,12 +15,13 @@ source runs also attach independent invariant-preservation reviews to compiled
 invariant routes when those reviews pass with current owner evidence.
 Preservation behavior routes link to accepted cases and fresh story receipts.
 Protected dispatch requires complete, passing route reconciliation before
-transferring a patch. The remaining milestone 3 fixture proves that a body-only
-regression is rejected even when source placement and ordinary validation pass.
+transferring a patch. The body-only regression fixture proves that a candidate
+with passing source placement and ordinary validation still fails protected
+story validation and is not transferred.
 Milestones 4–5 remain.
 
 Audited code baseline for this inventory: `feafe5b7b22bf7cd98dee9b06797ea87af558a4c`.
-Latest implementation review baseline: `0fba0cffe3f38e1c69f3c15ef1cdd94e2e9ce224` (PR #1490).
+Latest implementation review baseline: `274b00629bf247ff11e229c0592e6f33bb516208` (PR #1493).
 
 This plan replaces the intent-linked verification, evidence-backed prompt
 contract closure, and bounded coding-worker plans in `superseded/`. Those
@@ -169,7 +170,8 @@ Unavailable or inconclusive reviews remain `not_collected` without changing
 source-reference validation status. Fixtures cover route freshness, linked and
 stale story receipts, scope path containment, passing or inconclusive invariant
 reviews, and rejection of a body-only regression after placement validation
-passes. Reconciliation fixtures cover invalid records.
+passes. Reconciliation fixtures cover invalid records. Milestone 3 acceptance
+is complete.
 
 ### 4. Finish bounded execution and delivery migration
 
@@ -184,6 +186,16 @@ Acceptance: timeout, policy denial, no progress, failed verification, sandbox
 failure, input mutation, and candidate mutation prevent delivery. Pre-existing
 changes cannot satisfy worker progress. Final candidate identity matches every
 accepted receipt. Retry and duplicate-run fixtures prove invocation ownership.
+
+Implemented slices: prepared source runs bind immutable prompt and validation
+inputs to one invocation claim, reject duplicate execution, verify input and
+candidate identity, and reject policy violations and submitted work without
+durable progress. The native fake-model suite covers private input isolation,
+context completion, owner validation, candidate mutation during validation, and
+candidate mutation after acceptance. The source-run suite now explicitly covers
+a worker that completes without changes and confirms it returns
+`submitted_without_progress` instead of an accepted candidate. Temporary
+artifacts remain local to the protected run and are not a permanent audit store.
 
 ### 5. Demonstrate the complete production path
 

@@ -1,0 +1,72 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1495
+title: Cover source workers that submit without progress
+intent:
+  problem: The prepared source run rejects submissions without attributable changes, but the end-to-end protected worker fixture does not exercise that outcome.
+  goal: Prove a completed no-change worker attempt returns submitted_without_progress and cannot be accepted.
+human-decisions: []
+structured_files: []
+files:
+- path: tests/test_source_reference_run.py
+  type: modified
+  span: {start_line: 587, end_line: 594}
+  summary: Add a no-progress case to the native protected worker fixture.
+  rationale: Exercise submission without an attributable candidate change through the real worker boundary.
+- path: tests/test_source_reference_run.py
+  type: modified
+  span: {start_line: 611, end_line: 613}
+  summary: Keep the baseline source unchanged in the no-progress scenario.
+  rationale: Ensure the worker has no patch progress to attribute.
+- path: tests/test_source_reference_run.py
+  type: modified
+  span: {start_line: 660, end_line: 661}
+  summary: Submit the task without applying a source edit.
+  rationale: Exercise finalization of a completed no-change worker attempt.
+- path: tests/test_source_reference_run.py
+  type: modified
+  span: {start_line: 691, end_line: 691}
+  summary: Skip context-completion assertions when the worker is rejected before submission reconciliation.
+  rationale: Keep no-progress rejection distinct from context delivery failure.
+- path: tests/test_source_reference_run.py
+  type: modified
+  span: {start_line: 697, end_line: 697}
+  summary: Require the no-progress scenario to return submitted_without_progress.
+  rationale: Verify a completed empty attempt cannot become an accepted candidate.
+- path: docs/plans/implementation-contract-and-verification.md
+  type: modified
+  span: {start_line: 3, end_line: 3}
+  summary: Mark milestones 1 through 3 as fixture-accepted.
+  rationale: Reflect completion of the body-only regression acceptance test.
+- path: docs/plans/implementation-contract-and-verification.md
+  type: modified
+  span: {start_line: 18, end_line: 20}
+  summary: Describe the completed body-only regression fixture and its rejection point.
+  rationale: Keep the plan's current state accurate after PR 1492.
+- path: docs/plans/implementation-contract-and-verification.md
+  type: modified
+  span: {start_line: 24, end_line: 24}
+  summary: Advance the implementation review baseline to PR 1493.
+  rationale: Identify the latest merged baseline for subsequent work.
+- path: docs/plans/implementation-contract-and-verification.md
+  type: modified
+  span: {start_line: 173, end_line: 174}
+  summary: Mark milestone 3 acceptance complete.
+  rationale: Align the remaining milestone list with the completed behavioral gate coverage.
+- path: docs/plans/implementation-contract-and-verification.md
+  type: modified
+  span: {start_line: 190, end_line: 199}
+  summary: Record existing bounded-execution guarantees and the new no-progress fixture.
+  rationale: Track which milestone 4 acceptance conditions now have end-to-end regression evidence.
+entities:
+- id: protected-source-no-progress-regression-fixture
+  type: Integration test
+  action: added
+invariants:
+- id: submitted-source-runs-require-attributable-progress
+  description: A worker submission without attributable durable progress is rejected and cannot become an accepted candidate.
+  action: added
+guidance:
+- id: distinguish-no-progress-from-validation-failure
+  description: Report submitted_without_progress for completed worker attempts that produce no attributable changes.
+  action: added
+entity_relationships: []

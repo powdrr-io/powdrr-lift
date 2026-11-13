@@ -1,0 +1,37 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1497
+title: Prove reviewed revisions own fresh retry runs
+intent:
+  problem: A failed protected source invocation cannot be repeated, but the route lacks an integration fixture proving that a newly reviewed design revision can start a fresh invocation without reusing old artifacts.
+  goal: Verify failed runs are single-use, a new reviewed revision gets a separate run, and duplicate dispatch of that revision is rejected.
+human-decisions: []
+structured_files: []
+files:
+- path: tests/test_source_reference_dispatch.py
+  type: modified
+  span: {start_line: 414, end_line: 517}
+  summary: Exercise a failed protected invocation, a reviewed design revision retry, and duplicate dispatch rejection.
+  rationale: Prove invocation ownership and fresh artifact roots across reviewed revisions.
+- path: docs/plans/implementation-contract-and-verification.md
+  type: modified
+  span: {start_line: 24, end_line: 24}
+  summary: Advance the implementation review baseline to PR 1495.
+  rationale: Identify the latest merged baseline for subsequent plan work.
+- path: docs/plans/implementation-contract-and-verification.md
+  type: modified
+  span: {start_line: 199, end_line: 201}
+  summary: Record retry and duplicate invocation ownership evidence under milestone 4.
+  rationale: Keep the remaining acceptance inventory aligned with the new integration fixture.
+entities:
+- id: reviewed-revision-retry-invocation-fixture
+  type: Integration test
+  action: added
+invariants:
+- id: failed-invocations-require-new-reviewed-revision-for-retry
+  description: A failed source invocation cannot be reused; retry requires a new reviewed revision and creates a fresh run while duplicate dispatch for that revision remains rejected.
+  action: added
+guidance:
+- id: bind-retry-artifacts-to-reviewed-revision
+  description: Use the reviewed design base and identity to keep retry attempts and their evidence in separate protected run roots.
+  action: added
+entity_relationships: []

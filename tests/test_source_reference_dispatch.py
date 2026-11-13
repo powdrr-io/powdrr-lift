@@ -411,6 +411,110 @@ def test_story_context_is_bound_into_protected_source_objective(
     assert callable(captured["post_worker_reconciler"])
 
 
+def test_failed_source_invocation_retries_only_from_a_new_reviewed_revision(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo, base, proposed = fixture(tmp_path)
+    artifact_roots: list[Path] = []
+    invocations: list[int] = []
+
+    class Run:
+        def __init__(
+            self, invocation: int, artifact_root: Path, workspace_root: Path
+        ) -> None:
+            self.invocation = invocation
+            self.private_root = tmp_path / "private" / str(invocation)
+            self.public_root = tmp_path / "public" / str(invocation)
+            self.artifact_root = artifact_root
+            self.workspace_root = workspace_root
+
+        def execute(self, _handler: Any) -> Any:
+            invocations.append(self.invocation)
+            accepted = self.invocation == 1
+            if accepted:
+                (self.workspace_root / "twice.py").write_text(CANDIDATE)
+            return SimpleNamespace(
+                accepted=accepted,
+                to_data=lambda: {
+                    "outcome": "accepted" if accepted else "validation_failed",
+                    "attempt": {
+                        "attempt_id": f"run-{self.invocation}",
+                        "status": "completed",
+                        "changed_paths": ["twice.py"] if accepted else [],
+                    },
+                    "validation": {"status": "passed" if accepted else "failed"},
+                    "error": None if accepted else "verification failed",
+                    "obligation_route_evidence": (
+                        {
+                            "complete": True,
+                            "reconciliation": {"passed": True, "issues": []},
+                        }
+                        if accepted
+                        else None
+                    ),
+                },
+            )
+
+        def verify_candidate(self) -> None:
+            return None
+
+    def prepare(**kwargs: Any) -> Run:
+        invocation = len(artifact_roots)
+        artifact_roots.append(Path(kwargs["artifact_root"]))
+        return Run(
+            invocation,
+            artifact_roots[-1],
+            Path(kwargs["workspace_root"]),
+        )
+
+    monkeypatch.setattr(dispatch.SourceReferenceRun, "prepare", prepare)
+    monkeypatch.setattr(dispatch.tempfile, "gettempdir", lambda: str(tmp_path))
+    arguments: dict[str, Any] = {
+        "repo_root": repo,
+        "proposed": proposed,
+        "base_commit": base,
+        "workflow_id": "workflow-1",
+        "task_id": "implementation",
+        "objective": "Double the input.",
+        "allowed_paths": ("twice.py",),
+        "profile": ValidationProfile("behavior", (sys.executable, "-c", "pass")),
+        "code_agent": "minisweagent",
+        "model": "test",
+        "worker_timeout_seconds": 30,
+        "validation_timeout_seconds": 30,
+        "review_client": Reviewer(),
+    }
+
+    failed = dispatch.dispatch_source_reference_task(**arguments)
+    assert failed["passed"] is False
+    assert failed["source_reference_outcome"] == "validation_failed"
+    with pytest.raises(PowdrrExecutionError, match="already dispatched"):
+        dispatch.dispatch_source_reference_task(**arguments)
+    assert invocations == [0]
+
+    revised_design = yaml.safe_load((repo / "design.yaml").read_text())
+    revised_design["plan_id"] = "plan-2"
+    revised_design["item_id"] = "item-2"
+    (repo / "design.yaml").write_text(yaml.safe_dump(revised_design))
+    git(repo, "add", "design.yaml")
+    git(repo, "commit", "-m", "review revised implementation design")
+    revised_arguments = {
+        **arguments,
+        "proposed": {**proposed, "plan_id": "plan-2", "item_id": "item-2"},
+        "base_commit": git(repo, "rev-parse", "HEAD"),
+    }
+
+    retried = dispatch.dispatch_source_reference_task(**revised_arguments)
+    assert retried["passed"] is True, retried.get("error")
+    assert len(set(artifact_roots)) == 2
+    assert invocations == [0, 1]
+    assert Path(failed["source_reference_artifact_root"], "dispatch.json").is_file()
+    assert Path(retried["source_reference_artifact_root"], "dispatch.json").is_file()
+    with pytest.raises(PowdrrExecutionError, match="already dispatched"):
+        dispatch.dispatch_source_reference_task(**revised_arguments)
+    assert invocations == [0, 1]
+
+
 @pytest.mark.parametrize(
     (
         "initial_source",

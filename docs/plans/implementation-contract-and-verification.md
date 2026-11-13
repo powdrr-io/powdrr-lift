@@ -21,7 +21,7 @@ story validation and is not transferred.
 Milestones 4–5 remain.
 
 Audited code baseline for this inventory: `feafe5b7b22bf7cd98dee9b06797ea87af558a4c`.
-Latest implementation review baseline: `274b00629bf247ff11e229c0592e6f33bb516208` (PR #1493).
+Latest implementation review baseline: `b85f3ced69fa7566aee544b44bba04c295a864d7` (PR #1495).
 
 This plan replaces the intent-linked verification, evidence-backed prompt
 contract closure, and bounded coding-worker plans in `superseded/`. Those
@@ -196,6 +196,9 @@ candidate mutation after acceptance. The source-run suite now explicitly covers
 a worker that completes without changes and confirms it returns
 `submitted_without_progress` instead of an accepted candidate. Temporary
 artifacts remain local to the protected run and are not a permanent audit store.
+The dispatch retry fixture records a failed invocation, then proves that a new
+reviewed design revision starts a separate run and succeeds while a duplicate
+invocation of that same revision is rejected.
 
 ### 5. Demonstrate the complete production path
 

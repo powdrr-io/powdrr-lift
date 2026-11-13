@@ -8,8 +8,10 @@ import pytest
 
 from powdrr_lift.clean_pr_publisher import (
     publish_clean_pull_request,
+    validate_standard_pr_description,
     verify_publication_scope,
 )
+from powdrr_lift.errors import PowdrrExecutionError
 
 
 def _git(*args: str, cwd: Path) -> str:
@@ -17,6 +19,65 @@ def _git(*args: str, cwd: Path) -> str:
         ["git", *args], cwd=cwd, capture_output=True, text=True, check=True
     )
     return result.stdout
+
+
+def test_standard_pr_description_requires_ordered_nonempty_sections() -> None:
+    valid_description = """## Objective
+
+Explain the goal.
+
+## Scope
+
+- Include the implementation.
+
+## Implementation Details
+
+- Update the workflow.
+
+## Acceptance Criteria
+
+- The workflow runs.
+
+## Validation
+
+- pytest: passed.
+
+## Advisory Test-Quality Notes
+
+None."""
+    validate_standard_pr_description(valid_description)
+
+    for invalid_description in (
+        "## Objective Explain the goal. ## Scope Include the implementation.",
+        valid_description.replace("## Scope", "## Implementation Details", 1),
+        valid_description.replace("Explain the goal.", "", 1),
+        valid_description[: valid_description.rfind("None.")],
+    ):
+        with pytest.raises(PowdrrExecutionError):
+            validate_standard_pr_description(invalid_description)
+
+
+def test_clean_publisher_validates_standard_description_before_git_operations(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def unexpected_git_command(*_args: object, **_kwargs: object) -> str:
+        raise AssertionError("publication must stop before running Git")
+
+    monkeypatch.setattr("powdrr_lift.clean_pr_publisher._run", unexpected_git_command)
+
+    with pytest.raises(PowdrrExecutionError, match="required Objective heading"):
+        publish_clean_pull_request(
+            {
+                "files_to_publish": ["src/example.py"],
+                "base": "main",
+                "publication_branch": "powdrr/example",
+                "title": "Example change",
+                "body": "Malformed body",
+                "require_standard_pr_description": True,
+                "commit_message": "Implement example change",
+            },
+            worktree_root=tmp_path,
+        )
 
 
 def test_publication_scope_checks_every_path_and_rejects_runtime_state(

@@ -85,7 +85,6 @@ steps:
                   type: string
                   minLength: 1
                   maxLength: 12000
-                  pattern: '^## Objective\n\n(.|\n)+\n\n## Scope\n\n(.|\n)+\n\n## Implementation Details\n\n(.|\n)+\n\n## Acceptance Criteria\n\n(.|\n)+\n\n## Validation\n\n(.|\n)+\n\n## Advisory Test-Quality Notes\n\n(.|\n)+$'
                 base-branch: {type: string, const: main}
                 publication-branch: {type: string, minLength: 1}
       validation: {kind: json_schema}

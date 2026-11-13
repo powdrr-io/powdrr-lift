@@ -23,6 +23,7 @@ steps:
           publication_branch: {type: reference, value: workflow_context.publication-branch}
           title: {type: reference, value: workflow_context.feature-name}
           body: {type: reference, value: workflow_context.populated-pr-description}
+          require_standard_pr_description: true
           commit_message: {type: reference, value: workflow_context.commit-message}
       returns:
         type: string

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import re
 from pathlib import Path
 
 from powdrr_service.resources import bundled_process_directory
@@ -405,36 +404,8 @@ def test_execute_proposed_pr_is_a_procedrr_workflow_process() -> None:
     description_schema = title_judge["output"]["schema"]["properties"][
         "workflow_context"
     ]["properties"]["populated-pr-description"]
-    valid_description = """## Objective
-
-Explain the goal.
-
-## Scope
-
-- Include the implementation.
-
-## Implementation Details
-
-- Update the workflow.
-
-## Acceptance Criteria
-
-- The workflow runs.
-
-## Validation
-
-- `pytest`: passed.
-
-## Advisory Test-Quality Notes
-
-None."""
-    collapsed_description = (
-        "## Objective Explain the goal. ## Scope Include the implementation."
-    )
     assert description_schema["maxLength"] == 12000
-    assert r"[\s\S]" not in description_schema["pattern"]
-    assert re.search(description_schema["pattern"], valid_description)
-    assert not re.search(description_schema["pattern"], collapsed_description)
+    assert "pattern" not in description_schema
     assert implementation_steps[5]["call"]["inputs"]["files_to_publish"] == {
         "type": "reference",
         "value": "implementation_result.changed_paths",
@@ -450,7 +421,8 @@ None."""
     amendment_description_schema = amendment_process["steps"][4]["judge"]["output"][
         "schema"
     ]["properties"]["workflow_context"]["properties"]["populated-pr-description"]
-    assert amendment_description_schema["pattern"] == description_schema["pattern"]
+    assert amendment_description_schema["maxLength"] == 12000
+    assert "pattern" not in amendment_description_schema
 
 
 def test_create_pull_request_preserves_runtime_state_and_accepts_committed_files() -> (
@@ -467,6 +439,7 @@ def test_create_pull_request_preserves_runtime_state_and_accepts_committed_files
     parameters = operation["parameters"]["parameters"]
     assert parameters["operation"] == "pr_publish_clean"
     assert parameters["files_to_publish"]["value"] == "files_to_publish"
+    assert parameters["require_standard_pr_description"] is True
     assert (
         parameters["publication_branch"]["value"]
         == "workflow_context.publication-branch"

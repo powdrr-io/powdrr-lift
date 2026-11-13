@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import shutil
@@ -73,6 +74,7 @@ from powdrr_service.structrr.actual_diff import (
 )
 from powdrr_service.structrr.bootstrap import (
     bootstrap_structrr,
+    render_bootstrap_markdown,
     validate_bootstrap_sections,
 )
 from powdrr_service.structrr.candidate_comparison import compare_candidate_snapshot
@@ -6151,7 +6153,7 @@ def _ensure_current_baseline(
     bootstrap_path: Path | None = None,
     commit_changes: bool = True,
 ) -> Path:
-    """Reuse a current baseline only when every bootstrap section is current."""
+    """Reuse a baseline only when its report and freshness record are current."""
     current = _load_yaml_mapping(bootstrap_path) if bootstrap_path else None
     relative_paths = _git_output(
         runner,
@@ -6167,6 +6169,7 @@ def _ensure_current_baseline(
         )
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(yaml.safe_dump(current, sort_keys=False), encoding="utf-8")
+        _write_baseline_companions(current, target, worktree)
         if commit_changes:
             _commit(runner, worktree, "Bootstrap Structrr baseline")
         return target
@@ -6178,6 +6181,7 @@ def _ensure_current_baseline(
             raise PowdrrExecutionError(
                 f"Structrr bootstrap validation failed: {baseline.validation.issues}"
             )
+        _write_baseline_freshness(baseline.document, baseline.output_path, worktree)
         if commit_changes:
             _commit(runner, worktree, "Bootstrap Structrr baseline")
         return baseline.output_path
@@ -6196,8 +6200,23 @@ def _ensure_current_baseline(
     except PowdrrExecutionError:
         document = {}
     section_issues = validate_bootstrap_sections(document)
-    if not section_issues and (
-        current is None or snapshot_digest(document) == snapshot_digest(current)
+    report_path = selected_path.with_suffix(".md")
+    metadata_path = selected_path.with_suffix(".freshness.json")
+    metadata = _load_baseline_freshness(metadata_path)
+    current_validation_fingerprint = (
+        _validation_input_fingerprint(current) if current is not None else None
+    )
+    if (
+        not section_issues
+        and _baseline_companions_match(
+            document,
+            selected_path,
+            report_path,
+            metadata_path,
+            metadata,
+            expected_validation_fingerprint=current_validation_fingerprint,
+        )
+        and (current is None or snapshot_digest(document) == snapshot_digest(current))
     ):
         return selected_path
     if current is not None:
@@ -6209,6 +6228,7 @@ def _ensure_current_baseline(
         )
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text(yaml.safe_dump(current, sort_keys=False), encoding="utf-8")
+        _write_baseline_companions(current, target, worktree)
         if commit_changes:
             _commit(runner, worktree, "Refresh Structrr baseline")
         return target
@@ -6219,9 +6239,89 @@ def _ensure_current_baseline(
         raise PowdrrExecutionError(
             f"Structrr bootstrap regeneration failed: {baseline.validation.issues}"
         )
+    _write_baseline_freshness(baseline.document, baseline.output_path, worktree)
     if commit_changes:
         _commit(runner, worktree, "Refresh Structrr baseline sections")
     return baseline.output_path
+
+
+def _validation_input_fingerprint(document: Mapping[str, Any]) -> str:
+    """Fingerprint the validation inventory and context represented by a snapshot."""
+    return content_fingerprint(
+        {
+            "validation_inventory": document.get("validation_inventory"),
+            "validation_context": document.get("validation_context"),
+        }
+    )
+
+
+def _write_baseline_companions(
+    document: Mapping[str, Any], baseline_path: Path, worktree: Path
+) -> None:
+    report_path = baseline_path.with_suffix(".md")
+    report_path.write_text(
+        render_bootstrap_markdown(document, report_path=report_path, root=worktree),
+        encoding="utf-8",
+    )
+    _write_baseline_freshness(document, baseline_path, worktree)
+
+
+def _write_baseline_freshness(
+    document: Mapping[str, Any], baseline_path: Path, worktree: Path
+) -> None:
+    """Bind the baseline YAML and Markdown to their validation inputs."""
+    report_path = baseline_path.with_suffix(".md")
+    if not report_path.is_file():
+        report_path.write_text(
+            render_bootstrap_markdown(document, report_path=report_path, root=worktree),
+            encoding="utf-8",
+        )
+    metadata = {
+        "schema_version": "structrr-baseline-freshness-v1",
+        "baseline_digest": _file_sha256(baseline_path),
+        "report_digest": _file_sha256(report_path),
+        "validation_input_fingerprint": _validation_input_fingerprint(document),
+    }
+    baseline_path.with_suffix(".freshness.json").write_text(
+        json.dumps(metadata, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+
+
+def _load_baseline_freshness(path: Path) -> Mapping[str, Any] | None:
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return value if isinstance(value, Mapping) else None
+
+
+def _baseline_companions_match(
+    document: Mapping[str, Any],
+    baseline_path: Path,
+    report_path: Path,
+    metadata_path: Path,
+    metadata: Mapping[str, Any] | None,
+    *,
+    expected_validation_fingerprint: str | None,
+) -> bool:
+    if metadata is None or not report_path.is_file() or not metadata_path.is_file():
+        return False
+    return (
+        metadata.get("schema_version") == "structrr-baseline-freshness-v1"
+        and metadata.get("baseline_digest") == _file_sha256(baseline_path)
+        and metadata.get("report_digest") == _file_sha256(report_path)
+        and metadata.get("validation_input_fingerprint")
+        == _validation_input_fingerprint(document)
+        and (
+            expected_validation_fingerprint is None
+            or metadata.get("validation_input_fingerprint")
+            == expected_validation_fingerprint
+        )
+    )
+
+
+def _file_sha256(path: Path) -> str:
+    return "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
 
 
 def _bootstrap_validation_profiles(

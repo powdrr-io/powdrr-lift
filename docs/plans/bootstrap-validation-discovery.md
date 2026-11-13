@@ -21,9 +21,10 @@ block review. The inventory digest is retained with the CI outcome checkpoint.
 The feature review aggregate and core validation runner keep empty result sets
 pending, so missing results cannot satisfy the gate. The PR readiness gate
 also verifies the baseline YAML, Markdown report, freshness metadata, and
-fingerprinted validation inputs before using the inventory. This remains a
-partial implementation of WP8: detecting newly added validation inputs and
-the full runtime observation identity are still outstanding.
+fingerprinted validation inputs before using the inventory. It also checks
+changed PR paths for added, removed, renamed, or edited validation evidence and
+blocks until the baseline is refreshed. This remains a partial implementation
+of WP8: the full runtime observation identity is still outstanding.
 The core validation runner also keeps an empty profile selection pending.
 
 ## Objective and delivery contract

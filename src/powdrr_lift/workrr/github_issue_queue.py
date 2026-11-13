@@ -47,6 +47,7 @@ from powdrr_service.planning.plan_document import (
     serialize_reviewed_plan_yaml as serialize_reviewed_plan_yaml,
 )
 from powdrr_service.planning.plan_models import PlannedWorkItem, ReviewedExecutionPlan
+from powdrr_service.structrr.python_topology import is_validation_evidence_path
 from powdrr_service.structrr.validation_models import ValidationCheck
 
 QUEUE_LABELS = {
@@ -1014,6 +1015,9 @@ def run_worker_once(
                         inventory_digest=(
                             inventory["digest"] if inventory is not None else None
                         ),
+                        validation_input_paths=(
+                            inventory["input_paths"] if inventory is not None else None
+                        ),
                     )
                     ci_outcome = str(observation["outcome"])
                     _append_ci_outcome_checkpoint(
@@ -1266,6 +1270,9 @@ def continue_awaiting_ci_issue(
         pull_request_url,
         validation_inventory=(inventory["checks"] if inventory is not None else None),
         inventory_digest=inventory["digest"] if inventory is not None else None,
+        validation_input_paths=(
+            inventory["input_paths"] if inventory is not None else None
+        ),
     )
     _append_ci_outcome_checkpoint(
         client=client,
@@ -1423,6 +1430,9 @@ def _continue_manual_prerequisite_issue_locked(
                 inventory["checks"] if inventory is not None else None
             ),
             inventory_digest=inventory["digest"] if inventory is not None else None,
+            validation_input_paths=(
+                inventory["input_paths"] if inventory is not None else None
+            ),
         )
         _append_ci_outcome_checkpoint(
             client=client,
@@ -2635,11 +2645,68 @@ def _read_repository_validation_inventory(
     return {
         "checks": checks,
         "digest": baseline_digest,
+        "input_paths": tuple(
+            str(item["path"])
+            for item in input_fingerprints
+            if isinstance(item, Mapping) and isinstance(item.get("path"), str)
+        ),
     }
 
 
 def _sha256_file(path: Path) -> str:
     return "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _pull_request_changed_paths(
+    client: GitHubIssueClient, pull_request_number: int
+) -> tuple[str, ...] | None:
+    """Read every changed PR filename, retaining both sides of renames."""
+    endpoint = (
+        f"repos/{client.repository}/pulls/{pull_request_number}/files?per_page=100"
+    )
+    result = client._invoke(["api", "--paginate", endpoint], check=False)
+    if result.returncode != 0:
+        return None
+    try:
+        files = _parse_paginated_json_arrays(
+            result.stdout, description="pull request file"
+        )
+    except GitHubIssueQueueError:
+        return None
+    paths: set[str] = set()
+    for item in files:
+        if not isinstance(item, Mapping):
+            return None
+        filename = item.get("filename")
+        if not isinstance(filename, str) or not filename:
+            return None
+        paths.add(filename)
+        previous_filename = item.get("previous_filename")
+        if isinstance(previous_filename, str) and previous_filename:
+            paths.add(previous_filename)
+    return tuple(sorted(paths))
+
+
+def _validation_input_changes(
+    changed_paths: Sequence[str],
+    recorded_input_paths: Sequence[str] | None,
+) -> tuple[str, ...]:
+    """Return PR paths that can change validation discovery or its evidence."""
+    recorded = set(recorded_input_paths or ())
+    baseline_paths = {
+        "docs/structrr/current/baseline-bootstrap.yaml",
+        "docs/structrr/current/baseline-bootstrap.md",
+        "docs/structrr/current/baseline-bootstrap.freshness.json",
+    }
+    return tuple(
+        sorted(
+            path
+            for path in set(changed_paths)
+            if path in recorded
+            or path in baseline_paths
+            or is_validation_evidence_path(path)
+        )
+    )
 
 
 def _match_required_check_to_inventory(
@@ -2726,6 +2793,7 @@ def _observe_required_ci_outcome(
     *,
     validation_inventory: Sequence[Mapping[str, Any]] | None,
     inventory_digest: str | None,
+    validation_input_paths: Sequence[str] | None = None,
 ) -> dict[str, Any]:
     """Classify only current-PR required checks reported by GitHub CLI."""
     observed_at = datetime.now(UTC).isoformat()
@@ -2828,6 +2896,19 @@ def _observe_required_ci_outcome(
         for value in raw_checks
         if isinstance(value, Mapping)
     ]
+    changed_paths = _pull_request_changed_paths(client, number)
+    if changed_paths is None:
+        return _ci_outcome_observation(
+            "blocked",
+            head_sha,
+            checks,
+            "GitHub could not report changed PR paths; validation-input freshness is unknown",
+            observed_at,
+            inventory_digest,
+        )
+    validation_input_changes = _validation_input_changes(
+        changed_paths, validation_input_paths
+    )
     confirmed_result = client._invoke(
         ["pr", "view", str(number), "--json", "headRefOid"], check=False
     )
@@ -2848,8 +2929,15 @@ def _observe_required_ci_outcome(
             "the PR head changed while required checks were being observed",
             observed_at,
             inventory_digest,
+            validation_input_changes,
         )
-    if validation_inventory is None:
+    if validation_input_changes:
+        outcome = "blocked"
+        reason = (
+            "the PR changes validation inputs; refresh the committed validation "
+            "baseline before review"
+        )
+    elif validation_inventory is None:
         outcome = "blocked"
         reason = "committed validation inventory is missing, invalid, or stale"
     elif not checks or any(not item["name"] for item in checks):
@@ -2877,7 +2965,13 @@ def _observe_required_ci_outcome(
         outcome = "blocked"
         reason = "GitHub returned an unrecognized required-check state"
     return _ci_outcome_observation(
-        outcome, head_sha, checks, reason, observed_at, inventory_digest
+        outcome,
+        head_sha,
+        checks,
+        reason,
+        observed_at,
+        inventory_digest,
+        validation_input_changes,
     )
 
 
@@ -2903,6 +2997,7 @@ def _ci_outcome_observation(
     reason: str,
     observed_at: str,
     inventory_digest: str | None,
+    validation_input_changes: Sequence[str] = (),
 ) -> dict[str, Any]:
     """Return a dated observation set tied to the PR head reviewed by the gate."""
     head_checks = [
@@ -2913,6 +3008,7 @@ def _ci_outcome_observation(
         "head_sha": head_sha,
         "observed_at": observed_at,
         "validation_inventory_digest": inventory_digest,
+        "validation_input_changes": list(validation_input_changes),
         "checks": head_checks,
         "reason": reason,
     }
@@ -2935,6 +3031,7 @@ def _render_ci_outcome_checkpoint(
         "head_sha": observation.get("head_sha"),
         "observed_at": observation.get("observed_at"),
         "validation_inventory_digest": observation.get("validation_inventory_digest"),
+        "validation_input_changes": observation.get("validation_input_changes", []),
         "outcome": observation.get("outcome"),
         "required_checks": observation.get("checks", []),
         "reason": observation.get("reason", ""),

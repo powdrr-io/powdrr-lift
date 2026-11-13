@@ -30,10 +30,11 @@ for review. WP8 remains partial: comparing saved observations with the active
 runtime now invalidates a prior pass when its identity is missing or differs;
 the report retains the reason. Required-CI refresh failures also preserve the
 last remote checks with their original head and observation time, mark them
-stale/unknown, and keep readiness blocked. The `respond-to-pr-ci` workflow
-likewise marks its latest saved checkpoint stale on refresh failure, preserving
-the prior head and observation time. Offline staleness handling in the remaining
-remote-observation consumers is still outstanding.
+stale/unknown, and keep readiness blocked, including when a workflow omits its
+PR URL. The `respond-to-pr-ci` workflow likewise marks its latest saved
+checkpoint stale on refresh failure, preserving the prior head and observation
+time. The persisted GitHub CI checkpoint paths now handle staleness; broader
+WP8 gaps remain in validation-context handoffs and end-to-end readiness coverage.
 The core validation runner also keeps an empty profile selection pending.
 
 ## Objective and delivery contract

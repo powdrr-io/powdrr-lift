@@ -2471,6 +2471,50 @@ def test_failed_remote_refresh_preserves_prior_checks_as_dated_stale_evidence(
     assert '"last_known_status": "passed"' in stale_checkpoint
 
 
+def test_missing_pull_request_url_preserves_latest_ci_observation_as_stale() -> None:
+    pull_request_url = "https://github.com/example/project/pull/123"
+    prior = github_issue_queue._ci_outcome_observation(
+        "awaiting_review",
+        "d" * 40,
+        [{"name": "unit", "state": "success", "status": "passed"}],
+        "all checks passed",
+        "2026-11-13T19:00:00+00:00",
+        "inventory-v1",
+    )
+    prior_checkpoint = github_issue_queue._render_ci_outcome_checkpoint(
+        pull_request_url=pull_request_url, observation=prior
+    )
+    previous = github_issue_queue._latest_ci_outcome_observation(
+        ({"body": prior_checkpoint},), None
+    )
+    assert previous is not None
+    assert previous["pull_request_url"] == pull_request_url
+
+    observation = github_issue_queue._observe_required_ci_outcome(
+        FakeIssueClient(),  # type: ignore[arg-type]
+        None,
+        validation_inventory=None,
+        inventory_digest=None,
+        previous_observation=previous,
+    )
+
+    assert observation["outcome"] == "blocked"
+    assert observation["refresh_succeeded"] is False
+    assert observation["stale_remote_observations"] is True
+    assert observation["head_sha"] == "d" * 40
+    assert observation["checks"][0]["status"] == "unknown"
+    assert observation["checks"][0]["last_known_status"] == "passed"
+    stale_checkpoint = github_issue_queue._render_ci_outcome_checkpoint(
+        pull_request_url=None, observation=observation
+    )
+    recovered = github_issue_queue._latest_ci_outcome_observation(
+        ({"body": prior_checkpoint}, {"body": stale_checkpoint}), None
+    )
+    assert recovered is not None
+    assert recovered["pull_request_url"] == pull_request_url
+    assert recovered["checks"][0]["status"] == "unknown"
+
+
 def test_required_ci_readiness_blocks_when_validation_inventory_is_missing() -> None:
     client = FakeIssueClient()
     observation = github_issue_queue._observe_required_ci_outcome(

@@ -1,0 +1,77 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1500
+title: Preserve stale CI evidence without a PR URL
+intent:
+  problem: A completed issue workflow without a PR URL discards its previous CI checkpoint and can report that the refresh succeeded.
+  goal: Recover the latest intact issue checkpoint, mark it stale and unknown, and retain its original pull-request identity for later refreshes.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/plans/bootstrap-validation-discovery.md
+  type: modified
+  span: {start_line: 33, end_line: 37}
+  summary: Record stale handling for omitted PR URLs and the remaining WP8 gaps.
+  rationale: Keep the active plan aligned with current persisted checkpoint behavior.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 2809, end_line: 2815}
+  summary: Route missing PR URL outcomes through stale observation handling.
+  rationale: Avoid labeling an unattempted remote refresh successful and retain prior check evidence.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 3094, end_line: 3094}
+  summary: Hold the stale observation result so its previous PR identity can be retained.
+  rationale: Keep the issue checkpoint linked to the last valid remote observation.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 3107, end_line: 3114}
+  summary: Carry the prior PR URL into stale observations when the current workflow omits it.
+  rationale: Allow later refreshes to recover the correct PR checkpoint.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 3128, end_line: 3128}
+  summary: Fall back to the retained PR URL when rendering a stale checkpoint.
+  rationale: Persist the original remote observation identity.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 3131, end_line: 3131}
+  summary: Serialize the effective checkpoint PR URL.
+  rationale: Keep the checkpoint payload aligned with its displayed PR identity.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 3152, end_line: 3152}
+  summary: Describe checkpoint loading for exact or missing current PR identity.
+  rationale: Support recovery from issue comments when a later workflow omits the PR URL.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 3164, end_line: 3164}
+  summary: Document optional PR matching for recovered CI checkpoints.
+  rationale: Make the fallback behavior clear at its checkpoint loader.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 3181, end_line: 3185}
+  summary: Accept any intact issue checkpoint only when no current PR URL is available.
+  rationale: Recover prior evidence without weakening exact URL matching for normal refreshes.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 3199, end_line: 3199}
+  summary: Return the checkpoint PR URL with the recovered observation.
+  rationale: Preserve the link when writing a stale checkpoint.
+- path: tests/test_github_issue_queue.py
+  type: modified
+  span: {start_line: 2474, end_line: 2517}
+  summary: Verify a missing PR URL preserves prior checks as stale and retains the link across checkpoint recovery.
+  rationale: Prevent missing workflow metadata from erasing dated remote evidence.
+entities: []
+entity_relationships: []
+invariants:
+- id: missing-pr-url-does-not-claim-ci-refresh-success
+  description: When a completed workflow omits its PR URL, the prior required checks remain available as stale, unknown evidence and readiness stays blocked.
+  action: added
+- id: stale-checkpoint-retains-last-pr-identity
+  description: A stale checkpoint caused by missing current PR metadata retains the prior PR URL so a later refresh can target the correct pull request.
+  action: added
+guidance:
+- id: recover-pr-identity-from-intact-issue-checkpoint
+  description: When current workflow metadata lacks a PR URL, recover only an intact checkpoint from the same issue and retain its PR identity while treating its check status as stale.
+  action: added

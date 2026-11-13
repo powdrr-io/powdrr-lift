@@ -2,8 +2,10 @@
 
 Status: Active implementation. Milestones 1 and 2 are implemented with fixture
 acceptance. The source-reference route binds typed behavior cases to the public
-handoff and compiles a base-bound private repository evidence closure. Milestones
-3–5 remain.
+handoff and compiles a base-bound private repository evidence closure. Milestone
+3 now audits story receipts in enforce mode against the execution candidate and
+requires that report before patch transfer; its broader retained-intent and
+invariant gates remain. Milestones 4–5 remain.
 
 Audited code baseline for this inventory: `feafe5b7b22bf7cd98dee9b06797ea87af558a4c`.
 Latest implementation review baseline: `91a2cbbc644db93d9f9b26c4b2c46f8aa5bac339` (PR #1467).
@@ -119,6 +121,14 @@ Acceptance: stale, skipped, absent, weakened, duplicate, or unrelated evidence
 cannot authorize completion. A passing test command cannot discharge an unlinked
 obligation. A body-only regression fails even when source placement checks pass.
 Approved intent amendments invalidate affected evidence and retain history.
+
+Implemented slice: `execute_story_validation` now emits a deterministic
+verification-health report in enforce mode, re-audits story receipts against
+the captured candidate Git tree, and preserves both the audit input and report.
+Protected dispatch requires the enforce-mode report to pass before transferring
+the patch. Remaining work in this milestone includes compiling and connecting
+the retained-intent, preservation, scope, and verifier-change obligations, plus
+fixtures for unlinked and duplicate evidence and body-only regressions.
 
 ### 4. Finish bounded execution and delivery migration
 

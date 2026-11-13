@@ -19,6 +19,29 @@ from powdrr_lift.workrr import task_agent
 from powdrr_lift.workrr.coding_agent_validation import ValidationProfile
 from powdrr_lift.workrr.source_reference_postrun import reconcile_source_task
 
+
+@pytest.mark.parametrize(
+    "health",
+    [None, {"mode": "observe", "passed": True}, {"mode": "enforce", "passed": False}],
+)
+def test_story_dispatch_requires_passing_enforced_health(health: Any) -> None:
+    result = {
+        "passed": True,
+        "story_coverage": {"verified": True},
+        "verification_health": health,
+    }
+    assert dispatch._story_validation_is_accepted(result) is False
+
+
+def test_story_dispatch_accepts_current_enforced_health() -> None:
+    result = {
+        "passed": True,
+        "story_coverage": {"verified": True},
+        "verification_health": {"mode": "enforce", "passed": True},
+    }
+    assert dispatch._story_validation_is_accepted(result) is True
+
+
 BASELINE = "# structrr: feature:twice\ndef twice(value):\n    return value\n"
 CANDIDATE = BASELINE.replace("return value", "return value * 2")
 
@@ -297,6 +320,7 @@ def test_story_context_is_bound_into_protected_source_objective(
         lambda *_a, **kwargs: {
             "passed": True,
             "story_coverage": {"verified": True},
+            "verification_health": {"mode": "enforce", "passed": True},
             "coverage_evidence_error": None,
         },
     )

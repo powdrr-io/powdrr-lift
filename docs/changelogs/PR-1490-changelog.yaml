@@ -1,0 +1,65 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1490
+title: Gate source patch transfer on complete route evidence
+intent:
+  problem: Protected source dispatch can transfer a candidate patch after ordinary validation even when compiled obligation routes are incomplete or unreconciled.
+  goal: Require complete, passing route reconciliation before candidate patch export or application.
+human-decisions: []
+structured_files: []
+files:
+- path: src/powdrr_lift/workrr/source_reference_dispatch.py
+  type: modified
+  span: {start_line: 276, end_line: 276}
+  summary: Load candidate route evidence before optional story binding.
+  rationale: Preserve route evidence from the protected run when dispatch has no story validation bundle.
+- path: src/powdrr_lift/workrr/source_reference_dispatch.py
+  type: modified
+  span: {start_line: 335, end_line: 356}
+  summary: Require complete route evidence and a passing reconciliation before patch transfer.
+  rationale: Prevent candidates with missing, incomplete, or failed route evidence from reaching the task checkout.
+- path: tests/test_source_reference_dispatch.py
+  type: modified
+  span: {start_line: 296, end_line: 300}
+  summary: Exercise successful transfer with complete reconciled story route evidence.
+  rationale: Keep the positive dispatch fixture aligned with the new acceptance gate.
+- path: tests/test_source_reference_dispatch.py
+  type: modified
+  span: {start_line: 371, end_line: 371}
+  summary: Assert retained route evidence is complete after successful reconciliation.
+  rationale: Verify accepted dispatch carries its route artifact.
+- path: tests/test_source_reference_dispatch.py
+  type: modified
+  span: {start_line: 572, end_line: 574}
+  summary: Assert a candidate without linked story receipts is rejected before transfer.
+  rationale: Protect the no-story-validation path from accepting incomplete behavior routes.
+- path: tests/test_source_reference_dispatch.py
+  type: modified
+  span: {start_line: 580, end_line: 580}
+  summary: Retain the parent conflict case in the dispatch integration test.
+  rationale: Keep concurrent parent changes distinct from route evidence rejection.
+- path: tests/test_source_reference_dispatch.py
+  type: modified
+  span: {start_line: 586, end_line: 587}
+  summary: Assert the successful worker candidate is blocked by incomplete route evidence.
+  rationale: Verify the route gate runs before patch application.
+- path: docs/plans/implementation-contract-and-verification.md
+  type: modified
+  span: {start_line: 153, end_line: 159}
+  summary: Record complete route reconciliation as a prerequisite for protected patch transfer.
+  rationale: Keep the active plan aligned with the production acceptance behavior.
+entities:
+- id: protected-source-dispatch-route-acceptance-gate
+  type: Function
+  action: added
+- id: protected-source-dispatch-route-gate-tests
+  type: Unit test
+  action: added
+entity_relationships: []
+invariants:
+- id: source-patch-transfer-requires-complete-route-reconciliation
+  description: A protected source candidate is transferred only when route evidence is complete and its reconciliation passes.
+  action: added
+guidance:
+- id: preserve-incomplete-route-evidence-on-rejection
+  description: Dispatch results retain incomplete route evidence and identify route_evidence_incomplete before returning without patch transfer.
+  action: added

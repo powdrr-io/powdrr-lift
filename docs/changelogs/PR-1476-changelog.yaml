@@ -1,0 +1,73 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1476
+title: Reconcile candidate-bound obligation routes
+intent:
+  problem: Candidate route records are produced but are not checked for exact compiled-route coverage, candidate freshness, or duplicate and unrelated records.
+  goal: Require exactly one passing record for every compiled obligation-route pair on the current candidate and preserve explicit failure reasons.
+human-decisions: []
+structured_files: []
+files:
+- path: packages/service/src/powdrr_service/structrr/route_evidence_reconciliation.py
+  type: added
+  span: {start_line: 1, end_line: 108}
+  summary: Reconcile route evidence against compiled obligation-route pairs and the candidate identity.
+  rationale: Reject missing, duplicate, stale, unlinked, unsupported, and non-passing route evidence.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span: {start_line: 34, end_line: 36}
+  summary: Import exact obligation-route reconciliation into protected source runs.
+  rationale: Use the service reconciliation policy when assembling candidate-bound route outcomes.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span: {start_line: 196, end_line: 197}
+  summary: Remove the locally derived route-completion shortcut.
+  rationale: Derive completion from the service-owned exact reconciler.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span: {start_line: 200, end_line: 206}
+  summary: Reconcile emitted route records and derive completion from exact evidence coverage.
+  rationale: Prevent incomplete or stale route sets from claiming complete evidence.
+- path: tests/test_route_evidence_reconciliation.py
+  type: added
+  span: {start_line: 1, end_line: 119}
+  summary: Cover complete, missing, duplicate, stale, unlinked, and non-passing route records.
+  rationale: Verify every invalid route evidence state remains unable to pass reconciliation.
+- path: tests/test_source_reference_run.py
+  type: modified
+  span: {start_line: 221, end_line: 225}
+  summary: Verify the protected run embeds incomplete route reconciliation outcomes.
+  rationale: Ensure route reconciliation is used at the protected source-run boundary.
+- path: docs/plans/implementation-contract-and-verification.md
+  type: modified
+  span: {start_line: 11, end_line: 14}
+  summary: Record that exact route reconciliation exists but is not an acceptance gate.
+  rationale: Keep the active milestone and its remaining trusted evidence producers clear.
+- path: docs/plans/implementation-contract-and-verification.md
+  type: modified
+  span: {start_line: 18, end_line: 18}
+  summary: Advance the audited baseline to merged PR 1475.
+  rationale: Keep the implementation plan tied to the latest merged code.
+- path: docs/plans/implementation-contract-and-verification.md
+  type: modified
+  span: {start_line: 142, end_line: 148}
+  summary: Document exact reconciliation and its regression coverage.
+  rationale: Distinguish reconciled route evidence from the still-unimplemented acceptance gate.
+entities:
+- id: reconcile-obligation-route-evidence
+  type: Function
+  action: added
+- id: obligation-route-reconciliation-regression-tests
+  type: Unit test
+  action: added
+entity_relationships: []
+invariants:
+- id: every-compiled-route-has-one-fresh-result
+  description: Reconciliation passes only when each compiled obligation-route pair has exactly one passing record bound to the current candidate tree.
+  action: added
+- id: unrelated-route-evidence-cannot-pass
+  description: Missing, duplicate, stale, unlinked, unsupported, or non-passing route records prevent reconciliation from passing.
+  action: added
+guidance:
+- id: route-evidence-is-not-yet-an-acceptance-gate
+  description: The protected run records exact reconciliation outcomes, while acceptance remains unchanged until trusted producers exist for all required routes.
+  action: added

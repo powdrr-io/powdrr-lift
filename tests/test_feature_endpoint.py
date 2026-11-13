@@ -3363,6 +3363,33 @@ def test_aggregate_validation_persists_profile_context() -> None:
     assert stored[0].profile_contexts == (profile_context,)
 
 
+def test_aggregate_validation_keeps_unknown_applicability_pending() -> None:
+    state = {
+        "attempt": SimpleNamespace(attempt_id="attempt"),
+        "request": SimpleNamespace(request_id="request"),
+        "attempt_store": SimpleNamespace(save_validation_report=lambda _report: None),
+    }
+
+    result = _aggregate_validation(
+        {
+            "results": [
+                {
+                    "profile": "ci-tests",
+                    "command": ["pytest", "tests"],
+                    "status": "pending",
+                    "returncode": None,
+                    "error": "actual events is unavailable",
+                }
+            ]
+        },
+        worktree=Path("."),
+        state=state,
+    )
+
+    assert result["status"] == "pending"
+    assert result["passed"] is False
+
+
 def test_feature_flow_is_shared_and_validated() -> None:
     path = bundled_process_directory() / "implement-feature.yaml"
 

@@ -1,8 +1,16 @@
 # Bootstrap Structure and Validation Discovery Implementation Plan
 
-Status: proposed; implementation is in progress. Validation discovery adapters
-and context records are present, but the end-to-end bootstrap contract and
+Status: implementation is in progress. Validation discovery adapters and
+context records are present, but the end-to-end bootstrap contract and
 acceptance gate below remain incomplete.
+
+Current WP8 progress: Workrr now evaluates discovered applicability against the
+feature run's target event, base branch, and changed paths. Missing context,
+unsupported condition expressions, negated path patterns, and checks that are
+not locally reproducible remain pending; filters that provably do not match
+are recorded as not applicable. This is a partial implementation of step 6.
+Full GitHub expression evaluation, remote-only check observations, and the
+readiness gate in step 8 remain outstanding.
 
 ## Objective and delivery contract
 

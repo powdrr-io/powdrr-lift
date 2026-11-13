@@ -16,6 +16,7 @@ functions and unavailable context remain pending. Full GitHub expression
 evaluation, remote-only check observations, and the readiness gate in step 8
 remain outstanding. The feature review aggregate also keeps an empty validation
 result set pending, so missing results cannot satisfy the gate.
+The core validation runner also keeps an empty profile selection pending.
 
 ## Objective and delivery contract
 

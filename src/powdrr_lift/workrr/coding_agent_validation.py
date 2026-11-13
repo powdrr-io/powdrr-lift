@@ -780,7 +780,10 @@ class ValidationRunner:
             for result in results
         )
         pending = (
-            any(result.status is ValidationResultStatus.PENDING for result in results)
+            not results
+            or any(
+                result.status is ValidationResultStatus.PENDING for result in results
+            )
             or bool(results)
             and all(
                 result.status is ValidationResultStatus.NOT_APPLICABLE
@@ -800,6 +803,7 @@ class ValidationRunner:
                 else ValidationReportStatus.PASSED
             ),
             results=results,
+            error="no validation profiles produced results" if not results else None,
             profile_contexts=tuple(profile.to_data() for profile in profiles),
         )
 

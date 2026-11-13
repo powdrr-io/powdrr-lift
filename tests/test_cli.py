@@ -541,7 +541,7 @@ def test_cli_bootstrap_structrr_json_reports_validated_summary(tmp_path: Path) -
     assert summary == {
         "baseline_status": "not_run",
         "discovery_complete": False,
-        "discovery_status": "partial",
+        "discovery_status": "unknown",
         "entity_count": 3,
         "probe_mode": "not_run",
         "relationship_count": 0,

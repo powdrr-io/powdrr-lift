@@ -61,6 +61,7 @@ from powdrr_lift.workrr.feature_endpoint import (
     _aggregate_intent_review,
     _apply_sentence_design_trace,
     _assert_feature_design_ready_for_implementation,
+    _bootstrap_validation_profiles,
     _candidate_structural_gate,
     _candidate_validation_expectations,
     _capture_worker_prompt,
@@ -3173,6 +3174,71 @@ def test_endpoint_refreshes_stale_baseline_from_validated_bootstrap(
     )
     assert freshness["schema_version"] == "structrr-baseline-freshness-v1"
     assert _git(tmp_path, "status", "--short").stdout == ""
+
+
+def test_bootstrap_profiles_merge_explicit_and_typed_repository_checks(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    inventory = [
+        {
+            "schema_version": "verification-provider-inventory-v2",
+            "id": "validation:repository-tests",
+            "provider": "pytest",
+            "profile": "repository-tests",
+            "command": ["python", "-m", "pytest", "tests"],
+            "source": "pyproject.toml",
+            "execution": {
+                "kind": "argv",
+                "cwd": ".",
+                "shell": None,
+                "script": None,
+            },
+            "selectors": [],
+            "config_files": ["pyproject.toml"],
+            "settings": {},
+            "settings_status": "declared_only",
+            "applicability": {"local": True, "evaluation": "unknown"},
+            "ci_origins": [],
+            "requiredness": {"status": "required", "evidence": []},
+            "provenance": {"declaration": "declared", "evidence": []},
+            "confirmation": {"level": "static", "observations": []},
+            "depends_on": [],
+            "local_reproducibility": "yes",
+            "baseline": {"status": "not_run", "observation": None},
+            "unresolved": [],
+        }
+    ]
+    fake_result = SimpleNamespace(
+        document={"validation_inventory": inventory},
+        validation=SimpleNamespace(successful=True, issues=()),
+        output_path=tmp_path / "validation-bootstrap.yaml",
+    )
+    monkeypatch.setattr(
+        "powdrr_lift.workrr.feature_endpoint.bootstrap_structrr",
+        lambda *_args, **_kwargs: fake_result,
+    )
+
+    profiles = _bootstrap_validation_profiles(
+        tmp_path,
+        output_root=tmp_path,
+        explicit_command=("python", "-m", "pytest", "tests", "test_feature.py"),
+    )
+
+    assert [profile.name for profile in profiles] == [
+        "feature-validation",
+        "repository-tests",
+    ]
+    assert profiles[0].command[-1] == "test_feature.py"
+    assert profiles[1].command == ("python", "-m", "pytest", "tests")
+    assert not any(profile.command == ("true",) for profile in profiles)
+
+    fake_result.document = {"validation_inventory": []}
+    assert (
+        _bootstrap_validation_profiles(
+            tmp_path, output_root=tmp_path, explicit_command=()
+        )
+        == ()
+    )
 
 
 def test_feature_flow_is_shared_and_validated() -> None:

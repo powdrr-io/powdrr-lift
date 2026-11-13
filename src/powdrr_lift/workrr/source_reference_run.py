@@ -140,6 +140,8 @@ def _candidate_route_evidence(
     *,
     candidate_tree: str,
     changed_paths: tuple[str, ...],
+    invariant_reviews: tuple[Mapping[str, Any], ...] = (),
+    source_validation_fingerprint: str | None = None,
 ) -> dict[str, Any]:
     """Bind each compiled evidence route to this candidate or mark it uncollected."""
     data = handoff.to_data()
@@ -191,6 +193,55 @@ def _candidate_route_evidence(
                     if not out_of_scope
                     else "candidate changes include paths outside accepted scope"
                 )
+            elif route == "invariant_review":
+                reviews = [
+                    item
+                    for item in invariant_reviews
+                    if item.get("purpose") == "invariant_preservation"
+                    and item.get("obligation_id") == obligation_id
+                ]
+                if len(reviews) == 1:
+                    review = reviews[0]
+                    decision = review.get("decision")
+                    decision_data: Mapping[str, Any] = (
+                        decision if isinstance(decision, Mapping) else {}
+                    )
+                    decision_outcome = decision_data.get("outcome")
+                    locations = review.get("evidence_locations")
+                    available = review.get("available_evidence")
+                    if (
+                        review.get("classification") == "violated"
+                        and decision_outcome == "fail"
+                    ):
+                        status = "failed"
+                        reason = "independent invariant review found a violation"
+                    elif (
+                        review.get("classification") == "satisfied"
+                        and decision_outcome == "pass"
+                        and decision_data.get("subject") == obligation_id
+                        and decision_data.get("input_fingerprint")
+                        == review.get("request_fingerprint")
+                        and decision_data.get("evidence_refs") == available
+                        and isinstance(decision_data.get("evidence_fingerprint"), str)
+                        and decision_data["evidence_fingerprint"]
+                        and isinstance(locations, list)
+                        and locations
+                        and locations == available
+                        and isinstance(review.get("request_fingerprint"), str)
+                        and review["request_fingerprint"]
+                    ):
+                        status = "passed"
+                        evidence = list(locations)
+                        reason = (
+                            "independent invariant review passed with current "
+                            "owner evidence"
+                        )
+                    else:
+                        reason = (
+                            "independent invariant review is incomplete or inconclusive"
+                        )
+                else:
+                    reason = "independent invariant review is missing or duplicated"
             results.append(
                 {
                     "obligation_id": obligation_id,
@@ -200,6 +251,17 @@ def _candidate_route_evidence(
                     "status": status,
                     "evidence_paths": evidence,
                     "reason": reason,
+                    **(
+                        {"source_validation_fingerprint": source_validation_fingerprint}
+                        if route == "invariant_review"
+                        and source_validation_fingerprint is not None
+                        else {}
+                    ),
+                    **(
+                        {"review_fingerprint": reviews[0].get("request_fingerprint")}
+                        if route == "invariant_review" and len(reviews) == 1
+                        else {}
+                    ),
                 }
             )
     result: dict[str, Any] = {
@@ -1217,6 +1279,15 @@ class SourceReferenceRun:
                 None,
             )
             if reference_result is not None and reference_result.stdout:
+                try:
+                    reference_report = ReferenceValidationReport.from_data(
+                        json.loads(reference_result.stdout)
+                    ).to_data()
+                except (TypeError, ValueError, json.JSONDecodeError) as error:
+                    raise SourceRunFailure(
+                        "invalid_reference_validation",
+                        "Source reference validation returned an invalid report.",
+                    ) from error
                 head = _git(self.workspace_root, "rev-parse", "HEAD").decode().strip()
                 changed_paths = _committed_paths(
                     self.workspace_root,
@@ -1228,6 +1299,8 @@ class SourceReferenceRun:
                     self.handoff,
                     candidate_tree=self._candidate_state(),
                     changed_paths=tuple(sorted(changed_paths)),
+                    invariant_reviews=tuple(reference_report.get("reviews", ())),
+                    source_validation_fingerprint=reference_report.get("fingerprint"),
                 )
             result["reconciliation"] = self.reconciliation
             if execution.attempt.status is not CodingAgentStatus.COMPLETED:

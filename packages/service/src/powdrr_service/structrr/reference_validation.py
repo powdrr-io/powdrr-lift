@@ -190,6 +190,9 @@ def _review(
                             "Judge the exact accepted statement against "
                             "actual owner source, callers, scope, and "
                             "baseline/candidate bindings. "
+                            "For invariant_preservation, compare baseline "
+                            "and candidate behavior and do not treat an "
+                            "annotation as proof of preservation. "
                             "For a flexible selector identify every justified "
                             "binding; for relocation verify preservation of "
                             "responsibility. "
@@ -279,9 +282,11 @@ def _review(
     decision.validate_against(specification)
     return {
         "subject_id": packet["subject_id"],
+        "purpose": packet.get("purpose"),
         "classification": classification,
         "explanation": reason,
         "evidence_locations": locations,
+        "available_evidence": sorted(available),
         "request_fingerprint": identity,
         "decision": decision.to_data(),
     }
@@ -567,8 +572,11 @@ def validate_source_references(
         *,
         purpose: str,
         previous: list[dict[str, Any]] | None = None,
+        optional: bool = False,
     ) -> bool:
         if len(reviews) >= 50:
+            if optional:
+                return False
             finding(
                 "semantic_review_required",
                 "The 50-review validation bound was exceeded.",
@@ -589,9 +597,15 @@ def validate_source_references(
                         {k: v for k, v in b.items() if k != "source"}
                         for b in candidates
                     ],
+                    "purpose": purpose,
                 },
             )
+            result["obligation_id"] = obligation.get(
+                "obligation_id", obligation.get("id", purpose)
+            )
             reviews.append(result)
+            if optional:
+                return False
             finding(
                 "semantic_review_required",
                 result["explanation"],
@@ -646,6 +660,9 @@ def validate_source_references(
                 "obligation_id", obligation.get("id", purpose)
             ),
             "purpose": purpose,
+            "obligation_id": obligation.get(
+                "obligation_id", obligation.get("id", purpose)
+            ),
             "inputs": expected_inputs,
             "snapshot_digest": snapshot_digest,
             "obligation": dict(obligation),
@@ -662,8 +679,12 @@ def validate_source_references(
             ),
         }
         result = _review(review_client, packet)
+        result["purpose"] = purpose
+        result["obligation_id"] = packet["obligation_id"]
         reviews.append(result)
         if result["classification"] != "satisfied":
+            if optional:
+                return False
             finding(
                 "semantic_review_required"
                 if result["classification"] == "needs_review"
@@ -685,6 +706,8 @@ def validate_source_references(
             for b in candidates
         }
         if set(result["evidence_locations"]) != expected_locations:
+            if optional:
+                return False
             finding(
                 "semantic_review_required",
                 "Independent review did not bind every proposed owner.",
@@ -695,6 +718,9 @@ def validate_source_references(
         return True
 
     required_binding_keys: set[tuple[str, str, str, str]] = set()
+    optional_invariant_reviews: list[
+        tuple[Mapping[str, Any], list[dict[str, Any]], list[dict[str, Any]]]
+    ] = []
     for obligation in contract["obligations"]:
         selector, ref = obligation["owner"], obligation["ref"]
         found = select(selector, ref)
@@ -755,6 +781,14 @@ def validate_source_references(
             )
         if selector["binding"] == "requires_semantic_review" and found:
             review(obligation, found, purpose="flexible_owner")
+        definition = resolve_reference(catalog, ref).entry
+        if found and (
+            obligation["relationship"] == "preserves"
+            or (definition is not None and definition.reference.kind == "invariant")
+        ):
+            optional_invariant_reviews.append(
+                (obligation, found, select(selector, ref, "baseline"))
+            )
         if selector["role"] == "test" and found:
             evidence = test_collection_evidence or {}
             collected = evidence.get("owners", [])
@@ -844,6 +878,16 @@ def validate_source_references(
                 obligation=rule,
                 path=rule["owner"]["path"],
             )
+        if rule["disposition"] == "preserve":
+            preserved = select(rule["owner"], rule["ref"])
+            if preserved:
+                optional_invariant_reviews.append(
+                    (
+                        rule,
+                        preserved,
+                        select(rule["owner"], rule["ref"], "baseline"),
+                    )
+                )
         if rule["disposition"] in {"relocate", "supersede"}:
             destination = (
                 rule["destination"]
@@ -867,7 +911,26 @@ def validate_source_references(
                     purpose="relocation",
                     previous=select(rule["owner"], rule["ref"], "baseline"),
                 )
+            if found:
+                invariant_obligation = (
+                    rule if target_ref == rule["ref"] else {**rule, "ref": target_ref}
+                )
+                optional_invariant_reviews.append(
+                    (
+                        invariant_obligation,
+                        found,
+                        select(rule["owner"], rule["ref"], "baseline"),
+                    )
+                )
             required_binding_keys.update((target_ref, *_key(b)) for b in found)
+    for obligation, candidates, previous in optional_invariant_reviews:
+        review(
+            obligation,
+            candidates,
+            purpose="invariant_preservation",
+            previous=previous,
+            optional=True,
+        )
     for binding in bindings["baseline"]:
         key = binding["ref"], *_key(binding)
         index = indexes["baseline"][binding["path"]]

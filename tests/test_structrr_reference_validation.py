@@ -329,6 +329,24 @@ def test_removal_needs_accepted_authorization_and_relocation_needs_review() -> N
     )
 
 
+def test_unavailable_optional_invariant_review_is_recorded_without_blocking_audit() -> (
+    None
+):
+    report = validate(SOURCE)
+
+    reviews = [
+        item
+        for item in report.to_data()["reviews"]
+        if item.get("purpose") == "invariant_preservation"
+        and item.get("obligation_id") == "place:retry"
+    ]
+    assert report.status == "passed"
+    assert len(reviews) == 1
+    assert reviews[0]["classification"] == "needs_review"
+    assert reviews[0]["decision"]["outcome"] == "unknown"
+    assert reviews[0]["available_evidence"]
+
+
 def test_flexible_owners_and_suspicious_extra_placements_need_fresh_review() -> None:
     owner = {
         "binding": "requires_semantic_review",

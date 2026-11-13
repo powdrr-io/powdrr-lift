@@ -1,0 +1,114 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1489
+title: Block PR readiness on changed validation inputs
+intent:
+  problem: The required-CI readiness gate can trust a committed validation inventory even when a pull request changes validation discovery inputs.
+  goal: Detect changed validation paths, including additions, removals, and renames, and require the committed baseline to be refreshed before review.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/plans/bootstrap-validation-discovery.md
+  type: modified
+  span: {start_line: 24, end_line: 27}
+  summary: Record changed-path freshness enforcement and the remaining WP8 gap.
+  rationale: Keep the implementation plan aligned with the readiness gate behavior.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 50, end_line: 50}
+  summary: Import the shared predicate that recognizes validation evidence paths.
+  rationale: Reuse validation discovery's definition when checking pull request changes.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 1018, end_line: 1020}
+  summary: Pass verified validation input paths from the worker into CI readiness observation.
+  rationale: Compare pull request changes with the exact inputs used by the committed inventory.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 1273, end_line: 1275}
+  summary: Pass verified validation input paths when resuming an issue awaiting CI.
+  rationale: Apply the same freshness gate to resumed queue work.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 1433, end_line: 1435}
+  summary: Pass verified validation input paths through the manual prerequisite continuation.
+  rationale: Apply the same freshness gate after manual prerequisites are completed.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 2648, end_line: 2652}
+  summary: Retain the verified inventory's fingerprinted input paths.
+  rationale: Make the inputs used to build the committed inventory available to the readiness check.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 2660, end_line: 2711}
+  summary: Collect all changed PR paths, including both names for renames, and identify validation relevant changes.
+  rationale: Detect additions, edits, removals, and renames that can invalidate the committed validation inventory.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 2796, end_line: 2796}
+  summary: Accept verified validation input paths in the readiness observer.
+  rationale: Compare PR changes against the inputs used to build the committed inventory.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 2899, end_line: 2912}
+  summary: Retrieve changed PR paths and identify validation relevant changes.
+  rationale: Establish whether the committed validation evidence remains fresh for this PR.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 2933, end_line: 2933}
+  summary: Retain detected validation input changes when the PR head changes during observation.
+  rationale: Preserve the evidence gathered before the concurrent head change.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 2935, end_line: 2941}
+  summary: Block readiness when a PR changes validation inputs until its baseline is refreshed.
+  rationale: Prevent stale discovery evidence from satisfying the review gate.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 2969, end_line: 2975}
+  summary: Include validation input changes in the returned CI observation.
+  rationale: Keep the changed paths attached to the outcome used by the queue.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 3001, end_line: 3001}
+  summary: Add validation input changes to the CI observation serializer.
+  rationale: Preserve the freshness decision with the normalized outcome.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 3012, end_line: 3012}
+  summary: Serialize changed validation paths in the observation record.
+  rationale: Make paths that blocked readiness available for review.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 3035, end_line: 3035}
+  summary: Include changed validation paths in the checkpoint payload.
+  rationale: Keep the freshness decision in persisted queue evidence.
+- path: tests/test_github_issue_queue.py
+  type: modified
+  span: {start_line: 217, end_line: 217}
+  summary: Add changed PR files to fake GitHub client state.
+  rationale: Provide deterministic changed-path responses to readiness tests.
+- path: tests/test_github_issue_queue.py
+  type: modified
+  span: {start_line: 315, end_line: 320}
+  summary: Return pull request file lists from the fake GitHub API.
+  rationale: Exercise the changed-path request boundary without external GitHub calls.
+- path: tests/test_github_issue_queue.py
+  type: modified
+  span: {start_line: 1751, end_line: 1751}
+  summary: Expect the queue to request the PR's changed file list.
+  rationale: Verify changed-path inspection is part of readiness observation.
+- path: tests/test_github_issue_queue.py
+  type: modified
+  span: {start_line: 2443, end_line: 2484}
+  summary: Cover added, edited, removed, and renamed validation paths and checkpoint serialization.
+  rationale: Ensure every changed validation input blocks until its baseline is refreshed.
+entities: []
+entity_relationships: []
+invariants:
+- id: changed-validation-inputs-block-readiness
+  description: A PR that changes validation evidence, recorded inventory inputs, or baseline artifacts cannot reach review readiness until the committed baseline is refreshed.
+  action: added
+- id: unavailable-changed-paths-block-readiness
+  description: Failure to retrieve changed PR paths leaves validation input freshness unknown and blocks readiness.
+  action: added
+guidance: []

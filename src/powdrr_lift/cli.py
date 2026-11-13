@@ -16,7 +16,7 @@ import tempfile
 import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import replace
-from datetime import UTC
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -47,6 +47,7 @@ from powdrr_service.ci_response import (
     compare_local_reproduction,
     normalize_github_snapshot,
     render_ci_observation_checkpoint,
+    render_stale_ci_observation_checkpoint,
 )
 from powdrr_service.evaluations.deepswe_design_evaluation import (
     DEFAULT_STATE_DATA_RUBRIC,
@@ -3006,9 +3007,28 @@ def _run_respond_to_pr_ci(args: argparse.Namespace) -> int:
         if pr_number is None or pr_number < 1:
             raise GitHubActionsError("provide a positive --pr or a valid --pr-url")
         client = GitHubActionsClient(args.repository)
-        snapshot = client.observe_pull_request(pr_number)
         issue = client.get_issue(args.issue)
         prior = client.list_issue_comments(args.issue)
+        try:
+            snapshot = client.observe_pull_request(pr_number)
+        except GitHubActionsError as refresh_error:
+            stale_checkpoint = render_stale_ci_observation_checkpoint(
+                comments=prior,
+                repository=args.repository,
+                pull_request_number=pr_number,
+                issue_number=args.issue,
+                stale_since=datetime.now(UTC).isoformat(),
+                reason=str(refresh_error),
+            )
+            if stale_checkpoint is not None:
+                try:
+                    client.add_issue_comment(args.issue, stale_checkpoint[1])
+                except GitHubActionsError as checkpoint_error:
+                    raise GitHubActionsError(
+                        f"{refresh_error}; stale CI observation could not be "
+                        f"checkpointed: {checkpoint_error}"
+                    ) from refresh_error
+            raise
         issue_body = issue.get("body")
         pr_url = snapshot.pull_request.get("html_url")
         related_text = [
@@ -3071,6 +3091,7 @@ def _run_respond_to_pr_ci(args: argparse.Namespace) -> int:
             jobs=jobs,
             failures=failures,
             reproductions=reproductions,
+            observed_at=snapshot.observed_at,
         )
         duplicate = any(
             isinstance(item.get("body"), str)

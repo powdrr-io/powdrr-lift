@@ -131,6 +131,74 @@ def test_response_command_rejects_pull_request_url_from_another_repository(
     assert "must identify a PR in the requested repository" in capsys.readouterr().err
 
 
+def test_response_command_marks_last_checkpoint_stale_when_refresh_fails(
+    monkeypatch: Any, capsys: Any
+) -> None:
+    head_sha = "6c85b1e5c334a113b3db274b2c1b7a8f350b9707"
+    observed_at = "2026-11-13T12:00:00+00:00"
+    comments: list[dict[str, str]] = []
+    observe_calls = 0
+
+    class IntermittentClient:
+        def __init__(self, _repository: str) -> None:
+            pass
+
+        def get_issue(self, _number: int) -> dict[str, str]:
+            return {"body": "Tracking GitHub PR #270"}
+
+        def list_issue_comments(self, _number: int) -> tuple[dict[str, str], ...]:
+            return tuple(comments)
+
+        def observe_pull_request(self, _number: int) -> GitHubActionsSnapshot:
+            nonlocal observe_calls
+            observe_calls += 1
+            if observe_calls > 1:
+                raise cli.GitHubActionsError("network unavailable")
+            return GitHubActionsSnapshot(
+                repository="example/project",
+                pull_request={
+                    "html_url": "https://github.com/example/project/pull/270",
+                    "head": {"sha": head_sha},
+                },
+                runs=(),
+                jobs_by_run={},
+                annotations_by_check_run={},
+                observed_at=observed_at,
+            )
+
+        def add_issue_comment(self, _number: int, body: str) -> None:
+            comments.append({"body": body})
+
+    monkeypatch.setattr(cli, "GitHubActionsClient", IntermittentClient)
+    monkeypatch.setattr(
+        cli,
+        "_prepare_ci_observation_worktree",
+        lambda *_args, **_kwargs: (cli.Path.cwd(), cli.Path.cwd()),
+    )
+    args = Namespace(repository="example/project", pr=270, pr_url=None, issue=107)
+
+    assert cli._run_respond_to_pr_ci(args) == 0
+    capsys.readouterr()
+    assert (
+        "Observed at `2026-11-13T12:00:00+00:00`; freshness **current**."
+        in comments[0]["body"]
+    )
+
+    assert cli._run_respond_to_pr_ci(args) == 2
+    assert "network unavailable" in capsys.readouterr().err
+    assert len(comments) == 2
+    stale_body = comments[1]["body"]
+    assert "<!-- powdrr-ci-response-stale:v1 -->" in stale_body
+    assert "**stale; current status unknown**" in stale_body
+    assert f"head `{head_sha}` at `{observed_at}`" in stale_body
+    assert '"status": "unknown"' in stale_body
+    assert '"last_remote_observed_at": "2026-11-13T12:00:00+00:00"' in stale_body
+
+    assert cli._run_respond_to_pr_ci(args) == 2
+    capsys.readouterr()
+    assert len(comments) == 2
+
+
 def test_response_command_reproduces_matching_failure_at_exact_pr_head(
     monkeypatch: Any, capsys: Any
 ) -> None:

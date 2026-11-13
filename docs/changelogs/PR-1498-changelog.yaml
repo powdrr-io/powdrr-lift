@@ -1,0 +1,95 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1498
+title: Mark failed CI response refreshes stale
+intent:
+  problem: A failed GitHub Actions refresh leaves the previous issue checkpoint without a freshness warning.
+  goal: Preserve the last successful CI observation with its PR head and observation time, and explicitly mark current status unknown after a refresh failure.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/plans/bootstrap-validation-discovery.md
+  type: modified
+  span: {start_line: 33, end_line: 36}
+  summary: Record CI response checkpoint staleness and the remaining WP8 scope.
+  rationale: Keep plan progress aligned with the newly covered remote-observation path.
+- path: packages/service/src/powdrr_service/ci_response/__init__.py
+  type: modified
+  span: {start_line: 3, end_line: 6}
+  summary: Export the stale CI response checkpoint renderer.
+  rationale: Make stale checkpoint generation available to the CLI integration.
+- path: packages/service/src/powdrr_service/ci_response/__init__.py
+  type: modified
+  span: {start_line: 22, end_line: 22}
+  summary: Add the stale checkpoint renderer to the package exports.
+  rationale: Preserve the service package's public API contract.
+- path: packages/service/src/powdrr_service/ci_response/checkpoint.py
+  type: modified
+  span: {start_line: 7, end_line: 8}
+  summary: Import mapping and regular-expression support for checkpoint parsing.
+  rationale: Read prior checkpoint identities and timestamps from issue comments.
+- path: packages/service/src/powdrr_service/ci_response/checkpoint.py
+  type: modified
+  span: {start_line: 15, end_line: 20}
+  summary: Define markers and parsers for current and stale CI response checkpoints.
+  rationale: Identify prior observations and distinguish their freshness state.
+- path: packages/service/src/powdrr_service/ci_response/checkpoint.py
+  type: modified
+  span: {start_line: 32, end_line: 32}
+  summary: Accept the successful remote observation time in current checkpoints.
+  rationale: Preserve when GitHub Actions evidence was collected.
+- path: packages/service/src/powdrr_service/ci_response/checkpoint.py
+  type: modified
+  span: {start_line: 73, end_line: 73}
+  summary: Show successful checkpoint time and current freshness in the issue comment.
+  rationale: Let operators distinguish current observations from stale evidence.
+- path: packages/service/src/powdrr_service/ci_response/checkpoint.py
+  type: modified
+  span: {start_line: 84, end_line: 187}
+  summary: Generate an integrity-checked, idempotent stale notice referencing the last successful checkpoint.
+  rationale: Keep the original evidence intact while making its age and unknown current status explicit.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 19, end_line: 19}
+  summary: Import UTC datetime support for failed-refresh timestamps.
+  rationale: Record when the CLI could not refresh remote CI evidence.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 50, end_line: 50}
+  summary: Import the stale CI checkpoint renderer.
+  rationale: Connect refresh failure handling to service-owned checkpoint formatting.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 3009, end_line: 3009}
+  summary: Defer the Actions snapshot request until prior issue comments are loaded.
+  rationale: Make previously saved remote evidence available if the refresh fails.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 3012, end_line: 3031}
+  summary: Load prior issue comments before refresh and checkpoint a stale notice when GitHub Actions cannot be read.
+  rationale: Retain dated evidence and signal the refresh failure while returning the original error.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 3094, end_line: 3094}
+  summary: Pass the successful snapshot timestamp into the current checkpoint.
+  rationale: Tie saved evidence to its actual remote observation time.
+- path: tests/test_ci_response_cli.py
+  type: modified
+  span: {start_line: 134, end_line: 201}
+  summary: Verify timestamps, stale marking, preserved head identity, and idempotency after refresh failures.
+  rationale: Guard the offline refresh behavior and checkpoint history.
+entities:
+- id: stale-ci-response-checkpoint-renderer
+  type: Function
+  action: added
+invariants:
+- id: failed-actions-refresh-marks-prior-observation-stale
+  description: If a GitHub Actions refresh fails, the most recent saved observation remains available and a stale record marks current CI status unknown with the prior head and observation time retained.
+  action: added
+- id: repeated-ci-refresh-failure-does-not-duplicate-stale-notices
+  description: Repeated refresh failures for the same last successful observation do not append duplicate stale notices.
+  action: added
+guidance:
+- id: require-successful-actions-refresh-for-current-ci-status
+  description: Treat prior CI response comments as historical evidence after a refresh error and require a successful observation before describing current CI state.
+  action: added
+entity_relationships: []

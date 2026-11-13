@@ -712,9 +712,7 @@ class SourceReferencePrompt:
         private_digest = raw.get("private_validation_digest")
         if not isinstance(private_digest, str):
             raise ValueError("invalid private validation input digest")
-        expected = _prompt(
-            _normalize(raw["contract"]), private_digest
-        )
+        expected = _prompt(_normalize(raw["contract"]), private_digest)
         if dict(raw) != expected:
             raise ValueError("source reference prompt or fingerprint mismatch")
         return cls(_json(expected))

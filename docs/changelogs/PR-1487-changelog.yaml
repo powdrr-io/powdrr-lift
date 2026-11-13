@@ -1,0 +1,141 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1487
+title: Link preservation routes to accepted behavior
+intent:
+  problem: Preservation obligations compile behavior routes but carry no references to the accepted cases that can verify preserved behavior.
+  goal: Require preservation records to link accepted cases or scenarios and allow only fresh linked story receipts to discharge their behavior routes.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/design/structrr-source-reference-handoff.md
+  type: modified
+  span: {start_line: 24, end_line: 30}
+  summary: Document accepted behavior links for preservation records and the case mapping.
+  rationale: Make preservation behavior evidence an explicit part of the accepted design contract.
+- path: docs/design/structrr-source-reference-handoff.md
+  type: modified
+  span: {start_line: 65, end_line: 66}
+  summary: Add verification references to the documented preservation schema.
+  rationale: Explain the required case links for preserved baseline intent.
+- path: docs/plans/implementation-contract-and-verification.md
+  type: modified
+  span: {start_line: 16, end_line: 18}
+  summary: Record completion of preservation behavior linking while keeping acceptance gating open.
+  rationale: Keep milestone status aligned with the implementation.
+- path: docs/plans/implementation-contract-and-verification.md
+  type: modified
+  span: {start_line: 22, end_line: 22}
+  summary: Advance the plan baseline to merged PR 1486.
+  rationale: Tie the active inventory to the latest merged code.
+- path: docs/plans/implementation-contract-and-verification.md
+  type: modified
+  span: {start_line: 153, end_line: 156}
+  summary: Describe preservation case references and receipt-bound route discharge.
+  rationale: Distinguish linked behavior evidence from the remaining acceptance gate.
+- path: packages/service/src/powdrr_service/structrr/source_reference_handoff.py
+  type: modified
+  span: {start_line: 219, end_line: 219}
+  summary: Require verification references in preservation records.
+  rationale: Prevent preservation behavior routes from compiling without accepted case links.
+- path: packages/service/src/powdrr_service/structrr/source_reference_handoff.py
+  type: modified
+  span: {start_line: 233, end_line: 237}
+  summary: Normalize non-empty preservation verification references.
+  rationale: Keep the accepted preservation contract deterministic and typed.
+- path: packages/service/src/powdrr_service/structrr/source_reference_handoff.py
+  type: modified
+  span: {start_line: 266, end_line: 266}
+  summary: Retain normalized verification references in preservation records.
+  rationale: Make accepted links available to private evidence compilation and story validation.
+- path: packages/service/src/powdrr_service/structrr/source_reference_handoff.py
+  type: modified
+  span: {start_line: 303, end_line: 325}
+  summary: Validate placement and preservation refs against accepted case and scenario IDs.
+  rationale: Reject unresolved links at the accepted design boundary.
+- path: packages/service/src/powdrr_service/structrr/source_reference_handoff.py
+  type: modified
+  span: {start_line: 469, end_line: 479}
+  summary: Validate compiled preservation links against the frozen behavior case map.
+  rationale: Ensure deserialized handoffs retain only accepted verification identities.
+- path: packages/service/src/powdrr_service/structrr/source_reference_handoff.py
+  type: modified
+  span: {start_line: 483, end_line: 488}
+  summary: Reject identity collisions between placement and preservation obligations.
+  rationale: Keep route evidence keys globally unique for exact reconciliation.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span: {start_line: 306, end_line: 306}
+  summary: Index preservation obligations for story route binding.
+  rationale: Resolve compiled preservation behavior routes to their accepted references.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span: {start_line: 363, end_line: 367}
+  summary: Expand accepted scenario links to their case IDs.
+  rationale: Bind scenario-level references to the concrete cases and receipts that executed them.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span: {start_line: 372, end_line: 374}
+  summary: Resolve behavior route identities against either placement or preservation records.
+  rationale: Apply the same story evidence policy to every compiled behavior route.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span: {start_line: 376, end_line: 382}
+  summary: Collect the exact accepted case IDs for each route.
+  rationale: Require every linked case to pass before preservation behavior evidence is accepted.
+- path: tests/test_source_reference_handoff.py
+  type: modified
+  span: {start_line: 407, end_line: 407}
+  summary: Add accepted case links to preservation fixtures.
+  rationale: Keep source handoff fixtures aligned with the required preservation schema.
+- path: tests/test_source_reference_handoff.py
+  type: modified
+  span: {start_line: 459, end_line: 461}
+  summary: Assert preservation verification references survive contract compilation.
+  rationale: Verify accepted links remain in the normalized public contract.
+- path: tests/test_source_reference_handoff.py
+  type: modified
+  span: {start_line: 510, end_line: 522}
+  summary: Cover scenario aliases and reject unresolved preservation behavior refs.
+  rationale: Ensure accepted scenario IDs resolve to cases and invalid links block handoff.
+- path: tests/test_source_reference_run.py
+  type: modified
+  span: {start_line: 127, end_line: 127}
+  summary: Link the preserved helper obligation to its accepted behavior scenario.
+  rationale: Exercise scenario-to-case resolution for a preservation route.
+- path: tests/test_source_reference_run.py
+  type: modified
+  span: {start_line: 361, end_line: 363}
+  summary: Verify fresh story receipts discharge the linked preservation behavior route.
+  rationale: Confirm preservation evidence uses the same candidate and receipt checks as placements.
+- path: tests/test_source_reference_run.py
+  type: modified
+  span: {start_line: 417, end_line: 417}
+  summary: Assert the frozen preservation contract retains its verification link.
+  rationale: Check the accepted scenario reference is available to the protected run.
+- path: tests/test_structrr_reference_validation.py
+  type: modified
+  span: {start_line: 277, end_line: 277}
+  summary: Add verification refs to preservation validation fixtures.
+  rationale: Keep reference validation tests aligned with the required accepted schema.
+entities:
+- id: compile-preservation-behavior-links
+  type: Function
+  action: added
+- id: bind-story-receipts-to-preservation-routes
+  type: Function
+  action: added
+- id: preservation-behavior-link-regression-tests
+  type: Unit test
+  action: added
+entity_relationships: []
+invariants:
+- id: preservation-routes-require-accepted-case-links
+  description: Every preservation obligation must name at least one accepted behavior case or scenario before handoff compilation succeeds.
+  action: added
+- id: preservation-behavior-needs-fresh-linked-receipts
+  description: A preservation behavior route passes only when every resolved accepted case and its receipts pass for the validated story candidate tree.
+  action: added
+guidance:
+- id: scenario-links-resolve-to-case-receipts
+  description: Scenario-level preservation references expand to their compiled accepted case IDs before route evidence is evaluated.
+  action: added

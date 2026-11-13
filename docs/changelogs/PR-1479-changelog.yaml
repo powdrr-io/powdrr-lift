@@ -1,0 +1,58 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1479
+title: Support ordered validation path filters
+intent:
+  problem: Discovered validation profiles with negative path patterns remain unresolved even when their applicability can be determined from changed files.
+  goal: Evaluate ordered positive and negative path patterns while keeping malformed or negative-only filters pending.
+human-decisions: []
+structured_files: []
+files:
+- path: src/powdrr_lift/workrr/coding_agent_validation.py
+  type: modified
+  span: {start_line: 291, end_line: 293}
+  summary: Require a positive path pattern and reject a bare negation marker.
+  rationale: Keep malformed path filters unresolved.
+- path: src/powdrr_lift/workrr/coding_agent_validation.py
+  type: modified
+  span: {start_line: 295, end_line: 295}
+  summary: Explain why a path filter without a positive pattern remains pending.
+  rationale: Make the unresolved applicability reason actionable.
+- path: src/powdrr_lift/workrr/coding_agent_validation.py
+  type: modified
+  span: {start_line: 301, end_line: 311}
+  summary: Apply ordered positive and negative glob patterns to changed paths.
+  rationale: Allow later matching patterns to exclude or re-include paths.
+- path: src/powdrr_lift/workrr/coding_agent_validation.py
+  type: modified
+  span: {start_line: 313, end_line: 313}
+  summary: Report when no changed path remains included by the filter.
+  rationale: Distinguish a proven path mismatch from unknown applicability.
+- path: tests/test_coding_agent.py
+  type: modified
+  span: {start_line: 1546, end_line: 1602}
+  summary: Test exclusions, re-inclusions, and negative-only filters.
+  rationale: Protect ordered matching and conservative unresolved behavior.
+- path: docs/plans/bootstrap-validation-discovery.md
+  type: modified
+  span: {start_line: 9, end_line: 12}
+  summary: Record ordered path-filter support and current WP8 limits.
+  rationale: Keep implementation progress and remaining applicability work visible.
+entities:
+- id: path-is-included
+  type: Function
+  action: added
+- id: ordered-path-filter-tests
+  type: Unit test
+  action: added
+entity_relationships: []
+invariants:
+- id: ordered-validation-path-filters
+  description: Each matching path pattern updates inclusion state in order, so later matches exclude or re-include the path.
+  action: added
+- id: negative-only-validation-path-filter-pending
+  description: A path filter with no positive pattern cannot be resolved and remains pending.
+  action: added
+guidance:
+- id: path-filter-matching-scope
+  description: Path patterns use the runtime's case-sensitive glob matcher; patterns requiring semantics outside that matcher remain a future compatibility concern.
+  action: added

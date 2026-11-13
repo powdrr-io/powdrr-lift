@@ -518,6 +518,17 @@ def render_bootstrap_markdown(
                     "Runtime observation identity: "
                     f"{inline_code(identity_fingerprint)}."
                 )
+            invalidation = (
+                observation.get("prior_pass_invalidation")
+                if isinstance(observation, Mapping)
+                else None
+            )
+            if (
+                isinstance(invalidation, Mapping)
+                and invalidation.get("status") == "invalidated"
+            ):
+                reason = invalidation.get("reason", "runtime identity changed")
+                lines.append(f"Previous baseline pass invalidated: {reason}.")
         unresolved = check.get("unresolved", [])
         if isinstance(unresolved, list) and unresolved:
             lines.append(

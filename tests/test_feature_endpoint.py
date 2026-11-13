@@ -3324,6 +3324,183 @@ def test_single_profile_operation_round_trips_runtime_context(tmp_path: Path) ->
     assert result["profile_context"]["environment_id"] == "uv:api"
 
 
+def test_discovered_and_explicit_checks_gate_end_to_end_readiness(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    component = tmp_path / "packages" / "api"
+    component.mkdir(parents=True)
+    (tmp_path / "app.py").write_text("value = 1\n", encoding="utf-8")
+    (component / "pyproject.toml").write_text("[project]\nname = 'api'\n")
+    _git(tmp_path, "init", "-q")
+    _git(tmp_path, "config", "user.email", "test@example.com")
+    _git(tmp_path, "config", "user.name", "Test")
+    _git(tmp_path, "add", "app.py", "packages/api/pyproject.toml")
+    _git(tmp_path, "commit", "-qm", "baseline")
+    base_commit = _git(tmp_path, "rev-parse", "HEAD").stdout.strip()
+    (tmp_path / "app.py").write_text("value = 2\n", encoding="utf-8")
+
+    explicit_command = (
+        "python",
+        "-c",
+        "from pathlib import Path; assert Path.cwd().name != 'api'",
+    )
+    discovered_command = (
+        "python",
+        "-c",
+        "from pathlib import Path; assert Path.cwd().name == 'api'",
+    )
+    inventory = [
+        {
+            "schema_version": "verification-provider-inventory-v2",
+            "id": "validation:component-tests",
+            "provider": "pytest",
+            "profile": "component-tests",
+            "command": list(discovered_command),
+            "source": "packages/api/pyproject.toml",
+            "environment": "environment:python:packages/api",
+            "component": "component:python:packages/api",
+            "execution": {
+                "kind": "argv",
+                "cwd": "packages/api",
+                "shell": None,
+                "script": None,
+            },
+            "selectors": [],
+            "config_files": ["packages/api/pyproject.toml"],
+            "settings": {},
+            "settings_status": "declared_only",
+            "applicability": {"local": True, "evaluation": "applicable"},
+            "ci_origins": [],
+            "requiredness": {"status": "required", "evidence": []},
+            "provenance": {"declaration": "declared", "evidence": []},
+            "confirmation": {"level": "static", "observations": []},
+            "depends_on": [],
+            "local_reproducibility": "yes",
+            "baseline": {"status": "not_run", "observation": None},
+            "unresolved": [],
+        }
+    ]
+    fake_result = SimpleNamespace(
+        document={"validation_inventory": inventory},
+        validation=SimpleNamespace(successful=True, issues=()),
+    )
+    monkeypatch.setattr(
+        "powdrr_lift.workrr.feature_endpoint.bootstrap_structrr",
+        lambda *_args, **_kwargs: fake_result,
+    )
+    discovered = _bootstrap_validation_profiles(
+        tmp_path,
+        output_root=tmp_path,
+        explicit_command=explicit_command,
+    )
+    runtime_profiles = tuple(
+        _runtime_validation_profile(profile) for profile in discovered
+    )
+    assert [profile.name for profile in runtime_profiles] == [
+        "feature-validation",
+        "component-tests",
+    ]
+
+    request = ImplementationRequest(
+        request_id="request",
+        objective="change app",
+        prompt="change app",
+        base_commit=base_commit,
+        plan_fingerprint="plan",
+        allowed_paths=("app.py", "packages/api"),
+        acceptance_criteria=(),
+        validation_profiles=tuple(profile.name for profile in runtime_profiles),
+        allowed_command_argv=tuple(profile.command for profile in runtime_profiles),
+        validation_profile_contexts=tuple(
+            profile.to_data() for profile in runtime_profiles
+        ),
+    )
+    assert (
+        ImplementationRequest.from_data(request.to_data()).validation_profile_contexts
+        == request.validation_profile_contexts
+    )
+    attempt = CodingAgentAttempt(
+        attempt_id="attempt",
+        request_id=request.request_id,
+        provider="test",
+        status=CodingAgentStatus.COMPLETED,
+        exit_code=0,
+    )
+    checks = [
+        _run_validation_profile(
+            {"profile": profile.to_data()},
+            worktree=tmp_path,
+            state={"request": request, "attempt": attempt},
+        )
+        for profile in runtime_profiles
+    ]
+    assert [check["status"] for check in checks] == ["passed", "passed"]
+    assert checks[1]["profile_context"]["cwd"] == "packages/api"
+    assert (
+        checks[1]["profile_context"]["environment_id"]
+        == "environment:python:packages/api"
+    )
+    tampered_profile = replace(runtime_profiles[1], cwd=".")
+    tampered = _run_validation_profile(
+        {"profile": tampered_profile.to_data()},
+        worktree=tmp_path,
+        state={"request": request, "attempt": attempt},
+    )
+    assert tampered["status"] == "blocked"
+    assert "does not match the reviewed request" in tampered["error"]
+
+    saved: list[ValidationReport] = []
+    state = {
+        "attempt": attempt,
+        "request": request,
+        "attempt_store": SimpleNamespace(save_validation_report=saved.append),
+    }
+    aggregate = _aggregate_validation(
+        {"results": checks}, worktree=tmp_path, state=state
+    )
+    report = saved[0]
+    assert aggregate["status"] == "passed"
+    assert len(report.profile_contexts) == 2
+    assert review_feature_diff(tmp_path, request, attempt, report)["passed"] is True
+
+    unresolved_profile = replace(
+        runtime_profiles[1],
+        applicability={
+            "local": True,
+            "evaluation": "unknown",
+            "condition": "contains(github.event_name, 'push')",
+        },
+    )
+    unresolved_request = replace(
+        request,
+        validation_profile_contexts=(
+            runtime_profiles[0].to_data(),
+            unresolved_profile.to_data(),
+        ),
+    )
+    unresolved_check = _run_validation_profile(
+        {"profile": unresolved_profile.to_data()},
+        worktree=tmp_path,
+        state={
+            "request": unresolved_request,
+            "attempt": attempt,
+            "validation_target_event": "push",
+        },
+    )
+    saved.clear()
+    blocked_aggregate = _aggregate_validation(
+        {"results": [checks[0], unresolved_check]},
+        worktree=tmp_path,
+        state={**state, "request": unresolved_request},
+    )
+    assert unresolved_check["status"] == "pending"
+    assert blocked_aggregate["status"] == "pending"
+    assert (
+        review_feature_diff(tmp_path, unresolved_request, attempt, saved[0])["passed"]
+        is False
+    )
+
+
 def test_aggregate_validation_persists_profile_context() -> None:
     profile_context = {
         "name": "component-tests",

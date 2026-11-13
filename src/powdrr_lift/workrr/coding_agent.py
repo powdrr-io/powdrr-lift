@@ -119,6 +119,7 @@ class ImplementationRequest:
     context_refs: tuple[str, ...] = ()
     allowed_commands: tuple[str, ...] = ()
     allowed_command_argv: tuple[tuple[str, ...], ...] = ()
+    validation_profile_contexts: tuple[Mapping[str, Any], ...] = ()
     ephemeral_paths: tuple[str, ...] = ()
     planned_additions: tuple[Mapping[str, Any], ...] = ()
     planned_deletions: tuple[Mapping[str, Any], ...] = ()
@@ -270,6 +271,9 @@ class ImplementationRequest:
             "allowed_command_argv": [
                 list(command) for command in self.allowed_command_argv
             ],
+            "validation_profile_contexts": [
+                dict(profile) for profile in self.validation_profile_contexts
+            ],
             "ephemeral_paths": list(self.ephemeral_paths),
             "planned_additions": [dict(item) for item in self.planned_additions],
             "planned_deletions": [dict(item) for item in self.planned_deletions],
@@ -366,6 +370,9 @@ class ImplementationRequest:
             allowed_command_argv=_parse_allowed_command_argv(
                 data.get("allowed_command_argv", [])
             ),
+            validation_profile_contexts=_parse_validation_profile_contexts(
+                data.get("validation_profile_contexts", [])
+            ),
             ephemeral_paths=tuple(cast(list[str], data.get("ephemeral_paths", []))),
             planned_additions=tuple(
                 cast(list[Mapping[str, Any]], data.get("planned_additions", []))
@@ -399,6 +406,7 @@ class ImplementationRequest:
         context_refs: tuple[str, ...] = (),
         allowed_commands: tuple[str, ...] = (),
         allowed_command_argv: tuple[tuple[str, ...], ...] = (),
+        validation_profile_contexts: tuple[Mapping[str, Any], ...] = (),
         implementation_packet: ImplementationPacket | None = None,
     ) -> ImplementationRequest:
         """Compile one validated execution unit into a worker handoff."""
@@ -539,6 +547,7 @@ class ImplementationRequest:
             context_refs=context_refs,
             allowed_commands=allowed_commands,
             allowed_command_argv=allowed_command_argv,
+            validation_profile_contexts=validation_profile_contexts,
             ephemeral_paths=unit.ephemeral_paths,
             planned_additions=unit.planned_additions,
             planned_deletions=unit.planned_deletions,
@@ -557,6 +566,7 @@ class ImplementationRequest:
         context_refs: tuple[str, ...] = (),
         allowed_commands: tuple[str, ...] = (),
         allowed_command_argv: tuple[tuple[str, ...], ...] = (),
+        validation_profile_contexts: tuple[Mapping[str, Any], ...] = (),
         implementation_packet: ImplementationPacket | None = None,
     ) -> ImplementationRequest:
         """Compile one unit from a typed execution plan into a worker handoff."""
@@ -572,6 +582,7 @@ class ImplementationRequest:
             context_refs=context_refs,
             allowed_commands=allowed_commands,
             allowed_command_argv=allowed_command_argv,
+            validation_profile_contexts=validation_profile_contexts,
             implementation_packet=implementation_packet,
         )
 
@@ -701,6 +712,22 @@ def _parse_allowed_command_argv(value: Any) -> tuple[tuple[str, ...], ...]:
             raise ValueError(f"allowed_command_argv[{index}] must be non-empty argv")
         commands.append(tuple(command))
     return tuple(commands)
+
+
+def _parse_validation_profile_contexts(
+    value: Any,
+) -> tuple[Mapping[str, Any], ...]:
+    if not isinstance(value, list) or not all(
+        isinstance(item, Mapping) for item in value
+    ):
+        raise ValueError("validation_profile_contexts must be a list of mappings")
+    contexts = tuple(dict(item) for item in value)
+    names = [item.get("name") for item in contexts]
+    if any(not isinstance(name, str) or not name for name in names):
+        raise ValueError("validation profile contexts need a non-empty name")
+    if len(names) != len(set(names)):
+        raise ValueError("validation profile context names must be unique")
+    return contexts
 
 
 class CodingAgentStatus(StrEnum):

@@ -103,3 +103,64 @@ def test_missing_inventory_is_not_collected(tmp_path: Path) -> None:
 
     assert evidence[0].status is EvidenceStatus.NOT_COLLECTED
     assert evidence[0].error is not None
+
+
+def test_evidence_runner_hands_provider_the_discovered_execution_context(
+    tmp_path: Path,
+) -> None:
+    captured: list[VerificationProviderRequest] = []
+
+    class FakeProvider:
+        name = "fake"
+
+        def detect(self, root: Path, profiles: Any) -> bool:
+            return True
+
+        def inventory(self, root: Path, profile: Any) -> ProviderInventory:
+            return ProviderInventory("fake", "fake", (_obligation().selector,))
+
+        def execute(
+            self, request: VerificationProviderRequest
+        ) -> ProviderExecutionResult:
+            captured.append(request)
+            return ProviderExecutionResult(
+                request.provider,
+                request.selector,
+                request.profile,
+                "passed",
+            )
+
+        def normalize(self, result: ProviderExecutionResult) -> dict[str, Any]:
+            return {"status": result.status}
+
+    VerificationEvidenceRunner(VerificationProviderRegistry((FakeProvider(),))).run(
+        (_obligation(),),
+        root=tmp_path,
+        artifact_root=tmp_path / "artifacts",
+        candidate_tree="sha256:candidate",
+        inventory=(
+            {
+                "provider": "fake",
+                "profile": "fake",
+                "selector": _obligation().selector,
+                "command": ["fake", "run", "tests with spaces"],
+                "cwd": "packages/api",
+                "environment_id": "environment:python:packages/api",
+                "execution_kind": "argv",
+                "provider_version": "pytest 9.1.0",
+                "applicability": {"local": True, "evaluation": "applicable"},
+                "fingerprint": "sha256:inventory",
+            },
+        ),
+    )
+
+    assert len(captured) == 1
+    assert captured[0].command == ("fake", "run", "tests with spaces")
+    assert captured[0].cwd == "packages/api"
+    assert captured[0].environment_id == "environment:python:packages/api"
+    assert captured[0].execution_kind == "argv"
+    assert captured[0].provider_version == "pytest 9.1.0"
+    assert captured[0].applicability == {
+        "local": True,
+        "evaluation": "applicable",
+    }

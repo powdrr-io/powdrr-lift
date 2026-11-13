@@ -22,16 +22,23 @@ from powdrr_service.structrr.validation import DiscoveredValidationProfile
 
 
 def test_pytest_inventory_contains_exact_node_ids(tmp_path: Path) -> None:
-    tests = tmp_path / "tests"
-    tests.mkdir()
+    component = tmp_path / "packages" / "api"
+    tests = component / "tests"
+    tests.mkdir(parents=True)
     (tests / "test_sample.py").write_text(
         "def test_first():\n    assert True\n\n"
         "class TestGroup:\n    def test_second(self):\n        assert True\n",
         encoding="utf-8",
     )
     profile = DiscoveredValidationProfile(
-        "pytest", ("python", "-m", "pytest", "-q"), "test"
+        "pytest",
+        ("python", "-m", "pytest", "-q", "tests"),
+        "test",
+        cwd="packages/api",
+        environment_id="environment:python:packages/api",
+        applicability={"local": True, "evaluation": "applicable"},
     )
+    previous_directory = Path.cwd()
 
     inventory = PytestVerificationProvider().inventory(tmp_path, profile)
 
@@ -41,6 +48,28 @@ def test_pytest_inventory_contains_exact_node_ids(tmp_path: Path) -> None:
         "tests/test_sample.py::test_first",
     )
     assert inventory.fingerprint.startswith("sha256:")
+    assert inventory.cwd == "packages/api"
+    assert inventory.environment_id == "environment:python:packages/api"
+    assert inventory.applicability == {"local": True, "evaluation": "applicable"}
+    assert Path.cwd() == previous_directory
+
+
+def test_pytest_inventory_marks_shell_profiles_unresolved(tmp_path: Path) -> None:
+    (tmp_path / "tests").mkdir()
+    profile = DiscoveredValidationProfile(
+        "pytest",
+        ("pytest", "tests"),
+        "workflow",
+        shell="bash",
+        execution_kind="shell",
+    )
+
+    inventory = PytestVerificationProvider().inventory(tmp_path, profile)
+
+    assert inventory.selectors == ()
+    assert inventory.collection_error is not None
+    assert "argv profile" in inventory.collection_error
+    assert inventory.execution_kind == "shell"
 
 
 def test_registry_is_framework_neutral_and_dispatches_fake_provider(
@@ -81,8 +110,9 @@ def test_registry_is_framework_neutral_and_dispatches_fake_provider(
 def test_pytest_provider_executes_exact_selector(
     tmp_path: Path,
 ) -> None:
-    tests = tmp_path / "tests"
-    tests.mkdir()
+    component = tmp_path / "component"
+    tests = component / "tests"
+    tests.mkdir(parents=True)
     (tests / "test_sample.py").write_text(
         "def test_exact():\n    assert True\n", encoding="utf-8"
     )
@@ -93,6 +123,8 @@ def test_pytest_provider_executes_exact_selector(
             "pytest",
             tmp_path,
             command=("python", "-m", "pytest", "-q"),
+            cwd="component",
+            environment_id="environment:python:component",
         )
     )
 
@@ -112,9 +144,10 @@ def test_stestr_provider_collects_and_executes_exact_selector(
         command: Sequence[str], **_kwargs: Any
     ) -> subprocess.CompletedProcess[str]:
         calls.append(tuple(command))
-        output = (
-            "tests.test_one.TestOne.test_first\n" if command[1] == "list" else "ok\n"
-        )
+        output = {
+            "list": "tests.test_one.TestOne.test_first\n",
+            "--version": "stestr 4.1.0\n",
+        }.get(command[1], "ok\n")
         return subprocess.CompletedProcess(command, 0, output, "")
 
     monkeypatch.setattr(
@@ -134,8 +167,10 @@ def test_stestr_provider_collects_and_executes_exact_selector(
     )
 
     assert inventory.selectors == ("tests.test_one.TestOne.test_first",)
+    assert inventory.provider_version == "stestr 4.1.0"
     assert calls[0] == ("stestr", "list")
-    assert calls[1] == (
+    assert calls[1] == ("stestr", "--version")
+    assert calls[2] == (
         "stestr",
         "run",
         "--concurrency",

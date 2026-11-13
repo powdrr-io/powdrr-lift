@@ -1759,6 +1759,13 @@ def _expand_provider_inventory(value: Mapping[str, Any]) -> tuple[dict[str, Any]
             "fingerprint": value.get("fingerprint"),
             "verifier_fingerprint": value.get("fingerprint"),
             "command": value.get("command", []),
+            "cwd": value.get("cwd", "."),
+            "environment_id": value.get("environment_id"),
+            "execution_kind": value.get("execution_kind", "argv"),
+            "shell": value.get("shell"),
+            "script": value.get("script"),
+            "applicability": value.get("applicability"),
+            "provider_version": value.get("provider_version"),
         }
         for selector in selectors
         if isinstance(selector, str) and selector.strip()
@@ -3088,6 +3095,10 @@ def _run_code_agent_phase(
             context_refs=unit.source_refs,
             allowed_commands=_allowed_validation_commands(state["validation_profiles"]),
             allowed_command_argv=_allowed_validation_argv(state["validation_profiles"]),
+            validation_profile_contexts=tuple(
+                _runtime_validation_profile(profile).to_data()
+                for profile in state["validation_profiles"]
+            ),
             implementation_packet=worker_packet,
         )
         if story_context and not config.capture_worker_prompts_only:
@@ -4836,7 +4847,9 @@ def _runtime_validation_profile(
         execution_kind=profile.execution_kind or "argv",
         shell=profile.shell,
         script=profile.script,
-        applicability=dict(profile.applicability or {}),
+        applicability=(
+            dict(profile.applicability) if profile.applicability is not None else None
+        ),
         selectors=profile.selectors,
         config_files=profile.config_files,
         settings=dict(profile.settings or {}),
@@ -7265,6 +7278,10 @@ def _compile_initial_worker_prompt(
             plan_fingerprint=content_fingerprint(canonical_design),
             allowed_commands=_allowed_validation_commands(validation_profiles),
             allowed_command_argv=_allowed_validation_argv(validation_profiles),
+            validation_profile_contexts=tuple(
+                _runtime_validation_profile(profile).to_data()
+                for profile in validation_profiles
+            ),
             implementation_packet=packet,
         )
     except ValueError as error:

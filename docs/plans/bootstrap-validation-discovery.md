@@ -1,8 +1,7 @@
 # Bootstrap Structure and Validation Discovery Implementation Plan
 
-Status: implementation is in progress. Validation discovery adapters and
-context records are present, but the end-to-end bootstrap contract and
-acceptance gate below remain incomplete.
+Status: implementation is in progress. Work package 8 is complete; work package
+9 breadth evaluation and documentation, plus the final completion gate, remain.
 
 Current WP8 progress: Workrr now evaluates discovered applicability against the
 feature run's target event, base branch, and changed paths. Missing context,
@@ -33,9 +32,17 @@ last remote checks with their original head and observation time, mark them
 stale/unknown, and keep readiness blocked, including when a workflow omits its
 PR URL. The `respond-to-pr-ci` workflow likewise marks its latest saved
 checkpoint stale on refresh failure, preserving the prior head and observation
-time. The persisted GitHub CI checkpoint paths now handle staleness; broader
-WP8 gaps remain in validation-context handoffs and end-to-end readiness coverage.
-The core validation runner also keeps an empty profile selection pending.
+time. The persisted GitHub CI checkpoint paths now handle staleness. WP8 is
+complete: typed check records retain their execution context through bootstrap
+discovery, command responses, worker requests, local execution, provider
+inventories, and final reports. Worker validation rejects profile-context
+changes after request review. Pytest collection runs in a subprocess from the
+declared component directory, and provider inventory fingerprints include
+command, environment, execution, and applicability context. Unsupported shell
+or script profiles remain unresolved and block readiness. End-to-end coverage
+verifies that explicit and discovered checks both run before review can pass,
+and that an unsupported condition keeps readiness pending. The core validation
+runner also keeps an empty profile selection pending.
 
 ## Objective and delivery contract
 

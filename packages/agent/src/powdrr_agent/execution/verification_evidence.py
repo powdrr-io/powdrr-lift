@@ -121,6 +121,33 @@ class VerificationEvidenceRunner:
                         root,
                         command=command,
                         timeout_seconds=self.timeout_seconds,
+                        cwd=str(item.get("cwd", ".")),
+                        environment_id=(
+                            item.get("environment_id")
+                            if isinstance(item.get("environment_id"), str)
+                            else None
+                        ),
+                        execution_kind=str(item.get("execution_kind", "argv")),
+                        shell=(
+                            item.get("shell")
+                            if isinstance(item.get("shell"), str)
+                            else None
+                        ),
+                        script=(
+                            item.get("script")
+                            if isinstance(item.get("script"), str)
+                            else None
+                        ),
+                        applicability=(
+                            dict(item["applicability"])
+                            if isinstance(item.get("applicability"), Mapping)
+                            else None
+                        ),
+                        provider_version=(
+                            item.get("provider_version")
+                            if isinstance(item.get("provider_version"), str)
+                            else None
+                        ),
                     )
                 )
             evidence = self._persist(

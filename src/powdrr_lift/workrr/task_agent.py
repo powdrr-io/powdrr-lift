@@ -482,6 +482,8 @@ def _issue_worker_implementation_request(
         plan_fingerprint=fingerprint,
         context_refs=source_refs,
         allowed_commands=(verification_command,),
+        allowed_command_argv=(validation_profile.command,),
+        validation_profile_contexts=(validation_profile.to_data(),),
         implementation_packet=packet,
     )
     return (

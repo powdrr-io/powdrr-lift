@@ -742,6 +742,39 @@ class ValidationRunner:
                 profile_contexts=self._profile_contexts(names),
             )
 
+        if request.validation_profile_contexts:
+            declared = {
+                str(item["name"]): dict(item)
+                for item in request.validation_profile_contexts
+            }
+            mismatched = [
+                profile.name
+                for profile in profiles
+                if declared.get(profile.name) != profile.to_data()
+            ]
+            if mismatched:
+                return ValidationReport(
+                    attempt_id=attempt.attempt_id,
+                    request_id=request.request_id,
+                    status=ValidationReportStatus.BLOCKED,
+                    results=tuple(
+                        ValidationResult(
+                            profile=name,
+                            command=(),
+                            status=ValidationResultStatus.BLOCKED,
+                            returncode=None,
+                            error=(
+                                "validation profile context does not match the "
+                                "reviewed request: "
+                                f"{name}"
+                            ),
+                        )
+                        for name in mismatched
+                    ),
+                    error="validation profile context changed after request review",
+                    profile_contexts=self._profile_contexts(names),
+                )
+
         # Candidate test programs can mutate files. Source evidence must describe
         # the final bytes after every ordinary verification command has finished.
         context = applicability_context or ValidationApplicabilityContext()

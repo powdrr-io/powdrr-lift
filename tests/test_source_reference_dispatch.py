@@ -293,7 +293,11 @@ def test_story_context_is_bound_into_protected_source_objective(
         def bind_story_validation(
             self, _story_validation: dict[str, Any]
         ) -> dict[str, Any]:
-            return {"complete": False, "routes": []}
+            return {
+                "complete": True,
+                "routes": [],
+                "reconciliation": {"passed": True, "issues": []},
+            }
 
         def protect_command(self, command: tuple[str, ...]) -> tuple[str, ...]:
             return command
@@ -364,7 +368,7 @@ def test_story_context_is_bound_into_protected_source_objective(
     )
 
     assert result["passed"] is True, result.get("error")
-    assert result["obligation_route_evidence"] == {"complete": False, "routes": []}
+    assert result["obligation_route_evidence"]["complete"] is True
     assert result["obligation_route_evidence_path"].endswith(
         "story-route-evidence.json"
     )
@@ -565,21 +569,21 @@ def test_native_dispatch_validates_before_applying_candidate(
         )
     ):
         pytest.skip("Outer environment prevents nested native sandbox")
-    assert result["passed"] is (scenario == "success"), result
+    # This fixture has no protected story receipts, so its behavior route cannot
+    # be reconciled and the candidate must not transfer to the task checkout.
+    assert result["passed"] is False, result
     assert result["continuations"] == 0
     assert not result["retryable"]
     assert len(requests) == 4, result
     assert runtime.read_text() == "workflow state"
     assert git(repo, "rev-parse", "HEAD") == base
-    if scenario == "success":
-        assert (repo / "twice.py").read_text() == CANDIDATE
-        assert (repo / "added.py").read_text() == "VALUE = 1\n"
-        assert set(result["changed_paths"]) == {"twice.py", "added.py"}
-    elif scenario == "parent_conflict":
+    if scenario == "parent_conflict":
         assert (repo / "twice.py").read_text() == "concurrent parent edit\n"
         assert not (repo / "added.py").exists()
     else:
         assert (repo / "twice.py").read_text() == BASELINE
         assert not (repo / "added.py").exists()
+        if scenario == "success":
+            assert result["status"] == "route_evidence_incomplete"
     with pytest.raises(PowdrrExecutionError, match="already dispatched"):
         dispatch.dispatch_source_reference_task(**parameters)

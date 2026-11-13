@@ -273,6 +273,7 @@ def dispatch_source_reference_task(
         if not outcome.accepted:
             return result
         run.verify_candidate()
+        route_evidence: Any = data.get("obligation_route_evidence")
         if story_validation_bundle is not None:
             assert story_profile is not None
             assert story_snapshot is not None
@@ -331,6 +332,28 @@ def dispatch_source_reference_task(
                 run.private_root / "story-route-evidence.json"
             )
             result["story_validation"] = story_result
+        result["obligation_route_evidence"] = route_evidence
+        reconciliation = (
+            route_evidence.get("reconciliation")
+            if isinstance(route_evidence, Mapping)
+            else None
+        )
+        if (
+            not isinstance(route_evidence, Mapping)
+            or route_evidence.get("complete") is not True
+            or not isinstance(reconciliation, Mapping)
+            or reconciliation.get("passed") is not True
+        ):
+            issues = (
+                reconciliation.get("issues", [])
+                if isinstance(reconciliation, Mapping)
+                else ["route evidence is missing or incomplete"]
+            )
+            result.update(
+                status="route_evidence_incomplete",
+                error=f"Candidate route evidence is incomplete: {issues}",
+            )
+            return result
         changed = tuple(sorted(set(attempt["changed_paths"]) | set(test_sources)))
         # The reviewed intent and task metadata are never implementation output.
         reserved = {

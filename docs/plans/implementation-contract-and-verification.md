@@ -16,7 +16,7 @@ gates and trusted candidate-bound receipts for the remaining routes remain.
 Milestones 4–5 remain.
 
 Audited code baseline for this inventory: `feafe5b7b22bf7cd98dee9b06797ea87af558a4c`.
-Latest implementation review baseline: `60a27e0877c2a6876209b9c4920dae78e7b34430` (PR #1480).
+Latest implementation review baseline: `54a3d174749105e11f52062814f2ea4d6b1a9a6e` (PR #1482).
 
 This plan replaces the intent-linked verification, evidence-backed prompt
 contract closure, and bounded coding-worker plans in `superseded/`. Those
@@ -148,10 +148,14 @@ run candidate identity and the story candidate tree. Exact route reconciliation
 requires one passing record for each compiled obligation-route pair and rejects
 missing, duplicate, unlinked, stale, and non-passing records. This
 reconciliation is not yet consumed by the acceptance decision. Add trusted
-producers for invariant and scope routes, and resolve preservation behavior
-links, then gate acceptance on complete route coverage. Reconciliation fixtures
-cover invalid records and story-route fixtures cover stale and linked receipts.
-A body-only regression fixture remains.
+producers for invariant routes, and resolve preservation behavior links, then
+gate acceptance on complete route coverage. Candidate-bound scope routes are
+now evaluated against every changed path in the protected candidate, including
+non-Python files; out-of-scope paths produce a failed route with those paths
+retained as evidence. Scope route fixtures cover path containment and the
+candidate route collector now uses the complete Git change set. Reconciliation
+fixtures cover invalid records and story-route fixtures cover stale and linked
+receipts. A body-only regression fixture remains.
 
 ### 4. Finish bounded execution and delivery migration
 

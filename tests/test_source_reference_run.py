@@ -19,6 +19,7 @@ from powdrr_lift.workrr.source_reference_run import (
     SourceReferenceRun,
     SourceRunFailure,
     _candidate_route_evidence,
+    _out_of_scope_paths,
     bind_story_route_evidence,
     context_delivery_status,
 )
@@ -234,6 +235,15 @@ def test_candidate_route_evidence_is_scoped_and_marks_uncollected_routes(
     assert all(
         item["candidate_tree"] == "sha256:candidate-tree" for item in result["routes"]
     )
+
+
+def test_scope_review_identifies_candidate_paths_outside_accepted_scope() -> None:
+    assert _out_of_scope_paths(
+        {"src/retry.py", "docs/notes.md", "tests/test_retry.py"},
+        ("src", "tests"),
+    ) == ["docs/notes.md"]
+    assert _out_of_scope_paths({"src/retry.py"}, ("src", "tests")) == []
+    assert _out_of_scope_paths({"any/path"}, (".",)) == []
 
 
 def _story_validation(*, receipt_tree: str = "sha256:story-tree") -> dict[str, Any]:

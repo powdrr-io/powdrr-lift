@@ -11,12 +11,14 @@ outcomes where no trusted evidence producer is connected. After enforce-mode
 story validation, linked story receipts now discharge only the matching behavior
 routes and are persisted in a separate protected artifact. Exact route
 reconciliation rejects missing, duplicate, unlinked, stale, and non-passing
-records. The reconciled result is not yet an acceptance gate. Retained-intent
-gates and trusted candidate-bound receipts for the remaining routes remain.
+records. Protected source runs also attach independent invariant-preservation
+reviews to compiled invariant routes when those reviews pass with current owner
+evidence. The reconciled result is not yet an acceptance gate. Preservation
+behavior links and retained-intent acceptance gates remain.
 Milestones 4–5 remain.
 
 Audited code baseline for this inventory: `feafe5b7b22bf7cd98dee9b06797ea87af558a4c`.
-Latest implementation review baseline: `54a3d174749105e11f52062814f2ea4d6b1a9a6e` (PR #1482).
+Latest implementation review baseline: `1f1b85e678cb6b724dde2e974447458f5a434e23` (PR #1483; includes PR #1484).
 
 This plan replaces the intent-linked verification, evidence-backed prompt
 contract closure, and bounded coding-worker plans in `superseded/`. Those
@@ -148,14 +150,19 @@ run candidate identity and the story candidate tree. Exact route reconciliation
 requires one passing record for each compiled obligation-route pair and rejects
 missing, duplicate, unlinked, stale, and non-passing records. This
 reconciliation is not yet consumed by the acceptance decision. Add trusted
-producers for invariant routes, and resolve preservation behavior links, then
-gate acceptance on complete route coverage. Candidate-bound scope routes are
-now evaluated against every changed path in the protected candidate, including
-non-Python files; out-of-scope paths produce a failed route with those paths
-retained as evidence. Scope route fixtures cover path containment and the
-candidate route collector now uses the complete Git change set. Reconciliation
-fixtures cover invalid records and story-route fixtures cover stale and linked
-receipts. A body-only regression fixture remains.
+resolve preservation behavior links, then gate acceptance on complete route
+coverage. Candidate-bound scope routes are evaluated against every changed path
+in the protected candidate, including non-Python files; out-of-scope paths
+produce a failed route with those paths retained as evidence. Independent
+invariant-preservation reviews now use baseline and candidate owner evidence
+from the source validator. A route passes only when the review decision passes,
+its cited locations match the available owner evidence, and the validated
+source-report fingerprint is attached to the protected candidate tree.
+Unavailable or inconclusive reviews remain `not_collected` without changing
+source-reference validation status. Fixtures cover route freshness, linked and
+stale story receipts, scope path containment, and passing or inconclusive
+invariant reviews. Reconciliation fixtures cover invalid records. A body-only
+regression fixture remains.
 
 ### 4. Finish bounded execution and delivery migration
 

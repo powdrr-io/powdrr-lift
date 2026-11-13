@@ -237,6 +237,61 @@ def test_candidate_route_evidence_is_scoped_and_marks_uncollected_routes(
     )
 
 
+def test_independent_invariant_review_discharges_the_candidate_route(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    run = prepare(tmp_path, monkeypatch)
+    (run.workspace_root / "retry.py").write_text(CANDIDATE, encoding="utf-8")
+    report = run.check().to_data()
+    candidate_tree = run._candidate_state()
+
+    result = _candidate_route_evidence(
+        run.handoff,
+        candidate_tree=candidate_tree,
+        changed_paths=("retry.py",),
+        invariant_reviews=tuple(report["reviews"]),
+        source_validation_fingerprint=report["fingerprint"],
+    )
+
+    routes = {(item["obligation_id"], item["route"]): item for item in result["routes"]}
+    for obligation_id in ("place:retry", "move:helper"):
+        record = routes[(obligation_id, "invariant_review")]
+        assert record["status"] == "passed"
+        assert record["candidate_tree"] == candidate_tree
+        assert record["source_validation_fingerprint"] == report["fingerprint"]
+        assert record["review_fingerprint"]
+
+
+def test_inconclusive_invariant_review_does_not_discharge_route(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    run = prepare(tmp_path, monkeypatch)
+    report = run.check().to_data()
+    inconclusive = [
+        {**item, "classification": "needs_review"}
+        if item.get("purpose") == "invariant_preservation"
+        and item.get("obligation_id") == "place:retry"
+        else item
+        for item in report["reviews"]
+    ]
+
+    result = _candidate_route_evidence(
+        run.handoff,
+        candidate_tree="sha256:protected-candidate",
+        changed_paths=(),
+        invariant_reviews=tuple(inconclusive),
+        source_validation_fingerprint=report["fingerprint"],
+    )
+
+    record = next(
+        item
+        for item in result["routes"]
+        if item["obligation_id"] == "place:retry"
+        and item["route"] == "invariant_review"
+    )
+    assert record["status"] == "not_collected"
+
+
 def test_scope_review_identifies_candidate_paths_outside_accepted_scope() -> None:
     assert _out_of_scope_paths(
         {"src/retry.py", "docs/notes.md", "tests/test_retry.py"},

@@ -1,0 +1,166 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1486
+title: Connect invariant reviews to candidate routes
+intent:
+  problem: Compiled invariant routes remain uncollected even when the protected source validator performs an independent review of baseline and candidate owner evidence.
+  goal: Bind passing invariant-preservation reviews and their evidence fingerprints to the protected candidate while keeping missing or inconclusive reviews uncollected.
+human-decisions: []
+structured_files: []
+files:
+- path: packages/service/src/powdrr_service/structrr/reference_validation.py
+  type: modified
+  span: {start_line: 193, end_line: 195}
+  summary: Direct independent review instructions to compare baseline and candidate behavior for invariants.
+  rationale: Annotation presence alone cannot establish preservation.
+- path: packages/service/src/powdrr_service/structrr/reference_validation.py
+  type: modified
+  span: {start_line: 285, end_line: 285}
+  summary: Retain each source review purpose in its result.
+  rationale: Distinguish invariant-preservation decisions from owner and relocation reviews.
+- path: packages/service/src/powdrr_service/structrr/reference_validation.py
+  type: modified
+  span: {start_line: 289, end_line: 289}
+  summary: Retain the exact owner evidence available to the reviewer.
+  rationale: The protected route consumer can require the reviewer to cite the supplied owner evidence.
+- path: packages/service/src/powdrr_service/structrr/reference_validation.py
+  type: modified
+  span: {start_line: 575, end_line: 575}
+  summary: Add optional, nonblocking semantic review handling.
+  rationale: Inconclusive invariant review must remain uncollected without changing the existing source audit gate.
+- path: packages/service/src/powdrr_service/structrr/reference_validation.py
+  type: modified
+  span: {start_line: 578, end_line: 579}
+  summary: Leave optional reviews uncollected when the review bound is reached.
+  rationale: Preserve fail-closed evidence coverage without turning optional evidence into a new validation blocker.
+- path: packages/service/src/powdrr_service/structrr/reference_validation.py
+  type: modified
+  span: {start_line: 600, end_line: 600}
+  summary: Mark the unavailable-review packet with its purpose.
+  rationale: Keep candidate route mapping explicit when no independent reviewer is configured.
+- path: packages/service/src/powdrr_service/structrr/reference_validation.py
+  type: modified
+  span: {start_line: 603, end_line: 605}
+  summary: Bind unavailable review records to their source obligation.
+  rationale: Prevent a review result from being assigned to an unrelated invariant route.
+- path: packages/service/src/powdrr_service/structrr/reference_validation.py
+  type: modified
+  span: {start_line: 607, end_line: 608}
+  summary: Keep unavailable optional reviews out of source validation findings.
+  rationale: Missing route evidence remains visible without weakening existing validation.
+- path: packages/service/src/powdrr_service/structrr/reference_validation.py
+  type: modified
+  span: {start_line: 663, end_line: 665}
+  summary: Add purpose and obligation identity to review packets.
+  rationale: Allow protected route evidence to map the decision to one compiled obligation.
+- path: packages/service/src/powdrr_service/structrr/reference_validation.py
+  type: modified
+  span: {start_line: 682, end_line: 683}
+  summary: Attach purpose and obligation identity to review results.
+  rationale: Preserve the exact review-to-route association in the validation report.
+- path: packages/service/src/powdrr_service/structrr/reference_validation.py
+  type: modified
+  span: {start_line: 686, end_line: 687}
+  summary: Keep failed or inconclusive optional reviews from changing the existing audit status.
+  rationale: Route reconciliation remains responsible for treating the route as incomplete.
+- path: packages/service/src/powdrr_service/structrr/reference_validation.py
+  type: modified
+  span: {start_line: 709, end_line: 710}
+  summary: Leave optional reviews uncollected when citations omit available owner evidence.
+  rationale: A passing classification without the required evidence references cannot discharge an invariant route.
+- path: packages/service/src/powdrr_service/structrr/reference_validation.py
+  type: modified
+  span: {start_line: 721, end_line: 723}
+  summary: Collect optional invariant review packets for source obligations.
+  rationale: Keep independent preservation review evidence separate from structural annotation checks.
+- path: packages/service/src/powdrr_service/structrr/reference_validation.py
+  type: modified
+  span: {start_line: 784, end_line: 791}
+  summary: Queue invariant and preservation placements for independent review.
+  rationale: Review accepted baseline and candidate ownership evidence for every matching invariant route.
+- path: packages/service/src/powdrr_service/structrr/reference_validation.py
+  type: modified
+  span: {start_line: 881, end_line: 890}
+  summary: Queue retained baseline bindings for invariant review.
+  rationale: Preserve current-owner evidence when a binding is explicitly retained.
+- path: packages/service/src/powdrr_service/structrr/reference_validation.py
+  type: modified
+  span: {start_line: 914, end_line: 924}
+  summary: Queue relocated or superseded invariant bindings for independent review.
+  rationale: Tie the replacement owner decision to the accepted source obligation and baseline binding.
+- path: packages/service/src/powdrr_service/structrr/reference_validation.py
+  type: modified
+  span: {start_line: 926, end_line: 933}
+  summary: Run queued optional invariant reviews after required ownership reviews.
+  rationale: Preserve existing required review ordering and gate behavior.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span: {start_line: 143, end_line: 144}
+  summary: Accept invariant review results and the validated source report identity.
+  rationale: Bind independent invariant decisions to the protected source run.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span: {start_line: 196, end_line: 244}
+  summary: Map one conclusive invariant review to its compiled route.
+  rationale: Require a passing decision, matching subject, current evidence citations, and a review fingerprint.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span: {start_line: 254, end_line: 264}
+  summary: Retain source report and review fingerprints on invariant route records.
+  rationale: Bind the evidence route to the validated report and protected candidate tree.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span: {start_line: 1282, end_line: 1290}
+  summary: Validate the source reference report before consuming invariant reviews.
+  rationale: Reject malformed validation output at the protected run boundary.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span: {start_line: 1302, end_line: 1303}
+  summary: Pass validated invariant review results into candidate route compilation.
+  rationale: Persist independent review outcomes with the exact protected candidate identity.
+- path: tests/test_source_reference_run.py
+  type: modified
+  span: {start_line: 240, end_line: 294}
+  summary: Cover passing and inconclusive invariant review route outcomes.
+  rationale: Verify linked review evidence discharges only the matching candidate route.
+- path: tests/test_structrr_reference_validation.py
+  type: modified
+  span: {start_line: 332, end_line: 349}
+  summary: Cover optional invariant reviews with no configured reviewer.
+  rationale: Confirm unavailable review remains uncollected without blocking source audit status.
+- path: docs/plans/implementation-contract-and-verification.md
+  type: modified
+  span: {start_line: 14, end_line: 17}
+  summary: Record invariant review route evidence and the remaining acceptance work.
+  rationale: Keep the active plan status accurate.
+- path: docs/plans/implementation-contract-and-verification.md
+  type: modified
+  span: {start_line: 21, end_line: 21}
+  summary: Advance the implementation baseline to merged PR 1483 and PR 1484.
+  rationale: Tie the current inventory to the latest merged state.
+- path: docs/plans/implementation-contract-and-verification.md
+  type: modified
+  span: {start_line: 153, end_line: 165}
+  summary: Document invariant review evidence and remaining preservation behavior links.
+  rationale: Distinguish the new producer from the still incomplete route acceptance gate.
+entities:
+- id: candidate-obligation-route-evidence
+  type: Function
+  action: modified
+- id: source-reference-invariant-review-collection
+  type: Function
+  action: added
+- id: invariant-route-regression-tests
+  type: Unit test
+  action: added
+entity_relationships: []
+invariants:
+- id: invariant-routes-require-matching-independent-review
+  description: An invariant route passes only when exactly one satisfied review matches its obligation and cites all available current owner evidence.
+  action: added
+- id: invariant-review-evidence-is-candidate-bound
+  description: Passing invariant route records retain the validated source report fingerprint and protected candidate tree identity.
+  action: added
+guidance:
+- id: unavailable-invariant-reviews-remain-uncollected
+  description: Missing, inconclusive, or evidence-incomplete optional invariant reviews remain not_collected and do not change source reference validation status.
+  action: added

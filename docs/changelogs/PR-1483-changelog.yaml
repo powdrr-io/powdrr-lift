@@ -1,0 +1,114 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1483
+title: Gate PR review on normalized remote checks
+intent:
+  problem: The PR review queue records raw required-check states without a timestamped per-check outcome tied to the reviewed PR head.
+  goal: Normalize required CI observations and make the queue readiness decision consume those explicit outcomes.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/plans/bootstrap-validation-discovery.md
+  type: modified
+  span: {start_line: 16, end_line: 22}
+  summary: Record that the PR review readiness gate consumes normalized current-head check observations.
+  rationale: Keep WP8 progress aligned with the implementation while documenting the remaining inventory matching work.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 19, end_line: 19}
+  summary: Import UTC timestamp support for remote CI observations.
+  rationale: Date the evidence used by the review readiness gate.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 2536, end_line: 2536}
+  summary: Capture when required PR checks are observed.
+  rationale: Make CI evidence freshness visible.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 2538, end_line: 2544}
+  summary: Return timestamped observation records when no PR URL is available or it is outside the repository.
+  rationale: Keep missing remote context explicit in the durable outcome.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 2547, end_line: 2553}
+  summary: Record the blocked outcome when GitHub cannot report the PR head.
+  rationale: Do not advance readiness without a current head identity.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 2558, end_line: 2564}
+  summary: Record the blocked outcome when GitHub returns no valid head SHA.
+  rationale: Keep remote evidence tied to a verifiable pull request revision.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 2574, end_line: 2580}
+  summary: Record failures to retrieve required check states as timestamped observations.
+  rationale: Preserve missing remote validation evidence as blocked readiness.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 2593, end_line: 2597}
+  summary: Record incomplete or empty required-check responses as blocked observations.
+  rationale: An empty remote result cannot satisfy the readiness gate.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 2599, end_line: 2600}
+  summary: Normalize each required check into a known status or unknown.
+  rationale: Make queue decisions depend on explicit semantic outcomes rather than raw CLI strings.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 2606, end_line: 2612}
+  summary: Record required checks when the PR head changes during observation.
+  rationale: Prevent results from one revision from satisfying another revision's gate.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 2617, end_line: 2619}
+  summary: Add check status normalization for failure, pending, and unknown values.
+  rationale: Keep unrecognized or skipped checks unresolved rather than passing.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 2640, end_line: 2646}
+  summary: Drive review and CI queue outcomes from normalized required-check states.
+  rationale: Only passed checks advance to review; pending and unresolved checks remain gated.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 2650, end_line: 2650}
+  summary: Block readiness when a required check failed.
+  rationale: Failed required checks cannot advance to review.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 2652, end_line: 2653}
+  summary: Require every required check to pass before awaiting human review.
+  rationale: Keep the readiness gate closed when any obligation is pending or unresolved.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 2656, end_line: 2656}
+  summary: Keep pending required checks in the awaiting-CI state.
+  rationale: Do not classify incomplete remote validation as review-ready.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 2662, end_line: 2685}
+  summary: Build per-check records tied to the observed head SHA and timestamp.
+  rationale: Preserve remote validation provenance in the outcome reported by the gate.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 2689, end_line: 2690}
+  summary: Return normalized per-check observations with the aggregate queue outcome.
+  rationale: Make the evidence consumed by readiness available to durable checkpoints.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 2710, end_line: 2710}
+  summary: Include the observation timestamp in the durable CI outcome checkpoint.
+  rationale: Keep recorded readiness evidence auditable for freshness.
+- path: tests/test_github_issue_queue.py
+  type: modified
+  span: {start_line: 2250, end_line: 2287}
+  summary: Verify normalized statuses, current-head linkage, timestamp persistence, and unresolved checks in the readiness checkpoint.
+  rationale: Ensure only a complete successful required-check set can advance to review.
+entities: []
+entity_relationships: []
+invariants:
+- id: required-ci-current-head-observation
+  description: Every required check observation is tied to the current PR head SHA and observation time.
+  action: added
+- id: unresolved-required-check-blocks-review
+  description: Unknown or pending required checks cannot satisfy the PR review readiness gate.
+  action: added
+guidance: []

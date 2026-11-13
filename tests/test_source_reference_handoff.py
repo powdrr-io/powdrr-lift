@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from powdrr_service.behavior_contract import BEHAVIOR_DIMENSIONS
 from powdrr_service.structrr.design import DesignHandoff, DesiredState
 from powdrr_service.structrr.proposal import compile_proposal_revision
 from powdrr_service.structrr.reference_catalog import compile_reference_catalog
@@ -159,6 +160,133 @@ def test_placement_verification_reference_requires_accepted_behavior_case() -> N
     original = document(placement(verification_refs=["case:missing"]))
     with pytest.raises(ValueError, match="no accepted behavior case"):
         compile_document(original)
+
+
+def test_handoff_covers_behavior_closure_dimensions_and_case_identity() -> None:
+    cases = (
+        (
+            "omitted-optional",
+            "retry(value, limit=1)",
+            "retry(4)",
+            "the default limit is applied",
+            "normal_result",
+            "return 5 using the default limit",
+            "include",
+        ),
+        (
+            "nested-error-continuation",
+            "record processor",
+            "process a nested error followed by a valid record",
+            "preserve the nested error and process the later record",
+            "error_behavior",
+            {"nested": "retain source location"},
+            "include",
+        ),
+        (
+            "unsupported-operation",
+            "retry function",
+            "call retry with an unsupported keyword",
+            "raise TypeError without mutating input",
+            "unsupported_behavior",
+            "reject unsupported keyword arguments",
+            "include_prohibition",
+        ),
+        (
+            "negative-requirement",
+            "retry function",
+            "call retry with a negative input",
+            "do not mutate the caller's input object",
+            "negative_boundaries",
+            "input remains unchanged",
+            "include_prohibition",
+        ),
+        (
+            "conditional-result",
+            "retry function",
+            "call retry with strict=True",
+            "apply strict validation only when strict is true",
+            "normal_result",
+            "strict validation is conditional on the flag",
+            "include",
+        ),
+        (
+            "shared-interface",
+            "encode(value) and decode(text)",
+            "encode a value and pass its result to decode",
+            "both public operations agree on the shared wire format",
+            "compatibility",
+            "preserve the shared interface format",
+            "include",
+        ),
+    )
+    design = document()
+    required_cases: list[dict[str, Any]] = []
+    verification_refs: list[str] = []
+    for scenario_id, subject, given, then, dimension, dimension_value, routing in cases:
+        case_id = f"case:{scenario_id}"
+        verification_refs.append(case_id)
+        dimensions: dict[str, Any] = {
+            name: "not_applicable" for name in BEHAVIOR_DIMENSIONS
+        }
+        dimensions[dimension] = dimension_value
+        if scenario_id == "nested-error-continuation":
+            dimensions["continuation"] = "process later records after an error"
+        required_cases.append(
+            {
+                "id": case_id,
+                "behavior_scenario": {
+                    "scenario_id": scenario_id,
+                    "subject": subject,
+                    "given": given,
+                    "when": "invoke the described public operation",
+                    "then": then,
+                    "related_requirements": ["requirement:contract-closure"],
+                    "dimensions": dimensions,
+                    "evidence": [f"accepted-instruction:{scenario_id}"],
+                    "validator": f"focused behavior check for {scenario_id}",
+                    "capability_matrix": [],
+                    "faithfulness_ref": {
+                        "artifact_path": f"/accepted/{scenario_id}.json",
+                        "fingerprint": "sha256:" + "f" * 64,
+                    },
+                    "routing": routing,
+                },
+            }
+        )
+    design["required_test_cases"] = required_cases
+    design["source_reference_placements"][0]["verification_refs"] = verification_refs
+
+    contract = compile_document(design).worker_prompt.to_data()["contract"]
+    compiled = {item["scenario_id"]: item for item in contract["behavior_scenarios"]}
+    assert set(compiled) == {
+        case["behavior_scenario"]["scenario_id"] for case in required_cases
+    }
+    assert contract["behavior_case_ids"] == {
+        case["behavior_scenario"]["scenario_id"]: [case["id"]]
+        for case in required_cases
+    }
+    for case in required_cases:
+        scenario = case["behavior_scenario"]
+        result = compiled[scenario["scenario_id"]]
+        assert set(result["dimensions"]) == set(BEHAVIOR_DIMENSIONS)
+        assert result["evidence"] == scenario["evidence"]
+        assert result["validator"] == scenario["validator"]
+        assert result["faithfulness_ref"] == scenario["faithfulness_ref"]
+
+
+@pytest.mark.parametrize("missing_field", ["evidence", "validator", "faithfulness_ref"])
+def test_missing_behavior_provenance_blocks_handoff(missing_field: str) -> None:
+    design = document()
+    del design["required_test_cases"][0]["behavior_scenario"][missing_field]
+    with pytest.raises(ValueError, match="incomplete|provenance"):
+        compile_document(design)
+
+
+def test_missing_behavior_closure_blocks_handoff() -> None:
+    design = document()
+    design.pop("required_test_cases")
+    with pytest.raises(ValueError, match="requires observable behavior cases"):
+        compile_document(design)
 
 
 @pytest.mark.parametrize(

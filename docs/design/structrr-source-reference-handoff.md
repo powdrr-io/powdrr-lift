@@ -23,7 +23,9 @@ dimensions, evidence, validator, and a source-faithfulness fingerprint. Every
 placement `verification_ref` must resolve to one of those case IDs or scenario
 IDs. Unresolved dimensions and excluded routing values block handoff. This binds
 observable reviewed cases into the public contract instead of leaving verification
-references as unvalidated labels.
+references as unvalidated labels. The contract also carries a normalized map from
+scenario IDs to their accepted case IDs so workers can interpret placement
+verification references without guessing which scenario they name.
 
 ```yaml
 source_reference_placements:
@@ -92,7 +94,9 @@ Only `worker_prompt` belongs in a worker request. Private validation data is
 namespaced exclusively in the manifest. A prepared Workrr run adds the exact
 base's repository evidence inventory and validated contract closure to those
 private inputs; it refuses dirty or moved bases before capture. The closure
-records static source links as candidates and documents dynamic-dispatch limits.
+retains scenario evidence, requirement links, source dimensions, and faithfulness
+references. It omits validator commands from the private source inventory,
+records static source links as candidates, and documents dynamic-dispatch limits.
 The compiler never renders the whole
 accepted document, proposal operations, private oracle contents, or manifest
 locations into the prompt. Worker JSON is a public projection, not the bundle.

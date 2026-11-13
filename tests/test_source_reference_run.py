@@ -210,6 +210,7 @@ def test_prepared_inputs_are_bound_and_cannot_be_reused_or_mutated(
     run = prepare(tmp_path, monkeypatch)
     data = run.handoff.worker_prompt.to_data()
     assert data["contract"]["workspace_root"] == str(run.workspace_root)
+    assert data["contract"]["behavior_case_ids"] == {"retry-result": ["case:retry"]}
     manifest = run.handoff.validation_manifest
     private = manifest["private_validation_data"]
     assert private["repository_evidence"]["base_commit"] == run.catalog.base_commit
@@ -219,6 +220,12 @@ def test_prepared_inputs_are_bound_and_cannot_be_reused_or_mutated(
     assert private["repository_contract_closure"]["operations"][0]["scenario_refs"] == [
         "retry-result"
     ]
+    private_behavior = private["repository_contract_closure"]["operations"][0][
+        "behavior"
+    ]
+    assert private_behavior["evidence"] == ["retry.py::retry"]
+    assert private_behavior["faithfulness_ref"]["fingerprint"] == "sha256:" + "b" * 64
+    assert "validator" not in private_behavior
     assert "repository_contract_closure" not in run.request.prompt
     assert "PRIVATE-ORACLE" not in run.request.prompt
     assert str(run.private_root) not in run.request.prompt

@@ -260,6 +260,12 @@ def compile_accepted_behavior_scenarios(
     accepted_design: Mapping[str, Any],
 ) -> tuple[BehaviorScenario, ...]:
     """Compile reviewed required cases and reject incomplete semantic closure."""
+    return _compile_accepted_behavior_design(accepted_design)[0]
+
+
+def _compile_accepted_behavior_design(
+    accepted_design: Mapping[str, Any],
+) -> tuple[tuple[BehaviorScenario, ...], dict[str, list[str]]]:
     raw_cases = accepted_design.get("required_test_cases")
     if not isinstance(raw_cases, list) or not raw_cases:
         raise ValueError("accepted source design requires observable behavior cases")
@@ -278,6 +284,11 @@ def compile_accepted_behavior_scenarios(
         scenarios.append(scenario)
     compiled = _compile_behavior_scenario_data(scenarios)
     aliases = case_ids | {scenario.scenario_id for scenario in compiled}
+    case_ids_by_scenario: dict[str, list[str]] = {}
+    for case, scenario in zip(raw_cases, compiled, strict=True):
+        case_ids_by_scenario.setdefault(scenario.scenario_id, []).append(
+            required_text(case.get("id"), "behavior case id")
+        )
     placements = accepted_design.get("source_reference_placements", [])
     if isinstance(placements, list):
         for placement in placements:
@@ -289,7 +300,9 @@ def compile_accepted_behavior_scenarios(
                     f"placement {placement.get('obligation_id')} has no accepted "
                     "behavior case for verification reference(s): " + ", ".join(missing)
                 )
-    return compiled
+    return compiled, {
+        scenario_id: sorted(ids) for scenario_id, ids in case_ids_by_scenario.items()
+    }
 
 
 def _compile_behavior_scenario_data(
@@ -333,6 +346,7 @@ def _normalize(contract: Mapping[str, Any]) -> dict[str, Any]:
         "obligations",
         "preservation",
         "behavior_scenarios",
+        "behavior_case_ids",
     }
     if set(contract) - {"workspace_root"} != fields:
         raise ValueError("invalid source reference contract fields")
@@ -372,6 +386,20 @@ def _normalize(contract: Mapping[str, Any]) -> dict[str, Any]:
         scenario.to_data()
         for scenario in _compile_behavior_scenario_data(raw_scenarios)
     ]
+    raw_case_ids = contract["behavior_case_ids"]
+    scenario_ids = {scenario["scenario_id"] for scenario in behavior_scenarios}
+    if not isinstance(raw_case_ids, Mapping) or set(raw_case_ids) != scenario_ids:
+        raise ValueError("behavior case IDs must map every accepted scenario")
+    behavior_case_ids: dict[str, list[str]] = {}
+    for scenario_id, case_ids in raw_case_ids.items():
+        if not isinstance(case_ids, list):
+            raise ValueError(f"behavior case IDs for {scenario_id} are malformed")
+        normalized_case_ids = sorted(
+            {required_text(case_id, "behavior case id") for case_id in case_ids}
+        )
+        if not normalized_case_ids or len(normalized_case_ids) != len(case_ids):
+            raise ValueError(f"behavior case IDs for {scenario_id} are incomplete")
+        behavior_case_ids[scenario_id] = normalized_case_ids
     for items, field in ((obligations, "obligation_id"), (preservation, "id")):
         if len({item[field] for item in items}) != len(items):
             raise ValueError("duplicate source reference obligation identity")
@@ -414,6 +442,10 @@ def _normalize(contract: Mapping[str, Any]) -> dict[str, Any]:
         "behavior_scenarios": sorted(
             behavior_scenarios, key=lambda scenario: scenario["scenario_id"]
         ),
+        "behavior_case_ids": {
+            scenario_id: behavior_case_ids[scenario_id]
+            for scenario_id in sorted(behavior_case_ids)
+        },
     }
 
 
@@ -450,6 +482,7 @@ def _render(contract: Mapping[str, Any]) -> str:
                     for definition in contract["definitions"]
                 ],
                 "behavior_scenarios": contract["behavior_scenarios"],
+                "behavior_case_ids": contract["behavior_case_ids"],
             }
         ),
         _json(
@@ -641,7 +674,9 @@ def compile_source_reference_handoff(
     if catalog.accepted_document_digest != content_fingerprint(accepted_design):
         raise ValueError("accepted design and frozen catalog do not match")
     desired = DesiredState.from_snapshot(accepted_design)
-    behavior_scenarios = compile_accepted_behavior_scenarios(accepted_design)
+    behavior_scenarios, behavior_case_ids = _compile_accepted_behavior_design(
+        accepted_design
+    )
     placements = desired.document.get("source_reference_placements", [])
     preservation = desired.document.get("source_reference_preservations", [])
     refs = {p["ref"] for p in placements} | {p["ref"] for p in preservation}
@@ -673,6 +708,7 @@ def compile_source_reference_handoff(
             "behavior_scenarios": [
                 scenario.to_data() for scenario in behavior_scenarios
             ],
+            "behavior_case_ids": behavior_case_ids,
         }
     )
     private = dict(private_validation_data or {})

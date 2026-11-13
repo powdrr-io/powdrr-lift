@@ -106,6 +106,47 @@ def test_contract_closure_binds_scenario_to_source_and_renders_evidence(
     assert "Static call lists can omit dynamic dispatch" in rendered
 
 
+def test_contract_closure_retains_behavior_provenance_and_validation_fields(
+    tmp_path: Path,
+) -> None:
+    evidence = collect_python_evidence(
+        tmp_path, base_commit="git:base", tracked_paths=()
+    )
+    scenario = {
+        "scenario_id": "scenario:provenance",
+        "subject": "shared encoder and decoder interface",
+        "given": "a value and its encoded form",
+        "when": "both public operations are used",
+        "then": "the shared wire format is preserved",
+        "dimensions": {"compatibility": "preserve the shared format"},
+        "evidence": ["instruction:shared-interface"],
+        "validator": "focused shared interface check",
+        "related_requirements": ["requirement:wire-format"],
+        "faithfulness_ref": {
+            "artifact_path": "/accepted/faithfulness.json",
+            "fingerprint": "sha256:" + "a" * 64,
+        },
+        "source_dimensions": {"wire_format": "stable"},
+        "semantic_dimension_applicability": {"wire_format": "applicable"},
+        "unresolved_dimensions": [],
+        "routing": "include",
+    }
+
+    closure = compile_contract_closure(
+        [scenario], evidence, design_revision="sha256:design"
+    )
+    operation = validate_contract_closure(closure, evidence)["operations"][0]
+
+    assert operation["behavior"]["evidence"] == scenario["evidence"]
+    assert "validator" not in operation["behavior"]
+    assert (
+        operation["behavior"]["related_requirements"]
+        == scenario["related_requirements"]
+    )
+    assert operation["behavior"]["faithfulness_ref"] == scenario["faithfulness_ref"]
+    assert operation["behavior"]["source_dimensions"] == scenario["source_dimensions"]
+
+
 def test_contract_closure_allows_new_operations_and_rejects_stale_evidence(
     tmp_path: Path,
 ) -> None:

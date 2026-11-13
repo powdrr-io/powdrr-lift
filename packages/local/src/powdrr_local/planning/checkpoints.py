@@ -515,7 +515,7 @@ class LocalPlanningTelemetryStore:
     ) -> None:
         if not run_id or any(char not in "0123456789abcdef" for char in run_id):
             raise PlanningJournalError("telemetry run ID is malformed")
-        allowed = {
+        required = {
             "matching_line_count",
             "matching_path_count",
             "evidence_count",
@@ -525,7 +525,15 @@ class LocalPlanningTelemetryStore:
             "basedpyright_available",
             "base_commit",
         }
-        if set(search) != allowed:
+        optional = {"rg_search_status", "code_symbol_coverage"}
+        if not required <= set(search) or not set(search) <= required | optional:
+            raise PlanningJournalError("repository search telemetry is malformed")
+        if "rg_search_status" in search and not isinstance(
+            search["rg_search_status"], str
+        ):
+            raise PlanningJournalError("repository search telemetry is malformed")
+        coverage = search.get("code_symbol_coverage")
+        if coverage is not None and not isinstance(coverage, Mapping):
             raise PlanningJournalError("repository search telemetry is malformed")
         self._append(
             {
@@ -587,7 +595,7 @@ class LocalPlanningTelemetryStore:
         top: list[dict[str, Any]] = []
         by_phase_and_kind: dict[str, dict[str, dict[str, Any]]] = defaultdict(dict)
         pages: list[dict[str, Any]] = []
-        search_summary = {
+        search_summary: dict[str, Any] = {
             "requirements": 0,
             "matching_lines": 0,
             "matching_paths": 0,
@@ -596,6 +604,8 @@ class LocalPlanningTelemetryStore:
             "basedpyright_matches": 0,
             "rg_matches": 0,
             "basedpyright_unavailable": 0,
+            "rg_search_statuses": {},
+            "code_symbol_coverage_statuses": {},
         }
         deterministic_count = 0
         deterministic_by_rule: dict[str, int] = defaultdict(int)
@@ -634,6 +644,20 @@ class LocalPlanningTelemetryStore:
                             search_summary[target] += value
                         if record.get("basedpyright_available") is False:
                             search_summary["basedpyright_unavailable"] += 1
+                        rg_status = record.get("rg_search_status")
+                        if isinstance(rg_status, str):
+                            statuses = search_summary["rg_search_statuses"]
+                            statuses[rg_status] = statuses.get(rg_status, 0) + 1
+                        coverage = record.get("code_symbol_coverage")
+                        if isinstance(coverage, Mapping):
+                            coverage_status = coverage.get("status")
+                            if isinstance(coverage_status, str):
+                                statuses = search_summary[
+                                    "code_symbol_coverage_statuses"
+                                ]
+                                statuses[coverage_status] = (
+                                    statuses.get(coverage_status, 0) + 1
+                                )
                         continue
                     if record.get("schema") == "planning-deterministic-telemetry-v1":
                         rule_id = record.get("rule_id")

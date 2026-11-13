@@ -27,7 +27,10 @@ from powdrr_service.structrr.story_coverage import (
 )
 from powdrr_service.structrr.story_interview import StoryInterview, StoryUserResponse
 from powdrr_service.structrr.user_stories import StoryEditRequest, parse_story_catalog
-from powdrr_service.structrr.verification_health import audit_verification_health
+from powdrr_service.structrr.verification_health import (
+    VerificationPolicyMode,
+    audit_verification_health,
+)
 from powdrr_service.verification.execute_pr_test_quality import (
     review_execute_pr_test_quality,
 )
@@ -329,6 +332,8 @@ def test_prose_to_plan_author_execution_repair_and_approved_amendment(
     (root / "app.py").write_text(GOOD)
     passed = execute(root, graph, artifact, tmp_path / "runs")
     assert passed["story_coverage"]["verified"]
+    assert passed["verification_health"]["mode"] == "enforce"
+    assert passed["verification_health"]["passed"] is True
     assert (
         json.loads((root / "docs/plans/story-validation.json").read_text())["receipts"]
         == passed["story_receipts"]
@@ -392,7 +397,14 @@ def test_prose_to_plan_author_execution_repair_and_approved_amendment(
             Path(passed["story_evidence_path"]) / "verification-health-input.json"
         ).read_text()
     )
+    assert payload["candidate_tree"] == passed["execution_context"]["candidate_sha"]
+    assert payload["mode"] == "enforce"
     assert audit_verification_health(story_coverage=payload["story_coverage"]).passed
+    assert audit_verification_health(
+        story_coverage=payload["story_coverage"],
+        candidate_tree=payload["candidate_tree"],
+        mode=VerificationPolicyMode(payload["mode"]),
+    ).passed
     assert not audit_verification_health(
         story_coverage=payload["story_coverage"], candidate_tree="d" * 40
     ).passed

@@ -1,0 +1,95 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1470
+title: Gate story dispatch on verification health
+intent:
+  problem: Protected source dispatch relied on the story coverage flag without requiring the retained-intent verification-health audit.
+  goal: Require candidate-bound story receipt health in enforce mode before transferring a protected implementation patch.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/story_execution_operations.py
+    type: modified
+    span: {start_line: 18, end_line: 21}
+    summary: Import the verification-health policy and deterministic auditor.
+    rationale: Reuse the existing service-owned health rules in story execution.
+  - path: src/powdrr_lift/workrr/story_execution_operations.py
+    type: modified
+    span: {start_line: 149, end_line: 153}
+    summary: Audit story receipts against the captured execution candidate in enforce mode.
+    rationale: Check receipt freshness at the candidate that dispatch may transfer.
+  - path: src/powdrr_lift/workrr/story_execution_operations.py
+    type: modified
+    span: {start_line: 155, end_line: 167}
+    summary: Audit story receipts against the execution candidate in enforce mode and persist the audit inputs and report.
+    rationale: Retain independently inspectable, candidate-bound health evidence for each story-validation run.
+  - path: src/powdrr_lift/workrr/story_execution_operations.py
+    type: modified
+    span: {start_line: 172, end_line: 172}
+    summary: Return the enforce-mode health report with story validation results.
+    rationale: Let protected dispatch gate patch transfer on the completed audit.
+  - path: src/powdrr_lift/workrr/source_reference_dispatch.py
+    type: modified
+    span: {start_line: 87, end_line: 100}
+    summary: Require verified story coverage and a passing enforce-mode health report.
+    rationale: Prevent absent, observing, or failed health evidence from authorizing patch transfer.
+  - path: src/powdrr_lift/workrr/source_reference_dispatch.py
+    type: modified
+    span: {start_line: 306, end_line: 313}
+    summary: Use the enforce-mode story health result in dispatch acceptance.
+    rationale: Make verification-health acceptance part of the production dispatch decision.
+  - path: src/powdrr_lift/workrr/source_reference_dispatch.py
+    type: modified
+    span: {start_line: 322, end_line: 323}
+    summary: Include health and story findings in blocked dispatch diagnostics.
+    rationale: Make failed candidate evidence inspectable during review.
+  - path: tests/test_source_reference_dispatch.py
+    type: modified
+    span: {start_line: 22, end_line: 44}
+    summary: Verify that missing, observing, and failed health evidence are rejected.
+    rationale: Ensure only a passing enforce-mode health report satisfies the dispatch gate.
+  - path: tests/test_source_reference_dispatch.py
+    type: modified
+    span: {start_line: 323, end_line: 323}
+    summary: Provide enforce-mode health evidence in the dispatch acceptance fixture.
+    rationale: Exercise the protected route with the evidence required by the new gate.
+  - path: tests/test_story_execution.py
+    type: modified
+    span: {start_line: 30, end_line: 33}
+    summary: Import the enforce policy enum used to replay the persisted audit.
+    rationale: Keep the test's replayed audit mode type-safe.
+  - path: tests/test_story_execution.py
+    type: modified
+    span: {start_line: 335, end_line: 336}
+    summary: Assert story validation emits a passing enforce-mode health report.
+    rationale: Verify the execution adapter produces the report required by dispatch.
+  - path: tests/test_story_execution.py
+    type: modified
+    span: {start_line: 400, end_line: 401}
+    summary: Check persisted health inputs identify the exact candidate and enforce mode.
+    rationale: Protect the health evidence's candidate binding and policy level.
+  - path: tests/test_story_execution.py
+    type: modified
+    span: {start_line: 403, end_line: 407}
+    summary: Check that persisted health inputs bind to the execution candidate and re-audit successfully.
+    rationale: Protect candidate freshness and enforce-mode reporting.
+  - path: docs/plans/implementation-contract-and-verification.md
+    type: modified
+    span: {start_line: 5, end_line: 8}
+    summary: Record the implemented story health gate as a partial milestone 3 slice.
+    rationale: Keep the consolidated plan aligned with current production behavior.
+  - path: docs/plans/implementation-contract-and-verification.md
+    type: modified
+    span: {start_line: 125, end_line: 132}
+    summary: Describe the story audit integration and the retained milestone 3 work.
+    rationale: Distinguish completed story-health wiring from the remaining intent and invariant gates.
+entities:
+  - id: candidate-bound-story-health-gate
+    type: Feature
+    action: added
+entity_relationships: []
+invariants:
+  - id: story-dispatch-requires-enforced-candidate-health
+    action: added
+    description: Protected source dispatch accepts story validation only when pinned coverage is verified and its candidate-bound verification-health report passes in enforce mode.
+    rationale: Prevent stale, absent, observing, or failed story health evidence from authorizing patch transfer.
+guidance: []

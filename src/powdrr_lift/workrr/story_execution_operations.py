@@ -15,6 +15,10 @@ from powdrr_agent.execution.story_test_collection import (
     collect_story_tests,
     run_story_tests,
 )
+from powdrr_service.structrr.verification_health import (
+    VerificationPolicyMode,
+    audit_verification_health,
+)
 from powdrr_service.verification.story_execution import (
     compile_story_execution_receipts,
     story_coverage_report,
@@ -142,12 +146,30 @@ def execute_story_validation(
     (destination / "coverage.json").write_text(
         json.dumps(coverage, indent=2, sort_keys=True) + "\n"
     )
+    health = audit_verification_health(
+        story_coverage=payload,
+        candidate_tree=after["candidate_sha"],
+        mode=VerificationPolicyMode.ENFORCE,
+    )
     (destination / "verification-health-input.json").write_text(
-        json.dumps({"story_coverage": payload}, indent=2, sort_keys=True) + "\n"
+        json.dumps(
+            {
+                "story_coverage": payload,
+                "candidate_tree": after["candidate_sha"],
+                "mode": VerificationPolicyMode.ENFORCE.value,
+            },
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n"
+    )
+    (destination / "verification-health.json").write_text(
+        json.dumps(health.to_data(), indent=2, sort_keys=True) + "\n"
     )
     result.update(
         story_receipts=payload["receipts"],
         story_coverage=coverage,
+        verification_health=health.to_data(),
         execution_context=after,
         story_evidence_path=str(destination),
     )

@@ -84,6 +84,20 @@ class _ReferenceReviewer:
         return complete_json(self.client, messages, response_schema=response_schema)
 
 
+def _story_validation_is_accepted(result: Mapping[str, Any]) -> bool:
+    coverage = result.get("story_coverage")
+    health = result.get("verification_health")
+    return (
+        result.get("passed") is True
+        and not result.get("coverage_evidence_error")
+        and isinstance(coverage, Mapping)
+        and coverage.get("verified") is True
+        and isinstance(health, Mapping)
+        and health.get("mode") == "enforce"
+        and health.get("passed") is True
+    )
+
+
 def dispatch_source_reference_task(
     *,
     repo_root: Path,
@@ -289,12 +303,14 @@ def dispatch_source_reference_task(
             )
             run.verify_candidate()
             coverage = story_result.get("story_coverage", {})
-            if (
-                not story_result.get("passed")
-                or story_result.get("coverage_evidence_error")
-                or not isinstance(coverage, Mapping)
-                or coverage.get("verified") is not True
-            ):
+            health = story_result.get("verification_health", {})
+            if not _story_validation_is_accepted(story_result):
+                health_findings = (
+                    health.get("findings") if isinstance(health, Mapping) else None
+                )
+                story_cases = (
+                    coverage.get("stories") if isinstance(coverage, Mapping) else None
+                )
                 result.update(
                     status="story_validation_failed",
                     story_validation=story_result,
@@ -303,7 +319,8 @@ def dispatch_source_reference_task(
                         + str(
                             story_result.get("coverage_evidence_error")
                             or story_result.get("error")
-                            or coverage.get("stories")
+                            or health_findings
+                            or story_cases
                         )
                     ),
                 )

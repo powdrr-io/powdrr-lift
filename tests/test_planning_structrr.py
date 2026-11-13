@@ -1148,8 +1148,9 @@ def test_explicit_human_setup_requirement_becomes_an_item_prerequisite() -> None
 
 
 def test_file_structural_change_omits_unrelated_entity_identity_index() -> None:
+    target_path = "attestation/scripts/verify-all.sh"
     subject = BoundStructuralSubject(
-        "attestation/scripts/verify-all.sh",
+        target_path,
         "files",
         "item-0001",
         "added",
@@ -1157,24 +1158,34 @@ def test_file_structural_change_omits_unrelated_entity_identity_index() -> None:
         ("unit-0001",),
         ("anchor-01",),
         False,
-        "attestation/scripts/verify-all.sh",
+        target_path,
     )
     request = build_structural_change_request(
         subject,
         projected_baseline={"entities": [], "entity_relationships": [], "files": []},
         taxonomy_entity_types=("Source file",),
-        planned_paths={"attestation/scripts/verify-all.sh"},
+        planned_paths={target_path},
         known_entity_ids={f"entity-{index:05d}" for index in range(4_000)},
         valid_example={"result": "unchanged", "reason": "Already satisfied."},
     )
 
     serialized_input = build_question_messages(request)[1]["content"]
+    subject_context = next(
+        fact.value
+        for fact in request.accepted_facts
+        if fact.ref_id == f"subject:files:{target_path}"
+    )
 
     assert request.valid_example["result"] == "change"
-    assert request.valid_example["desired_content"] == {
-        "path": "attestation/scripts/verify-all.sh"
-    }
+    assert request.valid_example["desired_content"] == {"path": target_path}
     assert "one concise reason of at most 200 characters" in request.exact_question
+    assert subject_context == {
+        "subject_id": target_path,
+        "section": "files",
+        "item_id": "item-0001",
+        "action": "added",
+        "planned_path": target_path,
+    }
     assert "entity-identities" not in serialized_input
     assert len(serialized_input) < 24_000
 
@@ -1221,6 +1232,50 @@ def test_file_structural_change_omits_irrelevant_unit_validation_context() -> No
     assert len(serialized_input) < 24_000
     assert unit_context["id"] == "unit-0001"
     assert unit_context["requirement_ids"] == ["req-01"]
+    assert unit_context["planned_writes"][0]["path"] == target_path
+    assert "acceptance_criteria" not in unit_context
+    assert "validation_ids" not in unit_context
+
+
+def test_file_entity_change_omits_irrelevant_unit_validation_context() -> None:
+    target_path = "attestation/scripts/verify-all.sh"
+    subject = BoundStructuralSubject(
+        f"file:{target_path}",
+        "entities",
+        "item-0001",
+        "added",
+        ("req-01",),
+        ("unit-0001",),
+        ("anchor-01",),
+        True,
+    )
+    unit = WorkUnit(
+        "unit-0001",
+        ("req-01",),
+        "Add the client validation script.",
+        "attestation",
+        "shell",
+        (PlannedWrite(target_path, "implementation", "shell", (), ()),),
+        "Create the script and make it executable.",
+        tuple(f"Validation criterion {index}: " + "x" * 1_000 for index in range(25)),
+        tuple(f"validation-{index}" for index in range(25)),
+    )
+    request = build_structural_change_request(
+        subject,
+        projected_baseline={"entities": [], "entity_relationships": [], "files": []},
+        taxonomy_entity_types=("Source file",),
+        planned_paths={target_path},
+        known_entity_ids=set(),
+        valid_example={"result": "unchanged", "reason": "Already satisfied."},
+        units=(unit,),
+    )
+
+    serialized_input = build_question_messages(request)[1]["content"]
+    unit_context = next(
+        fact.value for fact in request.accepted_facts if fact.ref_id == "unit:unit-0001"
+    )
+
+    assert len(serialized_input) < 24_000
     assert unit_context["planned_writes"][0]["path"] == target_path
     assert "acceptance_criteria" not in unit_context
     assert "validation_ids" not in unit_context

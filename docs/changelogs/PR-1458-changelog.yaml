@@ -1,0 +1,44 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1458
+title: Refresh bootstrap skill outputs and validation guidance
+intent:
+  problem: The project bootstrap workflow reuses artifacts based only on file existence, treats successful help or command invocation as validation evidence, and emits no paired Structrr Markdown report.
+  goal: Inspect artifact freshness before reuse, preserve native validation declarations and probe outcomes independently, and generate both the Structrr snapshot and Markdown report.
+human-decisions: []
+structured_files: []
+files:
+- path: packages/service/src/powdrr_service/resources/processes/bootstrap-code-structure.yaml
+  type: modified
+  span:
+    start_line: 3
+    end_line: 4
+  summary: Describe use of bootstrap when project-structure or Structrr outputs are missing or stale.
+  rationale: Make the process applicable when current artifacts need refreshing.
+- path: packages/service/src/powdrr_service/resources/processes/bootstrap-code-structure.yaml
+  type: modified
+  span:
+    start_line: 21
+    end_line: 102
+  summary: Check project-structure and Structrr snapshot/report freshness before reuse; record exact native commands separately from supported probe results, retaining failed or unrunnable checks with reasons.
+  rationale: Prevent stale artifact reuse and keep project declarations intact when probes fail or are unavailable.
+- path: packages/service/src/powdrr_service/resources/processes/bootstrap-code-structure.yaml
+  type: modified
+  span:
+    start_line: 104
+    end_line: 154
+  summary: Generate and validate the Structrr YAML snapshot and paired Markdown report, then stage and publish those outputs with the project-structure artifact.
+  rationale: Emit both bootstrap outputs and preserve their exact paths through validation and PR preparation.
+- path: packages/service/src/powdrr_service/resources/processes/start-implementing-feature.yaml
+  type: modified
+  span:
+    start_line: 187
+    end_line: 191
+  summary: Always invoke the bootstrap workflow so its freshness check cannot be bypassed by an existence-only gate.
+  rationale: Ensure implementation workflows reuse only fresh project-structure and Structrr artifacts.
+entities:
+- id: bootstrap-code-structure
+  type: Workflow
+  action: added
+entity_relationships: []
+invariants: []
+guidance: []

@@ -610,7 +610,15 @@ def test_post_worker_reconciliation_uses_decision_and_changes_only_annotation(
         )
 
 
-@pytest.mark.parametrize("scenario", ["success", "behavior_failure", "parent_conflict"])
+@pytest.mark.parametrize(
+    "scenario",
+    [
+        "success",
+        "behavior_failure",
+        "parent_conflict",
+        "preexisting_parent_no_progress",
+    ],
+)
 def test_native_dispatch_validates_before_applying_candidate(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, scenario: str
 ) -> None:
@@ -624,6 +632,9 @@ def test_native_dispatch_validates_before_applying_candidate(
     runtime = repo / ".powdrr" / "state.json"
     runtime.parent.mkdir()
     runtime.write_text("workflow state")
+    preexisting_parent_edit = "pre-existing caller change\n"
+    if scenario == "preexisting_parent_no_progress":
+        (repo / "twice.py").write_text(preexisting_parent_edit)
     requests = []
 
     def infer(request: ChatCompletionRequest) -> ChatCompletionResponse:
@@ -631,6 +642,8 @@ def test_native_dispatch_validates_before_applying_candidate(
         candidate = next((tmp_path / "powdrr-source-tasks").glob("*/candidate"))
         if scenario == "parent_conflict":
             (repo / "twice.py").write_text("concurrent parent edit\n")
+        if scenario == "preexisting_parent_no_progress":
+            assert (candidate / "twice.py").read_text() == BASELINE
         completion = {
             "schema_version": "structrr-reference-completion-v1",
             "reference_owners": [
@@ -655,6 +668,8 @@ def test_native_dispatch_validates_before_applying_candidate(
             "printf '%s\\n' COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT "
             + shlex.quote(json.dumps(completion)),
         ]
+        if scenario == "preexisting_parent_no_progress":
+            commands[2] = "true"
         assert str(candidate) in request.messages[1]["content"]
         call = {
             "id": str(len(requests)),
@@ -714,10 +729,17 @@ def test_native_dispatch_validates_before_applying_candidate(
     if scenario == "parent_conflict":
         assert (repo / "twice.py").read_text() == "concurrent parent edit\n"
         assert not (repo / "added.py").exists()
+    elif scenario == "preexisting_parent_no_progress":
+        assert result["status"] == "submitted_without_progress", result
+        assert result["attempts"][0]["attempt"]["changed_paths"] == []
+        assert (repo / "twice.py").read_text() == preexisting_parent_edit
+        assert not (repo / "added.py").exists()
     else:
         assert (repo / "twice.py").read_text() == BASELINE
         assert not (repo / "added.py").exists()
         if scenario == "success":
             assert result["status"] == "route_evidence_incomplete"
+        elif scenario == "behavior_failure":
+            assert result["status"] == "validation_failed", result
     with pytest.raises(PowdrrExecutionError, match="already dispatched"):
         dispatch.dispatch_source_reference_task(**parameters)

@@ -1066,6 +1066,12 @@ class SourceReferenceRun:
         self.verify_inputs()
         if attempt.status is not CodingAgentStatus.COMPLETED:
             return
+        if attempt.out_of_scope_paths:
+            paths = ", ".join(sorted(attempt.out_of_scope_paths))
+            raise SourceRunFailure(
+                "policy_violation",
+                f"Source worker changed paths outside accepted scope: {paths}",
+            )
         if attempt.worker_committed or attempt.supporting_edit_paths:
             raise SourceRunFailure(
                 "policy_violation",

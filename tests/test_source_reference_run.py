@@ -13,8 +13,18 @@ import pytest
 from powdrr_contracts.models import ChatCompletionRequest, ChatCompletionResponse
 from powdrr_service.structrr.reference_definitions import ReferenceDefinition
 
-from powdrr_lift.workrr.coding_agent import MiniSWEAgentProvider
-from powdrr_lift.workrr.coding_agent_validation import ValidationProfile
+from powdrr_lift.workrr import source_reference_run as source_reference_run_module
+from powdrr_lift.workrr.coding_agent import (
+    CodingAgentAttempt,
+    CodingAgentStatus,
+    MiniSWEAgentProvider,
+)
+from powdrr_lift.workrr.coding_agent_validation import (
+    CodingAgentExecutionResult,
+    ValidationProfile,
+    ValidationReport,
+    ValidationReportStatus,
+)
 from powdrr_lift.workrr.source_reference_run import (
     SourceReferenceRun,
     SourceRunFailure,
@@ -460,6 +470,74 @@ def test_prepared_inputs_are_bound_and_cannot_be_reused_or_mutated(
         run.verify_inputs()
     with pytest.raises(FileExistsError):
         prepare(tmp_path, monkeypatch)
+
+
+def test_completed_source_worker_cannot_retain_out_of_scope_changes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    run = prepare(tmp_path, monkeypatch)
+    attempt = CodingAgentAttempt(
+        attempt_id=run.run_id,
+        request_id=run.run_id,
+        provider="minisweagent",
+        status=CodingAgentStatus.COMPLETED,
+        exit_code=0,
+        changed_paths=("retry.py", "rogue.py"),
+        out_of_scope_paths=("rogue.py",),
+        diff_fingerprint="sha256:out-of-scope-candidate",
+    )
+
+    with pytest.raises(SourceRunFailure, match="outside accepted scope"):
+        run.finalize_worker(attempt)
+
+
+@pytest.mark.parametrize(
+    ("status", "outcome"),
+    [
+        (CodingAgentStatus.TIMED_OUT, "timed_out_with_partial_progress"),
+        (CodingAgentStatus.POLICY_DENIED, "policy_violation"),
+    ],
+)
+def test_noncompleted_protected_worker_attempt_cannot_be_accepted(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    status: CodingAgentStatus,
+    outcome: str,
+) -> None:
+    run = prepare(tmp_path, monkeypatch)
+    attempt = CodingAgentAttempt(
+        attempt_id=run.run_id,
+        request_id=run.run_id,
+        provider="minisweagent",
+        status=status,
+        exit_code=None,
+        changed_paths=("retry.py",),
+        diff_fingerprint="sha256:partial-candidate",
+    )
+    validation = ValidationReport(
+        attempt_id=run.run_id,
+        request_id=run.run_id,
+        status=ValidationReportStatus.PASSED,
+        results=(),
+    )
+    execution = CodingAgentExecutionResult(
+        attempt,
+        validation,
+        subprocess.CompletedProcess(["git", "diff", "--check"], 0, "", ""),
+    )
+    monkeypatch.setattr(
+        source_reference_run_module,
+        "execute_coding_agent_attempt",
+        lambda *args, **kwargs: execution,
+    )
+
+    result = run.execute(unused_inference)
+
+    assert result.accepted is False
+    assert result.to_data()["outcome"] == outcome
+    terminal = json.loads((run.private_root / "terminal.json").read_text())
+    assert terminal["outcome"] == outcome
+    assert terminal["attempt"]["status"] == status.value
 
 
 def test_readonly_support_files_are_scoped_and_frozen(

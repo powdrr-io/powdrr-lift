@@ -34,9 +34,15 @@ from powdrr_service.structrr.reference_validation import (
 from powdrr_service.structrr.source_reader import ReaderLimits
 from powdrr_service.structrr.source_reference_handoff import (
     CompiledSourceReferenceHandoff,
+    compile_accepted_behavior_scenarios,
     compile_source_reference_handoff,
 )
 
+from powdrr_lift.core.contract_closure import (
+    collect_python_evidence,
+    compile_contract_closure,
+    validate_contract_closure,
+)
 from powdrr_lift.workrr.coding_agent import (
     CodingAgentAttempt,
     CodingAgentAttemptStore,
@@ -275,6 +281,47 @@ class SourceReferenceRun:
             base_commit=base_commit,
             authorized_amendment=authorized_amendment,
         )
+        tracked_paths = (
+            _git(
+                self.workspace_root,
+                "ls-tree",
+                "-r",
+                "--name-only",
+                base_commit,
+            )
+            .decode()
+            .splitlines()
+        )
+        repository_evidence = collect_python_evidence(
+            self.workspace_root,
+            base_commit=base_commit,
+            tracked_paths=tracked_paths,
+        )
+        behavior_scenarios = [
+            scenario.to_data()
+            for scenario in compile_accepted_behavior_scenarios(accepted_design)
+        ]
+        repository_contract = validate_contract_closure(
+            compile_contract_closure(
+                behavior_scenarios,
+                repository_evidence,
+                design_revision=self.catalog.accepted_document_digest,
+            ),
+            repository_evidence,
+        )
+        private_inputs = dict(private_validation_data or {})
+        reserved_private_keys = {
+            "repository_evidence",
+            "repository_contract_closure",
+        }
+        if reserved_private_keys & private_inputs.keys():
+            raise ValueError("private validation data uses a reserved contract key")
+        private_inputs.update(
+            {
+                "repository_evidence": repository_evidence.to_data(),
+                "repository_contract_closure": repository_contract,
+            }
+        )
         self.profiles = dict(sorted(profiles.items()))
         self.handoff = compile_source_reference_handoff(
             accepted_design,
@@ -283,7 +330,7 @@ class SourceReferenceRun:
             allowed_paths=allowed_paths,
             verification_commands=tuple(p.command for p in self.profiles.values()),
             reference_check_command=CHECK_COMMAND,
-            private_validation_data=private_validation_data,
+            private_validation_data=private_inputs,
             workspace_root=str(self.workspace_root),
         )
         self.request = replace(

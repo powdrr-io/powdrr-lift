@@ -1,8 +1,9 @@
 # Implementation contract and verification
 
-Status: Proposed consolidation. Milestone 1 route inventory and fixture
-acceptance are implemented; milestones 2–5 require further implementation and
-acceptance evidence.
+Status: Active implementation. Milestone 1 route inventory and fixture
+acceptance are implemented. Milestone 2 now binds typed accepted behavior cases
+to the public handoff and compiles a base-bound private repository evidence
+closure in Workrr; its full acceptance fixture set and milestones 3–5 remain.
 
 Audited code baseline for this inventory: `feafe5b7b22bf7cd98dee9b06797ea87af558a4c`.
 
@@ -35,6 +36,7 @@ new models, a new test-generation pipeline, or benchmark-specific product rules.
 | Capability | Current code and evidence | Limit that remains |
 | --- | --- | --- |
 | Accepted source authority | `workrr/source_reference_dispatch.py::load_reviewed_source_design` reads a bounded regular blob from the exact Git base and validates plan/item identity. | This route requires the explicit reviewed `source_reference_design_file` selector. |
+| Source-backed behavior closure | Service handoff requires typed accepted behavior scenarios with source-faithfulness provenance and resolves placement verification refs to case/scenario IDs. `SourceReferenceRun.prepare` collects tracked Python evidence at the clean base and validates a private closure tied to the accepted document digest. | Milestone 2 remains open: add fixtures for omitted optional arguments, nested error continuation, unsupported operations, negative requirements, conditional behavior, and shared interfaces; demonstrate complete per-field provenance and blocked missing closure. The closure is pre-implementation static evidence, not a runtime call graph. |
 | Immutable handoff and isolated execution | `SourceReferenceRun.prepare`, `authorize`, `claim_invocation`, and `execute` seal inputs and invoke MiniSWE once under Seatbelt or bubblewrap. | This guarantee applies to prepared source-reference runs, not every provider or legacy entry point. |
 | Source context and placement checks | Service `structrr/source_reader.py`, `source_observation.py`, `reference_validation.py`, and Workrr source-reference validation bind reads, owners, and canonical definitions. | Mechanical annotation coverage cannot establish behavioral correctness. |
 | Metadata reconciliation | `SourceReferenceRun.reconcile_after_worker` accepts a trusted reconciliation receipt, verifies the candidate, compares Python AST snapshots, and rejects product syntax changes. | Reconciliation must preserve frozen authority and separately identify corrected metadata. |
@@ -44,6 +46,7 @@ new models, a new test-generation pipeline, or benchmark-specific product rules.
 | Accepted patch transfer | Protected dispatch checks candidate identity, exports and checks the patch, and rejects conflicting caller state before application. | Temporary run artifacts are not a permanent audit store. |
 
 Regression evidence includes `tests/test_source_reference_dispatch.py`,
+`test_source_reference_handoff.py`, `test_contract_closure.py`,
 `test_source_reference_run.py`, `test_story_execution.py`,
 `test_structrr_reference_validation.py`, and `test_coding_agent.py`.
 These fixtures establish their exercised contracts; they do not establish live

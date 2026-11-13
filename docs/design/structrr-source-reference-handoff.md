@@ -3,10 +3,12 @@
 The service-owned `structrr/source_reference_handoff.py` compiles explicit source
 placement intent into one public prompt and one private validation manifest.
 Compatibility exports live in `powdrr_lift.workrr.source_reference_handoff`.
-The compiler reads no repository files, candidate diffs, transcripts, or inferred
-ID counts. Its caller establishes that the supplied design is accepted and that
-any catalog amendments are authorized. The catalog's accepted-document digest
-must match the exact supplied document.
+The service compiler reads no repository files, candidate diffs, transcripts, or
+inferred ID counts. Its caller establishes that the supplied design is accepted
+and that any catalog amendments are authorized. The catalog's accepted-document
+digest must match the exact supplied document. The Workrr run captures static
+Python evidence from the clean accepted base and compiles a private repository
+contract closure before invoking the worker.
 
 ## Accepted design records
 
@@ -14,6 +16,14 @@ Desired state now preserves `source_reference_placements` and
 `source_reference_preservations`. Proposal operations identify placements by
 `obligation_id`; preservation records use `id`. These are ordinary desired-state
 records, so projection and revision fingerprints retain them.
+
+Accepted source designs also require `required_test_cases`. Each entry has a
+stable case `id` and a typed `behavior_scenario` with explicit behavior
+dimensions, evidence, validator, and a source-faithfulness fingerprint. Every
+placement `verification_ref` must resolve to one of those case IDs or scenario
+IDs. Unresolved dimensions and excluded routing values block handoff. This binds
+observable reviewed cases into the public contract instead of leaving verification
+references as unvalidated labels.
 
 ```yaml
 source_reference_placements:
@@ -68,8 +78,8 @@ It returns immutable JSON-backed `CompiledSourceReferenceHandoff`.
 The public `worker_prompt` is `minisweagent-source-reference-prompt-v1`; the private
 artifact is `source-reference-validation-manifest-v1`. Both contain the exact
 same canonical contract: base commit, desired-state fingerprint, accepted
-document digest, catalog digest, placements, preservation rules, referenced
-definitions, scope, objective, and commands. They share a contract fingerprint;
+document digest, catalog digest, placements, preservation rules, typed behavior
+scenarios, referenced definitions, scope, objective, and commands. They share a contract fingerprint;
 the public artifact additionally binds a digest of the private validation inputs,
 without their contents. Changing private inputs requires a new prompt artifact
 fingerprint even when the rendered prompt bytes remain identical. The manifest
@@ -79,7 +89,11 @@ parity, and fingerprints. `require_matches` compares a worker artifact against
 the frozen private bundle. Hash consistency alone never establishes authority.
 
 Only `worker_prompt` belongs in a worker request. Private validation data is
-namespaced exclusively in the manifest. The compiler never renders the whole
+namespaced exclusively in the manifest. A prepared Workrr run adds the exact
+base's repository evidence inventory and validated contract closure to those
+private inputs; it refuses dirty or moved bases before capture. The closure
+records static source links as candidates and documents dynamic-dispatch limits.
+The compiler never renders the whole
 accepted document, proposal operations, private oracle contents, or manifest
 locations into the prompt. Worker JSON is a public projection, not the bundle.
 The separate schema names identify a placement-focused projection; they do not

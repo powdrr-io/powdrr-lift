@@ -62,6 +62,32 @@ def fixture(tmp_path: Path) -> tuple[Path, str, dict[str, Any]]:
                     "verification_refs": ["case:twice"],
                 }
             ],
+            "required_test_cases": [
+                {
+                    "id": "case:twice",
+                    "behavior_scenario": {
+                        "scenario_id": "twice-result",
+                        "subject": "twice function",
+                        "given": {"value": 3},
+                        "when": "twice is called",
+                        "then": {"result": 6},
+                        "related_requirements": [],
+                        "dimensions": {
+                            "normal_result": {"result": "twice the input"},
+                            "error_behavior": "not_applicable",
+                            "continuation": "not_applicable",
+                            "unsupported_behavior": "not_applicable",
+                            "cancellation_cleanup": "not_applicable",
+                            "compatibility": "not_applicable",
+                            "negative_boundaries": "not_applicable",
+                        },
+                        "evidence": ["twice.py::twice"],
+                        "validator": "focused twice behavior test",
+                        "capability_matrix": [],
+                        "faithfulness_ref": {"fingerprint": "sha256:" + "d" * 64},
+                    },
+                }
+            ],
         },
     }
     (repo / "design.yaml").write_text(yaml.safe_dump(document))

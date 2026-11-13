@@ -128,6 +128,32 @@ def prepare(
                 },
             },
         ],
+        "required_test_cases": [
+            {
+                "id": "case:retry",
+                "behavior_scenario": {
+                    "scenario_id": "retry-result",
+                    "subject": "retry function",
+                    "given": {"value": 4},
+                    "when": "retry is called",
+                    "then": {"result": 5},
+                    "related_requirements": [],
+                    "dimensions": {
+                        "normal_result": {"result": "increment input once"},
+                        "error_behavior": "not_applicable",
+                        "continuation": "not_applicable",
+                        "unsupported_behavior": "not_applicable",
+                        "cancellation_cleanup": "not_applicable",
+                        "compatibility": "preserve accepted return behavior",
+                        "negative_boundaries": "not_applicable",
+                    },
+                    "evidence": ["retry.py::retry"],
+                    "validator": "pytest -q tests/test_source_reference_run.py",
+                    "capability_matrix": [],
+                    "faithfulness_ref": {"fingerprint": "sha256:" + "b" * 64},
+                },
+            }
+        ],
     }
     if not native:
         monkeypatch.setattr(SourceReferenceRun, "_probe_protection", lambda self: None)
@@ -184,6 +210,16 @@ def test_prepared_inputs_are_bound_and_cannot_be_reused_or_mutated(
     run = prepare(tmp_path, monkeypatch)
     data = run.handoff.worker_prompt.to_data()
     assert data["contract"]["workspace_root"] == str(run.workspace_root)
+    manifest = run.handoff.validation_manifest
+    private = manifest["private_validation_data"]
+    assert private["repository_evidence"]["base_commit"] == run.catalog.base_commit
+    assert (
+        private["repository_contract_closure"]["base_commit"] == run.catalog.base_commit
+    )
+    assert private["repository_contract_closure"]["operations"][0]["scenario_refs"] == [
+        "retry-result"
+    ]
+    assert "repository_contract_closure" not in run.request.prompt
     assert "PRIVATE-ORACLE" not in run.request.prompt
     assert str(run.private_root) not in run.request.prompt
     assert "structrr-reference-completion-v1" in run.request.prompt

@@ -59,7 +59,7 @@ files:
   rationale: Keep absent validation visible instead of manufacturing a pass.
 - path: src/powdrr_lift/workrr/feature_endpoint.py
   type: modified
-  span: {start_line: 6364, end_line: 6369}
+  span: {start_line: 6364, end_line: 6371}
   summary: Preserve profiles with colliding names under unique runtime names.
   rationale: Keep explicit and discovered obligations distinct.
 - path: tests/test_cli.py

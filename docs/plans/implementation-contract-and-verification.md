@@ -5,12 +5,15 @@ acceptance. The source-reference route binds typed behavior cases to the public
 handoff and compiles a base-bound private repository evidence closure. Milestone
 3 now compiles per-placement and preservation evidence routes into the private
 handoff and audits story receipts in enforce mode against the execution
-candidate; it requires that report before patch transfer. Candidate-bound
-results for each compiled route and broader retained-intent gates remain.
+candidate; it requires that report before patch transfer. Protected source runs
+now emit candidate-tree-bound route records, including explicit `not_collected`
+outcomes for behavior and review routes without connected evidence adapters.
+Those records are not yet an acceptance gate. Retained-intent gates and
+candidate-bound receipts for each route remain.
 Milestones 4–5 remain.
 
 Audited code baseline for this inventory: `feafe5b7b22bf7cd98dee9b06797ea87af558a4c`.
-Latest implementation review baseline: `131c4b7d5df85a1f28041335d80e14179df0efc8` (PR #1470).
+Latest implementation review baseline: `03edeafc` (PR #1474).
 
 This plan replaces the intent-linked verification, evidence-backed prompt
 contract closure, and bounded coding-worker plans in `superseded/`. Those
@@ -130,10 +133,14 @@ evidence-route compiler and requiring exact obligation coverage. Story
 validation emits a deterministic verification-health report in enforce mode,
 re-audits receipts against the captured candidate Git tree, and preserves both
 the audit input and report. Protected dispatch requires the enforce-mode report
-to pass before transferring the patch. Remaining work connects each compiled
-route to its own candidate-bound result, including retained-intent, preservation,
-scope, and verifier-change outcomes, and adds fixtures for unlinked and duplicate
-evidence and body-only regressions.
+to pass before transferring the patch. Protected source runs now persist one
+route record per compiled route against the final candidate identity.
+Structural routes report changed accepted owner paths; routes without a trusted
+producer report `not_collected`, so an unrelated passing command cannot be
+misrepresented as route evidence. This report is not yet consumed by the
+acceptance decision. Add trusted producers and exact receipt reconciliation,
+then gate acceptance on complete route coverage. Fixtures for unlinked and
+duplicate evidence and body-only regressions remain.
 
 ### 4. Finish bounded execution and delivery migration
 

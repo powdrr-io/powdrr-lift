@@ -1,0 +1,68 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1475
+title: Bind source obligation routes to candidate trees
+intent:
+  problem: Compiled source-reference evidence routes do not yet produce route-specific outcomes bound to the implementation candidate.
+  goal: Persist a candidate-tree-bound result for every compiled route and state explicitly when a route has no trusted evidence producer.
+human-decisions: []
+structured_files: []
+files:
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span: {start_line: 135, end_line: 202}
+  summary: Compile per-obligation route outcomes against the source-reference candidate tree.
+  rationale: Bind structural diff evidence to accepted owner paths and prevent unrelated paths from counting.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span: {start_line: 975, end_line: 975}
+  summary: Add the route evidence field to the protected run result.
+  rationale: Include candidate-bound route outcomes in the terminal report.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span: {start_line: 1007, end_line: 1021}
+  summary: Persist route evidence with the protected run result.
+  rationale: Retain the candidate identity and route outcomes alongside validation results.
+- path: tests/test_source_reference_run.py
+  type: modified
+  span: {start_line: 21, end_line: 21}
+  summary: Import the route evidence helper for protected-run regression coverage.
+  rationale: Test the route compiler directly at the source-reference run boundary.
+- path: tests/test_source_reference_run.py
+  type: modified
+  span: {start_line: 208, end_line: 232}
+  summary: Cover scoped structural evidence and uncollected behavior and review routes.
+  rationale: Ensure every route carries the candidate identity and absent producers remain explicit.
+- path: docs/plans/implementation-contract-and-verification.md
+  type: modified
+  span: {start_line: 8, end_line: 12}
+  summary: Record the candidate-bound route evidence slice and current review baseline.
+  rationale: Keep milestone status and remaining acceptance work accurate.
+- path: docs/plans/implementation-contract-and-verification.md
+  type: modified
+  span: {start_line: 16, end_line: 16}
+  summary: Advance the implementation review baseline to the latest merged PR.
+  rationale: Ensure the plan reflects the current main branch.
+- path: docs/plans/implementation-contract-and-verification.md
+  type: modified
+  span: {start_line: 136, end_line: 143}
+  summary: Document emitted route records and the missing acceptance integration.
+  rationale: Distinguish visible evidence outcomes from completed retained-intent gates.
+entities:
+- id: candidate-obligation-route-evidence
+  type: Function
+  action: added
+- id: candidate-route-evidence-regression-test
+  type: Unit test
+  action: added
+entity_relationships: []
+invariants:
+- id: route-evidence-is-candidate-bound
+  description: Every emitted obligation route record carries the exact candidate tree identity used by the protected run.
+  action: added
+- id: missing-route-producers-remain-explicit
+  description: Behavior and review routes without a connected trusted producer are recorded as not_collected and cannot be reported complete.
+  action: added
+guidance:
+- id: structural-route-scope
+  description: A structural route only cites changed paths within its accepted exact owner or allowed owner paths.
+  action: added

@@ -584,7 +584,14 @@ def test_linux_bubblewrap_command_hides_private_and_bounds_writes(
 
 @pytest.mark.parametrize(
     "scenario",
-    ["success", "wrong_owner", "missing_context", "design_gap", "mutating_validation"],
+    [
+        "success",
+        "wrong_owner",
+        "missing_context",
+        "design_gap",
+        "mutating_validation",
+        "no_progress",
+    ],
 )
 def test_native_fake_model_end_to_end_protects_private_inputs_and_validates_owners(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, scenario: str
@@ -601,7 +608,9 @@ def test_native_fake_model_end_to_end_protects_private_inputs_and_validates_owne
         ),
     )
     candidate = (
-        CANDIDATE
+        BASELINE
+        if scenario == "no_progress"
+        else CANDIDATE
         if scenario != "wrong_owner"
         else CANDIDATE.replace("# structrr: decision:helper\n", "")
         + "\n# structrr: decision:helper\ndef unrelated(): return 0\n"
@@ -648,6 +657,8 @@ def test_native_fake_model_end_to_end_protects_private_inputs_and_validates_owne
     ]
     if scenario == "missing_context":
         commands[2] = "cat retry.py"
+    if scenario == "no_progress":
+        commands[3] = "true"
     if scenario == "design_gap":
         completion["design_gaps"] = [
             {"location": "helper", "consequence": "Needs a design decision"}
@@ -677,12 +688,13 @@ def test_native_fake_model_end_to_end_protects_private_inputs_and_validates_owne
     result = run.execute(infer)
     assert result.accepted is (scenario == "success"), result.to_data()
     assert len(requests) == len(commands), result.to_data()
-    if scenario not in {"design_gap", "missing_context"}:
+    if scenario not in {"design_gap", "missing_context", "no_progress"}:
         assert result.to_data()["context_delivery"]["complete"]
     expected = {
         "design_gap": "incomplete_design",
         "missing_context": "incomplete_context",
         "mutating_validation": "invalid_candidate",
+        "no_progress": "submitted_without_progress",
     }
     if scenario in expected:
         assert result.to_data()["outcome"] == expected[scenario], result.to_data()

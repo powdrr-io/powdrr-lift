@@ -1018,6 +1018,9 @@ def run_worker_once(
                         validation_input_paths=(
                             inventory["input_paths"] if inventory is not None else None
                         ),
+                        previous_observation=_latest_ci_outcome_observation(
+                            comments, pull_request_url
+                        ),
                     )
                     ci_outcome = str(observation["outcome"])
                     _append_ci_outcome_checkpoint(
@@ -1273,6 +1276,7 @@ def continue_awaiting_ci_issue(
         validation_input_paths=(
             inventory["input_paths"] if inventory is not None else None
         ),
+        previous_observation=_latest_ci_outcome_observation(comments, pull_request_url),
     )
     _append_ci_outcome_checkpoint(
         client=client,
@@ -1432,6 +1436,9 @@ def _continue_manual_prerequisite_issue_locked(
             inventory_digest=inventory["digest"] if inventory is not None else None,
             validation_input_paths=(
                 inventory["input_paths"] if inventory is not None else None
+            ),
+            previous_observation=_latest_ci_outcome_observation(
+                comments, pull_request_url
             ),
         )
         _append_ci_outcome_checkpoint(
@@ -2794,6 +2801,7 @@ def _observe_required_ci_outcome(
     validation_inventory: Sequence[Mapping[str, Any]] | None,
     inventory_digest: str | None,
     validation_input_paths: Sequence[str] | None = None,
+    previous_observation: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Classify only current-PR required checks reported by GitHub CLI."""
     observed_at = datetime.now(UTC).isoformat()
@@ -2820,13 +2828,13 @@ def _observe_required_ci_outcome(
         ["pr", "view", str(number), "--json", "headRefOid"], check=False
     )
     if head_result.returncode != 0:
-        return _ci_outcome_observation(
-            "blocked",
-            None,
-            (),
-            "GitHub could not report the current PR head",
-            observed_at,
-            inventory_digest,
+        return _stale_ci_outcome_observation(
+            previous_observation=previous_observation,
+            current_checks=(),
+            head_sha=None,
+            reason="GitHub could not report the current PR head",
+            observed_at=observed_at,
+            inventory_digest=inventory_digest,
         )
     try:
         head_value = json.loads(head_result.stdout)
@@ -2837,13 +2845,13 @@ def _observe_required_ci_outcome(
         not isinstance(head_sha, str)
         or re.fullmatch(r"[0-9a-f]{40,64}", head_sha) is None
     ):
-        return _ci_outcome_observation(
-            "blocked",
-            None,
-            (),
-            "GitHub returned no valid current PR head SHA",
-            observed_at,
-            inventory_digest,
+        return _stale_ci_outcome_observation(
+            previous_observation=previous_observation,
+            current_checks=(),
+            head_sha=None,
+            reason="GitHub returned no valid current PR head SHA",
+            observed_at=observed_at,
+            inventory_digest=inventory_digest,
         )
     checks_result = client._invoke(
         [
@@ -2857,27 +2865,29 @@ def _observe_required_ci_outcome(
         check=False,
     )
     if checks_result.returncode != 0:
-        return _ci_outcome_observation(
-            "blocked",
-            head_sha,
-            (),
-            "GitHub could not report required check states: "
-            + checks_result.stderr.strip()[:500],
-            observed_at,
-            inventory_digest,
+        return _stale_ci_outcome_observation(
+            previous_observation=previous_observation,
+            current_checks=(),
+            head_sha=head_sha,
+            reason=(
+                "GitHub could not report required check states: "
+                + checks_result.stderr.strip()[:500]
+            ),
+            observed_at=observed_at,
+            inventory_digest=inventory_digest,
         )
     try:
         raw_checks = json.loads(checks_result.stdout)
     except json.JSONDecodeError:
         raw_checks = None
     if not isinstance(raw_checks, list) or not raw_checks:
-        return _ci_outcome_observation(
-            "blocked",
-            head_sha,
-            (),
-            "GitHub reported no required checks; review readiness is unknown",
-            observed_at,
-            inventory_digest,
+        return _stale_ci_outcome_observation(
+            previous_observation=previous_observation,
+            current_checks=(),
+            head_sha=head_sha,
+            reason="GitHub reported no required checks; review readiness is unknown",
+            observed_at=observed_at,
+            inventory_digest=inventory_digest,
         )
     checks = [
         {
@@ -2923,14 +2933,14 @@ def _observe_required_ci_outcome(
         else None
     )
     if confirmed_result.returncode != 0 or confirmed_sha != head_sha:
-        return _ci_outcome_observation(
-            "blocked",
-            head_sha,
-            checks,
-            "the PR head changed while required checks were being observed",
-            observed_at,
-            inventory_digest,
-            validation_input_changes,
+        return _stale_ci_outcome_observation(
+            previous_observation=previous_observation,
+            current_checks=checks,
+            head_sha=(confirmed_sha if isinstance(confirmed_sha, str) else head_sha),
+            reason="the PR head changed while required checks were being observed",
+            observed_at=observed_at,
+            inventory_digest=inventory_digest,
+            validation_input_changes=validation_input_changes,
         )
     if validation_input_changes:
         outcome = "blocked"
@@ -2999,10 +3009,24 @@ def _ci_outcome_observation(
     observed_at: str,
     inventory_digest: str | None,
     validation_input_changes: Sequence[str] = (),
+    *,
+    refresh_succeeded: bool = True,
+    stale_remote_observations: bool = False,
+    last_remote_observed_at: str | None = None,
+    preserve_check_timestamps: bool = False,
 ) -> dict[str, Any]:
     """Return a dated observation set tied to the PR head reviewed by the gate."""
     head_checks = [
-        {**check, "head_sha": head_sha, "observed_at": observed_at} for check in checks
+        {
+            **check,
+            "head_sha": check.get("head_sha")
+            if preserve_check_timestamps
+            else head_sha,
+            "observed_at": (
+                check.get("observed_at") if preserve_check_timestamps else observed_at
+            ),
+        }
+        for check in checks
     ]
     return {
         "outcome": outcome,
@@ -3012,7 +3036,74 @@ def _ci_outcome_observation(
         "validation_input_changes": list(validation_input_changes),
         "checks": head_checks,
         "reason": reason,
+        "refresh_succeeded": refresh_succeeded,
+        "stale_remote_observations": stale_remote_observations,
+        "last_remote_observed_at": last_remote_observed_at
+        or (observed_at if refresh_succeeded else None),
     }
+
+
+def _stale_ci_outcome_observation(
+    *,
+    previous_observation: Mapping[str, Any] | None,
+    current_checks: Sequence[Mapping[str, Any]],
+    head_sha: str | None,
+    reason: str,
+    observed_at: str,
+    inventory_digest: str | None,
+    validation_input_changes: Sequence[str] = (),
+) -> dict[str, Any]:
+    """Preserve last-known remote checks as explicitly stale on refresh failure."""
+    prior_checks = (
+        previous_observation.get("checks", [])
+        if previous_observation is not None
+        else []
+    )
+    source_checks = list(current_checks) or (
+        list(prior_checks) if isinstance(prior_checks, list) else []
+    )
+    previous_last_observed_at = (
+        previous_observation.get("last_remote_observed_at")
+        if previous_observation is not None
+        else None
+    )
+    if not isinstance(previous_last_observed_at, str):
+        previous_last_observed_at = (
+            previous_observation.get("observed_at")
+            if previous_observation is not None
+            else None
+        )
+    last_observed_at = observed_at if current_checks else previous_last_observed_at
+    stale_checks: list[dict[str, Any]] = []
+    for check in source_checks:
+        stale_check = dict(check)
+        stale_check["last_known_status"] = check.get(
+            "last_known_status", check.get("status", "unknown")
+        )
+        stale_check["status"] = "unknown"
+        stale_check["freshness"] = "stale"
+        stale_check["stale_since"] = check.get("stale_since", observed_at)
+        stale_check["stale_reason"] = reason
+        if current_checks:
+            stale_check["head_sha"] = head_sha
+            stale_check["observed_at"] = observed_at
+        stale_checks.append(stale_check)
+    if head_sha is None and previous_observation is not None:
+        previous_head = previous_observation.get("head_sha")
+        head_sha = previous_head if isinstance(previous_head, str) else None
+    return _ci_outcome_observation(
+        "blocked",
+        head_sha,
+        stale_checks,
+        reason,
+        observed_at,
+        inventory_digest,
+        validation_input_changes,
+        refresh_succeeded=False,
+        stale_remote_observations=bool(stale_checks),
+        last_remote_observed_at=last_observed_at,
+        preserve_check_timestamps=True,
+    )
 
 
 def _queue_status_for_ci_outcome(outcome: str) -> str:
@@ -3036,6 +3127,11 @@ def _render_ci_outcome_checkpoint(
         "outcome": observation.get("outcome"),
         "required_checks": observation.get("checks", []),
         "reason": observation.get("reason", ""),
+        "refresh_succeeded": observation.get("refresh_succeeded", True),
+        "stale_remote_observations": observation.get(
+            "stale_remote_observations", False
+        ),
+        "last_remote_observed_at": observation.get("last_remote_observed_at"),
     }
     fingerprint = hashlib.sha256(
         json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
@@ -3051,6 +3147,58 @@ def _render_ci_outcome_checkpoint(
         f"{json.dumps(payload, indent=2, sort_keys=True)}\n"
         "```"
     )
+
+
+def _latest_ci_outcome_observation(
+    comments: Sequence[Mapping[str, Any]], pull_request_url: str | None
+) -> dict[str, Any] | None:
+    """Load the most recent intact CI checkpoint for this exact PR."""
+    if pull_request_url is None:
+        return None
+    for comment in reversed(comments):
+        body = comment.get("body")
+        if not isinstance(body, str) or _CI_OUTCOME_MARKER not in body:
+            continue
+        payload_match = re.search(r"```json\s*\n(.*?)\n```", body, re.DOTALL)
+        fingerprint_match = re.search(r"Observation `([0-9a-f]{16})`", body)
+        if payload_match is None or fingerprint_match is None:
+            continue
+        try:
+            payload = json.loads(payload_match.group(1))
+        except json.JSONDecodeError:
+            continue
+        if (
+            not isinstance(payload, Mapping)
+            or payload.get("schema")
+            != "https://powdrr.io/schemas/ci-outcome-checkpoint-v1"
+            or payload.get("pull_request_url") != pull_request_url
+            or not isinstance(payload.get("required_checks"), list)
+            or not all(
+                isinstance(check, Mapping)
+                for check in payload.get("required_checks", [])
+            )
+        ):
+            continue
+        fingerprint = hashlib.sha256(
+            json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+        ).hexdigest()[:16]
+        if fingerprint != fingerprint_match.group(1):
+            continue
+        return {
+            "outcome": payload.get("outcome"),
+            "head_sha": payload.get("head_sha"),
+            "observed_at": payload.get("observed_at"),
+            "validation_inventory_digest": payload.get("validation_inventory_digest"),
+            "validation_input_changes": payload.get("validation_input_changes", []),
+            "checks": payload.get("required_checks", []),
+            "reason": payload.get("reason", ""),
+            "refresh_succeeded": payload.get("refresh_succeeded", True),
+            "stale_remote_observations": payload.get(
+                "stale_remote_observations", False
+            ),
+            "last_remote_observed_at": payload.get("last_remote_observed_at"),
+        }
+    return None
 
 
 def _append_ci_outcome_checkpoint(

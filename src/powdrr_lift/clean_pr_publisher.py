@@ -12,6 +12,45 @@ from typing import Any
 
 from powdrr_lift.errors import PowdrrExecutionError
 
+_STANDARD_PR_DESCRIPTION_HEADINGS = (
+    "## Objective",
+    "## Scope",
+    "## Implementation Details",
+    "## Acceptance Criteria",
+    "## Validation",
+    "## Advisory Test-Quality Notes",
+)
+
+
+def validate_standard_pr_description(body: str) -> None:
+    """Require the section structure used by Powdrr-generated PR descriptions."""
+    expected_start = f"{_STANDARD_PR_DESCRIPTION_HEADINGS[0]}\n\n"
+    if not body.startswith(expected_start):
+        raise PowdrrExecutionError(
+            "PR description must start with the required Objective heading and a "
+            "blank line."
+        )
+
+    content_start = len(expected_start)
+    for heading in _STANDARD_PR_DESCRIPTION_HEADINGS[1:]:
+        marker = f"\n\n{heading}\n\n"
+        heading_start = body.find(marker, content_start)
+        if heading_start < 0:
+            raise PowdrrExecutionError(
+                "PR description must contain the required headings in order, each "
+                "on its own line with a blank line after it."
+            )
+        if not body[content_start:heading_start].strip():
+            raise PowdrrExecutionError(
+                f"PR description section before {heading!r} must not be empty."
+            )
+        content_start = heading_start + len(marker)
+
+    if not body[content_start:].strip():
+        raise PowdrrExecutionError(
+            "PR description's Advisory Test-Quality Notes section must not be empty."
+        )
+
 
 def verify_publication_scope(
     parameters: Mapping[str, Any], *, worktree_root: Path
@@ -61,6 +100,15 @@ def publish_clean_pull_request(
         )
     title = _required_text(parameters.get("title"), "title")
     body = _required_text(parameters.get("body"), "body")
+    require_standard_description = parameters.get("require_standard_pr_description")
+    if require_standard_description is not None and not isinstance(
+        require_standard_description, bool
+    ):
+        raise PowdrrExecutionError(
+            "require_standard_pr_description must be a boolean when provided."
+        )
+    if require_standard_description:
+        validate_standard_pr_description(body)
     commit_message = _required_text(parameters.get("commit_message"), "commit_message")
     source_root = worktree_root.resolve()
     source_branch = _run(["git", "branch", "--show-current"], cwd=source_root).strip()

@@ -1,0 +1,73 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1476
+title: Evaluate supported validation conditions
+intent:
+  problem: Discovered validation conditions are always left pending, even when they use values available in the feature run context.
+  goal: Evaluate a bounded GitHub expression subset for event and base-branch context while preserving pending for unsupported syntax or missing values.
+human-decisions: []
+structured_files: []
+files:
+- path: src/powdrr_lift/workrr/coding_agent_validation.py
+  type: modified
+  span: {start_line: 5, end_line: 5}
+  summary: Import safe string literal parsing for condition values.
+  rationale: Parse quoted expression values without evaluating arbitrary Python code.
+- path: src/powdrr_lift/workrr/coding_agent_validation.py
+  type: modified
+  span: {start_line: 7, end_line: 7}
+  summary: Import regular expressions for tokenizing condition syntax.
+  rationale: Limit parsing to a known expression grammar.
+- path: src/powdrr_lift/workrr/coding_agent_validation.py
+  type: modified
+  span: {start_line: 29, end_line: 35}
+  summary: Define tokens for supported GitHub condition expressions.
+  rationale: Recognize boolean operators, comparisons, grouping, literals, and context names.
+- path: src/powdrr_lift/workrr/coding_agent_validation.py
+  type: modified
+  span: {start_line: 222, end_line: 222}
+  summary: Track a successfully evaluated profile condition.
+  rationale: Preserve condition applicability when combining it with other filters.
+- path: src/powdrr_lift/workrr/coding_agent_validation.py
+  type: modified
+  span: {start_line: 224, end_line: 234}
+  summary: Resolve false conditions as not applicable and unsupported conditions as pending.
+  rationale: Use available context without treating unknown expressions as passing.
+- path: src/powdrr_lift/workrr/coding_agent_validation.py
+  type: modified
+  span: {start_line: 254, end_line: 255}
+  summary: Include a matched condition in applicability evidence.
+  rationale: Explain why a condition allowed the check to run.
+- path: src/powdrr_lift/workrr/coding_agent_validation.py
+  type: modified
+  span: {start_line: 319, end_line: 452}
+  summary: Add a restricted parser for comparisons, boolean operators, grouping, and event/base-branch values.
+  rationale: Evaluate deterministic conditions without executing expression text and leave unsupported inputs unresolved.
+- path: tests/test_coding_agent.py
+  type: modified
+  span: {start_line: 1488, end_line: 1545}
+  summary: Test matched, false, and unresolved GitHub conditions.
+  rationale: Verify known event/base values resolve while unavailable draft context stays pending.
+- path: docs/plans/bootstrap-validation-discovery.md
+  type: modified
+  span: {start_line: 12, end_line: 17}
+  summary: Record the supported condition subset and remaining WP8 work.
+  rationale: Keep implementation progress and limitations visible.
+entities:
+- id: evaluate-github-condition
+  type: Function
+  action: added
+- id: github-condition-applicability-tests
+  type: Unit test
+  action: added
+entity_relationships: []
+invariants:
+- id: unsupported-github-condition-remains-pending
+  description: Unsupported condition syntax and unavailable context never resolve as applicable or not applicable.
+  action: added
+- id: false-github-condition-is-not-applicable
+  description: A supported condition proven false for the current event or base branch is recorded as not applicable.
+  action: added
+guidance:
+- id: supported-github-condition-subset
+  description: The evaluator supports equality, inequality, boolean operators, and grouping for event-name and base-branch values; other GitHub expression features remain pending.
+  action: added

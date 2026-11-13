@@ -31,6 +31,9 @@ from powdrr_service.structrr.reference_validation import (
     ReferenceValidationReport,
     validation_input_identity,
 )
+from powdrr_service.structrr.route_evidence_reconciliation import (
+    reconcile_obligation_route_evidence,
+)
 from powdrr_service.structrr.source_reader import ReaderLimits
 from powdrr_service.structrr.source_reference_handoff import (
     CompiledSourceReferenceHandoff,
@@ -193,9 +196,14 @@ def _candidate_route_evidence(
         "schema_version": "candidate-obligation-route-evidence-v1",
         "candidate_tree": candidate_tree,
         "routes": results,
-        "complete": bool(results)
-        and all(item["status"] == "passed" for item in results),
     }
+    reconciliation = reconcile_obligation_route_evidence(
+        private["obligation_evidence_contracts"],
+        results,
+        candidate_tree=candidate_tree,
+    )
+    result["reconciliation"] = reconciliation
+    result["complete"] = reconciliation["passed"]
     result["fingerprint"] = content_fingerprint(result)
     return result
 

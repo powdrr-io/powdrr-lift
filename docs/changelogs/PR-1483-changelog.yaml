@@ -1,0 +1,76 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1483
+title: Collect candidate-bound scope evidence
+intent:
+  problem: Scope routes have no trusted producer, and source validation reports only changed Python paths.
+  goal: Evaluate scope routes against the complete candidate change set and retain out-of-scope paths as evidence.
+human-decisions: []
+structured_files: []
+files:
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span: {start_line: 151, end_line: 151}
+  summary: Read accepted allowed paths when compiling candidate route outcomes.
+  rationale: Scope evidence is evaluated against the frozen handoff boundary.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span: {start_line: 185, end_line: 193}
+  summary: Evaluate compiled scope routes and retain out-of-scope paths.
+  rationale: Scope evidence must account for non-Python changes and bind the result to the protected candidate.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span: {start_line: 221, end_line: 233}
+  summary: Identify changed paths outside accepted path prefixes.
+  rationale: Provide deterministic path containment checks for scope evidence.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span: {start_line: 1220, end_line: 1226}
+  summary: Build scope evidence from committed, staged, unstaged, and untracked candidate changes.
+  rationale: The reference audit's Python-only path list cannot establish the complete candidate scope.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span: {start_line: 1230, end_line: 1230}
+  summary: Pass the complete sorted changed-path set to route evidence compilation.
+  rationale: Ensure every compiled scope route sees the entire protected candidate diff.
+- path: tests/test_source_reference_run.py
+  type: modified
+  span: {start_line: 22, end_line: 22}
+  summary: Import the scope containment helper for focused regression coverage.
+  rationale: Exercise path scope behavior directly.
+- path: tests/test_source_reference_run.py
+  type: modified
+  span: {start_line: 240, end_line: 248}
+  summary: Cover accepted path containment and out-of-scope path reporting.
+  rationale: Ensure nested paths are accepted only under the frozen allowed-path prefixes.
+- path: docs/plans/implementation-contract-and-verification.md
+  type: modified
+  span: {start_line: 19, end_line: 19}
+  summary: Advance the plan's implementation review baseline to PR 1482.
+  rationale: Record the merged source state used for this route producer.
+- path: docs/plans/implementation-contract-and-verification.md
+  type: modified
+  span: {start_line: 151, end_line: 158}
+  summary: Record the scope producer and the still missing invariant and acceptance gates.
+  rationale: Keep the active plan's milestone status aligned with implementation.
+entities:
+- id: scope-route-candidate-path-check
+  type: Function
+  action: added
+- id: protected-run-scope-evidence-collection
+  type: Method
+  action: added
+- id: candidate-scope-path-regression-test
+  type: Unit test
+  action: added
+entity_relationships: []
+invariants:
+- id: scope-evidence-covers-complete-candidate-diff
+  description: Scope route evidence considers every committed and working-tree path in the protected candidate, including non-Python files.
+  action: added
+- id: scope-review-fails-on-out-of-scope-paths
+  description: A compiled scope route fails when any changed path falls outside every accepted allowed-path prefix.
+  action: added
+guidance:
+- id: scope-evidence-is-candidate-bound
+  description: Scope route records carry the protected candidate tree identity used by route reconciliation.
+  action: added

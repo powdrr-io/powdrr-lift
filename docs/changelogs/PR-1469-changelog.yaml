@@ -1,0 +1,195 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1469
+title: Preserve validation profile command context
+intent:
+  problem: Discovered validation declarations lose metadata and argument boundaries as they pass through the Procedrr command catalog and coding-agent runner.
+  goal: Carry complete profile context and exact argv through execution, then retain it in the persisted validation report.
+human-decisions: []
+structured_files: []
+files:
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span: {start_line: 121, end_line: 121}
+  summary: Add a structured argv allowlist to implementation requests.
+  rationale: Preserve argument boundaries when validation commands are transferred to the coding agent.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span: {start_line: 270, end_line: 272}
+  summary: Serialize the structured argv allowlist.
+  rationale: Preserve argument boundaries in persisted implementation requests.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span: {start_line: 366, end_line: 368}
+  summary: Parse structured argv allowlists when loading implementation requests.
+  rationale: Keep the handoff lossless across request persistence.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span: {start_line: 401, end_line: 401}
+  summary: Accept structured argv allowlists in execution-unit request construction.
+  rationale: Keep command arguments intact when compiling execution units.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span: {start_line: 541, end_line: 541}
+  summary: Forward structured argv allowlists from execution units.
+  rationale: Preserve command arguments through request construction.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span: {start_line: 559, end_line: 559}
+  summary: Accept structured argv allowlists in execution-plan request construction.
+  rationale: Keep plan-generated requests aligned with execution-unit requests.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span: {start_line: 574, end_line: 574}
+  summary: Forward structured argv allowlists from execution plans.
+  rationale: Preserve exact command arguments through request construction.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span: {start_line: 691, end_line: 705}
+  summary: Validate structured command argv data when loading requests.
+  rationale: Reject malformed command handoffs before execution.
+- path: src/powdrr_lift/workrr/coding_agent_validation.py
+  type: modified
+  span: {start_line: 45, end_line: 46}
+  summary: Add source and provider identity to runtime validation profiles.
+  rationale: Retain the origin and declared tool for discovered checks.
+- path: src/powdrr_lift/workrr/coding_agent_validation.py
+  type: modified
+  span: {start_line: 57, end_line: 65}
+  summary: Add purpose, requiredness, evidence, dependencies, and baseline metadata to runtime profiles.
+  rationale: Preserve the full validation declaration through the runner.
+- path: src/powdrr_lift/workrr/coding_agent_validation.py
+  type: modified
+  span: {start_line: 72, end_line: 73}
+  summary: Serialize source and provider identity.
+  rationale: Keep profile provenance available to downstream report readers.
+- path: src/powdrr_lift/workrr/coding_agent_validation.py
+  type: modified
+  span: {start_line: 80, end_line: 82}
+  summary: Preserve nullable applicability metadata during serialization.
+  rationale: Maintain lossless profile round-tripping.
+- path: src/powdrr_lift/workrr/coding_agent_validation.py
+  type: modified
+  span: {start_line: 85, end_line: 98}
+  summary: Serialize complete profile metadata and deserialize validated profile mappings.
+  rationale: Carry discovered declarations across the command catalog boundary without losing context.
+- path: src/powdrr_lift/workrr/coding_agent_validation.py
+  type: modified
+  span: {start_line: 102, end_line: 165}
+  summary: Parse and validate the full runtime profile payload.
+  rationale: Reject malformed context while keeping accepted profile data lossless.
+- path: src/powdrr_lift/workrr/coding_agent_validation.py
+  type: modified
+  span: {start_line: 583, end_line: 587}
+  summary: Match validation argv against exact structured prefixes.
+  rationale: Avoid re-tokenizing arguments and changing command meaning.
+- path: src/powdrr_lift/workrr/coding_agent_validation.py
+  type: modified
+  span: {start_line: 590, end_line: 591}
+  summary: Retain legacy string allowlists only when structured argv is absent.
+  rationale: Preserve backward compatibility without weakening the structured handoff.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span: {start_line: 1130, end_line: 1130}
+  summary: Return discovered validation profiles with their complete runtime context.
+  rationale: Prevent the command catalog boundary from discarding profile metadata.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span: {start_line: 8, end_line: 8}
+  summary: Import shell argument rendering for display-only validation commands.
+  rationale: Keep human-readable command forms safely quoted.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span: {start_line: 3086, end_line: 3086}
+  summary: Pass exact discovered argv allowlists into coding-agent requests.
+  rationale: Bind worker validation commands to the declared argv.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span: {start_line: 4799, end_line: 4817}
+  summary: Render safe command forms and compile exact argv allowlists for supported profiles.
+  rationale: Keep human-readable policy strings distinct from executable argument data.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span: {start_line: 4827, end_line: 4828}
+  summary: Carry profile source and provider into the runtime validation profile.
+  rationale: Retain the declared validation origin and tool.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span: {start_line: 4839, end_line: 4847}
+  summary: Carry declaration, evidence, purpose, and obligation metadata into the runtime profile.
+  rationale: Preserve the full discovered profile context.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span: {start_line: 4862, end_line: 4868}
+  summary: Deserialize complete validation profile mappings before running them.
+  rationale: Avoid reducing the Procedrr handoff to only a profile name and command.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span: {start_line: 4875, end_line: 4875}
+  summary: Run the profile reconstructed from its complete payload.
+  rationale: Preserve its execution context in the validation runner.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span: {start_line: 4882, end_line: 4884}
+  summary: Return complete profile context with each validation result.
+  rationale: Make the declaration available to aggregation and report persistence.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span: {start_line: 4928, end_line: 4932}
+  summary: Collect profile context from individual validation results.
+  rationale: Retain the context when building the aggregate report.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span: {start_line: 4959, end_line: 4959}
+  summary: Preserve profile context when adding failed operation checkpoints.
+  rationale: Keep report metadata intact across checkpoint failure handling.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span: {start_line: 7224, end_line: 7224}
+  summary: Pass exact argv allowlists into initial worker requests.
+  rationale: Apply the same command handoff to the initial implementation prompt.
+- path: tests/test_coding_agent.py
+  type: modified
+  span: {start_line: 288, end_line: 288}
+  summary: Add structured argv to an execution-unit request fixture.
+  rationale: Exercise command serialization through request construction.
+- path: tests/test_coding_agent.py
+  type: modified
+  span: {start_line: 293, end_line: 294}
+  summary: Assert structured argv request round-tripping.
+  rationale: Prevent request persistence from altering argument boundaries.
+- path: tests/test_coding_agent.py
+  type: modified
+  span: {start_line: 1404, end_line: 1433}
+  summary: Verify profile metadata round-tripping and exact argv matching with a spaced argument.
+  rationale: Protect the validation runner command boundary.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span: {start_line: 62, end_line: 64}
+  summary: Import helpers used to test validation profile handoff.
+  rationale: Exercise profile conversion, execution, and aggregation behavior.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span: {start_line: 100, end_line: 101}
+  summary: Import the runtime profile conversion and single-profile operation helpers.
+  rationale: Test the Procedrr validation path directly.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span: {start_line: 3249, end_line: 3365}
+  summary: Verify profile conversion, single-profile execution, and aggregate report persistence.
+  rationale: Cover the complete validation profile handoff through Procedrr operations.
+entities:
+- id: structured-validation-command-handoff
+  type: Function
+  action: added
+- id: validation-profile-handoff-regression-tests
+  type: Unit test
+  action: added
+entity_relationships: []
+invariants:
+- id: validation-argv-preserves-argument-boundaries
+  description: Validation commands execute with the exact declared argv values, including arguments containing spaces.
+  action: added
+- id: validation-reports-retain-profile-context
+  description: Aggregated and persisted validation reports retain the complete runtime context of each discovered profile.
+  action: added
+guidance: []

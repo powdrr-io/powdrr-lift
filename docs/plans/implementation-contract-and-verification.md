@@ -3,23 +3,24 @@
 Status: Active implementation. Milestones 1 and 2 are implemented with fixture
 acceptance. The source-reference route binds typed behavior cases to the public
 handoff and compiles a base-bound private repository evidence closure. Milestone
-3 now compiles per-placement and preservation evidence routes into the private
-handoff and audits story receipts in enforce mode against the execution
-candidate; it requires that report before patch transfer. Protected source runs
-now emit candidate-tree-bound route records, including explicit `not_collected`
-outcomes where no trusted evidence producer is connected. After enforce-mode
-story validation, linked story receipts now discharge only the matching behavior
-routes and are persisted in a separate protected artifact. Exact route
-reconciliation rejects missing, duplicate, unlinked, stale, and non-passing
-records. Protected source runs also attach independent invariant-preservation
-reviews to compiled invariant routes when those reviews pass with current owner
-evidence. Preservation behavior routes now link to accepted cases and fresh story
-receipts. The reconciled result is not yet an acceptance gate; retained-intent
-acceptance gates remain.
+3 compiles per-placement and preservation evidence routes into the private
+handoff, audits story receipts in enforce mode against the execution candidate,
+and requires that report before patch transfer. Protected source runs emit
+candidate-tree-bound route records, including explicit `not_collected` outcomes
+where no trusted evidence producer is connected. After enforce-mode story
+validation, linked story receipts discharge only the matching behavior routes
+and are persisted in a separate protected artifact. Exact route reconciliation
+rejects missing, duplicate, unlinked, stale, and non-passing records. Protected
+source runs also attach independent invariant-preservation reviews to compiled
+invariant routes when those reviews pass with current owner evidence.
+Preservation behavior routes link to accepted cases and fresh story receipts.
+Protected dispatch requires complete, passing route reconciliation before
+transferring a patch. The remaining milestone 3 fixture proves that a body-only
+regression is rejected even when source placement and ordinary validation pass.
 Milestones 4–5 remain.
 
 Audited code baseline for this inventory: `feafe5b7b22bf7cd98dee9b06797ea87af558a4c`.
-Latest implementation review baseline: `ff1c5d98e4a7c7c95a0dd488f1268500fd558f90` (PR #1486; includes PR #1485).
+Latest implementation review baseline: `0fba0cffe3f38e1c69f3c15ef1cdd94e2e9ce224` (PR #1490).
 
 This plan replaces the intent-linked verification, evidence-backed prompt
 contract closure, and bounded coding-worker plans in `superseded/`. Those
@@ -149,16 +150,15 @@ the obligation, every observation passes, and each receipt is fresh for the
 story candidate tree. The appended route artifact retains both the protected
 run candidate identity and the story candidate tree. Exact route reconciliation
 requires one passing record for each compiled obligation-route pair and rejects
-missing, duplicate, unlinked, stale, and non-passing records. This
-Protected dispatch now consumes reconciliation before exporting or applying a
+missing, duplicate, unlinked, stale, and non-passing records. Protected dispatch
+now consumes reconciliation before exporting or applying a
 candidate patch: route evidence must be complete and its reconciliation must
 pass. Missing evidence, incomplete behavior routes, and failed reconciliation
 return `route_evidence_incomplete` while retaining the route evidence; no patch
-is transferred. Preservation records now require verification references to
-accepted case or scenario IDs, and fresh story receipts discharge their behavior
-routes using the same exact
-case and receipt checks as placement routes. Gate acceptance on complete route
-coverage. Candidate-bound scope routes are evaluated against every changed path
+is transferred. Preservation records require verification references to accepted
+case or scenario IDs, and fresh story receipts discharge their behavior routes
+using the same exact case and receipt checks as placement routes. Candidate-bound
+scope routes are evaluated against every changed path
 in the protected candidate, including non-Python files; out-of-scope paths
 produce a failed route with those paths retained as evidence. Independent
 invariant-preservation reviews now use baseline and candidate owner evidence
@@ -167,9 +167,9 @@ its cited locations match the available owner evidence, and the validated
 source-report fingerprint is attached to the protected candidate tree.
 Unavailable or inconclusive reviews remain `not_collected` without changing
 source-reference validation status. Fixtures cover route freshness, linked and
-stale story receipts, scope path containment, and passing or inconclusive
-invariant reviews. Reconciliation fixtures cover invalid records. A body-only
-regression fixture remains.
+stale story receipts, scope path containment, passing or inconclusive invariant
+reviews, and rejection of a body-only regression after placement validation
+passes. Reconciliation fixtures cover invalid records.
 
 ### 4. Finish bounded execution and delivery migration
 

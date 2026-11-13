@@ -1,5 +1,5 @@
 schema: https://powdrr.io/schema/changelog-v2
-change_id: PR-1465
+change_id: PR-1467
 title: Bind source handoffs to accepted behavior closure
 intent:
   problem: Source-reference placements could point to unvalidated verification labels, while the protected run did not bind accepted behavior cases to repository evidence.

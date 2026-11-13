@@ -66,6 +66,20 @@ def test_route_reconciliation_accepts_exact_passing_candidate_records() -> None:
         (
             [
                 _record("structural_diff"),
+                _record("behavior_validation", status="failed"),
+            ],
+            "failed",
+        ),
+        (
+            [
+                _record("structural_diff"),
+                _record("behavior_validation", status="unsupported"),
+            ],
+            "invalid_status",
+        ),
+        (
+            [
+                _record("structural_diff"),
                 _record("behavior_validation"),
                 _record("orphaned_route"),
             ],

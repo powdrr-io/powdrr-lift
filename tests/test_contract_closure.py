@@ -106,7 +106,7 @@ def test_contract_closure_binds_scenario_to_source_and_renders_evidence(
     assert "Static call lists can omit dynamic dispatch" in rendered
 
 
-def test_contract_closure_retains_behavior_provenance_and_validation_fields(
+def test_contract_closure_retains_provenance_and_excludes_validator_commands(
     tmp_path: Path,
 ) -> None:
     evidence = collect_python_evidence(

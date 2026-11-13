@@ -103,7 +103,7 @@ No solution patch or hidden verifier enters production compilation.
 
 Acceptance evidence: `test_handoff_covers_behavior_closure_dimensions_and_case_identity`
 covers the scenario classes and case mapping; provenance omission and missing-
-closure fixtures reject incomplete designs. `test_contract_closure_retains_behavior_provenance_and_validation_fields`
+closure fixtures reject incomplete designs. `test_contract_closure_retains_provenance_and_excludes_validator_commands`
 checks that accepted evidence and faithfulness references survive private closure
 compilation while validator commands stay out of the repository source inventory.
 

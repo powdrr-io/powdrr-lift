@@ -1,0 +1,28 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1463
+title: Bound structural file review context
+intent:
+  problem: Structural review requests copied all acceptance criteria and validation IDs from a work unit into each independently reviewed file question, which could exceed the provider input limit.
+  goal: Keep file-level structural review prompts focused on the candidate file while preserving implementation and requirement context.
+human-decisions: []
+structured_files: []
+files:
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span: {start_line: 1772, end_line: 1772}
+  summary: Document the narrowed single-file review context.
+  rationale: Keep each file question focused on its candidate.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span: {start_line: 1775, end_line: 1789}
+  summary: Limit file review unit context to its identity, requirements, deliverable, implementation step, and candidate write.
+  rationale: Avoid serializing unrelated acceptance criteria, validation IDs, and sibling writes into a single-file structural question.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span: {start_line: 1159, end_line: 1205}
+  summary: Cover file structural review with oversized work-unit validation context.
+  rationale: Ensure irrelevant validation data is excluded and the serialized question remains within its configured input limit.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []

@@ -1769,14 +1769,24 @@ def _structural_change_unit_context(
     unit: WorkUnit,
     subject: BoundStructuralSubject,
 ) -> dict[str, Any]:
-    """Keep only the candidate file's write in a single-file review context."""
+    """Keep file review context focused on the candidate and its implementation."""
     data = unit.to_data()
     if subject.section == "files" and subject.planned_path is not None:
-        data["planned_writes"] = [
-            write.to_data()
-            for write in unit.planned_writes
-            if write.path == subject.planned_path
-        ]
+        # A file candidate is reviewed independently. The source excerpts and
+        # subject already carry the detailed requirement context, so copying
+        # every acceptance criterion, validation, and sibling write here can
+        # push an otherwise narrow question over the provider input limit.
+        data = {
+            "id": unit.id,
+            "requirement_ids": list(unit.requirement_ids),
+            "deliverable": unit.deliverable,
+            "implementation_step": unit.implementation_step,
+            "planned_writes": [
+                write.to_data()
+                for write in unit.planned_writes
+                if write.path == subject.planned_path
+            ],
+        }
     return data
 
 

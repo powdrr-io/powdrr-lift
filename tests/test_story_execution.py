@@ -839,8 +839,7 @@ def test_protected_source_dispatch_proves_story_before_patch_transfer(
         assert result["passed"] is False
         assert result["source_reference_outcome"] == "validation_failed"
         validation_statuses = {
-            item["profile"]: item["status"]
-            for item in result["validation"]["results"]
+            item["profile"]: item["status"] for item in result["validation"]["results"]
         }
         assert validation_statuses["structrr-references"] == "passed"
         assert validation_statuses["import-check"] == "passed"

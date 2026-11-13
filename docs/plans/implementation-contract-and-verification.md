@@ -150,9 +150,13 @@ story candidate tree. The appended route artifact retains both the protected
 run candidate identity and the story candidate tree. Exact route reconciliation
 requires one passing record for each compiled obligation-route pair and rejects
 missing, duplicate, unlinked, stale, and non-passing records. This
-reconciliation is not yet consumed by the acceptance decision. Preservation
-records now require verification references to accepted case or scenario IDs,
-and fresh story receipts discharge their behavior routes using the same exact
+Protected dispatch now consumes reconciliation before exporting or applying a
+candidate patch: route evidence must be complete and its reconciliation must
+pass. Missing evidence, incomplete behavior routes, and failed reconciliation
+return `route_evidence_incomplete` while retaining the route evidence; no patch
+is transferred. Preservation records now require verification references to
+accepted case or scenario IDs, and fresh story receipts discharge their behavior
+routes using the same exact
 case and receipt checks as placement routes. Gate acceptance on complete route
 coverage. Candidate-bound scope routes are evaluated against every changed path
 in the protected candidate, including non-Python files; out-of-scope paths

@@ -1,0 +1,84 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1487
+title: Reject stale validation inventories in PR readiness
+intent:
+  problem: The PR readiness gate trusts a typed validation inventory even when its companion report or recorded input files have changed.
+  goal: Use remote check reconciliation only when the committed Structrr baseline and its validation evidence are fresh.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/plans/bootstrap-validation-discovery.md
+  type: modified
+  span: {start_line: 22, end_line: 26}
+  summary: Record baseline and input freshness enforcement as partial WP8 progress.
+  rationale: Keep the plan status aligned with the implemented readiness gate and its remaining gaps.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 27, end_line: 27}
+  summary: Import the canonical fingerprint helper used by baseline freshness metadata.
+  rationale: Recompute the same validation-input fingerprint as Structrr bootstrap.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 2562, end_line: 2564}
+  summary: Resolve the repository root and require validation context before loading inventory.
+  rationale: Reject incomplete baseline documents before using their check declarations.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 2575, end_line: 2624}
+  summary: Verify baseline, report, metadata, and validation-input digests before accepting inventory.
+  rationale: Keep missing, tampered, stale, and escaped input paths from satisfying PR readiness.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 2637, end_line: 2637}
+  summary: Return the verified baseline digest with the typed inventory.
+  rationale: Preserve the exact freshness-checked source used for remote matching.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 2641, end_line: 2644}
+  summary: Resolve recorded validation input paths within the repository before reading them.
+  rationale: Prevent symlink escapes from being treated as fresh repository evidence.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 2654, end_line: 2654}
+  summary: Describe missing, invalid, or stale baseline inventory in the blocked readiness outcome.
+  rationale: Give queue users an actionable reason when evidence freshness cannot be established.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 2854, end_line: 2854}
+  summary: Mark the checked-inventory gate as requiring a fresh baseline.
+  rationale: Ensure stale evidence cannot be interpreted as a current readiness result.
+- path: tests/test_github_issue_queue.py
+  type: modified
+  span: {start_line: 46, end_line: 48}
+  summary: Create a workflow input file for baseline freshness fixtures.
+  rationale: Exercise checks against a real, fingerprinted repository input.
+- path: tests/test_github_issue_queue.py
+  type: modified
+  span: {start_line: 81, end_line: 91}
+  summary: Generate matching baseline, report, freshness metadata, and input fingerprints.
+  rationale: Test valid inventory loading using the production digest contract.
+- path: tests/test_github_issue_queue.py
+  type: modified
+  span: {start_line: 94, end_line: 111}
+  summary: Assert inventory loading rejects a changed report and changed workflow input.
+  rationale: Ensure stale companion artifacts and source evidence block remote readiness.
+- path: tests/test_github_issue_queue.py
+  type: modified
+  span: {start_line: 2396, end_line: 2396}
+  summary: Expect the queue to describe missing, invalid, or stale inventory context.
+  rationale: Verify unavailable freshness context is surfaced clearly.
+- path: tests/test_github_issue_queue.py
+  type: modified
+  span: {start_line: 2400, end_line: 2415}
+  summary: Cover stale report and source-input rejection in the inventory loader.
+  rationale: Keep outdated validation evidence from advancing review readiness.
+entities: []
+entity_relationships: []
+invariants:
+- id: remote-readiness-requires-fresh-inventory
+  description: Required checks only count toward review readiness when the baseline, report, freshness metadata, and recorded validation inputs agree.
+  action: added
+- id: validation-input-paths-stay-within-repository
+  description: Fingerprinted validation inputs cannot resolve outside the repository root.
+  action: added
+guidance: []

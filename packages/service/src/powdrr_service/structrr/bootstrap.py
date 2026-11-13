@@ -500,6 +500,24 @@ def render_bootstrap_markdown(
                 f"{inline_code(confirmation_level)}; baseline result: "
                 f"{inline_code(baseline_status)}."
             )
+            observation = (
+                baseline.get("observation") if isinstance(baseline, Mapping) else None
+            )
+            runtime_identity = (
+                observation.get("runtime_identity")
+                if isinstance(observation, Mapping)
+                else None
+            )
+            identity_fingerprint = (
+                runtime_identity.get("fingerprint")
+                if isinstance(runtime_identity, Mapping)
+                else None
+            )
+            if isinstance(identity_fingerprint, str):
+                lines.append(
+                    "Runtime observation identity: "
+                    f"{inline_code(identity_fingerprint)}."
+                )
         unresolved = check.get("unresolved", [])
         if isinstance(unresolved, list) and unresolved:
             lines.append(

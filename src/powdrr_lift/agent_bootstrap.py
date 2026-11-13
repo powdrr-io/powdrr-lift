@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
+import platform
 import signal
 import subprocess
+import sys
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, replace
@@ -17,6 +20,7 @@ import yaml
 from powdrr_service.structrr.bootstrap import (
     BootstrapResult,
     bootstrap_structrr,
+    render_bootstrap_markdown,
     validate_bootstrap_document,
 )
 from powdrr_service.structrr.entity_taxonomy import load_entity_taxonomy
@@ -258,6 +262,15 @@ def run_bootstrap_task(
                         ),
                         encoding="utf-8",
                     )
+        if bootstrap.report_path is not None:
+            bootstrap.report_path.write_text(
+                render_bootstrap_markdown(
+                    bootstrap.document,
+                    report_path=bootstrap.report_path,
+                    root=task.worktree,
+                ),
+                encoding="utf-8",
+            )
         candidate_paths = [bootstrap.output_path]
         # The bootstrap writer removes obsolete sidecars. Stage that removal
         # when an older repository still tracks one, but never read its data.
@@ -676,6 +689,7 @@ def _run_validation_baseline(
         stdout = ""
         stderr = ""
         error: str | None = None
+        runtime_identity: dict[str, Any] | None = None
         cwd = (worktree / str(cwd_value)).resolve()
         remaining_seconds = deadline - time.monotonic()
         try:
@@ -723,6 +737,15 @@ def _run_validation_baseline(
                 environment.pop("UV_PROJECT_ENVIRONMENT", None)
                 if command[0] == "uv":
                     environment["UV_PROJECT_ENVIRONMENT"] = str(worktree / ".venv")
+                runtime_identity = _validation_runtime_identity(
+                    check,
+                    document,
+                    worktree=worktree,
+                    cwd=cwd,
+                    environment=environment,
+                    runner=runner,
+                    timeout_seconds=min(timeout_seconds, remaining_seconds),
+                )
                 try:
                     completed = _run_validation_command(
                         runner,
@@ -753,6 +776,7 @@ def _run_validation_baseline(
             "stdout_sha256": _output_digest(stdout),
             "stderr_sha256": _output_digest(stderr),
             "error": error,
+            **({"runtime_identity": runtime_identity} if runtime_identity else {}),
         }
         check["confirmation"] = {
             "level": "execution",
@@ -771,6 +795,184 @@ def _run_validation_baseline(
     else:
         overall = "passed"
     return {"status": overall, "checks": len(statuses)}
+
+
+def _validation_runtime_identity(
+    check: dict[str, Any],
+    document: dict[str, Any],
+    *,
+    worktree: Path,
+    cwd: Path,
+    environment: dict[str, str],
+    runner: Any,
+    timeout_seconds: float,
+) -> dict[str, Any]:
+    """Fingerprint the source, recipe, and runtime used for a baseline check."""
+    context = document.get("validation_context", {})
+    context = context if isinstance(context, dict) else {}
+    source_manifest = document.get("source_manifest", {})
+    source_manifest = source_manifest if isinstance(source_manifest, dict) else {}
+    environment_id = check.get("environment")
+    environments = context.get("environments", [])
+    environment_record = (
+        next(
+            (
+                item
+                for item in environments
+                if isinstance(item, dict) and item.get("id") == environment_id
+            ),
+            None,
+        )
+        if isinstance(environments, list)
+        else None
+    )
+    input_fingerprints = context.get("input_fingerprints", [])
+    inputs = (
+        [
+            {"path": item.get("path"), "digest": item.get("digest")}
+            for item in input_fingerprints
+            if isinstance(item, dict)
+        ]
+        if isinstance(input_fingerprints, list)
+        else []
+    )
+    command = check.get("command", [])
+    provider = check.get("provider")
+    version_command = _validation_tool_version_command(command, provider)
+    tool_version = _observe_runtime_version(
+        version_command,
+        runner=runner,
+        cwd=cwd,
+        environment=environment,
+        timeout_seconds=timeout_seconds,
+    )
+    interpreter_command = _validation_interpreter_version_command(command)
+    interpreter_version = _observe_runtime_version(
+        interpreter_command,
+        runner=runner,
+        cwd=cwd,
+        environment=environment,
+        timeout_seconds=timeout_seconds,
+    )
+
+    stable_environment = {
+        key: environment[key]
+        for key in (
+            "PATH",
+            "VIRTUAL_ENV",
+            "UV_PROJECT_ENVIRONMENT",
+            "UV_NO_SYNC",
+            "PYTHONPATH",
+            "CI",
+        )
+        if key in environment
+    }
+    identity = {
+        "schema_version": "validation-runtime-identity-v1",
+        "check": {
+            "id": check.get("id"),
+            "provider": provider,
+            "command": command,
+            "execution": check.get("execution"),
+            "environment": environment_id,
+            "component": check.get("component"),
+            "selectors": check.get("selectors", []),
+            "config_files": check.get("config_files", []),
+            "settings": check.get("settings", {}),
+            "depends_on": check.get("depends_on", []),
+        },
+        "source": {
+            "product_digest": source_manifest.get("product_digest"),
+            "source_revision": source_manifest.get("source_revision"),
+        },
+        "validation_inputs": sorted(inputs, key=lambda item: str(item["path"])),
+        "environment_record": environment_record,
+        "runtime": {
+            "python_executable": sys.executable,
+            "python_version": sys.version.splitlines()[0],
+            "platform": platform.platform(),
+            "cwd": str(cwd.relative_to(worktree.resolve())),
+            "interpreter_version": interpreter_version,
+            "environment_fingerprint": _output_digest(
+                json.dumps(stable_environment, sort_keys=True, separators=(",", ":"))
+            ),
+            "tool_version": tool_version,
+        },
+    }
+    identity["fingerprint"] = (
+        "sha256:"
+        + hashlib.sha256(
+            json.dumps(identity, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        ).hexdigest()
+    )
+    return identity
+
+
+def _validation_tool_version_command(
+    command: object, provider: object
+) -> list[str] | None:
+    if (
+        not isinstance(command, list)
+        or not command
+        or not all(isinstance(item, str) and item for item in command)
+    ):
+        return None
+    if isinstance(provider, str) and provider in command:
+        return [*command[: command.index(provider) + 1], "--version"]
+    return [command[0], "--version"]
+
+
+def _validation_interpreter_version_command(command: object) -> list[str]:
+    if isinstance(command, list) and command:
+        if command[0] in {"uv", "poetry", "pipenv", "pdm", "hatch"}:
+            try:
+                run_index = command.index("run")
+            except ValueError:
+                pass
+            else:
+                return [*command[: run_index + 1], "python", "--version"]
+        if Path(command[0]).name in {"python", "python3"}:
+            return [command[0], "--version"]
+    return [sys.executable, "--version"]
+
+
+def _observe_runtime_version(
+    command: list[str] | None,
+    *,
+    runner: Any,
+    cwd: Path,
+    environment: dict[str, str],
+    timeout_seconds: float,
+) -> dict[str, Any]:
+    observation: dict[str, Any] = {
+        "command": command,
+        "status": "unavailable",
+        "version": None,
+    }
+    if command is None:
+        return observation
+    try:
+        result = _run_validation_command(
+            runner,
+            command,
+            cwd=cwd,
+            env=environment,
+            timeout_seconds=min(timeout_seconds, 30.0),
+        )
+    except (OSError, subprocess.SubprocessError) as error:
+        observation["error"] = type(error).__name__
+        return observation
+    version_text = "\n".join(
+        part.strip() for part in (result.stdout, result.stderr) if part and part.strip()
+    )
+    observation.update(
+        {
+            "status": "observed" if result.returncode == 0 else "failed",
+            "version": version_text[:500] or None,
+            "returncode": result.returncode,
+        }
+    )
+    return observation
 
 
 def _emit_bootstrap_progress(

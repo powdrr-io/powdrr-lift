@@ -23,8 +23,11 @@ pending, so missing results cannot satisfy the gate. The PR readiness gate
 also verifies the baseline YAML, Markdown report, freshness metadata, and
 fingerprinted validation inputs before using the inventory. It also checks
 changed PR paths for added, removed, renamed, or edited validation evidence and
-blocks until the baseline is refreshed. This remains a partial implementation
-of WP8: the full runtime observation identity is still outstanding.
+blocks until the baseline is refreshed. Local baseline observations also carry
+an identity fingerprint for source content, validation inputs, the check recipe,
+environment, interpreter, and tool version; the report links that fingerprint
+for review. WP8 remains partial: comparing saved observations with the active
+runtime and using mismatches to invalidate pass evidence are still outstanding.
 The core validation runner also keeps an empty profile selection pending.
 
 ## Objective and delivery contract

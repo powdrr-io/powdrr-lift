@@ -2342,6 +2342,10 @@ def test_required_ci_observation_rejects_head_change_during_check_read(
 
     assert observation["outcome"] == "blocked"
     assert "head changed" in observation["reason"]
+    assert observation["refresh_succeeded"] is False
+    assert observation["stale_remote_observations"] is True
+    assert observation["checks"][0]["status"] == "unknown"
+    assert observation["checks"][0]["last_known_status"] == "passed"
 
 
 def test_required_ci_readiness_uses_timestamped_normalized_current_head_checks(
@@ -2389,6 +2393,82 @@ def test_required_ci_readiness_uses_timestamped_normalized_current_head_checks(
     assert '"observed_at"' in checkpoint
     assert '"validation_inventory_digest": "test-digest"' in checkpoint
     assert '"status": "unknown"' in checkpoint
+
+
+def test_failed_remote_refresh_preserves_prior_checks_as_dated_stale_evidence(
+    tmp_path: Path,
+) -> None:
+    pull_request_url = "https://github.com/example/project/pull/123"
+    old_observed_at = "2026-11-13T19:00:00+00:00"
+    prior = github_issue_queue._ci_outcome_observation(
+        "awaiting_review",
+        "c" * 40,
+        [
+            {
+                "name": "unit",
+                "state": "success",
+                "status": "passed",
+                "workflow": "ci",
+                "inventory_match": {"status": "matched"},
+            }
+        ],
+        "all checks passed",
+        old_observed_at,
+        "inventory-v1",
+    )
+    checkpoint = github_issue_queue._render_ci_outcome_checkpoint(
+        pull_request_url=pull_request_url, observation=prior
+    )
+    previous = github_issue_queue._latest_ci_outcome_observation(
+        ({"body": checkpoint},), pull_request_url
+    )
+    assert previous is not None
+
+    class OfflineIssueClient(FakeIssueClient):
+        def _invoke(
+            self, arguments: list[str] | tuple[str, ...], *, check: bool = True
+        ) -> subprocess.CompletedProcess[str]:
+            if arguments[:2] == ["pr", "view"]:
+                return subprocess.CompletedProcess(
+                    ["gh", *arguments], 1, "", "network unavailable"
+                )
+            return super()._invoke(arguments, check=check)
+
+    observation = github_issue_queue._observe_required_ci_outcome(
+        OfflineIssueClient(),  # type: ignore[arg-type]
+        pull_request_url,
+        validation_inventory=_test_validation_checks(tmp_path),
+        inventory_digest="inventory-v2",
+        previous_observation=previous,
+    )
+
+    assert observation["outcome"] == "blocked"
+    assert observation["refresh_succeeded"] is False
+    assert observation["stale_remote_observations"] is True
+    assert observation["last_remote_observed_at"] == old_observed_at
+    stale_check = observation["checks"][0]
+    assert stale_check["status"] == "unknown"
+    assert stale_check["last_known_status"] == "passed"
+    assert stale_check["freshness"] == "stale"
+    assert stale_check["observed_at"] == old_observed_at
+    assert stale_check["head_sha"] == "c" * 40
+    assert stale_check["stale_since"] != old_observed_at
+    repeated_stale = github_issue_queue._stale_ci_outcome_observation(
+        previous_observation=observation,
+        current_checks=(),
+        head_sha=None,
+        reason="GitHub is still unavailable",
+        observed_at="2026-11-13T20:00:00+00:00",
+        inventory_digest="inventory-v2",
+    )
+    assert repeated_stale["last_remote_observed_at"] == old_observed_at
+    assert repeated_stale["checks"][0]["last_known_status"] == "passed"
+    assert repeated_stale["checks"][0]["stale_since"] == stale_check["stale_since"]
+    stale_checkpoint = github_issue_queue._render_ci_outcome_checkpoint(
+        pull_request_url=pull_request_url, observation=observation
+    )
+    assert '"stale_remote_observations": true' in stale_checkpoint
+    assert '"last_known_status": "passed"' in stale_checkpoint
 
 
 def test_required_ci_readiness_blocks_when_validation_inventory_is_missing() -> None:

@@ -1,5 +1,5 @@
 schema: https://powdrr.io/schema/changelog-v2
-change_id: PR-1500
+change_id: PR-1501
 title: Reject out-of-scope source worker delivery
 intent:
   problem: The protected source route needs explicit boundary evidence that failed or out-of-scope work cannot become a delivered patch and that caller checkout changes cannot count as worker progress.

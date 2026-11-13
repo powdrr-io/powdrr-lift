@@ -1,0 +1,94 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1466
+title: Preserve validation profile runtime context
+intent:
+  problem: The coding-agent validation handoff reduces discovered profiles to a name and argv, dropping working directory, environment identity, applicability, script details, and other execution context from the runner and its final report.
+  goal: Preserve declared profile context in runtime validation and reports, run argv checks in their repository-relative working directory, and keep unsupported shell checks visibly blocked.
+human-decisions: []
+structured_files: []
+files:
+- path: src/powdrr_lift/workrr/coding_agent_validation.py
+  type: modified
+  span: {start_line: 45, end_line: 55}
+  summary: Add execution context fields to runtime validation profiles.
+  rationale: Retain the context supplied by the typed validation inventory.
+- path: src/powdrr_lift/workrr/coding_agent_validation.py
+  type: modified
+  span: {start_line: 58, end_line: 72}
+  summary: Serialize complete validation profile context.
+  rationale: Make profile declarations available in persisted reports.
+- path: src/powdrr_lift/workrr/coding_agent_validation.py
+  type: modified
+  span: {start_line: 114, end_line: 114}
+  summary: Add profile contexts to validation reports.
+  rationale: Preserve the actual validation obligation alongside its outcomes.
+- path: src/powdrr_lift/workrr/coding_agent_validation.py
+  type: modified
+  span: {start_line: 152, end_line: 152}
+  summary: Include profile contexts in report serialization.
+  rationale: Keep execution settings available to downstream readers.
+- path: src/powdrr_lift/workrr/coding_agent_validation.py
+  type: modified
+  span: {start_line: 314, end_line: 314}
+  summary: Preserve known profile context when validation is blocked by an incomplete worker attempt.
+  rationale: Retain the affected obligations in blocked reports.
+- path: src/powdrr_lift/workrr/coding_agent_validation.py
+  type: modified
+  span: {start_line: 343, end_line: 343}
+  summary: Preserve known profile context when a requested profile is unregistered.
+  rationale: Keep missing execution configuration visible.
+- path: src/powdrr_lift/workrr/coding_agent_validation.py
+  type: modified
+  span: {start_line: 387, end_line: 392}
+  summary: Attach executed profile context to the final validation report.
+  rationale: Bind the outcomes to the declarations used by the runner.
+- path: src/powdrr_lift/workrr/coding_agent_validation.py
+  type: modified
+  span: {start_line: 446, end_line: 456}
+  summary: Keep shell or unresolved execution blocked with its profile identity.
+  rationale: Avoid silently converting unsupported declarations into argv commands.
+- path: src/powdrr_lift/workrr/coding_agent_validation.py
+  type: modified
+  span: {start_line: 465, end_line: 490}
+  summary: Validate profile working directories and run checks from the declared directory.
+  rationale: Ensure relative paths and test collection match the repository configuration.
+- path: src/powdrr_lift/workrr/coding_agent_validation.py
+  type: modified
+  span: {start_line: 523, end_line: 523}
+  summary: Launch argv validation in its resolved working directory.
+  rationale: Honor the validated profile cwd.
+- path: src/powdrr_lift/workrr/coding_agent_validation.py
+  type: modified
+  span: {start_line: 642, end_line: 646}
+  summary: Restore profile context while loading saved validation reports.
+  rationale: Preserve the report contract across persistence.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span: {start_line: 3447, end_line: 3447}
+  summary: Pass complete discovered profiles into coding-agent validation.
+  rationale: Avoid stripping runtime metadata at the implementation handoff.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span: {start_line: 4800, end_line: 4820}
+  summary: Convert discovered profiles without discarding execution or applicability fields.
+  rationale: Keep one consistent conversion at both validation call sites.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span: {start_line: 7589, end_line: 7589}
+  summary: Preserve profile context in focused code-task validation.
+  rationale: Keep task-level validation aligned with coding-attempt validation.
+- path: tests/test_coding_agent.py
+  type: modified
+  span: {start_line: 1372, end_line: 1431}
+  summary: Verify declared cwd execution, report context persistence, and explicit blocking for shell profiles.
+  rationale: Prevent context loss or false execution claims at the runtime boundary.
+entities:
+- id: coding-agent-validation-runtime-context
+  type: Function
+  action: added
+- id: validation-runtime-context-tests
+  type: Unit test
+  action: added
+entity_relationships: []
+invariants: []
+guidance: []

@@ -1,0 +1,81 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1471
+title: Bound structural change context for file entities
+intent:
+  problem: File entity change questions included full work-unit validation lists and sibling writes, which could exceed the planning input limit.
+  goal: Keep each file candidate's structural-change context focused on its implementation and matching planned write so planning can continue within the input bound.
+human-decisions: []
+structured_files: []
+files:
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span: {start_line: 1099, end_line: 1100}
+  summary: Use focused subject facts when describing structural changes for file candidates.
+  rationale: Avoid repeating identifiers already carried by the question and its context records.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span: {start_line: 1792, end_line: 1797}
+  summary: Recognize file entities by their file identity and derive the matching planned path.
+  rationale: Apply the file-specific prompt bound to file entities represented in the entities section.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span: {start_line: 1799, end_line: 1799}
+  summary: Apply focused context to file entities as well as file-section subjects.
+  rationale: Prevent full validation lists from exceeding the structural question input limit.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span: {start_line: 1812, end_line: 1812}
+  summary: Retain only the planned write matching the file candidate.
+  rationale: Preserve implementation evidence without including sibling writes.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span: {start_line: 1818, end_line: 1835}
+  summary: Add a focused subject-context builder for file candidates.
+  rationale: Keep source references and identifiers from being repeated in the prompt facts.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span: {start_line: 1151, end_line: 1151}
+  summary: Name the file path once in the structural-context regression test.
+  rationale: Reuse the same candidate identity throughout the assertions.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span: {start_line: 1153, end_line: 1153}
+  summary: Use the named file path in the file subject fixture.
+  rationale: Keep the test subject aligned with the asserted planned path.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span: {start_line: 1161, end_line: 1161}
+  summary: Use the named file path as the planned subject path.
+  rationale: Keep the file identity consistent across the fixture.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span: {start_line: 1167, end_line: 1167}
+  summary: Supply the named candidate path as the planned write path.
+  rationale: Ensure the question is scoped to the tested file candidate.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span: {start_line: 1173, end_line: 1177}
+  summary: Inspect the focused file subject context.
+  rationale: Verify redundant subject identifiers are omitted from accepted facts.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span: {start_line: 1180, end_line: 1180}
+  summary: Assert the example answer uses the named file path.
+  rationale: Keep the example aligned with the candidate fixture.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span: {start_line: 1182, end_line: 1188}
+  summary: Assert the subject fact contains only the focused file identity fields.
+  rationale: Protect the bounded file prompt context from redundant metadata.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span: {start_line: 1237, end_line: 1280}
+  summary: Add a large-validation-list regression for file entities.
+  rationale: Ensure file entity questions retain the matching planned write while staying under the input cap.
+entities:
+- id: structural-change-subject-context
+  type: Function
+  action: added
+entity_relationships: []
+invariants: []
+guidance: []

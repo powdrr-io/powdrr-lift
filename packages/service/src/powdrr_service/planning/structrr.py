@@ -1096,7 +1096,8 @@ def build_structural_change_request(
             relevant_planned_paths = unit_planned_paths
     facts = [
         ContextRecord(
-            f"subject:{subject.section}:{subject.subject_id}", subject.to_data()
+            f"subject:{subject.section}:{subject.subject_id}",
+            _structural_change_subject_context(subject),
         ),
         ContextRecord(
             f"projected-baseline:{subject.item_id}:{baseline_digest[:20]}",
@@ -1788,8 +1789,14 @@ def _structural_change_unit_context(
     subject: BoundStructuralSubject,
 ) -> dict[str, Any]:
     """Keep file review context focused on the candidate and its implementation."""
+    is_file_candidate = subject.section == "files" or (
+        subject.section == "entities" and subject.subject_id.startswith("file:")
+    )
+    file_path = subject.planned_path
+    if file_path is None and subject.section == "entities" and is_file_candidate:
+        file_path = subject.subject_id.removeprefix("file:")
     data = unit.to_data()
-    if subject.section == "files" and subject.planned_path is not None:
+    if is_file_candidate and file_path is not None:
         # A file candidate is reviewed independently. The source excerpts and
         # subject already carry the detailed requirement context, so copying
         # every acceptance criterion, validation, and sibling write here can
@@ -1802,10 +1809,28 @@ def _structural_change_unit_context(
             "planned_writes": [
                 write.to_data()
                 for write in unit.planned_writes
-                if write.path == subject.planned_path
+                if write.path == file_path
             ],
         }
     return data
+
+
+def _structural_change_subject_context(
+    subject: BoundStructuralSubject,
+) -> dict[str, Any]:
+    """Avoid repeating file-candidate identifiers already carried by the packet."""
+    if subject.section == "files":
+        # Source refs are represented by the source excerpts, while unit and
+        # requirement IDs are carried by the corresponding unit context. Keep
+        # this fact focused on the exact file identity under review.
+        return {
+            "subject_id": subject.subject_id,
+            "section": subject.section,
+            "item_id": subject.item_id,
+            "action": subject.action,
+            "planned_path": subject.planned_path,
+        }
+    return subject.to_data()
 
 
 def _mapping_records(value: Any) -> list[Mapping[str, Any]]:

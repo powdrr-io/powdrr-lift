@@ -319,6 +319,7 @@ def test_new_extensionless_data_file_can_be_explicitly_runtime_neutral() -> None
     "path",
     [
         "attestation/macos/Package.resolved",
+        "attestation/macos/privileged.entitlements",
         "attestation/config/sandbox-profile.sb",
         "installer/launchd.plist",
         "config/install-paths.conf",

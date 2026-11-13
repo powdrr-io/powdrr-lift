@@ -303,6 +303,7 @@ def bind_story_route_evidence(
     contract = data["worker_prompt"]["contract"]
     private = data["validation_manifest"]["private_validation_data"]
     placements = {item["obligation_id"]: item for item in contract["obligations"]}
+    preservations = {item["id"]: item for item in contract["preservation"]}
     coverage = story_validation.get("story_coverage")
     health = story_validation.get("verification_health")
     context = story_validation.get("execution_context")
@@ -359,14 +360,26 @@ def bind_story_route_evidence(
         if isinstance(receipt_id, str):
             history.setdefault(receipt_id, []).append(entry)
 
+    case_ids_by_scenario = contract["behavior_case_ids"]
+    accepted_case_ids = {
+        case_id for case_ids in case_ids_by_scenario.values() for case_id in case_ids
+    }
+
     results = [dict(item) for item in route_evidence.get("routes", [])]
     for result in results:
         if result.get("route") != "behavior_validation":
             continue
-        placement = placements.get(str(result.get("obligation_id")))
-        if placement is None:
+        obligation_id = str(result.get("obligation_id"))
+        obligation = placements.get(obligation_id) or preservations.get(obligation_id)
+        if obligation is None:
             continue
-        refs = placement["verification_refs"]
+        refs: list[str] = []
+        for ref in obligation["verification_refs"]:
+            case_ids = (
+                [ref] if ref in accepted_case_ids else case_ids_by_scenario.get(ref, [])
+            )
+            refs.extend(case_ids)
+        refs = list(dict.fromkeys(refs))
         receipt_ids: set[str] = set()
         failed = False
         for ref in refs:

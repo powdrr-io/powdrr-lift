@@ -13,12 +13,13 @@ routes and are persisted in a separate protected artifact. Exact route
 reconciliation rejects missing, duplicate, unlinked, stale, and non-passing
 records. Protected source runs also attach independent invariant-preservation
 reviews to compiled invariant routes when those reviews pass with current owner
-evidence. The reconciled result is not yet an acceptance gate. Preservation
-behavior links and retained-intent acceptance gates remain.
+evidence. Preservation behavior routes now link to accepted cases and fresh story
+receipts. The reconciled result is not yet an acceptance gate; retained-intent
+acceptance gates remain.
 Milestones 4–5 remain.
 
 Audited code baseline for this inventory: `feafe5b7b22bf7cd98dee9b06797ea87af558a4c`.
-Latest implementation review baseline: `1f1b85e678cb6b724dde2e974447458f5a434e23` (PR #1483; includes PR #1484).
+Latest implementation review baseline: `ff1c5d98e4a7c7c95a0dd488f1268500fd558f90` (PR #1486; includes PR #1485).
 
 This plan replaces the intent-linked verification, evidence-backed prompt
 contract closure, and bounded coding-worker plans in `superseded/`. Those
@@ -149,8 +150,10 @@ story candidate tree. The appended route artifact retains both the protected
 run candidate identity and the story candidate tree. Exact route reconciliation
 requires one passing record for each compiled obligation-route pair and rejects
 missing, duplicate, unlinked, stale, and non-passing records. This
-reconciliation is not yet consumed by the acceptance decision. Add trusted
-resolve preservation behavior links, then gate acceptance on complete route
+reconciliation is not yet consumed by the acceptance decision. Preservation
+records now require verification references to accepted case or scenario IDs,
+and fresh story receipts discharge their behavior routes using the same exact
+case and receipt checks as placement routes. Gate acceptance on complete route
 coverage. Candidate-bound scope routes are evaluated against every changed path
 in the protected candidate, including non-Python files; out-of-scope paths
 produce a failed route with those paths retained as evidence. Independent

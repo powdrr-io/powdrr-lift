@@ -124,6 +124,7 @@ def prepare(
                 "disposition": "relocate",
                 "reason": "Extract the calculation.",
                 "successor": None,
+                "verification_refs": ["retry-result"],
                 "destination": {
                     "path": "retry.py",
                     "kind": "function",
@@ -357,7 +358,9 @@ def test_story_receipts_discharge_only_linked_candidate_behavior_routes(
             "sha256:story-tree"
         )
         assert by_obligation[obligation_id]["evidence_receipts"] == ["receipt:retry"]
-    assert by_obligation["move:helper"]["status"] == "not_collected"
+    assert by_obligation["move:helper"]["status"] == "passed"
+    assert by_obligation["move:helper"]["story_candidate_tree"] == ("sha256:story-tree")
+    assert by_obligation["move:helper"]["evidence_receipts"] == ["receipt:retry"]
     assert result["complete"] is False
 
 
@@ -411,6 +414,7 @@ def test_prepared_inputs_are_bound_and_cannot_be_reused_or_mutated(
     data = run.handoff.worker_prompt.to_data()
     assert data["contract"]["workspace_root"] == str(run.workspace_root)
     assert data["contract"]["behavior_case_ids"] == {"retry-result": ["case:retry"]}
+    assert data["contract"]["preservation"][0]["verification_refs"] == ["retry-result"]
     manifest = run.handoff.validation_manifest
     private = manifest["private_validation_data"]
     assert private["repository_evidence"]["base_commit"] == run.catalog.base_commit

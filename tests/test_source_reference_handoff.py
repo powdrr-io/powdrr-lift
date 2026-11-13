@@ -404,6 +404,7 @@ def preservation(**changes: Any) -> dict[str, Any]:
         "reason": "Keep baseline behavior.",
         "successor": None,
         "destination": None,
+        "verification_refs": ["case:retry"],
         **changes,
     }
 
@@ -455,6 +456,9 @@ def test_preservation_relocation_removal_and_canonical_supersession() -> None:
     ]
     handoff = compile_document(document(preservation=rules))
     assert len(handoff.validation_manifest["contract"]["preservation"]) == 2
+    assert handoff.validation_manifest["contract"]["preservation"][0][
+        "verification_refs"
+    ] == ["case:retry"]
     assert "baseline_reference_rules" in handoff.worker_prompt.prompt
     removal = preservation(disposition="remove", reason="Accepted retirement.")
     assert compile_document(document(preservation=[removal]))
@@ -501,6 +505,19 @@ def test_preservation_relocation_removal_and_canonical_supersession() -> None:
                 ]
             )
         )
+
+
+def test_preservation_behavior_refs_accept_case_or_scenario_identity() -> None:
+    rule = preservation(verification_refs=["retry-result"])
+    handoff = compile_document(document(preservation=[rule]))
+
+    assert handoff.validation_manifest["contract"]["preservation"][0][
+        "verification_refs"
+    ] == ["retry-result"]
+
+    unresolved = preservation(verification_refs=["case:missing"])
+    with pytest.raises(ValueError, match="preservation preserve:old"):
+        compile_document(document(preservation=[unresolved]))
 
 
 def test_frozen_catalog_and_inactive_reference_guards() -> None:

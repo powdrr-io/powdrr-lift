@@ -274,6 +274,7 @@ def rule(disposition: str = "preserve", **changes: Any) -> dict[str, Any]:
         "reason": "Accepted source change.",
         "successor": None,
         "destination": None,
+        "verification_refs": ["case:1"],
         **changes,
     }
 

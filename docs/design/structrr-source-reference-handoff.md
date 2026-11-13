@@ -21,11 +21,13 @@ Accepted source designs also require `required_test_cases`. Each entry has a
 stable case `id` and a typed `behavior_scenario` with explicit behavior
 dimensions, evidence, validator, and a source-faithfulness fingerprint. Every
 placement `verification_ref` must resolve to one of those case IDs or scenario
-IDs. Unresolved dimensions and excluded routing values block handoff. This binds
-observable reviewed cases into the public contract instead of leaving verification
-references as unvalidated labels. The contract also carries a normalized map from
-scenario IDs to their accepted case IDs so workers can interpret placement
-verification references without guessing which scenario they name.
+IDs. Every preservation record must also name `verification_refs` that resolve to
+case or scenario IDs. Unresolved dimensions, verification references, and
+excluded routing values block handoff. This binds observable reviewed cases into
+the public contract instead of leaving verification references as unvalidated
+labels. The contract also carries a normalized map from scenario IDs to their
+accepted case IDs so story receipts can discharge placement and preservation
+behavior routes without guessing which scenario they name.
 
 ```yaml
 source_reference_placements:
@@ -60,7 +62,8 @@ require `cardinality: one_or_more`. Worker owner claims remain unverified until
 an independent reviewer binds them; the compiler emits no passing receipt.
 
 Preservation records have exactly `id`, `ref`, `owner`, `disposition`, `reason`,
-`successor`, and `destination`. Nullable fields are explicit. Baseline owners
+`successor`, `destination`, and non-empty `verification_refs`. Nullable fields
+are explicit. Baseline owners
 are exact selectors. `preserve` keeps that binding; `remove` authorizes its
 removal; `relocate` requires a destination; `supersede` requires a distinct active
 successor agreeing with canonical lifecycle history. Changing the baseline

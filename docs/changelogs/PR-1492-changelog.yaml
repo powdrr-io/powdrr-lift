@@ -1,0 +1,82 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1492
+title: Prove body regressions block protected handoff
+intent:
+  problem: Source placement and a passing ordinary validation command do not prove that an implementation preserves accepted story behavior.
+  goal: Demonstrate that protected dispatch rejects a body-only behavior regression and leaves the task checkout unchanged.
+human-decisions: []
+structured_files: []
+files:
+- path: tests/test_story_execution.py
+  type: modified
+  span: {start_line: 7, end_line: 7}
+  summary: Import the active interpreter for the deliberately shallow validation profile.
+  rationale: Keep the ordinary validation check independent from the protected story tests.
+- path: tests/test_story_execution.py
+  type: modified
+  span: {start_line: 54, end_line: 54}
+  summary: Import ValidationProfile for the protected dispatch fixture.
+  rationale: Configure an ordinary check that can pass while story behavior regresses.
+- path: tests/test_story_execution.py
+  type: modified
+  span: {start_line: 649, end_line: 651}
+  summary: Exercise both an accepted candidate and a body-regression candidate through protected dispatch.
+  rationale: Retain the passing control while covering the failed behavior case.
+- path: tests/test_story_execution.py
+  type: modified
+  span: {start_line: 653, end_line: 656}
+  summary: Add the behavior-regression selector to the integration test.
+  rationale: Choose whether the worker candidate preserves accepted decisions.
+- path: tests/test_story_execution.py
+  type: modified
+  span: {start_line: 757, end_line: 760}
+  summary: Make the regression candidate drop previously accepted decisions from its return value.
+  rationale: Change implementation behavior while keeping the same source owner and placement annotation.
+- path: tests/test_story_execution.py
+  type: modified
+  span: {start_line: 825, end_line: 825}
+  summary: Use an import-only command for ordinary candidate validation.
+  rationale: Prove the behavior regression is caught by story validation rather than structural validation.
+- path: tests/test_story_execution.py
+  type: modified
+  span: {start_line: 838, end_line: 861}
+  summary: Assert placement and import checks pass, story validation fails, and the candidate is not transferred.
+  rationale: Verify a body-only regression blocks delivery despite passing ordinary checks.
+- path: docs/plans/implementation-contract-and-verification.md
+  type: modified
+  span: {start_line: 6, end_line: 19}
+  summary: Update milestone status to record the merged route acceptance gate and remaining regression fixture.
+  rationale: Keep the active plan synchronized with implementation and this test slice.
+- path: docs/plans/implementation-contract-and-verification.md
+  type: modified
+  span: {start_line: 23, end_line: 23}
+  summary: Advance the implementation review baseline to PR 1490.
+  rationale: Identify the latest merged production gate in the plan.
+- path: docs/plans/implementation-contract-and-verification.md
+  type: modified
+  span: {start_line: 153, end_line: 154}
+  summary: Clarify that protected dispatch consumes complete route reconciliation.
+  rationale: Remove stale wording that implied the gate was pending.
+- path: docs/plans/implementation-contract-and-verification.md
+  type: modified
+  span: {start_line: 158, end_line: 161}
+  summary: Clarify preserved behavior evidence and route scope documentation.
+  rationale: Keep the implemented acceptance description concise and current.
+- path: docs/plans/implementation-contract-and-verification.md
+  type: modified
+  span: {start_line: 170, end_line: 172}
+  summary: Record the body-only regression test as milestone 3 acceptance evidence.
+  rationale: Track the remaining fixture completion accurately.
+entities:
+- id: protected-dispatch-body-only-regression-fixture
+  type: Integration test
+  action: added
+invariants:
+- id: body-regressions-cannot-pass-on-placement-and-import-checks-alone
+  description: A protected source candidate that keeps its Structrr placement but breaks accepted story behavior is rejected before patch transfer, even when source placement and ordinary import validation pass.
+  action: added
+guidance:
+- id: use-protected-story-receipts-for-body-behavior
+  description: Require current protected story tests to establish accepted behavior independently from source placement and shallow validation commands.
+  action: added
+entity_relationships: []

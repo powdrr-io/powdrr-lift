@@ -4,6 +4,7 @@ import copy
 import json
 import shlex
 import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -50,6 +51,7 @@ from test_story_test_authoring import (
 
 from powdrr_lift.workrr import source_reference_dispatch, task_agent
 from powdrr_lift.workrr.coding_agent import ImplementationRequest
+from powdrr_lift.workrr.coding_agent_validation import ValidationProfile
 from powdrr_lift.workrr.feature_endpoint import (
     FeatureEndpointConfig,
     _validate_feature_story_execution,
@@ -644,8 +646,14 @@ def test_missing_interface_baseline_requires_actual_declared_absence(
         )
 
 
+@pytest.mark.parametrize(
+    "break_behavior", [False, True], ids=["accepted", "body-regression"]
+)
 def test_protected_source_dispatch_proves_story_before_patch_transfer(
-    graph: dict[str, Any], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    graph: dict[str, Any],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    break_behavior: bool,
 ) -> None:
     # Exercise the full dispatch and receipt path hermetically. OS write
     # protection itself is covered by the test for protected story support files.
@@ -746,6 +754,10 @@ def test_protected_source_dispatch_proves_story_before_patch_transfer(
         "        path.write_text(json.dumps(state))\n"
         "    return result\n"
     )
+    if break_behavior:
+        candidate_source = candidate_source.replace(
+            "'accepted': state['accepted']", "'accepted': []"
+        )
     calls: list[ChatCompletionRequest] = []
 
     def infer(request: ChatCompletionRequest) -> ChatCompletionResponse:
@@ -810,7 +822,7 @@ def test_protected_source_dispatch_proves_story_before_patch_transfer(
         task_id="story-integration-validation",
         objective="Validate the confirmed resume story.",
         allowed_paths=("app.py",),
-        profile=PROFILE,
+        profile=ValidationProfile("import-check", (sys.executable, "-c", "import app")),
         code_agent="minisweagent",
         model="test",
         worker_timeout_seconds=30,
@@ -823,16 +835,27 @@ def test_protected_source_dispatch_proves_story_before_patch_transfer(
             "authoring": authoring,
         },
     )
-    assert result["passed"] is True, {
-        "status": result.get("status"),
-        "error": result.get("error"),
-        "attempt": (result.get("attempts") or [{}])[0].get("attempt"),
-        "run_error": (result.get("attempts") or [{}])[0].get("error"),
-        "attempt_result": (result.get("attempts") or [{}])[0],
-        "worker_error": (result.get("attempts") or [{}])[0]
-        .get("attempt", {})
-        .get("error"),
-    }
-    assert result["story_validation"]["story_coverage"]["verified"] is True
-    assert "app.py" in result["changed_paths"]
-    assert any(path.startswith("tests/") for path in result["changed_paths"])
+    if break_behavior:
+        assert result["passed"] is False
+        assert result["source_reference_outcome"] == "validation_failed"
+        validation_statuses = {
+            item["profile"]: item["status"] for item in result["validation"]["results"]
+        }
+        assert validation_statuses["structrr-references"] == "passed"
+        assert validation_statuses["import-check"] == "passed"
+        assert validation_statuses["story-validation"] == "failed"
+        assert (repo / "app.py").read_text().startswith("def resume(path, available):")
+    else:
+        assert result["passed"] is True, {
+            "status": result.get("status"),
+            "error": result.get("error"),
+            "attempt": (result.get("attempts") or [{}])[0].get("attempt"),
+            "run_error": (result.get("attempts") or [{}])[0].get("error"),
+            "attempt_result": (result.get("attempts") or [{}])[0],
+            "worker_error": (result.get("attempts") or [{}])[0]
+            .get("attempt", {})
+            .get("error"),
+        }
+        assert result["story_validation"]["story_coverage"]["verified"] is True
+        assert "app.py" in result["changed_paths"]
+        assert any(path.startswith("tests/") for path in result["changed_paths"])

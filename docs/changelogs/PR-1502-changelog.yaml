@@ -1,0 +1,38 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1502
+title: Close implementation contract plan at milestone 4
+intent:
+  problem: The plan still described milestone 5 as required for completion even though the user chose to close the plan after milestone 4.
+  goal: Mark the plan closed while clearly recording that the end-to-end demonstration in milestone 5 was deferred and not completed.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/plans/implementation-contract-and-verification.md
+  type: modified
+  span: {start_line: 3, end_line: 5}
+  summary: Mark the plan complete at milestone 4 and disclose that milestone 5 is deferred.
+  rationale: Record the requested closure without implying that the end-to-end demonstration was performed.
+- path: docs/plans/implementation-contract-and-verification.md
+  type: modified
+  span: {start_line: 22, end_line: 22}
+  summary: Clarify that the final integration demonstration remains deferred.
+  rationale: Keep the implementation status summary accurate.
+- path: docs/plans/implementation-contract-and-verification.md
+  type: modified
+  span: {start_line: 210, end_line: 214}
+  summary: Label milestone 5 deferred and state that its acceptance criteria were not satisfied.
+  rationale: Preserve the unfinished work as visible plan history.
+- path: docs/plans/implementation-contract-and-verification.md
+  type: modified
+  span: {start_line: 229, end_line: 229}
+  summary: Rename the final section to describe closure.
+  rationale: Reflect the plan’s completed status.
+- path: docs/plans/implementation-contract-and-verification.md
+  type: modified
+  span: {start_line: 233, end_line: 236}
+  summary: Record that closure at milestone 4 does not claim milestone 5 was completed.
+  rationale: Keep plan status distinct from technical acceptance of the deferred demonstration.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []

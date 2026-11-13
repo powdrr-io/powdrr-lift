@@ -2902,7 +2902,8 @@ def _observe_required_ci_outcome(
             "blocked",
             head_sha,
             checks,
-            "GitHub could not report changed PR paths; validation-input freshness is unknown",
+            "GitHub could not report changed PR paths; validation-input freshness "
+            "is unknown",
             observed_at,
             inventory_digest,
         )

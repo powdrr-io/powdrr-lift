@@ -212,7 +212,10 @@ from powdrr_lift.workrr.git import (
     workflow_dependencies_completion,
     workflow_id_from_task_id,
 )
-from powdrr_lift.workrr.github_issue_queue import MANUAL_PREREQUISITE_TRIGGER
+from powdrr_lift.workrr.github_issue_queue import (
+    MANUAL_PREREQUISITE_TRIGGER,
+    GitHubIssueClient,
+)
 from powdrr_lift.workrr.llm import (
     DEFAULT_MAX_ROUNDTRIPS,
     PowdrrExecutionError,
@@ -2478,6 +2481,190 @@ def _append_inline_plan_adjustments_to_pr_body(
     )
 
 
+def _append_issue_reference_to_pr_body(
+    action: WorkflowAction, *, issue_number: int | None
+) -> WorkflowAction:
+    """Make the issue-to-PR relationship survive independently of worker state."""
+    if (
+        issue_number is None
+        or action.tool != GH_TOOL
+        or action.parameters.get("operation") not in {"pr_create", "pr_publish_clean"}
+    ):
+        return action
+    branch = str(action.parameters.get("publication_branch", ""))
+    if branch.endswith("-plan-amendment") or "-plan-amendment-" in branch:
+        return action
+    parameters = dict(action.parameters)
+    body_value = parameters.get("body")
+    body = body_value if isinstance(body_value, str) else ""
+    closing_reference = f"Closes #{issue_number}"
+    if re.search(rf"(?im)^\s*closes\s+#{issue_number}\s*$", body):
+        return action
+    parameters["body"] = f"{body.rstrip()}\n\n{closing_reference}".lstrip()
+    return WorkflowAction(kind=action.kind, tool=action.tool, parameters=parameters)
+
+
+def _issue_worker_pr_changelog(
+    *,
+    repo_root: Path,
+    pr_number: str,
+    proposed: Mapping[str, Any],
+    files_to_publish: Sequence[str],
+) -> str:
+    """Compile a PR changelog from reviewed intent and the published file list."""
+    title = str(
+        proposed.get("title") or proposed.get("item_id") or "Implementation"
+    ).strip()
+    objective = str(proposed.get("objective") or title).strip()
+    problem = str(
+        proposed.get("problem")
+        or f"The planned change {title!r} is not yet implemented."
+    ).strip()
+    structured_diff: Mapping[str, Any] = {}
+    for relative in files_to_publish:
+        if not relative.endswith("structrr-diff.yaml"):
+            continue
+        try:
+            loaded = yaml.safe_load((repo_root / relative).read_text(encoding="utf-8"))
+        except (OSError, yaml.YAMLError) as error:
+            raise PowdrrExecutionError(
+                f"could not read Structrr evidence for the PR changelog: {error}"
+            ) from error
+        if isinstance(loaded, Mapping):
+            structured_diff = loaded
+            break
+    type_by_path = {
+        path: (
+            "Test file"
+            if path.startswith("tests/")
+            else "Configuration file"
+            if path.endswith((".yaml", ".yml", ".json", ".toml"))
+            else "Documentation"
+            if path.startswith("docs/")
+            else "Source file"
+        )
+        for path in files_to_publish
+        if path != f"docs/changelogs/PR-{pr_number}-changelog.yaml"
+    }
+    descriptor = {
+        "schema": "https://powdrr.io/schema/changelog-v2",
+        "change_id": f"PR-{pr_number}",
+        "title": title,
+        "intent": {"problem": problem, "goal": objective},
+        "human-decisions": proposed.get("human-decisions", []),
+        "files": [
+            {
+                "path": path,
+                "type": type_by_path[path],
+                "span": {"start_line": 1, "end_line": 1},
+                "summary": f"Changed as part of {title}.",
+                "rationale": objective,
+            }
+            for path in sorted(type_by_path)
+        ],
+        **{
+            key: structured_diff.get(key, proposed.get(key, []))
+            for key in (
+                "entities",
+                "entity_relationships",
+                "invariants",
+                "guidance",
+                "features",
+                "acceptance_criteria",
+                "proposed_prs",
+            )
+        },
+    }
+    text = yaml.safe_dump(
+        descriptor,
+        allow_unicode=True,
+        default_flow_style=False,
+        sort_keys=False,
+    )
+    try:
+        parse_change_log(text)
+    except (TypeError, ValueError) as error:
+        raise PowdrrExecutionError(
+            f"generated PR changelog is invalid: {error}"
+        ) from error
+    relative_path = f"docs/changelogs/PR-{pr_number}-changelog.yaml"
+    output_path = (repo_root / relative_path).resolve()
+    try:
+        output_path.relative_to(repo_root.resolve())
+    except ValueError as error:
+        raise PowdrrExecutionError(
+            "PR changelog path escapes the repository"
+        ) from error
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(text, encoding="utf-8")
+    return relative_path
+
+
+def _finish_issue_worker_pull_request(
+    strategy: _TaskWorkflowExecutionStrategy,
+    *,
+    action: WorkflowAction,
+    pull_request_url: str,
+) -> None:
+    """Attach the generated changelog and durable issue link after PR creation."""
+    match = re.search(r"/pull/(\d+)(?:$|[?#])", pull_request_url)
+    if match is None:
+        raise PowdrrExecutionError(
+            f"clean publication returned an invalid PR URL: {pull_request_url!r}"
+        )
+    issue_number = getattr(strategy.config, "github_issue_number", None)
+    repository = getattr(strategy.config, "github_repository", None)
+    if (
+        not isinstance(issue_number, int)
+        or isinstance(issue_number, bool)
+        or issue_number < 1
+        or not isinstance(repository, str)
+        or not repository.strip()
+    ):
+        raise PowdrrExecutionError(
+            "issue-worker PR finalization requires its GitHub issue and repository"
+        )
+    client = GitHubIssueClient(repository)
+    marker = f"Powdrr PR for issue #{issue_number}: {pull_request_url}"
+    comments = client.list_comments(issue_number)
+    if not any(
+        pull_request_url in str(comment.get("body", "")) for comment in comments
+    ):
+        client.add_issue_comment(issue_number, marker)
+
+    task_state = strategy.task.input_state
+    proposed = task_state.get("proposed_pr_context")
+    files_value = action.parameters.get("files_to_publish")
+    if (
+        not isinstance(proposed, Mapping)
+        or not isinstance(files_value, list)
+        or not all(isinstance(path, str) for path in files_value)
+    ):
+        raise PowdrrExecutionError(
+            "issue-worker PR finalization requires reviewed context and published paths"
+        )
+    changelog_path = _issue_worker_pr_changelog(
+        repo_root=strategy.repo_root,
+        pr_number=match.group(1),
+        proposed=proposed,
+        files_to_publish=files_value,
+    )
+    parameters = action.parameters
+    from powdrr_lift.clean_pr_publisher import publish_clean_pull_request
+
+    publish_clean_pull_request(
+        {
+            "files_to_publish": [changelog_path],
+            "base": parameters.get("base"),
+            "publication_branch": parameters.get("publication_branch"),
+            "title": parameters.get("title"),
+            "body": parameters.get("body"),
+            "commit_message": f"Add PR-{match.group(1)} changelog descriptor",
+        },
+        worktree_root=strategy.repo_root,
+    )
+
+
 def _append_plan_repair_metadata_to_pr_body(
     action: WorkflowAction,
     *,
@@ -3298,6 +3485,10 @@ class _TaskWorkflowExecutionStrategy:
             action,
             self.task.input_state,
         )
+        action = _append_issue_reference_to_pr_body(
+            action,
+            issue_number=getattr(self.config, "github_issue_number", None),
+        )
         action = _append_plan_repair_metadata_to_pr_body(
             action,
             task_input_state=self.task.input_state,
@@ -3371,6 +3562,26 @@ class _TaskWorkflowExecutionStrategy:
                     "stderr": "",
                     "pull_request_url": result,
                 }
+            if (
+                action.tool == GH_TOOL
+                and action.parameters.get("operation") == "pr_publish_clean"
+                and isinstance(
+                    self.task.input_state.get("proposed_pr_context"), Mapping
+                )
+            ):
+                pull_request_url = (
+                    result
+                    if isinstance(result, str)
+                    else result.get("pull_request_url")
+                    if isinstance(result, Mapping)
+                    else None
+                )
+                if isinstance(pull_request_url, str):
+                    _finish_issue_worker_pull_request(
+                        self,
+                        action=action,
+                        pull_request_url=pull_request_url,
+                    )
             if isinstance(result, Mapping):
                 if result.get("stdout"):
                     print(str(result["stdout"]), end="", file=self.stdout)
@@ -3661,6 +3872,39 @@ class _TaskWorkflowExecutionStrategy:
                 story_context=pinned_story_context,
                 story_validation_bundle=story_validation_bundle,
             )
+            # The shared implementation workflow gates PR publication on these
+            # two summaries. Source-reference dispatch has a different internal
+            # result shape, so adapt its actual validation profiles here rather
+            # than letting the workflow resolve missing bindings after success.
+            validation = result.get("validation")
+            validation_results = (
+                validation.get("results", []) if isinstance(validation, Mapping) else []
+            )
+            reference_result = next(
+                (
+                    item
+                    for item in validation_results
+                    if isinstance(item, Mapping)
+                    and item.get("profile") == "structrr-references"
+                ),
+                None,
+            )
+            integration_results = [
+                item
+                for item in validation_results
+                if isinstance(item, Mapping)
+                and item.get("profile") != "structrr-references"
+            ]
+            result["structrr"] = {
+                "passed": result.get("passed") is True
+                and isinstance(reference_result, Mapping)
+                and reference_result.get("status") == "passed"
+            }
+            result["integration_tests"] = {
+                "passed": result.get("passed") is True
+                and bool(integration_results)
+                and all(item.get("status") == "passed" for item in integration_results)
+            }
             self.events.append({"kind": "coding_agent", "result": result})
             return result
         structrr_context = _issue_worker_structrr_context(

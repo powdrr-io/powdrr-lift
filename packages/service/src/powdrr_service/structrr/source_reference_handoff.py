@@ -56,7 +56,9 @@ WORKER_INSTRUCTION = (
     "or satisfy coverage by listing IDs in unrelated code. If an essential decision\n"
     "or assumption is missing, report the gap with its location and consequence.\n"
     "Run the local reference check before submitting. Report each implemented ID\n"
-    "and its owning path and qualified symbol. These claims are independently checked."
+    "and its owning path and qualified symbol. Run `git diff --check` and fix any\n"
+    "reported whitespace errors before submitting. "
+    "These claims are independently checked."
 )
 _RELATIONSHIPS = {
     "implements": "feature",
@@ -486,10 +488,6 @@ def _normalize(contract: Mapping[str, Any]) -> dict[str, Any]:
     ]
     if len(route_identities) != len(set(route_identities)):
         raise ValueError("placement and preservation identities must be distinct")
-    if not obligations and not preservation:
-        raise ValueError(
-            "source reference handoff requires accepted placement obligations"
-        )
     baseline_keys = [
         (rule["ref"], _binding_key(rule["owner"])) for rule in preservation
     ]
@@ -534,6 +532,57 @@ def _normalize(contract: Mapping[str, Any]) -> dict[str, Any]:
 
 def _render(contract: Mapping[str, Any]) -> str:
     workspace = contract.get("workspace_root")
+    has_reference_intent = bool(contract["obligations"] or contract["preservation"])
+    reference_guidance = (
+        WORKER_INSTRUCTION + "\n\nAnnotation grammar: # structrr: ID; "
+        "# structrr[module]: ID; # structrr[block]: ID. Place declaration markers "
+        "immediately above the owning declaration, before decorators. Module markers "
+        "belong in the module header. Block markers precede their owning statement.\n"
+        + _json({"baseline_reference_rules": contract["preservation"]})
+        if has_reference_intent
+        else (
+            "Implement the accepted behavior scenarios and verification commands "
+            "within the allowed paths. This design contains no source-reference "
+            "placement or preservation obligations; do not invent Structrr IDs or "
+            "add markers to unrelated code. Preserve existing repository behavior "
+            "outside the accepted scenarios. Run `git diff --check` and fix any "
+            "reported whitespace errors before submitting."
+        )
+    )
+    completion_guidance = (
+        "Return control using the existing completion protocol. In the existing "
+        "submission report each reference ID, owning path, kind and qualified symbol; "
+        "include unresolved design gaps, their locations and consequences. Do not "
+        "write an additional repository artifact. Semantic owner selectors require "
+        "independent review; worker claims never establish a passing binding. "
+        "A design gap leaves the attempt incomplete and requires the normal design "
+        "workflow; the worker cannot approve its own amendment."
+        if has_reference_intent
+        else (
+            "Return control using the existing completion protocol. Report an empty "
+            "reference_owners list and include any unresolved design gaps, their "
+            "locations and consequences. Do not write an additional repository "
+            "artifact. The worker cannot approve its own amendment. The final Bash "
+            "command must submit completion JSON with no prose afterward: "
+            "printf '%s\\n' COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT "
+            '\'{"schema_version":"structrr-reference-completion-v1",'
+            '"reference_owners":[],"design_gaps":[]}\''
+        )
+    )
+    if workspace:
+        completion_guidance += (
+            "\nSubmit a JSON object with "
+            "schema_version=structrr-reference-completion-v1, "
+            "reference_owners (a list of ref/path/kind/qualified_name objects), and "
+            "design_gaps (a list of location/consequence objects). The final Bash "
+            "command must execute printf '%s\\n' "
+            "COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT followed by that valid JSON, with "
+            "no prose or markdown afterward. For empty lists, use: printf '%s\\n' "
+            "COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT "
+            '\'{"schema_version":"structrr-reference-completion-v1",'
+            '"reference_owners":[],"design_gaps":[]}\'. Report every '
+            "unresolved gap; a nonempty list blocks acceptance. Do not commit or push."
+        )
     sections = (
         _json(contract["objective"]),
         _json(
@@ -580,11 +629,7 @@ def _render(contract: Mapping[str, Any]) -> str:
                 "commands": contract["verification_commands"],
             }
         ),
-        WORKER_INSTRUCTION + "\n\nAnnotation grammar: # structrr: ID; "
-        "# structrr[module]: ID; # structrr[block]: ID. Place declaration markers "
-        "immediately above the owning declaration, before decorators. Module markers "
-        "belong in the module header. Block markers precede their owning statement.\n"
-        + _json({"baseline_reference_rules": contract["preservation"]}),
+        reference_guidance,
         _json(contract["allowed_paths"]),
         _json(
             {
@@ -616,22 +661,7 @@ def _render(contract: Mapping[str, Any]) -> str:
             if contract["reference_check_command"] is None
             else ""
         ),
-        "Return control using the existing completion protocol. In the existing "
-        "submission report each reference ID, owning path, kind and qualified symbol; "
-        "include unresolved design gaps, their locations and consequences. Do not "
-        "write an additional repository artifact. Semantic owner selectors require "
-        "independent review; worker claims never establish a passing binding. "
-        "A design gap leaves the attempt incomplete and requires the normal design "
-        "workflow; the worker cannot approve its own amendment."
-        + (
-            "\nSubmit a JSON object with "
-            "schema_version=structrr-reference-completion-v1, "
-            "reference_owners (a list of ref/path/kind/qualified_name objects), and "
-            "design_gaps (a list of location/consequence objects). Report every "
-            "unresolved gap; a nonempty list blocks acceptance. Do not commit or push."
-            if workspace
-            else ""
-        ),
+        completion_guidance,
     )
     return (
         "\n\n".join(
@@ -679,9 +709,10 @@ class SourceReferencePrompt:
             raw.get("contract"), Mapping
         ):
             raise ValueError("invalid source reference prompt schema")
-        expected = _prompt(
-            _normalize(raw["contract"]), raw.get("private_validation_digest")
-        )
+        private_digest = raw.get("private_validation_digest")
+        if not isinstance(private_digest, str):
+            raise ValueError("invalid private validation input digest")
+        expected = _prompt(_normalize(raw["contract"]), private_digest)
         if dict(raw) != expected:
             raise ValueError("source reference prompt or fingerprint mismatch")
         return cls(_json(expected))

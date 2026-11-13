@@ -1553,7 +1553,11 @@ def test_issue_worker_runs_plan_task_from_durable_runtime_directory(
             workflow_file,
             plan.items[0].workflow_id,
             "worker",
-            replace(plan.items[0], github_issue_number=23),
+            replace(
+                plan.items[0],
+                github_issue_number=23,
+                source_reference_design_file="reviewed/design.yaml",
+            ),
             plan,
             (),
             lambda *_args: None,
@@ -1604,6 +1608,12 @@ def test_issue_worker_runs_plan_task_from_durable_runtime_directory(
     assert (
         captured["workflow_inputs"]["proposed_pr_context"]["github_repository"]
         == "owner/repo"
+    )
+    assert (
+        captured["workflow_inputs"]["proposed_pr_context"][
+            "source_reference_design_file"
+        ]
+        == "reviewed/design.yaml"
     )
     task_files = sorted(runtime_directory.glob("*.yaml"))
     assert len(task_files) == 2

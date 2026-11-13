@@ -1,7 +1,8 @@
 # Implementation contract and verification
 
-Status: Proposed consolidation. Existing capabilities below are implemented;
-remaining milestones require implementation and acceptance evidence.
+Status: Proposed consolidation. Milestone 1 route inventory and fixture
+acceptance are implemented; milestones 2–5 require further implementation and
+acceptance evidence.
 
 Audited code baseline for this inventory: `feafe5b7b22bf7cd98dee9b06797ea87af558a4c`.
 
@@ -76,9 +77,11 @@ points reject, the standalone generic coding-agent CLI was removed, and CI
 repair modes, operations, worker helpers, and process declarations were
 removed. CI observation remains without auto-repair. The feature endpoint's
 candidate correction loop and coding helper are removed; plan amendments remain
-as typed non-code-writing service repairs. Route-level fixtures for all
-delegating entry points remain before this milestone meets its acceptance
-criteria.
+as typed non-code-writing service repairs. Route fixtures now trace selected
+authority through the CLI issue-worker, planned-workflow, and benchmark
+task-scenario adapters, and exercise explicit rejection or observation at the
+other implementation-capable boundaries. Milestone 1 acceptance is complete;
+milestones 2–5 remain.
 
 ### 2. Compile one complete, source-backed obligation closure
 

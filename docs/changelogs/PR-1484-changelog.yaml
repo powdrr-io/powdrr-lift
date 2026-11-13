@@ -1,5 +1,5 @@
 schema: https://powdrr.io/schema/changelog-v2
-change_id: PR-1483
+change_id: PR-1484
 title: Collect candidate-bound scope evidence
 intent:
   problem: Scope routes have no trusted producer, and source validation reports only changed Python paths.

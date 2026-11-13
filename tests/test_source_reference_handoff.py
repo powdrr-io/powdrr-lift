@@ -408,6 +408,37 @@ def preservation(**changes: Any) -> dict[str, Any]:
     }
 
 
+def test_private_evidence_contracts_cover_placements_and_preservations() -> None:
+    doc = document(preservation=[preservation()])
+    private = compile_document(doc).validation_manifest["private_validation_data"]
+    contracts = {
+        item["obligation_id"]: item["review_routes"]
+        for item in private["obligation_evidence_contracts"]
+    }
+    assert contracts == {
+        "placement:retry": ["invariant_review", "behavior_validation"],
+        "preserve:old": ["invariant_review", "behavior_validation"],
+    }
+
+
+def test_feature_placement_compiles_structural_and_behavior_routes() -> None:
+    definition = ReferenceDefinition(
+        "Opaque:retry", "feature", "Retry safely.", "spec:1"
+    )
+    doc = document(
+        placement(
+            relationship="implements",
+            requirement="Retry safely.",
+        ),
+        definitions=[definition],
+    )
+    private = compile_document(doc).validation_manifest["private_validation_data"]
+    assert private["obligation_evidence_contracts"][0]["review_routes"] == [
+        "structural_diff",
+        "behavior_validation",
+    ]
+
+
 def test_preservation_relocation_removal_and_canonical_supersession() -> None:
     rules = [
         preservation(),

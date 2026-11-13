@@ -100,6 +100,7 @@ from powdrr_service.structrr.snapshot import snapshot_digest
 from powdrr_service.structrr.source_manifest import SourceManifest
 from powdrr_service.structrr.validation import (
     DiscoveredValidationProfile,
+    validation_profiles_from_inventory,
 )
 from powdrr_service.structrr.verification_obligations import (
     VerificationObligationCompilation,
@@ -648,8 +649,8 @@ def _execute_procedrr_flow(
     )
     if not validation_profiles and not config.benchmark_mode:
         raise PowdrrExecutionError(
-            "Could not discover a validation command. Provide "
-            "--validation-command or declare project validation tooling."
+            "Validation discovery is unknown: no explicit or repository check "
+            "was found. Provide --validation-command or declare project tooling."
         )
     state["validation_profiles"] = validation_profiles
     state["source_baseline_manifest_path"] = output_root / "validation-bootstrap.yaml"
@@ -6345,43 +6346,29 @@ def _bootstrap_validation_profiles(
             "Structrr bootstrap validation failed while discovering validation "
             f"tools: {bootstrap.validation.issues}"
         )
+    profiles = list(
+        validation_profiles_from_inventory(
+            bootstrap.document.get("validation_inventory", [])
+        )
+    )
     if explicit_command:
-        return (
+        profiles.insert(
+            0,
             DiscoveredValidationProfile(
                 "feature-validation", explicit_command, "feature command"
             ),
         )
-    profiles: list[DiscoveredValidationProfile] = []
-    for tool in bootstrap.document.get("tools", []):
-        if not isinstance(tool, Mapping):
-            continue
-        tool_id = tool.get("id")
-        command = tool.get("validation_action")
-        if not isinstance(tool_id, str) or not tool_id.startswith("validation:"):
-            continue
-        if not isinstance(command, list) or not all(
-            isinstance(item, str) and item for item in command
-        ):
-            continue
-        profiles.append(
-            DiscoveredValidationProfile(
-                tool_id.removeprefix("validation:"),
-                tuple(command),
-                str(tool.get("source", "Structrr bootstrap")),
-            )
-        )
-    if not profiles and not benchmark_mode:
-        profiles.append(
-            DiscoveredValidationProfile(
-                "repository-validation",
-                ("true",),
-                "no repository-declared validation command",
-            )
-        )
-    unique: dict[str, DiscoveredValidationProfile] = {}
+    unique: list[DiscoveredValidationProfile] = []
+    used_names: set[str] = set()
     for profile in profiles:
-        unique.setdefault(profile.name, profile)
-    return tuple(unique.values())
+        name = profile.name
+        suffix = 2
+        while name in used_names:
+            name = f"{profile.name}-{suffix}"
+            suffix += 1
+        used_names.add(name)
+        unique.append(profile if name == profile.name else replace(profile, name=name))
+    return tuple(unique)
 
 
 def _require_clean_root(root: Path, runner: Runner) -> None:

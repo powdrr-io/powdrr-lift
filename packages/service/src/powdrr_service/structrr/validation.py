@@ -7,7 +7,7 @@ import os
 import re
 import shlex
 import tomllib
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import cast
@@ -110,15 +110,15 @@ def validation_context(
     if not profiles:
         diagnostics.append(
             {
-                "code": "discovery_scope_limited",
+                "code": "validation_discovery_unknown",
                 "message": (
-                    "Validation discovery is limited to the detectors currently "
-                    "implemented; absence of a check is not proof that none exists."
+                    "No validation obligation was discovered. Validation readiness "
+                    "is unknown until a check is declared or discovered."
                 ),
             }
         )
     return ValidationContext(
-        discovery_status="partial",
+        discovery_status="unknown" if not profiles else "partial",
         coverage=(
             "currently implemented validation detectors",
             "Python component and environment manifests",
@@ -136,6 +136,68 @@ def validation_context(
         diagnostics=tuple(diagnostics),
         input_fingerprints=topology.input_fingerprints if topology else (),
     ).to_data()
+
+
+def validation_profiles_from_inventory(
+    inventory: object,
+) -> tuple[DiscoveredValidationProfile, ...]:
+    """Load Workrr profiles from the typed Structrr validation inventory."""
+    if not isinstance(inventory, Sequence) or isinstance(inventory, (str, bytes)):
+        raise ValueError("validation inventory must be a sequence")
+    profiles: list[DiscoveredValidationProfile] = []
+    for index, record in enumerate(inventory):
+        if not isinstance(record, Mapping):
+            raise ValueError(f"validation inventory entry {index} must be a mapping")
+        try:
+            check = ValidationCheck.from_data(record)
+        except (TypeError, ValueError) as error:
+            raise ValueError(
+                f"validation inventory entry {index} is invalid: {error}"
+            ) from error
+        execution = check.execution
+        declaration = check.provenance.get("declaration", "unknown")
+        evidence = check.provenance.get("evidence", ())
+        profiles.append(
+            DiscoveredValidationProfile(
+                name=check.profile,
+                command=check.command,
+                source=check.source,
+                provider_name=check.provider,
+                component=check.component,
+                environment_id=check.environment,
+                purpose=check.purpose,
+                roles=check.roles,
+                cwd=str(execution.get("cwd", ".")),
+                shell=_optional_string(execution.get("shell")),
+                script=_optional_string(execution.get("script")),
+                execution_kind=str(execution.get("kind", "unresolved")),
+                selectors=check.selectors,
+                config_files=check.config_files,
+                settings=dict(check.settings),
+                applicability=dict(check.applicability),
+                ci_origins=tuple(dict(origin) for origin in check.ci_origins),
+                requiredness=dict(check.requiredness),
+                declaration=(
+                    declaration if isinstance(declaration, str) else "unknown"
+                ),
+                evidence=(
+                    tuple(item for item in evidence if isinstance(item, str))
+                    if isinstance(evidence, Sequence)
+                    and not isinstance(evidence, (str, bytes))
+                    else ()
+                ),
+                confirmation=dict(check.confirmation),
+                depends_on=check.depends_on,
+                local_reproducibility=check.local_reproducibility,
+                baseline=dict(check.baseline),
+                unresolved=check.unresolved,
+            )
+        )
+    return tuple(profiles)
+
+
+def _optional_string(value: object) -> str | None:
+    return value if isinstance(value, str) else None
 
 
 def assign_python_topology(

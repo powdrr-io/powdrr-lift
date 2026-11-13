@@ -2,7 +2,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from powdrr_service.structrr.validation import discover_validation_profiles
+from powdrr_service.structrr.validation import (
+    discover_validation_profiles,
+    validation_context,
+    validation_profiles_from_inventory,
+)
+from powdrr_service.structrr.validation_models import ValidationCheck
 
 
 def test_discovers_project_checks_from_configuration_and_ci(tmp_path: Path) -> None:
@@ -61,6 +66,56 @@ def test_explicit_validation_command_is_used_when_no_tooling_is_detected(
 
     assert profiles[0].name == "feature-validation"
     assert profiles[0].command == ("python", "-m", "pytest")
+
+
+def test_typed_inventory_loader_preserves_execution_context() -> None:
+    check = ValidationCheck(
+        id="validation:component-tests",
+        provider="pytest",
+        profile="component-tests",
+        command=("python", "-m", "pytest", "tests"),
+        source="pyproject.toml",
+        environment="uv:root",
+        execution={
+            "kind": "argv",
+            "cwd": "packages/api",
+            "shell": None,
+            "script": None,
+        },
+        component="python-component:api",
+        purpose="Run API tests",
+        roles=("test",),
+        selectors=("tests/",),
+        config_files=("pyproject.toml", "uv.lock"),
+        settings={"timeout": 60},
+        applicability={"local": True, "evaluation": "applicable"},
+        requiredness={"status": "required", "evidence": ["workflow:ci"]},
+        provenance={"declaration": "declared", "evidence": ["evidence:pyproject"]},
+        confirmation={"level": "configuration", "observations": []},
+        depends_on=("validation:install",),
+        baseline={"status": "not_run", "observation": None},
+    )
+
+    (profile,) = validation_profiles_from_inventory([check.to_data()])
+
+    assert profile.command == ("python", "-m", "pytest", "tests")
+    assert profile.provider == "pytest"
+    assert profile.cwd == "packages/api"
+    assert profile.environment_id == "uv:root"
+    assert profile.component == "python-component:api"
+    assert profile.config_files == ("pyproject.toml", "uv.lock")
+    assert profile.requiredness == {"status": "required", "evidence": ["workflow:ci"]}
+    assert profile.depends_on == ("validation:install",)
+
+
+def test_empty_validation_discovery_is_explicitly_unknown() -> None:
+    context = validation_context(())
+    diagnostics = context["diagnostics"]
+
+    assert context["discovery_status"] == "unknown"
+    assert isinstance(diagnostics, list)
+    assert isinstance(diagnostics[0], dict)
+    assert diagnostics[0]["code"] == "validation_discovery_unknown"
 
 
 def test_discovers_stestr_profile_from_repository_configuration(tmp_path: Path) -> None:

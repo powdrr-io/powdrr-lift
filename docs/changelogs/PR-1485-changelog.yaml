@@ -1,0 +1,214 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1485
+title: Match required checks to validation inventory
+intent:
+  problem: Required GitHub checks are not linked to the repository's discovered validation declarations before review readiness is granted.
+  goal: Require every remote required check to match a unique workflow job in the typed Structrr inventory and retain the inventory digest with the CI observation.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/plans/bootstrap-validation-discovery.md
+  type: modified
+  span: {start_line: 18, end_line: 24}
+  summary: Record required-check inventory matching as partial WP8 progress and retain remaining freshness work.
+  rationale: Keep plan status aligned with the new remote readiness requirement.
+- path: packages/service/src/powdrr_service/structrr/validation.py
+  type: modified
+  span: {start_line: 2164, end_line: 2164}
+  summary: Record the workflow display name in discovered CI origins.
+  rationale: Support matching GitHub's workflow identity to the inventory declaration.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 3442, end_line: 3442}
+  summary: Pass the repository root when rechecking required CI.
+  rationale: Load the same committed validation inventory during CI continuation.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 25, end_line: 25}
+  summary: Import YAML support for reading the committed validation baseline.
+  rationale: Read typed validation obligations from the repository checkout.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 49, end_line: 49}
+  summary: Import the typed validation check model.
+  rationale: Reject malformed inventory records before matching remote checks.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 1006, end_line: 1016}
+  summary: Load the committed inventory when the worker observes a completed PR.
+  rationale: Bind readiness to the repository's discovered validation obligations.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 1248, end_line: 1248}
+  summary: Require repository context when continuing an awaiting-CI issue.
+  rationale: Ensure follow-up observations can load the same validation baseline.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 1262, end_line: 1268}
+  summary: Match refreshed required checks against the repository validation inventory.
+  rationale: Prevent a later CI recheck from bypassing inventory reconciliation.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 1417, end_line: 1425}
+  summary: Match checks after resuming a manual-prerequisite workflow.
+  rationale: Apply the same readiness contract to resumed implementation work.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 2558, end_line: 2666}
+  summary: Load and type-check the baseline inventory, then match required checks to workflow and job identities.
+  rationale: Keep missing, invalid, unmatched, and ambiguous remote obligations unresolved.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 2668, end_line: 2672}
+  summary: Require the typed inventory and its digest when observing required CI.
+  rationale: Make inventory reconciliation an explicit input to the readiness gate.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 2683, end_line: 2683}
+  summary: Preserve the inventory digest when the PR URL is invalid.
+  rationale: Keep the evidence basis visible in every outcome record.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 2693, end_line: 2693}
+  summary: Preserve the inventory digest when GitHub cannot report a current head.
+  rationale: Retain the observation basis for blocked outcomes.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 2705, end_line: 2705}
+  summary: Preserve the inventory digest when the PR head is malformed.
+  rationale: Retain the observation basis for blocked outcomes.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 2722, end_line: 2722}
+  summary: Preserve the inventory digest when required checks cannot be read.
+  rationale: Keep remote evidence provenance in failure reports.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 2743, end_line: 2743}
+  summary: Preserve the inventory digest when GitHub returns no required checks.
+  rationale: Keep the readiness basis explicit for empty remote observations.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 2756, end_line: 2756}
+  summary: Include inventory matching results on each required check.
+  rationale: Show how remote identities map to discovered check profiles.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 2768, end_line: 2770}
+  summary: Preserve inventory provenance when the PR head changes during observation.
+  rationale: Prevent stale remote data from satisfying readiness.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 2794, end_line: 2794}
+  summary: Block when the validation inventory is unavailable.
+  rationale: Unknown validation context cannot grant review readiness.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 2796, end_line: 2799}
+  summary: Block when required checks do not map to a discovered workflow job.
+  rationale: Keep unmatched and ambiguous obligations unresolved.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 2802, end_line: 2807}
+  summary: Keep failed, unknown, or pending outcomes from advancing to review.
+  rationale: Only a complete set of passed and matched checks can satisfy the gate.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 2811, end_line: 2813}
+  summary: Return a blocked outcome for unrecognized required-check states.
+  rationale: Avoid treating unknown remote outcomes as successful validation.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 2823, end_line: 2825}
+  summary: Validate per-check inventory match records before granting readiness.
+  rationale: Fail closed on malformed observation data.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 2838, end_line: 2842}
+  summary: Retain the inventory digest in aggregate CI observations.
+  rationale: Make the exact validation inventory used by the gate auditable.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 2849, end_line: 2849}
+  summary: Add the inventory digest to the serialized observation.
+  rationale: Keep checkpoint provenance attached to each CI outcome.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 2859, end_line: 2859}
+  summary: Return the inventory digest with the observation result.
+  rationale: Preserve the source inventory identity for follow-up review.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 2881, end_line: 2881}
+  summary: Include inventory provenance in the durable CI outcome checkpoint.
+  rationale: Make later review able to identify the inventory used for readiness.
+- path: tests/test_github_issue_queue.py
+  type: modified
+  span: {start_line: 45, end_line: 93}
+  summary: Provide a typed baseline fixture for required-check readiness tests.
+  rationale: Exercise worker decisions against discovered workflow job identities.
+- path: tests/test_github_issue_queue.py
+  type: modified
+  span: {start_line: 2232, end_line: 2234}
+  summary: Supply repository context to CI continuation coverage.
+  rationale: Verify follow-up readiness reads the baseline inventory.
+- path: tests/test_github_issue_queue.py
+  type: modified
+  span: {start_line: 2268, end_line: 2268}
+  summary: Pass the repository root to CI continuation.
+  rationale: Load the validation inventory when reevaluating the PR readiness gate.
+- path: tests/test_github_issue_queue.py
+  type: modified
+  span: {start_line: 2276, end_line: 2278}
+  summary: Supply inventory records when checking PR-head change handling.
+  rationale: Preserve the inventory requirement in stale-head coverage.
+- path: tests/test_github_issue_queue.py
+  type: modified
+  span: {start_line: 2300, end_line: 2301}
+  summary: Supply a valid inventory for normalized current-head check coverage.
+  rationale: Verify remote check results are reconciled to discovery records.
+- path: tests/test_github_issue_queue.py
+  type: modified
+  span: {start_line: 2308, end_line: 2310}
+  summary: Assert each observed check is matched to its discovered profile.
+  rationale: Confirm the readiness gate preserves inventory linkage.
+- path: tests/test_github_issue_queue.py
+  type: modified
+  span: {start_line: 2321, end_line: 2322}
+  summary: Assert checkpoint serialization includes the inventory digest.
+  rationale: Keep provenance available after the queue decision.
+- path: tests/test_github_issue_queue.py
+  type: modified
+  span: {start_line: 2325, end_line: 2326}
+  summary: Cover blocked readiness when the inventory is unavailable.
+  rationale: Missing discovery context cannot satisfy required CI.
+- path: tests/test_github_issue_queue.py
+  type: modified
+  span: {start_line: 2334, end_line: 2338}
+  summary: Cover blocking an unmatched required check.
+  rationale: Ensure an unrepresented remote obligation stays unresolved.
+- path: tests/test_github_issue_queue.py
+  type: modified
+  span: {start_line: 2351, end_line: 2351}
+  summary: Add a regression case for ambiguous workflow identity.
+  rationale: Require a unique remote-to-inventory match.
+- path: tests/test_github_issue_queue.py
+  type: modified
+  span: {start_line: 2353, end_line: 2409}
+  summary: Cover ambiguous identity and verify multiple workflows cannot be mistaken for one required check.
+  rationale: Keep ambiguous remote evidence from satisfying review readiness.
+- path: tests/test_validation_tasks.py
+  type: modified
+  span: {start_line: 383, end_line: 384}
+  summary: Assert workflow display names are retained in CI origin records.
+  rationale: Give remote check matching a stable workflow identity.
+entities: []
+entity_relationships: []
+invariants:
+- id: required-check-matches-discovered-job
+  description: Every required remote check must match a unique workflow job identity in the typed validation inventory.
+  action: added
+- id: missing-or-ambiguous-inventory-match-blocks-review
+  description: Missing, invalid, unmatched, ambiguous, and unknown required-check evidence cannot advance to review.
+  action: added
+guidance: []

@@ -7,15 +7,16 @@ handoff and compiles a base-bound private repository evidence closure. Milestone
 handoff and audits story receipts in enforce mode against the execution
 candidate; it requires that report before patch transfer. Protected source runs
 now emit candidate-tree-bound route records, including explicit `not_collected`
-outcomes for behavior and review routes without connected evidence adapters.
-Exact route reconciliation rejects missing, duplicate, unlinked, stale, and
-non-passing records. The reconciled result is not yet an acceptance gate.
-Retained-intent gates and trusted candidate-bound receipts for the remaining
-routes remain.
+outcomes where no trusted evidence producer is connected. After enforce-mode
+story validation, linked story receipts now discharge only the matching behavior
+routes and are persisted in a separate protected artifact. Exact route
+reconciliation rejects missing, duplicate, unlinked, stale, and non-passing
+records. The reconciled result is not yet an acceptance gate. Retained-intent
+gates and trusted candidate-bound receipts for the remaining routes remain.
 Milestones 4–5 remain.
 
 Audited code baseline for this inventory: `feafe5b7b22bf7cd98dee9b06797ea87af558a4c`.
-Latest implementation review baseline: `5a72076933b50f994b2774fa879a8f9432f50c5b` (PR #1475).
+Latest implementation review baseline: `60a27e0877c2a6876209b9c4920dae78e7b34430` (PR #1480).
 
 This plan replaces the intent-linked verification, evidence-backed prompt
 contract closure, and bounded coding-worker plans in `superseded/`. Those
@@ -139,13 +140,18 @@ to pass before transferring the patch. Protected source runs now persist one
 route record per compiled route against the final candidate identity.
 Structural routes report changed accepted owner paths; routes without a trusted
 producer report `not_collected`, so an unrelated passing command cannot be
-misrepresented as route evidence. Exact route reconciliation now requires one
-passing record for each compiled obligation-route pair on the candidate and
-rejects missing, duplicate, unlinked, stale, and non-passing records. This
+misrepresented as route evidence. After protected story validation, current
+receipts discharge behavior routes only when their exact case IDs are linked by
+the obligation, every observation passes, and each receipt is fresh for the
+story candidate tree. The appended route artifact retains both the protected
+run candidate identity and the story candidate tree. Exact route reconciliation
+requires one passing record for each compiled obligation-route pair and rejects
+missing, duplicate, unlinked, stale, and non-passing records. This
 reconciliation is not yet consumed by the acceptance decision. Add trusted
-producers for the remaining routes, then gate acceptance on complete route
-coverage. New reconciliation fixtures reject missing, duplicate, unlinked, stale,
-and non-passing route records. A body-only regression fixture remains.
+producers for invariant and scope routes, and resolve preservation behavior
+links, then gate acceptance on complete route coverage. Reconciliation fixtures
+cover invalid records and story-route fixtures cover stale and linked receipts.
+A body-only regression fixture remains.
 
 ### 4. Finish bounded execution and delivery migration
 

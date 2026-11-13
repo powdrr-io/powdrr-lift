@@ -1,0 +1,89 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1482
+title: Bind story receipts to behavior routes
+intent:
+  problem: Story validation already produces fresh case receipts, but compiled obligation behavior routes remain uncollected.
+  goal: Discharge only behavior routes that explicitly link to passing story cases with current candidate-bound receipts.
+human-decisions: []
+structured_files: []
+files:
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span: {start_line: 211, end_line: 365}
+  summary: Bind exact story case receipts to matching behavior route records.
+  rationale: Require every linked observation and receipt to pass and retain the story candidate tree identity.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span: {start_line: 1063, end_line: 1080}
+  summary: Append story route evidence after rechecking the protected candidate.
+  rationale: Keep the final candidate unchanged across story validation and evidence persistence.
+- path: src/powdrr_lift/workrr/source_reference_dispatch.py
+  type: modified
+  span: {start_line: 328, end_line: 332}
+  summary: Return the appended story route artifact with the protected task result.
+  rationale: Make post-validation route outcomes available to the dispatch caller.
+- path: tests/test_source_reference_run.py
+  type: modified
+  span: {start_line: 22, end_line: 22}
+  summary: Import story route evidence binding for focused tests.
+  rationale: Exercise behavior route mapping and receipt freshness.
+- path: tests/test_source_reference_run.py
+  type: modified
+  span: {start_line: 239, end_line: 341}
+  summary: Cover linked passing cases, stale receipts, and protected artifact persistence.
+  rationale: Ensure only fresh receipts for explicitly referenced cases discharge behavior routes.
+- path: tests/test_source_reference_dispatch.py
+  type: modified
+  span: {start_line: 293, end_line: 297}
+  summary: Model the post-validation route evidence adapter in the dispatch fixture.
+  rationale: Keep the protected dispatch test aligned with the route binding step.
+- path: tests/test_source_reference_dispatch.py
+  type: modified
+  span: {start_line: 367, end_line: 370}
+  summary: Assert the appended route evidence and artifact path are returned.
+  rationale: Verify dispatch exposes post-story evidence to its caller.
+- path: docs/plans/implementation-contract-and-verification.md
+  type: modified
+  span: {start_line: 10, end_line: 15}
+  summary: Record linked story evidence for behavior routes and the remaining missing producers.
+  rationale: Keep milestone status accurate without implying route acceptance is complete.
+- path: docs/plans/implementation-contract-and-verification.md
+  type: modified
+  span: {start_line: 19, end_line: 19}
+  summary: Advance the implementation review baseline to PR 1479.
+  rationale: Keep the active plan tied to latest main.
+- path: docs/plans/implementation-contract-and-verification.md
+  type: modified
+  span: {start_line: 143, end_line: 149}
+  summary: Document story receipt binding, exact route reconciliation, and remaining gates.
+  rationale: Distinguish newly connected behavior routes from unresolved preservation, invariant, and scope evidence.
+- path: docs/plans/implementation-contract-and-verification.md
+  type: modified
+  span: {start_line: 151, end_line: 154}
+  summary: Record remaining route producers and fixture work.
+  rationale: Keep unimplemented evidence producers and acceptance criteria visible.
+entities:
+- id: bind-story-route-evidence
+  type: Function
+  action: added
+- id: bind-story-validation-to-source-run
+  type: Method
+  action: added
+- id: story-route-evidence-regression-tests
+  type: Unit test
+  action: added
+entity_relationships: []
+invariants:
+- id: behavior-route-requires-linked-story-cases
+  description: A behavior route passes only when every explicitly referenced story case and observation is passing.
+  action: added
+- id: story-receipts-must-match-the-story-candidate
+  description: Every receipt used by a behavior route must be fresh and name the candidate tree captured by story validation.
+  action: added
+- id: protected-candidate-remains-unchanged-during-binding
+  description: Story route evidence is appended only after rechecking the protected source candidate before and after binding.
+  action: added
+guidance:
+- id: unlinked-preservation-routes-remain-uncollected
+  description: Preservation behavior routes without explicit verification case links remain not_collected; unrelated story receipts do not discharge them.
+  action: added

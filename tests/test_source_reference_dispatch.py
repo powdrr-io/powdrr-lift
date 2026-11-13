@@ -290,6 +290,11 @@ def test_story_context_is_bound_into_protected_source_objective(
         def verify_candidate(self) -> None:
             return None
 
+        def bind_story_validation(
+            self, _story_validation: dict[str, Any]
+        ) -> dict[str, Any]:
+            return {"complete": False, "routes": []}
+
         def protect_command(self, command: tuple[str, ...]) -> tuple[str, ...]:
             return command
 
@@ -359,6 +364,10 @@ def test_story_context_is_bound_into_protected_source_objective(
     )
 
     assert result["passed"] is True, result.get("error")
+    assert result["obligation_route_evidence"] == {"complete": False, "routes": []}
+    assert result["obligation_route_evidence_path"].endswith(
+        "story-route-evidence.json"
+    )
     assert "Pinned customer story contract and selected cases" in captured["objective"]
     assert "story:resume:case:1" in captured["objective"]
     assert captured["readonly_support_files"] == {

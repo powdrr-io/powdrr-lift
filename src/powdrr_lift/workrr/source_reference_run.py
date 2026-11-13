@@ -208,6 +208,161 @@ def _candidate_route_evidence(
     return result
 
 
+def bind_story_route_evidence(
+    route_evidence: Mapping[str, Any],
+    handoff: CompiledSourceReferenceHandoff,
+    story_validation: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Bind verified story receipts to behavior routes naming their cases."""
+    data = handoff.to_data()
+    contract = data["worker_prompt"]["contract"]
+    private = data["validation_manifest"]["private_validation_data"]
+    placements = {item["obligation_id"]: item for item in contract["obligations"]}
+    coverage = story_validation.get("story_coverage")
+    health = story_validation.get("verification_health")
+    context = story_validation.get("execution_context")
+    if not all(isinstance(item, Mapping) for item in (coverage, health, context)):
+        raise ValueError("story route evidence requires coverage, health, and context")
+    assert isinstance(coverage, Mapping)
+    assert isinstance(health, Mapping)
+    assert isinstance(context, Mapping)
+    coverage_context = coverage.get("context")
+    stories = coverage.get("stories")
+    receipts = coverage.get("receipts")
+    if (
+        not isinstance(coverage_context, Mapping)
+        or not isinstance(stories, list)
+        or not isinstance(receipts, list)
+    ):
+        raise ValueError("story coverage is missing typed context or evidence lists")
+    story_tree = context.get("candidate_sha")
+    if (
+        story_validation.get("passed") is not True
+        or story_validation.get("coverage_evidence_error")
+        or coverage.get("verified") is not True
+        or health.get("mode") != "enforce"
+        or health.get("passed") is not True
+        or not isinstance(story_tree, str)
+        or coverage_context.get("candidate_sha") != story_tree
+    ):
+        raise ValueError("story evidence is not verified for one candidate tree")
+
+    case_rows: dict[str, list[Mapping[str, Any]]] = {}
+    for story in stories:
+        if not isinstance(story, Mapping):
+            raise ValueError("story coverage contains a malformed story row")
+        cases = story.get("cases")
+        if not isinstance(cases, list):
+            raise ValueError("story coverage contains a malformed case list")
+        for case in cases:
+            if not isinstance(case, Mapping) or not isinstance(
+                case.get("case_id"), str
+            ):
+                raise ValueError("story coverage contains a malformed case row")
+            case_rows.setdefault(case["case_id"], []).append(case)
+    history: dict[str, list[Mapping[str, Any]]] = {}
+    for entry in receipts:
+        if not isinstance(entry, Mapping) or not isinstance(
+            entry.get("receipt"), Mapping
+        ):
+            raise ValueError("story coverage contains a malformed receipt entry")
+        receipt = entry["receipt"]
+        receipt_id = receipt.get("receipt_id")
+        receipt_context = receipt.get("context")
+        if not isinstance(receipt_context, Mapping):
+            raise ValueError("story receipt has no typed execution context")
+        if isinstance(receipt_id, str):
+            history.setdefault(receipt_id, []).append(entry)
+
+    results = [dict(item) for item in route_evidence.get("routes", [])]
+    for result in results:
+        if result.get("route") != "behavior_validation":
+            continue
+        placement = placements.get(str(result.get("obligation_id")))
+        if placement is None:
+            continue
+        refs = placement["verification_refs"]
+        receipt_ids: set[str] = set()
+        failed = False
+        for ref in refs:
+            matches = case_rows.get(ref, [])
+            if len(matches) != 1 or matches[0].get("status") != "passed":
+                failed = True
+                break
+            case = matches[0]
+            observations = case.get("observations")
+            if not isinstance(observations, list) or not observations:
+                raise ValueError("story coverage contains a malformed observation list")
+            if any(
+                not isinstance(observation, Mapping)
+                or observation.get("status") != "passed"
+                for observation in observations
+            ):
+                failed = True
+                break
+            tests: list[Mapping[str, Any]] = []
+            for observation in observations:
+                assert isinstance(observation, Mapping)
+                raw_tests = observation.get("tests")
+                if not isinstance(raw_tests, list):
+                    raise ValueError("story observation contains a malformed test list")
+                if any(not isinstance(test, Mapping) for test in raw_tests):
+                    raise ValueError(
+                        "story observation contains malformed receipt links"
+                    )
+                tests.extend(test for test in raw_tests if isinstance(test, Mapping))
+            if not tests:
+                failed = True
+                break
+            for test in tests:
+                receipt_id = test.get("receipt_id")
+                entries = history.get(str(receipt_id), [])
+                if (
+                    not isinstance(receipt_id, str)
+                    or test.get("status") != "passed"
+                    or len(entries) != 1
+                    or entries[0].get("status") != "passed"
+                    or entries[0]["receipt"]["context"].get("candidate_sha")
+                    != story_tree
+                ):
+                    failed = True
+                    break
+                receipt_ids.add(receipt_id)
+            if failed:
+                break
+        if not failed and refs:
+            result.update(
+                status="passed",
+                evidence_receipts=sorted(receipt_ids),
+                story_candidate_tree=story_tree,
+                reason=(
+                    "all linked story cases passed with fresh candidate-bound receipts"
+                ),
+            )
+        else:
+            result.update(
+                status="not_collected",
+                evidence_receipts=[],
+                story_candidate_tree=story_tree,
+                reason="linked story cases lack exact passing receipt coverage",
+            )
+
+    updated = {
+        key: value for key, value in route_evidence.items() if key != "fingerprint"
+    }
+    updated["routes"] = results
+    reconciliation = reconcile_obligation_route_evidence(
+        private["obligation_evidence_contracts"],
+        results,
+        candidate_tree=str(route_evidence["candidate_tree"]),
+    )
+    updated["reconciliation"] = reconciliation
+    updated["complete"] = reconciliation["passed"]
+    updated["story_candidate_tree"] = story_tree
+    updated["fingerprint"] = content_fingerprint(updated)
+    return updated
+
+
 @dataclass(frozen=True, slots=True)
 class SourceReferenceRunResult:
     _data_json: str
@@ -904,6 +1059,24 @@ class SourceReferenceRun:
             raise SourceRunFailure(
                 "invalid_candidate", "Candidate changed after worker validation"
             )
+
+    def bind_story_validation(
+        self, story_validation: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        """Append story receipts while the validated candidate is frozen."""
+        self.verify_candidate()
+        terminal = json.loads((self.private_root / "terminal.json").read_text())
+        route_evidence = terminal.get("obligation_route_evidence")
+        if not isinstance(route_evidence, Mapping):
+            raise SourceRunFailure(
+                "missing_route_evidence", "Source run has no compiled route evidence"
+            )
+        updated = bind_story_route_evidence(
+            route_evidence, self.handoff, story_validation
+        )
+        self.verify_candidate()
+        _write_once(self.private_root / "story-route-evidence.json", updated)
+        return updated
 
     def reconcile_after_worker(self) -> None:
         """Apply trusted metadata-only corrections before independent validation."""

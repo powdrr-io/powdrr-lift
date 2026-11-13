@@ -19,6 +19,7 @@ from powdrr_lift.workrr.source_reference_run import (
     SourceReferenceRun,
     SourceRunFailure,
     _candidate_route_evidence,
+    bind_story_route_evidence,
     context_delivery_status,
 )
 
@@ -233,6 +234,109 @@ def test_candidate_route_evidence_is_scoped_and_marks_uncollected_routes(
     assert all(
         item["candidate_tree"] == "sha256:candidate-tree" for item in result["routes"]
     )
+
+
+def _story_validation(*, receipt_tree: str = "sha256:story-tree") -> dict[str, Any]:
+    receipt = {
+        "receipt_id": "receipt:retry",
+        "context": {"candidate_sha": receipt_tree},
+    }
+    case = {
+        "case_id": "case:retry",
+        "status": "passed",
+        "observations": [
+            {
+                "status": "passed",
+                "tests": [{"receipt_id": receipt["receipt_id"], "status": "passed"}],
+            }
+        ],
+    }
+    coverage = {
+        "verified": True,
+        "context": {"candidate_sha": "sha256:story-tree"},
+        "stories": [{"story_id": "story:retry", "cases": [case]}],
+        "receipts": [{"receipt": receipt, "status": "passed"}],
+    }
+    return {
+        "passed": True,
+        "coverage_evidence_error": None,
+        "story_coverage": coverage,
+        "verification_health": {"mode": "enforce", "passed": True},
+        "execution_context": {"candidate_sha": "sha256:story-tree"},
+    }
+
+
+def test_story_receipts_discharge_only_linked_candidate_behavior_routes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    run = prepare(tmp_path, monkeypatch)
+    initial = _candidate_route_evidence(
+        run.handoff,
+        candidate_tree="sha256:source-candidate",
+        changed_paths=("retry.py",),
+    )
+
+    result = bind_story_route_evidence(initial, run.handoff, _story_validation())
+
+    behavior = [
+        item for item in result["routes"] if item["route"] == "behavior_validation"
+    ]
+    assert len(behavior) == 3
+    by_obligation = {item["obligation_id"]: item for item in behavior}
+    for obligation_id in ("place:retry", "place:helper"):
+        assert by_obligation[obligation_id]["status"] == "passed"
+        assert by_obligation[obligation_id]["candidate_tree"] == (
+            "sha256:source-candidate"
+        )
+        assert by_obligation[obligation_id]["story_candidate_tree"] == (
+            "sha256:story-tree"
+        )
+        assert by_obligation[obligation_id]["evidence_receipts"] == ["receipt:retry"]
+    assert by_obligation["move:helper"]["status"] == "not_collected"
+    assert result["complete"] is False
+
+
+def test_stale_story_receipt_does_not_discharge_behavior_route(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    run = prepare(tmp_path, monkeypatch)
+    initial = _candidate_route_evidence(
+        run.handoff,
+        candidate_tree="sha256:source-candidate",
+        changed_paths=("retry.py",),
+    )
+
+    result = bind_story_route_evidence(
+        initial, run.handoff, _story_validation(receipt_tree="sha256:old-tree")
+    )
+
+    behavior = [
+        item for item in result["routes"] if item["route"] == "behavior_validation"
+    ]
+    assert all(item["status"] == "not_collected" for item in behavior)
+    assert all(item.get("evidence_receipts", []) == [] for item in behavior)
+
+
+def test_run_appends_story_route_evidence_after_candidate_recheck(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    run = prepare(tmp_path, monkeypatch)
+    candidate_tree = run._candidate_state()
+    run._candidate_after_worker = candidate_tree
+    initial = _candidate_route_evidence(
+        run.handoff,
+        candidate_tree=candidate_tree,
+        changed_paths=(),
+    )
+    (run.private_root / "terminal.json").write_text(
+        json.dumps({"obligation_route_evidence": initial}), encoding="utf-8"
+    )
+
+    updated = run.bind_story_validation(_story_validation())
+
+    artifact = run.private_root / "story-route-evidence.json"
+    assert json.loads(artifact.read_text(encoding="utf-8")) == updated
+    assert updated["story_candidate_tree"] == "sha256:story-tree"
 
 
 def test_prepared_inputs_are_bound_and_cannot_be_reused_or_mutated(

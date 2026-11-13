@@ -24,8 +24,8 @@ from urllib.parse import quote
 
 import yaml
 from powdrr_local.file_lock import Timeout, file_lock
-from powdrr_service.planning.checkpoints import has_complete_checkpoint_archive
 from powdrr_service.decision_obligation import content_fingerprint
+from powdrr_service.planning.checkpoints import has_complete_checkpoint_archive
 from powdrr_service.planning.plan_document import (
     MANUAL_PREREQUISITE_TRIGGER,  # noqa: F401 - legacy public re-export
     QUEUE_SCHEMA,  # noqa: F401 - legacy public re-export

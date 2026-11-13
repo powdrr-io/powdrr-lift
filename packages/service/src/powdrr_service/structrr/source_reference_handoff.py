@@ -216,6 +216,7 @@ def _preservation(
         "reason",
         "successor",
         "destination",
+        "verification_refs",
     }:
         raise ValueError("invalid preservation record fields")
     ref = validate_reference_id(raw["ref"])
@@ -229,6 +230,11 @@ def _preservation(
     if disposition not in {"preserve", "remove", "supersede", "relocate"}:
         raise ValueError("unsupported reference preservation disposition")
     reason = required_text(raw["reason"], "reason")
+    verification = sorted(
+        set(text_tuple(raw["verification_refs"], "verification_refs"))
+    )
+    if not verification:
+        raise ValueError("preservation rule requires verification references")
     destination = (
         _owner(raw["destination"], allowed) if raw["destination"] is not None else None
     )
@@ -257,6 +263,7 @@ def _preservation(
         "reason": reason,
         "successor": successor,
         "destination": destination,
+        "verification_refs": verification,
     }
 
 
@@ -293,17 +300,29 @@ def _compile_accepted_behavior_design(
         case_ids_by_scenario.setdefault(scenario.scenario_id, []).append(
             required_text(case.get("id"), "behavior case id")
         )
-    placements = accepted_design.get("source_reference_placements", [])
-    if isinstance(placements, list):
-        for placement in placements:
-            if not isinstance(placement, Mapping):
-                continue
-            missing = sorted(set(placement.get("verification_refs", ())) - aliases)
-            if missing:
-                raise ValueError(
-                    f"placement {placement.get('obligation_id')} has no accepted "
-                    "behavior case for verification reference(s): " + ", ".join(missing)
-                )
+    for items, identity_key, label in (
+        (
+            accepted_design.get("source_reference_placements", []),
+            "obligation_id",
+            "placement",
+        ),
+        (
+            accepted_design.get("source_reference_preservations", []),
+            "id",
+            "preservation",
+        ),
+    ):
+        if isinstance(items, list):
+            for item in items:
+                if not isinstance(item, Mapping):
+                    continue
+                missing = sorted(set(item.get("verification_refs", ())) - aliases)
+                if missing:
+                    raise ValueError(
+                        f"{label} {item.get(identity_key)} has no accepted "
+                        "behavior case for verification reference(s): "
+                        + ", ".join(missing)
+                    )
     return compiled, {
         scenario_id: sorted(ids) for scenario_id, ids in case_ids_by_scenario.items()
     }
@@ -447,9 +466,26 @@ def _normalize(contract: Mapping[str, Any]) -> dict[str, Any]:
         if not normalized_case_ids or len(normalized_case_ids) != len(case_ids):
             raise ValueError(f"behavior case IDs for {scenario_id} are incomplete")
         behavior_case_ids[scenario_id] = normalized_case_ids
+    behavior_aliases = set(scenario_ids) | {
+        case_id for case_ids in behavior_case_ids.values() for case_id in case_ids
+    }
+    for items in (obligations, preservation):
+        for item in items:
+            missing = sorted(set(item["verification_refs"]) - behavior_aliases)
+            if missing:
+                raise ValueError(
+                    f"obligation {item.get('obligation_id', item.get('id'))} has "
+                    "unresolved verification references: " + ", ".join(missing)
+                )
     for items, field in ((obligations, "obligation_id"), (preservation, "id")):
         if len({item[field] for item in items}) != len(items):
             raise ValueError("duplicate source reference obligation identity")
+    route_identities = [
+        *(item["obligation_id"] for item in obligations),
+        *(item["id"] for item in preservation),
+    ]
+    if len(route_identities) != len(set(route_identities)):
+        raise ValueError("placement and preservation identities must be distinct")
     if not obligations and not preservation:
         raise ValueError(
             "source reference handoff requires accepted placement obligations"

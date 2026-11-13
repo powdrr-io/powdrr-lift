@@ -1,9 +1,9 @@
 # Implementation contract and verification
 
-Status: Active implementation. Milestones 1–3 are implemented with fixture
-acceptance. The source-reference route binds typed behavior cases to the public
-handoff and compiles a base-bound private repository evidence closure. Milestone
-3 compiles per-placement and preservation evidence routes into the private
+Status: Active implementation. Milestones 1–4 are implemented with fixture
+acceptance; milestone 5 remains. The source-reference route binds typed behavior
+cases to the public handoff and compiles a base-bound private repository evidence
+closure. Milestone 3 compiles per-placement and preservation evidence routes into the private
 handoff, audits story receipts in enforce mode against the execution candidate,
 and requires that report before patch transfer. Protected source runs emit
 candidate-tree-bound route records, including explicit `not_collected` outcomes
@@ -18,10 +18,10 @@ Protected dispatch requires complete, passing route reconciliation before
 transferring a patch. The body-only regression fixture proves that a candidate
 with passing source placement and ordinary validation still fails protected
 story validation and is not transferred.
-Milestones 4–5 remain.
+Milestone 5 remains.
 
 Audited code baseline for this inventory: `feafe5b7b22bf7cd98dee9b06797ea87af558a4c`.
-Latest implementation review baseline: `b85f3ced69fa7566aee544b44bba04c295a864d7` (PR #1495).
+Latest implementation review baseline: `464936b7ce009fac5eb16d8d86a853bfeca634dd` (PR #1497).
 
 This plan replaces the intent-linked verification, evidence-backed prompt
 contract closure, and bounded coding-worker plans in `superseded/`. Those
@@ -99,8 +99,7 @@ candidate correction loop and coding helper are removed; plan amendments remain
 as typed non-code-writing service repairs. Route fixtures now trace selected
 authority through the CLI issue-worker, planned-workflow, and benchmark
 task-scenario adapters, and exercise explicit rejection or observation at the
-other implementation-capable boundaries. Milestone 1 acceptance is complete;
-milestones 3–5 remain.
+other implementation-capable boundaries. Milestone 1 acceptance is complete.
 
 ### 2. Compile one complete, source-backed obligation closure
 
@@ -198,7 +197,14 @@ a worker that completes without changes and confirms it returns
 artifacts remain local to the protected run and are not a permanent audit store.
 The dispatch retry fixture records a failed invocation, then proves that a new
 reviewed design revision starts a separate run and succeeds while a duplicate
-invocation of that same revision is rejected.
+invocation of that same revision is rejected. Dispatch starts each candidate
+from the reviewed base, so dirty caller-checkout changes cannot count as worker
+progress. A completed attempt with out-of-scope changes now fails immediately
+with `policy_violation` and retains the offending paths. Fixtures prove that
+timed-out and policy-denied attempts remain failed terminal receipts, failed
+verification prevents patch transfer, and a dirty caller checkout survives a
+no-progress attempt without entering its candidate. Milestone 4 acceptance is
+complete; milestone 5 remains.
 
 ### 5. Demonstrate the complete production path
 
@@ -221,5 +227,6 @@ Each milestone needs meaningful regression fixtures at the changed boundary,
 full repository checks required by AGENTS.md, and updated route/evidence reports.
 Use the shared environment and current worktree source. Completion requires all
 five milestones accepted, all selected production routes connected, and no
-mandatory obligation satisfied by an unsupported or stale claim. Until then,
-this consolidated plan remains proposed with implemented foundations.
+mandatory obligation satisfied by an unsupported or stale claim. The plan
+remains active until milestone 5 and the final route/evidence inventory are
+accepted.

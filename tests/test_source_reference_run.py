@@ -18,6 +18,7 @@ from powdrr_lift.workrr.coding_agent_validation import ValidationProfile
 from powdrr_lift.workrr.source_reference_run import (
     SourceReferenceRun,
     SourceRunFailure,
+    _candidate_route_evidence,
     context_delivery_status,
 )
 
@@ -202,6 +203,31 @@ def prepare(
 
 def unused_inference(request: ChatCompletionRequest) -> ChatCompletionResponse:
     raise AssertionError("No inference expected")
+
+
+def test_candidate_route_evidence_is_scoped_and_marks_uncollected_routes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    run = prepare(tmp_path, monkeypatch)
+
+    result = _candidate_route_evidence(
+        run.handoff,
+        candidate_tree="sha256:candidate-tree",
+        changed_paths=("retry.py", "unrelated.py"),
+    )
+
+    assert result["candidate_tree"] == "sha256:candidate-tree"
+    assert result["complete"] is False
+    routes = {(item["obligation_id"], item["route"]): item for item in result["routes"]}
+    assert routes[("place:helper", "structural_diff")]["status"] == "passed"
+    assert routes[("place:helper", "structural_diff")]["evidence_paths"] == ["retry.py"]
+    assert routes[("place:helper", "behavior_validation")]["status"] == (
+        "not_collected"
+    )
+    assert routes[("place:retry", "invariant_review")]["status"] == ("not_collected")
+    assert all(
+        item["candidate_tree"] == "sha256:candidate-tree" for item in result["routes"]
+    )
 
 
 def test_prepared_inputs_are_bound_and_cannot_be_reused_or_mutated(

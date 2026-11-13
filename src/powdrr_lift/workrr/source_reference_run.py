@@ -132,6 +132,74 @@ def context_delivery_status(
     }
 
 
+def _candidate_route_evidence(
+    handoff: CompiledSourceReferenceHandoff,
+    *,
+    candidate_tree: str,
+    changed_paths: tuple[str, ...],
+) -> dict[str, Any]:
+    """Bind each compiled evidence route to this candidate or mark it uncollected."""
+    data = handoff.to_data()
+    contract = data["worker_prompt"]["contract"]
+    private = data["validation_manifest"]["private_validation_data"]
+    placements = {item["obligation_id"]: item for item in contract["obligations"]}
+    preservation = {item["id"]: item for item in contract["preservation"]}
+    changed = set(changed_paths)
+    results: list[dict[str, Any]] = []
+    for raw in private["obligation_evidence_contracts"]:
+        obligation_id = raw["obligation_id"]
+        obligation = placements.get(obligation_id) or preservation.get(obligation_id)
+        if obligation is None:
+            raise ValueError("compiled evidence route has no source obligation")
+        owner = obligation["owner"]
+        for route in raw["review_routes"]:
+            status = "not_collected"
+            evidence: list[str] = []
+            reason = "independent candidate-bound evidence is not connected"
+            if route == "structural_diff":
+                paths = (
+                    [owner["path"]]
+                    if owner["binding"] == "exact"
+                    else owner["allowed_paths"]
+                )
+                evidence = sorted(
+                    path
+                    for path in changed
+                    if any(
+                        scope == "."
+                        or path == scope
+                        or path.startswith(scope.rstrip("/") + "/")
+                        for scope in paths
+                    )
+                )
+                status = "passed" if evidence else "failed"
+                reason = (
+                    "candidate diff touches an accepted owner scope"
+                    if evidence
+                    else "candidate diff does not touch an accepted owner scope"
+                )
+            results.append(
+                {
+                    "obligation_id": obligation_id,
+                    "clause_id": raw["clause_id"],
+                    "route": route,
+                    "candidate_tree": candidate_tree,
+                    "status": status,
+                    "evidence_paths": evidence,
+                    "reason": reason,
+                }
+            )
+    result: dict[str, Any] = {
+        "schema_version": "candidate-obligation-route-evidence-v1",
+        "candidate_tree": candidate_tree,
+        "routes": results,
+        "complete": bool(results)
+        and all(item["status"] == "passed" for item in results),
+    }
+    result["fingerprint"] = content_fingerprint(result)
+    return result
+
+
 @dataclass(frozen=True, slots=True)
 class SourceReferenceRunResult:
     _data_json: str
@@ -904,6 +972,7 @@ class SourceReferenceRun:
             "error": None,
             "attempt": None,
             "validation": None,
+            "obligation_route_evidence": None,
             "completion": None,
             "context_delivery": None,
             "reconciliation": None,
@@ -935,6 +1004,21 @@ class SourceReferenceRun:
                 execution.attempt.to_data(),
                 execution.validation.to_data(),
             )
+            reference_result = next(
+                (
+                    item
+                    for item in execution.validation.results
+                    if item.profile == "structrr-references"
+                ),
+                None,
+            )
+            if reference_result is not None and reference_result.stdout:
+                reference_report = json.loads(reference_result.stdout)
+                result["obligation_route_evidence"] = _candidate_route_evidence(
+                    self.handoff,
+                    candidate_tree=self._candidate_state(),
+                    changed_paths=tuple(reference_report.get("changed_paths", ())),
+                )
             result["reconciliation"] = self.reconciliation
             if execution.attempt.status is not CodingAgentStatus.COMPLETED:
                 result["outcome"] = classify_coding_agent_attempt(

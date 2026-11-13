@@ -1,0 +1,103 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1462
+title: Verify implementation route delegation
+intent:
+  problem: The plan-to-workflow adapter could drop the reviewed source-design selector and pinned story context, while stale values from a workflow template could survive when the current plan item omitted them.
+  goal: Carry only the selected plan item's protected-route authority into workflow execution, test the delegating entry points, and record completion of route-inventory milestone acceptance.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/plans/implementation-contract-and-verification.md
+  type: modified
+  span: {start_line: 3, end_line: 5}
+  summary: Mark route inventory and route-fixture acceptance complete while retaining later milestones as remaining work.
+  rationale: Reflect the verified current plan state without marking the full consolidation complete.
+- path: docs/plans/implementation-contract-and-verification.md
+  type: modified
+  span: {start_line: 80, end_line: 84}
+  summary: Record the delegating route fixtures and milestone 1 completion.
+  rationale: Make acceptance evidence and remaining milestones explicit.
+- path: docs/plans/implementation-route-matrix.md
+  type: modified
+  span: {start_line: 24, end_line: 24}
+  summary: Document how workflow adapters forward reviewed selectors and pinned story context.
+  rationale: Keep the route matrix aligned with the protected handoff behavior.
+- path: docs/plans/implementation-route-matrix.md
+  type: modified
+  span: {start_line: 47, end_line: 56}
+  summary: Replace the route-fixture gap with current selector propagation and rejection evidence.
+  rationale: Tie milestone acceptance to executable route tests.
+- path: docs/plans/implementation-route-matrix.md
+  type: modified
+  span: {start_line: 63, end_line: 66}
+  summary: Record delegated route-fixture coverage and the remaining milestones.
+  rationale: Keep the migration status current.
+- path: src/powdrr_lift/workrr/planned_workflow_task.py
+  type: modified
+  span: {start_line: 92, end_line: 106}
+  summary: Forward source-design and story selectors from the reviewed plan item and clear stale template values.
+  rationale: Prevent dropped protected authority and prevent an unreviewed template value from selecting implementation.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span: {start_line: 1556, end_line: 1560}
+  summary: Exercise the CLI issue-worker wrapper with a reviewed source-design selector.
+  rationale: Verify the selected plan item is carried through production task preparation.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span: {start_line: 1612, end_line: 1617}
+  summary: Assert the CLI issue-worker route places the selected design file in workflow inputs.
+  rationale: Catch future loss of protected route authority at the adapter boundary.
+- path: tests/test_planned_workflow_task.py
+  type: modified
+  span: {start_line: 4, end_line: 4}
+  summary: Import the replacement helper for variant plan-item fixtures.
+  rationale: Construct reviewed selector and non-selector cases from the same plan item.
+- path: tests/test_planned_workflow_task.py
+  type: modified
+  span: {start_line: 10, end_line: 10}
+  summary: Import the typed story reference used by the adapter fixture.
+  rationale: Verify pinned story metadata is serialized into workflow inputs.
+- path: tests/test_planned_workflow_task.py
+  type: modified
+  span: {start_line: 100, end_line: 106}
+  summary: Parameterize adapter coverage for present and absent reviewed design selectors.
+  rationale: Exercise both protected dispatch selection and fail-closed omission.
+- path: tests/test_planned_workflow_task.py
+  type: modified
+  span: {start_line: 108, end_line: 111}
+  summary: Seed stale selector and story values in the workflow template fixture.
+  rationale: Verify template data cannot override the selected plan item.
+- path: tests/test_planned_workflow_task.py
+  type: modified
+  span: {start_line: 125, end_line: 132}
+  summary: Build plan-item cases with or without the reviewed selector and pinned story data.
+  rationale: Test item authority as the single source for protected route selection.
+- path: tests/test_planned_workflow_task.py
+  type: modified
+  span: {start_line: 166, end_line: 181}
+  summary: Pass the exact plan item through planned workflow task preparation.
+  rationale: Keep the test plan and selected work item aligned.
+- path: tests/test_planned_workflow_task.py
+  type: modified
+  span: {start_line: 186, end_line: 187}
+  summary: Use the same selector-bearing item in the plan and execution call.
+  rationale: Avoid testing against a plan item different from the one dispatched.
+- path: tests/test_planned_workflow_task.py
+  type: modified
+  span: {start_line: 211, end_line: 227}
+  summary: Assert the selector and pinned story data are forwarded and stale values are cleared.
+  rationale: Protect the workflow adapter boundary from authority loss or substitution.
+- path: tests/test_workflow_task_scenario.py
+  type: modified
+  span: {start_line: 20, end_line: 20}
+  summary: Import the task-agent configuration type for the benchmark adapter fixture.
+  rationale: Inspect the task scenario's delegated workflow input.
+- path: tests/test_workflow_task_scenario.py
+  type: modified
+  span: {start_line: 61, end_line: 106}
+  summary: Verify the task-scenario wrapper preserves a reviewed source-route selector.
+  rationale: Ensure benchmark delegation does not rewrite protected route authority.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []

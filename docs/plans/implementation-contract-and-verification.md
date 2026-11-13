@@ -1,7 +1,8 @@
 # Implementation contract and verification
 
-Status: Active implementation. Milestones 1–4 are implemented with fixture
-acceptance; milestone 5 remains. The source-reference route binds typed behavior
+Status: Complete (closed at milestone 4). Milestones 1–4 were accepted. The
+milestone 5 end-to-end demonstration is deferred and is not claimed complete.
+The source-reference route binds typed behavior
 cases to the public handoff and compiles a base-bound private repository evidence
 closure. Milestone 3 compiles per-placement and preservation evidence routes into the private
 handoff, audits story receipts in enforce mode against the execution candidate,
@@ -18,7 +19,7 @@ Protected dispatch requires complete, passing route reconciliation before
 transferring a patch. The body-only regression fixture proves that a candidate
 with passing source placement and ordinary validation still fails protected
 story validation and is not transferred.
-Milestone 5 remains.
+The final integration demonstration remains deferred as documented in milestone 5.
 
 Audited code baseline for this inventory: `feafe5b7b22bf7cd98dee9b06797ea87af558a4c`.
 Latest implementation review baseline: `464936b7ce009fac5eb16d8d86a853bfeca634dd` (PR #1497).
@@ -206,7 +207,11 @@ verification prevents patch transfer, and a dirty caller checkout survives a
 no-progress attempt without entering its candidate. Milestone 4 acceptance is
 complete; milestone 5 remains.
 
-### 5. Demonstrate the complete production path
+### 5. Deferred: demonstrate the complete production path
+
+This demonstration was not implemented and is not part of this plan's closure.
+The work is recorded here so that closure does not imply that the demonstration
+or its acceptance criteria were satisfied.
 
 Use an isolated repository fixture with accepted instructions, retained behavior,
 a public integration boundary, a planted regression, and an approved amendment.
@@ -221,12 +226,11 @@ Optional live-provider experiments report quality and cost separately. Hidden
 benchmark scores and task-specific solve-rate thresholds are not product
 completion criteria.
 
-## Verification and completion
+## Verification and closure
 
 Each milestone needs meaningful regression fixtures at the changed boundary,
 full repository checks required by AGENTS.md, and updated route/evidence reports.
-Use the shared environment and current worktree source. Completion requires all
-five milestones accepted, all selected production routes connected, and no
-mandatory obligation satisfied by an unsupported or stale claim. The plan
-remains active until milestone 5 and the final route/evidence inventory are
-accepted.
+Use the shared environment and current worktree source for completed milestones.
+This plan is closed at milestone 4 by user decision. Its status records closure
+of the planned scope; it does not mean the deferred milestone 5 demonstration
+or its acceptance criteria were completed.

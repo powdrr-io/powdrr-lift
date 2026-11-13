@@ -1369,6 +1369,66 @@ def test_validation_runner_executes_every_declared_profile_and_persists_report(
     assert store.load_validation_report("attempt-validation") == report
 
 
+def test_validation_runner_uses_and_reports_declared_working_directory(
+    tmp_path: Path,
+) -> None:
+    worktree = _git_repo(tmp_path / "repo")
+    (worktree / "component").mkdir()
+    request = _request(_head(worktree))
+    attempt = run_coding_agent(
+        FakeProvider("allowed"), request, worktree_root=worktree, attempt_id="cwd-check"
+    )
+    profile = ValidationProfile(
+        "python",
+        (
+            "python3",
+            "-c",
+            "import os; assert os.getcwd().endswith('component')",
+        ),
+        cwd="component",
+        environment_id="uv:component",
+        component="python-component:component",
+        applicability={"local": True, "evaluation": "unknown"},
+    )
+
+    report = ValidationRunner({"python": profile}).run(
+        request, attempt, worktree_root=worktree
+    )
+
+    assert report.status is ValidationReportStatus.PASSED
+    assert report.profile_contexts == (profile.to_data(),)
+    assert report.to_data()["profile_contexts"][0]["environment_id"] == "uv:component"
+
+
+def test_validation_runner_keeps_unsupported_shell_context_blocked(
+    tmp_path: Path,
+) -> None:
+    worktree = _git_repo(tmp_path / "repo")
+    request = replace(_request(_head(worktree)), validation_profiles=("custom-shell",))
+    attempt = run_coding_agent(
+        FakeProvider("allowed"),
+        request,
+        worktree_root=worktree,
+        attempt_id="shell-check",
+    )
+    profile = ValidationProfile(
+        "custom-shell",
+        (),
+        execution_kind="shell",
+        shell="/bin/bash",
+        script="scripts/verify.sh --all",
+        unresolved=("The runner currently accepts argv checks only.",),
+    )
+
+    report = ValidationRunner({"custom-shell": profile}).run(
+        request, attempt, worktree_root=worktree
+    )
+
+    assert report.status is ValidationReportStatus.BLOCKED
+    assert "shell" in (report.results[0].error or "")
+    assert report.profile_contexts == (profile.to_data(),)
+
+
 def test_validation_runner_blocks_unregistered_or_unauthorized_profiles(
     tmp_path: Path,
 ) -> None:

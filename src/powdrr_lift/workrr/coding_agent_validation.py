@@ -42,9 +42,34 @@ class ValidationReportStatus(StrEnum):
 class ValidationProfile:
     name: str
     command: tuple[str, ...]
+    cwd: str = "."
+    environment_id: str | None = None
+    component: str | None = None
+    execution_kind: str = "argv"
+    shell: str | None = None
+    script: str | None = None
+    applicability: Mapping[str, Any] | None = None
+    selectors: tuple[str, ...] = ()
+    config_files: tuple[str, ...] = ()
+    settings: Mapping[str, Any] | None = None
+    unresolved: tuple[str, ...] = ()
 
     def to_data(self) -> dict[str, Any]:
-        return {"name": self.name, "command": list(self.command)}
+        return {
+            "name": self.name,
+            "command": list(self.command),
+            "cwd": self.cwd,
+            "environment_id": self.environment_id,
+            "component": self.component,
+            "execution_kind": self.execution_kind,
+            "shell": self.shell,
+            "script": self.script,
+            "applicability": dict(self.applicability or {}),
+            "selectors": list(self.selectors),
+            "config_files": list(self.config_files),
+            "settings": dict(self.settings or {}),
+            "unresolved": list(self.unresolved),
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -86,6 +111,7 @@ class ValidationReport:
     status: ValidationReportStatus
     results: tuple[ValidationResult, ...]
     error: str | None = None
+    profile_contexts: tuple[Mapping[str, Any], ...] = ()
     schema_version: str = CODING_AGENT_VALIDATION_REPORT_SCHEMA_VERSION
 
     def to_data(self) -> dict[str, Any]:
@@ -123,6 +149,7 @@ class ValidationReport:
             "request_id": self.request_id,
             "status": self.status.value,
             "results": [result.to_data() for result in self.results],
+            "profile_contexts": [dict(item) for item in self.profile_contexts],
             "error": self.error,
             "failures": failures,
         }
@@ -284,6 +311,7 @@ class ValidationRunner:
                     for name in names
                 ),
                 error="validation is blocked until the coding-agent attempt completes",
+                profile_contexts=self._profile_contexts(names),
             )
 
         profiles: list[ValidationProfile] = []
@@ -312,6 +340,7 @@ class ValidationRunner:
                     for name in names
                 ),
                 error="one or more validation profiles are not registered",
+                profile_contexts=self._profile_contexts(names),
             )
 
         # Candidate test programs can mutate files. Source evidence must describe
@@ -355,6 +384,12 @@ class ValidationRunner:
                 else ValidationReportStatus.PASSED
             ),
             results=results,
+            profile_contexts=tuple(profile.to_data() for profile in profiles),
+        )
+
+    def _profile_contexts(self, names: Sequence[str]) -> tuple[Mapping[str, Any], ...]:
+        return tuple(
+            self.profiles[name].to_data() for name in names if name in self.profiles
         )
 
     def _run_references(
@@ -408,6 +443,17 @@ class ValidationRunner:
         request: ImplementationRequest,
         worktree_root: Path,
     ) -> ValidationResult:
+        if profile.execution_kind != "argv" or profile.shell or profile.script:
+            return ValidationResult(
+                profile=profile.name,
+                command=profile.command,
+                status=ValidationResultStatus.BLOCKED,
+                returncode=None,
+                error=(
+                    "shell or unresolved validation execution is not supported "
+                    "by the argv runner"
+                ),
+            )
         if not profile.command:
             return ValidationResult(
                 profile=profile.name,
@@ -415,6 +461,32 @@ class ValidationRunner:
                 status=ValidationResultStatus.BLOCKED,
                 returncode=None,
                 error="validation profile command must not be empty",
+            )
+        relative_cwd = Path(profile.cwd)
+        if not profile.cwd or relative_cwd.is_absolute() or ".." in relative_cwd.parts:
+            return ValidationResult(
+                profile=profile.name,
+                command=profile.command,
+                status=ValidationResultStatus.BLOCKED,
+                returncode=None,
+                error="validation profile cwd must be repository-relative",
+            )
+        execution_cwd = (worktree_root / relative_cwd).resolve()
+        if not execution_cwd.is_relative_to(worktree_root.resolve()):
+            return ValidationResult(
+                profile=profile.name,
+                command=profile.command,
+                status=ValidationResultStatus.BLOCKED,
+                returncode=None,
+                error="validation profile cwd escapes the worktree",
+            )
+        if not execution_cwd.is_dir():
+            return ValidationResult(
+                profile=profile.name,
+                command=profile.command,
+                status=ValidationResultStatus.BLOCKED,
+                returncode=None,
+                error=f"validation profile cwd does not exist: {profile.cwd}",
             )
         if not any(
             _command_matches(profile.command, allowed)
@@ -448,7 +520,7 @@ class ValidationRunner:
                     if self.command_wrapper
                     else profile.command
                 ),
-                cwd=worktree_root,
+                cwd=execution_cwd,
                 env=environment,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -567,6 +639,11 @@ def validation_report_from_data(data: Mapping[str, Any]) -> ValidationReport:
         status=ValidationReportStatus(str(data["status"])),
         results=results,
         error=data.get("error"),
+        profile_contexts=tuple(
+            dict(item)
+            for item in data.get("profile_contexts", [])
+            if isinstance(item, Mapping)
+        ),
         schema_version=str(data["schema_version"]),
     )
 

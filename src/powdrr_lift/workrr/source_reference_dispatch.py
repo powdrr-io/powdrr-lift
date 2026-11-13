@@ -325,6 +325,11 @@ def dispatch_source_reference_task(
                     ),
                 )
                 return result
+            route_evidence = run.bind_story_validation(story_result)
+            result["obligation_route_evidence"] = route_evidence
+            result["obligation_route_evidence_path"] = str(
+                run.private_root / "story-route-evidence.json"
+            )
             result["story_validation"] = story_result
         changed = tuple(sorted(set(attempt["changed_paths"]) | set(test_sources)))
         # The reviewed intent and task metadata are never implementation output.

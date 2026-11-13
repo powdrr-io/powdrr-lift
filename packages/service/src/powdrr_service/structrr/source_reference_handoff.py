@@ -13,6 +13,11 @@ from dataclasses import dataclass
 from pathlib import PurePosixPath, PureWindowsPath
 from typing import Any
 
+from powdrr_service.behavior_contract import (
+    BehaviorContractError,
+    BehaviorScenario,
+    compile_behavior_scenarios,
+)
 from powdrr_service.decision_obligation import content_fingerprint
 from powdrr_service.structrr.design import DesiredState
 from powdrr_service.structrr.reference_catalog import (
@@ -251,6 +256,69 @@ def _preservation(
     }
 
 
+def compile_accepted_behavior_scenarios(
+    accepted_design: Mapping[str, Any],
+) -> tuple[BehaviorScenario, ...]:
+    """Compile reviewed required cases and reject incomplete semantic closure."""
+    raw_cases = accepted_design.get("required_test_cases")
+    if not isinstance(raw_cases, list) or not raw_cases:
+        raise ValueError("accepted source design requires observable behavior cases")
+    scenarios: list[Mapping[str, Any]] = []
+    case_ids: set[str] = set()
+    for case in raw_cases:
+        if not isinstance(case, Mapping):
+            raise ValueError("accepted behavior case is malformed")
+        case_id = required_text(case.get("id"), "behavior case id")
+        if case_id in case_ids:
+            raise ValueError(f"duplicate behavior case ID: {case_id}")
+        case_ids.add(case_id)
+        scenario = case.get("behavior_scenario")
+        if not isinstance(scenario, Mapping):
+            raise ValueError(f"behavior case {case_id} has no typed scenario")
+        scenarios.append(scenario)
+    compiled = _compile_behavior_scenario_data(scenarios)
+    aliases = case_ids | {scenario.scenario_id for scenario in compiled}
+    placements = accepted_design.get("source_reference_placements", [])
+    if isinstance(placements, list):
+        for placement in placements:
+            if not isinstance(placement, Mapping):
+                continue
+            missing = sorted(set(placement.get("verification_refs", ())) - aliases)
+            if missing:
+                raise ValueError(
+                    f"placement {placement.get('obligation_id')} has no accepted "
+                    "behavior case for verification reference(s): " + ", ".join(missing)
+                )
+    return compiled
+
+
+def _compile_behavior_scenario_data(
+    scenarios: list[Mapping[str, Any]],
+) -> tuple[BehaviorScenario, ...]:
+    try:
+        compiled = compile_behavior_scenarios(scenarios)
+    except BehaviorContractError as error:
+        raise ValueError(
+            f"accepted behavior scenarios are incomplete: {error}"
+        ) from error
+    for scenario in compiled:
+        if scenario.routing not in {"include", "include_prohibition"}:
+            raise ValueError(
+                f"behavior scenario {scenario.scenario_id} is not an actionable "
+                "obligation"
+            )
+        if scenario.unresolved_dimensions:
+            raise ValueError(
+                f"behavior scenario {scenario.scenario_id} has unresolved dimensions"
+            )
+        if not scenario.faithfulness_ref.get("fingerprint"):
+            raise ValueError(
+                f"behavior scenario {scenario.scenario_id} lacks source-"
+                "faithfulness provenance"
+            )
+    return compiled
+
+
 def _normalize(contract: Mapping[str, Any]) -> dict[str, Any]:
     fields = {
         "base_commit",
@@ -264,6 +332,7 @@ def _normalize(contract: Mapping[str, Any]) -> dict[str, Any]:
         "definitions",
         "obligations",
         "preservation",
+        "behavior_scenarios",
     }
     if set(contract) - {"workspace_root"} != fields:
         raise ValueError("invalid source reference contract fields")
@@ -293,6 +362,15 @@ def _normalize(contract: Mapping[str, Any]) -> dict[str, Any]:
     obligations = [_placement(raw, by_id, allowed) for raw in contract["obligations"]]
     preservation = [
         _preservation(raw, by_id, allowed) for raw in contract["preservation"]
+    ]
+    raw_scenarios = contract["behavior_scenarios"]
+    if not isinstance(raw_scenarios, list) or any(
+        not isinstance(scenario, Mapping) for scenario in raw_scenarios
+    ):
+        raise ValueError("source reference contract requires behavior scenarios")
+    behavior_scenarios = [
+        scenario.to_data()
+        for scenario in _compile_behavior_scenario_data(raw_scenarios)
     ]
     for items, field in ((obligations, "obligation_id"), (preservation, "id")):
         if len({item[field] for item in items}) != len(items):
@@ -333,6 +411,9 @@ def _normalize(contract: Mapping[str, Any]) -> dict[str, Any]:
         "definitions": [by_id[key].to_data() for key in sorted(by_id)],
         "obligations": sorted(obligations, key=lambda o: o["obligation_id"]),
         "preservation": sorted(preservation, key=lambda o: o["id"]),
+        "behavior_scenarios": sorted(
+            behavior_scenarios, key=lambda scenario: scenario["scenario_id"]
+        ),
     }
 
 
@@ -368,6 +449,7 @@ def _render(contract: Mapping[str, Any]) -> str:
                     }
                     for definition in contract["definitions"]
                 ],
+                "behavior_scenarios": contract["behavior_scenarios"],
             }
         ),
         _json(
@@ -559,6 +641,7 @@ def compile_source_reference_handoff(
     if catalog.accepted_document_digest != content_fingerprint(accepted_design):
         raise ValueError("accepted design and frozen catalog do not match")
     desired = DesiredState.from_snapshot(accepted_design)
+    behavior_scenarios = compile_accepted_behavior_scenarios(accepted_design)
     placements = desired.document.get("source_reference_placements", [])
     preservation = desired.document.get("source_reference_preservations", [])
     refs = {p["ref"] for p in placements} | {p["ref"] for p in preservation}
@@ -587,6 +670,9 @@ def compile_source_reference_handoff(
             "definitions": definitions,
             "obligations": placements,
             "preservation": preservation,
+            "behavior_scenarios": [
+                scenario.to_data() for scenario in behavior_scenarios
+            ],
         }
     )
     private = dict(private_validation_data or {})

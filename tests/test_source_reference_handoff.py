@@ -49,6 +49,27 @@ def document(
     definitions: list[ReferenceDefinition] | None = None,
     preservation: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
+    scenario = {
+        "scenario_id": "retry-result",
+        "subject": "retry function",
+        "given": {"value": 4},
+        "when": "retry is called",
+        "then": {"result": 5},
+        "related_requirements": [],
+        "dimensions": {
+            "normal_result": {"result": "increment input once"},
+            "error_behavior": "not_applicable",
+            "continuation": "not_applicable",
+            "unsupported_behavior": "not_applicable",
+            "cancellation_cleanup": "not_applicable",
+            "compatibility": "preserve accepted return behavior",
+            "negative_boundaries": "not_applicable",
+        },
+        "evidence": ["tests/test_retry.py::test_retry_result"],
+        "validator": "pytest -q tests/test_retry.py::test_retry_result",
+        "capability_matrix": [],
+        "faithfulness_ref": {"fingerprint": "sha256:" + "a" * 64},
+    }
     return {
         "reference_definitions": [
             d.to_data()
@@ -63,6 +84,7 @@ def document(
         ],
         "source_reference_placements": list(placements or [placement()]),
         "source_reference_preservations": preservation or [],
+        "required_test_cases": [{"id": "case:retry", "behavior_scenario": scenario}],
     }
 
 
@@ -99,6 +121,9 @@ def test_atomic_prompt_manifest_parity_privacy_and_stability() -> None:
     assert manifest["contract_fingerprint"] == worker["contract_fingerprint"]
     assert manifest["prompt_fingerprint"] == worker["fingerprint"]
     assert len(manifest["contract"]["obligations"]) == 1
+    assert (
+        manifest["contract"]["behavior_scenarios"][0]["scenario_id"] == "retry-result"
+    )
     assert [
         line[3:] for line in worker["prompt"].splitlines() if line.startswith("## ")
     ] == list(SECTIONS)
@@ -128,6 +153,12 @@ def test_atomic_prompt_manifest_parity_privacy_and_stability() -> None:
         handoff.validation_manifest["private_validation_data"]["oracle"]
         == "SECRET_PRIVATE_ORACLE"
     )
+
+
+def test_placement_verification_reference_requires_accepted_behavior_case() -> None:
+    original = document(placement(verification_refs=["case:missing"]))
+    with pytest.raises(ValueError, match="no accepted behavior case"):
+        compile_document(original)
 
 
 @pytest.mark.parametrize(

@@ -79,6 +79,32 @@ def inputs(
             }
         ],
         "source_reference_preservations": rules or [],
+        "required_test_cases": [
+            {
+                "id": "case:1",
+                "behavior_scenario": {
+                    "scenario_id": "retry-result",
+                    "subject": "retry function",
+                    "given": "an input value",
+                    "when": "retry is called",
+                    "then": "the accepted retry result is returned",
+                    "related_requirements": [],
+                    "dimensions": {
+                        "normal_result": "preserve the accepted result",
+                        "error_behavior": "not_applicable",
+                        "continuation": "not_applicable",
+                        "unsupported_behavior": "not_applicable",
+                        "cancellation_cleanup": "not_applicable",
+                        "compatibility": "preserve existing behavior",
+                        "negative_boundaries": "not_applicable",
+                    },
+                    "evidence": ["retry.py::retry"],
+                    "validator": "focused retry behavior test",
+                    "capability_matrix": [],
+                    "faithfulness_ref": {"fingerprint": "sha256:" + "c" * 64},
+                },
+            }
+        ],
     }
     catalog = compile_reference_catalog(doc, base_commit=base)
     return compile_source_reference_handoff(

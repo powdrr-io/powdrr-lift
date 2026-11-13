@@ -681,6 +681,32 @@ def test_protected_source_dispatch_proves_story_before_patch_transfer(
                 }
             ],
             "source_reference_preservations": [],
+            "required_test_cases": [
+                {
+                    "id": ref.case_ids[0],
+                    "behavior_scenario": {
+                        "scenario_id": "resume-story-behavior",
+                        "subject": "resume function",
+                        "given": "a prior accepted story state",
+                        "when": "resume is called",
+                        "then": "accepted decisions are preserved",
+                        "related_requirements": [],
+                        "dimensions": {
+                            "normal_result": "return the accepted resume result",
+                            "error_behavior": "not_applicable",
+                            "continuation": "not_applicable",
+                            "unsupported_behavior": "not_applicable",
+                            "cancellation_cleanup": "not_applicable",
+                            "compatibility": "preserve accepted decisions",
+                            "negative_boundaries": "not_applicable",
+                        },
+                        "evidence": ["app.py::resume"],
+                        "validator": "story behavior validation",
+                        "capability_matrix": [],
+                        "faithfulness_ref": {"fingerprint": "sha256:" + "e" * 64},
+                    },
+                }
+            ],
         },
     }
     (repo / "design.yaml").write_text(yaml.safe_dump(design, sort_keys=False))

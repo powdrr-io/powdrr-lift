@@ -1,5 +1,5 @@
 schema: https://powdrr.io/schema/changelog-v2
-change_id: PR-1487
+change_id: PR-1488
 title: Link preservation routes to accepted behavior
 intent:
   problem: Preservation obligations compile behavior routes but carry no references to the accepted cases that can verify preserved behavior.

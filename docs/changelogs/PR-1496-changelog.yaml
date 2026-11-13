@@ -1,0 +1,118 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1496
+title: Preserve stale required CI observations
+intent:
+  problem: A failed GitHub refresh replaces saved required-check evidence with an empty result, obscuring what was last observed.
+  goal: Preserve dated last-known checks as stale and unknown while keeping queue readiness blocked until a successful refresh.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/plans/bootstrap-validation-discovery.md
+  type: modified
+  span: {start_line: 31, end_line: 34}
+  summary: Record required-CI staleness handling and the remaining remote-observation work.
+  rationale: Keep WP8 progress and its remaining scope accurate.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 1021, end_line: 1023}
+  summary: Pass the latest valid CI checkpoint into the worker refresh path.
+  rationale: Preserve last-known check evidence when a subsequent remote refresh fails.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 1279, end_line: 1279}
+  summary: Pass the latest valid CI checkpoint into the awaiting-CI continuation path.
+  rationale: Apply stale-observation handling to scheduled refreshes.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 1440, end_line: 1442}
+  summary: Pass the latest valid CI checkpoint into manual prerequisite continuation.
+  rationale: Apply the same refresh behavior to manual queue continuations.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 2804, end_line: 2804}
+  summary: Accept the prior CI observation when refreshing required checks.
+  rationale: Make last-known remote evidence available when a refresh fails.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 2831, end_line: 2837}
+  summary: Preserve stale checks when GitHub cannot report the current PR head.
+  rationale: Keep the previous head and check evidence visible while blocking readiness.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 2848, end_line: 2854}
+  summary: Preserve stale checks when GitHub returns an invalid head identity.
+  rationale: Avoid discarding prior evidence when the current remote identity is unusable.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 2868, end_line: 2877}
+  summary: Preserve stale checks when the required-check API call fails.
+  rationale: Retain last-known evidence while treating current readiness as unknown.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 2884, end_line: 2890}
+  summary: Preserve stale checks when GitHub reports no usable required-check data.
+  rationale: Keep readiness blocked without replacing the last-known check set.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 2936, end_line: 2943}
+  summary: Mark checks stale when the pull-request head changes during observation.
+  rationale: Tie check evidence to the exact head against which it was collected.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 3012, end_line: 3016}
+  summary: Add refresh and stale-evidence metadata to CI outcomes.
+  rationale: Distinguish successful current observations from blocked refresh failures.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 3020, end_line: 3029}
+  summary: Retain original check head and timestamps when serializing stale evidence.
+  rationale: Keep each check attached to the remote observation that produced it.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 3039, end_line: 3042}
+  summary: Record refresh success, stale status, and last remote observation time.
+  rationale: Make observation freshness explicit in the persisted CI outcome.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 3046, end_line: 3108}
+  summary: Preserve original check timestamps, head identity, last-known status, and stale-since time.
+  rationale: Keep stale evidence auditable across repeated refresh failures.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 3130, end_line: 3134}
+  summary: Persist stale CI refresh metadata in checkpoints.
+  rationale: Carry freshness state between work-queue runs.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 3152, end_line: 3203}
+  summary: Persist and load integrity-checked stale CI checkpoint metadata.
+  rationale: Make prior observations available to later refresh attempts without trusting altered comments.
+- path: tests/test_github_issue_queue.py
+  type: modified
+  span: {start_line: 2345, end_line: 2348}
+  summary: Assert moving-head checks are unknown stale evidence with their previous status retained.
+  rationale: Cover check observations that cannot be tied to a stable current head.
+- path: tests/test_github_issue_queue.py
+  type: modified
+  span: {start_line: 2398, end_line: 2473}
+  summary: Cover failed refreshes, checkpoint recovery, and repeated stale observations.
+  rationale: Ensure outages preserve original timestamps and status history while blocking readiness.
+entities:
+- id: stale-required-ci-observation
+  type: Function
+  action: added
+- id: latest-ci-checkpoint-loader
+  type: Function
+  action: added
+entity_relationships: []
+invariants:
+- id: failed-ci-refresh-never-implies-readiness
+  description: A required-CI refresh failure keeps readiness blocked and marks any retained check evidence unknown and stale.
+  action: added
+- id: stale-checks-retain-last-remote-observation
+  description: Stale required checks retain the head, observation time, and last-known status from their most recent successful remote observation, including across repeated failures.
+  action: added
+guidance:
+- id: require-successful-current-head-refresh-for-ci-readiness
+  description: Treat retained required-check results as historical context only; require a successful refresh for the current pull-request head before allowing readiness.
+  action: added

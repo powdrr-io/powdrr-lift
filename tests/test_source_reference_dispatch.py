@@ -20,6 +20,18 @@ from powdrr_lift.workrr.coding_agent_validation import ValidationProfile
 from powdrr_lift.workrr.source_reference_postrun import reconcile_source_task
 
 
+def test_missing_validation_is_reported_as_structured_failure() -> None:
+    result = dispatch._validation_result(
+        {"validation": None, "error": "Source completion was invalid"}
+    )
+
+    assert result == {
+        "status": "not_run",
+        "passed": False,
+        "error": "Source completion was invalid",
+    }
+
+
 @pytest.mark.parametrize(
     "health",
     [None, {"mode": "observe", "passed": True}, {"mode": "enforce", "passed": False}],
@@ -130,6 +142,24 @@ def fixture(tmp_path: Path) -> tuple[Path, str, dict[str, Any]]:
         ),
     }
     return repo, git(repo, "rev-parse", "HEAD"), proposed
+
+
+def test_reviewed_base_may_be_ancestor_of_workflow_checkpoint_checkout(
+    tmp_path: Path,
+) -> None:
+    repo, base_commit, _ = fixture(tmp_path)
+    checkpoint = repo / "workflow-checkpoint.txt"
+    checkpoint.write_text("persisted workflow state\n")
+    git(repo, "add", "workflow-checkpoint.txt")
+    git(repo, "commit", "-m", "persist workflow checkpoint")
+    checkout_commit = git(repo, "rev-parse", "HEAD")
+
+    assert dispatch._is_base_ancestor_of_checkout(
+        repo, base_commit=base_commit, checkout_commit=checkout_commit
+    )
+    assert not dispatch._is_base_ancestor_of_checkout(
+        repo, base_commit=checkout_commit, checkout_commit=base_commit
+    )
 
 
 class Reviewer:

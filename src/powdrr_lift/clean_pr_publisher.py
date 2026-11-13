@@ -95,10 +95,15 @@ def publish_clean_pull_request(
                     cwd=publication_root,
                 ).splitlines()
             )
-            if committed != set(files):
+            if staged and committed != set(files):
                 raise PowdrrExecutionError(
                     "Clean publication commit contains paths outside the approved "
                     f"file set: {sorted(committed ^ set(files))!r}."
+                )
+            if not staged and committed:
+                raise PowdrrExecutionError(
+                    "Clean publication found unexpected commits on an unchanged "
+                    f"publication request: {sorted(committed)!r}."
                 )
             _run(
                 ["git", "push", "--set-upstream", "origin", branch],

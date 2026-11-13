@@ -41,6 +41,22 @@ def _git(root: Path, *arguments: str, data: bytes | None = None) -> bytes:
     return result.stdout
 
 
+def _is_base_ancestor_of_checkout(
+    repo_root: Path, *, base_commit: str, checkout_commit: str
+) -> bool:
+    result = subprocess.run(
+        ["git", "merge-base", "--is-ancestor", base_commit, checkout_commit],
+        cwd=repo_root,
+        capture_output=True,
+        check=False,
+    )
+    if result.returncode == 0:
+        return True
+    if result.returncode == 1:
+        return False
+    raise PowdrrExecutionError(result.stderr.decode(errors="replace").strip())
+
+
 def load_reviewed_source_design(
     repo_root: Path, proposed: Mapping[str, Any], *, base_commit: str
 ) -> tuple[str, dict[str, Any]]:
@@ -96,6 +112,17 @@ def _story_validation_is_accepted(result: Mapping[str, Any]) -> bool:
         and health.get("mode") == "enforce"
         and health.get("passed") is True
     )
+
+
+def _validation_result(data: Mapping[str, Any]) -> dict[str, Any]:
+    validation = data.get("validation")
+    if isinstance(validation, Mapping):
+        return dict(validation)
+    return {
+        "status": "not_run",
+        "passed": False,
+        "error": data.get("error") or "source reference validation did not complete",
+    }
 
 
 def dispatch_source_reference_task(
@@ -236,9 +263,14 @@ def dispatch_source_reference_task(
         "source_reference_artifact_root": str(root),
         "source_reference_mode": "enforce",
     }
+    checkout_commit = _git(repo_root, "rev-parse", "HEAD").decode().strip()
     try:
-        if _git(repo_root, "rev-parse", "HEAD").decode().strip() != base_commit:
-            raise ValueError("Task checkout differs from the reviewed source base")
+        if not _is_base_ancestor_of_checkout(
+            repo_root, base_commit=base_commit, checkout_commit=checkout_commit
+        ):
+            raise ValueError(
+                "Reviewed source base is not an ancestor of the task checkout"
+            )
         _git(repo_root, "worktree", "add", "--detach", str(candidate), base_commit)
         run = SourceReferenceRun.prepare(
             workspace_root=candidate,
@@ -263,8 +295,10 @@ def dispatch_source_reference_task(
         attempt = data["attempt"] or {}
         result.update(
             attempt_id=attempt.get("attempt_id"),
-            status=attempt.get("status", "failed"),
-            validation=data["validation"],
+            status=data["outcome"],
+            attempt_status=attempt.get("status", "failed"),
+            validation=_validation_result(data),
+            diff_check=data.get("diff_check"),
             source_reference_outcome=data["outcome"],
             source_reference_terminal=str(run.private_root / "terminal.json"),
             attempts=[data],
@@ -401,7 +435,7 @@ def dispatch_source_reference_task(
             patch += untracked.stdout
         run.verify_candidate()
         (root / "accepted.patch").write_bytes(patch)
-        if _git(repo_root, "rev-parse", "HEAD").decode().strip() != base_commit:
+        if _git(repo_root, "rev-parse", "HEAD").decode().strip() != checkout_commit:
             raise ValueError("Task checkout moved while the source worker ran")
         if _git(
             repo_root, "status", "--porcelain", "--untracked-files=all", "--", *changed

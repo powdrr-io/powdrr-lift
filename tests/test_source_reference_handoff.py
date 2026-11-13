@@ -156,6 +156,27 @@ def test_atomic_prompt_manifest_parity_privacy_and_stability() -> None:
     )
 
 
+def test_behavior_only_handoff_does_not_require_source_reference_placements() -> None:
+    accepted = document()
+    accepted["reference_definitions"] = []
+    accepted["source_reference_placements"] = []
+    accepted["source_reference_preservations"] = []
+
+    handoff = compile_document(accepted)
+    contract = handoff.worker_prompt.to_data()["contract"]
+    prompt = handoff.worker_prompt.prompt
+
+    assert contract["definitions"] == []
+    assert contract["obligations"] == []
+    assert contract["preservation"] == []
+    assert contract["behavior_case_ids"] == {"retry-result": ["case:retry"]}
+    assert "Implement the accepted behavior scenarios" in prompt
+    assert "Add the supplied Structrr IDs" not in prompt
+    assert "COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT" in prompt
+    assert '\'{"schema_version":"structrr-reference-completion-v1",' in prompt
+    assert '"reference_owners":[],"design_gaps":[]}\'' in prompt
+
+
 def test_placement_verification_reference_requires_accepted_behavior_case() -> None:
     original = document(placement(verification_refs=["case:missing"]))
     with pytest.raises(ValueError, match="no accepted behavior case"):

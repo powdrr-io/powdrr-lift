@@ -898,9 +898,12 @@ class SourceReferenceRun:
             "(version 1)",
             "(allow default)",
             f"(deny file-read* (subpath {json.dumps(str(self.private_root))}))",
+            # Shell and verifier probes redirect to /dev/null; allow that device
+            # while keeping writes outside the workspace and public artifacts denied.
             "(deny file-write* (require-all "
             f"(require-not (subpath {json.dumps(str(self.workspace_root))})) "
-            f"(require-not (subpath {json.dumps(str(self.public_root))}))))",
+            f"(require-not (subpath {json.dumps(str(self.public_root))})) "
+            '(require-not (literal "/dev/null"))))',
             "(deny file-write* (literal "
             + json.dumps(str(self.workspace_root / ".git"))
             + "))",
@@ -1283,6 +1286,12 @@ class SourceReferenceRun:
                 execution.attempt.to_data(),
                 execution.validation.to_data(),
             )
+            result["diff_check"] = {
+                "passed": execution.diff_check.returncode == 0,
+                "returncode": execution.diff_check.returncode,
+                "stdout": execution.diff_check.stdout,
+                "stderr": execution.diff_check.stderr,
+            }
             reference_result = next(
                 (
                     item
@@ -1320,11 +1329,16 @@ class SourceReferenceRun:
                 result["outcome"] = classify_coding_agent_attempt(
                     execution.attempt
                 ).value
-            elif (
-                execution.validation.status is not ValidationReportStatus.PASSED
-                or execution.diff_check.returncode
-            ):
+            elif execution.validation.status is not ValidationReportStatus.PASSED:
                 result["outcome"] = "validation_failed"
+            elif execution.diff_check.returncode:
+                result["outcome"] = "validation_failed"
+                details = execution.diff_check.stderr.strip() or (
+                    execution.diff_check.stdout.strip()
+                )
+                result["error"] = "git diff --check failed"
+                if details:
+                    result["error"] += f": {details}"
             elif self._candidate_after_worker != self._candidate_state():
                 result["outcome"] = "invalid_candidate"
                 result["error"] = (

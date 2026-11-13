@@ -432,6 +432,7 @@ None."""
         "## Objective Explain the goal. ## Scope Include the implementation."
     )
     assert description_schema["maxLength"] == 12000
+    assert r"[\s\S]" not in description_schema["pattern"]
     assert re.search(description_schema["pattern"], valid_description)
     assert not re.search(description_schema["pattern"], collapsed_description)
     assert implementation_steps[5]["call"]["inputs"]["files_to_publish"] == {

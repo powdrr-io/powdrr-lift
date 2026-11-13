@@ -1,5 +1,5 @@
 schema: https://powdrr.io/schema/changelog-v2
-change_id: PR-1476
+change_id: PR-1477
 title: Reconcile candidate-bound obligation routes
 intent:
   problem: Candidate route records are produced but are not checked for exact compiled-route coverage, candidate freshness, or duplicate and unrelated records.

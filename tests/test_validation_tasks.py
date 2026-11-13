@@ -380,6 +380,8 @@ def test_make_ci_command_and_workflow_path_preserve_quoted_arguments(
         "validation-input:Makefile",
         "validation-input:.github/workflows/ci.yml",
     )
+    assert profile.ci_origins[0]["workflow_name"] == "ci"
+    assert profile.ci_origins[0]["job_name"] == "test"
 
 
 def test_make_dynamic_recipes_and_include_cycles_remain_unresolved(

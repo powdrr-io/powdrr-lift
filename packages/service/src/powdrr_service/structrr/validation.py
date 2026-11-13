@@ -2161,6 +2161,7 @@ def _github_validation_origins(root: Path) -> tuple[dict[str, object], ...]:
                 origins.append(
                     {
                         "workflow": path.relative_to(root).as_posix(),
+                        "workflow_name": str(data.get("name", path.stem)),
                         "triggers": triggers,
                         "job_id": str(job_id),
                         "job_name": str(job.get("name", job_id)),

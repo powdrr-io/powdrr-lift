@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import ast
 import os
+import re
 import shlex
 import signal
 import subprocess
@@ -24,6 +26,13 @@ from powdrr_lift.workrr.source_reference_validation import (
 )
 
 CODING_AGENT_VALIDATION_REPORT_SCHEMA_VERSION = "coding-agent-validation-report-v1"
+_UNKNOWN_CONDITION_VALUE = object()
+_CONDITION_TOKEN = re.compile(
+    r"\s*(?:(?P<operator>&&|\|\||==|!=|!|\(|\))"
+    r"|(?P<string>'(?:\\.|[^'\\])*'|\"(?:\\.|[^\"\\])*\")"
+    r"|(?P<literal>true|false|null)\b"
+    r"|(?P<identifier>[A-Za-z_][A-Za-z0-9_.]*))"
+)
 
 
 class ValidationResultStatus(StrEnum):
@@ -210,10 +219,19 @@ def evaluate_validation_applicability(
             "profile is declared not applicable"
         )
     condition = applicability.get("condition")
+    condition_matched = False
     if condition not in (None, ""):
-        return ValidationApplicabilityStatus.PENDING, (
-            "applicability condition cannot be evaluated deterministically"
-        )
+        condition_result = _evaluate_github_condition(condition, context)
+        if condition_result is False:
+            return ValidationApplicabilityStatus.NOT_APPLICABLE, (
+                "applicability condition evaluated false"
+            )
+        if condition_result is None:
+            return ValidationApplicabilityStatus.PENDING, (
+                "applicability condition needs unsupported syntax "
+                "or unavailable context"
+            )
+        condition_matched = True
 
     local = applicability.get("local")
     if local is False:
@@ -233,6 +251,8 @@ def evaluate_validation_applicability(
         )
 
     constraints: list[str] = []
+    if condition_matched:
+        constraints.append("condition matched")
     for key, actual in (
         ("events", context.event),
         ("base_branches", context.base_branch),
@@ -294,6 +314,140 @@ def evaluate_validation_applicability(
             "profile applies to local validation"
         )
     return ValidationApplicabilityStatus.PENDING, ("profile applicability is unknown")
+
+
+def _evaluate_github_condition(
+    condition: object,
+    context: ValidationApplicabilityContext,
+) -> bool | None:
+    """Evaluate the deterministic GitHub expression subset supported locally."""
+    if not isinstance(condition, str) or len(condition) > 1024:
+        return None
+    expression = condition.strip()
+    if expression.startswith("${{") and expression.endswith("}}"):
+        expression = expression[3:-2].strip()
+    if not expression:
+        return None
+    tokens: list[tuple[str, str]] = []
+    offset = 0
+    while offset < len(expression):
+        match = _CONDITION_TOKEN.match(expression, offset)
+        if match is None:
+            return None
+        kind = next(
+            name for name, value in match.groupdict().items() if value is not None
+        )
+        tokens.append((kind, match.group(kind)))
+        offset = match.end()
+
+    class _Parser:
+        def __init__(self) -> None:
+            self.index = 0
+
+        def peek(self, value: str | None = None) -> bool:
+            if self.index >= len(tokens):
+                return False
+            return value is None or tokens[self.index][1] == value
+
+        def take(self, value: str | None = None) -> tuple[str, str] | None:
+            if not self.peek(value):
+                return None
+            token = tokens[self.index]
+            self.index += 1
+            return token
+
+        def parse(self) -> object:
+            result = self.parse_or()
+            return result if self.index == len(tokens) else _UNKNOWN_CONDITION_VALUE
+
+        def parse_or(self) -> object:
+            result = self.parse_and()
+            while self.take("||"):
+                right = self.parse_and()
+                result = _condition_or(result, right)
+            return result
+
+        def parse_and(self) -> object:
+            result = self.parse_unary()
+            while self.take("&&"):
+                right = self.parse_unary()
+                result = _condition_and(result, right)
+            return result
+
+        def parse_unary(self) -> object:
+            if self.take("!"):
+                value = self.parse_unary()
+                return (
+                    _UNKNOWN_CONDITION_VALUE
+                    if value is _UNKNOWN_CONDITION_VALUE
+                    else not value
+                )
+            return self.parse_comparison()
+
+        def parse_comparison(self) -> object:
+            left = self.parse_primary()
+            operator = self.take("==") or self.take("!=")
+            if operator is None:
+                return left
+            right = self.parse_primary()
+            if left is _UNKNOWN_CONDITION_VALUE or right is _UNKNOWN_CONDITION_VALUE:
+                return _UNKNOWN_CONDITION_VALUE
+            equal = type(left) is type(right) and left == right
+            return equal if operator[1] == "==" else not equal
+
+        def parse_primary(self) -> object:
+            if self.take("("):
+                value = self.parse_or()
+                if not self.take(")"):
+                    return _UNKNOWN_CONDITION_VALUE
+                return value
+            token = self.take()
+            if token is None:
+                return _UNKNOWN_CONDITION_VALUE
+            kind, value = token
+            if kind == "string":
+                try:
+                    parsed = ast.literal_eval(value)
+                except (SyntaxError, ValueError):
+                    return _UNKNOWN_CONDITION_VALUE
+                return parsed if isinstance(parsed, str) else _UNKNOWN_CONDITION_VALUE
+            if kind == "literal":
+                return {"true": True, "false": False, "null": None}[value]
+            if kind == "identifier":
+                known_values: dict[str, object] = {
+                    "github.event_name": context.event
+                    if context.event is not None
+                    else _UNKNOWN_CONDITION_VALUE,
+                    "github.base_ref": context.base_branch
+                    if context.base_branch is not None
+                    else _UNKNOWN_CONDITION_VALUE,
+                    "github.event.pull_request.base.ref": context.base_branch
+                    if context.base_branch is not None
+                    else _UNKNOWN_CONDITION_VALUE,
+                }
+                return known_values.get(value, _UNKNOWN_CONDITION_VALUE)
+            return _UNKNOWN_CONDITION_VALUE
+
+    parsed = _Parser().parse()
+    if isinstance(parsed, bool):
+        return parsed
+    return None
+
+
+def _condition_or(left: object, right: object) -> object:
+    if left is True or right is True:
+        return True
+    if left is False and right is False:
+        return False
+    return _UNKNOWN_CONDITION_VALUE
+
+
+def _condition_and(left: object, right: object) -> object:
+    if left is False or right is False:
+        return False
+    if left is True and right is True:
+        return True
+    return _UNKNOWN_CONDITION_VALUE
 
 
 @dataclass(frozen=True, slots=True)

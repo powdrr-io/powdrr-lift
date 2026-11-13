@@ -1485,6 +1485,64 @@ def test_validation_applicability_matches_actual_event_base_and_changed_paths(
     assert report.results[0].applicability_context == context.to_data()
 
 
+def test_validation_applicability_evaluates_supported_github_conditions() -> None:
+    profile = ValidationProfile(
+        "ci-tests",
+        ("pytest",),
+        applicability={
+            "local": True,
+            "evaluation": "unknown",
+            "condition": (
+                "${{ (github.event_name == 'pull_request' "
+                "&& github.base_ref == 'main') }}"
+            ),
+        },
+    )
+
+    applicability, explanation = evaluate_validation_applicability(
+        profile,
+        ValidationApplicabilityContext(event="pull_request", base_branch="main"),
+    )
+
+    assert applicability is ValidationApplicabilityStatus.APPLICABLE
+    assert explanation == "condition matched"
+
+
+def test_validation_applicability_conditions_resolve_false_or_remain_pending() -> None:
+    false_profile = ValidationProfile(
+        "push-only",
+        ("pytest",),
+        applicability={
+            "local": True,
+            "evaluation": "unknown",
+            "condition": "github.event_name != 'push'",
+        },
+    )
+    unknown_profile = ValidationProfile(
+        "draft-only",
+        ("pytest",),
+        applicability={
+            "local": True,
+            "evaluation": "unknown",
+            "condition": "github.event.pull_request.draft == false",
+        },
+    )
+
+    false_status, false_reason = evaluate_validation_applicability(
+        false_profile,
+        ValidationApplicabilityContext(event="push"),
+    )
+    unknown_status, unknown_reason = evaluate_validation_applicability(
+        unknown_profile,
+        ValidationApplicabilityContext(event="pull_request"),
+    )
+
+    assert false_status is ValidationApplicabilityStatus.NOT_APPLICABLE
+    assert false_reason == "applicability condition evaluated false"
+    assert unknown_status is ValidationApplicabilityStatus.PENDING
+    assert "unavailable context" in unknown_reason
+
+
 def test_unknown_validation_applicability_is_pending_not_skipped(
     tmp_path: Path,
 ) -> None:

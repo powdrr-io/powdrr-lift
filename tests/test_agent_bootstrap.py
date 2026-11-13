@@ -10,10 +10,12 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from powdrr_service.structrr.bootstrap import render_bootstrap_markdown
 
 from powdrr_lift.agent_bootstrap import (
     BootstrapTaskConfig,
     BootstrapTaskResult,
+    _run_validation_baseline,
     _validation_runtime_identity,
     run_bootstrap_task,
 )
@@ -294,7 +296,6 @@ def test_validation_runtime_identity_changes_with_source_inputs_and_tool_version
     original = identity()["fingerprint"]
     tool_version = "ruff 2.0.0"
     assert identity()["fingerprint"] != original
-
     tool_version = "ruff 1.0.0"
     document["source_manifest"]["product_digest"] = "sha256:source-two"
     assert identity()["fingerprint"] != original
@@ -304,6 +305,63 @@ def test_validation_runtime_identity_changes_with_source_inputs_and_tool_version
         "sha256:lock-two"
     )
     assert identity()["fingerprint"] != original
+
+
+def test_validation_baseline_invalidates_saved_pass_when_runtime_identity_changes(
+    tmp_path: Path,
+) -> None:
+    check: dict[str, Any] = {
+        "id": "validation:ruff-check",
+        "profile": "ruff-check",
+        "provider": "ruff",
+        "command": ["ruff", "check", "."],
+        "execution": {"kind": "argv", "cwd": "."},
+        "environment": None,
+        "component": None,
+        "selectors": [],
+        "config_files": [],
+        "settings": {},
+        "depends_on": [],
+        "applicability": {"local": True},
+    }
+    document: dict[str, Any] = {
+        "validation_inventory": [check],
+        "source_manifest": {"product_digest": "sha256:source-current"},
+        "validation_context": {"environments": [], "input_fingerprints": []},
+    }
+    previous_check = {
+        **check,
+        "baseline": {
+            "status": "passed",
+            "observation": {
+                "status": "passed",
+                "runtime_identity": {"fingerprint": "sha256:source-previous"},
+            },
+        },
+    }
+
+    def runner(
+        command: Sequence[str], **kwargs: Any
+    ) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(list(command), 0, "tool 2.0\n", "")
+
+    result = _run_validation_baseline(
+        tmp_path,
+        document,
+        runner=runner,
+        timeout_seconds=10,
+        previous_inventory=[previous_check],
+    )
+
+    assert result["status"] == "passed"
+    observation = check["baseline"]["observation"]
+    invalidation = observation["prior_pass_invalidation"]
+    assert invalidation["status"] == "invalidated"
+    assert invalidation["reason"] == "runtime identity changed"
+    report = render_bootstrap_markdown(
+        document, report_path=tmp_path / "baseline.md", root=tmp_path
+    )
+    assert "Previous baseline pass invalidated: runtime identity changed." in report
 
 
 def test_bootstrap_reports_validation_failure_and_keeps_snapshot(

@@ -27,7 +27,9 @@ blocks until the baseline is refreshed. Local baseline observations also carry
 an identity fingerprint for source content, validation inputs, the check recipe,
 environment, interpreter, and tool version; the report links that fingerprint
 for review. WP8 remains partial: comparing saved observations with the active
-runtime and using mismatches to invalidate pass evidence are still outstanding.
+runtime now invalidates a prior pass when its identity is missing or differs;
+the report retains the reason. Offline remote observation aging and enforcement
+across the remaining downstream consumers are still outstanding.
 The core validation runner also keeps an empty profile selection pending.
 
 ## Objective and delivery contract

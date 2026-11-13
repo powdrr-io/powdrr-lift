@@ -10,7 +10,7 @@ import signal
 import subprocess
 import sys
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, replace
 from importlib.resources import files
 from pathlib import Path
@@ -165,11 +165,17 @@ def run_bootstrap_task(
             snapshot_path.read_bytes() if snapshot_path.is_file() else None
         )
         previous_manifest_data: Any = None
+        previous_validation_inventory: list[dict[str, Any]] = []
         if previous_snapshot is not None:
             try:
                 prior_document = yaml.safe_load(previous_snapshot)
                 if isinstance(prior_document, dict):
                     previous_manifest_data = prior_document.get("source_manifest")
+                    raw_inventory = prior_document.get("validation_inventory", [])
+                    if isinstance(raw_inventory, list):
+                        previous_validation_inventory = [
+                            item for item in raw_inventory if isinstance(item, dict)
+                        ]
             except yaml.YAMLError:
                 previous_manifest_data = None
         _emit_bootstrap_progress(
@@ -200,6 +206,7 @@ def run_bootstrap_task(
             runner=runner,
             timeout_seconds=config.validation_timeout_seconds,
             progress=progress,
+            previous_inventory=previous_validation_inventory,
         )
         validation_status = str(baseline_result["status"])
         _emit_bootstrap_progress(
@@ -653,6 +660,7 @@ def _run_validation_baseline(
     runner: Any,
     timeout_seconds: float,
     progress: Callable[[str], None] | None = None,
+    previous_inventory: Sequence[dict[str, Any]] = (),
 ) -> dict[str, Any]:
     """Run discovered local argv checks and store bounded baseline outcomes."""
     inventory = document.get("validation_inventory", [])
@@ -674,6 +682,11 @@ def _run_validation_baseline(
 
     deadline = time.monotonic() + _VALIDATION_BUDGET_SECONDS
     statuses: list[str] = []
+    previous_by_id = {
+        str(check["id"]): check
+        for check in previous_inventory
+        if isinstance(check.get("id"), str)
+    }
     for index, check in enumerate(applicable, start=1):
         command = check.get("command", [])
         execution = check.get("execution", {})
@@ -777,6 +790,15 @@ def _run_validation_baseline(
             "stderr_sha256": _output_digest(stderr),
             "error": error,
             **({"runtime_identity": runtime_identity} if runtime_identity else {}),
+            **(
+                {"prior_pass_invalidation": invalidation}
+                if (
+                    invalidation := _prior_pass_invalidation(
+                        previous_by_id.get(str(check.get("id"))), runtime_identity
+                    )
+                )
+                else {}
+            ),
         }
         check["confirmation"] = {
             "level": "execution",
@@ -795,6 +817,49 @@ def _run_validation_baseline(
     else:
         overall = "passed"
     return {"status": overall, "checks": len(statuses)}
+
+
+def _prior_pass_invalidation(
+    previous_check: dict[str, Any] | None,
+    current_identity: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    """Explain when a saved pass no longer matches the active check identity."""
+    if previous_check is None:
+        return None
+    previous_baseline = previous_check.get("baseline")
+    if (
+        not isinstance(previous_baseline, dict)
+        or previous_baseline.get("status") != "passed"
+    ):
+        return None
+    previous_observation = previous_baseline.get("observation")
+    previous_identity = (
+        previous_observation.get("runtime_identity")
+        if isinstance(previous_observation, dict)
+        else None
+    )
+    previous_fingerprint = (
+        previous_identity.get("fingerprint")
+        if isinstance(previous_identity, dict)
+        else None
+    )
+    current_fingerprint = (
+        current_identity.get("fingerprint") if current_identity is not None else None
+    )
+    if previous_fingerprint and previous_fingerprint == current_fingerprint:
+        return None
+    if current_fingerprint is None:
+        reason = "active runtime identity could not be established"
+    elif previous_fingerprint is None:
+        reason = "saved pass has no runtime identity"
+    else:
+        reason = "runtime identity changed"
+    return {
+        "status": "invalidated",
+        "reason": reason,
+        "saved_identity_fingerprint": previous_fingerprint,
+        "current_identity_fingerprint": current_fingerprint,
+    }
 
 
 def _validation_runtime_identity(
@@ -883,7 +948,6 @@ def _validation_runtime_identity(
         },
         "source": {
             "product_digest": source_manifest.get("product_digest"),
-            "source_revision": source_manifest.get("source_revision"),
         },
         "validation_inputs": sorted(inputs, key=lambda item: str(item["path"])),
         "environment_record": environment_record,

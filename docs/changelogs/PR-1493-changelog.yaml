@@ -1,0 +1,104 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1493
+title: Invalidate baseline passes on runtime identity changes
+intent:
+  problem: Saved validation baseline passes can remain visible after the source or runtime identity that produced them changes.
+  goal: Compare prior passing observations with the active runtime identity and explicitly invalidate stale evidence.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/plans/bootstrap-validation-discovery.md
+  type: modified
+  span: {start_line: 30, end_line: 32}
+  summary: Record active identity comparison and the remaining remote/downstream freshness work.
+  rationale: Keep WP8 progress accurate as stale baseline handling is added.
+- path: packages/service/src/powdrr_service/structrr/bootstrap.py
+  type: modified
+  span: {start_line: 521, end_line: 531}
+  summary: Display the reason a previous baseline pass was invalidated.
+  rationale: Make stale-result handling visible in the human-readable Structrr report.
+- path: src/powdrr_lift/agent_bootstrap.py
+  type: modified
+  span: {start_line: 13, end_line: 13}
+  summary: Import sequence typing for previous validation inventories.
+  rationale: Accept prior check records when comparing saved identities.
+- path: src/powdrr_lift/agent_bootstrap.py
+  type: modified
+  span: {start_line: 168, end_line: 168}
+  summary: Initialize prior inventory state for the bootstrap run.
+  rationale: Read saved check observations when a previous baseline exists.
+- path: src/powdrr_lift/agent_bootstrap.py
+  type: modified
+  span: {start_line: 174, end_line: 178}
+  summary: Load prior validation check records from the saved baseline.
+  rationale: Compare previous passes with the identities observed in the new run.
+- path: src/powdrr_lift/agent_bootstrap.py
+  type: modified
+  span: {start_line: 209, end_line: 209}
+  summary: Pass prior check records into local baseline execution.
+  rationale: Make the saved observations available for freshness comparison.
+- path: src/powdrr_lift/agent_bootstrap.py
+  type: modified
+  span: {start_line: 663, end_line: 663}
+  summary: Accept the previous inventory in baseline execution.
+  rationale: Tie prior results to their matching current validation check.
+- path: src/powdrr_lift/agent_bootstrap.py
+  type: modified
+  span: {start_line: 685, end_line: 689}
+  summary: Index previous checks by stable validation identity.
+  rationale: Compare only observations for the same check.
+- path: src/powdrr_lift/agent_bootstrap.py
+  type: modified
+  span: {start_line: 793, end_line: 801}
+  summary: Persist invalidation details when a saved pass identity is missing or differs from the active run.
+  rationale: Ensure stale pass evidence is explicitly superseded with an actionable reason.
+- path: src/powdrr_lift/agent_bootstrap.py
+  type: modified
+  span: {start_line: 822, end_line: 864}
+  summary: Classify prior passing observations as invalidated when their runtime fingerprint does not match.
+  rationale: Prevent a saved pass from being treated as current after source or runtime changes.
+- path: src/powdrr_lift/agent_bootstrap.py
+  type: modified
+  span: {start_line: 886, end_line: 886}
+  summary: Exclude the commit revision from the runtime identity fingerprint.
+  rationale: Keep identity based on source content and execution conditions rather than commit metadata.
+- path: tests/fixtures/structrr/golden-python-symbols.yaml
+  type: modified
+  span: {start_line: 8, end_line: 8}
+  summary: Update the expected bootstrap module end line.
+  rationale: Keep the golden symbol span aligned with report renderer growth.
+- path: tests/fixtures/structrr/golden-python-symbols.yaml
+  type: modified
+  span: {start_line: 21, end_line: 22}
+  summary: Update the expected source model function span.
+  rationale: Keep the golden symbol location aligned with preceding source additions.
+- path: tests/test_agent_bootstrap.py
+  type: modified
+  span: {start_line: 13, end_line: 13}
+  summary: Import the Markdown renderer for stale evidence reporting assertions.
+  rationale: Verify invalidation reasons reach the report.
+- path: tests/test_agent_bootstrap.py
+  type: modified
+  span: {start_line: 18, end_line: 18}
+  summary: Import the local baseline runner for focused regression coverage.
+  rationale: Exercise prior-pass comparison without a full repository bootstrap.
+- path: tests/test_agent_bootstrap.py
+  type: modified
+  span: {start_line: 310, end_line: 366}
+  summary: Verify a previous pass with a different runtime identity is invalidated and reported.
+  rationale: Ensure mismatched saved evidence cannot remain current.
+- path: tests/test_agent_bootstrap.py
+  type: modified
+  span: {start_line: 297, end_line: 297}
+  summary: Remove an extra blank line before the new regression case.
+  rationale: Keep the bootstrap test file formatted consistently.
+entities: []
+entity_relationships: []
+invariants:
+- id: saved-pass-requires-matching-runtime-identity
+  description: A saved passing baseline is invalidated when its runtime identity is absent or differs from the active check identity.
+  action: added
+- id: stale-pass-invalidation-is-reported
+  description: The Structrr report explains when a prior baseline pass was invalidated.
+  action: added
+guidance: []

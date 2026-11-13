@@ -13,7 +13,7 @@ candidate-bound receipts for each route remain.
 Milestones 4–5 remain.
 
 Audited code baseline for this inventory: `feafe5b7b22bf7cd98dee9b06797ea87af558a4c`.
-Latest implementation review baseline: `1106f41930b4479123e80cf9186623ae41fbc7c6` (PR #1473).
+Latest implementation review baseline: `03edeafc` (PR #1474).
 
 This plan replaces the intent-linked verification, evidence-backed prompt
 contract closure, and bounded coding-worker plans in `superseded/`. Those

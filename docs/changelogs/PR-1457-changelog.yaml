@@ -1,0 +1,123 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1457
+title: Remove legacy feature correction loop
+intent:
+  problem: The feature implementation process still launched a second coding phase to correct candidate diffs after review, despite the decision to remove unsupported legacy code-writing routes.
+  goal: Remove the automatic correction loop and its helpers while preserving deterministic review and fail-closed handling of unresolved obligations.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/plans/implementation-contract-and-verification.md
+  type: modified
+  span: {start_line: 42, end_line: 42}
+  summary: Record removal of the feature candidate correction loop and clarify that typed plan amendment remains non-code-writing.
+  rationale: Keep the consolidated implementation plan aligned with the current route behavior.
+- path: docs/plans/implementation-contract-and-verification.md
+  type: modified
+  span: {start_line: 77, end_line: 81}
+  summary: Update remaining implementation milestone work after removing feature correction.
+  rationale: Track route-level fixtures as the remaining acceptance gap.
+- path: docs/plans/implementation-route-matrix.md
+  type: modified
+  span: {start_line: 19, end_line: 19}
+  summary: Describe plan amendment as a typed non-code-writing PlanRepairService workflow.
+  rationale: Keep the route inventory consistent with its deterministic implementation.
+- path: docs/plans/implementation-route-matrix.md
+  type: modified
+  span: {start_line: 21, end_line: 21}
+  summary: Mark the feature candidate correction loop and helper as removed with stale dispatch rejected.
+  rationale: Document that final review fails closed without starting another coding session.
+- path: docs/plans/implementation-route-matrix.md
+  type: modified
+  span: {start_line: 55, end_line: 58}
+  summary: Update the current route cleanup status and remaining evidence gap.
+  rationale: Keep milestone claims tied to existing route-level evidence.
+- path: packages/service/src/powdrr_service/resources/processes/implement-feature.yaml
+  type: modified
+  span: {start_line: 656, end_line: 656}
+  summary: Remove correction tracking from the final review output contract.
+  rationale: The process no longer runs correction attempts.
+- path: packages/service/src/powdrr_service/resources/processes/implement-feature.yaml
+  type: modified
+  span: {start_line: 671, end_line: 737}
+  summary: Delete candidate correction process steps and bind final review directly to the initial review.
+  rationale: Remove the second coding pass from feature implementation.
+- path: packages/service/src/powdrr_service/resources/processes/implement-feature.yaml
+  type: modified
+  span: {start_line: 805, end_line: 805}
+  summary: Remove the correction loop operation from process dispatch.
+  rationale: No correction operation remains after review.
+- path: packages/service/src/powdrr_service/resources/processes/implement-feature.yaml
+  type: modified
+  span: {start_line: 891, end_line: 891}
+  summary: Remove the obsolete candidate correction review operation.
+  rationale: Keep the process operation catalog aligned with supported behavior.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span: {start_line: 856, end_line: 858}
+  summary: Remove feature command registrations for starting and retrieving correction reviews.
+  rationale: The process no longer requests candidate correction.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span: {start_line: 3380, end_line: 3383}
+  summary: Remove runtime handlers for candidate correction commands.
+  rationale: Delete unreachable legacy correction dispatch.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span: {start_line: 7991, end_line: 7994}
+  summary: Remove candidate correction review state from final review preparation.
+  rationale: Final review no longer feeds an automated correction phase.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span: {start_line: 8254, end_line: 8259}
+  summary: Delete correction prompt construction, provider invocation, and correction review helpers.
+  rationale: Remove the second code-writing session and its supporting logic.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span: {start_line: 8268, end_line: 8420}
+  summary: Delete the automatic candidate correction implementation helpers.
+  rationale: Remove unreachable feature code-writing behavior.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span: {start_line: 8593, end_line: 8595}
+  summary: Remove obsolete correction attempt limit validation from finalization.
+  rationale: The review result no longer carries correction attempts.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span: {start_line: 8726, end_line: 8729}
+  summary: Remove correction counters from the finalized implementation result.
+  rationale: No correction loop runs or reports attempts.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span: {start_line: 74, end_line: 74}
+  summary: Remove the import for the deleted candidate correction helper.
+  rationale: The helper is no longer part of the feature endpoint.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span: {start_line: 3181, end_line: 3183}
+  summary: Assert the feature process has no candidate correction operations.
+  rationale: Guard against reintroducing the removed loop.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span: {start_line: 3402, end_line: 3612}
+  summary: Assert final review does not report removed correction attempts.
+  rationale: Keep finalization expectations aligned with the reduced workflow.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span: {start_line: 3756, end_line: 3756}
+  summary: Remove the obsolete candidate correction attempt field from structural mismatch setup.
+  rationale: Structural review no longer retries candidate correction.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span: {start_line: 3574, end_line: 3574}
+  summary: Assert correction attempt data is absent from final review output.
+  rationale: Finalization has no correction attempts to report.
+- path: tests/test_minisweagent_monitor.py
+  type: modified
+  span: {start_line: 161, end_line: 163}
+  summary: Give the continuous-progress monitor test enough startup tolerance for loaded CI workers.
+  rationale: Prevent process startup delays from being mistaken for a stalled worker.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []

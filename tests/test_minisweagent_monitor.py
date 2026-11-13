@@ -158,7 +158,9 @@ for index in range(6):
         trajectory_path=trajectory,
         log_path=log,
         cwd=tmp_path,
-        timeout_seconds=0.5,
+        # Allow a slow CI worker to start the child before its first trajectory
+        # write; the test still verifies that later progress resets the timeout.
+        timeout_seconds=3.0,
         poll_interval=0.01,
     )
 

@@ -1,0 +1,540 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1504
+title: Complete bootstrap validation freshness enforcement
+intent:
+  problem: Validation context is lost at provider boundaries, pytest collection mutates the orchestrator
+    process, and existing tests do not exercise readiness end to end.
+  goal: Preserve reviewed validation context through execution and provider evidence, collect in the declared
+    component context, and prove unresolved checks cannot pass readiness.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/plans/bootstrap-validation-discovery.md
+  type: modified
+  span:
+    start_line: 3
+    end_line: 4
+  summary: Document provider context preservation, subprocess collection, and readiness tests.
+  rationale: Record the evidence supporting WP8 completion without claiming the overall plan is complete.
+- path: docs/plans/bootstrap-validation-discovery.md
+  type: modified
+  span:
+    start_line: 35
+    end_line: 45
+  summary: Document provider context preservation, subprocess collection, and readiness tests.
+  rationale: Record the evidence supporting WP8 completion without claiming the overall plan is complete.
+- path: packages/agent/src/powdrr_agent/execution/verification_evidence.py
+  type: modified
+  span:
+    start_line: 124
+    end_line: 150
+  summary: Pass provider execution context and target tool version from inventory into verification requests.
+  rationale: Keep evidence execution aligned with the discovered profile.
+- path: packages/agent/src/powdrr_agent/execution/verification_provider.py
+  type: modified
+  span:
+    start_line: 6
+    end_line: 6
+  summary: Validate profile execution context, resolve a repository-contained cwd, and build the target
+    subprocess environment.
+  rationale: Keep unsupported shell or script semantics unresolved and prevent cwd escape.
+- path: packages/agent/src/powdrr_agent/execution/verification_provider.py
+  type: modified
+  span:
+    start_line: 12
+    end_line: 12
+  summary: Validate profile execution context, resolve a repository-contained cwd, and build the target
+    subprocess environment.
+  rationale: Keep unsupported shell or script semantics unresolved and prevent cwd escape.
+- path: packages/agent/src/powdrr_agent/execution/verification_provider.py
+  type: modified
+  span:
+    start_line: 67
+    end_line: 73
+  summary: Validate profile execution context, resolve a repository-contained cwd, and build the target
+    subprocess environment.
+  rationale: Keep unsupported shell or script semantics unresolved and prevent cwd escape.
+- path: packages/agent/src/powdrr_agent/execution/verification_provider.py
+  type: modified
+  span:
+    start_line: 84
+    end_line: 89
+  summary: Validate profile execution context, resolve a repository-contained cwd, and build the target
+    subprocess environment.
+  rationale: Keep unsupported shell or script semantics unresolved and prevent cwd escape.
+- path: packages/agent/src/powdrr_agent/execution/verification_provider.py
+  type: modified
+  span:
+    start_line: 93
+    end_line: 110
+  summary: Validate profile execution context, resolve a repository-contained cwd, and build the target
+    subprocess environment.
+  rationale: Keep unsupported shell or script semantics unresolved and prevent cwd escape.
+- path: packages/agent/src/powdrr_agent/execution/verification_provider.py
+  type: modified
+  span:
+    start_line: 122
+    end_line: 129
+  summary: Validate profile execution context, resolve a repository-contained cwd, and build the target
+    subprocess environment.
+  rationale: Keep unsupported shell or script semantics unresolved and prevent cwd escape.
+- path: packages/agent/src/powdrr_agent/execution/verification_provider.py
+  type: modified
+  span:
+    start_line: 211
+    end_line: 213
+  summary: Validate profile execution context, resolve a repository-contained cwd, and build the target
+    subprocess environment.
+  rationale: Keep unsupported shell or script semantics unresolved and prevent cwd escape.
+- path: packages/agent/src/powdrr_agent/execution/verification_provider.py
+  type: modified
+  span:
+    start_line: 218
+    end_line: 218
+  summary: Validate profile execution context, resolve a repository-contained cwd, and build the target
+    subprocess environment.
+  rationale: Keep unsupported shell or script semantics unresolved and prevent cwd escape.
+- path: packages/agent/src/powdrr_agent/execution/verification_provider.py
+  type: modified
+  span:
+    start_line: 220
+    end_line: 220
+  summary: Validate profile execution context, resolve a repository-contained cwd, and build the target
+    subprocess environment.
+  rationale: Keep unsupported shell or script semantics unresolved and prevent cwd escape.
+- path: packages/agent/src/powdrr_agent/execution/verification_provider.py
+  type: modified
+  span:
+    start_line: 222
+    end_line: 245
+  summary: Validate profile execution context, resolve a repository-contained cwd, and build the target
+    subprocess environment.
+  rationale: Keep unsupported shell or script semantics unresolved and prevent cwd escape.
+- path: packages/agent/src/powdrr_agent/execution/verification_provider.py
+  type: modified
+  span:
+    start_line: 247
+    end_line: 280
+  summary: Validate profile execution context, resolve a repository-contained cwd, and build the target
+    subprocess environment.
+  rationale: Keep unsupported shell or script semantics unresolved and prevent cwd escape.
+- path: packages/agent/src/powdrr_agent/execution/verification_provider.py
+  type: modified
+  span:
+    start_line: 284
+    end_line: 299
+  summary: Validate profile execution context, resolve a repository-contained cwd, and build the target
+    subprocess environment.
+  rationale: Keep unsupported shell or script semantics unresolved and prevent cwd escape.
+- path: packages/agent/src/powdrr_agent/execution/verification_provider.py
+  type: modified
+  span:
+    start_line: 301
+    end_line: 301
+  summary: Validate profile execution context, resolve a repository-contained cwd, and build the target
+    subprocess environment.
+  rationale: Keep unsupported shell or script semantics unresolved and prevent cwd escape.
+- path: packages/agent/src/powdrr_agent/execution/verification_provider.py
+  type: modified
+  span:
+    start_line: 305
+    end_line: 311
+  summary: Validate profile execution context, resolve a repository-contained cwd, and build the target
+    subprocess environment.
+  rationale: Keep unsupported shell or script semantics unresolved and prevent cwd escape.
+- path: packages/agent/src/powdrr_agent/execution/verification_provider.py
+  type: modified
+  span:
+    start_line: 313
+    end_line: 313
+  summary: Validate profile execution context, resolve a repository-contained cwd, and build the target
+    subprocess environment.
+  rationale: Keep unsupported shell or script semantics unresolved and prevent cwd escape.
+- path: packages/agent/src/powdrr_agent/execution/verification_provider.py
+  type: modified
+  span:
+    start_line: 317
+    end_line: 342
+  summary: Validate profile execution context, resolve a repository-contained cwd, and build the target
+    subprocess environment.
+  rationale: Keep unsupported shell or script semantics unresolved and prevent cwd escape.
+- path: packages/agent/src/powdrr_agent/execution/verification_provider.py
+  type: modified
+  span:
+    start_line: 349
+    end_line: 352
+  summary: Validate profile execution context, resolve a repository-contained cwd, and build the target
+    subprocess environment.
+  rationale: Keep unsupported shell or script semantics unresolved and prevent cwd escape.
+- path: packages/agent/src/powdrr_agent/execution/verification_provider.py
+  type: modified
+  span:
+    start_line: 357
+    end_line: 358
+  summary: Validate profile execution context, resolve a repository-contained cwd, and build the target
+    subprocess environment.
+  rationale: Keep unsupported shell or script semantics unresolved and prevent cwd escape.
+- path: packages/agent/src/powdrr_agent/execution/verification_provider.py
+  type: modified
+  span:
+    start_line: 375
+    end_line: 375
+  summary: Validate profile execution context, resolve a repository-contained cwd, and build the target
+    subprocess environment.
+  rationale: Keep unsupported shell or script semantics unresolved and prevent cwd escape.
+- path: packages/agent/src/powdrr_agent/execution/verification_provider.py
+  type: modified
+  span:
+    start_line: 385
+    end_line: 385
+  summary: Validate profile execution context, resolve a repository-contained cwd, and build the target
+    subprocess environment.
+  rationale: Keep unsupported shell or script semantics unresolved and prevent cwd escape.
+- path: packages/agent/src/powdrr_agent/execution/verification_provider.py
+  type: modified
+  span:
+    start_line: 405
+    end_line: 405
+  summary: Validate profile execution context, resolve a repository-contained cwd, and build the target
+    subprocess environment.
+  rationale: Keep unsupported shell or script semantics unresolved and prevent cwd escape.
+- path: packages/agent/src/powdrr_agent/execution/verification_provider.py
+  type: modified
+  span:
+    start_line: 441
+    end_line: 461
+  summary: Validate profile execution context, resolve a repository-contained cwd, and build the target
+    subprocess environment.
+  rationale: Keep unsupported shell or script semantics unresolved and prevent cwd escape.
+- path: packages/agent/src/powdrr_agent/execution/verification_provider.py
+  type: modified
+  span:
+    start_line: 466
+    end_line: 467
+  summary: Validate profile execution context, resolve a repository-contained cwd, and build the target
+    subprocess environment.
+  rationale: Keep unsupported shell or script semantics unresolved and prevent cwd escape.
+- path: packages/agent/src/powdrr_agent/execution/verification_provider.py
+  type: modified
+  span:
+    start_line: 478
+    end_line: 478
+  summary: Validate profile execution context, resolve a repository-contained cwd, and build the target
+    subprocess environment.
+  rationale: Keep unsupported shell or script semantics unresolved and prevent cwd escape.
+- path: packages/agent/src/powdrr_agent/execution/verification_provider.py
+  type: modified
+  span:
+    start_line: 481
+    end_line: 481
+  summary: Validate profile execution context, resolve a repository-contained cwd, and build the target
+    subprocess environment.
+  rationale: Keep unsupported shell or script semantics unresolved and prevent cwd escape.
+- path: packages/agent/src/powdrr_agent/execution/verification_provider.py
+  type: modified
+  span:
+    start_line: 483
+    end_line: 483
+  summary: Validate profile execution context, resolve a repository-contained cwd, and build the target
+    subprocess environment.
+  rationale: Keep unsupported shell or script semantics unresolved and prevent cwd escape.
+- path: packages/agent/src/powdrr_agent/execution/verification_provider.py
+  type: modified
+  span:
+    start_line: 493
+    end_line: 493
+  summary: Validate profile execution context, resolve a repository-contained cwd, and build the target
+    subprocess environment.
+  rationale: Keep unsupported shell or script semantics unresolved and prevent cwd escape.
+- path: packages/agent/src/powdrr_agent/execution/verification_provider.py
+  type: modified
+  span:
+    start_line: 498
+    end_line: 498
+  summary: Validate profile execution context, resolve a repository-contained cwd, and build the target
+    subprocess environment.
+  rationale: Keep unsupported shell or script semantics unresolved and prevent cwd escape.
+- path: packages/agent/src/powdrr_agent/execution/verification_provider.py
+  type: modified
+  span:
+    start_line: 502
+    end_line: 527
+  summary: Validate profile execution context, resolve a repository-contained cwd, and build the target
+    subprocess environment.
+  rationale: Keep unsupported shell or script semantics unresolved and prevent cwd escape.
+- path: packages/agent/src/powdrr_agent/execution/verification_provider.py
+  type: modified
+  span:
+    start_line: 533
+    end_line: 534
+  summary: Validate profile execution context, resolve a repository-contained cwd, and build the target
+    subprocess environment.
+  rationale: Keep unsupported shell or script semantics unresolved and prevent cwd escape.
+- path: packages/agent/src/powdrr_agent/execution/verification_provider.py
+  type: modified
+  span:
+    start_line: 551
+    end_line: 551
+  summary: Validate profile execution context, resolve a repository-contained cwd, and build the target
+    subprocess environment.
+  rationale: Keep unsupported shell or script semantics unresolved and prevent cwd escape.
+- path: packages/agent/src/powdrr_agent/execution/verification_provider.py
+  type: modified
+  span:
+    start_line: 561
+    end_line: 561
+  summary: Validate profile execution context, resolve a repository-contained cwd, and build the target
+    subprocess environment.
+  rationale: Keep unsupported shell or script semantics unresolved and prevent cwd escape.
+- path: packages/agent/src/powdrr_agent/execution/verification_provider.py
+  type: modified
+  span:
+    start_line: 575
+    end_line: 575
+  summary: Validate profile execution context, resolve a repository-contained cwd, and build the target
+    subprocess environment.
+  rationale: Keep unsupported shell or script semantics unresolved and prevent cwd escape.
+- path: packages/agent/src/powdrr_agent/execution/verification_provider.py
+  type: modified
+  span:
+    start_line: 651
+    end_line: 705
+  summary: Validate profile execution context, resolve a repository-contained cwd, and build the target
+    subprocess environment.
+  rationale: Keep unsupported shell or script semantics unresolved and prevent cwd escape.
+- path: packages/agent/src/powdrr_agent/execution/verification_provider.py
+  type: modified
+  span:
+    start_line: 723
+    end_line: 723
+  summary: Validate profile execution context, resolve a repository-contained cwd, and build the target
+    subprocess environment.
+  rationale: Keep unsupported shell or script semantics unresolved and prevent cwd escape.
+- path: packages/agent/src/powdrr_agent/execution/verification_provider.py
+  type: modified
+  span:
+    start_line: 726
+    end_line: 728
+  summary: Validate profile execution context, resolve a repository-contained cwd, and build the target
+    subprocess environment.
+  rationale: Keep unsupported shell or script semantics unresolved and prevent cwd escape.
+- path: packages/agent/src/powdrr_agent/execution/verification_provider.py
+  type: modified
+  span:
+    start_line: 731
+    end_line: 733
+  summary: Validate profile execution context, resolve a repository-contained cwd, and build the target
+    subprocess environment.
+  rationale: Keep unsupported shell or script semantics unresolved and prevent cwd escape.
+- path: packages/agent/src/powdrr_agent/execution/verification_provider.py
+  type: modified
+  span:
+    start_line: 735
+    end_line: 744
+  summary: Validate profile execution context, resolve a repository-contained cwd, and build the target
+    subprocess environment.
+  rationale: Keep unsupported shell or script semantics unresolved and prevent cwd escape.
+- path: packages/agent/src/powdrr_agent/execution/verification_provider.py
+  type: modified
+  span:
+    start_line: 746
+    end_line: 750
+  summary: Validate profile execution context, resolve a repository-contained cwd, and build the target
+    subprocess environment.
+  rationale: Keep unsupported shell or script semantics unresolved and prevent cwd escape.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 122
+    end_line: 122
+  summary: Validate profile context mappings and unique names when loading requests.
+  rationale: Keep serialized reviewed profiles unambiguous.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 274
+    end_line: 276
+  summary: Validate profile context mappings and unique names when loading requests.
+  rationale: Keep serialized reviewed profiles unambiguous.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 373
+    end_line: 375
+  summary: Validate profile context mappings and unique names when loading requests.
+  rationale: Keep serialized reviewed profiles unambiguous.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 409
+    end_line: 409
+  summary: Validate profile context mappings and unique names when loading requests.
+  rationale: Keep serialized reviewed profiles unambiguous.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 550
+    end_line: 550
+  summary: Validate profile context mappings and unique names when loading requests.
+  rationale: Keep serialized reviewed profiles unambiguous.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 569
+    end_line: 569
+  summary: Validate profile context mappings and unique names when loading requests.
+  rationale: Keep serialized reviewed profiles unambiguous.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 585
+    end_line: 585
+  summary: Validate profile context mappings and unique names when loading requests.
+  rationale: Keep serialized reviewed profiles unambiguous.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 717
+    end_line: 732
+  summary: Validate profile context mappings and unique names when loading requests.
+  rationale: Keep serialized reviewed profiles unambiguous.
+- path: src/powdrr_lift/workrr/coding_agent_validation.py
+  type: modified
+  span:
+    start_line: 745
+    end_line: 777
+  summary: Block validation when a runtime profile differs from its reviewed request context.
+  rationale: Prevent changed cwd, environment, or applicability from reusing command authorization.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 1762
+    end_line: 1768
+  summary: Attach profile contexts to design-only implementation requests.
+  rationale: Keep preview and execution request handoffs aligned.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 3098
+    end_line: 3101
+  summary: Attach profile contexts to design-only implementation requests.
+  rationale: Keep preview and execution request handoffs aligned.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 4850
+    end_line: 4852
+  summary: Attach profile contexts to design-only implementation requests.
+  rationale: Keep preview and execution request handoffs aligned.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 7281
+    end_line: 7284
+  summary: Attach profile contexts to design-only implementation requests.
+  rationale: Keep preview and execution request handoffs aligned.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 485
+    end_line: 486
+  summary: Include argv authorization and profile context in task-agent requests.
+  rationale: Preserve the same reviewed command boundary in task workflows.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span:
+    start_line: 3327
+    end_line: 3503
+  summary: Test typed discovery through explicit and repository check execution, report aggregation, and
+    readiness review.
+  rationale: Prove both checks must pass and unsupported applicability keeps readiness pending.
+- path: tests/test_verification_evidence.py
+  type: modified
+  span:
+    start_line: 106
+    end_line: 166
+  summary: Verify provider requests retain the discovered execution context.
+  rationale: Guard context transfer into evidence execution.
+- path: tests/test_verification_provider.py
+  type: modified
+  span:
+    start_line: 25
+    end_line: 27
+  summary: Verify stestr version probing and exact selector execution order.
+  rationale: Keep target tool identity in provider inventory.
+- path: tests/test_verification_provider.py
+  type: modified
+  span:
+    start_line: 34
+    end_line: 39
+  summary: Verify stestr version probing and exact selector execution order.
+  rationale: Keep target tool identity in provider inventory.
+- path: tests/test_verification_provider.py
+  type: modified
+  span:
+    start_line: 41
+    end_line: 41
+  summary: Verify stestr version probing and exact selector execution order.
+  rationale: Keep target tool identity in provider inventory.
+- path: tests/test_verification_provider.py
+  type: modified
+  span:
+    start_line: 51
+    end_line: 72
+  summary: Verify stestr version probing and exact selector execution order.
+  rationale: Keep target tool identity in provider inventory.
+- path: tests/test_verification_provider.py
+  type: modified
+  span:
+    start_line: 113
+    end_line: 115
+  summary: Verify stestr version probing and exact selector execution order.
+  rationale: Keep target tool identity in provider inventory.
+- path: tests/test_verification_provider.py
+  type: modified
+  span:
+    start_line: 126
+    end_line: 127
+  summary: Verify stestr version probing and exact selector execution order.
+  rationale: Keep target tool identity in provider inventory.
+- path: tests/test_verification_provider.py
+  type: modified
+  span:
+    start_line: 147
+    end_line: 150
+  summary: Verify stestr version probing and exact selector execution order.
+  rationale: Keep target tool identity in provider inventory.
+- path: tests/test_verification_provider.py
+  type: modified
+  span:
+    start_line: 170
+    end_line: 170
+  summary: Verify stestr version probing and exact selector execution order.
+  rationale: Keep target tool identity in provider inventory.
+- path: tests/test_verification_provider.py
+  type: modified
+  span:
+    start_line: 172
+    end_line: 173
+  summary: Verify stestr version probing and exact selector execution order.
+  rationale: Keep target tool identity in provider inventory.
+entities: []
+entity_relationships: []
+invariants:
+- id: reviewed-validation-context-cannot-change-before-execution
+  description: A validation profile whose serialized context differs from the reviewed request is blocked
+    before execution.
+  action: added
+- id: unsupported-validation-applicability-cannot-pass-readiness
+  description: A check with unresolved applicability remains pending and prevents the feature review gate
+    from passing.
+  action: added
+- id: provider-inventory-fingerprint-covers-execution-context
+  description: Provider inventory identity includes command, target version, cwd, environment identity,
+    execution semantics, and applicability.
+  action: added
+guidance:
+- id: unsupported-provider-execution-remains-unresolved
+  description: Provider adapters execute argv profiles only; shell and script profiles must remain unresolved
+    until their exact execution semantics are supported.
+  action: added

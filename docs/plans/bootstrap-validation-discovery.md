@@ -13,9 +13,11 @@ match are recorded as not applicable. This is a partial implementation of step 6
 The evaluator also supports GitHub condition equality/inequality, boolean
 operators, and grouping for event-name and base-branch values. Unsupported
 functions and unavailable context remain pending. Full GitHub expression
-evaluation, remote-only check observations, and the readiness gate in step 8
-remain outstanding. The feature review aggregate also keeps an empty validation
-result set pending, so missing results cannot satisfy the gate.
+evaluation remains outstanding. GitHub job outcomes can now be normalized for
+required checks on the current pull request head; wiring those observations into
+the feature readiness gate remains outstanding. The feature review aggregate
+and core validation runner keep empty result sets pending, so missing results
+cannot satisfy the gate.
 The core validation runner also keeps an empty profile selection pending.
 
 ## Objective and delivery contract

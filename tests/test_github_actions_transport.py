@@ -8,7 +8,10 @@ from typing import Any
 
 from powdrr_agent.execution.github_actions import (
     GitHubActionsClient,
+    GitHubActionsSnapshot,
+    RemoteCheckObservationStatus,
     execute_pinned_local_command,
+    observe_required_checks,
 )
 
 HEAD = "6c85b1e5c334a113b3db274b2c1b7a8f350b9707"
@@ -81,7 +84,93 @@ def test_observation_fetches_annotations_even_when_runner_never_started() -> Non
     assert snapshot.annotations_by_check_run["127527360223"][0]["message"].startswith(
         "The configuration"
     )
+    assert snapshot.observed_at is not None
     assert any("annotations?per_page=100" in item[-1] for item in calls)
+
+
+def test_required_check_observations_use_current_head_and_preserve_unknowns() -> None:
+    snapshot = GitHubActionsSnapshot(
+        repository="example/project",
+        pull_request={"head": {"sha": HEAD}},
+        runs=(
+            {
+                "id": 1,
+                "head_sha": HEAD,
+                "path": ".github/workflows/ci.yml",
+                "updated_at": "2026-11-13T10:00:00Z",
+            },
+            {
+                "id": 2,
+                "head_sha": "old-head",
+                "path": ".github/workflows/ci.yml",
+                "updated_at": "2026-11-13T11:00:00Z",
+            },
+        ),
+        jobs_by_run={
+            "1": (
+                {
+                    "id": 10,
+                    "name": "unit",
+                    "status": "completed",
+                    "conclusion": "success",
+                },
+                {
+                    "id": 11,
+                    "name": "lint",
+                    "status": "completed",
+                    "conclusion": "failure",
+                },
+                {
+                    "id": 12,
+                    "name": "integration",
+                    "status": "in_progress",
+                    "conclusion": None,
+                },
+                {
+                    "id": 13,
+                    "name": "docs",
+                    "status": "completed",
+                    "conclusion": "skipped",
+                },
+            ),
+            "2": (
+                {
+                    "id": 20,
+                    "name": "stale",
+                    "status": "completed",
+                    "conclusion": "success",
+                },
+            ),
+        },
+        annotations_by_check_run={},
+        observed_at="2026-11-13T12:00:00Z",
+    )
+    expected = tuple(
+        {"profile": profile, "workflow": ".github/workflows/ci.yml", "job_name": job}
+        for profile, job in (
+            ("unit-tests", "unit"),
+            ("lint", "lint"),
+            ("integration", "integration"),
+            ("docs", "docs"),
+            ("missing", "missing"),
+            ("stale", "stale"),
+        )
+    )
+
+    observations = observe_required_checks(snapshot, expected)
+
+    assert [item.status for item in observations] == [
+        RemoteCheckObservationStatus.PASSED,
+        RemoteCheckObservationStatus.FAILED,
+        RemoteCheckObservationStatus.PENDING,
+        RemoteCheckObservationStatus.UNKNOWN,
+        RemoteCheckObservationStatus.UNKNOWN,
+        RemoteCheckObservationStatus.UNKNOWN,
+    ]
+    assert observations[0].head_sha == HEAD
+    assert observations[0].observed_at == "2026-11-13T12:00:00Z"
+    assert observations[0].run_id == 1
+    assert observations[-1].reason == "no matching job was observed on the current head"
 
 
 def test_pagination_merges_object_collection_fields() -> None:

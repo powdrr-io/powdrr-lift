@@ -23,7 +23,6 @@ from typing import Any
 from urllib.parse import quote
 
 import yaml
-
 from powdrr_local.file_lock import Timeout, file_lock
 from powdrr_service.planning.checkpoints import has_complete_checkpoint_archive
 from powdrr_service.planning.plan_document import (
@@ -46,8 +45,8 @@ from powdrr_service.planning.plan_document import (
 from powdrr_service.planning.plan_document import (
     serialize_reviewed_plan_yaml as serialize_reviewed_plan_yaml,
 )
-from powdrr_service.structrr.validation_models import ValidationCheck
 from powdrr_service.planning.plan_models import PlannedWorkItem, ReviewedExecutionPlan
+from powdrr_service.structrr.validation_models import ValidationCheck
 
 QUEUE_LABELS = {
     "ready": "powdrr:ready",
@@ -2800,9 +2799,12 @@ def _observe_required_ci_outcome(
     elif not checks or any(not item["name"] for item in checks):
         outcome = "blocked"
         reason = "GitHub returned incomplete required-check data"
-    elif any(item["inventory_match"]["status"] != "matched" for item in checks):
+    elif any(not _required_check_inventory_match_is_valid(item) for item in checks):
         outcome = "blocked"
-        reason = "one or more required checks could not be matched to the validation inventory"
+        reason = (
+            "one or more required checks could not be matched to the validation "
+            "inventory"
+        )
     elif any(item["status"] == "failed" for item in checks):
         outcome = "blocked"
         reason = "one or more required checks failed or were canceled"
@@ -2831,6 +2833,11 @@ def _normalized_required_check_status(state: str) -> str:
     if state in {"pending", "queued", "in_progress"}:
         return "pending"
     return "unknown"
+
+
+def _required_check_inventory_match_is_valid(check: Mapping[str, Any]) -> bool:
+    match = check.get("inventory_match")
+    return isinstance(match, Mapping) and match.get("status") == "matched"
 
 
 def _ci_outcome_observation(

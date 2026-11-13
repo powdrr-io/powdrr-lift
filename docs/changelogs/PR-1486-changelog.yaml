@@ -1,5 +1,5 @@
 schema: https://powdrr.io/schema/changelog-v2
-change_id: PR-1485
+change_id: PR-1486
 title: Connect invariant reviews to candidate routes
 intent:
   problem: Compiled invariant routes remain uncollected even when the protected source validator performs an independent review of baseline and candidate owner evidence.

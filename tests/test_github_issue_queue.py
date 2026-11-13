@@ -42,6 +42,55 @@ from powdrr_lift.workrr.github_issue_queue import (
 PLAN_COMMIT = "a" * 40
 
 
+def _write_test_validation_inventory(root: Path) -> None:
+    checks = []
+    for job in ("test", "unit", "integration", "docs"):
+        checks.append(
+            {
+                "id": f"validation:{job}",
+                "schema_version": "verification-provider-inventory-v2",
+                "provider": "pytest",
+                "profile": job,
+                "command": ["pytest", "tests"],
+                "source": ".github/workflows/ci.yml",
+                "execution": {
+                    "kind": "argv",
+                    "cwd": ".",
+                    "shell": None,
+                    "script": None,
+                },
+                "applicability": {"local": True, "evaluation": "applicable"},
+                "settings": {},
+                "requiredness": {"status": "unknown", "evidence": []},
+                "provenance": {"declaration": "declared", "evidence": []},
+                "confirmation": {"level": "static", "observations": []},
+                "baseline": {"status": "not_run", "observation": None},
+                "ci_origins": [
+                    {
+                        "workflow": ".github/workflows/ci.yml",
+                        "workflow_name": "CI",
+                        "job_id": job,
+                        "job_name": job,
+                    }
+                ],
+            }
+        )
+    path = root / "docs/structrr/current/baseline-bootstrap.yaml"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps({"validation_inventory": checks}), encoding="utf-8")
+
+
+def _test_validation_checks(root: Path) -> tuple[Mapping[str, Any], ...]:
+    inventory = github_issue_queue._read_repository_validation_inventory(root)
+    assert inventory is not None
+    return inventory["checks"]
+
+
+@pytest.fixture(autouse=True)
+def _validation_inventory_baseline(tmp_path: Path) -> None:
+    _write_test_validation_inventory(tmp_path)
+
+
 def _checkpoint_completed_pr(
     checkpoint: TaskCheckpointCallback,
     item: PlannedWorkItem,
@@ -2180,7 +2229,9 @@ def test_worker_keeps_pending_required_checks_out_of_review_queue(
     )
 
 
-def test_continue_awaiting_ci_rechecks_current_head_and_records_result() -> None:
+def test_continue_awaiting_ci_rechecks_current_head_and_records_result(
+    tmp_path: Path,
+) -> None:
     client = FakeIssueClient()
     client.issues.append(
         QueueIssue(
@@ -2214,6 +2265,7 @@ def test_continue_awaiting_ci_rechecks_current_head_and_records_result() -> None
     report = continue_awaiting_ci_issue(
         client=client,  # type: ignore[arg-type]
         issue_number=100,
+        repo_root=tmp_path,
     )
 
     assert report.outcome == "awaiting_review"
@@ -2221,7 +2273,9 @@ def test_continue_awaiting_ci_rechecks_current_head_and_records_result() -> None
     assert QUEUE_LABELS["awaiting_ci"] not in client.get_issue(100).labels
 
 
-def test_required_ci_observation_rejects_head_change_during_check_read() -> None:
+def test_required_ci_observation_rejects_head_change_during_check_read(
+    tmp_path: Path,
+) -> None:
     class ChangingHeadClient(FakeIssueClient):
         view_count = 0
 
@@ -2243,15 +2297,17 @@ def test_required_ci_observation_rejects_head_change_during_check_read() -> None
     observation = github_issue_queue._observe_required_ci_outcome(
         client,  # type: ignore[arg-type]
         "https://github.com/example/project/pull/123",
+        validation_inventory=_test_validation_checks(tmp_path),
+        inventory_digest="test-digest",
     )
 
     assert observation["outcome"] == "blocked"
     assert "head changed" in observation["reason"]
 
 
-def test_required_ci_readiness_uses_timestamped_normalized_current_head_checks() -> (
-    None
-):
+def test_required_ci_readiness_uses_timestamped_normalized_current_head_checks(
+    tmp_path: Path,
+) -> None:
     client = FakeIssueClient()
     client.required_checks = [
         {"name": "unit", "state": "success", "workflow": "ci"},
@@ -2262,15 +2318,23 @@ def test_required_ci_readiness_uses_timestamped_normalized_current_head_checks()
     observation = github_issue_queue._observe_required_ci_outcome(
         client,  # type: ignore[arg-type]
         "https://github.com/example/project/pull/123",
+        validation_inventory=_test_validation_checks(tmp_path),
+        inventory_digest="test-digest",
     )
 
-    assert observation["outcome"] == "awaiting_ci"
+    assert observation["outcome"] == "blocked"
+    assert "unrecognized state" in observation["reason"]
     assert observation["head_sha"] == client.pr_head
     assert observation["observed_at"].endswith("+00:00")
     assert [item["status"] for item in observation["checks"]] == [
         "passed",
         "pending",
         "unknown",
+    ]
+    assert [item["inventory_match"]["status"] for item in observation["checks"]] == [
+        "matched",
+        "matched",
+        "matched",
     ]
     assert all(item["head_sha"] == client.pr_head for item in observation["checks"])
     assert all(
@@ -2284,4 +2348,62 @@ def test_required_ci_readiness_uses_timestamped_normalized_current_head_checks()
     )
 
     assert '"observed_at"' in checkpoint
+    assert '"validation_inventory_digest": "test-digest"' in checkpoint
     assert '"status": "unknown"' in checkpoint
+
+
+def test_required_ci_readiness_blocks_when_validation_inventory_is_missing() -> None:
+    client = FakeIssueClient()
+    observation = github_issue_queue._observe_required_ci_outcome(
+        client,  # type: ignore[arg-type]
+        "https://github.com/example/project/pull/123",
+        validation_inventory=None,
+        inventory_digest=None,
+    )
+
+    assert observation["outcome"] == "blocked"
+    assert "inventory is unavailable" in observation["reason"]
+    assert observation["checks"][0]["inventory_match"]["status"] == "unavailable"
+
+
+def test_required_ci_readiness_blocks_unmatched_discovered_job(
+    tmp_path: Path,
+) -> None:
+    client = FakeIssueClient()
+    client.required_checks = [
+        {"name": "security-scan", "state": "success", "workflow": "ci"}
+    ]
+    observation = github_issue_queue._observe_required_ci_outcome(
+        client,  # type: ignore[arg-type]
+        "https://github.com/example/project/pull/123",
+        validation_inventory=_test_validation_checks(tmp_path),
+        inventory_digest="test-digest",
+    )
+
+    assert observation["outcome"] == "blocked"
+    assert "could not be matched" in observation["reason"]
+    assert observation["checks"][0]["inventory_match"]["status"] == "unmatched"
+
+
+def test_required_ci_matching_rejects_ambiguous_workflow_identity(
+    tmp_path: Path,
+) -> None:
+    inventory = list(_test_validation_checks(tmp_path))
+    duplicate = dict(inventory[1])
+    duplicate["id"] = "validation:unit-other-workflow"
+    duplicate["ci_origins"] = [
+        {
+            "workflow": ".github/workflows/other.yml",
+            "workflow_name": "Other",
+            "job_id": "unit",
+            "job_name": "unit",
+        }
+    ]
+    inventory.append(duplicate)
+
+    match = github_issue_queue._match_required_check_to_inventory(
+        {"name": "unit", "workflow": None}, inventory
+    )
+
+    assert match["status"] == "ambiguous"
+    assert match["profile_ids"] == []

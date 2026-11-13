@@ -3439,7 +3439,7 @@ def _run_github_issue_worker_continue(args: argparse.Namespace) -> int:
     if QUEUE_LABELS["awaiting_ci"] in issue.labels:
         try:
             report = continue_awaiting_ci_issue(
-                client=client, issue_number=args.issue_number
+                client=client, issue_number=args.issue_number, repo_root=repo_root
             )
         except GitHubIssueQueueError as error:
             print(str(error), file=sys.stderr)

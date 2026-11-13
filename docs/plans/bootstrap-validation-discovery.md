@@ -15,11 +15,13 @@ operators, and grouping for event-name and base-branch values. Unsupported
 functions and unavailable context remain pending. Full GitHub expression
 evaluation remains outstanding. Required GitHub checks now enter the PR review
 readiness gate as normalized, timestamped outcomes tied to the current pull
-request head; only a complete set of passed checks advances to review. The
-feature review aggregate and core validation runner keep empty result sets
-pending, so missing results cannot satisfy the gate. The gate still uses
-GitHub's required-check list instead of matching every remote observation to
-the discovered validation inventory.
+request head. Each required check must also match a discovered workflow job in
+the committed validation inventory; missing, ambiguous, and unknown matches
+block review. The inventory digest is retained with the CI outcome checkpoint.
+The feature review aggregate and core validation runner keep empty result sets
+pending, so missing results cannot satisfy the gate. This remains a partial
+implementation of WP8: broader baseline freshness and remote observation
+identity requirements are still outstanding.
 The core validation runner also keeps an empty profile selection pending.
 
 ## Objective and delivery contract

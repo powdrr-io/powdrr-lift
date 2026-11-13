@@ -22,6 +22,7 @@ from time import sleep, time
 from typing import Any
 from urllib.parse import quote
 
+import yaml
 from powdrr_local.file_lock import Timeout, file_lock
 from powdrr_service.planning.checkpoints import has_complete_checkpoint_archive
 from powdrr_service.planning.plan_document import (
@@ -45,6 +46,7 @@ from powdrr_service.planning.plan_document import (
     serialize_reviewed_plan_yaml as serialize_reviewed_plan_yaml,
 )
 from powdrr_service.planning.plan_models import PlannedWorkItem, ReviewedExecutionPlan
+from powdrr_service.structrr.validation_models import ValidationCheck
 
 QUEUE_LABELS = {
     "ready": "powdrr:ready",
@@ -1001,7 +1003,17 @@ def run_worker_once(
                     pull_request_url = _pull_request_url_from_task_record(
                         _read_local_task_checkpoint(root, issue.number)
                     ) or _latest_checkpoint_pull_request_url(comments)
-                    observation = _observe_required_ci_outcome(client, pull_request_url)
+                    inventory = _read_repository_validation_inventory(root)
+                    observation = _observe_required_ci_outcome(
+                        client,
+                        pull_request_url,
+                        validation_inventory=(
+                            inventory["checks"] if inventory is not None else None
+                        ),
+                        inventory_digest=(
+                            inventory["digest"] if inventory is not None else None
+                        ),
+                    )
                     ci_outcome = str(observation["outcome"])
                     _append_ci_outcome_checkpoint(
                         client=client,
@@ -1233,7 +1245,7 @@ def continue_manual_prerequisite_issue(
 
 
 def continue_awaiting_ci_issue(
-    *, client: GitHubIssueClient, issue_number: int
+    *, client: GitHubIssueClient, issue_number: int, repo_root: str | Path
 ) -> WorkerReport:
     """Refresh the required-check outcome for a published implementation PR."""
     issue = client.get_issue(issue_number)
@@ -1247,7 +1259,13 @@ def continue_awaiting_ci_issue(
         raise GitHubIssueQueueError(
             f"issue #{issue_number} has no published PR checkpoint to observe"
         )
-    observation = _observe_required_ci_outcome(client, pull_request_url)
+    inventory = _read_repository_validation_inventory(repo_root)
+    observation = _observe_required_ci_outcome(
+        client,
+        pull_request_url,
+        validation_inventory=(inventory["checks"] if inventory is not None else None),
+        inventory_digest=inventory["digest"] if inventory is not None else None,
+    )
     _append_ci_outcome_checkpoint(
         client=client,
         issue=issue,
@@ -1396,7 +1414,15 @@ def _continue_manual_prerequisite_issue_locked(
             or _latest_checkpoint_pull_request_url(comments)
             or str(checkpoint["pull_request_url"])
         )
-        observation = _observe_required_ci_outcome(client, pull_request_url)
+        inventory = _read_repository_validation_inventory(repo_root)
+        observation = _observe_required_ci_outcome(
+            client,
+            pull_request_url,
+            validation_inventory=(
+                inventory["checks"] if inventory is not None else None
+            ),
+            inventory_digest=inventory["digest"] if inventory is not None else None,
+        )
         _append_ci_outcome_checkpoint(
             client=client,
             issue=issue,
@@ -2529,8 +2555,121 @@ def _pull_request_url_from_task_record(
 _CI_OUTCOME_MARKER = "<!-- powdrr-ci-outcome:v1 -->"
 
 
+def _read_repository_validation_inventory(
+    repo_root: str | Path,
+) -> dict[str, Any] | None:
+    """Load typed validation obligations from the committed Structrr baseline."""
+    path = Path(repo_root) / "docs/structrr/current/baseline-bootstrap.yaml"
+    try:
+        raw = path.read_bytes()
+        document = yaml.safe_load(raw)
+    except (OSError, yaml.YAMLError):
+        return None
+    if not isinstance(document, Mapping):
+        return None
+    inventory = document.get("validation_inventory")
+    if not isinstance(inventory, list):
+        return None
+    try:
+        checks = tuple(
+            ValidationCheck.from_data(value).to_data()
+            for value in inventory
+            if isinstance(value, Mapping)
+        )
+    except (TypeError, ValueError):
+        return None
+    if len(checks) != len(inventory):
+        return None
+    return {
+        "checks": checks,
+        "digest": "sha256:" + hashlib.sha256(raw).hexdigest(),
+    }
+
+
+def _match_required_check_to_inventory(
+    required_check: Mapping[str, Any],
+    validation_inventory: Sequence[Mapping[str, Any]] | None,
+) -> dict[str, Any]:
+    """Match a remote required check to one declared workflow job identity."""
+    if validation_inventory is None:
+        return {
+            "status": "unavailable",
+            "profile_ids": [],
+            "reason": "repository validation inventory is unavailable or invalid",
+        }
+    check_name = required_check.get("name")
+    workflow = required_check.get("workflow")
+    if not isinstance(check_name, str) or not check_name.strip():
+        return {
+            "status": "unmatched",
+            "profile_ids": [],
+            "reason": "required check has no usable name",
+        }
+    check_name_key = check_name.strip().casefold()
+    workflow_key = workflow.strip().casefold() if isinstance(workflow, str) else None
+    candidates: dict[tuple[str, str], set[str]] = {}
+    for check in validation_inventory:
+        profile_id = check.get("id")
+        origins = check.get("ci_origins")
+        if not isinstance(profile_id, str) or not isinstance(origins, list):
+            continue
+        for origin in origins:
+            if not isinstance(origin, Mapping):
+                continue
+            job_names = {
+                value.strip().casefold()
+                for key in ("job_name", "job_id")
+                if isinstance((value := origin.get(key)), str) and value.strip()
+            }
+            if check_name_key not in job_names:
+                continue
+            workflow_path = origin.get("workflow")
+            if not isinstance(workflow_path, str) or not workflow_path.strip():
+                continue
+            workflow_aliases = {
+                workflow_path.strip().casefold(),
+                Path(workflow_path).name.casefold(),
+                Path(workflow_path).stem.casefold(),
+            }
+            workflow_name = origin.get("workflow_name")
+            if isinstance(workflow_name, str) and workflow_name.strip():
+                workflow_aliases.add(workflow_name.strip().casefold())
+            if workflow_key is not None and workflow_key not in workflow_aliases:
+                continue
+            job_id = origin.get("job_id")
+            job_identity = (
+                workflow_path.strip(),
+                job_id.strip()
+                if isinstance(job_id, str) and job_id.strip()
+                else check_name_key,
+            )
+            candidates.setdefault(job_identity, set()).add(profile_id)
+    if not candidates:
+        return {
+            "status": "unmatched",
+            "profile_ids": [],
+            "reason": "required check does not match a discovered workflow job",
+        }
+    if len(candidates) != 1:
+        return {
+            "status": "ambiguous",
+            "profile_ids": [],
+            "reason": "required check matches multiple discovered workflow jobs",
+        }
+    profile_ids = sorted(next(iter(candidates.values())))
+    return {
+        "status": "matched",
+        "profile_ids": profile_ids,
+        "reason": None,
+    }
+
+
 def _observe_required_ci_outcome(
-    client: GitHubIssueClient, pull_request_url: str | None
+    client: GitHubIssueClient,
+    pull_request_url: str | None,
+    *,
+    validation_inventory: Sequence[Mapping[str, Any]] | None,
+    inventory_digest: str | None,
 ) -> dict[str, Any]:
     """Classify only current-PR required checks reported by GitHub CLI."""
     observed_at = datetime.now(UTC).isoformat()
@@ -2541,6 +2680,7 @@ def _observe_required_ci_outcome(
             (),
             "the completed workflow did not checkpoint a pull request URL",
             observed_at,
+            inventory_digest,
         )
     number = _same_repository_pull_request_number(pull_request_url, client.repository)
     if number is None:
@@ -2550,6 +2690,7 @@ def _observe_required_ci_outcome(
             (),
             "the checkpointed PR URL does not belong to this repository",
             observed_at,
+            inventory_digest,
         )
     head_result = client._invoke(
         ["pr", "view", str(number), "--json", "headRefOid"], check=False
@@ -2561,6 +2702,7 @@ def _observe_required_ci_outcome(
             (),
             "GitHub could not report the current PR head",
             observed_at,
+            inventory_digest,
         )
     try:
         head_value = json.loads(head_result.stdout)
@@ -2577,6 +2719,7 @@ def _observe_required_ci_outcome(
             (),
             "GitHub returned no valid current PR head SHA",
             observed_at,
+            inventory_digest,
         )
     checks_result = client._invoke(
         [
@@ -2597,6 +2740,7 @@ def _observe_required_ci_outcome(
             "GitHub could not report required check states: "
             + checks_result.stderr.strip()[:500],
             observed_at,
+            inventory_digest,
         )
     try:
         raw_checks = json.loads(checks_result.stdout)
@@ -2609,6 +2753,7 @@ def _observe_required_ci_outcome(
             (),
             "GitHub reported no required checks; review readiness is unknown",
             observed_at,
+            inventory_digest,
         )
     checks = [
         {
@@ -2619,6 +2764,9 @@ def _observe_required_ci_outcome(
             ),
             "workflow": (
                 str(value["workflow"]) if value.get("workflow") is not None else None
+            ),
+            "inventory_match": _match_required_check_to_inventory(
+                value, validation_inventory
             ),
         }
         for value in raw_checks
@@ -2643,13 +2791,26 @@ def _observe_required_ci_outcome(
             checks,
             "the PR head changed while required checks were being observed",
             observed_at,
+            inventory_digest,
         )
-    if not checks or any(not item["name"] for item in checks):
+    if validation_inventory is None:
+        outcome = "blocked"
+        reason = "repository validation inventory is unavailable or invalid"
+    elif not checks or any(not item["name"] for item in checks):
         outcome = "blocked"
         reason = "GitHub returned incomplete required-check data"
+    elif any(not _required_check_inventory_match_is_valid(item) for item in checks):
+        outcome = "blocked"
+        reason = (
+            "one or more required checks could not be matched to the validation "
+            "inventory"
+        )
     elif any(item["status"] == "failed" for item in checks):
         outcome = "blocked"
         reason = "one or more required checks failed or were canceled"
+    elif any(item["status"] == "unknown" for item in checks):
+        outcome = "blocked"
+        reason = "one or more required checks have an unrecognized state"
     elif all(item["status"] == "passed" for item in checks):
         outcome = "awaiting_review"
         reason = "all required checks passed for the current PR head"
@@ -2659,7 +2820,9 @@ def _observe_required_ci_outcome(
     else:
         outcome = "blocked"
         reason = "GitHub returned an unrecognized required-check state"
-    return _ci_outcome_observation(outcome, head_sha, checks, reason, observed_at)
+    return _ci_outcome_observation(
+        outcome, head_sha, checks, reason, observed_at, inventory_digest
+    )
 
 
 def _normalized_required_check_status(state: str) -> str:
@@ -2672,12 +2835,18 @@ def _normalized_required_check_status(state: str) -> str:
     return "unknown"
 
 
+def _required_check_inventory_match_is_valid(check: Mapping[str, Any]) -> bool:
+    match = check.get("inventory_match")
+    return isinstance(match, Mapping) and match.get("status") == "matched"
+
+
 def _ci_outcome_observation(
     outcome: str,
     head_sha: str | None,
     checks: Sequence[Mapping[str, Any]],
     reason: str,
     observed_at: str,
+    inventory_digest: str | None,
 ) -> dict[str, Any]:
     """Return a dated observation set tied to the PR head reviewed by the gate."""
     head_checks = [
@@ -2687,6 +2856,7 @@ def _ci_outcome_observation(
         "outcome": outcome,
         "head_sha": head_sha,
         "observed_at": observed_at,
+        "validation_inventory_digest": inventory_digest,
         "checks": head_checks,
         "reason": reason,
     }
@@ -2708,6 +2878,7 @@ def _render_ci_outcome_checkpoint(
         "pull_request_url": pull_request_url,
         "head_sha": observation.get("head_sha"),
         "observed_at": observation.get("observed_at"),
+        "validation_inventory_digest": observation.get("validation_inventory_digest"),
         "outcome": observation.get("outcome"),
         "required_checks": observation.get("checks", []),
         "reason": observation.get("reason", ""),

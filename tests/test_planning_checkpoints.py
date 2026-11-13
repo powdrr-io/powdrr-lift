@@ -899,6 +899,11 @@ def test_local_planning_telemetry_summarizes_large_runs_without_journal_data(
             "rg_match_count": 0,
             "basedpyright_available": True,
             "base_commit": "a" * 40,
+            "rg_search_status": "complete",
+            "code_symbol_coverage": {
+                "status": "partial",
+                "requested_paths": ["src/module.py"],
+            },
         },
     )
 
@@ -922,6 +927,10 @@ def test_local_planning_telemetry_summarizes_large_runs_without_journal_data(
     }
     assert summary["repository_search"]["requirements"] == 1
     assert summary["repository_search"]["basedpyright_queries"] == 2
+    assert summary["repository_search"]["rg_search_statuses"] == {"complete": 1}
+    assert summary["repository_search"]["code_symbol_coverage_statuses"] == {
+        "partial": 1
+    }
     assert [run["run"] for run in summary["runs"]] == ["prior", "current"]
     assert summary["runs"][0]["questions"] == 700
     assert summary["runs"][1]["questions"] == 300

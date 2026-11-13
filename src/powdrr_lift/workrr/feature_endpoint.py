@@ -4947,7 +4947,8 @@ def _aggregate_validation(
     )
     blocked = any(result.status is ValidationResultStatus.BLOCKED for result in results)
     pending = (
-        any(result.status is ValidationResultStatus.PENDING for result in results)
+        not results
+        or any(result.status is ValidationResultStatus.PENDING for result in results)
         or bool(results)
         and all(
             result.status is ValidationResultStatus.NOT_APPLICABLE for result in results
@@ -4966,6 +4967,7 @@ def _aggregate_validation(
             else ValidationReportStatus.PASSED
         ),
         results=results,
+        error="validation produced no results" if not results else None,
         profile_contexts=tuple(
             item["profile_context"]
             for item in collected_results

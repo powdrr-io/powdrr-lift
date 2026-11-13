@@ -3390,6 +3390,26 @@ def test_aggregate_validation_keeps_unknown_applicability_pending() -> None:
     assert result["passed"] is False
 
 
+def test_aggregate_validation_with_no_results_cannot_pass() -> None:
+    stored: list[ValidationReport] = []
+    state = {
+        "attempt": SimpleNamespace(attempt_id="attempt"),
+        "request": SimpleNamespace(request_id="request"),
+        "attempt_store": SimpleNamespace(save_validation_report=stored.append),
+    }
+
+    result = _aggregate_validation(
+        {"results": []},
+        worktree=Path("."),
+        state=state,
+    )
+
+    assert result["status"] == "pending"
+    assert result["passed"] is False
+    assert result["error"] == "validation produced no results"
+    assert stored[0].status is ValidationReportStatus.PENDING
+
+
 def test_feature_flow_is_shared_and_validated() -> None:
     path = bundled_process_directory() / "implement-feature.yaml"
 

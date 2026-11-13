@@ -21,6 +21,9 @@ from powdrr_service.planning.plan_document import (
     PlanDocumentError,
     parse_reviewed_plan_yaml,
 )
+from powdrr_service.planning.source_reference_design import (
+    compile_source_reference_design,
+)
 from powdrr_service.structrr.snapshot import snapshot_digest
 
 from powdrr_lift.workrr.github_issue_queue import (
@@ -31,6 +34,42 @@ from powdrr_lift.workrr.github_issue_queue import (
 
 def _source_digest(value: str) -> str:
     return hashlib.sha256(value.encode()).hexdigest()
+
+
+def test_source_design_binds_accepted_test_cases_to_plan_and_item() -> None:
+    design = compile_source_reference_design(
+        plan_id="bounded-plan",
+        item_id="item-01",
+        proposal={
+            "verification": {
+                "required_test_cases": [
+                    {
+                        "id": "AC-01",
+                        "description": "The implementation is covered.",
+                        "test_type": "integration",
+                        "scenario": "Exercise the public behavior.",
+                        "expected_outcome": "The result satisfies the criterion.",
+                    }
+                ]
+            }
+        },
+    )
+
+    assert design["plan_id"] == "bounded-plan"
+    assert design["item_id"] == "item-01"
+    assert design["design"]["required_test_cases"][0]["id"] == "AC-01"
+    scenario = design["design"]["required_test_cases"][0]["behavior_scenario"]
+    assert scenario["when"] == "Exercise the public behavior."
+    assert scenario["then"] == "The result satisfies the criterion."
+    assert scenario["faithfulness_ref"]["fingerprint"]
+    assert design["design"]["source_reference_placements"] == []
+
+
+def test_source_design_rejects_items_without_accepted_test_cases() -> None:
+    with pytest.raises(ValueError, match="no accepted required test cases"):
+        compile_source_reference_design(
+            plan_id="bounded-plan", item_id="item-01", proposal={}
+        )
 
 
 def _fixture() -> tuple[ReviewedExecutionPlan, PlanningManifest, Any]:
@@ -44,6 +83,17 @@ def _fixture() -> tuple[ReviewedExecutionPlan, PlanningManifest, Any]:
                 "id": "item-01",
                 "acceptance_criteria": ["The implementation is covered."],
                 "allowed_paths": ["src/app.py"],
+                "verification": {
+                    "required_test_cases": [
+                        {
+                            "id": "AC-01",
+                            "description": "The implementation is covered.",
+                            "test_type": "integration",
+                            "scenario": "Exercise the public behavior.",
+                            "expected_outcome": "The result satisfies the criterion.",
+                        }
+                    ]
+                },
             }
         ],
         proposed_operations=[],
@@ -639,6 +689,9 @@ def test_source_design_pointer_survives_compilation_and_detects_workflow_drift()
     parsed = parse_reviewed_plan_yaml(compiled.files["docs/plans/bounded-plan.yaml"])
     assert parsed.items[0].source_reference_design_file == "docs/design/accepted.yaml"
     assert validate_compiled_plan(compiled, snapshot).valid
+    source_design = compiled.files["docs/design/accepted.yaml"]
+    assert "schema_version: structrr-source-reference-task-v1" in source_design
+    assert "Exercise the public behavior." in source_design
     files = dict(compiled.files)
     path = "docs/workflows/bounded-plan/item-01.yaml"
     assert "source_reference_design_file: docs/design/accepted.yaml" in files[path]
@@ -647,6 +700,13 @@ def test_source_design_pointer_survives_compilation_and_detects_workflow_drift()
     )
     altered = replace(compiled, files=files)
     assert not validate_compiled_plan(altered, snapshot).valid
+
+    files = dict(compiled.files)
+    files["docs/design/accepted.yaml"] = source_design.replace(
+        "The result satisfies the criterion.", "A different outcome."
+    )
+    altered_design = replace(compiled, files=files)
+    assert not validate_compiled_plan(altered_design, snapshot).valid
 
 
 @pytest.mark.parametrize(

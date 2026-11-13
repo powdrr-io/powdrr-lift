@@ -2754,6 +2754,18 @@ class SourceLedgerQuestionMachine:
             else item
             for item in assembly.plan.items
         )
+        design_directory = (
+            Path("docs") / "plans" / f"{slugify_workflow_id(plan_id)}-source-design"
+        )
+        plan_items = tuple(
+            replace(
+                item,
+                source_reference_design_file=(
+                    design_directory / f"{item.item_id}.yaml"
+                ).as_posix(),
+            )
+            for item in plan_items
+        )
 
         source_record = {
             "repository": self.source.document.repository,

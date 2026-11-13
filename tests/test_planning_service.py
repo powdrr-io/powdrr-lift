@@ -1523,6 +1523,10 @@ def test_source_question_machine_accounts_for_normative_and_context_blocks() -> 
     )
     assert set(compiled.destinations) == set(compiled.files)
     assert compiled.ready_item_ids == ("item-0001",)
+    assert compiled.plan.items[0].source_reference_design_file == (
+        "docs/plans/bounded-plan-source-design/item-0001.yaml"
+    )
+    assert "docs/plans/bounded-plan-source-design/item-0001.yaml" in compiled.files
     assert compiled.plan.planning is not None
     assert [item["id"] for item in compiled.plan.planning["evidence"]] == [
         searched_evidence.id
@@ -2009,7 +2013,8 @@ def test_procedrr_runs_real_planning_machine_through_compiled_artifacts(
         proposal_path="docs/plans/bounded-plan-structrr-proposal.json",
     )
     assert compiled.ready_item_ids == ("item-0001",)
-    assert len(compiled.files) == 3
+    assert len(compiled.files) == 4
+    assert compiled.plan.items[0].source_reference_design_file in compiled.files
     proposal = machine.accepted_structrr_proposal(accepted)
     assert proposal.full_proposal.code_evidence == expected_code_evidence
     assert any(

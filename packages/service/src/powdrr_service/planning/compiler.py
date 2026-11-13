@@ -22,6 +22,9 @@ from powdrr_service.planning.plan_document import (
 )
 from powdrr_service.planning.plan_models import PlannedWorkItem, ReviewedExecutionPlan
 from powdrr_service.planning.plan_sizing import CANONICAL_RUNTIMES
+from powdrr_service.planning.source_reference_design import (
+    compile_source_reference_design,
+)
 from powdrr_service.planning.story_allocation import (
     merge_story_refs,
     parse_story_refs,
@@ -181,6 +184,31 @@ def compile_plan(
     workflow_ids = {item.item_id: item.workflow_id for item in plan.items}
     plan_slug = slugify_workflow_id(plan.plan_id)
     for item in plan.items:
+        if item.source_reference_design_file is not None:
+            _repository_path(
+                item.source_reference_design_file,
+                f"item {item.item_id} source_reference_design_file",
+            )
+            item_proposal = structrr_proposal.item_proposals[item.item_id]
+            try:
+                design = compile_source_reference_design(
+                    plan_id=plan.plan_id,
+                    item_id=item.item_id,
+                    proposal=item_proposal.to_data(),
+                )
+            except (TypeError, ValueError) as error:
+                raise PlanningCompilationError(
+                    f"plan item {item.item_id!r} has no executable source design: "
+                    f"{error}"
+                ) from error
+            if item.source_reference_design_file in files:
+                raise PlanningCompilationError(
+                    "duplicate artifact destination "
+                    f"{item.source_reference_design_file!r}"
+                )
+            files[item.source_reference_design_file] = yaml.safe_dump(
+                design, sort_keys=False, allow_unicode=True
+            )
         if item.workflow_file is None:
             raise PlanningCompilationError(
                 f"plan item {item.item_id!r} has no workflow_file"
@@ -299,12 +327,43 @@ def validate_compiled_plan(
         expected_workflow_paths = {
             item.workflow_file for item in compiled.plan.items if item.workflow_file
         }
-        actual_workflow_paths = set(compiled.files) - {
-            compiled.plan_path,
-            compiled.proposal_path,
+        expected_design_paths = {
+            item.source_reference_design_file
+            for item in compiled.plan.items
+            if item.source_reference_design_file
         }
+        actual_workflow_paths = (
+            set(compiled.files)
+            - {
+                compiled.plan_path,
+                compiled.proposal_path,
+            }
+            - expected_design_paths
+        )
         if actual_workflow_paths != expected_workflow_paths:
             errors.append("workflow destinations differ from plan workflow references")
+        item_proposals = proposal.get("item_proposals", {})
+        for item in parsed_plan.items:
+            design_path = item.source_reference_design_file
+            if design_path is None:
+                continue
+            try:
+                raw_item_proposal = item_proposals[item.item_id]
+                expected_design = compile_source_reference_design(
+                    plan_id=parsed_plan.plan_id,
+                    item_id=item.item_id,
+                    proposal=raw_item_proposal,
+                )
+                actual_design = yaml.safe_load(compiled.files[design_path])
+                if actual_design != expected_design:
+                    errors.append(
+                        f"source design for plan item {item.item_id!r} differs "
+                        "from accepted tests"
+                    )
+            except (KeyError, TypeError, ValueError, yaml.YAMLError) as error:
+                errors.append(
+                    f"source design for plan item {item.item_id!r} is invalid: {error}"
+                )
         for item in compiled.plan.items:
             if item.workflow_file is None:
                 continue

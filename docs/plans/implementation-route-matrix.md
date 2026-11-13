@@ -21,7 +21,7 @@ not to port them.
 | Feature endpoint candidate correction | Removed; stale dispatch rejected | No accepted correction authority. | The automatic correction loop and helper were removed from the process and endpoint; stale `correct_candidate_from_structrr_diff` dispatch is rejected. | Final review now fails closed on unresolved obligations; it does not start a second coding session. |
 | CLI `run-coding-agent` / `run_coding_agent` | Removed | The parser command and handler were removed. | Requests fail argparse validation; no generic standalone provider invocation is available. Tests: `test_coding_agent.py`, `test_coding_agent_end_to_end.py`. |
 | CLI and Procedrr `respond-to-pr-ci` | Observation only | CI status, associated issue/PR, verification command, and observed PR head. | The process invokes `ci_observe` and returns; the repair workflow declarations, research/compilation helpers, retry logic, and repair operations are removed. | Observation and checkpoint reporting remain available. Tests: `test_ci_response_cli.py`, `test_ci_response_policy.py`, `test_procedrr_chat.py`. |
-| CLI issue and feature commands; Harbor/Pier adapters | Delegating wrappers | Authority is supplied by the selected workflow/issue/PR context and then follows the corresponding row above. | Inherits delegated workflow behavior. | Inherits delegated gates and artifact locations. CLI parsing is in `cli.py`; adapters are `task_scenario.py` and `planned_workflow_task.py`. |
+| CLI issue and feature commands; Harbor/Pier adapters | Delegating wrappers | Authority is supplied by the selected workflow/issue/PR context and then follows the corresponding row above. | The plan-item adapter forwards the reviewed `source_reference_design_file` and pinned story context from the selected item, clearing stale copies from workflow templates. | Inherits delegated gates and artifact locations. Route fixtures cover the CLI issue worker, planned-workflow adapter, and task-scenario wrapper in `test_github_issue_plan_generation.py`, `test_planned_workflow_task.py`, and `test_workflow_task_scenario.py`. |
 | Harbor/Pier benchmark or worker wrapper | Delegating wrapper | Task/plan payload supplied to the workflow adapter; no separate protected implementation contract was found in this repository audit. | Delegates into workflow/task routes, so route selection remains governed by the issue-worker selector or the legacy task path. | Inherits delegated route gates; benchmark run artifacts are external to the production handoff and are not a delivery authority. Relevant adapters: `task_scenario.py`, `planned_workflow_task.py`; tests include `test_harbor_env.py`. |
 
 ## Migration contract
@@ -44,15 +44,23 @@ not to port them.
 The route-selector fixture in `test_source_reference_dispatch.py` proves that a
 reviewed selector reaches the protected dispatcher without entering legacy
 Structrr authorship, and that reference intent without the selector fails
-closed. The source-run tests cover single invocation and prepared-run controls.
-The other rows are inventory findings backed by their component tests; they do
-not yet prove removal or rejection of their code-writing paths. That is the
-remaining milestone 1 gap.
+closed. `test_issue_worker_runs_plan_task_from_durable_runtime_directory` traces
+the CLI issue-worker wrapper into planned task preparation and verifies that
+the selected item’s design file reaches workflow inputs. Adapter tests prove
+that stale template selectors are cleared and that the benchmark task-scenario
+wrapper preserves its reviewed selector. Component boundary tests cover explicit
+rejection for issue-worker fallback, CI repair mode, feature code-writing, and
+the removed standalone coding CLI; CI observation and typed plan amendment have
+their own route tests. This closes the route-fixture acceptance gap for
+milestone 1. Later milestones still need their separate handoff, gate, and full
+production-path evidence.
 
 The generic issue-worker fallback is rejected, feature endpoint code-writing
 commands are rejected, and the standalone generic coding-agent CLI is removed.
 CI repair modes, operations, worker helpers, retry logic, and process
 declarations are removed; CI observation remains. The feature candidate
 correction loop and helper are also removed. Typed plan amendment remains a
-non-code-writing service workflow. Route-level evidence for delegating entry
-points remains before claiming a common handoff contract.
+non-code-writing service workflow. Route fixtures now cover selector propagation
+through the CLI issue-worker and benchmark task-scenario adapters, plus explicit
+rejection or observation behavior at the other implementation-capable
+boundaries. This completes milestone 1; milestones 2–5 remain.

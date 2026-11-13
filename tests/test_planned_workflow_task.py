@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import io
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, TextIO
 
 import pytest
+from powdrr_service.planning.story_allocation import StoryPlanRef
 
 from powdrr_lift.workrr.github_issue_queue import PlannedWorkItem, ReviewedExecutionPlan
 from powdrr_lift.workrr.planned_workflow_task import (
@@ -95,8 +97,18 @@ def test_existing_workflow_directory_uses_shared_task_runner(
     assert captured["stderr"] is errors
 
 
+@pytest.mark.parametrize(
+    ("source_design_file", "expected_source_design_file"),
+    [
+        ("reviewed/design.yaml", "reviewed/design.yaml"),
+        (None, None),
+    ],
+)
 def test_plan_item_preparation_uses_unique_worktree_and_pinned_context(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    source_design_file: str | None,
+    expected_source_design_file: str | None,
 ) -> None:
     workflow_descriptor = tmp_path / "workflow.yaml"
     workflow_descriptor.write_text("descriptor", encoding="utf-8")
@@ -110,7 +122,14 @@ def test_plan_item_preparation_uses_unique_worktree_and_pinned_context(
         lambda _path: SimpleNamespace(
             workflow_id="search-workflow",
             process_id="process-1",
-            inputs={"proposed_pr_context": {"original": "context"}},
+            inputs={
+                "proposed_pr_context": {
+                    "original": "context",
+                    "source_reference_design_file": "stale/design.yaml",
+                    "story_refs": [{"story_id": "stale-story"}],
+                    "story_validation": True,
+                }
+            },
         ),
     )
 
@@ -144,12 +163,28 @@ def test_plan_item_preparation_uses_unique_worktree_and_pinned_context(
         lambda _config, **_kwargs: 0,
     )
 
+    item = replace(
+        _item(),
+        source_reference_design_file=source_design_file,
+        story_refs=(
+            StoryPlanRef(
+                story_id="story:search",
+                contract_digest="sha256:reviewed",
+                step_ids=("step:query",),
+                transition_ids=(),
+                case_ids=("case:query",),
+            ),
+        )
+        if source_design_file
+        else (),
+        story_validation=bool(source_design_file),
+    )
     result = run_planned_workflow_task(
         workflow_path=workflow_descriptor,
         workflow_id="search-workflow",
         worker_id="worker-1",
-        item=_item(),
-        plan=ReviewedExecutionPlan("plan-1", (_item(),)),
+        item=item,
+        plan=ReviewedExecutionPlan("plan-1", (item,)),
         fulfilled_without_pr_dependencies=("legacy-dependency",),
         checkpoint_callback=lambda *_args: None,
         repo_root=tmp_path,
@@ -173,6 +208,23 @@ def test_plan_item_preparation_uses_unique_worktree_and_pinned_context(
     assert context["inline_plan_adjustments"] == [
         {"path": "src/search.py", "note": "Keep it small."}
     ]
+    assert context.get("source_reference_design_file") == expected_source_design_file
+    assert context.get("story_validation", False) is bool(expected_source_design_file)
+    assert context.get("story_refs", []) == (
+        [
+            {
+                "story_id": "story:search",
+                "contract_digest": "sha256:reviewed",
+                "step_ids": ["step:query"],
+                "transition_ids": [],
+                "case_ids": ["case:query"],
+                "dependency_digests": {},
+                "case_digests": {},
+            }
+        ]
+        if expected_source_design_file
+        else []
+    )
     assert context["github_issue_number"] == 42
     assert context["github_repository"] == "powdrr-io/example"
     assert captured["git_state"].fulfilled_without_pr_dependencies == (

@@ -89,6 +89,21 @@ def run_planned_workflow_task(
                 "github_repository": options.repository,
             }
         )
+        # The reviewed plan item is the authority for selecting protected
+        # implementation and story context. Do not inherit stale selectors
+        # from the workflow template when the current item omits them.
+        for field in ("source_reference_design_file", "story_refs", "story_validation"):
+            workflow_context.pop(field, None)
+        if item.source_reference_design_file is not None:
+            workflow_context["source_reference_design_file"] = (
+                item.source_reference_design_file
+            )
+        if item.story_refs:
+            workflow_context["story_refs"] = [
+                story_ref.to_data() for story_ref in item.story_refs
+            ]
+        if item.story_validation:
+            workflow_context["story_validation"] = True
         workflow_inputs["feature_description"] = item.objective
         workflow_inputs["github_issue_number"] = item.github_issue_number
         workflow_inputs["github_repository"] = options.repository

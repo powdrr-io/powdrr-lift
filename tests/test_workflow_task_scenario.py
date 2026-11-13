@@ -17,6 +17,7 @@ from powdrr_lift.workrr.scenario import (
     load_workflow_scenario,
     run_workflow_scenario,
 )
+from powdrr_lift.workrr.task_agent import WorkflowTaskAgentConfig
 from powdrr_lift.workrr.task_scenario import run_workflow_task_scenario
 
 
@@ -55,6 +56,52 @@ def test_task_scenario_runs_the_real_task_agent(tmp_path: Path) -> None:
     assert result["exit_code"] == 0
     assert result["task_status"] == "completed"
     assert result["output_matches"] is True
+
+
+def test_task_scenario_preserves_reviewed_source_route_selector(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    workflow = WorkflowInstance.create(
+        tmp_path / "source-workflow",
+        (
+            WorkflowTask(
+                task_id="implementation",
+                status=TaskStatus.OPEN,
+                complexity=TaskComplexity.LOW,
+                input_state={
+                    "proposed_pr_context": {
+                        "source_reference_design_file": "reviewed/design.yaml"
+                    }
+                },
+                description="Implement the reviewed design.",
+                assignee_type=AssigneeType.AGENT,
+                assignee_role=AgentRole.ARCHITECT,
+                output_state_type="implementation-result",
+            ),
+        ),
+    )
+    captured: dict[str, object] = {}
+
+    def inspect_delegated_task(
+        config: WorkflowTaskAgentConfig, **_kwargs: object
+    ) -> int:
+        delegated_task = WorkflowInstance.from_directory(config.workflow_dir).tasks[0]
+        captured.update(delegated_task.input_state["proposed_pr_context"])
+        return 0
+
+    monkeypatch.setattr(
+        "powdrr_lift.workrr.task_scenario.run_workflow_task", inspect_delegated_task
+    )
+    result = run_workflow_task_scenario(
+        workflow_source=workflow.directory,
+        task_id="implementation",
+        responses=[],
+        expected_output_state=None,
+    )
+
+    assert result["exit_code"] == 0
+    assert result["output_matches"] is True
+    assert captured["source_reference_design_file"] == "reviewed/design.yaml"
 
 
 def test_task_scenario_repairs_a_failed_procedrr_operation(tmp_path: Path) -> None:

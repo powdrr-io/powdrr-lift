@@ -1,5 +1,5 @@
 schema: https://powdrr.io/schema/changelog-v2
-change_id: PR-1481
+change_id: PR-1482
 title: Bind story receipts to behavior routes
 intent:
   problem: Story validation already produces fresh case receipts, but compiled obligation behavior routes remain uncollected.

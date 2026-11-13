@@ -214,6 +214,7 @@ class FakeIssueClient:
         self.fulfillment_label_ensured = False
         self.merged_commit: str | None = None
         self.required_checks = [{"name": "test", "state": "pass", "workflow": "ci"}]
+        self.pull_request_files: list[dict[str, str]] = []
         self.pr_head = "c" * 40
         self._next_number = 100
 
@@ -310,6 +311,12 @@ class FakeIssueClient:
         if arguments[:2] == ["pr", "checks"]:
             return subprocess.CompletedProcess(
                 ["gh", *arguments], 0, json.dumps(self.required_checks), ""
+            )
+        if arguments[:1] == ["api"] and any(
+            "/pulls/" in argument and "/files?" in argument for argument in arguments
+        ):
+            return subprocess.CompletedProcess(
+                ["gh", *arguments], 0, json.dumps(self.pull_request_files), ""
             )
         return subprocess.CompletedProcess(["gh", *arguments], 1, "", "unexpected")
 
@@ -1741,6 +1748,7 @@ def test_continue_manual_prerequisite_retries_ci_then_resumes(tmp_path: Path) ->
     assert [command[1:3] for command in commands[4:]] == [
         ["view", "123"],
         ["checks", "123"],
+        ["--paginate", "repos/example/project/pulls/123/files?per_page=100"],
         ["view", "123"],
     ]
     assert QUEUE_LABELS["awaiting_review"] in client.get_issue(100).labels
@@ -2430,6 +2438,48 @@ def test_required_ci_readiness_blocks_unmatched_discovered_job(
     assert observation["outcome"] == "blocked"
     assert "could not be matched" in observation["reason"]
     assert observation["checks"][0]["inventory_match"]["status"] == "unmatched"
+
+
+@pytest.mark.parametrize(
+    "changed_file",
+    [
+        {"filename": ".github/workflows/new-checks.yml", "status": "added"},
+        {"filename": ".github/workflows/ci.yml", "status": "modified"},
+        {"filename": ".github/workflows/ci.yml", "status": "removed"},
+        {
+            "filename": ".github/workflows/new-ci.yml",
+            "previous_filename": ".github/workflows/ci.yml",
+            "status": "renamed",
+        },
+    ],
+)
+def test_required_ci_readiness_blocks_changed_validation_inputs(
+    tmp_path: Path, changed_file: dict[str, str]
+) -> None:
+    client = FakeIssueClient()
+    client.pull_request_files = [changed_file]
+    inventory = github_issue_queue._read_repository_validation_inventory(tmp_path)
+    assert inventory is not None
+
+    observation = github_issue_queue._observe_required_ci_outcome(
+        client,  # type: ignore[arg-type]
+        "https://github.com/example/project/pull/123",
+        validation_inventory=inventory["checks"],
+        inventory_digest=inventory["digest"],
+        validation_input_paths=inventory["input_paths"],
+    )
+
+    assert observation["outcome"] == "blocked"
+    assert "refresh the committed validation baseline" in observation["reason"]
+    assert observation["validation_input_changes"]
+    assert changed_file["filename"] in observation["validation_input_changes"]
+    if previous_filename := changed_file.get("previous_filename"):
+        assert previous_filename in observation["validation_input_changes"]
+    checkpoint = github_issue_queue._render_ci_outcome_checkpoint(
+        pull_request_url="https://github.com/example/project/pull/123",
+        observation=observation,
+    )
+    assert '"validation_input_changes"' in checkpoint
 
 
 def test_required_ci_matching_rejects_ambiguous_workflow_identity(

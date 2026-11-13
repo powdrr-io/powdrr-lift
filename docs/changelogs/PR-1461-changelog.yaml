@@ -1,0 +1,93 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1461
+title: Track Structrr baseline report freshness
+intent:
+  problem: Structrr baseline reuse trusts the YAML section shape and may copy a supplied snapshot without its paired report or freshness evidence.
+  goal: Bind each reusable baseline to its Markdown report and validation inventory/context, and create those companions whenever a supplied snapshot is copied.
+human-decisions: []
+structured_files: []
+files:
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 5
+    end_line: 5
+  summary: Import SHA-256 support for baseline artifact digests.
+  rationale: Bind freshness metadata to the exact persisted files.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span: {start_line: 77, end_line: 77}
+  summary: Import the canonical Structrr Markdown renderer.
+  rationale: Generate the same report format for copied baseline snapshots.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span: {start_line: 6156, end_line: 6156}
+  summary: Describe baseline reuse in terms of report and freshness validation.
+  rationale: Make the reuse rule explicit at its entry point.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span: {start_line: 6172, end_line: 6172}
+  summary: Write companion artifacts when copying a supplied baseline.
+  rationale: Keep the generated baseline complete.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span: {start_line: 6184, end_line: 6184}
+  summary: Record freshness metadata for a newly generated baseline.
+  rationale: Allow later reuse checks to verify its saved report and validation context.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span:
+    start_line: 6203
+    end_line: 6219
+  summary: Require matching YAML, Markdown, and validation fingerprints before reusing a baseline.
+  rationale: Refresh a baseline when its report is edited or supplied validation inputs no longer match.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span: {start_line: 6231, end_line: 6231}
+  summary: Write companion artifacts when refreshing from a supplied current snapshot.
+  rationale: Keep refreshed baselines complete.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span: {start_line: 6242, end_line: 6242}
+  summary: Record freshness metadata after regenerating an existing baseline.
+  rationale: Keep the generated baseline eligible for later validated reuse.
+- path: src/powdrr_lift/workrr/feature_endpoint.py
+  type: modified
+  span: {start_line: 6248, end_line: 6326}
+  summary: Render baseline reports and persist file and validation input digests.
+  rationale: Make baseline freshness checkable without changing product snapshot exclusions.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span: {start_line: 104, end_line: 104}
+  summary: Import the baseline companion writer for test fixtures.
+  rationale: Create realistic reusable baselines in endpoint tests.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span: {start_line: 3117, end_line: 3117}
+  summary: Create freshness companions for the first baseline fixture.
+  rationale: Exercise reuse only with a complete baseline artifact set.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span: {start_line: 3124, end_line: 3124}
+  summary: Create freshness companions for the latest baseline fixture.
+  rationale: Exercise selection and reuse of a complete latest baseline.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span: {start_line: 3132, end_line: 3145}
+  summary: Verify report edits trigger baseline refresh.
+  rationale: Prevent edited Markdown from being accepted as a current baseline companion.
+- path: tests/test_feature_endpoint.py
+  type: modified
+  span: {start_line: 3171, end_line: 3175}
+  summary: Verify copying a supplied current snapshot writes its report and freshness record.
+  rationale: Keep the supplied-snapshot path consistent with generated bootstrap artifacts.
+entities:
+- id: structrr-baseline-freshness
+  type: Function
+  action: added
+- id: structrr-baseline-freshness-tests
+  type: Unit test
+  action: added
+entity_relationships: []
+invariants: []
+guidance: []

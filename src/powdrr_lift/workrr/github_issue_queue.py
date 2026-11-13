@@ -2806,13 +2806,13 @@ def _observe_required_ci_outcome(
     """Classify only current-PR required checks reported by GitHub CLI."""
     observed_at = datetime.now(UTC).isoformat()
     if pull_request_url is None:
-        return _ci_outcome_observation(
-            "blocked",
-            None,
-            (),
-            "the completed workflow did not checkpoint a pull request URL",
-            observed_at,
-            inventory_digest,
+        return _stale_ci_outcome_observation(
+            previous_observation=previous_observation,
+            current_checks=(),
+            head_sha=None,
+            reason="the completed workflow did not checkpoint a pull request URL",
+            observed_at=observed_at,
+            inventory_digest=inventory_digest,
         )
     number = _same_repository_pull_request_number(pull_request_url, client.repository)
     if number is None:
@@ -3091,7 +3091,7 @@ def _stale_ci_outcome_observation(
     if head_sha is None and previous_observation is not None:
         previous_head = previous_observation.get("head_sha")
         head_sha = previous_head if isinstance(previous_head, str) else None
-    return _ci_outcome_observation(
+    observation = _ci_outcome_observation(
         "blocked",
         head_sha,
         stale_checks,
@@ -3104,6 +3104,14 @@ def _stale_ci_outcome_observation(
         last_remote_observed_at=last_observed_at,
         preserve_check_timestamps=True,
     )
+    previous_url = (
+        previous_observation.get("pull_request_url")
+        if previous_observation is not None
+        else None
+    )
+    if isinstance(previous_url, str):
+        observation["pull_request_url"] = previous_url
+    return observation
 
 
 def _queue_status_for_ci_outcome(outcome: str) -> str:
@@ -3117,9 +3125,10 @@ def _queue_status_for_ci_outcome(outcome: str) -> str:
 def _render_ci_outcome_checkpoint(
     *, pull_request_url: str | None, observation: Mapping[str, Any]
 ) -> str:
+    checkpoint_url = pull_request_url or observation.get("pull_request_url")
     payload = {
         "schema": "https://powdrr.io/schemas/ci-outcome-checkpoint-v1",
-        "pull_request_url": pull_request_url,
+        "pull_request_url": checkpoint_url,
         "head_sha": observation.get("head_sha"),
         "observed_at": observation.get("observed_at"),
         "validation_inventory_digest": observation.get("validation_inventory_digest"),
@@ -3140,7 +3149,7 @@ def _render_ci_outcome_checkpoint(
         "### Powdrr required CI outcome\n\n"
         f"{_CI_OUTCOME_MARKER}\n"
         f"Observation `{fingerprint}` for "
-        f"{pull_request_url or 'an unlinked PR'} at head "
+        f"{checkpoint_url or 'an unlinked PR'} at head "
         f"`{observation.get('head_sha') or 'unknown'}`: "
         f"**{observation.get('outcome', 'blocked')}**.\n\n"
         "```json\n"
@@ -3152,9 +3161,7 @@ def _render_ci_outcome_checkpoint(
 def _latest_ci_outcome_observation(
     comments: Sequence[Mapping[str, Any]], pull_request_url: str | None
 ) -> dict[str, Any] | None:
-    """Load the most recent intact CI checkpoint for this exact PR."""
-    if pull_request_url is None:
-        return None
+    """Load the most recent intact CI checkpoint, optionally for one PR."""
     for comment in reversed(comments):
         body = comment.get("body")
         if not isinstance(body, str) or _CI_OUTCOME_MARKER not in body:
@@ -3171,7 +3178,11 @@ def _latest_ci_outcome_observation(
             not isinstance(payload, Mapping)
             or payload.get("schema")
             != "https://powdrr.io/schemas/ci-outcome-checkpoint-v1"
-            or payload.get("pull_request_url") != pull_request_url
+            or not isinstance(payload.get("pull_request_url"), str)
+            or (
+                pull_request_url is not None
+                and payload.get("pull_request_url") != pull_request_url
+            )
             or not isinstance(payload.get("required_checks"), list)
             or not all(
                 isinstance(check, Mapping)
@@ -3185,6 +3196,7 @@ def _latest_ci_outcome_observation(
         if fingerprint != fingerprint_match.group(1):
             continue
         return {
+            "pull_request_url": payload.get("pull_request_url"),
             "outcome": payload.get("outcome"),
             "head_sha": payload.get("head_sha"),
             "observed_at": payload.get("observed_at"),

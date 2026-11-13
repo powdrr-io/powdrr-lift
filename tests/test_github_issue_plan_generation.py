@@ -2343,7 +2343,7 @@ def test_plan_resume_restores_checkout_before_checking_existing_output(
         )
 
 
-def test_publish_execution_plan_pull_request_uses_remote_default_from_detached_head(
+def test_publish_execution_plan_pull_request_targets_main_from_planning_branch(
     tmp_path: Any,
 ) -> None:
     _, plan = generate_execution_plan_yaml(
@@ -2367,15 +2367,7 @@ def test_publish_execution_plan_pull_request_uses_remote_default_from_detached_h
         del cwd, capture_output, text, check
         commands.append(command)
         if command == ["git", "branch", "--show-current"]:
-            stdout = ""
-        elif command == [
-            "git",
-            "symbolic-ref",
-            "--quiet",
-            "--short",
-            "refs/remotes/origin/HEAD",
-        ]:
-            stdout = "origin/main\n"
+            stdout = "planning/local-replan\n"
         elif command[:3] == ["git", "rev-parse", "--verify"]:
             stdout = "abc123\n"
         elif command[:3] == ["gh", "pr", "create"]:

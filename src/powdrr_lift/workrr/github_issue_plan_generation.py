@@ -1393,14 +1393,9 @@ def publish_execution_plan_pull_request(
     original_head = _run_publication_command(
         runner, repo_root, ["git", "rev-parse", "--verify", "HEAD^{commit}"]
     ).strip()
-    if current_branch:
-        selected_base = current_branch
-    else:
-        selected_base = _remote_default_branch(
-            runner=runner,
-            repo_root=repo_root,
-            remote=remote,
-        )
+    # Planning can start from a session branch, but review PRs always target
+    # main. The current branch may be local-only and unavailable to GitHub.
+    selected_base = "main"
 
     relative_paths: list[str] = []
     for generated_file in generated_files:
@@ -1507,39 +1502,6 @@ def publish_execution_plan_pull_request(
         base_branch=selected_base,
         commit_sha=commit_sha,
         pull_request_url=pull_request_url,
-    )
-
-
-def _remote_default_branch(*, runner: Any, repo_root: Path, remote: str) -> str:
-    """Resolve the PR base when plan generation starts from a detached checkout."""
-    symbolic_ref = f"refs/remotes/{remote}/HEAD"
-    try:
-        remote_head = _run_publication_command(
-            runner,
-            repo_root,
-            ["git", "symbolic-ref", "--quiet", "--short", symbolic_ref],
-        ).strip()
-    except PlanGenerationError:
-        remote_head = _run_publication_command(
-            runner,
-            repo_root,
-            [
-                "gh",
-                "repo",
-                "view",
-                "--json",
-                "defaultBranchRef",
-                "--jq",
-                ".defaultBranchRef.name",
-            ],
-        ).strip()
-    remote_prefix = f"{remote}/"
-    if remote_head.startswith(remote_prefix):
-        return remote_head.removeprefix(remote_prefix)
-    if remote_head:
-        return remote_head
-    raise PlanGenerationError(
-        f"Could not determine the default branch for remote {remote!r}."
     )
 
 

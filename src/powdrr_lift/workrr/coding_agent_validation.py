@@ -7,8 +7,9 @@ import shlex
 import signal
 import subprocess
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import StrEnum
+from fnmatch import fnmatchcase
 from pathlib import Path
 from typing import Any
 
@@ -30,12 +31,21 @@ class ValidationResultStatus(StrEnum):
     FAILED = "failed"
     TIMED_OUT = "timed_out"
     BLOCKED = "blocked"
+    NOT_APPLICABLE = "not_applicable"
+    PENDING = "pending"
 
 
 class ValidationReportStatus(StrEnum):
     PASSED = "passed"
     FAILED = "failed"
     BLOCKED = "blocked"
+    PENDING = "pending"
+
+
+class ValidationApplicabilityStatus(StrEnum):
+    APPLICABLE = "applicable"
+    NOT_APPLICABLE = "not_applicable"
+    PENDING = "pending"
 
 
 @dataclass(frozen=True, slots=True)
@@ -165,6 +175,128 @@ class ValidationProfile:
 
 
 @dataclass(frozen=True, slots=True)
+class ValidationApplicabilityContext:
+    """Actual target context used to evaluate a profile's event filters."""
+
+    event: str | None = None
+    base_branch: str | None = None
+    changed_paths: tuple[str, ...] | None = None
+
+    def to_data(self) -> dict[str, Any]:
+        return {
+            "event": self.event,
+            "base_branch": self.base_branch,
+            "changed_paths": (
+                list(self.changed_paths) if self.changed_paths is not None else None
+            ),
+        }
+
+
+def evaluate_validation_applicability(
+    profile: ValidationProfile,
+    context: ValidationApplicabilityContext,
+) -> tuple[ValidationApplicabilityStatus, str]:
+    """Evaluate supported event, base-branch, and changed-path constraints."""
+    applicability = profile.applicability
+    if applicability is None:
+        return (
+            ValidationApplicabilityStatus.APPLICABLE,
+            "no applicability filters declared",
+        )
+
+    evaluation = applicability.get("evaluation", "unknown")
+    if evaluation == "not_applicable":
+        return ValidationApplicabilityStatus.NOT_APPLICABLE, (
+            "profile is declared not applicable"
+        )
+    condition = applicability.get("condition")
+    if condition not in (None, ""):
+        return ValidationApplicabilityStatus.PENDING, (
+            "applicability condition cannot be evaluated deterministically"
+        )
+
+    local = applicability.get("local")
+    if local is False:
+        return ValidationApplicabilityStatus.PENDING, (
+            "profile is not reproducible in the local validation runner"
+        )
+    if local is not None and not isinstance(local, bool):
+        return ValidationApplicabilityStatus.PENDING, (
+            "local applicability declaration is malformed"
+        )
+    if evaluation == "applicable" and not any(
+        key in applicability
+        for key in ("events", "base_branches", "paths", "condition")
+    ):
+        return ValidationApplicabilityStatus.APPLICABLE, (
+            "profile is declared applicable"
+        )
+
+    constraints: list[str] = []
+    for key, actual in (
+        ("events", context.event),
+        ("base_branches", context.base_branch),
+    ):
+        declared = applicability.get(key)
+        if declared is None:
+            continue
+        if (
+            not isinstance(declared, (list, tuple))
+            or not declared
+            or not all(isinstance(item, str) and item for item in declared)
+        ):
+            return ValidationApplicabilityStatus.PENDING, (
+                f"{key} applicability filter is malformed"
+            )
+        if actual is None:
+            return ValidationApplicabilityStatus.PENDING, (
+                f"actual {key} is unavailable"
+            )
+        if actual not in declared:
+            return ValidationApplicabilityStatus.NOT_APPLICABLE, (
+                f"actual {key} {actual!r} is outside the declared filter"
+            )
+        constraints.append(f"{key} matched")
+
+    declared_paths = applicability.get("paths")
+    if declared_paths is not None:
+        if (
+            not isinstance(declared_paths, (list, tuple))
+            or not declared_paths
+            or not all(isinstance(item, str) and item for item in declared_paths)
+        ):
+            return ValidationApplicabilityStatus.PENDING, (
+                "paths applicability filter is malformed"
+            )
+        if any(pattern.startswith("!") for pattern in declared_paths):
+            return ValidationApplicabilityStatus.PENDING, (
+                "negative path patterns are not supported by the "
+                "applicability evaluator"
+            )
+        if context.changed_paths is None:
+            return ValidationApplicabilityStatus.PENDING, (
+                "actual changed paths are unavailable"
+            )
+        if not any(
+            fnmatchcase(path, pattern)
+            for path in context.changed_paths
+            for pattern in declared_paths
+        ):
+            return ValidationApplicabilityStatus.NOT_APPLICABLE, (
+                "no changed path matches the declared path filter"
+            )
+        constraints.append("changed paths matched")
+
+    if constraints:
+        return ValidationApplicabilityStatus.APPLICABLE, "; ".join(constraints)
+    if local is True or evaluation == "applicable":
+        return ValidationApplicabilityStatus.APPLICABLE, (
+            "profile applies to local validation"
+        )
+    return ValidationApplicabilityStatus.PENDING, ("profile applicability is unknown")
+
+
+@dataclass(frozen=True, slots=True)
 class ValidationResult:
     profile: str
     command: tuple[str, ...]
@@ -178,6 +310,9 @@ class ValidationResult:
     actual: str | None = None
     source_location: str | None = None
     evidence_path: str | None = None
+    applicability_status: str | None = None
+    applicability_reason: str | None = None
+    applicability_context: Mapping[str, Any] | None = None
 
     def to_data(self) -> dict[str, Any]:
         return {
@@ -193,6 +328,13 @@ class ValidationResult:
             "actual": self.actual,
             "source_location": self.source_location,
             "evidence_path": self.evidence_path,
+            "applicability_status": self.applicability_status,
+            "applicability_reason": self.applicability_reason,
+            "applicability_context": (
+                dict(self.applicability_context)
+                if self.applicability_context is not None
+                else None
+            ),
         }
 
 
@@ -219,7 +361,8 @@ class ValidationReport:
                 evidence_path=result.evidence_path,
                 classification=(
                     "environment_failure"
-                    if result.status is ValidationResultStatus.BLOCKED
+                    if result.status
+                    in (ValidationResultStatus.BLOCKED, ValidationResultStatus.PENDING)
                     else "test_failure"
                 ),
                 repairability=(
@@ -228,12 +371,14 @@ class ValidationReport:
                     in (
                         ValidationResultStatus.BLOCKED,
                         ValidationResultStatus.TIMED_OUT,
+                        ValidationResultStatus.PENDING,
                     )
                     else "repairable"
                 ),
             )
             for result in self.results
             if result.status is not ValidationResultStatus.PASSED
+            and result.status is not ValidationResultStatus.NOT_APPLICABLE
         ]
         return {
             "schema_version": self.schema_version,
@@ -370,6 +515,7 @@ class ValidationRunner:
         attempt: CodingAgentAttempt,
         *,
         worktree_root: Path,
+        applicability_context: ValidationApplicabilityContext | None = None,
     ) -> ValidationReport:
         reference_required = (
             request.source_reference_prompt is not None
@@ -437,8 +583,15 @@ class ValidationRunner:
 
         # Candidate test programs can mutate files. Source evidence must describe
         # the final bytes after every ordinary verification command has finished.
+        context = applicability_context or ValidationApplicabilityContext()
         ordinary_results = tuple(
-            self._run_profile(profile, request, worktree_root) for profile in profiles
+            self._run_profile_for_context(
+                profile,
+                request,
+                worktree_root,
+                context,
+            )
+            for profile in profiles
         )
         reference_results: list[ValidationResult] = []
         if reference_required:
@@ -465,6 +618,14 @@ class ValidationRunner:
             in (ValidationResultStatus.FAILED, ValidationResultStatus.TIMED_OUT)
             for result in results
         )
+        pending = (
+            any(result.status is ValidationResultStatus.PENDING for result in results)
+            or bool(results)
+            and all(
+                result.status is ValidationResultStatus.NOT_APPLICABLE
+                for result in results
+            )
+        )
         return ValidationReport(
             attempt_id=attempt.attempt_id,
             request_id=request.request_id,
@@ -473,6 +634,8 @@ class ValidationRunner:
                 if blocked
                 else ValidationReportStatus.FAILED
                 if failed
+                else ValidationReportStatus.PENDING
+                if pending
                 else ValidationReportStatus.PASSED
             ),
             results=results,
@@ -482,6 +645,41 @@ class ValidationRunner:
     def _profile_contexts(self, names: Sequence[str]) -> tuple[Mapping[str, Any], ...]:
         return tuple(
             self.profiles[name].to_data() for name in names if name in self.profiles
+        )
+
+    def _run_profile_for_context(
+        self,
+        profile: ValidationProfile,
+        request: ImplementationRequest,
+        worktree_root: Path,
+        context: ValidationApplicabilityContext,
+    ) -> ValidationResult:
+        applicability_status, reason = evaluate_validation_applicability(
+            profile, context
+        )
+        if applicability_status is ValidationApplicabilityStatus.NOT_APPLICABLE:
+            result = ValidationResult(
+                profile=profile.name,
+                command=profile.command,
+                status=ValidationResultStatus.NOT_APPLICABLE,
+                returncode=None,
+                error=reason,
+            )
+        elif applicability_status is ValidationApplicabilityStatus.PENDING:
+            result = ValidationResult(
+                profile=profile.name,
+                command=profile.command,
+                status=ValidationResultStatus.PENDING,
+                returncode=None,
+                error=reason,
+            )
+        else:
+            result = self._run_profile(profile, request, worktree_root)
+        return replace(
+            result,
+            applicability_status=applicability_status.value,
+            applicability_reason=reason,
+            applicability_context=context.to_data(),
         )
 
     def _run_references(
@@ -727,6 +925,13 @@ def validation_report_from_data(data: Mapping[str, Any]) -> ValidationReport:
             actual=item.get("actual"),
             source_location=item.get("source_location"),
             evidence_path=item.get("evidence_path"),
+            applicability_status=item.get("applicability_status"),
+            applicability_reason=item.get("applicability_reason"),
+            applicability_context=(
+                dict(item["applicability_context"])
+                if isinstance(item.get("applicability_context"), Mapping)
+                else None
+            ),
         )
         for item in data.get("results", [])
     )
@@ -748,11 +953,14 @@ def validation_report_from_data(data: Mapping[str, Any]) -> ValidationReport:
 __all__ = [
     "CODING_AGENT_VALIDATION_REPORT_SCHEMA_VERSION",
     "ValidationProfile",
+    "ValidationApplicabilityContext",
+    "ValidationApplicabilityStatus",
     "ValidationReport",
     "ValidationReportStatus",
     "ValidationResult",
     "ValidationResultStatus",
     "ValidationRunner",
+    "evaluate_validation_applicability",
     "parse_validation_profile",
     "validation_report_from_data",
 ]

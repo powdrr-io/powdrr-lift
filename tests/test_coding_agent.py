@@ -31,10 +31,13 @@ from powdrr_lift.workrr.coding_agent import (
     run_coding_agent,
 )
 from powdrr_lift.workrr.coding_agent_validation import (
+    ValidationApplicabilityContext,
+    ValidationApplicabilityStatus,
     ValidationProfile,
     ValidationReportStatus,
     ValidationResultStatus,
     ValidationRunner,
+    evaluate_validation_applicability,
     parse_validation_profile,
 )
 
@@ -1431,6 +1434,127 @@ def test_validation_runner_matches_exact_argv_with_space_containing_argument(
     )
 
     assert report.status is ValidationReportStatus.PASSED
+
+
+def test_validation_applicability_matches_actual_event_base_and_changed_paths(
+    tmp_path: Path,
+) -> None:
+    worktree = _git_repo(tmp_path / "repo")
+    command = ("python3", "-c", "pass")
+    profile = ValidationProfile(
+        "ci-tests",
+        command,
+        applicability={
+            "local": True,
+            "evaluation": "unknown",
+            "events": ["pull_request"],
+            "base_branches": ["main"],
+            "paths": ["src/**"],
+        },
+    )
+    context = ValidationApplicabilityContext(
+        event="pull_request",
+        base_branch="main",
+        changed_paths=("src/package/module.py",),
+    )
+    request = replace(
+        _request(_head(worktree)),
+        validation_profiles=(profile.name,),
+        allowed_commands=("python3 *",),
+    )
+    attempt = run_coding_agent(
+        FakeProvider("allowed"),
+        request,
+        worktree_root=worktree,
+        attempt_id="applicable",
+    )
+
+    applicability, explanation = evaluate_validation_applicability(profile, context)
+    report = ValidationRunner({profile.name: profile}).run(
+        request,
+        attempt,
+        worktree_root=worktree,
+        applicability_context=context,
+    )
+
+    assert applicability is ValidationApplicabilityStatus.APPLICABLE
+    assert "events matched" in explanation
+    assert report.status is ValidationReportStatus.PASSED
+    assert report.results[0].status is ValidationResultStatus.PASSED
+    assert report.results[0].applicability_status == "applicable"
+    assert report.results[0].applicability_context == context.to_data()
+
+
+def test_unknown_validation_applicability_is_pending_not_skipped(
+    tmp_path: Path,
+) -> None:
+    worktree = _git_repo(tmp_path / "repo")
+    profile = ValidationProfile(
+        "ci-tests",
+        ("python3", "-c", "raise AssertionError('must not run')"),
+        applicability={
+            "local": True,
+            "evaluation": "unknown",
+            "events": ["pull_request"],
+        },
+    )
+    request = replace(
+        _request(_head(worktree)),
+        validation_profiles=(profile.name,),
+        allowed_commands=("python3 *",),
+    )
+    attempt = run_coding_agent(
+        FakeProvider("allowed"), request, worktree_root=worktree, attempt_id="pending"
+    )
+
+    report = ValidationRunner({profile.name: profile}).run(
+        request, attempt, worktree_root=worktree
+    )
+
+    assert report.status is ValidationReportStatus.PENDING
+    assert report.results[0].status is ValidationResultStatus.PENDING
+    assert report.results[0].error == "actual events is unavailable"
+    assert report.results[0].applicability_context == {
+        "event": None,
+        "base_branch": None,
+        "changed_paths": None,
+    }
+
+
+def test_non_matching_validation_filter_is_not_applicable_and_report_stays_pending(
+    tmp_path: Path,
+) -> None:
+    worktree = _git_repo(tmp_path / "repo")
+    profile = ValidationProfile(
+        "ci-tests",
+        ("python3", "-c", "raise AssertionError('must not run')"),
+        applicability={
+            "local": True,
+            "evaluation": "unknown",
+            "events": ["pull_request"],
+        },
+    )
+    request = replace(
+        _request(_head(worktree)),
+        validation_profiles=(profile.name,),
+        allowed_commands=("python3 *",),
+    )
+    attempt = run_coding_agent(
+        FakeProvider("allowed"), request, worktree_root=worktree, attempt_id="n-a"
+    )
+
+    report = ValidationRunner({profile.name: profile}).run(
+        request,
+        attempt,
+        worktree_root=worktree,
+        applicability_context=ValidationApplicabilityContext(event="local"),
+    )
+
+    assert report.status is ValidationReportStatus.PENDING
+    assert report.results[0].status is ValidationResultStatus.NOT_APPLICABLE
+    assert report.results[0].applicability_reason == (
+        "actual events 'local' is outside the declared filter"
+    )
 
 
 def test_validation_runner_keeps_unsupported_shell_context_blocked(

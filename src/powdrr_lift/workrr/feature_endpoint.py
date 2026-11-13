@@ -155,6 +155,7 @@ from powdrr_lift.workrr.coding_agent import (
     build_coding_agent_provider,
 )
 from powdrr_lift.workrr.coding_agent_validation import (
+    ValidationApplicabilityContext,
     ValidationProfile,
     ValidationReport,
     ValidationReportStatus,
@@ -547,6 +548,9 @@ def _execute_procedrr_flow(
         ),
         "benchmark_gate_warnings": [],
         "submission_base": _git_output(runner, worktree, ["git", "rev-parse", "HEAD"]),
+        "validation_runner": runner,
+        "validation_target_event": "pull_request" if config.open_pr else "local",
+        "validation_base_branch": config.base_branch,
     }
     _write_run_metadata(
         config,
@@ -4874,7 +4878,28 @@ def _run_validation_profile(
     report = ValidationRunner(
         {name: runtime_profile},
         timeout_seconds=timeout_seconds,
-    ).run(request, state["attempt"], worktree_root=worktree)
+    ).run(
+        request,
+        state["attempt"],
+        worktree_root=worktree,
+        applicability_context=ValidationApplicabilityContext(
+            event=(
+                state.get("validation_target_event")
+                if isinstance(state.get("validation_target_event"), str)
+                else None
+            ),
+            base_branch=(
+                state.get("validation_base_branch")
+                if isinstance(state.get("validation_base_branch"), str)
+                else None
+            ),
+            changed_paths=(
+                tuple(sorted(_changed_paths(state["validation_runner"], worktree)))
+                if state.get("validation_runner") is not None
+                else None
+            ),
+        ),
+    )
     if len(report.results) != 1:
         raise PowdrrExecutionError(
             f"validation profile {name!r} did not produce one result"
@@ -4905,6 +4930,13 @@ def _aggregate_validation(
             stdout=str(item.get("stdout", "")),
             stderr=str(item.get("stderr", "")),
             error=item.get("error"),
+            applicability_status=item.get("applicability_status"),
+            applicability_reason=item.get("applicability_reason"),
+            applicability_context=(
+                dict(item["applicability_context"])
+                if isinstance(item.get("applicability_context"), Mapping)
+                else None
+            ),
         )
         for item in collected_results
     )
@@ -4914,6 +4946,13 @@ def _aggregate_validation(
         for result in results
     )
     blocked = any(result.status is ValidationResultStatus.BLOCKED for result in results)
+    pending = (
+        any(result.status is ValidationResultStatus.PENDING for result in results)
+        or bool(results)
+        and all(
+            result.status is ValidationResultStatus.NOT_APPLICABLE for result in results
+        )
+    )
     validation = ValidationReport(
         attempt_id=state["attempt"].attempt_id,
         request_id=state["request"].request_id,
@@ -4922,6 +4961,8 @@ def _aggregate_validation(
             if blocked
             else ValidationReportStatus.FAILED
             if failed
+            else ValidationReportStatus.PENDING
+            if pending
             else ValidationReportStatus.PASSED
         ),
         results=results,

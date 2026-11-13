@@ -100,6 +100,7 @@ from powdrr_lift.workrr.feature_endpoint import (
     _validate_required_test_cases,
     _worker_prompt_capture_flow_source,
     _worktree_state_fingerprint,
+    _write_baseline_companions,
     _write_structrr_plan,
     _write_structrr_plan_from_obligations,
     review_feature_diff,
@@ -3112,12 +3113,14 @@ def test_endpoint_reuses_existing_latest_baseline_without_writing(
     valid_sections["intent"] = {}
     valid_sections["section_versions"] = BOOTSTRAP_SECTION_VERSIONS
     first.write_text(yaml.safe_dump(valid_sections), encoding="utf-8")
+    _write_baseline_companions(valid_sections, first, tmp_path)
     _git(tmp_path, "init", "-q")
     _git(tmp_path, "config", "user.email", "test@example.com")
     _git(tmp_path, "config", "user.name", "Test")
     _git(tmp_path, "add", ".")
     _git(tmp_path, "commit", "-qm", "first baseline")
     second.write_text(yaml.safe_dump(valid_sections), encoding="utf-8")
+    _write_baseline_companions(valid_sections, second, tmp_path)
     _git(tmp_path, "add", ".")
     _git(tmp_path, "commit", "-qm", "second baseline")
 
@@ -3125,6 +3128,20 @@ def test_endpoint_reuses_existing_latest_baseline_without_writing(
 
     assert selected == second
     assert not (current / "baseline.yaml").exists()
+    assert selected.with_suffix(".md").is_file()
+    assert selected.with_suffix(".freshness.json").is_file()
+
+    selected.with_suffix(".md").write_text("edited report\n", encoding="utf-8")
+    refreshed = _ensure_current_baseline(
+        tmp_path, subprocess.run, bootstrap_path=selected
+    )
+
+    assert refreshed != selected
+    assert (
+        refreshed.with_suffix(".md")
+        .read_text(encoding="utf-8")
+        .startswith("# Project bootstrap findings")
+    )
 
 
 def test_endpoint_refreshes_stale_baseline_from_validated_bootstrap(
@@ -3150,6 +3167,11 @@ def test_endpoint_refreshes_stale_baseline_from_validated_bootstrap(
     )
 
     assert yaml.safe_load(selected.read_text(encoding="utf-8")) == fresh
+    assert selected.with_suffix(".md").is_file()
+    freshness = json.loads(
+        selected.with_suffix(".freshness.json").read_text(encoding="utf-8")
+    )
+    assert freshness["schema_version"] == "structrr-baseline-freshness-v1"
     assert _git(tmp_path, "status", "--short").stdout == ""
 
 

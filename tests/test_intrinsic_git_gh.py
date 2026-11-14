@@ -156,12 +156,21 @@ def test_gh_intrinsic_operations_have_expected_commands() -> None:
     assert intrinsic_command(
         {
             "operation": "pr_publish_clean",
-            "title": "Add feature",
-            "body": "Summary",
-            "base": "main",
-            "publication_branch": "powdrr/feature-implementation",
+            "workflow_context": {
+                "feature-name": "Add feature",
+                "base-branch": "main",
+                "publication-branch": "powdrr/feature-implementation",
+                "commit-message": "Implement feature",
+                "pr-description-sections": {
+                    "objective": "Implement feature.",
+                    "scope": "Update approved files.",
+                    "implementation_details": "Add the implementation.",
+                    "acceptance_criteria": "Feature behavior works.",
+                    "validation": "- `pytest -q`: passed.",
+                    "advisory_test_quality_notes": "None.",
+                },
+            },
             "files_to_publish": ["src/a.py"],
-            "commit_message": "Implement feature",
         },
         tool="gh",
     )[-4:] == [
@@ -170,6 +179,37 @@ def test_gh_intrinsic_operations_have_expected_commands() -> None:
         "--head",
         "powdrr/feature-implementation",
     ]
+    template_sections = {
+        "objective": "Implement the reviewed feature.",
+        "scope": "Update approved files.",
+        "implementation_details": "Add the CLI and tests.",
+        "acceptance_criteria": "The CLI validates the sequence.",
+        "validation": "- `pytest -q`: passed.",
+        "advisory_test_quality_notes": "None.",
+    }
+    templated_command = intrinsic_command(
+        {
+            "operation": "pr_publish_clean",
+            "workflow_context": {
+                "feature-name": "Reviewed feature",
+                "base-branch": "main",
+                "publication-branch": "powdrr/feature-implementation",
+                "commit-message": "Implement feature",
+                "pr-description-sections": template_sections,
+            },
+            "files_to_publish": ["src/a.py"],
+        },
+        tool="gh",
+    )
+    template_body = (
+        "## Objective\n\nImplement the reviewed feature.\n\n"
+        "## Scope\n\nUpdate approved files.\n\n"
+        "## Implementation Details\n\nAdd the CLI and tests.\n\n"
+        "## Acceptance Criteria\n\nThe CLI validates the sequence.\n\n"
+        "## Validation\n\n- `pytest -q`: passed.\n\n"
+        "## Advisory Test-Quality Notes\n\nNone."
+    )
+    assert templated_command[templated_command.index("--body") + 1] == template_body
 
 
 def test_gh_edit_rejects_a_model_owned_target(tmp_path: Path) -> None:

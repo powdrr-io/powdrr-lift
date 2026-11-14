@@ -403,16 +403,15 @@ def test_execute_proposed_pr_is_a_procedrr_workflow_process() -> None:
     )
     description_schema = title_judge["output"]["schema"]["properties"][
         "workflow_context"
-    ]["properties"]["populated-pr-description"]
-    assert description_schema["maxLength"] == 12000
-    assert "pattern" not in description_schema
-    assert implementation_steps[5]["call"]["inputs"]["files_to_publish"] == {
+    ]["properties"]["pr-description-sections"]
+    assert description_schema["type"] == "object"
+    assert "objective" not in description_schema.get("required", [])
+    publish_call = implementation_steps[5]["call"]
+    assert publish_call["inputs"]["files_to_publish"] == {
         "type": "reference",
         "value": "implementation_result.changed_paths",
     }
-    assert implementation_steps[5]["call"]["outputs"] == {
-        "pull_request_url": "pull_request_url"
-    }
+    assert publish_call["outputs"] == {"pull_request_url": "pull_request_url"}
     assert process["outputs"]["pull_request_url"]["pattern"].endswith("/pull/[0-9]+$")
     amendment_process = catalog.get("amend-plan-and-open-pr").document
     amendment_call = amendment_process["steps"][1]["operation"]["parameters"]
@@ -420,9 +419,9 @@ def test_execute_proposed_pr_is_a_procedrr_workflow_process() -> None:
     assert amendment_process["steps"][2]["gate"]["subject"] == "amendment_result.passed"
     amendment_description_schema = amendment_process["steps"][4]["judge"]["output"][
         "schema"
-    ]["properties"]["workflow_context"]["properties"]["populated-pr-description"]
-    assert amendment_description_schema["maxLength"] == 12000
-    assert "pattern" not in amendment_description_schema
+    ]["properties"]["workflow_context"]["properties"]["pr-description-sections"]
+    assert amendment_description_schema["type"] == "object"
+    assert "objective" not in amendment_description_schema.get("required", [])
 
 
 def test_create_pull_request_preserves_runtime_state_and_accepts_committed_files() -> (
@@ -435,15 +434,32 @@ def test_create_pull_request_preserves_runtime_state_and_accepts_committed_files
         .get("create-pull-request")
         .document
     )
-    operation = process["steps"][0]["operation"]
+    attempt = process["steps"][0]["attempt"]
+    assert attempt["id"] == "publish-pr"
+    assert attempt["max_attempts"] == 2
+    assert attempt["on_failure"] == {
+        "recovery": "repair-pr-description",
+        "resume": "publish-pr",
+    }
+    operation = attempt["body"][0]["operation"]
     parameters = operation["parameters"]["parameters"]
     assert parameters["operation"] == "pr_publish_clean"
     assert parameters["files_to_publish"]["value"] == "files_to_publish"
     assert parameters["require_standard_pr_description"] is True
-    assert (
-        parameters["publication_branch"]["value"]
-        == "workflow_context.publication-branch"
-    )
+    assert parameters["workflow_context"]["value"] == "workflow_context"
+    assert "body" not in parameters
+    recovery_judge = process["recoveries"]["repair-pr-description"]["steps"][0]["judge"]
+    recovery_sections = recovery_judge["output"]["schema"]["properties"][
+        "pr-description-sections"
+    ]
+    assert recovery_sections["required"] == [
+        "objective",
+        "scope",
+        "implementation_details",
+        "acceptance_criteria",
+        "validation",
+        "advisory_test_quality_notes",
+    ]
     assert process["outputs"]["pull_request_url"]["pattern"].endswith("/pull/[0-9]+$")
 
 

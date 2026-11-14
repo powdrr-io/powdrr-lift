@@ -8,6 +8,7 @@ import pytest
 
 from powdrr_lift.clean_pr_publisher import (
     publish_clean_pull_request,
+    render_standard_pr_description,
     validate_standard_pr_description,
     verify_publication_scope,
 )
@@ -57,6 +58,45 @@ None."""
             validate_standard_pr_description(invalid_description)
 
 
+def test_standard_pr_template_assembles_fixed_headings_from_section_content() -> None:
+    body = render_standard_pr_description(
+        {
+            "objective": "Explain the goal.",
+            "scope": "- Include the implementation.",
+            "implementation_details": "- Update the workflow.",
+            "acceptance_criteria": "- The workflow runs.",
+            "validation": "- `pytest -q`: passed.",
+            "advisory_test_quality_notes": "None.",
+        }
+    )
+
+    assert body == (
+        "## Objective\n\nExplain the goal.\n\n"
+        "## Scope\n\n- Include the implementation.\n\n"
+        "## Implementation Details\n\n- Update the workflow.\n\n"
+        "## Acceptance Criteria\n\n- The workflow runs.\n\n"
+        "## Validation\n\n- `pytest -q`: passed.\n\n"
+        "## Advisory Test-Quality Notes\n\nNone."
+    )
+
+
+def test_standard_pr_template_rejects_missing_or_empty_sections() -> None:
+    sections = {
+        "objective": "Explain the goal.",
+        "scope": "Include the implementation.",
+        "implementation_details": "Update the workflow.",
+        "acceptance_criteria": "The workflow runs.",
+        "validation": "- `pytest -q`: passed.",
+        "advisory_test_quality_notes": "None.",
+    }
+    with pytest.raises(PowdrrExecutionError, match="exactly the standard fields"):
+        render_standard_pr_description(
+            {key: value for key, value in sections.items() if key != "scope"}
+        )
+    with pytest.raises(PowdrrExecutionError, match="non-empty text"):
+        render_standard_pr_description({**sections, "scope": "  "})
+
+
 def test_clean_publisher_validates_standard_description_before_git_operations(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -65,7 +105,9 @@ def test_clean_publisher_validates_standard_description_before_git_operations(
 
     monkeypatch.setattr("powdrr_lift.clean_pr_publisher._run", unexpected_git_command)
 
-    with pytest.raises(PowdrrExecutionError, match="required Objective heading"):
+    with pytest.raises(
+        PowdrrExecutionError, match="requires structured description sections"
+    ):
         publish_clean_pull_request(
             {
                 "files_to_publish": ["src/example.py"],
@@ -168,7 +210,15 @@ def test_clean_publication_branch_excludes_checkpoint_commits(
             "base": "main",
             "publication_branch": "powdrr/attestation-pr-01-implementation",
             "title": "Add local validation attestation implementation",
-            "body": "## Summary\n\nPublish the validated protocol implementation.",
+            "description_sections": {
+                "objective": "Publish the validated protocol implementation.",
+                "scope": "- Implement the reviewed attestation behavior.",
+                "implementation_details": "- Add the manifest, CLI, schema, and tests.",
+                "acceptance_criteria": "- The local validation workflow works.",
+                "validation": "- `bash attestation/scripts/verify-all.sh`: passed.",
+                "advisory_test_quality_notes": "None.",
+            },
+            "require_standard_pr_description": True,
             "commit_message": "Implement local validation attestation PR-01",
         },
         worktree_root=source,
@@ -213,6 +263,14 @@ def test_clean_publication_branch_excludes_checkpoint_commits(
     assert (
         "pr create --draft --base main --head powdrr/attestation-pr-01-implementation"
         in calls
+    )
+    assert (
+        "--body ## Objective\n\nPublish the validated protocol implementation.\n\n"
+        "## Scope\n\n- Implement the reviewed attestation behavior.\n\n"
+        "## Implementation Details\n\n- Add the manifest, CLI, schema, and tests.\n\n"
+        "## Acceptance Criteria\n\n- The local validation workflow works.\n\n"
+        "## Validation\n\n- `bash attestation/scripts/verify-all.sh`: passed.\n\n"
+        "## Advisory Test-Quality Notes\n\nNone." in calls
     )
 
 

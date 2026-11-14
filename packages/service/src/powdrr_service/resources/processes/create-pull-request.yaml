@@ -1,9 +1,23 @@
 version: 1
 name: create-pull-request
-description: Publish only the approved implementation files from a clean draft pull-request branch.
+description: >-
+  Publish only the approved implementation files from a clean draft pull-request
+  branch. Callers provide PR description content as the six named fields in
+  workflow_context.pr-description-sections. Powdrr assembles those values into
+  the fixed Markdown heading template; callers must not construct the headings.
 inputs:
   - {name: user_request, type: string, required: true}
-  - {name: workflow_context, type: object, required: true}
+  - name: workflow_context
+    type: object
+    required: true
+    schema:
+      type: object
+      required: [feature-name, commit-message, base-branch, publication-branch]
+      properties:
+        feature-name: {type: string, minLength: 1, maxLength: 100}
+        commit-message: {type: string, minLength: 1}
+        base-branch: {type: string, const: main}
+        publication-branch: {type: string, minLength: 1}
   - {name: files_to_publish, type: array, required: true}
 outputs:
   pull_request_url:
@@ -12,22 +26,62 @@ outputs:
     pattern: ^https?://[^ ]+/pull/[0-9]+$
 limits: {context_chars: 12000, context_value_chars: 8000}
 steps:
-  - operation:
-      tool: invoke_tool
-      parameters:
-        tool: gh
-        parameters:
-          operation: pr_publish_clean
-          files_to_publish: {type: reference, value: files_to_publish}
-          base: {type: reference, value: workflow_context.base-branch}
-          publication_branch: {type: reference, value: workflow_context.publication-branch}
-          title: {type: reference, value: workflow_context.feature-name}
-          body: {type: reference, value: workflow_context.populated-pr-description}
-          require_standard_pr_description: true
-          commit_message: {type: reference, value: workflow_context.commit-message}
-      returns:
-        type: string
-        minLength: 1
-        pattern: ^https?://[^ ]+/pull/[0-9]+$
-      bind: pull_request_url
+  - attempt:
+      id: publish-pr
+      max_attempts: 2
+      body:
+        - operation:
+            tool: invoke_tool
+            parameters:
+              tool: gh
+              parameters:
+                operation: pr_publish_clean
+                files_to_publish: {type: reference, value: files_to_publish}
+                workflow_context: {type: reference, value: workflow_context}
+                require_standard_pr_description: true
+            returns:
+              type: string
+              minLength: 1
+              pattern: ^https?://[^ ]+/pull/[0-9]+$
+            bind: pull_request_url
+      on_failure: {recovery: repair-pr-description, resume: publish-pr}
   - terminal: succeeded
+
+recoveries:
+  repair-pr-description:
+    steps:
+      - judge:
+          kind: construct_one
+          question: What structured PR description sections should be used after publication rejected the request?
+          subject: failure
+          prompt_system: Return only the declared JSON object.
+          instructions:
+            - Treat failure.error as authoritative evidence of why publication failed.
+            - Preserve the user request, feature name, commit message, base branch, and publication branch from the supplied inputs.
+            - Provide non-empty body text for all six required section fields; do not return Markdown headings because Powdrr assembles the fixed template.
+            - Ground every claim in user_request, workflow_context, and files_to_publish; preserve all validated command results and do not claim unrun checks passed.
+            - Correct only the rejected PR description request and do not change publication identity or file scope.
+          context: [failure, user_request, workflow_context, files_to_publish]
+          output:
+            name: workflow_context
+            schema:
+              type: object
+              required: [feature-name, commit-message, base-branch, publication-branch, pr-description-sections]
+              additionalProperties: true
+              properties:
+                feature-name: {type: string, minLength: 1, maxLength: 100}
+                commit-message: {type: string, minLength: 1}
+                base-branch: {type: string, const: main}
+                publication-branch: {type: string, minLength: 1}
+                pr-description-sections:
+                  type: object
+                  required: [objective, scope, implementation_details, acceptance_criteria, validation, advisory_test_quality_notes]
+                  additionalProperties: false
+                  properties:
+                    objective: {type: string, minLength: 1}
+                    scope: {type: string, minLength: 1}
+                    implementation_details: {type: string, minLength: 1}
+                    acceptance_criteria: {type: string, minLength: 1}
+                    validation: {type: string, minLength: 1}
+                    advisory_test_quality_notes: {type: string, minLength: 1}
+          validation: {kind: json_schema}

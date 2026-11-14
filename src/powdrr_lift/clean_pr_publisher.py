@@ -20,6 +20,38 @@ _STANDARD_PR_DESCRIPTION_HEADINGS = (
     "## Validation",
     "## Advisory Test-Quality Notes",
 )
+_STANDARD_PR_DESCRIPTION_SECTIONS = (
+    ("objective", _STANDARD_PR_DESCRIPTION_HEADINGS[0]),
+    ("scope", _STANDARD_PR_DESCRIPTION_HEADINGS[1]),
+    ("implementation_details", _STANDARD_PR_DESCRIPTION_HEADINGS[2]),
+    ("acceptance_criteria", _STANDARD_PR_DESCRIPTION_HEADINGS[3]),
+    ("validation", _STANDARD_PR_DESCRIPTION_HEADINGS[4]),
+    ("advisory_test_quality_notes", _STANDARD_PR_DESCRIPTION_HEADINGS[5]),
+)
+
+
+def render_standard_pr_description(sections: Mapping[str, Any]) -> str:
+    """Render model-authored section content into Powdrr's fixed PR template."""
+    expected_keys = {name for name, _ in _STANDARD_PR_DESCRIPTION_SECTIONS}
+    if set(sections) != expected_keys:
+        missing = sorted(expected_keys - set(sections))
+        unexpected = sorted(set(sections) - expected_keys)
+        raise PowdrrExecutionError(
+            "PR description sections must contain exactly the standard fields; "
+            f"missing={missing!r}, unexpected={unexpected!r}."
+        )
+
+    rendered: list[str] = []
+    for name, heading in _STANDARD_PR_DESCRIPTION_SECTIONS:
+        content = sections[name]
+        if not isinstance(content, str) or not content.strip():
+            raise PowdrrExecutionError(
+                f"PR description section {name!r} must contain non-empty text."
+            )
+        rendered.append(f"{heading}\n\n{content.strip()}")
+    body = "\n\n".join(rendered)
+    validate_standard_pr_description(body)
+    return body
 
 
 def validate_standard_pr_description(body: str) -> None:
@@ -50,6 +82,48 @@ def validate_standard_pr_description(body: str) -> None:
         raise PowdrrExecutionError(
             "PR description's Advisory Test-Quality Notes section must not be empty."
         )
+
+
+def normalize_clean_pr_publication_parameters(
+    parameters: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Resolve PR metadata and either template sections or a legacy body."""
+    normalized = dict(parameters)
+    context = parameters.get("workflow_context")
+    if not isinstance(context, Mapping):
+        return normalized
+
+    aliases = {
+        "base": ("base-branch", "base"),
+        "publication_branch": ("publication-branch", "publication_branch"),
+        "title": ("feature-name", "pull-request-title", "title"),
+        "commit_message": ("commit-message", "commit_message"),
+    }
+    for target, keys in aliases.items():
+        if target not in normalized:
+            normalized[target] = next(
+                (context[key] for key in keys if key in context), None
+            )
+
+    sections = context.get("pr-description-sections")
+    if sections is None:
+        sections = context.get("pr_description_sections")
+    if sections is not None:
+        normalized["description_sections"] = sections
+    elif "body" not in normalized:
+        normalized["body"] = next(
+            (
+                context[key]
+                for key in (
+                    "populated-pr-description",
+                    "pull-request-description",
+                    "description",
+                )
+                if key in context
+            ),
+            None,
+        )
+    return normalized
 
 
 def verify_publication_scope(
@@ -91,6 +165,7 @@ def publish_clean_pull_request(
     parameters: Mapping[str, Any], *, worktree_root: Path
 ) -> str:
     """Copy only approved files to a clean publication branch and open a PR."""
+    parameters = normalize_clean_pr_publication_parameters(parameters)
     files = _relative_paths(parameters.get("files_to_publish"))
     base = _branch(parameters.get("base"), field="base")
     branch = _branch(parameters.get("publication_branch"), field="publication_branch")
@@ -99,7 +174,7 @@ def publish_clean_pull_request(
             "publication_branch must be scoped under the powdrr/ namespace."
         )
     title = _required_text(parameters.get("title"), "title")
-    body = _required_text(parameters.get("body"), "body")
+    description_sections = parameters.get("description_sections")
     require_standard_description = parameters.get("require_standard_pr_description")
     if require_standard_description is not None and not isinstance(
         require_standard_description, bool
@@ -107,6 +182,18 @@ def publish_clean_pull_request(
         raise PowdrrExecutionError(
             "require_standard_pr_description must be a boolean when provided."
         )
+    if require_standard_description and description_sections is None:
+        raise PowdrrExecutionError(
+            "Clean PR publication requires structured description sections."
+        )
+    if description_sections is not None:
+        if not isinstance(description_sections, Mapping):
+            raise PowdrrExecutionError(
+                "description_sections must be an object when provided."
+            )
+        body = render_standard_pr_description(description_sections)
+    else:
+        body = _required_text(parameters.get("body"), "body")
     if require_standard_description:
         validate_standard_pr_description(body)
     commit_message = _required_text(parameters.get("commit_message"), "commit_message")

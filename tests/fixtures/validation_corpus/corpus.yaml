@@ -12,7 +12,7 @@ repositories:
     default_branch: main
     license: NOASSERTION
     license_evidence: GitHub repository metadata reported no SPDX license identifier; the repository has no top-level license file at this revision.
-    coverage: [this-repository, Ruff, mypy, pytest, custom-CI, workflow-scenarios]
+    coverage: [this-repository, Ruff, mypy, pytest, custom-CI, workflow-scenarios, Windows-portable-locks]
     evidence: [.github/workflows/ci.yml, pyproject.toml]
     obligations:
       - id: formatter
@@ -47,16 +47,24 @@ repositories:
         evidence: [.github/workflows/ci.yml]
       - id: procedural-catalog
         profile: validate-procedrr-processes
-        command: []
+        command: [uv, run, powdrr-lift, validate-procedrr-processes]
         cwd: .
-        state: unresolved
+        state: executable
         requiredness: unknown
         evidence: [.github/workflows/ci.yml]
       - id: deterministic-workflow-scenarios
         profile: workflow-scenario-suite
-        command: []
+        command: [./scripts/run-deterministic-workflow-suite.sh]
         cwd: .
-        state: unresolved
+        state: executable
+        requiredness: unknown
+        evidence: [.github/workflows/ci.yml, scripts/run-deterministic-workflow-suite.sh]
+      - id: portable-lock-tests
+        profile: pytest
+        provider: pytest
+        command: [uv, run, pytest, tests/test_file_lock.py, -q]
+        cwd: .
+        state: executable
         requiredness: unknown
         evidence: [.github/workflows/ci.yml]
 
@@ -77,7 +85,7 @@ repositories:
         requiredness: unknown
         evidence: [.github/workflows/doc-check-links.yml, tox.ini]
       - id: dynamic-test-matrix
-        profile: tox-2-${{
+        profile: tox-dynamic-matrix
         command: []
         cwd: .
         state: unresolved
@@ -125,20 +133,20 @@ repositories:
     evidence: [.github/workflows/tests.yml, .github/workflows/check-migrations.yml, tox.ini]
     obligations:
       - id: django-unittest
-        profile: pytest
+        profile: django-unittest
         provider: unittest
-        command: [python, -m, unittest, discover, -v, -s, scripts/]
+        command: [python, -Wall, tests/runtests.py, --settings=test_postgres, -v2]
         cwd: .
         state: executable
         requiredness: unknown
-        evidence: [.github/workflows/tests.yml]
+        evidence: [.github/workflows/coverage_tests.yml]
       - id: migrations
         profile: django-migration-check
         command: []
         cwd: .
         state: unresolved
         requiredness: unknown
-        evidence: [.github/workflows/check-migrations.yml]
+        evidence: [.github/workflows/check-migrations.yml, scripts/check_migrations.py]
 
   - id: poetry
     repository: https://github.com/python-poetry/poetry
@@ -155,14 +163,14 @@ repositories:
         cwd: .
         state: executable
         requiredness: unknown
-        evidence: [.github/workflows/tests.yaml, pyproject.toml]
+        evidence: [.github/workflows/.tests-matrix.yaml, pyproject.toml]
       - id: integration-tests
         profile: pytest
         command: [poetry, run, pytest, --integration, -v]
         cwd: .
         state: executable
         requiredness: unknown
-        evidence: [.github/workflows/tests.yaml, pyproject.toml]
+        evidence: [.github/workflows/.tests-matrix.yaml, pyproject.toml]
 
   - id: uv
     repository: https://github.com/astral-sh/uv
@@ -188,7 +196,7 @@ repositories:
         requiredness: unknown
         evidence: [.github/workflows/check-lint.yml, pyproject.toml]
       - id: reusable-check-workflow
-        profile: reusable-check-workflow
+        profile: reusable-check-fmt
         command: []
         cwd: .
         state: unresolved
@@ -219,7 +227,7 @@ repositories:
     license: MIT
     license_evidence: LICENSE.txt
     coverage: [Hatch, pytest, type-checking, documentation]
-    evidence: [.github/workflows/test.yml, pyproject.toml]
+    evidence: [.github/workflows/test.yml, hatch.toml]
     obligations:
       - id: documentation-build
         profile: hatch-1-docs-build-check
@@ -227,14 +235,14 @@ repositories:
         cwd: .
         state: unresolved
         requiredness: unknown
-        evidence: [.github/workflows/test.yml, pyproject.toml]
+        evidence: [.github/workflows/test.yml, hatch.toml]
       - id: type-check
         profile: hatch-5-types-check
         command: [hatch, run, types:check]
         cwd: .
         state: unresolved
         requiredness: unknown
-        evidence: [.github/workflows/test.yml, pyproject.toml]
+        evidence: [.github/workflows/test.yml, hatch.toml]
 
   - id: conda
     repository: https://github.com/conda/conda
@@ -289,11 +297,18 @@ repositories:
     obligations:
       - id: tox-checks
         profile: tox-py,pypy3,pre-commit
-        command: [tox, -e, py,pypy3,pre-commit]
+        command: [tox, -e, "py,pypy3,pre-commit"]
         cwd: .
         state: executable
         requiredness: unknown
-        evidence: [.github/workflows/main.yml, tox.ini]
+        evidence: [tox.ini]
+      - id: reusable-tox-workflow
+        profile: reusable-main-linux-tox
+        command: []
+        cwd: .
+        state: unresolved
+        requiredness: unknown
+        evidence: [.github/workflows/main.yml]
 
   - id: tox
     repository: https://github.com/tox-dev/tox
@@ -305,14 +320,14 @@ repositories:
     evidence: [.github/workflows/check.yaml, tox.toml, pyproject.toml]
     obligations:
       - id: dynamic-test-matrix
-        profile: tox-1-${{ 
+        profile: tox-dynamic-matrix
         command: []
         cwd: .
         state: unresolved
         requiredness: unknown
-        evidence: [.github/workflows/check.yaml]
+        evidence: [.github/workflows/check.yaml, tox.toml]
       - id: reusable-workflow
-        profile: tox-shared-check-workflow
+        profile: reusable-check-tox-workflow
         command: []
         cwd: .
         state: unresolved

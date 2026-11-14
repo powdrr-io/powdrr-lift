@@ -2,7 +2,7 @@
 
 > **Superseded.** This proposal's OpenCode and feature-endpoint architecture is
 > historical. Current remaining work is defined by [Intent lineage for protected
-> source-reference runs](../intent-source-reference-lineage-spec.md).
+> source-reference runs](../completed/intent-source-reference-lineage-spec.md).
 
 ## Status
 

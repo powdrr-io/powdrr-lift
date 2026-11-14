@@ -1,0 +1,58 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1514
+title: Organize completed plans and remove retired test suite plan
+intent:
+  problem: The lineage plan is complete but remains in the active plans directory, while the retired test suite rationalization plan remains in the active list.
+  goal: Move the completed lineage specification into the completed directory, update its links, and delete the retired test suite plan.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/plans/test-suite-rationalization-audit.md
+  type: deleted
+  span: {start_line: 1, end_line: 137}
+  summary: Delete the retired test suite rationalization plan.
+  rationale: Remove the plan from the active and historical document set as requested.
+- path: docs/design/source-anchored-semantic-contract-compilation.md
+  type: modified
+  span: {start_line: 70, end_line: 71}
+  summary: Point the active design map to the completed lineage plan.
+  rationale: Keep the design reference valid after the move and indicate implementation completion.
+- path: docs/plans/research/acceptance-criteria-template-catalog-proposal.md
+  type: modified
+  span: {start_line: 81, end_line: 81}
+  summary: Update the research proposal link to the completed lineage plan.
+  rationale: Preserve a valid reference without presenting completed implementation as active work.
+- path: docs/plans/superseded/durable-intent-implementation-plan.md
+  type: modified
+  span: {start_line: 5, end_line: 5}
+  summary: Update its link to the completed lineage plan.
+  rationale: Keep the historical document’s current-direction reference working.
+- path: docs/plans/superseded/durable-user-intent-retrieval-and-enforcement.md
+  type: modified
+  span: {start_line: 5, end_line: 5}
+  summary: Update its link to the completed lineage plan.
+  rationale: Keep the historical document’s current-direction reference working.
+- path: docs/plans/superseded/intent-preserving-change-control.md
+  type: modified
+  span: {start_line: 5, end_line: 5}
+  summary: Update its link to the completed lineage plan.
+  rationale: Keep the historical document’s current-direction reference working.
+- path: docs/plans/superseded/intent-preserving-change-implementation-plan.md
+  type: modified
+  span: {start_line: 4, end_line: 4}
+  summary: Update its link to the completed lineage plan.
+  rationale: Keep the historical document’s current-direction reference working.
+- path: docs/plans/superseded/intent-preserving-change-pr-plan.md
+  type: modified
+  span: {start_line: 4, end_line: 4}
+  summary: Update its link to the completed lineage plan.
+  rationale: Keep the historical document’s current-direction reference working.
+- path: docs/plans/superseded/structrr-diff-and-invariant-repair-loop.md
+  type: modified
+  span: {start_line: 5, end_line: 5}
+  summary: Update its link to the completed lineage plan.
+  rationale: Keep the historical document’s current-direction reference working.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []

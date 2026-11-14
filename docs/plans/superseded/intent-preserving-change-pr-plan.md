@@ -1,7 +1,7 @@
 # Intent-Preserving Change Control PR Plan
 
 > **Superseded.** This PR sequence targets the former feature and OpenCode
-> flow. Use [Intent lineage for protected source-reference runs](../intent-source-reference-lineage-spec.md)
+> flow. Use [Intent lineage for protected source-reference runs](../completed/intent-source-reference-lineage-spec.md)
 > for current remaining work.
 
 ## Purpose

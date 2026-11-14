@@ -2,9 +2,9 @@
 
 ## Status
 
-In progress. Milestones 1–3 are implemented; milestone 4 is in verification.
-This specification covers the remaining work to make accepted Structrr intent
-traceable through Powdrr's supported implementation handoff.
+Complete. All four milestones are implemented and verified. The protected
+source-reference route records stable-ID lineage from accepted Structrr intent
+through validation evidence and patch transfer.
 It supersedes the broader intent plans archived in `superseded/`.
 
 ## Purpose
@@ -217,9 +217,8 @@ at least:
   trigger a second worker invocation; and
 - deterministic audit replay for an unchanged record.
 
-Focused schema, run, dispatch, and story-transfer tests pass. The full suite is
-being rerun; this milestone remains open until that run completes and any
-regressions are resolved.
+Focused schema, run, dispatch, and story-transfer tests pass. The full suite
+passes with 2,799 tests passed and 16 skipped.
 
 ## Completion criteria
 

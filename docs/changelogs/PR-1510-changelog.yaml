@@ -9,39 +9,209 @@ structured_files: []
 files:
 - path: docs/plans/intent-source-reference-lineage-spec.md
   type: modified
-  span: {start_line: 1, end_line: 255}
-  summary: Record stable-ID schema and implementation milestone status.
-  rationale: Keep the plan aligned with the delivered schema and current implementation state.
+  span: {start_line: 5, end_line: 7}
+  summary: Mark all four implementation milestones complete.
+  rationale: Record the verified stable-ID lineage delivery status.
+- path: docs/plans/intent-source-reference-lineage-spec.md
+  type: modified
+  span: {start_line: 69, end_line: 120}
+  summary: Define the stable-ID lineage schema and artifact identities.
+  rationale: Prevent unrelated content changes from breaking lineage links.
+- path: docs/plans/intent-source-reference-lineage-spec.md
+  type: modified
+  span: {start_line: 127, end_line: 128}
+  summary: Clarify fingerprints are integrity metadata.
+  rationale: Keep fingerprints out of semantic joins.
+- path: docs/plans/intent-source-reference-lineage-spec.md
+  type: modified
+  span: {start_line: 135, end_line: 138}
+  summary: Require resolved links between stable artifact IDs.
+  rationale: Make lineage links independently auditable.
+- path: docs/plans/intent-source-reference-lineage-spec.md
+  type: modified
+  span: {start_line: 144, end_line: 146}
+  summary: Specify deterministic stable-ID audit behavior.
+  rationale: Make acceptance depend on resolved artifacts and validated outcomes.
+- path: docs/plans/intent-source-reference-lineage-spec.md
+  type: modified
+  span: {start_line: 163, end_line: 163}
+  summary: Mark schema milestone implemented.
+  rationale: Reflect delivered schema work.
+- path: docs/plans/intent-source-reference-lineage-spec.md
+  type: modified
+  span: {start_line: 172, end_line: 176}
+  summary: Record schema audit implementation details.
+  rationale: Point to the implementation and stable-ID join rule.
+- path: docs/plans/intent-source-reference-lineage-spec.md
+  type: modified
+  span: {start_line: 186, end_line: 190}
+  summary: Record Workrr lineage persistence behavior.
+  rationale: Describe frozen inputs and terminal integrity binding.
+- path: docs/plans/intent-source-reference-lineage-spec.md
+  type: modified
+  span: {start_line: 199, end_line: 202}
+  summary: Record pre-transfer dispatch audit behavior.
+  rationale: Document the fail-closed patch gate.
+- path: docs/plans/intent-source-reference-lineage-spec.md
+  type: modified
+  span: {start_line: 220, end_line: 223}
+  summary: Record focused and full-suite verification results.
+  rationale: Close the final milestone after all project tests pass.
 - path: packages/service/src/powdrr_service/structrr/source_run_lineage.py
   type: added
   span: {start_line: 1, end_line: 760}
   summary: Define and audit stable-ID source-run lineage records.
   rationale: Connect reviewed design obligations, cases, evidence, attempts, candidates, patches, and transfer decisions by durable domain IDs.
-- path: src/powdrr_lift/workrr/source_reference_run.py
-  type: modified
-  span: {start_line: 1, end_line: 1421}
-  summary: Persist private lineage records and audit results for protected runs.
-  rationale: Build lineage from frozen Workrr inputs and bind its integrity fingerprint into terminal evidence.
-- path: src/powdrr_lift/workrr/source_reference_dispatch.py
-  type: modified
-  span: {start_line: 1, end_line: 536}
-  summary: Audit stable-ID lineage and patch transfer eligibility before applying a candidate.
-  rationale: Prevent transfer when the run graph or exact proposed patch fails audit.
 - path: src/powdrr_lift/workrr/coding_agent.py
   type: modified
-  span: {start_line: 1030, end_line: 1055}
+  span: {start_line: 1050, end_line: 1058}
   summary: Pass worktree source paths into protected worker subprocesses.
-  rationale: Let subprocesses using the shared interpreter load the correct worktree packages.
+  rationale: Let subprocesses using the shared interpreter load current worktree packages.
+- path: src/powdrr_lift/workrr/source_reference_dispatch.py
+  type: modified
+  span: {start_line: 21, end_line: 21}
+  summary: Import lineage construction and audit functions.
+  rationale: Integrate stable-ID graph validation into dispatch.
+- path: src/powdrr_lift/workrr/source_reference_dispatch.py
+  type: modified
+  span: {start_line: 23, end_line: 27}
+  summary: Import source-run graph builder and auditor.
+  rationale: Integrate stable-ID graph validation into dispatch.
+- path: src/powdrr_lift/workrr/source_reference_dispatch.py
+  type: modified
+  span: {start_line: 185, end_line: 187}
+  summary: Capture the committed design blob identity.
+  rationale: Bind the run to its reviewed design artifact.
+- path: src/powdrr_lift/workrr/source_reference_dispatch.py
+  type: modified
+  span: {start_line: 293, end_line: 300}
+  summary: Pass plan, item, workflow, and design identities into Workrr.
+  rationale: Build lineage from stable source identities.
+- path: src/powdrr_lift/workrr/source_reference_dispatch.py
+  type: modified
+  span: {start_line: 321, end_line: 322}
+  summary: Surface source-run lineage status in dispatch results.
+  rationale: Make audit findings reviewable.
+- path: src/powdrr_lift/workrr/source_reference_dispatch.py
+  type: modified
+  span: {start_line: 410, end_line: 448}
+  summary: Verify lineage integrity and audit frozen source-run links.
+  rationale: Stop dispatch when the record is altered or incomplete.
+- path: src/powdrr_lift/workrr/source_reference_dispatch.py
+  type: modified
+  span: {start_line: 505, end_line: 527}
+  summary: Bind the proposed patch and transfer decision into lineage.
+  rationale: Audit the exact patch before applying it.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span: {start_line: 43, end_line: 46}
+  summary: Import source-run lineage builder and auditor.
+  rationale: Generate lineage from Workrr-owned state.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span: {start_line: 438, end_line: 438}
+  summary: Attach stable case IDs to route evidence.
+  rationale: Link verified obligations to their cases.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span: {start_line: 448, end_line: 448}
+  summary: Attach stable case IDs to preservation evidence.
+  rationale: Preserve case-level lineage for protected obligations.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span: {start_line: 505, end_line: 506}
+  summary: Retain frozen lineage inputs on the run object.
+  rationale: Prevent worker output from supplying authoritative lineage fields.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span: {start_line: 536, end_line: 536}
+  summary: Accept lineage context during run preparation.
+  rationale: Bind the run to stable workflow and design identities.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span: {start_line: 691, end_line: 696}
+  summary: Freeze design and lineage inputs during run setup.
+  rationale: Build the record from accepted Workrr inputs.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span: {start_line: 737, end_line: 737}
+  summary: Include lineage context in the sealed run configuration.
+  rationale: Retain the run identity binding privately.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span: {start_line: 745, end_line: 745}
+  summary: Persist frozen lineage context as a private artifact.
+  rationale: Keep lineage evidence outside the worker-visible workspace.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span: {start_line: 1386, end_line: 1416}
+  summary: Build and audit lineage when finalizing the terminal result.
+  rationale: Fail closed on invalid lineage and bind record integrity into terminal evidence.
+- path: tests/test_source_reference_dispatch.py
+  type: modified
+  span: {start_line: 14, end_line: 14}
+  summary: Import helpers for lineage-bound dispatch tests.
+  rationale: Validate integrity checks at the transfer boundary.
+- path: tests/test_source_reference_dispatch.py
+  type: modified
+  span: {start_line: 16, end_line: 16}
+  summary: Import the source lineage graph builder.
+  rationale: Create integrity-bound fake run records in dispatch tests.
+- path: tests/test_source_reference_dispatch.py
+  type: modified
+  span: {start_line: 149, end_line: 182}
+  summary: Create a minimal private lineage fixture.
+  rationale: Exercise exact run record verification.
+- path: tests/test_source_reference_dispatch.py
+  type: modified
+  span: {start_line: 337, end_line: 337}
+  summary: Include lineage in dispatch fake run results.
+  rationale: Keep existing dispatch tests aligned with the new terminal contract.
+- path: tests/test_source_reference_dispatch.py
+  type: modified
+  span: {start_line: 343, end_line: 343}
+  summary: Return the lineage integrity fingerprint from fake runs.
+  rationale: Keep existing dispatch tests aligned with the new terminal contract.
+- path: tests/test_source_reference_dispatch.py
+  type: modified
+  span: {start_line: 355, end_line: 355}
+  summary: Stub committed design blob lookup in dispatch tests.
+  rationale: Test stable design identity capture.
+- path: tests/test_source_reference_dispatch.py
+  type: modified
+  span: {start_line: 384, end_line: 385}
+  summary: Stub committed design blob lookup in dispatch tests.
+  rationale: Test stable design identity capture.
+- path: tests/test_source_reference_dispatch.py
+  type: modified
+  span: {start_line: 467, end_line: 467}
+  summary: Update retry fake runs with lineage records.
+  rationale: Preserve failure and retry test coverage under the new contract.
+- path: tests/test_source_reference_dispatch.py
+  type: modified
+  span: {start_line: 477, end_line: 477}
+  summary: Assign a stable run ID in retry fake runs.
+  rationale: Keep retry fakes aligned with the lineage schema.
+- path: tests/test_source_reference_dispatch.py
+  type: modified
+  span: {start_line: 479, end_line: 480}
+  summary: Create lineage records for successful retry attempts.
+  rationale: Keep retry fakes aligned with the lineage schema.
+- path: tests/test_source_reference_dispatch.py
+  type: modified
+  span: {start_line: 492, end_line: 494}
+  summary: Include lineage integrity in retry terminal results.
+  rationale: Verify exact run integrity during dispatch.
+- path: tests/test_source_reference_dispatch.py
+  type: modified
+  span: {start_line: 566, end_line: 645}
+  summary: Test fail-closed dispatch on a tampered lineage graph.
+  rationale: Verify an invalid graph leaves the caller checkout unchanged.
 - path: tests/test_source_run_lineage.py
   type: added
   span: {start_line: 1, end_line: 160}
-  summary: Cover stable identifiers, resolved graph links, candidate evidence, and transfer checks.
+  summary: Cover stable IDs, graph resolution, evidence routing, and transfer checks.
   rationale: Ensure fingerprint changes do not sever stable-ID links and invalid graphs fail audit.
-- path: tests/test_source_reference_dispatch.py
-  type: modified
-  span: {start_line: 1, end_line: 873}
-  summary: Verify tampered lineage blocks dispatch without changing the task checkout.
-  rationale: Exercise the fail-closed transfer boundary.
 entities:
 - id: structrr-source-run-lineage
   type: Module

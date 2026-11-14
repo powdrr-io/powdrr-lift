@@ -1,0 +1,157 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1519
+title: Bind plan compilation to runtime execution preparation
+intent:
+  problem: Planning validates source-reference designs separately from the preparation that runtime reconstructs, and dependency readiness can be checked against stale remote state.
+  goal: Carry one deterministic preparation contract from planning through execution and resolve dependency readiness against the refreshed execution base before a task is claimed.
+human-decisions: []
+structured_files: []
+files:
+  - path: packages/service/src/powdrr_service/structrr/execution_preparation.py
+    type: added
+    span: {start_line: 1, end_line: 195}
+    summary: Compile and validate a deterministic source-reference preparation contract.
+    rationale: Share scope, command, catalog, evidence-route, and design checks between planning and runtime.
+  - path: packages/service/src/powdrr_service/planning/source_reference_design.py
+    type: modified
+    span: {start_line: 10, end_line: 13}
+    summary: Import the shared preparation compiler and command parser.
+    rationale: Keep plan artifact preparation on the same service-owned path as runtime.
+  - path: packages/service/src/powdrr_service/planning/source_reference_design.py
+    type: modified
+    span: {start_line: 59, end_line: 60}
+    summary: Accept the plan verification command and unresolved dependency preconditions.
+    rationale: Include these accepted values in preparation identity.
+  - path: packages/service/src/powdrr_service/planning/source_reference_design.py
+    type: modified
+    span: {start_line: 188, end_line: 195}
+    summary: Embed the shared preparation contract in each executable reviewed design.
+    rationale: Preserve the exact preparation value with the accepted plan artifact.
+  - path: packages/service/src/powdrr_service/planning/compiler.py
+    type: modified
+    span: {start_line: 208, end_line: 212}
+    summary: Compile and validate item preparation using the plan verification command and dependency set.
+    rationale: Fail plan compilation when the accepted design cannot satisfy runtime preparation.
+  - path: packages/service/src/powdrr_service/planning/compiler.py
+    type: modified
+    span: {start_line: 393, end_line: 397}
+    summary: Recompute the preparation contract during plan artifact validation.
+    rationale: Detect changes between initial compilation and publication.
+  - path: packages/service/src/powdrr_service/planning/compiler.py
+    type: modified
+    span: {start_line: 439, end_line: 444}
+    summary: Validate the preparation schema in generated workflow context.
+    rationale: Ensure runtime knows the reviewed task requires a preparation contract.
+  - path: packages/service/src/powdrr_service/planning/compiler.py
+    type: modified
+    span: {start_line: 501, end_line: 501}
+    summary: Mark source-reference workflow items with the preparation schema.
+    rationale: Require contract verification for newly compiled items.
+  - path: src/powdrr_lift/workrr/source_reference_dispatch.py
+    type: modified
+    span: {start_line: 23, end_line: 26}
+    summary: Import preparation parsing and validation helpers.
+    rationale: Verify the accepted contract before source dispatch.
+  - path: src/powdrr_lift/workrr/source_reference_dispatch.py
+    type: modified
+    span: {start_line: 74, end_line: 83}
+    summary: Preserve the design loader and add a contract-aware loader.
+    rationale: Read reviewed contract data from committed base blobs.
+  - path: src/powdrr_lift/workrr/source_reference_dispatch.py
+    type: modified
+    span: {start_line: 97, end_line: 107}
+    summary: Allow only known preparation metadata in the committed design document.
+    rationale: Reject malformed or unrecognized reviewed artifacts.
+  - path: src/powdrr_lift/workrr/source_reference_dispatch.py
+    type: modified
+    span: {start_line: 120, end_line: 123}
+    summary: Return the recorded preparation contract from the base artifact.
+    rationale: Bind dispatch to the accepted plan value.
+  - path: src/powdrr_lift/workrr/source_reference_dispatch.py
+    type: modified
+    span: {start_line: 212, end_line: 242}
+    summary: Validate source preparation before dispatching a coding run.
+    rationale: Fail on objective, command, scope, or dependency-contract drift.
+  - path: src/powdrr_lift/workrr/source_reference_dispatch.py
+    type: modified
+    span: {start_line: 362, end_line: 367}
+    summary: Pass the accepted preparation into runtime preparation.
+    rationale: Compare runtime handoff against the reviewed plan contract.
+  - path: src/powdrr_lift/workrr/source_reference_run.py
+    type: modified
+    span: {start_line: 552, end_line: 552}
+    summary: Accept the reviewed preparation contract in SourceReferenceRun.prepare.
+    rationale: Make the accepted contract available to runtime handoff validation.
+  - path: src/powdrr_lift/workrr/source_reference_run.py
+    type: modified
+    span: {start_line: 681, end_line: 689}
+    summary: Compare runtime worker obligations with reviewed obligations.
+    rationale: Require an amendment when runtime reconstruction changes accepted meaning.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span: {start_line: 2750, end_line: 2750}
+    summary: Store one exact execution base on the task strategy.
+    rationale: Keep execution on the commit validated before claiming the task.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span: {start_line: 3745, end_line: 3748}
+    summary: Reuse the captured execution base during implementation.
+    rationale: Avoid silently resolving a different base after claim.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span: {start_line: 5494, end_line: 5502}
+    summary: Resolve and refresh the workflow context before checking dependencies.
+    rationale: Evaluate readiness using current remote refs.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span: {start_line: 5504, end_line: 5504}
+    summary: Resolve the project root from the refreshed workflow checkout.
+    rationale: Keep dependency checks aligned with the integration worktree.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span: {start_line: 5506, end_line: 5506}
+    summary: Check dependency completion after refresh.
+    rationale: Avoid stale dependency readiness.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span: {start_line: 5512, end_line: 5518}
+    summary: Remove the pre-refresh dependency check.
+    rationale: Ensure only the refreshed dependency result gates execution.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span: {start_line: 5634, end_line: 5688}
+    summary: Validate reviewed preparation against the exact execution base before task claim.
+    rationale: Prevent coding from starting when the committed contract is missing or has drifted.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span: {start_line: 5864, end_line: 5864}
+    summary: Pass the captured execution base into the task strategy.
+    rationale: Bind implementation dispatch to the validated commit.
+  - path: tests/test_planning_compiler.py
+    type: modified
+    span: {start_line: 30, end_line: 33}
+    summary: Import preparation parsing and validation for contract assertions.
+    rationale: Exercise shared validation behavior.
+  - path: tests/test_planning_compiler.py
+    type: modified
+    span: {start_line: 131, end_line: 156}
+    summary: Verify preparation round trips and rejects objective drift.
+    rationale: Protect the reviewed preparation identity.
+entities:
+  - id: compile-execution-preparation
+    type: Function
+    action: added
+  - id: validate-execution-preparation
+    type: Function
+    action: added
+entity_relationships: []
+invariants:
+  - id: reviewed-preparation-identity
+    description: Runtime preparation must match the preparation recorded with the reviewed source design.
+    action: added
+    rationale: Material interpretation changes require a reviewed plan amendment.
+  - id: current-dependency-readiness
+    description: Workflow dependencies are checked only after remote refs have been refreshed.
+    action: added
+    rationale: Readiness must be based on the latest fetched target branch and merged predecessors.
+guidance: []

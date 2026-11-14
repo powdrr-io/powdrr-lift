@@ -30,6 +30,7 @@ def render_ci_observation_checkpoint(
     failures: Sequence[CIFailureUnit] | None = None,
     reproductions: dict[str, LocalReproduction] | None = None,
     observed_at: str | None = None,
+    pull_request_draft: bool | None = None,
 ) -> tuple[str, str]:
     """Return a deterministic observation ID and bounded issue comment."""
     units = (
@@ -41,6 +42,7 @@ def render_ci_observation_checkpoint(
         "issue": issue_number,
         "head_sha": head_sha,
         "jobs": [job.to_dict() for job in jobs],
+        "pull_request_draft": pull_request_draft,
         "reproductions": {
             failure_id: result.to_dict()
             for failure_id, result in sorted((reproductions or {}).items())
@@ -64,6 +66,12 @@ def render_ci_observation_checkpoint(
         rows.append(
             "No completed failed Actions jobs were found for the current PR head."
         )
+    if pull_request_draft is True:
+        rows.insert(
+            0,
+            "The PR is a draft; required checks may not start until it is marked "
+            "ready for review.",
+        )
     body = "\n".join(
         (
             _CHECKPOINT_MARKER,
@@ -75,7 +83,10 @@ def render_ci_observation_checkpoint(
             *rows,
             "",
             "This checkpoint records observed CI evidence only; it does not mark "
-            "the PR ready for review.",
+            "the PR ready for review."
+            if pull_request_draft is not True
+            else "This checkpoint records observed CI evidence only; the PR remains "
+            "a draft and is not ready for review.",
         )
     )
     return observation_id, body

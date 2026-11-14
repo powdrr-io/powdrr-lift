@@ -26,6 +26,8 @@ def test_response_command_writes_idempotent_runner_failure_checkpoint(
                 repository="example/project",
                 pull_request={
                     "html_url": "https://github.com/example/project/pull/270",
+                    "body": "Closes #107",
+                    "draft": True,
                     "head": {"sha": head_sha},
                 },
                 runs=(
@@ -62,7 +64,7 @@ def test_response_command_writes_idempotent_runner_failure_checkpoint(
             )
 
         def get_issue(self, _number: int) -> dict[str, str]:
-            return {"body": "Tracking GitHub PR #270"}
+            return {"body": "Tracking implementation request"}
 
         def list_issue_comments(self, _number: int) -> tuple[dict[str, str], ...]:
             return tuple({"body": body} for body in comment_bodies)
@@ -86,6 +88,8 @@ def test_response_command_writes_idempotent_runner_failure_checkpoint(
     assert cli._run_respond_to_pr_ci(args) == 0
     first = json.loads(capsys.readouterr().out)
     assert first["checkpoint_written"] is True
+    assert first["pull_request_metadata"]["draft"] is True
+    assert "PR is a draft" in comment_bodies[0]
     assert first["failures"][0]["phase"] == "runner_provisioning"
     assert (
         first["failures"][0]["local_reproduction"]["status"] == "not_executable_locally"
@@ -115,6 +119,58 @@ def test_response_command_writes_idempotent_runner_failure_checkpoint(
     )
     assert cli._run_respond_to_pr_ci(url_args) == 0
     assert json.loads(capsys.readouterr().out)["pull_request"] == 270
+
+
+def test_response_command_retries_issue_link_lookup_for_eventual_consistency(
+    monkeypatch: Any, capsys: Any
+) -> None:
+    head_sha = "6c85b1e5c334a113b3db274b2c1b7a8f350b9707"
+    comment_reads = 0
+    checkpoints: list[str] = []
+
+    class DelayedIssueLinkClient:
+        def __init__(self, _repository: str) -> None:
+            pass
+
+        def get_issue(self, _number: int) -> dict[str, str]:
+            return {"body": "Tracking implementation request"}
+
+        def list_issue_comments(self, _number: int) -> tuple[dict[str, str], ...]:
+            nonlocal comment_reads
+            comment_reads += 1
+            if comment_reads == 1:
+                return ()
+            return ({"body": "Powdrr PR: #270"},)
+
+        def observe_pull_request(self, _number: int) -> GitHubActionsSnapshot:
+            return GitHubActionsSnapshot(
+                repository="example/project",
+                pull_request={
+                    "html_url": "https://github.com/example/project/pull/270",
+                    "head": {"sha": head_sha},
+                },
+                runs=(),
+                jobs_by_run={},
+                annotations_by_check_run={},
+            )
+
+        def add_issue_comment(self, _number: int, body: str) -> None:
+            checkpoints.append(body)
+
+    monkeypatch.setattr(cli, "GitHubActionsClient", DelayedIssueLinkClient)
+    monkeypatch.setattr(cli.time, "sleep", lambda _delay: None)
+    monkeypatch.setattr(
+        cli,
+        "_prepare_ci_observation_worktree",
+        lambda *_args, **_kwargs: (cli.Path.cwd(), cli.Path.cwd()),
+    )
+    args = Namespace(repository="example/project", pr=270, pr_url=None, issue=107)
+
+    assert cli._run_respond_to_pr_ci(args) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result["pull_request"] == 270
+    assert comment_reads == 2
+    assert len(checkpoints) == 1
 
 
 def test_response_command_rejects_pull_request_url_from_another_repository(

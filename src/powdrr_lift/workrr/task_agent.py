@@ -2747,6 +2747,7 @@ class _TaskWorkflowExecutionStrategy:
     runtime: ExecutionRuntime | None = None
     deterministic_output_state: Any = None
     requires_deterministic_output_state: bool = False
+    execution_base_commit: str | None = None
     response_correction: str | None = None
     compacted_context: dict[str, Any] | None = None
     observer_intervention: str | None = None
@@ -3741,10 +3742,10 @@ class _TaskWorkflowExecutionStrategy:
         workflow_id = str(self.task.input_state.get("proposed_pr_id", ""))
         if not workflow_id.strip():
             raise PowdrrExecutionError("proposed PR ID must not be empty")
-        base_commit = _workflow_base_commit(
-            self.repo_root,
-            self.workflow.directory,
-            workflow_id=workflow_id,
+        base_commit = getattr(
+            self, "execution_base_commit", None
+        ) or _workflow_base_commit(
+            self.repo_root, self.workflow.directory, workflow_id=workflow_id
         )
         plan_defect_evidence = _preflight_reviewed_file_creation_conflicts(
             self.repo_root,
@@ -5490,16 +5491,19 @@ def run_workflow_task(
                     f"{configured_git_state.proposed_pr_id}",
                     file=stdout,
                 )
+        repo_root, workflow_dir = _resolve_workflow_task_context(
+            config,
+            configured_repo_root=configured_repo_root,
+            workflow_git_state=configured_git_state,
+            stdout=stdout,
+            stderr=stderr,
+        )
+        # Resolving workflow context refreshes origin/main and synchronizes the
+        # integration worktree. Dependency readiness must use that current view.
         if configured_git_state is not None:
-            project_root = resolve_project_root(
-                configured_repo_root,
-                configured_repo_root,
-            )
+            project_root = resolve_project_root(configured_repo_root, repo_root)
             dependencies_complete, incomplete_dependencies = (
-                workflow_dependencies_completion(
-                    project_root,
-                    configured_git_state,
-                )
+                workflow_dependencies_completion(project_root, configured_git_state)
             )
             if not dependencies_complete:
                 print(
@@ -5509,13 +5513,6 @@ def run_workflow_task(
                 for dependency in incomplete_dependencies:
                     print(f"  - {dependency}", file=stderr)
                 return 1
-        repo_root, workflow_dir = _resolve_workflow_task_context(
-            config,
-            configured_repo_root=configured_repo_root,
-            workflow_git_state=configured_git_state,
-            stdout=stdout,
-            stderr=stderr,
-        )
     except WorkflowGitInconsistency as exc:
         print(
             "Workflow Git state is inconsistent; no task work was started.",
@@ -5633,6 +5630,61 @@ def run_workflow_task(
                 return 1
             print("No ready agent task found.", file=stderr)
             return 1
+
+        execution_base_commit: str | None = None
+        proposed_context = task.input_state.get("proposed_pr_context")
+        if (
+            workflow_git_state is not None
+            and isinstance(proposed_context, Mapping)
+            and proposed_context.get("execution_preparation_schema")
+            == "source-reference-preparation-v1"
+        ):
+            from powdrr_lift.workrr.source_reference_dispatch import (
+                load_reviewed_source_design_contract,
+            )
+
+            execution_base_commit = _workflow_base_commit(
+                repo_root,
+                workflow_dir,
+                workflow_id=workflow_git_state.proposed_pr_id,
+            )
+            try:
+                _, design, preparation = load_reviewed_source_design_contract(
+                    repo_root, proposed_context, base_commit=execution_base_commit
+                )
+                if preparation is None:
+                    raise ValueError("reviewed source design has no preparation")
+                from powdrr_service.structrr.execution_preparation import (
+                    parse_command_spec,
+                    validate_execution_preparation,
+                )
+
+                validate_execution_preparation(
+                    preparation,
+                    design,
+                    planning_base_commit=str(
+                        preparation.get("planning_base_commit", "")
+                    ),
+                    objective=str(proposed_context.get("objective", "")),
+                    allowed_paths=tuple(proposed_context.get("allowed_paths", ())),
+                    verification_commands=(
+                        parse_command_spec(
+                            str(proposed_context.get("verification_command", ""))
+                        ),
+                    ),
+                    dependency_preconditions=tuple(
+                        {"dependency_item_id": dependency, "status": "unresolved"}
+                        for dependency in proposed_context.get("dependencies", ())
+                    ),
+                )
+            except (TypeError, ValueError, PowdrrExecutionError) as error:
+                print(
+                    "Reviewed execution preparation is invalid; "
+                    "task remains unclaimed.",
+                    file=stderr,
+                )
+                print(str(error), file=stderr)
+                return 1
 
         provider = resolve_workflow_provider(config.provider)
         mappings = tuple(default_llm_mappings(provider).items())
@@ -5809,6 +5861,7 @@ def run_workflow_task(
             events=driver_events,
             deterministic_output_state=deterministic_output_state,
             requires_deterministic_output_state=requires_deterministic_output_state,
+            execution_base_commit=execution_base_commit,
         )
         process_client = ProcedrrModelClient(
             task_client,

@@ -20,6 +20,10 @@ from powdrr_agent.execution.execute_pr_tests import (
 from powdrr_local.miniswe_inference import create_miniswe_inference_handler
 from powdrr_service.decision_obligation import content_fingerprint
 from powdrr_service.planning.plan_models import source_reference_design_file
+from powdrr_service.structrr.execution_preparation import (
+    parse_command_spec,
+    validate_execution_preparation,
+)
 from powdrr_service.structrr.source_run_lineage import (
     audit_source_run_lineage,
     bind_source_run_patch,
@@ -67,6 +71,16 @@ def load_reviewed_source_design(
     repo_root: Path, proposed: Mapping[str, Any], *, base_commit: str
 ) -> tuple[str, dict[str, Any]]:
     """Read accepted intent from a regular committed blob, never candidate files."""
+    path, design, _ = load_reviewed_source_design_contract(
+        repo_root, proposed, base_commit=base_commit
+    )
+    return path, design
+
+
+def load_reviewed_source_design_contract(
+    repo_root: Path, proposed: Mapping[str, Any], *, base_commit: str
+) -> tuple[str, dict[str, Any], dict[str, Any] | None]:
+    """Read reviewed design and its static preparation contract from the base."""
     path = source_reference_design_file(proposed.get("source_reference_design_file"))
     if not re.fullmatch(r"[a-f0-9]{40}", base_commit):
         raise ValueError("Source task requires an exact Git base commit")
@@ -80,7 +94,17 @@ def load_reviewed_source_design(
     document = yaml.safe_load(_git(repo_root, "show", blob))
     if (
         not isinstance(document, dict)
-        or set(document) != {"schema_version", "plan_id", "item_id", "design"}
+        or not {"schema_version", "plan_id", "item_id", "design"}.issubset(document)
+        or set(document)
+        - {
+            "schema_version",
+            "plan_id",
+            "item_id",
+            "design",
+            "preparation",
+            "status",
+            "amendment_requirement",
+        }
         or document["schema_version"] != DESIGN_SCHEMA
         or not isinstance(document["design"], dict)
         or any(
@@ -93,7 +117,10 @@ def load_reviewed_source_design(
         raise ValueError(
             "Committed source design does not match the reviewed plan item"
         )
-    return path, document["design"]
+    preparation = document.get("preparation")
+    if preparation is not None and not isinstance(preparation, dict):
+        raise ValueError("Committed source design preparation is malformed")
+    return path, document["design"], preparation
 
 
 class _ReferenceReviewer:
@@ -182,6 +209,37 @@ def dispatch_source_reference_task(
     design_path, design = load_reviewed_source_design(
         repo_root, proposed, base_commit=base_commit
     )
+    preparation: dict[str, Any] | None = None
+    if (
+        proposed.get("execution_preparation_schema")
+        == "source-reference-preparation-v1"
+    ):
+        design_path, design, preparation = load_reviewed_source_design_contract(
+            repo_root, proposed, base_commit=base_commit
+        )
+        if preparation is None:
+            raise PowdrrExecutionError(
+                "Reviewed source design has no shared execution preparation contract"
+            )
+        try:
+            validate_execution_preparation(
+                preparation,
+                design,
+                planning_base_commit=str(preparation.get("planning_base_commit", "")),
+                objective=str(proposed.get("objective", objective)),
+                allowed_paths=allowed_paths,
+                verification_commands=(
+                    parse_command_spec(
+                        str(proposed.get("verification_command", "python -m pytest"))
+                    ),
+                ),
+                dependency_preconditions=tuple(
+                    {"dependency_item_id": dependency, "status": "unresolved"}
+                    for dependency in proposed.get("dependencies", ())
+                ),
+            )
+        except (TypeError, ValueError) as error:
+            raise PowdrrExecutionError(str(error)) from error
     design_blob_id = (
         _git(repo_root, "rev-parse", f"{base_commit}:{design_path}").decode().strip()
     )
@@ -301,6 +359,12 @@ def dispatch_source_reference_task(
             model=model,
             worker_timeout_seconds=worker_timeout_seconds,
             validation_timeout_seconds=validation_timeout_seconds,
+            accepted_preparation=(
+                preparation
+                if proposed.get("execution_preparation_schema")
+                == "source-reference-preparation-v1"
+                else None
+            ),
             review_client=_ReferenceReviewer(review_client),
             readonly_support_files=test_sources,
             post_worker_reconciler=lambda current_run: reconcile_source_task(

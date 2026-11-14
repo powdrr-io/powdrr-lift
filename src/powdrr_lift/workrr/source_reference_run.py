@@ -549,6 +549,7 @@ class SourceReferenceRun:
         test_collection_evidence: dict[str, Any] | None = None,
         reader_limits: ReaderLimits | None = None,
         readonly_support_files: Mapping[str, str] | None = None,
+        accepted_preparation: Mapping[str, Any] | None = None,
         post_worker_reconciler: (
             Callable[[SourceReferenceRun], Mapping[str, Any] | None] | None
         ) = None,
@@ -677,6 +678,15 @@ class SourceReferenceRun:
             private_validation_data=private_inputs,
             workspace_root=str(self.workspace_root),
         )
+        if accepted_preparation is not None:
+            runtime_contract = dict(self.handoff.to_data()["worker_prompt"]["contract"])
+            runtime_contract.pop("base_commit", None)
+            runtime_contract.pop("catalog_digest", None)
+            if runtime_contract != accepted_preparation.get("accepted_contract"):
+                raise ValueError(
+                    "runtime preparation differs from the reviewed plan; a plan "
+                    "amendment is required"
+                )
         self.request = replace(
             ImplementationRequest.from_source_reference_handoff(
                 self.handoff,

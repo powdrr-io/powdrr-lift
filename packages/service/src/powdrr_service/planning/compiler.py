@@ -205,6 +205,11 @@ def compile_plan(
                     base_commit=base_commit,
                     objective=item.objective,
                     allowed_paths=item.allowed_paths,
+                    verification_command=verification_command,
+                    dependency_preconditions=tuple(
+                        {"dependency_item_id": dependency, "status": "unresolved"}
+                        for dependency in item.dependencies
+                    ),
                 )
             except (TypeError, ValueError) as error:
                 raise PlanningCompilationError(
@@ -385,6 +390,11 @@ def validate_compiled_plan(
                     base_commit=base_commit,
                     objective=item.objective,
                     allowed_paths=item.allowed_paths,
+                    verification_command=compiled.verification_command,
+                    dependency_preconditions=tuple(
+                        {"dependency_item_id": dependency, "status": "unresolved"}
+                        for dependency in item.dependencies
+                    ),
                 )
                 actual_design = yaml.safe_load(compiled.files[design_path])
                 if actual_design != expected_design:
@@ -426,6 +436,12 @@ def validate_compiled_plan(
                     ("structrr_proposal_file", compiled.proposal_path),
                     ("item_id", item.item_id),
                     ("source_reference_design_file", item.source_reference_design_file),
+                    (
+                        "execution_preparation_schema",
+                        "source-reference-preparation-v1"
+                        if item.source_reference_design_file
+                        else None,
+                    ),
                     ("title", item.title),
                     ("objective", item.objective),
                     ("scope", list(item.scope)),
@@ -482,6 +498,7 @@ def _workflow_definition(
     }
     if item.source_reference_design_file is not None:
         context["source_reference_design_file"] = item.source_reference_design_file
+        context["execution_preparation_schema"] = "source-reference-preparation-v1"
     if item.manual_prerequisite is not None:
         context["manual_prerequisite"] = dict(item.manual_prerequisite)
     if item.story_refs:

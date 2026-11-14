@@ -132,6 +132,81 @@ def test_pytest_provider_executes_exact_selector(
     assert result.returncode == 0
 
 
+def test_pytest_provider_reports_failed_subprocess_result(tmp_path: Path) -> None:
+    tests = tmp_path / "tests"
+    tests.mkdir()
+    (tests / "test_failure.py").write_text(
+        "def test_failure():\n    assert False\n", encoding="utf-8"
+    )
+
+    result = PytestVerificationProvider().execute(
+        VerificationProviderRequest(
+            "pytest",
+            "tests/test_failure.py::test_failure",
+            "pytest",
+            tmp_path,
+            command=("python", "-m", "pytest", "-q"),
+        )
+    )
+
+    assert result.status == "failed"
+    assert result.returncode != 0
+    assert "pytest exited with" in (result.error or "")
+
+
+def test_pytest_provider_records_timeout_and_removes_temporary_report(
+    tmp_path: Path, monkeypatch: Any
+) -> None:
+    (tmp_path / "tests").mkdir()
+    junit_paths: list[Path] = []
+
+    def timeout(
+        command: Sequence[str], **_kwargs: Any
+    ) -> subprocess.CompletedProcess[str]:
+        junit_paths.append(
+            Path(
+                next(
+                    arg.split("=", 1)[1]
+                    for arg in command
+                    if arg.startswith("--junitxml=")
+                )
+            )
+        )
+        raise subprocess.TimeoutExpired(command, timeout=1)
+
+    monkeypatch.setattr(
+        "powdrr_agent.execution.verification_provider.subprocess.run", timeout
+    )
+    result = PytestVerificationProvider().execute(
+        VerificationProviderRequest(
+            "pytest", "tests/test_slow.py::test_slow", "pytest", tmp_path
+        )
+    )
+
+    assert result.status == "timed_out"
+    assert result.returncode == 124
+    assert junit_paths and not junit_paths[0].exists()
+
+
+def test_pytest_provider_does_not_execute_declared_shell_profile(
+    tmp_path: Path,
+) -> None:
+    request = VerificationProviderRequest(
+        "pytest",
+        "tests/test_sample.py::test_first",
+        "pytest",
+        tmp_path,
+        execution_kind="shell",
+        shell="bash",
+        script="pytest tests",
+    )
+
+    result = PytestVerificationProvider().execute(request)
+
+    assert result.status == "errored"
+    assert "argv profile" in (result.error or "")
+
+
 def test_stestr_provider_collects_and_executes_exact_selector(
     tmp_path: Path, monkeypatch: Any
 ) -> None:

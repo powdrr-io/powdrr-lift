@@ -1,0 +1,96 @@
+schema_version: validation-discovery-fixtures-v1
+cases:
+  - id: requirements-only
+    description: A requirements-only Python repository uses its declared pytest command without an invented uv prefix.
+    profiles:
+      - name: pytest
+        command: [pytest, -q]
+        cwd: .
+        provider: pytest
+        evidence: []
+        applicability: {local: true, evaluation: unknown}
+        depends_on: []
+        unresolved: []
+    unresolved: []
+  - id: ruff-pytest
+    description: Distinct formatting, lint, type, and test workflow commands retain their own selectors.
+    profiles:
+      - name: ruff-format-check
+        command: [uv, run, ruff, format, --check, .]
+        cwd: .
+        provider: ruff
+        evidence: [validation-input:.github/workflows/ci.yml]
+        applicability: {local: true, evaluation: unknown}
+        depends_on: []
+        unresolved: []
+      - name: ruff-check
+        command: [uv, run, ruff, check, .]
+        cwd: .
+        provider: ruff
+        evidence: [validation-input:.github/workflows/ci.yml]
+        applicability: {local: true, evaluation: unknown}
+        depends_on: []
+        unresolved: []
+      - name: mypy
+        command: [uv, run, mypy, src, tests]
+        cwd: .
+        provider: mypy
+        evidence: [validation-input:.github/workflows/ci.yml]
+        applicability: {local: true, evaluation: unknown}
+        depends_on: []
+        unresolved: []
+      - name: pytest
+        command: [uv, run, pytest, -q, tests]
+        cwd: .
+        provider: pytest
+        evidence: [validation-input:.github/workflows/ci.yml]
+        applicability: {local: true, evaluation: unknown}
+        depends_on: []
+        unresolved: []
+    unresolved: []
+  - id: tox-aggregate
+    description: A selected tox environment set remains one native aggregate invocation.
+    profiles:
+      - name: tox-lint,test
+        command: [tox, -e, "lint,test"]
+        cwd: .
+        provider: aggregate
+        evidence:
+          - validation-input:tox.ini
+          - validation-input:.github/workflows/ci.yml
+        applicability: {local: true, evaluation: unknown}
+        depends_on: []
+        unresolved: []
+    unresolved: []
+  - id: nested-api
+    description: Nested Python projects retain their component working directory.
+    profiles:
+      - name: packages-api-pytest
+        command: [uv, run, pytest, -q]
+        cwd: packages/api
+        provider: pytest
+        evidence: []
+        applicability: {local: true, evaluation: unknown}
+        depends_on: []
+        unresolved: []
+    unresolved: []
+  - id: polyglot
+    description: JavaScript and Go project declarations remain independently discoverable.
+    profiles:
+      - name: npm-test
+        command: [npm, test]
+        cwd: .
+        provider: npm
+        evidence: []
+        applicability: {local: true, evaluation: unknown}
+        depends_on: []
+        unresolved: []
+      - name: go-test
+        command: [go, test, ./...]
+        cwd: .
+        provider: go
+        evidence: []
+        applicability: {local: true, evaluation: unknown}
+        depends_on: []
+        unresolved: []
+    unresolved: []

@@ -609,6 +609,22 @@ def _git_command(parameters: Mapping[str, Any]) -> list[str]:
 
 def _gh_command(parameters: Mapping[str, Any]) -> list[str]:
     operation = parameters.get("operation")
+    if operation == "pr_publish_clean":
+        from powdrr_lift.clean_pr_publisher import (
+            normalize_clean_pr_publication_parameters,
+            render_standard_pr_description,
+        )
+
+        parameters = normalize_clean_pr_publication_parameters(parameters)
+        sections = parameters.get("description_sections")
+        if not isinstance(sections, Mapping):
+            raise PowdrrExecutionError(
+                "Clean PR publication requires structured description sections."
+            )
+        parameters = {
+            **parameters,
+            "body": render_standard_pr_description(sections),
+        }
     reference = parameters.get("pr_reference", parameters.get("number"))
     if operation in {"pr_view", "pr_diff", "pr_checks"}:
         subcommand = operation.removeprefix("pr_").replace("_", "-")
@@ -634,6 +650,7 @@ def _gh_command(parameters: Mapping[str, Any]) -> list[str]:
             if parameters.get("jq") == ".url":
                 command.extend(["--jq", ".url"])
     elif operation in {"pr_create", "pr_publish_clean"}:
+        body = parameters.get("body")
         command = [
             "pr",
             "create",
@@ -641,7 +658,7 @@ def _gh_command(parameters: Mapping[str, Any]) -> list[str]:
             "--title",
             _required_text(parameters.get("title"), "title"),
             "--body",
-            _required_text(parameters.get("body"), "body"),
+            _required_text(body, "body"),
         ]
         if parameters.get("base") is not None:
             command.extend(["--base", _branch_name(parameters.get("base"))])

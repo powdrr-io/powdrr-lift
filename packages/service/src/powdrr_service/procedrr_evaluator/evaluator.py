@@ -660,11 +660,14 @@ class Evaluator:
                     body, state, events, usage, limits, f"{path}.attempt[{attempt}]"
                 )
                 return
-            except EvaluationError as exc:
+            except (EvaluationError, JsonSchemaError) as exc:
                 failure: dict[str, Any] = {}
                 if isinstance(exc, ValidationGateError):
                     failure["category"] = _validation_category(exc.evidence)
                     failure["validation"] = exc.evidence
+                elif isinstance(exc, JsonSchemaError):
+                    failure["category"] = "output_validation_error"
+                    failure["error"] = str(exc)
                 else:
                     failure["category"] = "execution_error"
                     failure["error"] = str(exc)

@@ -1110,6 +1110,90 @@ steps:
     assert calls == ["check", "repair", "check"]
 
 
+def test_attempt_recovers_from_called_process_output_schema_error() -> None:
+    from powdrr_service.procedrr import ProcessCatalog
+
+    process = (
+        ProcessCatalog.load(bundled_process_directory())
+        .get("create-pull-request")
+        .document
+    )
+
+    class PublicationRetryLLM:
+        def complete_json(
+            self, messages: list[dict[str, str]], **_: Any
+        ) -> dict[str, Any]:
+            prompt = messages[1]["content"]
+            assert "publication rejected" in prompt
+            assert "requires structured description sections" in prompt
+            return {
+                "feature-name": "Reviewed feature",
+                "commit-message": "Implement reviewed feature",
+                "base-branch": "main",
+                "publication-branch": "powdrr/reviewed-feature-implementation",
+                "pr-description-sections": {
+                    "objective": "Corrected after the publication rejection.",
+                    "scope": "Update the approved files.",
+                    "implementation_details": "Add the implementation and tests.",
+                    "acceptance_criteria": "Meet the reviewed criteria.",
+                    "validation": "- `pytest -q` passed.",
+                    "advisory_test_quality_notes": "None.",
+                },
+            }
+
+    publication_calls = 0
+
+    def execute(tool: str, parameters: Mapping[str, Any]) -> Any:
+        nonlocal publication_calls
+        if tool == "invoke_tool":
+            nested_tool = parameters.get("tool")
+            nested_parameters = parameters.get("parameters")
+            assert isinstance(nested_tool, str)
+            assert isinstance(nested_parameters, Mapping)
+            tool = nested_tool
+            parameters = nested_parameters
+        operation = parameters.get("operation")
+        if tool == "gh" and operation == "pr_publish_clean":
+            workflow_context = parameters["workflow_context"]
+            assert isinstance(workflow_context, Mapping)
+            publication_calls += 1
+            if publication_calls == 1:
+                assert "pr-description-sections" not in workflow_context
+                return {
+                    "error": (
+                        "Clean PR publication requires structured description sections."
+                    ),
+                    "retryable": True,
+                }
+            sections = workflow_context["pr-description-sections"]
+            assert isinstance(sections, Mapping)
+            assert sections["objective"] == "Corrected after the publication rejection."
+            return "https://github.com/example/repo/pull/123"
+        raise AssertionError(f"Unexpected operation: {tool} {parameters!r}")
+
+    result = Evaluator(
+        PublicationRetryLLM(), execute, process_directory=bundled_process_directory()
+    ).evaluate(
+        process,
+        {
+            "user_request": "Implement the reviewed change.",
+            "workflow_context": {
+                "feature-name": "Reviewed feature",
+                "commit-message": "Implement reviewed feature",
+                "base-branch": "main",
+                "publication-branch": "powdrr/reviewed-feature-implementation",
+                "populated-pr-description": "## Objective",
+            },
+            "files_to_publish": ["src/feature.py"],
+        },
+    )
+
+    assert publication_calls == 2
+    assert result.bindings["pull_request_url"] == (
+        "https://github.com/example/repo/pull/123"
+    )
+
+
 def test_evaluator_resolves_tool_output_into_declared_judge_context() -> None:
     llm = FakeLLM()
     calls: list[tuple[str, dict[str, Any]]] = []

@@ -1,0 +1,303 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1506
+title: Complete bootstrap validation discovery WP9
+intent:
+  problem: Validation discovery breadth lacked reviewed fixtures and a pinned multi-repository
+    evaluation, and CI command variants could lose their evidence or scope.
+  goal: Document supported discovery behavior and report misses, context mismatches,
+    evidence gaps, and unresolved findings separately.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/bootstrap-validation-discovery.md
+  type: added
+  span:
+    start_line: 1
+    end_line: 175
+  summary: Add reviewed validation discovery coverage and reporting.
+  rationale: Make command scope and source evidence reviewable across fixtures and
+    a pinned repository corpus.
+- path: docs/plans/bootstrap-validation-discovery.md
+  type: modified
+  span:
+    start_line: 3
+    end_line: 4
+  summary: Add reviewed validation discovery coverage and reporting.
+  rationale: Make command scope and source evidence reviewable across fixtures and
+    a pinned repository corpus.
+- path: docs/plans/bootstrap-validation-discovery.md
+  type: modified
+  span:
+    start_line: 630
+    end_line: 640
+  summary: Add reviewed validation discovery coverage and reporting.
+  rationale: Make command scope and source evidence reviewable across fixtures and
+    a pinned repository corpus.
+- path: docs/reports/validation-discovery-corpus-2026-11-14.md
+  type: added
+  span:
+    start_line: 1
+    end_line: 128
+  summary: Add reviewed validation discovery coverage and reporting.
+  rationale: Make command scope and source evidence reviewable across fixtures and
+    a pinned repository corpus.
+- path: packages/agent/src/powdrr_agent/execution/verification_provider.py
+  type: modified
+  span:
+    start_line: 365
+    end_line: 369
+  summary: Add reviewed validation discovery coverage and reporting.
+  rationale: Make command scope and source evidence reviewable across fixtures and
+    a pinned repository corpus.
+- path: packages/agent/src/powdrr_agent/execution/verification_provider.py
+  type: modified
+  span:
+    start_line: 383
+    end_line: 387
+  summary: Add reviewed validation discovery coverage and reporting.
+  rationale: Make command scope and source evidence reviewable across fixtures and
+    a pinned repository corpus.
+- path: packages/service/src/powdrr_service/structrr/validation.py
+  type: modified
+  span:
+    start_line: 520
+    end_line: 520
+  summary: Add reviewed validation discovery coverage and reporting.
+  rationale: Make command scope and source evidence reviewable across fixtures and
+    a pinned repository corpus.
+- path: packages/service/src/powdrr_service/structrr/validation.py
+  type: modified
+  span:
+    start_line: 525
+    end_line: 525
+  summary: Add reviewed validation discovery coverage and reporting.
+  rationale: Make command scope and source evidence reviewable across fixtures and
+    a pinned repository corpus.
+- path: packages/service/src/powdrr_service/structrr/validation.py
+  type: modified
+  span:
+    start_line: 530
+    end_line: 532
+  summary: Add reviewed validation discovery coverage and reporting.
+  rationale: Make command scope and source evidence reviewable across fixtures and
+    a pinned repository corpus.
+- path: packages/service/src/powdrr_service/structrr/validation.py
+  type: modified
+  span:
+    start_line: 535
+    end_line: 538
+  summary: Add reviewed validation discovery coverage and reporting.
+  rationale: Make command scope and source evidence reviewable across fixtures and
+    a pinned repository corpus.
+- path: packages/service/src/powdrr_service/structrr/validation.py
+  type: modified
+  span:
+    start_line: 541
+    end_line: 568
+  summary: Add reviewed validation discovery coverage and reporting.
+  rationale: Make command scope and source evidence reviewable across fixtures and
+    a pinned repository corpus.
+- path: packages/service/src/powdrr_service/structrr/validation.py
+  type: modified
+  span:
+    start_line: 571
+    end_line: 571
+  summary: Add reviewed validation discovery coverage and reporting.
+  rationale: Make command scope and source evidence reviewable across fixtures and
+    a pinned repository corpus.
+- path: packages/service/src/powdrr_service/structrr/validation.py
+  type: modified
+  span:
+    start_line: 574
+    end_line: 595
+  summary: Add reviewed validation discovery coverage and reporting.
+  rationale: Make command scope and source evidence reviewable across fixtures and
+    a pinned repository corpus.
+- path: packages/service/src/powdrr_service/structrr/validation.py
+  type: modified
+  span:
+    start_line: 618
+    end_line: 636
+  summary: Add reviewed validation discovery coverage and reporting.
+  rationale: Make command scope and source evidence reviewable across fixtures and
+    a pinned repository corpus.
+- path: packages/service/src/powdrr_service/structrr/validation.py
+  type: modified
+  span:
+    start_line: 663
+    end_line: 665
+  summary: Add reviewed validation discovery coverage and reporting.
+  rationale: Make command scope and source evidence reviewable across fixtures and
+    a pinned repository corpus.
+- path: packages/service/src/powdrr_service/structrr/validation.py
+  type: modified
+  span:
+    start_line: 630
+    end_line: 630
+  summary: Add reviewed validation discovery coverage and reporting.
+  rationale: Make command scope and source evidence reviewable across fixtures and
+    a pinned repository corpus.
+- path: packages/service/src/powdrr_service/structrr/validation.py
+  type: modified
+  span:
+    start_line: 704
+    end_line: 705
+  summary: Add reviewed validation discovery coverage and reporting.
+  rationale: Make command scope and source evidence reviewable across fixtures and
+    a pinned repository corpus.
+- path: packages/service/src/powdrr_service/structrr/validation_corpus.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 353
+  summary: Add reviewed validation discovery coverage and reporting.
+  rationale: Make command scope and source evidence reviewable across fixtures and
+    a pinned repository corpus.
+- path: scripts/evaluate-validation-corpus.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 207
+  summary: Add reviewed validation discovery coverage and reporting.
+  rationale: Make command scope and source evidence reviewable across fixtures and
+    a pinned repository corpus.
+- path: tests/fixtures/validation_corpus/corpus.yaml
+  type: added
+  span:
+    start_line: 1
+    end_line: 375
+  summary: Add reviewed validation discovery coverage and reporting.
+  rationale: Make command scope and source evidence reviewable across fixtures and
+    a pinned repository corpus.
+- path: tests/fixtures/validation_discovery/expectations.yaml
+  type: added
+  span:
+    start_line: 1
+    end_line: 96
+  summary: Add reviewed validation discovery coverage and reporting.
+  rationale: Make command scope and source evidence reviewable across fixtures and
+    a pinned repository corpus.
+- path: tests/fixtures/validation_discovery/nested-api/packages/api/pyproject.toml
+  type: added
+  span:
+    start_line: 1
+    end_line: 4
+  summary: Add reviewed validation discovery coverage and reporting.
+  rationale: Make command scope and source evidence reviewable across fixtures and
+    a pinned repository corpus.
+- path: tests/fixtures/validation_discovery/nested-api/packages/api/tests/test_component.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 2
+  summary: Add reviewed validation discovery coverage and reporting.
+  rationale: Make command scope and source evidence reviewable across fixtures and
+    a pinned repository corpus.
+- path: tests/fixtures/validation_discovery/nested-api/pyproject.toml
+  type: added
+  span:
+    start_line: 1
+    end_line: 3
+  summary: Add reviewed validation discovery coverage and reporting.
+  rationale: Make command scope and source evidence reviewable across fixtures and
+    a pinned repository corpus.
+- path: tests/fixtures/validation_discovery/polyglot/go.mod
+  type: added
+  span:
+    start_line: 1
+    end_line: 3
+  summary: Add reviewed validation discovery coverage and reporting.
+  rationale: Make command scope and source evidence reviewable across fixtures and
+    a pinned repository corpus.
+- path: tests/fixtures/validation_discovery/polyglot/package.json
+  type: added
+  span:
+    start_line: 1
+    end_line: 1
+  summary: Add reviewed validation discovery coverage and reporting.
+  rationale: Make command scope and source evidence reviewable across fixtures and
+    a pinned repository corpus.
+- path: tests/fixtures/validation_discovery/requirements-only/requirements.txt
+  type: added
+  span:
+    start_line: 1
+    end_line: 1
+  summary: Add reviewed validation discovery coverage and reporting.
+  rationale: Make command scope and source evidence reviewable across fixtures and
+    a pinned repository corpus.
+- path: tests/fixtures/validation_discovery/requirements-only/tests/test_smoke.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 2
+  summary: Add reviewed validation discovery coverage and reporting.
+  rationale: Make command scope and source evidence reviewable across fixtures and
+    a pinned repository corpus.
+- path: tests/fixtures/validation_discovery/ruff-pytest/.github/workflows/ci.yml
+  type: added
+  span:
+    start_line: 1
+    end_line: 9
+  summary: Add reviewed validation discovery coverage and reporting.
+  rationale: Make command scope and source evidence reviewable across fixtures and
+    a pinned repository corpus.
+- path: tests/fixtures/validation_discovery/ruff-pytest/pyproject.toml
+  type: added
+  span:
+    start_line: 1
+    end_line: 10
+  summary: Add reviewed validation discovery coverage and reporting.
+  rationale: Make command scope and source evidence reviewable across fixtures and
+    a pinned repository corpus.
+- path: tests/fixtures/validation_discovery/ruff-pytest/tests/test_sample.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 2
+  summary: Add reviewed validation discovery coverage and reporting.
+  rationale: Make command scope and source evidence reviewable across fixtures and
+    a pinned repository corpus.
+- path: tests/fixtures/validation_discovery/tox-aggregate/.github/workflows/ci.yml
+  type: added
+  span:
+    start_line: 1
+    end_line: 6
+  summary: Add reviewed validation discovery coverage and reporting.
+  rationale: Make command scope and source evidence reviewable across fixtures and
+    a pinned repository corpus.
+- path: tests/fixtures/validation_discovery/tox-aggregate/tox.ini
+  type: added
+  span:
+    start_line: 1
+    end_line: 8
+  summary: Add reviewed validation discovery coverage and reporting.
+  rationale: Make command scope and source evidence reviewable across fixtures and
+    a pinned repository corpus.
+- path: tests/test_validation_breadth.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 207
+  summary: Add reviewed validation discovery coverage and reporting.
+  rationale: Make command scope and source evidence reviewable across fixtures and
+    a pinned repository corpus.
+- path: tests/test_validation_discovery.py
+  type: modified
+  span:
+    start_line: 214
+    end_line: 238
+  summary: Add reviewed validation discovery coverage and reporting.
+  rationale: Make command scope and source evidence reviewable across fixtures and
+    a pinned repository corpus.
+- path: tests/test_verification_provider.py
+  type: modified
+  span:
+    start_line: 135
+    end_line: 209
+  summary: Add reviewed validation discovery coverage and reporting.
+  rationale: Make command scope and source evidence reviewable across fixtures and
+    a pinned repository corpus.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []

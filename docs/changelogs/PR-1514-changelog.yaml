@@ -57,6 +57,11 @@ files:
   span: {start_line: 3, end_line: 3}
   summary: Refresh the catalog fingerprint from the current source proposal.
   rationale: Restore reproducibility between the checked-in catalog and its source after CI detected a stale generated fingerprint.
+- path: tests/test_agent_feature.py
+  type: modified
+  span: {start_line: 142, end_line: 183}
+  summary: Isolate timeout reporting coverage from real worktree setup and allow setup time before the deadline.
+  rationale: Keep the timeout test deterministic on CI while exercising the same timed out report behavior.
 entities: []
 entity_relationships: []
 invariants: []

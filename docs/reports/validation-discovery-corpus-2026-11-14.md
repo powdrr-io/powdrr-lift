@@ -6,12 +6,12 @@ This is static discovery evidence. It does not establish that a command was exec
 
 | Repository | Pinned revision | License | Exact argv matches | Missed obligations | Unreviewed discoveries | Invented required checks | Command/context mismatches | Provider mismatches | Evidence gaps | Unresolved profiles |
 | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| [powdrr-lift](https://github.com/powdrr-io/powdrr-lift) | `7e1d8c2c7a0d` | `NOASSERTION` | 7 | 0 | 7 | 0 | 0 | 0 | 0 | 5 |
+| [powdrr-lift](https://github.com/powdrr-io/powdrr-lift) | `7e1d8c2c7a0d` | `NOASSERTION` | 8 | 0 | 7 | 0 | 0 | 0 | 0 | 5 |
 | [pytest](https://github.com/pytest-dev/pytest) | `fc9a7ef678f6` | `MIT` | 0 | 0 | 4 | 0 | 0 | 0 | 0 | 3 |
 | [flask](https://github.com/pallets/flask) | `49943b5a9441` | `BSD-3-Clause` | 2 | 0 | 10 | 0 | 0 | 0 | 0 | 1 |
 | [django](https://github.com/django/django) | `f24f38c6b282` | `BSD-3-Clause` | 1 | 0 | 9 | 0 | 0 | 0 | 0 | 5 |
 | [poetry](https://github.com/python-poetry/poetry) | `4acc75e19f12` | `MIT` | 2 | 0 | 3 | 0 | 0 | 0 | 0 | 1 |
-| [uv](https://github.com/astral-sh/uv) | `d5c3f1744174` | `Apache-2.0` | 2 | 0 | 124 | 0 | 0 | 0 | 0 | 16 |
+| [uv](https://github.com/astral-sh/uv) | `d5c3f1744174` | `Apache-2.0` | 2 | 0 | 127 | 0 | 0 | 0 | 0 | 16 |
 | [pdm](https://github.com/pdm-project/pdm) | `9af22ebcd76e` | `MIT` | 0 | 0 | 11 | 0 | 0 | 0 | 0 | 7 |
 | [hatch](https://github.com/pypa/hatch) | `893fa13ccd61` | `MIT` | 0 | 0 | 10 | 0 | 0 | 0 | 0 | 10 |
 | [conda](https://github.com/conda/conda) | `742ee7878560` | `NOASSERTION` | 1 | 0 | 3 | 0 | 0 | 0 | 0 | 0 |
@@ -23,10 +23,10 @@ This is static discovery evidence. It does not establish that a command was exec
 
 ## Totals
 
-- Expected obligations: 34
-- Exact executable discoveries: 17
+- Expected obligations: 35
+- Exact executable discoveries: 18
 - Missed obligations: 0
-- Unreviewed discovery candidates: 257
+- Unreviewed discovery candidates: 260
 - Invented required checks: 0
 - Command/context mismatches: 0
 - Evidence gaps: 0

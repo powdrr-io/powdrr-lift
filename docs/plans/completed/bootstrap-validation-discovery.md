@@ -1,48 +1,44 @@
 # Bootstrap Structure and Validation Discovery Implementation Plan
 
-Status: implementation and final completion gate are complete. Work packages 8
-and 9 are complete; the final corpus follow-up is recorded in the report.
+Status: complete. Work packages 1 through 9 and the final completion gate are
+complete. The plan's supported validation and readiness behavior is implemented;
+known limits and deferred extensions are recorded below.
 
-Current WP8 progress: Workrr now evaluates discovered applicability against the
-feature run's target event, base branch, and changed paths. Missing context,
-unsupported condition expressions, negative-only path filters, and checks that
-are not locally reproducible remain pending; ordered positive and negative path
-filters now exclude and re-include matching paths. Filters that provably do not
-match are recorded as not applicable. This is a partial implementation of step 6.
-The evaluator also supports GitHub condition equality/inequality, boolean
-operators, and grouping for event-name and base-branch values. Unsupported
-functions and unavailable context remain pending. Full GitHub expression
-evaluation remains outstanding. Required GitHub checks now enter the PR review
-readiness gate as normalized, timestamped outcomes tied to the current pull
-request head. Each required check must also match a discovered workflow job in
-the committed validation inventory; missing, ambiguous, and unknown matches
-block review. The inventory digest is retained with the CI outcome checkpoint.
-The feature review aggregate and core validation runner keep empty result sets
-pending, so missing results cannot satisfy the gate. The PR readiness gate
-also verifies the baseline YAML, Markdown report, freshness metadata, and
-fingerprinted validation inputs before using the inventory. It also checks
-changed PR paths for added, removed, renamed, or edited validation evidence and
-blocks until the baseline is refreshed. Local baseline observations also carry
-an identity fingerprint for source content, validation inputs, the check recipe,
-environment, interpreter, and tool version; the report links that fingerprint
-for review. WP8 remains partial: comparing saved observations with the active
-runtime now invalidates a prior pass when its identity is missing or differs;
-the report retains the reason. Required-CI refresh failures also preserve the
-last remote checks with their original head and observation time, mark them
-stale/unknown, and keep readiness blocked, including when a workflow omits its
-PR URL. The `respond-to-pr-ci` workflow likewise marks its latest saved
-checkpoint stale on refresh failure, preserving the prior head and observation
-time. The persisted GitHub CI checkpoint paths now handle staleness. WP8 is
-complete: typed check records retain their execution context through bootstrap
-discovery, command responses, worker requests, local execution, provider
-inventories, and final reports. Worker validation rejects profile-context
-changes after request review. Pytest collection runs in a subprocess from the
-declared component directory, and provider inventory fingerprints include
-command, environment, execution, and applicability context. Unsupported shell
-or script profiles remain unresolved and block readiness. End-to-end coverage
-verifies that explicit and discovered checks both run before review can pass,
-and that an unsupported condition keeps readiness pending. The core validation
-runner also keeps an empty profile selection pending.
+WP8 completion: Workrr evaluates discovered applicability against the feature
+run's target event, base branch, and changed paths. It supports ordered positive
+and negative path filters, plus GitHub condition equality/inequality, boolean
+operators, and grouping for event-name and base-branch values. Proven
+non-matches are not applicable. Missing context, unsupported condition
+expressions, and checks that are not locally reproducible remain pending. Full
+GitHub expression-language evaluation is deferred follow-up; the implemented
+scope deliberately leaves unsupported functions and unavailable context
+unresolved rather than treating them as passes.
+
+Required GitHub checks enter the PR review readiness gate as normalized,
+timestamped outcomes tied to the current pull request head. Each required check
+must match a discovered workflow job in the committed validation inventory;
+missing, ambiguous, and unknown matches block review. The inventory digest is
+retained with the CI outcome checkpoint. Empty result sets remain pending. The
+readiness gate verifies the baseline YAML, Markdown report, freshness metadata,
+and fingerprinted validation inputs before using the inventory. Added, removed,
+renamed, or edited validation evidence blocks readiness until the baseline is
+refreshed. Local baseline observations include an identity fingerprint for
+source content, validation inputs, check recipe, environment, interpreter, and
+tool version. A missing or changed identity invalidates a saved pass. Required
+CI refresh failures preserve remote checks with their original head and
+observation time, mark them stale/unknown, and keep readiness blocked, including
+when a workflow omits its PR URL. The `respond-to-pr-ci` workflow and persisted
+GitHub CI checkpoints also retain stale state on refresh failure.
+
+Typed check records retain execution context through bootstrap discovery,
+command responses, worker requests, local execution, provider inventories, and
+final reports. Worker validation rejects profile-context changes after request
+review. Pytest collection runs in a subprocess from the declared component
+directory, and provider inventory fingerprints include command, environment,
+execution, and applicability context. Unsupported shell or script profiles
+remain unresolved and block readiness. End-to-end coverage verifies that
+explicit and discovered checks both run before review can pass, unsupported
+conditions keep readiness pending, and an empty profile selection cannot pass.
 
 ## Objective and delivery contract
 
@@ -90,10 +86,12 @@ validation therefore rejects the generated snapshot even though both files
 are present. Normalize adapter evidence through the shared evidence index
 before serializing profiles; do not weaken dangling-reference validation.
 
-Discovery on this repository currently returns Ruff format, Ruff lint, mypy,
-and pytest. `.github/workflows/ci.yml` also invokes workflow-definition
-validation, `scripts/run-deterministic-workflow-suite.sh`, and conditional
-workflow tuning. Those custom validation steps must become acceptance cases.
+At the initial inspection revision, discovery on this repository returned
+Ruff format, Ruff lint, mypy, and pytest. The reviewed CI workflow also declares
+Procedrr catalog validation, isolated package-distribution verification, the
+deterministic workflow scenario suite, and Windows portable-lock tests. The
+current workflow does not declare a separate workflow-definition validator or
+conditional workflow-tuning check; neither is an acceptance obligation.
 
 The existing `docs/plans/polyglot-repository-and-go-support.md` proposes
 component-aware profiles. Reuse an implemented component model if present;
@@ -629,7 +627,7 @@ invalidates the correct evidence; existing non-Python profiles still execute.
 
 WP9 progress: complete. Five reviewed fixture repositories assert command,
 provider, working directory, evidence anchors, applicability, prerequisites,
-and unresolved facts. The pinned corpus covers 14 repositories and 34 reviewed
+and unresolved facts. The pinned corpus covers 14 repositories and 35 reviewed
 obligations; its evaluator reports discovery misses, mismatches, evidence gaps,
 and unresolved findings separately. User documentation describes output
 formats, supported coverage, execution boundaries, migration, and corpus use.
@@ -672,12 +670,12 @@ Final completion gate:
 - All supported executable fixtures reproduce native invocation context.
 - Unsupported/dynamic cases have anchored, actionable unresolved records.
 - This repository accounts for Ruff format/lint, mypy, pytest/coverage,
-  procedural-catalog validation, deterministic workflow scenarios, and the
-  Windows portable-lock test. RTK/uv installation is setup; artifact uploads
-  are reporting. The pinned `.github/workflows/ci.yml` declares no separate
-  workflow-definition validator or conditional workflow-tuning check, so these
-  are not discovery obligations. Requiredness remains unknown without
-  repository-rule evidence.
+  procedural-catalog validation, isolated package-distribution verification,
+  deterministic workflow scenarios, and the Windows portable-lock test.
+  RTK/uv installation is setup; artifact uploads are reporting. The pinned
+  `.github/workflows/ci.yml` declares no separate workflow-definition
+  validator or conditional workflow-tuning check, so these are not discovery
+  obligations. Requiredness remains unknown without repository-rule evidence.
 - Full repository verification passes, or independently established baseline
   failures are documented for user review without weakening the checks.
 

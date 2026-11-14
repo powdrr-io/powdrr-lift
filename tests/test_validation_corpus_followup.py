@@ -116,12 +116,17 @@ def test_custom_ci_scripts_and_catalog_commands_are_accounted_for(
         "#!/bin/sh\nuv run powdrr-lift workflow-scenario-suite\n",
         encoding="utf-8",
     )
+    (scripts / "verify-agent-distribution.py").write_text(
+        "from pathlib import Path\n",
+        encoding="utf-8",
+    )
     _workflow(
         tmp_path,
         "jobs:\n  checks:\n    steps:\n"
         "      - run: scripts/check\n"
         "      - run: uv run powdrr-lift validate-procedrr-processes\n"
-        "      - run: ./scripts/run-deterministic-workflow-suite.sh\n",
+        "      - run: ./scripts/run-deterministic-workflow-suite.sh\n"
+        "      - run: uv run python scripts/verify-agent-distribution.py\n",
     )
 
     profiles = discover_validation_profiles(tmp_path)
@@ -137,6 +142,17 @@ def test_custom_ci_scripts_and_catalog_commands_are_accounted_for(
     )
     assert by_name["workflow-scenario-suite"].command == (
         "./scripts/run-deterministic-workflow-suite.sh",
+    )
+    assert by_name["script-verify-agent-distribution"].provider == "custom"
+    assert by_name["script-verify-agent-distribution"].command == (
+        "uv",
+        "run",
+        "python",
+        "scripts/verify-agent-distribution.py",
+    )
+    assert by_name["script-verify-agent-distribution"].evidence == (
+        ".github/workflows/ci.yml",
+        "scripts/verify-agent-distribution.py",
     )
 
 

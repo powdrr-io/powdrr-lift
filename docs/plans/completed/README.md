@@ -5,6 +5,7 @@ complete. Future work that was explicitly excluded remains documented in the
 individual plan.
 
 - [Planning code-symbol evidence](code-analysis-artifacts-and-scoped-queries.md)
+- [Bootstrap structure and validation discovery](bootstrap-validation-discovery.md)
 - [Static workflow liveness plan audit](static-workflow-liveness-audit.md)
 - [Structrr source references](structrr-source-references.md)
 - [Structrr user stories and behavioral testing](structrr-user-stories-and-behavioral-testing.md)

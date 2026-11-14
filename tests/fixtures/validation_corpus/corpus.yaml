@@ -12,7 +12,7 @@ repositories:
     default_branch: main
     license: NOASSERTION
     license_evidence: GitHub repository metadata reported no SPDX license identifier; the repository has no top-level license file at this revision.
-    coverage: [this-repository, Ruff, mypy, pytest, custom-CI, workflow-scenarios, Windows-portable-locks]
+    coverage: [this-repository, Ruff, mypy, pytest, custom-CI, package-distribution, workflow-scenarios, Windows-portable-locks]
     evidence: [.github/workflows/ci.yml, pyproject.toml]
     obligations:
       - id: formatter
@@ -67,6 +67,14 @@ repositories:
         state: executable
         requiredness: unknown
         evidence: [.github/workflows/ci.yml]
+      - id: agent-distribution-verification
+        profile: script-verify-agent-distribution
+        provider: custom
+        command: [uv, run, python, scripts/verify-agent-distribution.py]
+        cwd: .
+        state: executable
+        requiredness: unknown
+        evidence: [.github/workflows/ci.yml, scripts/verify-agent-distribution.py]
 
   - id: pytest
     repository: https://github.com/pytest-dev/pytest

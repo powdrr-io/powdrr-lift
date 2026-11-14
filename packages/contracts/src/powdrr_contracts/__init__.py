@@ -2,7 +2,9 @@
 
 from powdrr_contracts.ci import (
     CIAnnotation,
+    CIFailureUnit,
     CIJobObservation,
+    CIObservation,
     LocalReproduction,
 )
 from powdrr_contracts.models import (
@@ -37,7 +39,9 @@ __all__ = [
     "ChatCompletionRequest",
     "ChatCompletionResponse",
     "CIAnnotation",
+    "CIFailureUnit",
     "CIJobObservation",
+    "CIObservation",
     "ContractError",
     "EvidenceStatus",
     "LocalAction",

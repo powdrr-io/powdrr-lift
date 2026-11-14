@@ -31,6 +31,7 @@ from powdrr_agent.execution.github_actions import (
     GitHubActionsError,
     execute_pinned_local_command,
 )
+from powdrr_contracts.ci import CIFailureUnit as CIResponseFailureUnit
 from powdrr_contracts.ci import LocalReproduction
 from powdrr_contracts.models import (
     Artifact,
@@ -46,7 +47,7 @@ from powdrr_local.planning.repair_publication import (
 from powdrr_service.ci_response import (
     build_failure_units,
     compare_local_reproduction,
-    normalize_github_snapshot,
+    normalize_ci_observation,
     render_ci_observation_checkpoint,
     render_stale_ci_observation_checkpoint,
 )
@@ -3101,14 +3102,18 @@ def _run_respond_to_pr_ci(args: argparse.Namespace) -> int:
                 f"issue #{args.issue} does not identify PR #{pr_number}; "
                 "refusing to checkpoint unrelated work"
             )
-        jobs = normalize_github_snapshot(
+        observation = normalize_ci_observation(
             {
                 "pull_request": snapshot.pull_request,
                 "runs": snapshot.runs,
                 "jobs_by_run": snapshot.jobs_by_run,
                 "annotations_by_check_run": snapshot.annotations_by_check_run,
-            }
+                "observed_at": snapshot.observed_at,
+            },
+            repository=args.repository,
+            pull_request_number=pr_number,
         )
+        jobs = observation.jobs
         failures = build_failure_units(jobs)
         head = snapshot.pull_request.get("head")
         head_sha = head.get("sha") if isinstance(head, Mapping) else None
@@ -3160,6 +3165,10 @@ def _run_respond_to_pr_ci(args: argparse.Namespace) -> int:
             "pull_request": pr_number,
             "issue": args.issue,
             "head_sha": head_sha,
+            "observation_schema_version": 1,
+            "tested_sha": observation.tested_sha,
+            "required_checks_status": observation.required_checks_status,
+            "required_check_source": observation.required_check_source,
             "pull_request_metadata": {
                 "head_ref": head_ref if isinstance(head_ref, str) else None,
                 "base_ref": base_ref if isinstance(base_ref, str) else None,
@@ -3173,19 +3182,25 @@ def _run_respond_to_pr_ci(args: argparse.Namespace) -> int:
             "changed_paths": list(snapshot.changed_paths),
             "failures": [
                 {
-                    "failure_id": item.failure_id,
-                    "job_id": item.job_id,
-                    "run_id": item.run_id,
-                    "run_attempt": item.run_attempt,
-                    "phase": item.phase,
-                    "signature": item.signature,
-                    "evidence": list(item.evidence),
-                    "locally_executable": item.locally_executable,
-                    "workflow_path": (
-                        runs_by_id.get(item.run_id, {}).get("path")
-                        if isinstance(runs_by_id.get(item.run_id, {}).get("path"), str)
-                        else None
-                    ),
+                    **CIResponseFailureUnit(
+                        failure_id=item.failure_id,
+                        observation_id=observation_id,
+                        job_id=item.job_id,
+                        phase=item.phase,
+                        signature=item.signature,
+                        evidence=item.evidence,
+                        locally_executable=item.locally_executable,
+                        head_sha=head_sha,
+                        run_id=item.run_id,
+                        run_attempt=item.run_attempt,
+                        workflow_path=(
+                            runs_by_id.get(item.run_id, {}).get("path")
+                            if isinstance(
+                                runs_by_id.get(item.run_id, {}).get("path"), str
+                            )
+                            else None
+                        ),
+                    ).to_dict(),
                     "runner_labels": list(
                         jobs_by_id[item.job_id].runner_labels
                         if item.job_id in jobs_by_id

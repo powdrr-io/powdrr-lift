@@ -29,6 +29,220 @@ LocalReproductionStatus = Literal[
 
 
 @dataclass(frozen=True, slots=True)
+class CIObservation:
+    """Versioned envelope binding job evidence to one observed pull request head."""
+
+    repository: str
+    pull_request_number: int
+    head_sha: str
+    jobs: tuple[CIJobObservation, ...]
+    observed_at: str | None = None
+    tested_sha: str | None = None
+    merge_base_sha: str | None = None
+    required_checks_status: Literal["available", "unavailable"] = "unavailable"
+    required_check_source: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.repository.count("/") != 1 or not all(self.repository.split("/")):
+            raise ContractError("ci_observation.repository must use owner/name form")
+        _positive_int(self.pull_request_number, "ci_observation.pull_request_number")
+        if self.observed_at is not None and not isinstance(self.observed_at, str):
+            raise ContractError("ci_observation.observed_at must be a string or null")
+        _validate_sha(self.head_sha, "ci_observation.head_sha")
+        for name in ("tested_sha", "merge_base_sha"):
+            value = getattr(self, name)
+            if value is not None:
+                _validate_sha(value, f"ci_observation.{name}")
+        if self.required_checks_status not in {"available", "unavailable"}:
+            raise ContractError("ci_observation.required_checks_status is unsupported")
+        if (
+            self.required_checks_status == "available"
+            and not self.required_check_source
+        ):
+            raise ContractError(
+                "available required checks must identify their policy source"
+            )
+        if any(job.head_sha != self.head_sha for job in self.jobs):
+            raise ContractError("ci_observation jobs must match its PR head SHA")
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": 1,
+            "repository": self.repository,
+            "pull_request_number": self.pull_request_number,
+            "head_sha": self.head_sha,
+            "tested_sha": self.tested_sha,
+            "merge_base_sha": self.merge_base_sha,
+            "observed_at": self.observed_at,
+            "required_checks_status": self.required_checks_status,
+            "required_check_source": self.required_check_source,
+            "jobs": [job.to_dict() for job in self.jobs],
+        }
+
+    @classmethod
+    def from_dict(cls, value: object) -> Self:
+        data = _object(value, "ci_observation")
+        if data.get("schema_version") != 1:
+            raise ContractError("unsupported ci_observation schema_version")
+        jobs = data.get("jobs")
+        if not isinstance(jobs, list):
+            raise ContractError("ci_observation.jobs must be an array")
+        parsed_jobs = tuple(CIJobObservation.from_dict(item) for item in jobs)
+        observed_at = data.get("observed_at")
+        source = data.get("required_check_source")
+        if observed_at is not None and not isinstance(observed_at, str):
+            raise ContractError("ci_observation.observed_at must be a string or null")
+        if source is not None and not isinstance(source, str):
+            raise ContractError(
+                "ci_observation.required_check_source must be a string or null"
+            )
+        return cls(
+            repository=_string(data.get("repository"), "ci_observation.repository"),
+            pull_request_number=_positive_int(
+                data.get("pull_request_number"), "ci_observation.pull_request_number"
+            ),
+            head_sha=_string(data.get("head_sha"), "ci_observation.head_sha"),
+            tested_sha=_optional_sha(
+                data.get("tested_sha"), "ci_observation.tested_sha"
+            ),
+            merge_base_sha=_optional_sha(
+                data.get("merge_base_sha"), "ci_observation.merge_base_sha"
+            ),
+            observed_at=observed_at,
+            required_checks_status=data.get("required_checks_status", "unavailable"),
+            required_check_source=source,
+            jobs=parsed_jobs,
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class CIFailureUnit:
+    """Versioned, narrowly scoped failure evidence from one observed job."""
+
+    failure_id: str
+    observation_id: str
+    job_id: int
+    phase: str
+    signature: str
+    evidence: tuple[str, ...]
+    locally_executable: bool
+    head_sha: str
+    run_id: int
+    run_attempt: int
+    workflow_path: str | None = None
+    start_line: int | None = None
+    end_line: int | None = None
+    command: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        for name in ("failure_id", "observation_id", "phase", "signature"):
+            if not getattr(self, name).strip():
+                raise ContractError(f"ci_failure_unit.{name} must not be empty")
+        _validate_sha(self.head_sha, "ci_failure_unit.head_sha")
+        for name in ("job_id", "run_id", "run_attempt"):
+            _positive_int(getattr(self, name), f"ci_failure_unit.{name}")
+        if not self.evidence or any(not item.strip() for item in self.evidence):
+            raise ContractError("ci_failure_unit.evidence must contain references")
+        if any(
+            value is not None and value < 1
+            for value in (self.start_line, self.end_line)
+        ):
+            raise ContractError("ci_failure_unit line numbers must be positive")
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": 1,
+            "failure_id": self.failure_id,
+            "observation_id": self.observation_id,
+            "job_id": self.job_id,
+            "run_id": self.run_id,
+            "run_attempt": self.run_attempt,
+            "head_sha": self.head_sha,
+            "phase": self.phase,
+            "signature": self.signature,
+            "evidence": list(self.evidence),
+            "locally_executable": self.locally_executable,
+            "workflow_path": self.workflow_path,
+            "start_line": self.start_line,
+            "end_line": self.end_line,
+            "command": list(self.command),
+        }
+
+    @classmethod
+    def from_dict(cls, value: object) -> Self:
+        data = _object(value, "ci_failure_unit")
+        if data.get("schema_version") != 1:
+            raise ContractError("unsupported ci_failure_unit schema_version")
+        evidence = data.get("evidence")
+        command = data.get("command", [])
+        if not isinstance(evidence, list) or not all(
+            isinstance(item, str) for item in evidence
+        ):
+            raise ContractError("ci_failure_unit.evidence must be an array of strings")
+        if not isinstance(command, list) or not all(
+            isinstance(item, str) for item in command
+        ):
+            raise ContractError("ci_failure_unit.command must be an array of strings")
+        executable = data.get("locally_executable")
+        if not isinstance(executable, bool):
+            raise ContractError("ci_failure_unit.locally_executable must be boolean")
+        workflow_path = data.get("workflow_path")
+        if workflow_path is not None and not isinstance(workflow_path, str):
+            raise ContractError(
+                "ci_failure_unit.workflow_path must be a string or null"
+            )
+        line_values: dict[str, int | None] = {}
+        for name in ("start_line", "end_line"):
+            item = data.get(name)
+            if item is not None and (
+                not isinstance(item, int) or isinstance(item, bool) or item < 1
+            ):
+                raise ContractError(f"ci_failure_unit.{name} must be positive or null")
+            line_values[name] = item
+        return cls(
+            failure_id=_string(data.get("failure_id"), "ci_failure_unit.failure_id"),
+            observation_id=_string(
+                data.get("observation_id"), "ci_failure_unit.observation_id"
+            ),
+            job_id=_positive_int(data.get("job_id"), "ci_failure_unit.job_id"),
+            phase=_string(data.get("phase"), "ci_failure_unit.phase"),
+            signature=_string(data.get("signature"), "ci_failure_unit.signature"),
+            evidence=tuple(evidence),
+            locally_executable=executable,
+            head_sha=_string(data.get("head_sha"), "ci_failure_unit.head_sha"),
+            run_id=_positive_int(data.get("run_id"), "ci_failure_unit.run_id"),
+            run_attempt=_positive_int(
+                data.get("run_attempt"), "ci_failure_unit.run_attempt"
+            ),
+            workflow_path=workflow_path,
+            start_line=line_values["start_line"],
+            end_line=line_values["end_line"],
+            command=tuple(command),
+        )
+
+
+def _validate_sha(value: str, name: str) -> None:
+    if len(value) not in (40, 64) or any(
+        char not in "0123456789abcdef" for char in value
+    ):
+        raise ContractError(f"{name} must be a full lowercase commit SHA")
+
+
+def _optional_sha(value: object, name: str) -> str | None:
+    if value is None:
+        return None
+    sha = _string(value, name)
+    _validate_sha(sha, name)
+    return sha
+
+
+def _positive_int(value: object, name: str) -> int:
+    if not isinstance(value, int) or isinstance(value, bool) or value < 1:
+        raise ContractError(f"{name} must be a positive integer")
+    return value
+
+
+@dataclass(frozen=True, slots=True)
 class CIAnnotation:
     """A GitHub check annotation with its source check-run identity."""
 
@@ -116,6 +330,11 @@ class CIJobObservation:
     head_sha: str
     status: CIObservationStatus
     conclusion: CIConclusion | None
+    tested_sha: str | None = None
+    workflow_path: str | None = None
+    matrix: tuple[tuple[str, str], ...] = ()
+    check_context: str | None = None
+    check_app_id: int | None = None
     runner_name: str | None = None
     runner_id: int | None = None
     runner_group_name: str | None = None
@@ -147,6 +366,23 @@ class CIJobObservation:
             "unknown",
         }:
             raise ContractError("ci_job.conclusion is unsupported")
+        if self.tested_sha is not None:
+            _validate_sha(self.tested_sha, "ci_job.tested_sha")
+        for name in ("workflow_path", "check_context"):
+            value = getattr(self, name)
+            if value is not None and not isinstance(value, str):
+                raise ContractError(f"ci_job.{name} must be a string or null")
+        if self.check_app_id is not None and (
+            not isinstance(self.check_app_id, int)
+            or isinstance(self.check_app_id, bool)
+            or self.check_app_id < 0
+        ):
+            raise ContractError("ci_job.check_app_id must be a non-negative integer")
+        if any(
+            not isinstance(key, str) or not isinstance(value, str)
+            for key, value in self.matrix
+        ):
+            raise ContractError("ci_job.matrix must contain string key/value pairs")
         if self.runner_id is not None and (
             not isinstance(self.runner_id, int)
             or isinstance(self.runner_id, bool)
@@ -165,6 +401,11 @@ class CIJobObservation:
             "head_sha": self.head_sha,
             "status": self.status,
             "conclusion": self.conclusion,
+            "tested_sha": self.tested_sha,
+            "workflow_path": self.workflow_path,
+            "matrix": {key: value for key, value in self.matrix},
+            "check_context": self.check_context,
+            "check_app_id": self.check_app_id,
             "runner_name": self.runner_name,
             "runner_id": self.runner_id,
             "runner_group_name": self.runner_group_name,
@@ -172,6 +413,68 @@ class CIJobObservation:
             "steps": list(self.steps),
             "annotations": [item.to_dict() for item in self.annotations],
         }
+
+    @classmethod
+    def from_dict(cls, value: object) -> Self:
+        data = _object(value, "ci_job")
+        if data.get("schema_version") != 1:
+            raise ContractError("unsupported ci_job schema_version")
+        labels = data.get("runner_labels", [])
+        steps = data.get("steps", [])
+        annotations = data.get("annotations", [])
+        if not isinstance(labels, list) or not all(
+            isinstance(item, str) for item in labels
+        ):
+            raise ContractError("ci_job.runner_labels must be an array of strings")
+        if not isinstance(steps, list) or not all(
+            isinstance(item, dict) for item in steps
+        ):
+            raise ContractError("ci_job.steps must be an array of objects")
+        if not isinstance(annotations, list):
+            raise ContractError("ci_job.annotations must be an array")
+        optional_strings = ("runner_name", "runner_group_name")
+        for name in optional_strings:
+            if data.get(name) is not None and not isinstance(data[name], str):
+                raise ContractError(f"ci_job.{name} must be a string or null")
+        runner_id = data.get("runner_id")
+        if runner_id is not None and (
+            not isinstance(runner_id, int) or isinstance(runner_id, bool)
+        ):
+            raise ContractError("ci_job.runner_id must be an integer or null")
+        matrix = data.get("matrix", {})
+        if not isinstance(matrix, dict) or not all(
+            isinstance(key, str) and isinstance(value, str)
+            for key, value in matrix.items()
+        ):
+            raise ContractError("ci_job.matrix must be an object of string values")
+        tested_sha = _optional_sha(data.get("tested_sha"), "ci_job.tested_sha")
+        for name in ("workflow_path", "check_context"):
+            if data.get(name) is not None and not isinstance(data[name], str):
+                raise ContractError(f"ci_job.{name} must be a string or null")
+        check_app_id = data.get("check_app_id")
+        if check_app_id is not None and (
+            not isinstance(check_app_id, int) or isinstance(check_app_id, bool)
+        ):
+            raise ContractError("ci_job.check_app_id must be an integer or null")
+        return cls(
+            job_id=_positive_int(data.get("job_id"), "ci_job.job_id"),
+            run_id=_positive_int(data.get("run_id"), "ci_job.run_id"),
+            run_attempt=_positive_int(data.get("run_attempt"), "ci_job.run_attempt"),
+            head_sha=_string(data.get("head_sha"), "ci_job.head_sha"),
+            status=data.get("status"),
+            conclusion=data.get("conclusion"),
+            tested_sha=tested_sha,
+            workflow_path=data.get("workflow_path"),
+            matrix=tuple(sorted(matrix.items())),
+            check_context=data.get("check_context"),
+            check_app_id=check_app_id,
+            runner_name=data.get("runner_name"),
+            runner_id=runner_id,
+            runner_group_name=data.get("runner_group_name"),
+            runner_labels=tuple(labels),
+            steps=tuple(steps),
+            annotations=tuple(CIAnnotation.from_dict(item) for item in annotations),
+        )
 
 
 @dataclass(frozen=True, slots=True)

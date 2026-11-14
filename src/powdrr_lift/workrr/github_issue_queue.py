@@ -120,6 +120,37 @@ class WorkerReport:
     item_id: str | None = None
     detail: str | None = None
     ci_outcome: str | None = None
+    failure_record: str | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class TaskExecutionResult:
+    """Serializable terminal evidence for a failed planned item."""
+
+    plan_id: str
+    item_id: str
+    workflow_id: str
+    issue_number: int
+    worker_id: str
+    stage: str
+    outcome: str
+    detail: str
+    runner_exit_code: int | None = None
+
+    def to_data(self) -> dict[str, Any]:
+        return {
+            "schema": "https://powdrr.io/schemas/task-execution-result-v1",
+            "plan_id": self.plan_id,
+            "item_id": self.item_id,
+            "workflow_id": self.workflow_id,
+            "issue_number": self.issue_number,
+            "worker_id": self.worker_id,
+            "stage": self.stage,
+            "outcome": self.outcome,
+            "detail": self.detail,
+            "runner_exit_code": self.runner_exit_code,
+            "recorded_at": datetime.now(UTC).isoformat(),
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -1037,9 +1068,26 @@ def run_worker_once(
             else:
                 status = "blocked"
                 outcome = "blocked"
-                note = "Powdrr execution did not finish successfully."
-                if detail:
-                    note += f" {detail}"
+                detail = detail or "Task runner returned a non-success exit code."
+                failure = TaskExecutionResult(
+                    plan_id=plan.plan_id,
+                    item_id=item.item_id,
+                    workflow_id=item.workflow_id,
+                    issue_number=issue.number,
+                    worker_id=worker_id,
+                    stage="implementation",
+                    outcome="failed",
+                    detail=detail,
+                    runner_exit_code=(
+                        return_code if isinstance(return_code, int) else None
+                    ),
+                )
+                failure_path = _write_task_execution_result(root, failure)
+                note = (
+                    "Powdrr execution failed during implementation.\n\n"
+                    f"{detail}\n\n"
+                    f"Durable diagnostic: `{failure_path.relative_to(root).as_posix()}`"
+                )
             issue = client.get_issue(issue.number)
             client.update_issue(
                 issue,
@@ -1060,8 +1108,34 @@ def run_worker_once(
                 item.item_id,
                 detail,
                 ci_outcome=ci_outcome,
+                failure_record=(str(failure_path) if return_code != 0 else None),
             )
     return WorkerReport("no_eligible_work")
+
+
+def _write_task_execution_result(repo_root: Path, result: TaskExecutionResult) -> Path:
+    """Atomically persist the terminal failure record before reporting it."""
+    directory = repo_root / ".powdrr" / "github-issue-worker" / "results"
+    directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+    os.chmod(directory, 0o700)
+    path = directory / f"issue-{result.issue_number}.json"
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".issue-{result.issue_number}-", suffix=".tmp", dir=directory
+    )
+    temporary_path = Path(temporary_name)
+    try:
+        os.fchmod(descriptor, 0o600)
+        with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+            json.dump(
+                result.to_data(), stream, ensure_ascii=False, indent=2, sort_keys=True
+            )
+            stream.write("\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary_path, path)
+    finally:
+        temporary_path.unlink(missing_ok=True)
+    return path
 
 
 def latest_manual_prerequisite_checkpoint(

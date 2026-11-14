@@ -11,7 +11,9 @@ from typing import Any, cast
 import pytest
 import yaml
 from powdrr_contracts.models import ChatCompletionRequest, ChatCompletionResponse
+from powdrr_service.decision_obligation import content_fingerprint
 from powdrr_service.structrr.reference_definitions import ReferenceDefinition
+from powdrr_service.structrr.source_run_lineage import build_source_run_lineage
 
 from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.workrr import source_reference_dispatch as dispatch
@@ -142,6 +144,40 @@ def fixture(tmp_path: Path) -> tuple[Path, str, dict[str, Any]]:
         ),
     }
     return repo, git(repo, "rev-parse", "HEAD"), proposed
+
+
+def _write_minimal_lineage(private_root: Path, run_id: str) -> dict[str, Any]:
+    private_root.mkdir(parents=True, exist_ok=True)
+    record = build_source_run_lineage(
+        run_id=run_id,
+        lineage_context={"plan_id": "plan-1", "item_id": "item-1"},
+        accepted_design={},
+        handoff={
+            "worker_prompt": {
+                "fingerprint": "prompt-integrity",
+                "contract": {
+                    "base_commit": "a" * 40,
+                    "design_fingerprint": "design-integrity",
+                    "catalog_digest": "catalog-integrity",
+                    "definitions": [],
+                    "obligations": [],
+                    "preservation": [],
+                    "behavior_case_ids": {},
+                },
+            },
+            "validation_manifest": {"fingerprint": "manifest-integrity"},
+        },
+        terminal={
+            "outcome": "accepted",
+            "validation": {"results": []},
+            "obligation_route_evidence": {
+                "candidate_tree": "candidate-tree-id",
+                "routes": [],
+            },
+        },
+    )
+    (private_root / "lineage.json").write_text(json.dumps(record), encoding="utf-8")
+    return record
 
 
 def test_reviewed_base_may_be_ancestor_of_workflow_checkpoint_checkout(
@@ -298,11 +334,13 @@ def test_story_context_is_bound_into_protected_source_objective(
     class Run:
         private_root = tmp_path / "private"
         public_root = tmp_path / "public"
+        run_id = "implementation"
 
         def __init__(self) -> None:
             self.public_root.mkdir()
 
         def execute(self, _handler: Any) -> Any:
+            record = _write_minimal_lineage(self.private_root, self.run_id)
             return SimpleNamespace(
                 accepted=True,
                 to_data=lambda: {
@@ -314,6 +352,7 @@ def test_story_context_is_bound_into_protected_source_objective(
                     },
                     "validation": {"status": "passed"},
                     "error": None,
+                    "lineage_record_fingerprint": content_fingerprint(record),
                 },
             )
 
@@ -342,6 +381,8 @@ def test_story_context_is_bound_into_protected_source_objective(
     def fake_git(_root: Path, *arguments: str, data: bytes | None = None) -> bytes:
         if arguments[:2] == ("rev-parse", "HEAD"):
             return base.encode()
+        if arguments[0] == "rev-parse" and ":" in arguments[1]:
+            return b"source-design-blob-id"
         if arguments[0] in {"diff", "ls-files", "status", "apply", "worktree"}:
             return b""
         pytest.fail(f"unexpected git command: {arguments}")
@@ -423,6 +464,7 @@ def test_failed_source_invocation_retries_only_from_a_new_reviewed_revision(
             self, invocation: int, artifact_root: Path, workspace_root: Path
         ) -> None:
             self.invocation = invocation
+            self.run_id = "implementation"
             self.private_root = tmp_path / "private" / str(invocation)
             self.public_root = tmp_path / "public" / str(invocation)
             self.artifact_root = artifact_root
@@ -432,7 +474,10 @@ def test_failed_source_invocation_retries_only_from_a_new_reviewed_revision(
             invocations.append(self.invocation)
             accepted = self.invocation == 1
             if accepted:
+                record = _write_minimal_lineage(self.private_root, self.run_id)
                 (self.workspace_root / "twice.py").write_text(CANDIDATE)
+            else:
+                record = None
             return SimpleNamespace(
                 accepted=accepted,
                 to_data=lambda: {
@@ -444,6 +489,9 @@ def test_failed_source_invocation_retries_only_from_a_new_reviewed_revision(
                     },
                     "validation": {"status": "passed" if accepted else "failed"},
                     "error": None if accepted else "verification failed",
+                    "lineage_record_fingerprint": (
+                        content_fingerprint(record) if record is not None else None
+                    ),
                     "obligation_route_evidence": (
                         {
                             "complete": True,
@@ -513,6 +561,86 @@ def test_failed_source_invocation_retries_only_from_a_new_reviewed_revision(
     with pytest.raises(PowdrrExecutionError, match="already dispatched"):
         dispatch.dispatch_source_reference_task(**revised_arguments)
     assert invocations == [0, 1]
+
+
+def test_dispatch_blocks_patch_when_stable_lineage_link_is_missing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo, base, proposed = fixture(tmp_path)
+    candidate_roots: list[Path] = []
+
+    class Run:
+        run_id = "implementation"
+
+        def __init__(self, artifact_root: Path, workspace_root: Path) -> None:
+            self.private_root = artifact_root / self.run_id / "private"
+            self.private_root.mkdir(parents=True)
+            self.workspace_root = workspace_root
+
+        def execute(self, _handler: Any) -> Any:
+            (self.workspace_root / "twice.py").write_text(CANDIDATE)
+            original_record = _write_minimal_lineage(self.private_root, self.run_id)
+            tampered_record = json.loads(
+                (self.private_root / "lineage.json").read_text()
+            )
+            tampered_record["links"] = [
+                link
+                for link in tampered_record["links"]
+                if link["relation"] != "invoked"
+            ]
+            (self.private_root / "lineage.json").write_text(json.dumps(tampered_record))
+            return SimpleNamespace(
+                accepted=True,
+                to_data=lambda: {
+                    "outcome": "accepted",
+                    "attempt": {
+                        "attempt_id": self.run_id,
+                        "status": "completed",
+                        "changed_paths": ["twice.py"],
+                    },
+                    "validation": {"status": "passed"},
+                    "error": None,
+                    "lineage_record_fingerprint": content_fingerprint(original_record),
+                    "obligation_route_evidence": {
+                        "complete": True,
+                        "reconciliation": {"passed": True, "issues": []},
+                    },
+                },
+            )
+
+        def verify_candidate(self) -> None:
+            return None
+
+    def prepare(**kwargs: Any) -> Run:
+        artifact_root = Path(kwargs["artifact_root"])
+        candidate_roots.append(artifact_root)
+        return Run(artifact_root, Path(kwargs["workspace_root"]))
+
+    monkeypatch.setattr(dispatch.SourceReferenceRun, "prepare", prepare)
+    monkeypatch.setattr(dispatch.tempfile, "gettempdir", lambda: str(tmp_path))
+    monkeypatch.setattr(dispatch, "create_miniswe_inference_handler", lambda _t: None)
+    result = dispatch.dispatch_source_reference_task(
+        repo_root=repo,
+        proposed=proposed,
+        base_commit=base,
+        workflow_id="workflow-1",
+        task_id="implementation",
+        objective="Double the input.",
+        allowed_paths=("twice.py",),
+        profile=ValidationProfile("behavior", (sys.executable, "-c", "pass")),
+        code_agent="minisweagent",
+        model="test",
+        worker_timeout_seconds=30,
+        validation_timeout_seconds=30,
+        review_client=Reviewer(),
+    )
+
+    assert result["passed"] is False
+    assert result["status"] == "lineage_failed"
+    assert result["lineage_audit"]["passed"] is False
+    assert git(repo, "rev-parse", "HEAD") == base
+    assert (repo / "twice.py").read_text() == BASELINE
+    assert not (repo / "added.py").exists()
 
 
 @pytest.mark.parametrize(

@@ -1,0 +1,51 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1510
+title: Implement stable-ID lineage for protected source handoffs
+intent:
+  problem: Protected source-reference runs do not record lineage across accepted design, attempts, evidence, candidates, and patch transfer.
+  goal: Implement a stable-ID lineage graph and fail-closed audit at the Workrr handoff boundary.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/plans/intent-source-reference-lineage-spec.md
+  type: modified
+  span: {start_line: 1, end_line: 255}
+  summary: Record stable-ID schema and implementation milestone status.
+  rationale: Keep the plan aligned with the delivered schema and current implementation state.
+- path: packages/service/src/powdrr_service/structrr/source_run_lineage.py
+  type: added
+  span: {start_line: 1, end_line: 760}
+  summary: Define and audit stable-ID source-run lineage records.
+  rationale: Connect reviewed design obligations, cases, evidence, attempts, candidates, patches, and transfer decisions by durable domain IDs.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span: {start_line: 1, end_line: 1421}
+  summary: Persist private lineage records and audit results for protected runs.
+  rationale: Build lineage from frozen Workrr inputs and bind its integrity fingerprint into terminal evidence.
+- path: src/powdrr_lift/workrr/source_reference_dispatch.py
+  type: modified
+  span: {start_line: 1, end_line: 536}
+  summary: Audit stable-ID lineage and patch transfer eligibility before applying a candidate.
+  rationale: Prevent transfer when the run graph or exact proposed patch fails audit.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span: {start_line: 1030, end_line: 1055}
+  summary: Pass worktree source paths into protected worker subprocesses.
+  rationale: Let subprocesses using the shared interpreter load the correct worktree packages.
+- path: tests/test_source_run_lineage.py
+  type: added
+  span: {start_line: 1, end_line: 160}
+  summary: Cover stable identifiers, resolved graph links, candidate evidence, and transfer checks.
+  rationale: Ensure fingerprint changes do not sever stable-ID links and invalid graphs fail audit.
+- path: tests/test_source_reference_dispatch.py
+  type: modified
+  span: {start_line: 1, end_line: 873}
+  summary: Verify tampered lineage blocks dispatch without changing the task checkout.
+  rationale: Exercise the fail-closed transfer boundary.
+entities:
+- id: structrr-source-run-lineage
+  type: Module
+  action: added
+entity_relationships: []
+invariants: []
+guidance: []

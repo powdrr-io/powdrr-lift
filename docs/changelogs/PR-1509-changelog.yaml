@@ -1,0 +1,83 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1509
+title: Clarify and archive validation discovery plan
+intent:
+  problem: The completed validation discovery plan mixed complete acceptance scope with contradictory partial-status wording and omitted a declared CI distribution check from its corpus.
+  goal: State completion and deferred limits consistently, archive the plan, and make corpus accounting match the reviewed CI workflow.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/plans/completed/README.md
+    type: modified
+    span: {start_line: 8, end_line: 8}
+    summary: Index the completed validation discovery plan.
+    rationale: Make completed plans discoverable in their archive directory.
+  - path: docs/plans/completed/bootstrap-validation-discovery.md
+    type: modified
+    span: {start_line: 1, end_line: 743}
+    summary: Clarify completion scope and archive the finished plan.
+    rationale: State deferred expression support consistently, reflect reviewed CI obligations, and preserve the completed plan in its archive.
+  - path: docs/reports/validation-discovery-corpus-2026-11-14.md
+    type: modified
+    span: {start_line: 9, end_line: 9}
+    summary: Refresh the Powdrr corpus match count.
+    rationale: Reflect the added distribution verification obligation.
+  - path: docs/reports/validation-discovery-corpus-2026-11-14.md
+    type: modified
+    span: {start_line: 14, end_line: 14}
+    summary: Refresh the discovery candidate total.
+    rationale: Report the updated profile inventory after adding script discovery.
+  - path: docs/reports/validation-discovery-corpus-2026-11-14.md
+    type: modified
+    span: {start_line: 26, end_line: 27}
+    summary: Update corpus obligation and executable discovery totals.
+    rationale: Include the additional reviewed executable check.
+  - path: docs/reports/validation-discovery-corpus-2026-11-14.md
+    type: modified
+    span: {start_line: 29, end_line: 29}
+    summary: Refresh the unresolved obligation count.
+    rationale: Keep unresolved checks distinct from executable discoveries.
+  - path: packages/service/src/powdrr_service/structrr/validation.py
+    type: modified
+    span: {start_line: 934, end_line: 934}
+    summary: Classify validation Python scripts as custom CI profiles.
+    rationale: Discover script-based verification steps without mislabeling them as standard providers.
+  - path: packages/service/src/powdrr_service/structrr/validation.py
+    type: modified
+    span: {start_line: 970, end_line: 974}
+    summary: Assign stable names to validation script profiles.
+    rationale: Preserve readable identities for repository scripts.
+  - path: packages/service/src/powdrr_service/structrr/validation.py
+    type: modified
+    span: {start_line: 979, end_line: 987}
+    summary: Recognize validation-oriented scripts under scripts/.
+    rationale: Restrict custom script discovery to clearly named verification tasks.
+  - path: tests/fixtures/validation_corpus/corpus.yaml
+    type: modified
+    span: {start_line: 15, end_line: 15}
+    summary: Add package distribution to Powdrr corpus coverage.
+    rationale: Reflect the additional reviewed CI validation category.
+  - path: tests/fixtures/validation_corpus/corpus.yaml
+    type: modified
+    span: {start_line: 70, end_line: 77}
+    summary: Record the exact package-distribution command and evidence.
+    rationale: Check discovery against the workflow declaration and referenced script.
+  - path: tests/test_validation_corpus_followup.py
+    type: modified
+    span: {start_line: 119, end_line: 122}
+    summary: Add a fixture validation script to the discovery regression case.
+    rationale: Exercise Python-script classification for CI commands.
+  - path: tests/test_validation_corpus_followup.py
+    type: modified
+    span: {start_line: 128, end_line: 129}
+    summary: Add the distribution script command to the workflow fixture.
+    rationale: Test the exact native command shape from CI.
+  - path: tests/test_validation_corpus_followup.py
+    type: modified
+    span: {start_line: 146, end_line: 156}
+    summary: Assert distribution profile, command, provider, and evidence.
+    rationale: Protect the discovered check's identity and provenance.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []

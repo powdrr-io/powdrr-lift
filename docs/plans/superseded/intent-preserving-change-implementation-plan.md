@@ -1,7 +1,7 @@
 # Intent-Preserving Change Control Implementation Plan
 
 > **Superseded.** This implementation sequence targets the former feature and
-> OpenCode flow. Use [Intent lineage for protected source-reference runs](../intent-source-reference-lineage-spec.md)
+> OpenCode flow. Use [Intent lineage for protected source-reference runs](../completed/intent-source-reference-lineage-spec.md)
 > for current remaining work.
 
 ## Purpose

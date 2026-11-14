@@ -2,7 +2,7 @@
 
 > **Superseded.** This broad intent-retrieval plan is historical and is not an
 > implementation guide for Powdrr's current protected source-reference route.
-> See [Intent lineage for protected source-reference runs](../intent-source-reference-lineage-spec.md).
+> See [Intent lineage for protected source-reference runs](../completed/intent-source-reference-lineage-spec.md).
 
 ## Purpose
 

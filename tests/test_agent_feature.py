@@ -139,6 +139,19 @@ def test_agent_feature_timeout_writes_a_timed_out_report(
     tmp_path: Path, monkeypatch: Any
 ) -> None:
     root = _repository(tmp_path / "repo")
+    task = AgentWorktree(
+        root,
+        root,
+        "powdrr/timed-feature",
+        _git(root, "rev-parse", "HEAD"),
+        None,
+        None,
+    )
+
+    monkeypatch.setattr(
+        "powdrr_lift.agent_feature.prepare_agent_worktree",
+        lambda *args, **kwargs: task,
+    )
 
     def slow_feature(*args: Any, **kwargs: Any) -> FeatureEndpointResult:
         del args, kwargs
@@ -151,7 +164,7 @@ def test_agent_feature_timeout_writes_a_timed_out_report(
         _config(root),
         run_id="timed-feature",
         output_root=tmp_path / "reports",
-        timeout_seconds=0.05,
+        timeout_seconds=0.5,
     )
 
     report = json.loads(result.report_json_path.read_text(encoding="utf-8"))
@@ -164,7 +177,7 @@ def test_agent_feature_timeout_writes_a_timed_out_report(
     assert result.status == "timed_out"
     assert report["status"] == "timed_out"
     assert metadata["limits"] == {
-        "timeout_seconds": 0.05,
+        "timeout_seconds": 0.5,
         "max_repair_attempts": 2,
     }
     assert failure["stage"] == "timeout"

@@ -1,0 +1,78 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1514
+title: Organize completed plans and remove retired test suite plan
+intent:
+  problem: The lineage plan is complete but remains in the active plans directory, while the retired test suite rationalization plan remains in the active list.
+  goal: Move the completed lineage specification into the completed directory, update its links, and delete the retired test suite plan.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/plans/test-suite-rationalization-audit.md
+  type: deleted
+  span: {start_line: 1, end_line: 137}
+  summary: Delete the retired test suite rationalization plan.
+  rationale: Remove the plan from the active and historical document set as requested.
+- path: docs/design/source-anchored-semantic-contract-compilation.md
+  type: modified
+  span: {start_line: 70, end_line: 71}
+  summary: Point the active design map to the completed lineage plan.
+  rationale: Keep the design reference valid after the move and indicate implementation completion.
+- path: docs/plans/research/acceptance-criteria-template-catalog-proposal.md
+  type: modified
+  span: {start_line: 81, end_line: 81}
+  summary: Update the research proposal link to the completed lineage plan.
+  rationale: Preserve a valid reference without presenting completed implementation as active work.
+- path: docs/plans/superseded/durable-intent-implementation-plan.md
+  type: modified
+  span: {start_line: 5, end_line: 5}
+  summary: Update its link to the completed lineage plan.
+  rationale: Keep the historical document’s current-direction reference working.
+- path: docs/plans/superseded/durable-user-intent-retrieval-and-enforcement.md
+  type: modified
+  span: {start_line: 5, end_line: 5}
+  summary: Update its link to the completed lineage plan.
+  rationale: Keep the historical document’s current-direction reference working.
+- path: docs/plans/superseded/intent-preserving-change-control.md
+  type: modified
+  span: {start_line: 5, end_line: 5}
+  summary: Update its link to the completed lineage plan.
+  rationale: Keep the historical document’s current-direction reference working.
+- path: docs/plans/superseded/intent-preserving-change-implementation-plan.md
+  type: modified
+  span: {start_line: 4, end_line: 4}
+  summary: Update its link to the completed lineage plan.
+  rationale: Keep the historical document’s current-direction reference working.
+- path: docs/plans/superseded/intent-preserving-change-pr-plan.md
+  type: modified
+  span: {start_line: 4, end_line: 4}
+  summary: Update its link to the completed lineage plan.
+  rationale: Keep the historical document’s current-direction reference working.
+- path: docs/plans/superseded/structrr-diff-and-invariant-repair-loop.md
+  type: modified
+  span: {start_line: 5, end_line: 5}
+  summary: Update its link to the completed lineage plan.
+  rationale: Keep the historical document’s current-direction reference working.
+- path: science/deepswe/acceptance_templates/catalog.json
+  type: modified
+  span: {start_line: 3, end_line: 3}
+  summary: Refresh the catalog fingerprint from the current source proposal.
+  rationale: Restore reproducibility between the checked-in catalog and its source after CI detected a stale generated fingerprint.
+- path: tests/test_agent_feature.py
+  type: modified
+  span: {start_line: 142, end_line: 154}
+  summary: Stub worktree preparation in the timeout reporting test.
+  rationale: Ensure the test exercises deadline handling during feature execution instead of Git setup.
+- path: tests/test_agent_feature.py
+  type: modified
+  span: {start_line: 167, end_line: 167}
+  summary: Give the timeout test enough time to complete its lightweight setup.
+  rationale: Avoid a 50 ms CI scheduling race before the mocked slow feature runs.
+- path: tests/test_agent_feature.py
+  type: modified
+  span: {start_line: 180, end_line: 180}
+  summary: Update the asserted timeout metadata to match the test deadline.
+  rationale: Keep the report assertion aligned with the more reliable timeout duration.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []

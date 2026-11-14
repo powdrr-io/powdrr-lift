@@ -931,6 +931,7 @@ def _validation_provider(command: Sequence[str]) -> str | None:
     if any(
         Path(token).name in {"check_migrations.py"}
         or Path(token).as_posix().lstrip("./") in {"scripts/check", "scripts/test"}
+        or _is_validation_python_script(token)
         or Path(token).name == "run-deterministic-workflow-suite.sh"
         for token in tokens
     ) or any(
@@ -966,8 +967,22 @@ def _validation_profile_name(
         return "django-unittest"
     if provider == "unittest":
         return f"ci-{cwd_name}-unittest-{variant}"
+    validation_script = next(
+        (token for token in tokens if _is_validation_python_script(token)), None
+    )
+    if provider == "custom" and validation_script:
+        return f"script-{Path(validation_script).stem}"
     kind = _validation_command_kind(tuple(command)) or "custom"
     return f"ci-{cwd_name}-{kind}-{variant}"
+
+
+def _is_validation_python_script(token: str) -> bool:
+    path = Path(token)
+    return (
+        path.parent.as_posix().lstrip("./") == "scripts"
+        and path.suffix == ".py"
+        and path.stem.startswith(("verify-", "validate-", "check-", "test-", "lint-"))
+    )
 
 
 def _profile(

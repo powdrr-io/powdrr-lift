@@ -16,7 +16,15 @@ from powdrr_service.planning.multipr_structrr import (
     rebase_item_proposal,
     write_multi_pr_proposal,
 )
+from powdrr_service.planning.source_reference_design import (
+    compile_source_reference_design,
+)
+from powdrr_service.structrr.reference_catalog import compile_reference_catalog
+from powdrr_service.structrr.reference_definitions import ReferenceDefinition
 from powdrr_service.structrr.snapshot import snapshot_digest
+from powdrr_service.structrr.source_reference_handoff import (
+    compile_source_reference_handoff,
+)
 
 
 def _plan_item(item_id: str) -> dict[str, object]:
@@ -73,31 +81,196 @@ def test_multi_pr_proposal_partitions_operations_over_projected_states() -> None
         operation.subject_id
         for operation in proposal.item_proposals["second"].operations
     ] == ["second-module"]
-    assert proposal.item_proposals["first"].verification == {
-        "required_test_cases": [
-            {
-                "id": "AC-01",
-                "description": "first works",
-                "status": "planned",
-            }
-        ],
-        "validation_runs": [],
-    }
-    assert proposal.full_proposal.verification["required_test_cases"] == [
-        {
-            "id": "first/AC-01",
-            "description": "first works",
-            "status": "planned",
-        },
-        {
-            "id": "second/AC-01",
-            "description": "second works",
-            "status": "planned",
-        },
-    ]
+    first_case = proposal.item_proposals["first"].verification["required_test_cases"][0]
+    assert first_case["id"] == "AC-01"
+    assert first_case["description"] == "first works"
+    assert first_case["obligation_id"] == "AC-01"
+    assert first_case["source_text"] == "first works"
+    assert proposal.full_proposal.verification["required_test_cases"][0]["id"] == (
+        "first/AC-01"
+    )
+    assert proposal.full_proposal.verification["required_test_cases"][1]["id"] == (
+        "second/AC-01"
+    )
     assert any(
         entity["id"] == "first-module"
         for entity in proposal.item_baselines["second"]["entities"]
+    )
+
+
+def test_multi_pr_proposal_preserves_typed_behavior_and_source_provenance(
+    tmp_path: Path,
+) -> None:
+    scenario = {
+        "schema_version": "behavior-scenario-v1",
+        "scenario_id": "scenario:typed",
+        "subject": "typed response",
+        "given": "a valid request",
+        "when": "the response is built",
+        "then": "the accepted type is returned",
+        "dimensions": {
+            "normal_result": "returns the accepted type",
+            "error_behavior": "not_applicable",
+            "continuation": "not_applicable",
+            "unsupported_behavior": "not_applicable",
+            "cancellation_cleanup": "not_applicable",
+            "compatibility": "preserves the public wire format",
+            "negative_boundaries": "not_applicable",
+        },
+        "source_dimensions": {"behavior_family": "success"},
+        "evidence": ["source-clause:typed"],
+        "validator": "typed response test",
+        "faithfulness_ref": {"fingerprint": "sha256:" + "f" * 64},
+    }
+    case = {
+        "id": "case:typed",
+        "description": "The typed response is retained.",
+        "status": "planned",
+        "test_type": "integration",
+        "scenario": "build a response for a valid request",
+        "expected_outcome": "the accepted type is returned",
+        "source_clauses": ["source-clause:typed"],
+        "behavior_scenario": scenario,
+    }
+    proposal = compile_multi_pr_proposal(
+        plan_id="typed-plan",
+        baseline_snapshot={"entities": []},
+        items=[
+            {
+                **_plan_item("typed-item"),
+                "verification": {"required_test_cases": [case]},
+            }
+        ],
+        proposed_operations=[],
+        source_ref="docs/typed-plan.md",
+    )
+
+    assert proposal.item_proposals["typed-item"].verification[
+        "required_test_cases"
+    ] == [case]
+    full_case = proposal.full_proposal.verification["required_test_cases"][0]
+    assert full_case["id"] == "case:typed"
+    assert full_case["source_clauses"] == case["source_clauses"]
+    assert full_case["behavior_scenario"] == scenario
+    path = tmp_path / "typed-proposal.json"
+    write_multi_pr_proposal(path, proposal)
+    restored = load_multi_pr_proposal(path)
+    assert (
+        restored.item_proposals["typed-item"].verification["required_test_cases"]
+        == proposal.item_proposals["typed-item"].verification["required_test_cases"]
+    )
+
+
+def test_dependency_projected_reference_definition_reaches_later_item_handoff() -> None:
+    definition = ReferenceDefinition(
+        "feature:shared-wire",
+        "feature",
+        "Use the shared wire format in both stages.",
+        "source:shared-wire",
+    )
+
+    def case(case_id: str, scenario_id: str) -> dict[str, object]:
+        return {
+            "id": case_id,
+            "description": f"Verify {scenario_id}.",
+            "test_type": "integration",
+            "scenario": f"exercise {scenario_id}",
+            "expected_outcome": f"{scenario_id} passes",
+            "behavior_scenario": {
+                "schema_version": "behavior-scenario-v1",
+                "scenario_id": scenario_id,
+                "subject": "shared wire operation",
+                "given": "a valid payload",
+                "when": "the operation is called",
+                "then": "the shared wire format is used",
+                "dimensions": {
+                    "normal_result": "uses the shared wire format",
+                    "error_behavior": "not_applicable",
+                    "continuation": "not_applicable",
+                    "unsupported_behavior": "not_applicable",
+                    "cancellation_cleanup": "not_applicable",
+                    "compatibility": "preserves the wire format",
+                    "negative_boundaries": "not_applicable",
+                },
+                "evidence": ["source:shared-wire"],
+                "validator": "focused shared wire test",
+                "faithfulness_ref": {"fingerprint": "sha256:" + "b" * 64},
+            },
+        }
+
+    baseline: dict[str, Any] = {"reference_definitions": []}
+    placement = {
+        "obligation_id": "placement:second-shared-wire",
+        "ref": definition.id,
+        "relationship": "implements",
+        "requirement": definition.statement,
+        "owner": {
+            "path": "src/second.py",
+            "kind": "function",
+            "qualified_name": "second_stage",
+        },
+        "cardinality": "exactly_one",
+        "verification_refs": ["case:second"],
+    }
+    proposal = compile_multi_pr_proposal(
+        plan_id="dependency-plan",
+        baseline_snapshot=baseline,
+        items=[
+            {
+                **_plan_item("first"),
+                "verification": {
+                    "required_test_cases": [case("case:first", "scenario:first")]
+                },
+            },
+            {
+                **_plan_item("second"),
+                "verification": {
+                    "required_test_cases": [case("case:second", "scenario:second")]
+                },
+            },
+        ],
+        proposed_operations=[
+            {
+                "operation_id": "definition:shared-wire",
+                "item_id": "first",
+                "section": "reference_definitions",
+                "subject_id": definition.id,
+                "action": "added",
+                "content": definition.to_data(),
+            },
+            {
+                "operation_id": "placement:second-shared-wire",
+                "item_id": "second",
+                "section": "source_reference_placements",
+                "subject_id": placement["obligation_id"],
+                "action": "added",
+                "content": placement,
+            },
+        ],
+        source_ref="docs/dependency-plan.md",
+    )
+
+    second_baseline = proposal.item_baselines["second"]
+    assert definition.to_data() in second_baseline["reference_definitions"]
+    design = compile_source_reference_design(
+        plan_id=proposal.plan_id,
+        item_id="second",
+        proposal=proposal.item_proposals["second"].to_data(),
+        baseline_snapshot=second_baseline,
+        base_commit="c" * 40,
+        objective="Use the shared wire format.",
+        allowed_paths=("src",),
+    )["design"]
+    assert design["source_reference_placements"] == [placement]
+    catalog = compile_reference_catalog(design, base_commit="c" * 40)
+    handoff = compile_source_reference_handoff(
+        design,
+        catalog,
+        objective="Use the shared wire format.",
+        allowed_paths=("src",),
+    )
+    assert handoff.validation_manifest["contract"]["definitions"][0]["id"] == (
+        definition.id
     )
 
 

@@ -13,6 +13,7 @@ import shlex
 import subprocess
 import sys
 import tempfile
+import time
 import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import replace
@@ -2987,6 +2988,32 @@ def _run_publish_plan_issues(args: argparse.Namespace) -> int:
     return 0
 
 
+def _issue_identifies_pull_request(
+    texts: Sequence[str], *, pr_number: int, pr_url: object
+) -> bool:
+    return any(
+        (isinstance(pr_url, str) and pr_url in text)
+        or re.search(rf"(?<![\w#])#{pr_number}(?!\d)", text) is not None
+        for text in texts
+    )
+
+
+def _pull_request_closes_issue(
+    body: object, *, issue_number: int, repository: str
+) -> bool:
+    if not isinstance(body, str):
+        return False
+    issue_url = f"https://github.com/{repository}/issues/{issue_number}"
+    if issue_url in body:
+        return True
+    reference = rf"(?:{re.escape(repository)}\s+)?#{issue_number}\b"
+    closing_keyword = (
+        r"\b(?:clos(?:e|es|ed|ing)|fix(?:es|ed|ing)?|"
+        r"resolv(?:e|es|ed|ing))\b"
+    )
+    return re.search(rf"(?im){closing_keyword}\s+{reference}", body) is not None
+
+
 def _run_respond_to_pr_ci(args: argparse.Namespace) -> int:
     """Capture current-head Actions evidence and checkpoint deterministic triage."""
     try:
@@ -3039,11 +3066,36 @@ def _run_respond_to_pr_ci(args: argparse.Namespace) -> int:
                 if isinstance(comment.get("body"), str)
             ),
         ]
-        associated = any(
-            (isinstance(pr_url, str) and pr_url in text)
-            or re.search(rf"(?<![\w#])#{pr_number}(?!\d)", text) is not None
-            for text in related_text
+        pr_body = snapshot.pull_request.get("body")
+        associated = _issue_identifies_pull_request(
+            related_text, pr_number=pr_number, pr_url=pr_url
+        ) or _pull_request_closes_issue(
+            pr_body, issue_number=args.issue, repository=args.repository
         )
+        # The issue comment that records a newly created PR can lag behind the
+        # pull request itself. Re-read the issue briefly before deciding the PR
+        # is unrelated; the PR's own closing reference is checked above and is
+        # authoritative even while GitHub's reverse association is catching up.
+        for delay in (0.5, 1.0, 2.0, 4.0):
+            if associated:
+                break
+            time.sleep(delay)
+            issue = client.get_issue(args.issue)
+            prior = client.list_issue_comments(args.issue)
+            issue_body = issue.get("body")
+            related_text = [
+                issue_body if isinstance(issue_body, str) else "",
+                *(
+                    comment.get("body", "")
+                    for comment in prior
+                    if isinstance(comment.get("body"), str)
+                ),
+            ]
+            associated = _issue_identifies_pull_request(
+                related_text, pr_number=pr_number, pr_url=pr_url
+            ) or _pull_request_closes_issue(
+                pr_body, issue_number=args.issue, repository=args.repository
+            )
         if not associated:
             raise GitHubActionsError(
                 f"issue #{args.issue} does not identify PR #{pr_number}; "
@@ -3071,6 +3123,8 @@ def _run_respond_to_pr_ci(args: argparse.Namespace) -> int:
         base_ref = base.get("ref") if isinstance(base, Mapping) else None
         title = snapshot.pull_request.get("title")
         body = snapshot.pull_request.get("body")
+        draft = snapshot.pull_request.get("draft")
+        draft_status = draft if isinstance(draft, bool) else None
         reproductions = _reproduce_ci_failures(
             failures,
             repository_root=clone_root,
@@ -3092,6 +3146,7 @@ def _run_respond_to_pr_ci(args: argparse.Namespace) -> int:
             failures=failures,
             reproductions=reproductions,
             observed_at=snapshot.observed_at,
+            pull_request_draft=draft_status,
         )
         duplicate = any(
             isinstance(item.get("body"), str)
@@ -3110,6 +3165,7 @@ def _run_respond_to_pr_ci(args: argparse.Namespace) -> int:
                 "base_ref": base_ref if isinstance(base_ref, str) else None,
                 "title": title if isinstance(title, str) else "",
                 "body": body if isinstance(body, str) else "",
+                "draft": draft_status,
             },
             "observation_id": observation_id,
             "checkpoint_written": not duplicate,

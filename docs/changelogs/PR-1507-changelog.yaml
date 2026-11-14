@@ -1,0 +1,66 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1507
+title: Consolidate intent lineage work around protected source handoff
+intent:
+  problem: Intent planning documents describe overlapping and partly removed code-writing routes, while the protected source-reference route has no integrated run-bound lineage audit.
+  goal: Define the remaining intent traceability work for the current route and archive outdated intent plans with clear superseded status.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/plans/intent-source-reference-lineage-spec.md
+  type: added
+  span: {start_line: 1, end_line: 180}
+  summary: Specify the remaining lineage record and audit gate for protected source-reference runs.
+  rationale: Bind accepted Structrr intent, one worker attempt, candidate evidence, and patch transfer without reopening removed routes.
+- path: docs/design/source-anchored-semantic-contract-compilation.md
+  type: modified
+  span: {start_line: 70, end_line: 71}
+  summary: Point intent ownership to the consolidated current-direction specification.
+  rationale: Keep the active design map from directing readers to an archived broad plan.
+- path: docs/plans/research/acceptance-criteria-template-catalog-proposal.md
+  type: modified
+  span: {start_line: 81, end_line: 81}
+  summary: Mark the old repair-loop link as historical research and link the current intent-lineage scope.
+  rationale: Avoid implying that the removed automatic correction loop is current direction.
+- path: science/deepswe/acceptance_templates/catalog.json
+  type: modified
+  span: {start_line: 3, end_line: 3}
+  summary: Refresh the frozen catalog fingerprint after changing its source proposal.
+  rationale: Keep the generated experiment artifact reproducible from the checked-in proposal.
+- path: docs/plans/superseded/durable-intent-implementation-plan.md
+  type: added
+  span: {start_line: 1, end_line: 781}
+  summary: Archive the durable-intent plan with a superseded notice and current-spec link.
+  rationale: Preserve historical context without presenting it as active implementation work.
+- path: docs/plans/superseded/durable-user-intent-retrieval-and-enforcement.md
+  type: added
+  span: {start_line: 1, end_line: 934}
+  summary: Archive the intent-retrieval plan with a superseded notice and current-spec link.
+  rationale: Preserve historical context without presenting it as active implementation work.
+- path: docs/plans/superseded/intent-preserving-change-control.md
+  type: added
+  span: {start_line: 1, end_line: 906}
+  summary: Archive the change-control proposal with a superseded notice and current-spec link.
+  rationale: Preserve historical context without presenting the former route as current.
+- path: docs/plans/superseded/intent-preserving-change-implementation-plan.md
+  type: added
+  span: {start_line: 1, end_line: 541}
+  summary: Archive the implementation plan with a superseded notice and current-spec link.
+  rationale: Preserve the old sequence while directing implementation to the current specification.
+- path: docs/plans/superseded/intent-preserving-change-pr-plan.md
+  type: added
+  span: {start_line: 1, end_line: 845}
+  summary: Archive the PR plan with a superseded notice and current-spec link.
+  rationale: Keep its sequencing history without competing with current work.
+- path: docs/plans/superseded/structrr-diff-and-invariant-repair-loop.md
+  type: added
+  span: {start_line: 1, end_line: 403}
+  summary: Archive the automatic repair-loop proposal with a superseded notice and current-spec link.
+  rationale: Preserve the proposal while making clear that the current route fails closed instead of retrying implementation.
+entities:
+- id: intent-source-reference-lineage-spec
+  type: Technical specification
+  action: added
+entity_relationships: []
+invariants: []
+guidance: []

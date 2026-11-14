@@ -67,8 +67,8 @@ design-to-implementation boundary.
   sentence segmentation, and atomic-clause production.
 - `docs/design/single-decision-feature-development.md` defines the governing
   single-decision normal form.
-- `docs/plans/durable-intent-implementation-plan.md` defines durable source and
-  semantic-contract ownership.
+- `docs/plans/intent-source-reference-lineage-spec.md` defines the remaining
+  intent traceability work at the protected source-reference handoff.
 - `docs/design/structrr-procedrr-workrr-integration.md` defines authority and
   runtime context boundaries.
 - `docs/design/external-coding-agent-boundary.md` defines the downstream worker

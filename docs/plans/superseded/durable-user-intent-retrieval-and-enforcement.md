@@ -1,5 +1,9 @@
 # Durable User Intent Retrieval and Enforcement Plan
 
+> **Superseded.** This broad intent-retrieval plan is historical and is not an
+> implementation guide for Powdrr's current protected source-reference route.
+> See [Intent lineage for protected source-reference runs](../intent-source-reference-lineage-spec.md).
+
 ## Purpose
 
 The primary reliability goal for Powdrr is that an instruction from a user

@@ -1,5 +1,9 @@
 # Intent-Preserving Change Control
 
+> **Superseded.** This proposal's OpenCode and feature-endpoint architecture is
+> historical. Current remaining work is defined by [Intent lineage for protected
+> source-reference runs](../intent-source-reference-lineage-spec.md).
+
 ## Status
 
 This document proposes the control protocol that joins Structrr, Procedrr,

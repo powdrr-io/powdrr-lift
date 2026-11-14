@@ -40,6 +40,10 @@ from powdrr_service.structrr.source_reference_handoff import (
     compile_accepted_behavior_scenarios,
     compile_source_reference_handoff,
 )
+from powdrr_service.structrr.source_run_lineage import (
+    audit_source_run_lineage,
+    build_source_run_lineage,
+)
 
 from powdrr_lift.core.contract_closure import (
     collect_python_evidence,
@@ -437,6 +441,7 @@ def bind_story_route_evidence(
         if not failed and refs:
             result.update(
                 status="passed",
+                case_ids=refs,
                 evidence_receipts=sorted(receipt_ids),
                 story_candidate_tree=story_tree,
                 reason=(
@@ -446,6 +451,7 @@ def bind_story_route_evidence(
         else:
             result.update(
                 status="not_collected",
+                case_ids=refs,
                 evidence_receipts=[],
                 story_candidate_tree=story_tree,
                 reason="linked story cases lack exact passing receipt coverage",
@@ -502,6 +508,8 @@ class SourceReferenceRun:
     validation_timeout_seconds: float
     reader_limits: ReaderLimits
     run_id: str
+    lineage_context: dict[str, Any]
+    accepted_design: dict[str, Any]
     inputs: dict[str, str]
     validation_context: SourceReferenceValidationContext
     _configuration: dict[str, Any]
@@ -531,6 +539,7 @@ class SourceReferenceRun:
         profiles: Mapping[str, ValidationProfile],
         artifact_root: Path,
         run_id: str,
+        lineage_context: Mapping[str, Any] | None = None,
         model: str,
         worker_timeout_seconds: float = 300,
         validation_timeout_seconds: float = 600,
@@ -685,6 +694,12 @@ class SourceReferenceRun:
         self.validation_timeout_seconds = validation_timeout_seconds
         self.reader_limits = reader_limits or ReaderLimits()
         self.run_id = run_id
+        self.lineage_context = json.loads(
+            json.dumps(dict(lineage_context or {}), allow_nan=False)
+        )
+        self.accepted_design = json.loads(
+            json.dumps(dict(accepted_design), allow_nan=False)
+        )
         self.root = artifact_root / run_id
         self.root.mkdir(parents=True, exist_ok=False)
         self.private_root, self.public_root = (
@@ -725,6 +740,7 @@ class SourceReferenceRun:
             "isolation": self._isolation_name(),
             "profiles": {name: p.to_data() for name, p in self.profiles.items()},
             "readonly_support_files": self.readonly_support_files,
+            "lineage_context": self.lineage_context,
             "post_worker_reconciliation": post_worker_reconciler is not None,
         }
         payloads = {
@@ -732,6 +748,7 @@ class SourceReferenceRun:
             "handoff.json": self.handoff.to_data(),
             "validation-inputs.json": self.inputs,
             "configuration.json": self._configuration,
+            "lineage-context.json": self.lineage_context,
         }
         for name, data in payloads.items():
             _write_once(self.private_root / name, data)
@@ -1373,6 +1390,37 @@ class SourceReferenceRun:
                 self.completion,
                 self.delivery,
             )
+            try:
+                lineage = build_source_run_lineage(
+                    run_id=self.run_id,
+                    lineage_context=self.lineage_context,
+                    accepted_design=self.accepted_design,
+                    handoff=self.handoff.to_data(),
+                    terminal=result,
+                )
+                lineage_audit = audit_source_run_lineage(lineage)
+                _write_once(self.private_root / "lineage.json", lineage)
+                _write_once(self.private_root / "lineage-audit.json", lineage_audit)
+                result["lineage_record_fingerprint"] = content_fingerprint(lineage)
+            except Exception as error:
+                lineage_audit = {
+                    "schema_version": "structrr-source-run-lineage-audit-v1",
+                    "run_id": self.run_id,
+                    "passed": False,
+                    "findings": [
+                        {
+                            "code": "lineage_build_failed",
+                            "subject_id": f"source-run:{self.run_id}",
+                            "message": str(error),
+                        }
+                    ],
+                }
+                _write_once(self.private_root / "lineage-audit.json", lineage_audit)
+            result["lineage_record_id"] = f"source-run:{self.run_id}"
+            result["lineage_audit"] = lineage_audit
+            if result["outcome"] == "accepted" and not lineage_audit["passed"]:
+                result["outcome"] = "lineage_failed"
+                result["error"] = "Source run lineage is incomplete or invalid"
             result["fingerprint"] = content_fingerprint(result)
             _write_once(self.private_root / "terminal.json", result)
         return SourceReferenceRunResult(

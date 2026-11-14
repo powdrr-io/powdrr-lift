@@ -1048,7 +1048,15 @@ class MiniSWEAgentProvider:
             )
         )
         if execution is not None:
-            environment.update(execution.process_environment())
+            # The worker uses the shared interpreter, so make the source tree
+            # under execution available to its module entry point and tools.
+            validation_environment = execution.validation_environment()
+            source_paths = environment.get("PYTHONPATH", "")
+            validation_paths = validation_environment.get("PYTHONPATH", "")
+            environment.update(validation_environment)
+            environment["PYTHONPATH"] = os.pathsep.join(
+                path for path in (source_paths, validation_paths) if path
+            )
         environment["MSWEA_GLOBAL_CONFIG_DIR"] = str(inference_config_root)
         inference_parent, inference_child = socket.socketpair()
         environment["POWDRR_MINISWE_INFERENCE_FD"] = str(inference_child.fileno())

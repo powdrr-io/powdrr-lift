@@ -18,7 +18,13 @@ from powdrr_agent.execution.execute_pr_tests import (
     pytest_command_for_files,
 )
 from powdrr_local.miniswe_inference import create_miniswe_inference_handler
+from powdrr_service.decision_obligation import content_fingerprint
 from powdrr_service.planning.plan_models import source_reference_design_file
+from powdrr_service.structrr.source_run_lineage import (
+    audit_source_run_lineage,
+    bind_source_run_patch,
+    build_source_run_lineage,
+)
 
 from powdrr_lift.errors import PowdrrExecutionError
 from powdrr_lift.workrr.coding_agent import _remove_provider_credentials
@@ -176,6 +182,9 @@ def dispatch_source_reference_task(
     design_path, design = load_reviewed_source_design(
         repo_root, proposed, base_commit=base_commit
     )
+    design_blob_id = (
+        _git(repo_root, "rev-parse", f"{base_commit}:{design_path}").decode().strip()
+    )
     if story_context is not None:
         objective = (
             objective + "\n\nPinned customer story contract and selected cases "
@@ -281,6 +290,14 @@ def dispatch_source_reference_task(
             profiles=profiles,
             artifact_root=root / "runs",
             run_id="implementation",
+            lineage_context={
+                "workflow_id": workflow_id,
+                "task_id": task_id,
+                "plan_id": proposed["plan_id"],
+                "item_id": proposed["item_id"],
+                "design_path": design_path,
+                "design_blob_id": design_blob_id,
+            },
             model=model,
             worker_timeout_seconds=worker_timeout_seconds,
             validation_timeout_seconds=validation_timeout_seconds,
@@ -301,6 +318,8 @@ def dispatch_source_reference_task(
             diff_check=data.get("diff_check"),
             source_reference_outcome=data["outcome"],
             source_reference_terminal=str(run.private_root / "terminal.json"),
+            lineage_record_id=data.get("lineage_record_id"),
+            lineage_audit=data.get("lineage_audit"),
             attempts=[data],
             error=data["error"],
         )
@@ -388,6 +407,45 @@ def dispatch_source_reference_task(
                 error=f"Candidate route evidence is incomplete: {issues}",
             )
             return result
+        lineage_path = run.private_root / "lineage.json"
+        lineage = json.loads(lineage_path.read_text(encoding="utf-8"))
+        if data.get("lineage_record_fingerprint") != content_fingerprint(lineage):
+            lineage_audit = {
+                "schema_version": "structrr-source-run-lineage-audit-v1",
+                "run_id": run.run_id,
+                "passed": False,
+                "findings": [
+                    {
+                        "code": "lineage_record_tampered",
+                        "subject_id": f"source-run:{run.run_id}",
+                        "message": (
+                            "Stored lineage record differs from the terminal record"
+                        ),
+                    }
+                ],
+            }
+            result.update(
+                status="lineage_failed",
+                lineage_audit=lineage_audit,
+                error="Source run lineage integrity check failed",
+            )
+            return result
+        if hasattr(run, "accepted_design") and hasattr(run, "handoff"):
+            lineage = build_source_run_lineage(
+                run_id=run.run_id,
+                lineage_context=run.lineage_context,
+                accepted_design=run.accepted_design,
+                handoff=run.handoff.to_data(),
+                terminal={**data, "obligation_route_evidence": route_evidence},
+            )
+            run_audit = audit_source_run_lineage(lineage)
+            if not run_audit["passed"]:
+                result.update(
+                    status="lineage_failed",
+                    lineage_audit=run_audit,
+                    error="Source run lineage is incomplete or invalid",
+                )
+                return result
         changed = tuple(sorted(set(attempt["changed_paths"]) | set(test_sources)))
         # The reviewed intent and task metadata are never implementation output.
         reserved = {
@@ -444,6 +502,29 @@ def dispatch_source_reference_task(
                 "Task checkout changed on candidate paths; patch not applied"
             )
         _git(repo_root, "apply", "--check", "--binary", "-", data=patch)
+        lineage = bind_source_run_patch(
+            lineage, patch_sha256=hashlib.sha256(patch).hexdigest()
+        )
+        lineage_audit = audit_source_run_lineage(lineage)
+        (run.private_root / "dispatch-lineage.json").write_text(
+            json.dumps(lineage, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+        (run.private_root / "dispatch-lineage-audit.json").write_text(
+            json.dumps(lineage_audit, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        result.update(
+            lineage_record_id=f"source-run:{run.run_id}",
+            lineage_audit=lineage_audit,
+            lineage_dispatch_record=str(run.private_root / "dispatch-lineage.json"),
+            lineage_dispatch_fingerprint=content_fingerprint(lineage),
+        )
+        if not lineage_audit["passed"]:
+            result.update(
+                status="lineage_failed",
+                error="Source patch lineage is incomplete or invalid",
+            )
+            return result
         _git(repo_root, "apply", "--binary", "-", data=patch)
         result.update(passed=True, changed_paths=list(changed))
     except Exception as error:

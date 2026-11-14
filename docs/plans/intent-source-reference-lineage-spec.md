@@ -2,8 +2,9 @@
 
 ## Status
 
-Proposed. This specification covers the remaining work to make accepted
-Structrr intent traceable through Powdrr's supported implementation handoff.
+Complete. All four milestones are implemented and verified. The protected
+source-reference route records stable-ID lineage from accepted Structrr intent
+through validation evidence and patch transfer.
 It supersedes the broader intent plans archived in `superseded/`.
 
 ## Purpose
@@ -65,31 +66,84 @@ candidate identity, validation reports, and dispatch result already created by
 Workrr. The record is private run evidence and follows the existing temporary
 artifact retention policy; this plan does not promise a permanent audit store.
 
-The record must link, with stable IDs and fingerprints where available:
+Lineage links use stable domain IDs. A content fingerprint may be stored as an
+integrity or freshness check, but it is never the identity of a design,
+obligation, case, attempt, candidate, or evidence artifact. An unrelated change
+by another agent must not change an artifact's ID or sever a valid link. A plan
+item keeps its design ID across revisions; the run records the exact accepted
+base commit. Distinct obligations, cases, attempts, candidates, and evidence
+results use their own stable IDs.
+
+The record uses this structure:
+
+```json
+{
+  "schema_version": "structrr-source-run-lineage-v1",
+  "run_id": "<stable Workrr run ID>",
+  "transfer_required": false,
+  "artifacts": [
+    {
+      "artifact_id": "structrr-obligation:<obligation_id>",
+      "kind": "placement",
+      "status": "recorded",
+      "attributes": {"source_id": "<obligation_id>"}
+    }
+  ],
+  "links": [
+    {
+      "source_id": "design:<plan_id>:<item_id>",
+      "relation": "defines",
+      "target_id": "structrr-obligation:<obligation_id>"
+    }
+  ]
+}
+```
+
+Stable IDs come from their owning contract: `design:<plan_id>:<item_id>`
+identifies the design item; `structrr-obligation:<obligation_id>`,
+`structrr-reference:<ref>`, `verification-case:<case_id>`, and
+`behavior-scenario:<scenario_id>` identify its semantic parts;
+`source-run:<run_id>`, `source-handoff:<run_id>`,
+`source-contract:<run_id>`, `worker-prompt:<run_id>`,
+`validation-manifest:<run_id>`, and `worker-attempt:<run_id>` identify the
+execution inputs and attempt; `candidate:<run_id>`,
+`validation-evidence:<run_id>:<profile>`,
+`route-evidence:<run_id>:<obligation_id>:<route>`,
+`story-receipt:<run_id>:<receipt_id>`, `patch:<run_id>`, and
+`transfer-decision:<run_id>` identify run artifacts. IDs use domain keys and
+are unaffected by unrelated content changes. A new run ID identifies each
+execution, and the exact accepted base commit is recorded as an attribute.
+The record stores the exact base commit, design blob ID, candidate tree
+identity, and patch digest as attributes so readers can check the captured
+artifacts without using those values as the lineage graph's primary IDs.
+
+The record must link:
 
 1. Repository identity, workflow and plan item identity, exact base commit,
    reviewed design path, committed blob digest, and parsed design identity.
 2. Accepted source-reference obligation IDs, their Structrr references and
    dispositions, and the required case/scenario IDs that verify them.
 3. Catalog, handoff contract, public prompt, private manifest, and complete
-   bundle fingerprints. Do not copy private oracle contents into the record.
+   bundle IDs. Their existing fingerprints may be retained as integrity fields.
+   Do not copy private oracle contents into the record.
 4. The reserved run identity and sole worker attempt, including its terminal
    classification and candidate worktree/tree or diff identity.
 5. Candidate-bound verification evidence, independent source-reference review,
    final validation outcome, patch digest, and transfer eligibility decision.
 
 The lineage record must identify which obligations each case and evidence item
-supports. It may reference existing artifacts by typed IDs and fingerprints;
-it must not rely on filesystem ordering, mutable paths alone, worker-reported
-claims, or reconstructed conversation history.
+supports. Its `artifacts` have unique stable IDs, and every `links` endpoint
+must resolve to exactly one artifact. It must not rely on fingerprints as join
+keys, filesystem ordering, mutable paths alone, worker-reported claims, or
+reconstructed conversation history.
 
 ## Required behavior
 
 1. Produce the record from frozen run inputs and Workrr-observed results. The
    worker cannot create, edit, or supply authoritative lineage fields.
-2. Recompute document, catalog, handoff, candidate, and evidence fingerprints
-   using the existing canonical validators. A digest by itself does not prove
-   that an artifact is accepted or that an evidence item passed.
+2. Resolve every link by stable artifact ID and validate each artifact with its
+   owning contract. Check stored fingerprints only to detect changed bytes or
+   stale evidence; a digest by itself does not prove acceptance or passage.
 3. Audit the record deterministically and include a machine-readable report in
    the private terminal artifacts. Repeated audits over identical input must
    produce identical report data.
@@ -106,7 +160,7 @@ claims, or reconstructed conversation history.
 
 ## Delivery sequence
 
-### 1. Define the source-run lineage schema
+### 1. Define the source-run lineage schema — implemented
 
 Specify the schema version, required artifact references, canonical
 normalization, fingerprint rules, and finding codes. It must model the
@@ -115,7 +169,11 @@ proposal revision or durable-intent clause fields that they do not use. Keep
 the proposal-history auditor available for its existing input format unless a
 separate migration is explicitly justified.
 
-### 2. Produce and audit lineage in Workrr
+The schema and deterministic audit are implemented in
+`powdrr_service.structrr.source_run_lineage`. Fingerprint attributes are
+integrity metadata and are not used as graph joins.
+
+### 2. Produce and audit lineage in Workrr — implemented
 
 Build the record from the prepared source-reference bundle, invocation record,
 candidate identity, and independent validation. Store it under the run's private
@@ -125,7 +183,11 @@ patch proposed for transfer and the transfer eligibility decision; the terminal
 result records whether transfer then succeeded. The worker must not see private
 lineage or validation inputs.
 
-### 3. Gate delivery and expose findings
+Workrr writes the private record and audit at run completion, binds the record
+integrity digest into `terminal.json`, and rebuilds from frozen state after
+story validation adds route receipts.
+
+### 3. Gate delivery and expose findings — implemented
 
 Map audit findings to the existing blocked/failed terminal result. A successful
 worker exit, passing behavioral tests, or valid patch cannot override missing
@@ -134,7 +196,10 @@ concise finding codes and references in the dispatch result; retain detailed
 evidence and the final transfer outcome in the private run artifacts. Keep
 artifacts under the established temporary roots and retention policy.
 
-### 4. Verify end-to-end cases
+Dispatch binds the exact proposed patch digest to a transfer decision and
+audits before applying it. A failed source or dispatch audit prevents transfer.
+
+### 4. Verify end-to-end cases — in progress
 
 Exercise the real source-reference preparation, invocation, candidate
 validation, audit, and transfer boundaries with offline/scripted workers. Cover
@@ -151,6 +216,9 @@ at least:
 - a failed lineage audit that leaves the caller checkout untouched and cannot
   trigger a second worker invocation; and
 - deterministic audit replay for an unchanged record.
+
+Focused schema, run, dispatch, and story-transfer tests pass. The full suite
+passes with 2,799 tests passed and 16 skipped.
 
 ## Completion criteria
 

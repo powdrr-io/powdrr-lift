@@ -1,7 +1,7 @@
 # Bootstrap Structure and Validation Discovery Implementation Plan
 
-Status: implementation is in progress. Work packages 8 and 9 are complete; the
-final completion gate remains open.
+Status: implementation and final completion gate are complete. Work packages 8
+and 9 are complete; the final corpus follow-up is recorded in the report.
 
 Current WP8 progress: Workrr now evaluates discovered applicability against the
 feature run's target event, base branch, and changed paths. Missing context,
@@ -629,14 +629,16 @@ invalidates the correct evidence; existing non-Python profiles still execute.
 
 WP9 progress: complete. Five reviewed fixture repositories assert command,
 provider, working directory, evidence anchors, applicability, prerequisites,
-and unresolved facts. The pinned corpus covers 14 repositories and 32 reviewed
+and unresolved facts. The pinned corpus covers 14 repositories and 34 reviewed
 obligations; its evaluator reports discovery misses, mismatches, evidence gaps,
 and unresolved findings separately. User documentation describes output
 formats, supported coverage, execution boundaries, migration, and corpus use.
 The current corpus results are in
-`docs/reports/validation-discovery-corpus-2026-11-14.md`; the reported misses
-remain inputs to the final completion gate rather than being treated as
-successful discovery.
+`docs/reports/validation-discovery-corpus-2026-11-14.md`. Follow-up evaluation
+accounts for all reviewed obligations with no misses, command/context
+mismatches, or evidence gaps. Legitimate unresolved profiles and unreviewed
+candidates remain separately reported; requiredness remains unknown without
+repository-rule evidence.
 
 Files: `tests/fixtures/validation_discovery/`, adapter conformance tests,
 integration tests, user documentation, optional corpus evaluation script.
@@ -670,9 +672,12 @@ Final completion gate:
 - All supported executable fixtures reproduce native invocation context.
 - Unsupported/dynamic cases have anchored, actionable unresolved records.
 - This repository accounts for Ruff format/lint, mypy, pytest/coverage,
-  workflow-definition validation, deterministic workflow scenarios, and
-  conditional workflow tuning. RTK/uv installation is setup; artifact uploads
-  are reporting. Requiredness remains unknown without repository-rule evidence.
+  procedural-catalog validation, deterministic workflow scenarios, and the
+  Windows portable-lock test. RTK/uv installation is setup; artifact uploads
+  are reporting. The pinned `.github/workflows/ci.yml` declares no separate
+  workflow-definition validator or conditional workflow-tuning check, so these
+  are not discovery obligations. Requiredness remains unknown without
+  repository-rule evidence.
 - Full repository verification passes, or independently established baseline
   failures are documented for user review without weakening the checks.
 
@@ -698,11 +703,11 @@ rtk proxy ./scripts/run-deterministic-workflow-suite.sh
 ```
 
 Run focused package tests while implementing; run the full commands before
-pushing. If skill definitions or templates change, also run the conditional
-workflow-tuning checks declared in `.github/workflows/ci.yml` against the PR
-base, preserving replay/scenario selection. Scope any additional checks to
-actual declarations and changes. Inspect `git status` after checks and keep
-generated reports out of commits unless they are intended fixtures.
+pushing. If skill definitions or templates change, run any conditional
+workflow-tuning checks actually declared by the workflow against the PR base,
+preserving replay/scenario selection. Scope additional checks to actual
+declarations and changes. Inspect `git status` after checks and keep generated
+reports out of commits unless they are intended fixtures.
 
 Open a PR for every change set; do not push to main or merge the PR. Describe
 implemented packages, fixture coverage, validation results, unresolved limits,

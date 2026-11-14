@@ -69,6 +69,17 @@ def is_validation_evidence_path(relative: str) -> bool:
         or relative.startswith(".github/actions/")
         or name in _PROJECT_MANIFESTS
         or name in _ENVIRONMENT_FILES
+        or name
+        in {
+            "package.json",
+            "go.mod",
+            "Cargo.toml",
+            "pom.xml",
+            "mvnw",
+            "gradlew",
+            "build.gradle",
+            "build.gradle.kts",
+        }
         or name in _EVIDENCE_FILENAMES
         or name.startswith(("requirements-", "requirements."))
         or name in {"poetry.lock", "uv.lock", "pdm.lock", "Pipfile.lock"}

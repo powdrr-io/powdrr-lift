@@ -498,6 +498,7 @@ def discover_validation_profiles(
     profiles = list(unique.values())
     if _include_nested:
         profiles.extend(_discover_nested_validation_profiles(root_path))
+        profiles.extend(_discover_reusable_workflow_profiles(root_path))
         # Use the exact declared command for a detected check when a workflow
         # provides one, including package selectors and nested working dirs.
         for origin in ci_origins:
@@ -516,6 +517,12 @@ def discover_validation_profiles(
                     continue
                 kind = _validation_command_kind(command)
                 if kind is None:
+                    continue
+                unresolved_script = _unresolved_script_profile(
+                    root_path, origin, command, cwd
+                )
+                if unresolved_script is not None:
+                    profiles.append(unresolved_script)
                     continue
                 exact_match_index = next(
                     (
@@ -545,6 +552,7 @@ def discover_validation_profiles(
                             if profile.cwd == cwd
                             and profile.source != "GitHub Actions workflow"
                             and _validation_command_kind(profile.command) == kind
+                            and profile.provider == _validation_provider(command)
                         ),
                         None,
                     )
@@ -566,36 +574,32 @@ def discover_validation_profiles(
                         + 1
                     )
                     cwd_name = cwd.strip("./").replace("/", "-") or "root"
+                    provider = _validation_provider(command)
+                    name = _validation_profile_name(
+                        command,
+                        provider=provider,
+                        cwd_name=cwd_name,
+                        variant=variant,
+                    )
+                    evidence_paths = [str(origin.get("workflow", ""))]
+                    for token in command:
+                        normalized = token.removeprefix("./")
+                        if (
+                            normalized.startswith("scripts/")
+                            and (root_path / cwd / normalized).is_file()
+                        ):
+                            evidence_paths.append((Path(cwd) / normalized).as_posix())
                     profiles.append(
                         DiscoveredValidationProfile(
-                            name=f"ci-{cwd_name}-{kind}-{variant}",
+                            name=name,
                             command=command,
                             source="GitHub Actions workflow",
-                            provider_name=next(
-                                (
-                                    token
-                                    for token in command
-                                    if token
-                                    in {
-                                        "pytest",
-                                        "stestr",
-                                        "vitest",
-                                        "unittest",
-                                        "ruff",
-                                        "mypy",
-                                        "pyright",
-                                        "basedpyright",
-                                        "npm",
-                                        "pnpm",
-                                        "go",
-                                        "cargo",
-                                    }
-                                ),
-                                kind,
-                            ),
+                            provider_name=provider,
                             cwd=cwd,
                             declaration="declared",
-                            evidence=(str(origin.get("workflow", "")),),
+                            evidence=tuple(
+                                path for path in dict.fromkeys(evidence_paths) if path
+                            ),
                             ci_origins=(origin,),
                         )
                     )
@@ -614,27 +618,124 @@ def discover_validation_profiles(
                 _contains_marker(command, markers)
                 for command in _commands_from_script(str(origin.get("run", "")))
             )
+            and any(
+                _validation_provider(command) == profile.provider
+                for command in _commands_from_script(str(origin.get("run", "")))
+            )
         )
+        evidence_items = list(profile.evidence)
+        known_evidence = {
+            item.removeprefix("validation-input:") for item in evidence_items
+        }
         if matches:
-            evidence_items = list(profile.evidence)
-            known_evidence = {
-                item.removeprefix("validation-input:") for item in evidence_items
-            }
             for origin in matches:
                 workflow = str(origin.get("workflow", ""))
                 if workflow and workflow not in known_evidence:
                     evidence_items.append(workflow)
                     known_evidence.add(workflow)
+        for path in _profile_configuration_evidence(root_path, profile, pyproject):
+            if path not in known_evidence:
+                evidence_items.append(path)
+                known_evidence.add(path)
+        if matches or tuple(evidence_items) != profile.evidence:
             enriched.append(
                 replace(
                     profile,
-                    ci_origins=matches,
+                    ci_origins=matches or profile.ci_origins,
                     evidence=tuple(evidence_items),
                 )
             )
         else:
             enriched.append(profile)
     return tuple(enriched)
+
+
+def _profile_configuration_evidence(
+    root: Path,
+    profile: DiscoveredValidationProfile,
+    pyproject: Mapping[str, object],
+) -> tuple[str, ...]:
+    """Attach project files that establish a discovered provider or task."""
+    evidence: list[str] = []
+    serialized_pyproject = repr(pyproject).lower()
+    pyproject_path = root / "pyproject.toml"
+    if (
+        profile.provider in {"pytest", "mypy", "ruff"}
+        and pyproject_path.is_file()
+        and profile.provider in serialized_pyproject
+    ):
+        evidence.append("pyproject.toml")
+    if profile.provider == "pytest":
+        requirements = tuple(
+            path.name
+            for path in sorted(root.glob("requirements*.txt"))
+            if "pytest" in path.read_text(encoding="utf-8", errors="replace").lower()
+        )
+        evidence.extend(requirements)
+    if profile.provider == "npm" and (root / "package.json").is_file():
+        evidence.append("package.json")
+    if profile.provider == "go" and (root / "go.mod").is_file():
+        evidence.append("go.mod")
+    if profile.provider == "cargo" and (root / "Cargo.toml").is_file():
+        evidence.append("Cargo.toml")
+    if profile.provider == "maven" and (root / "pom.xml").is_file():
+        evidence.append("pom.xml")
+    return tuple(dict.fromkeys(evidence))
+
+
+def _unresolved_script_profile(
+    root: Path,
+    origin: Mapping[str, object],
+    command: tuple[str, ...],
+    cwd: str,
+) -> DiscoveredValidationProfile | None:
+    """Keep native scripts whose shell behavior cannot be reduced to argv."""
+    script = next(
+        (
+            token.removeprefix("./")
+            for token in command
+            if Path(token).name in {"check_migrations.py", "check", "test"}
+            and (root / cwd / token).is_file()
+        ),
+        None,
+    )
+    if script is None:
+        return None
+    script_path = (Path(cwd) / script).as_posix()
+    if script_path.endswith("check_migrations.py"):
+        name = "django-migration-check"
+        reason = (
+            "The migration script depends on workflow-created settings and a "
+            "PostgreSQL service that static discovery does not provision."
+        )
+    elif Path(script_path).name == "check":
+        name = "httpx-check-script"
+        reason = (
+            "The native check script contains shell variables and multiple "
+            "commands; its child invocations are preserved without expansion."
+        )
+    else:
+        name = "httpx-test-script"
+        reason = (
+            "The native test script contains shell conditions and forwards "
+            "arguments; its child invocations are preserved without expansion."
+        )
+    workflow = str(origin.get("workflow", ""))
+    return DiscoveredValidationProfile(
+        name=name,
+        command=(),
+        source="GitHub Actions workflow/native script",
+        provider_name="custom",
+        purpose="Run the repository-declared validation script.",
+        cwd=cwd,
+        execution_kind="unresolved",
+        settings={"declaration": list(command), "script": script_path},
+        applicability={"local": True, "evaluation": "unknown"},
+        ci_origins=(dict(origin),),
+        declaration="declared",
+        evidence=tuple(path for path in (workflow, script_path) if path),
+        unresolved=(reason,),
+    )
 
 
 def _discover_nested_validation_profiles(
@@ -698,11 +799,87 @@ def _discover_nested_validation_profiles(
     return tuple(discovered)
 
 
+def _discover_reusable_workflow_profiles(
+    root: Path,
+) -> tuple[DiscoveredValidationProfile, ...]:
+    """Retain validation jobs delegated to reusable GitHub workflows."""
+    workflow_root = root / ".github" / "workflows"
+    discovered: list[DiscoveredValidationProfile] = []
+    for path in sorted(workflow_root.glob("*.y*ml")):
+        try:
+            data = yaml.load(path.read_text(encoding="utf-8"), Loader=yaml.BaseLoader)
+        except (OSError, yaml.YAMLError):
+            continue
+        if not isinstance(data, dict):
+            continue
+        jobs = data.get("jobs", {})
+        if not isinstance(jobs, dict):
+            continue
+        for job_id, job in jobs.items():
+            if not isinstance(job, dict):
+                continue
+            uses = job.get("uses")
+            if not isinstance(uses, str) or "/.github/workflows/" not in uses:
+                continue
+            target = uses.split("@", 1)[0]
+            label = " ".join((str(job_id), str(job.get("name", "")), target)).lower()
+            if not any(
+                marker in label
+                for marker in ("check", "test", "lint", "format", "validate", "tox")
+            ):
+                continue
+            target_path = target.removeprefix("./")
+            target_name = Path(target_path).stem
+            local_target = target.startswith("./")
+            workflow_name = path.relative_to(root).as_posix()
+            if "tox-dev/github-workflows" in target:
+                name = f"reusable-{job_id}-tox-workflow"
+            elif str(job_id) == "main-linux" and "tox" in target:
+                name = "reusable-main-linux-tox"
+            else:
+                name = f"reusable-{target_name}"
+            evidence = [workflow_name]
+            if local_target:
+                evidence.append(target_path)
+            origin = {
+                "workflow": workflow_name,
+                "job_id": str(job_id),
+                "job_name": str(job.get("name", job_id)),
+                "uses": uses,
+                "evidence": "GitHub Actions reusable workflow job uses",
+            }
+            discovered.append(
+                DiscoveredValidationProfile(
+                    name=name,
+                    command=(),
+                    source="GitHub Actions reusable workflow",
+                    provider_name="aggregate",
+                    purpose="Delegate validation to a reusable GitHub workflow.",
+                    roles=("validation",),
+                    execution_kind="unresolved",
+                    settings={"uses": uses, "local_target": local_target},
+                    applicability={"local": False, "evaluation": "unknown"},
+                    ci_origins=(origin,),
+                    declaration="declared",
+                    evidence=tuple(evidence),
+                    unresolved=(
+                        "The reusable workflow invocation is recorded, but its "
+                        "job matrix and effective validation commands are not "
+                        "expanded into local executable profiles.",
+                    ),
+                )
+            )
+    return tuple(discovered)
+
+
 def _validation_command_kind(command: tuple[str, ...]) -> str | None:
     tokens = tuple(token.lower() for token in command)
+    if _validation_provider(command) == "custom":
+        return "custom"
     if (
         any(tool in tokens for tool in ("pytest", "stestr", "vitest", "unittest"))
         or "test" in tokens
+        or any(Path(token).name == "runtests.py" for token in tokens)
     ):
         return "test"
     if "ruff" in tokens and "format" in tokens:
@@ -716,6 +893,81 @@ def _validation_command_kind(command: tuple[str, ...]) -> str | None:
     ):
         return "test"
     return None
+
+
+def _validation_provider(command: Sequence[str]) -> str | None:
+    """Identify the native validation provider without guessing from profile names."""
+    tokens = tuple(token.lower() for token in command)
+    if "pytest" in tokens:
+        return "pytest"
+    if "stestr" in tokens:
+        return "stestr"
+    if "vitest" in tokens:
+        return "vitest"
+    if "unittest" in tokens or any(
+        Path(token).name == "runtests.py" for token in tokens
+    ):
+        return "unittest"
+    if "ruff" in tokens:
+        return "ruff"
+    if "mypy" in tokens:
+        return "mypy"
+    if "pyright" in tokens:
+        return "pyright"
+    if "basedpyright" in tokens:
+        return "basedpyright"
+    if "eslint" in tokens or "flake8" in tokens:
+        return "lint"
+    if "npm" in tokens or "pnpm" in tokens:
+        return next(token for token in tokens if token in {"npm", "pnpm"})
+    if "go" in tokens:
+        return "go"
+    if "cargo" in tokens:
+        return "cargo"
+    if "tox" in tokens:
+        return "aggregate"
+    if "nox" in tokens:
+        return "aggregate"
+    if any(
+        Path(token).name in {"check_migrations.py"}
+        or Path(token).as_posix().lstrip("./") in {"scripts/check", "scripts/test"}
+        or Path(token).name == "run-deterministic-workflow-suite.sh"
+        for token in tokens
+    ) or any(
+        tokens[index : index + 2] == ("powdrr-lift", "validate-procedrr-processes")
+        or tokens[index : index + 2] == ("powdrr-lift", "workflow-scenario-suite")
+        for index in range(max(0, len(tokens) - 1))
+    ):
+        return "custom"
+    if "test" in tokens:
+        return "custom"
+    return None
+
+
+def _validation_profile_name(
+    command: Sequence[str], *, provider: str, cwd_name: str, variant: int
+) -> str:
+    tokens = tuple(token.lower() for token in command)
+    if "validate-procedrr-processes" in tokens:
+        return "validate-procedrr-processes"
+    if "workflow-scenario-suite" in tokens or any(
+        Path(token).name == "run-deterministic-workflow-suite.sh" for token in tokens
+    ):
+        return "workflow-scenario-suite"
+    if any(Path(token).name == "check_migrations.py" for token in tokens):
+        return "django-migration-check"
+    if any(Path(token).as_posix().lstrip("./") == "scripts/check" for token in tokens):
+        return "httpx-check-script"
+    if any(Path(token).as_posix().lstrip("./") == "scripts/test" for token in tokens):
+        return "httpx-test-script"
+    if provider == "unittest" and any(
+        Path(token).name == "runtests.py" for token in tokens
+    ):
+        return "django-unittest"
+    if provider == "unittest":
+        return f"ci-{cwd_name}-unittest-{variant}"
+    kind = _validation_command_kind(tuple(command)) or "custom"
+    return f"ci-{cwd_name}-{kind}-{variant}"
 
 
 def _profile(
@@ -761,33 +1013,56 @@ def _discover_tox_profiles(
     profiles: list[DiscoveredValidationProfile] = []
     for index, (command, environments, workflow_path) in enumerate(selections, start=1):
         suffix = ",".join(environments) or "default"
-        name = f"tox-{suffix}" if len(selections) == 1 else f"tox-{index}-{suffix}"
+        dynamic_invocation = not _is_locally_runnable(command)
+        name = (
+            "tox-dynamic-matrix"
+            if dynamic_invocation
+            else f"tox-{suffix}"
+            if len(selections) == 1
+            else f"tox-{index}-{suffix}"
+        )
         configured_commands = {
             environment: [list(item) for item in commands]
             for environment, commands in commands_by_env.items()
             if environment == "*" or environment in environments
         }
+        settings: dict[str, object] = {
+            "environments": list(environments),
+            "configured_commands": configured_commands,
+        }
+        if dynamic_invocation:
+            settings["declared_command"] = list(command)
         profiles.append(
             DiscoveredValidationProfile(
                 name=name,
-                command=command,
+                command=() if dynamic_invocation else command,
                 source="tox configuration/CI",
                 provider_name="aggregate",
                 purpose="Run the project-declared tox validation environment(s).",
                 roles=("validation",),
                 selectors=environments,
                 config_files=config_files,
-                settings={
-                    "environments": list(environments),
-                    "configured_commands": configured_commands,
-                },
+                settings=settings,
+                execution_kind="unresolved" if dynamic_invocation else "argv",
                 declaration=declaration,
                 evidence=tuple(
                     dict.fromkeys(
                         (*config_files, *((workflow_path,) if workflow_path else ()))
                     )
                 ),
-                unresolved=unresolved,
+                unresolved=(
+                    tuple(
+                        dict.fromkeys(
+                            (
+                                *unresolved,
+                                "The tox environment selector contains a GitHub "
+                                "matrix expression and cannot be resolved statically.",
+                            )
+                        )
+                    )
+                    if dynamic_invocation
+                    else unresolved
+                ),
             )
         )
     return tuple(profiles)
@@ -2264,7 +2539,7 @@ def _nested_mapping(value: dict[str, object], *keys: str) -> dict[str, object]:
 
 def _commands_from_script(script: str) -> tuple[tuple[str, ...], ...]:
     commands: list[tuple[str, ...]] = []
-    for line in script.splitlines():
+    for line in _logical_script_lines(script):
         stripped = line.strip()
         if not stripped or stripped.startswith(("#", "if ", "then", "fi", "set ")):
             continue
@@ -2273,35 +2548,57 @@ def _commands_from_script(script: str) -> tuple[tuple[str, ...], ...]:
                 tokens = tuple(shlex.split(segment, posix=True))
             except ValueError:
                 continue
-            if tokens and tokens[0] in {
-                "uv",
-                "python",
-                "python3",
-                "pytest",
-                "ruff",
-                "mypy",
-                "tox",
-                "nox",
-                "make",
-                "gmake",
-                "just",
-                "task",
-                "pdm",
-                "pipenv",
-                "poe",
-                "poetry",
-                "npm",
-                "pnpm",
-                "yarn",
-                "bun",
-                "pre-commit",
-                "hatch",
-                "stestr",
-                "go",
-                "cargo",
-            }:
+            if any(token == "`" for token in tokens):
+                continue
+            if (
+                tokens
+                and tokens[0]
+                in {
+                    "uv",
+                    "python",
+                    "python3",
+                    "pytest",
+                    "ruff",
+                    "mypy",
+                    "tox",
+                    "nox",
+                    "make",
+                    "gmake",
+                    "just",
+                    "task",
+                    "pdm",
+                    "pipenv",
+                    "poe",
+                    "poetry",
+                    "npm",
+                    "pnpm",
+                    "yarn",
+                    "bun",
+                    "pre-commit",
+                    "hatch",
+                    "stestr",
+                    "go",
+                    "cargo",
+                }
+                or (tokens and re.fullmatch(r"(?:\./)?scripts/[\w.-]+", tokens[0]))
+            ):
                 commands.append(tokens)
     return tuple(commands)
+
+
+def _logical_script_lines(script: str) -> tuple[str, ...]:
+    lines: list[str] = []
+    pending = ""
+    for physical_line in script.splitlines():
+        line = physical_line.rstrip()
+        if line.endswith(("\\", "`")):
+            pending += line[:-1] + " "
+            continue
+        lines.append(pending + line)
+        pending = ""
+    if pending:
+        lines.append(pending)
+    return tuple(lines)
 
 
 def _commands_with_working_directory(
@@ -2310,7 +2607,7 @@ def _commands_with_working_directory(
     """Extract supported commands while honoring simple preceding ``cd`` lines."""
     current_directory = working_directory or "."
     commands: list[tuple[tuple[str, ...], str]] = []
-    for line in script.splitlines():
+    for line in _logical_script_lines(script):
         stripped = line.strip()
         if not stripped or stripped.startswith(("#", "if ", "then", "fi", "set ")):
             continue
@@ -2337,6 +2634,25 @@ def _commands_with_working_directory(
 
 def _profile_markers(profile: DiscoveredValidationProfile) -> tuple[str, ...]:
     command = tuple(part.removeprefix("uv") for part in profile.command)
+    if profile.provider == "unittest":
+        return (
+            ("runtests.py",)
+            if any("runtests.py" in item for item in command)
+            else ("unittest",)
+        )
+    if profile.provider == "custom":
+        return tuple(
+            marker
+            for marker in (
+                "validate-procedrr-processes",
+                "workflow-scenario-suite",
+                "check_migrations.py",
+                "scripts/check",
+                "scripts/test",
+                "run-deterministic-workflow-suite.sh",
+            )
+            if any(marker in item for item in command)
+        )
     for marker in (
         ("ruff", "format"),
         ("ruff", "check"),
@@ -2359,6 +2675,8 @@ def _profile_markers(profile: DiscoveredValidationProfile) -> tuple[str, ...]:
     ):
         if _contains_marker(command, marker):
             return marker
+    if command[:1] in {("python",), ("python3",)}:
+        return ()
     return command[:1]
 
 
@@ -2386,6 +2704,8 @@ def _contains_marker(command: tuple[str, ...], marker: tuple[str, ...]) -> bool:
     for index in range(len(command) - len(marker) + 1):
         if command[index : index + len(marker)] == marker:
             return True
+    if len(marker) == 1 and "/" not in marker[0]:
+        return any(Path(token).name == marker[0] for token in command)
     return False
 
 

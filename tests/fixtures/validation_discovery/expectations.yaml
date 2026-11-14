@@ -7,7 +7,7 @@ cases:
         command: [pytest, -q]
         cwd: .
         provider: pytest
-        evidence: []
+        evidence: [validation-input:requirements.txt]
         applicability: {local: true, evaluation: unknown}
         depends_on: []
         unresolved: []
@@ -19,7 +19,9 @@ cases:
         command: [uv, run, ruff, format, --check, .]
         cwd: .
         provider: ruff
-        evidence: [validation-input:.github/workflows/ci.yml]
+        evidence:
+          - validation-input:.github/workflows/ci.yml
+          - validation-input:pyproject.toml
         applicability: {local: true, evaluation: unknown}
         depends_on: []
         unresolved: []
@@ -27,7 +29,9 @@ cases:
         command: [uv, run, ruff, check, .]
         cwd: .
         provider: ruff
-        evidence: [validation-input:.github/workflows/ci.yml]
+        evidence:
+          - validation-input:.github/workflows/ci.yml
+          - validation-input:pyproject.toml
         applicability: {local: true, evaluation: unknown}
         depends_on: []
         unresolved: []
@@ -35,7 +39,9 @@ cases:
         command: [uv, run, mypy, src, tests]
         cwd: .
         provider: mypy
-        evidence: [validation-input:.github/workflows/ci.yml]
+        evidence:
+          - validation-input:.github/workflows/ci.yml
+          - validation-input:pyproject.toml
         applicability: {local: true, evaluation: unknown}
         depends_on: []
         unresolved: []
@@ -43,7 +49,9 @@ cases:
         command: [uv, run, pytest, -q, tests]
         cwd: .
         provider: pytest
-        evidence: [validation-input:.github/workflows/ci.yml]
+        evidence:
+          - validation-input:.github/workflows/ci.yml
+          - validation-input:pyproject.toml
         applicability: {local: true, evaluation: unknown}
         depends_on: []
         unresolved: []
@@ -69,7 +77,7 @@ cases:
         command: [uv, run, pytest, -q]
         cwd: packages/api
         provider: pytest
-        evidence: []
+        evidence: [validation-input:packages/api/pyproject.toml]
         applicability: {local: true, evaluation: unknown}
         depends_on: []
         unresolved: []
@@ -81,7 +89,7 @@ cases:
         command: [npm, test]
         cwd: .
         provider: npm
-        evidence: []
+        evidence: [validation-input:package.json]
         applicability: {local: true, evaluation: unknown}
         depends_on: []
         unresolved: []
@@ -89,7 +97,7 @@ cases:
         command: [go, test, ./...]
         cwd: .
         provider: go
-        evidence: []
+        evidence: [validation-input:go.mod]
         applicability: {local: true, evaluation: unknown}
         depends_on: []
         unresolved: []

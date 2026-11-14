@@ -9,7 +9,10 @@ from powdrr_service.ci_response.evidence import (
     build_failure_units,
     normalize_failure_signature,
 )
-from powdrr_service.ci_response.observation import normalize_github_snapshot
+from powdrr_service.ci_response.observation import (
+    normalize_ci_observation,
+    normalize_github_snapshot,
+)
 from powdrr_service.ci_response.reproduction import compare_local_reproduction
 
 __all__ = [
@@ -17,6 +20,7 @@ __all__ = [
     "build_failure_units",
     "compare_local_reproduction",
     "normalize_failure_signature",
+    "normalize_ci_observation",
     "normalize_github_snapshot",
     "render_ci_observation_checkpoint",
     "render_stale_ci_observation_checkpoint",

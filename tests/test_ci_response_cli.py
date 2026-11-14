@@ -7,6 +7,7 @@ from types import SimpleNamespace
 from typing import Any
 
 from powdrr_agent.execution.github_actions import GitHubActionsSnapshot
+from powdrr_contracts.ci import CIFailureUnit
 
 from powdrr_lift import cli
 
@@ -89,8 +90,15 @@ def test_response_command_writes_idempotent_runner_failure_checkpoint(
     first = json.loads(capsys.readouterr().out)
     assert first["checkpoint_written"] is True
     assert first["pull_request_metadata"]["draft"] is True
+    assert first["observation_schema_version"] == 1
+    assert first["tested_sha"] is None
+    assert first["required_checks_status"] == "unavailable"
     assert "PR is a draft" in comment_bodies[0]
     assert first["failures"][0]["phase"] == "runner_provisioning"
+    failure = CIFailureUnit.from_dict(first["failures"][0])
+    assert failure.observation_id == first["observation_id"]
+    assert failure.head_sha == head_sha
+    assert failure.workflow_path == ".github/workflows/ci.yml"
     assert (
         first["failures"][0]["local_reproduction"]["status"] == "not_executable_locally"
     )

@@ -11,6 +11,7 @@ from powdrr_contracts.ci import (
     CIAnnotation,
     CIConclusion,
     CIJobObservation,
+    CIObservation,
     CIObservationStatus,
 )
 from powdrr_contracts.models import ContractError
@@ -55,7 +56,9 @@ def normalize_github_snapshot(
         for job in jobs:
             if not isinstance(job, Mapping):
                 raise ContractError("CI snapshot contains a malformed job")
-            if job.get("head_sha", head_sha) != head_sha:
+            run_tested_sha = matching_run.get("head_sha")
+            job_tested_sha = job.get("head_sha")
+            if job_tested_sha not in (None, head_sha, run_tested_sha):
                 continue
             job_id = job.get("id")
             if not isinstance(job_id, int):
@@ -103,6 +106,25 @@ def normalize_github_snapshot(
                 )
             labels = job.get("labels", ())
             steps = job.get("steps", ())
+            matrix_value = job.get("matrix", {})
+            matrix = (
+                tuple(
+                    sorted(
+                        (str(key), str(value))
+                        for key, value in matrix_value.items()
+                        if isinstance(key, str) and isinstance(value, (str, int, bool))
+                    )
+                )
+                if isinstance(matrix_value, Mapping)
+                else ()
+            )
+            tested_sha = (
+                job_tested_sha
+                if isinstance(job_tested_sha, str)
+                else run_tested_sha
+                if isinstance(run_tested_sha, str)
+                else None
+            )
             normalized.append(
                 CIJobObservation(
                     job_id=job_id,
@@ -111,6 +133,21 @@ def normalize_github_snapshot(
                     head_sha=head_sha,
                     status=_status(job.get("status")),
                     conclusion=_conclusion(job.get("conclusion")),
+                    tested_sha=tested_sha,
+                    workflow_path=(
+                        matching_run.get("path")
+                        if isinstance(matching_run.get("path"), str)
+                        else None
+                    ),
+                    matrix=matrix,
+                    check_context=job.get("name")
+                    if isinstance(job.get("name"), str)
+                    else None,
+                    check_app_id=(
+                        job.get("app_id")
+                        if isinstance(job.get("app_id"), int)
+                        else None
+                    ),
                     runner_name=job.get("runner_name")
                     if isinstance(job.get("runner_name"), str)
                     else None,
@@ -132,6 +169,34 @@ def normalize_github_snapshot(
                 )
             )
     return tuple(normalized)
+
+
+def normalize_ci_observation(
+    snapshot: Mapping[str, Any], *, repository: str, pull_request_number: int
+) -> CIObservation:
+    """Bind normalized jobs to the exact PR head and explicit policy availability."""
+    pull_request = snapshot.get("pull_request")
+    if not isinstance(pull_request, Mapping):
+        raise ContractError("CI snapshot is missing pull_request metadata")
+    head = pull_request.get("head")
+    head_sha = head.get("sha") if isinstance(head, Mapping) else None
+    if not isinstance(head_sha, str):
+        raise ContractError("CI snapshot is missing the pull request head SHA")
+    return CIObservation(
+        repository=repository,
+        pull_request_number=pull_request_number,
+        head_sha=head_sha,
+        tested_sha=None,
+        merge_base_sha=None,
+        observed_at=(
+            snapshot.get("observed_at")
+            if isinstance(snapshot.get("observed_at"), str)
+            else None
+        ),
+        required_checks_status="unavailable",
+        required_check_source=None,
+        jobs=normalize_github_snapshot(snapshot),
+    )
 
 
 def _status(value: object) -> CIObservationStatus:

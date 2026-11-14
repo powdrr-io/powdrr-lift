@@ -1,6 +1,7 @@
 # Procedrr CI response action
 
-Status: implementation plan, ready for review. This document authorizes no target-repository edits.
+Status: implementation in progress. Delivery follows the three-PR sequence below;
+this branch contains the versioned observation and failure records for PR 1.
 
 ## Outcome
 

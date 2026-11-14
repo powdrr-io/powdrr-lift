@@ -6,17 +6,79 @@ import pytest
 from powdrr_contracts.ci import (
     CIAnnotation,
     CIJobObservation,
+    CIObservation,
     ContractError,
     LocalReproduction,
 )
 from powdrr_service.ci_response import (
     build_failure_units,
     compare_local_reproduction,
+    normalize_ci_observation,
     normalize_github_snapshot,
     render_ci_observation_checkpoint,
 )
 
 HEAD = "6c85b1e5c334a113b3db274b2c1b7a8f350b9707"
+
+
+def test_public_ci_observation_round_trips_with_unavailable_required_policy() -> None:
+    observation = normalize_ci_observation(
+        {
+            "pull_request": {"head": {"sha": HEAD}},
+            "runs": [],
+            "jobs_by_run": {},
+            "annotations_by_check_run": {},
+            "observed_at": "2026-11-14T12:00:00+00:00",
+        },
+        repository="example/project",
+        pull_request_number=270,
+    )
+
+    restored = CIObservation.from_dict(observation.to_dict())
+
+    assert restored == observation
+    assert restored.head_sha == HEAD
+    assert restored.tested_sha is None
+    assert restored.required_checks_status == "unavailable"
+    assert restored.required_check_source is None
+
+
+def test_public_ci_observation_rejects_jobs_from_a_different_head() -> None:
+    with pytest.raises(ContractError, match="jobs must match"):
+        CIObservation(
+            repository="example/project",
+            pull_request_number=270,
+            head_sha=HEAD,
+            jobs=(
+                CIJobObservation(
+                    job_id=3,
+                    run_id=4,
+                    run_attempt=1,
+                    head_sha="a" * 40,
+                    status="completed",
+                    conclusion="success",
+                ),
+            ),
+        )
+
+
+def test_observation_keeps_tested_sha_separate_from_pull_request_head() -> None:
+    tested_sha = "b" * 40
+    observation = normalize_ci_observation(
+        {
+            "pull_request": {"head": {"sha": HEAD}},
+            "runs": [{"id": 9, "run_attempt": 1, "head_sha": tested_sha}],
+            "jobs_by_run": {
+                "9": [{"id": 10, "status": "completed", "conclusion": "success"}]
+            },
+            "annotations_by_check_run": {},
+        },
+        repository="example/project",
+        pull_request_number=270,
+    )
+
+    assert observation.head_sha == HEAD
+    assert observation.jobs[0].tested_sha == tested_sha
 
 
 def test_runner_rejection_without_steps_is_not_locally_executable() -> None:

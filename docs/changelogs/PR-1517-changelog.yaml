@@ -1,0 +1,184 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1517
+title: Add versioned Procedrr CI response contracts
+intent:
+  problem: CI response observations and failures cross the CLI and Procedrr boundary without a single public typed envelope.
+  goal: Bind normalized evidence to a PR head, retain the tested workflow SHA separately, and serialize versioned failure records with explicit required-check availability.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/plans/procedrr-ci-response-action.md
+  type: modified
+  span: {start_line: 3, end_line: 4}
+  summary: Record the staged implementation status.
+  rationale: Keep the plan aligned with its three-PR delivery sequence.
+- path: packages/contracts/src/powdrr_contracts/__init__.py
+  type: modified
+  span: {start_line: 5, end_line: 5}
+  summary: Export the CI failure-unit contract.
+  rationale: Make serialized failure records public.
+- path: packages/contracts/src/powdrr_contracts/__init__.py
+  type: modified
+  span: {start_line: 7, end_line: 7}
+  summary: Export the CI observation contract.
+  rationale: Make observation records public.
+- path: packages/contracts/src/powdrr_contracts/__init__.py
+  type: modified
+  span: {start_line: 42, end_line: 42}
+  summary: Add the failure-unit export to the package API.
+  rationale: Support imports through powdrr_contracts.
+- path: packages/contracts/src/powdrr_contracts/__init__.py
+  type: modified
+  span: {start_line: 44, end_line: 44}
+  summary: Add the observation export to the package API.
+  rationale: Support imports through powdrr_contracts.
+- path: packages/contracts/src/powdrr_contracts/ci.py
+  type: modified
+  span: {start_line: 31, end_line: 244}
+  summary: Define versioned observation and failure-unit records with validation and serialization.
+  rationale: Preserve exact PR, run, job, and evidence provenance across process boundaries.
+- path: packages/contracts/src/powdrr_contracts/ci.py
+  type: modified
+  span: {start_line: 333, end_line: 337}
+  summary: Add tested SHA, workflow, matrix, and check identity to job records.
+  rationale: Keep workflow execution identity separate from the current PR head.
+- path: packages/contracts/src/powdrr_contracts/ci.py
+  type: modified
+  span: {start_line: 369, end_line: 385}
+  summary: Validate optional workflow and check identity fields.
+  rationale: Reject malformed CI provenance records.
+- path: packages/contracts/src/powdrr_contracts/ci.py
+  type: modified
+  span: {start_line: 404, end_line: 408}
+  summary: Serialize workflow-tested SHA and check identity.
+  rationale: Preserve job metadata in the public record.
+- path: packages/contracts/src/powdrr_contracts/ci.py
+  type: modified
+  span: {start_line: 417, end_line: 478}
+  summary: Parse and validate serialized CI job records.
+  rationale: Support safe round trips through the agent/service boundary.
+- path: packages/service/src/powdrr_service/ci_response/__init__.py
+  type: modified
+  span: {start_line: 12, end_line: 15}
+  summary: Export the public CI observation normalizer.
+  rationale: Expose the service-owned normalization entry point.
+- path: packages/service/src/powdrr_service/ci_response/__init__.py
+  type: modified
+  span: {start_line: 23, end_line: 23}
+  summary: Add the normalizer to the module API.
+  rationale: Allow the CLI adapter to use the service normalizer.
+- path: packages/service/src/powdrr_service/ci_response/observation.py
+  type: modified
+  span: {start_line: 14, end_line: 14}
+  summary: Import the observation contract for normalization.
+  rationale: Bind normalized CI job data to a versioned envelope.
+- path: packages/service/src/powdrr_service/ci_response/observation.py
+  type: modified
+  span: {start_line: 59, end_line: 61}
+  summary: Retain workflow-tested SHA while filtering unrelated job records.
+  rationale: Avoid treating the workflow commit as the PR head.
+- path: packages/service/src/powdrr_service/ci_response/observation.py
+  type: modified
+  span: {start_line: 109, end_line: 127}
+  summary: Normalize matrix and tested commit metadata.
+  rationale: Preserve execution context for diagnosis and comparison.
+- path: packages/service/src/powdrr_service/ci_response/observation.py
+  type: modified
+  span: {start_line: 136, end_line: 150}
+  summary: Populate workflow path, matrix, and check identity on jobs.
+  rationale: Keep relevant CI metadata in each normalized job.
+- path: packages/service/src/powdrr_service/ci_response/observation.py
+  type: modified
+  span: {start_line: 174, end_line: 201}
+  summary: Construct an observation bound to repository, PR, head, and policy availability.
+  rationale: State unavailable required-check policy explicitly.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 34, end_line: 34}
+  summary: Import the public failure-unit contract.
+  rationale: Serialize CLI failure results using the shared contract.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 50, end_line: 50}
+  summary: Use the typed observation normalizer.
+  rationale: Keep normalization policy in the service package.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 3105, end_line: 3105}
+  summary: Normalize the GitHub snapshot into a public observation.
+  rationale: Bind job evidence to the requested repository and PR.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 3111, end_line: 3114}
+  summary: Pass observation time and PR identity to normalization.
+  rationale: Preserve observation provenance.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 3116, end_line: 3116}
+  summary: Read normalized jobs from the observation contract.
+  rationale: Keep the checkpoint and failure analysis on the same typed evidence.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 3168, end_line: 3171}
+  summary: Emit contract version, tested SHA, and required-policy availability.
+  rationale: Do not imply required checks were collected when they were unavailable.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 3185, end_line: 3203}
+  summary: Serialize each failure with its observation identity and workflow provenance.
+  rationale: Prevent diagnosis from detaching a failure from its exact CI evidence.
+- path: tests/test_ci_response_cli.py
+  type: modified
+  span: {start_line: 10, end_line: 10}
+  summary: Import the failure-unit contract for CLI assertions.
+  rationale: Validate the serialized public boundary record.
+- path: tests/test_ci_response_cli.py
+  type: modified
+  span: {start_line: 93, end_line: 95}
+  summary: Assert explicit required-policy availability in CLI output.
+  rationale: Prevent missing required-check data from being interpreted as no required checks.
+- path: tests/test_ci_response_cli.py
+  type: modified
+  span: {start_line: 98, end_line: 101}
+  summary: Round-trip the returned failure unit and verify provenance.
+  rationale: Catch contract serialization regressions at the CLI boundary.
+- path: tests/test_ci_response_policy.py
+  type: modified
+  span: {start_line: 9, end_line: 9}
+  summary: Import the observation model for contract checks.
+  rationale: Exercise typed observation validation.
+- path: tests/test_ci_response_policy.py
+  type: modified
+  span: {start_line: 16, end_line: 16}
+  summary: Import the observation normalizer.
+  rationale: Test the service-owned normalization path.
+- path: tests/test_ci_response_policy.py
+  type: modified
+  span: {start_line: 24, end_line: 83}
+  summary: Cover contract round trips, head validation, and tested-SHA separation.
+  rationale: Ensure observations reject mismatched evidence and preserve workflow identity.
+entities:
+- id: ci-observation-contract
+  type: Class
+  action: added
+- id: ci-failure-unit-contract
+  type: Class
+  action: added
+- id: ci-observation-normalizer
+  type: Function
+  action: added
+entity_relationships: []
+invariants:
+- id: ci-job-sha-separation
+  description: CI job records retain PR head SHA and workflow-tested SHA as separate values.
+  action: added
+  rationale: A workflow run may test a different commit than the current PR head.
+- id: required-policy-explicitness
+  description: Missing required-check policy is reported as unavailable.
+  action: added
+  rationale: The response path must not infer that no checks are required.
+- id: failure-provenance-binding
+  description: Each serialized failure unit binds to its observation, PR head, run attempt, and job.
+  action: added
+  rationale: Resume and diagnosis must not reuse a failure from a different observation.
+guidance: []

@@ -31,6 +31,11 @@ def _link(source_id: str, relation: str, target_id: str) -> dict[str, str]:
     return {"source_id": source_id, "relation": relation, "target_id": target_id}
 
 
+def _attributes(artifact: Mapping[str, Any]) -> Mapping[str, Any]:
+    attributes = artifact.get("attributes")
+    return attributes if isinstance(attributes, Mapping) else {}
+
+
 def build_source_run_lineage(
     *,
     run_id: str,
@@ -283,6 +288,7 @@ def build_source_run_lineage(
                         "profile": profile,
                         "test_id": result.get("test_id"),
                         "candidate_tree": candidate_tree,
+                        "evidence_fingerprint": result.get("fingerprint"),
                     },
                 )
             )
@@ -309,6 +315,7 @@ def build_source_run_lineage(
                         "candidate_tree": route.get("candidate_tree"),
                         "evidence_paths": list(route.get("evidence_paths", [])),
                         "case_ids": list(route.get("case_ids", [])),
+                        "evidence_fingerprint": route.get("fingerprint"),
                     },
                 )
             )
@@ -332,6 +339,7 @@ def build_source_run_lineage(
                             "receipt_id": receipt_id,
                             "candidate_tree": route.get("story_candidate_tree"),
                             "obligation_id": route.get("obligation_id"),
+                            "case_ids": list(route.get("case_ids", [])),
                         },
                     )
                 )
@@ -511,7 +519,7 @@ def audit_source_run_lineage(record: Mapping[str, Any]) -> dict[str, Any]:
     ]
     if len(design_artifacts) == 1:
         design = design_artifacts[0]
-        attributes = design.get("attributes", {})
+        attributes = _attributes(design)
         plan_id = attributes.get("plan_id")
         item_id = attributes.get("item_id")
         expected_design_id = (
@@ -551,7 +559,7 @@ def audit_source_run_lineage(record: Mapping[str, Any]) -> dict[str, Any]:
             )
         if (
             kind == "worker_attempt"
-            and artifact.get("attributes", {}).get("attempt_id") != run_id
+            and _attributes(artifact).get("attempt_id") != run_id
         ):
             finding(
                 "attempt_id_mismatch",
@@ -594,7 +602,7 @@ def audit_source_run_lineage(record: Mapping[str, Any]) -> dict[str, Any]:
     manifest_id = f"validation-manifest:{run_id}"
     catalog = by_id.get(contract_id)
     catalog_id = (
-        str(catalog.get("attributes", {}).get("catalog_id"))
+        str(_attributes(catalog).get("catalog_id"))
         if isinstance(catalog, Mapping)
         else ""
     )
@@ -615,6 +623,133 @@ def audit_source_run_lineage(record: Mapping[str, Any]) -> dict[str, Any]:
                 source,
                 f"Required {relation!r} link to {target!r} is missing",
             )
+    for artifact in by_id.values():
+        artifact_id = str(artifact.get("artifact_id"))
+        kind = artifact.get("kind")
+        attributes = _attributes(artifact)
+        if not isinstance(attributes, Mapping):
+            continue
+        required_edges: list[tuple[str, str, str]] = []
+        if kind == "compiled_handoff":
+            required_edges.append((artifact_id, "compiled_from", design_id))
+        elif kind in {"placement", "preservation"}:
+            obligation_key = str(attributes.get("source_id", ""))
+            reference_id = str(attributes.get("reference_id", ""))
+            required_edges.extend(
+                (
+                    (design_id, "defines", artifact_id),
+                    (handoff_id, "carries", artifact_id),
+                    (
+                        artifact_id,
+                        "refers_to",
+                        f"structrr-reference:{reference_id}",
+                    ),
+                )
+            )
+            verification_links = [
+                link
+                for link in link_set
+                if link[0] == artifact_id and link[1] == "verified_by"
+            ]
+            if attributes.get("verification_refs") and not verification_links:
+                finding(
+                    "obligation_without_case",
+                    artifact_id,
+                    "Obligation has no verification case link",
+                )
+            if not obligation_key:
+                finding(
+                    "obligation_id_missing",
+                    artifact_id,
+                    "Obligation has no stable source ID",
+                )
+        elif kind == "verification_case":
+            required_edges.append((design_id, "requires_case", artifact_id))
+            scenario_id = attributes.get("scenario_id")
+            if _text(scenario_id):
+                required_edges.append(
+                    (artifact_id, "instantiates", f"behavior-scenario:{scenario_id}")
+                )
+        elif kind == "validation_evidence":
+            required_edges.append((f"candidate:{run_id}", "validated_by", artifact_id))
+        elif kind == "obligation_evidence":
+            obligation_key = str(attributes.get("obligation_id", ""))
+            required_edges.extend(
+                (
+                    (
+                        f"structrr-obligation:{obligation_key}",
+                        "supported_by",
+                        artifact_id,
+                    ),
+                    (f"candidate:{run_id}", "reviewed_by", artifact_id),
+                )
+            )
+            case_ids = attributes.get("case_ids", [])
+            if not isinstance(case_ids, list) or any(
+                not _text(case_key) for case_key in case_ids
+            ):
+                finding(
+                    "invalid_evidence_case_ids",
+                    artifact_id,
+                    "Evidence case IDs must be a list of non-empty stable IDs",
+                )
+                case_ids = []
+            for case_key in case_ids:
+                required_edges.append(
+                    (
+                        f"verification-case:{case_key}",
+                        "supported_by",
+                        artifact_id,
+                    )
+                )
+        elif kind == "story_receipt":
+            obligation_key = str(attributes.get("obligation_id", ""))
+            required_edges.extend(
+                (
+                    (
+                        f"structrr-obligation:{obligation_key}",
+                        "supported_by",
+                        artifact_id,
+                    ),
+                    (f"candidate:{run_id}", "reviewed_by", artifact_id),
+                )
+            )
+            case_ids = attributes.get("case_ids", [])
+            if not isinstance(case_ids, list) or any(
+                not _text(case_key) for case_key in case_ids
+            ):
+                finding(
+                    "invalid_evidence_case_ids",
+                    artifact_id,
+                    "Evidence case IDs must be a list of non-empty stable IDs",
+                )
+                case_ids = []
+            for case_key in case_ids:
+                required_edges.append(
+                    (
+                        f"verification-case:{case_key}",
+                        "verified_by",
+                        artifact_id,
+                    )
+                )
+            evidence_edges = [
+                edge
+                for edge in link_set
+                if edge[1] == "contains" and edge[2] == artifact_id
+            ]
+            if len(evidence_edges) != 1:
+                finding(
+                    "story_receipt_parent_missing",
+                    artifact_id,
+                    "Story receipt must belong to exactly one route evidence artifact",
+                )
+        for source, relation, target in required_edges:
+            if (source, relation, target) not in link_set:
+                finding(
+                    "missing_lineage_link",
+                    source,
+                    f"Required {relation!r} link to {target!r} is missing",
+                )
     for artifact in by_id.values():
         artifact_id = str(artifact.get("artifact_id"))
         kind = artifact.get("kind")
@@ -686,7 +821,7 @@ def audit_source_run_lineage(record: Mapping[str, Any]) -> dict[str, Any]:
                 str(transfer_nodes[0].get("artifact_id")),
                 "Patch transfer is not eligible",
             )
-        elif not _text(patch_nodes[0].get("attributes", {}).get("patch_sha256")):
+        elif not _text(_attributes(patch_nodes[0]).get("patch_sha256")):
             finding(
                 "patch_identity_missing",
                 str(patch_nodes[0].get("artifact_id")),
@@ -716,16 +851,25 @@ def audit_source_run_lineage(record: Mapping[str, Any]) -> dict[str, Any]:
         for obligation in by_id.values():
             if obligation.get("kind") not in {"placement", "preservation"}:
                 continue
-            attributes = obligation.get("attributes", {})
+            attributes = _attributes(obligation)
             required_routes = attributes.get("required_routes", [])
+            if not isinstance(required_routes, list) or any(
+                not _text(route_name) for route_name in required_routes
+            ):
+                finding(
+                    "invalid_required_routes",
+                    str(obligation.get("artifact_id")),
+                    "Required evidence routes must be stable non-empty strings",
+                )
+                required_routes = []
             for route_name in required_routes:
                 matches = [
                     evidence
                     for evidence in by_id.values()
                     if evidence.get("kind") == "obligation_evidence"
-                    and evidence.get("attributes", {}).get("obligation_id")
+                    and _attributes(evidence).get("obligation_id")
                     == attributes.get("source_id")
-                    and evidence.get("attributes", {}).get("route") == route_name
+                    and _attributes(evidence).get("route") == route_name
                 ]
                 if len(matches) != 1:
                     finding(

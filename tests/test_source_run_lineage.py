@@ -100,6 +100,26 @@ def test_lineage_uses_stable_domain_ids_for_links() -> None:
     assert audit_source_run_lineage(record)["passed"] is True
 
 
+def test_audit_is_deterministic_for_an_unchanged_record() -> None:
+    record = _record()
+
+    assert audit_source_run_lineage(record) == audit_source_run_lineage(
+        deepcopy(record)
+    )
+
+
+def test_audit_rejects_each_missing_emitted_lineage_edge() -> None:
+    record = _record()
+
+    for link in record["links"]:
+        changed = deepcopy(record)
+        changed["links"].remove(link)
+
+        audit = audit_source_run_lineage(changed)
+        assert audit["passed"] is False, link
+        assert audit["findings"], link
+
+
 def test_audit_rejects_duplicate_and_unresolved_artifact_ids() -> None:
     record = _record()
     changed = deepcopy(record)
@@ -114,6 +134,17 @@ def test_audit_rejects_duplicate_and_unresolved_artifact_ids() -> None:
 
     codes = {item["code"] for item in audit_source_run_lineage(changed)["findings"]}
     assert {"duplicate_artifact_id", "unresolved_link"} <= codes
+
+
+def test_audit_reports_malformed_artifact_attributes_without_crashing() -> None:
+    record = _record()
+    attempt = next(
+        item for item in record["artifacts"] if item["kind"] == "worker_attempt"
+    )
+    attempt["attributes"] = None
+
+    codes = {item["code"] for item in audit_source_run_lineage(record)["findings"]}
+    assert {"invalid_artifact", "attempt_id_mismatch"} <= codes
 
 
 def test_audit_rejects_cross_run_evidence_without_joining_by_fingerprint() -> None:

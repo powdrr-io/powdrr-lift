@@ -1,0 +1,123 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1512
+title: Complete source-run lineage verification matrix
+intent:
+  problem: The source-run lineage plan's implementation was marked complete before the promised missing-edge, tampering, and deterministic-audit cases were verified.
+  goal: Enforce required lineage edges, fail closed on malformed or tampered records, and complete milestone-four verification.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/plans/intent-source-reference-lineage-spec.md
+  type: modified
+  span: {start_line: 220, end_line: 224}
+  summary: Record complete verification matrix and final suite results.
+  rationale: Align plan completion with executed cases and measured test results.
+- path: packages/service/src/powdrr_service/structrr/source_run_lineage.py
+  type: modified
+  span: {start_line: 34, end_line: 38}
+  summary: Safely read artifact attributes during audit.
+  rationale: Return findings for malformed records instead of raising while auditing them.
+- path: packages/service/src/powdrr_service/structrr/source_run_lineage.py
+  type: modified
+  span: {start_line: 291, end_line: 291}
+  summary: Retain validation evidence fingerprints as integrity metadata.
+  rationale: Make validation evidence integrity inspectable without using fingerprints as IDs.
+- path: packages/service/src/powdrr_service/structrr/source_run_lineage.py
+  type: modified
+  span: {start_line: 318, end_line: 318}
+  summary: Retain obligation-route evidence fingerprints.
+  rationale: Preserve integrity metadata alongside stable evidence IDs.
+- path: packages/service/src/powdrr_service/structrr/source_run_lineage.py
+  type: modified
+  span: {start_line: 342, end_line: 342}
+  summary: Store case IDs on story receipt artifacts.
+  rationale: Audit receipt support against stable verification case IDs.
+- path: packages/service/src/powdrr_service/structrr/source_run_lineage.py
+  type: modified
+  span: {start_line: 522, end_line: 522}
+  summary: Use safe attribute access for design artifacts.
+  rationale: Keep malformed data on the deterministic audit path.
+- path: packages/service/src/powdrr_service/structrr/source_run_lineage.py
+  type: modified
+  span: {start_line: 562, end_line: 562}
+  summary: Use safe attribute access for worker attempt IDs.
+  rationale: Keep malformed data on the deterministic audit path.
+- path: packages/service/src/powdrr_service/structrr/source_run_lineage.py
+  type: modified
+  span: {start_line: 605, end_line: 605}
+  summary: Use safe attribute access for reference catalog IDs.
+  rationale: Keep malformed data on the deterministic audit path.
+- path: packages/service/src/powdrr_service/structrr/source_run_lineage.py
+  type: modified
+  span: {start_line: 626, end_line: 752}
+  summary: Require design, obligation, case, candidate, and evidence links.
+  rationale: Fail closed when any emitted semantic lineage edge is missing.
+- path: packages/service/src/powdrr_service/structrr/source_run_lineage.py
+  type: modified
+  span: {start_line: 824, end_line: 824}
+  summary: Safely validate patch metadata.
+  rationale: Preserve fail-closed behavior for malformed artifact attributes.
+- path: packages/service/src/powdrr_service/structrr/source_run_lineage.py
+  type: modified
+  span: {start_line: 854, end_line: 854}
+  summary: Safely access obligation attributes during transfer eligibility checks.
+  rationale: Reject malformed route metadata deterministically.
+- path: packages/service/src/powdrr_service/structrr/source_run_lineage.py
+  type: modified
+  span: {start_line: 856, end_line: 864}
+  summary: Validate required route metadata before transfer eligibility checks.
+  rationale: Reject malformed route lists deterministically.
+- path: packages/service/src/powdrr_service/structrr/source_run_lineage.py
+  type: modified
+  span: {start_line: 870, end_line: 870}
+  summary: Use safe attribute access for route evidence matching.
+  rationale: Avoid audit exceptions on malformed evidence artifacts.
+- path: packages/service/src/powdrr_service/structrr/source_run_lineage.py
+  type: modified
+  span: {start_line: 872, end_line: 872}
+  summary: Use safe route attribute access for obligation evidence matching.
+  rationale: Avoid audit exceptions on malformed evidence artifacts.
+- path: tests/test_source_reference_dispatch.py
+  type: modified
+  span: {start_line: 172, end_line: 180}
+  summary: Include a fingerprinted validation evidence record in the dispatch fixture.
+  rationale: Exercise evidence integrity tampering at the transfer boundary.
+- path: tests/test_source_reference_dispatch.py
+  type: modified
+  span: {start_line: 574, end_line: 587}
+  summary: Parameterize protected dispatch tampering cases.
+  rationale: Cover missing links and mismatched run, design, bundle, attempt, candidate, and evidence fields.
+- path: tests/test_source_reference_dispatch.py
+  type: modified
+  span: {start_line: 591, end_line: 591}
+  summary: Count worker invocation attempts.
+  rationale: Verify lineage failure cannot trigger a second implementation attempt.
+- path: tests/test_source_reference_dispatch.py
+  type: modified
+  span: {start_line: 602, end_line: 603}
+  summary: Count the single worker invocation.
+  rationale: Verify lineage failure cannot trigger a second implementation attempt.
+- path: tests/test_source_reference_dispatch.py
+  type: modified
+  span: {start_line: 609, end_line: 638}
+  summary: Mutate stable record fields and fingerprints in dispatch tests.
+  rationale: Ensure terminal integrity binding rejects altered lineage before patch transfer.
+- path: tests/test_source_reference_dispatch.py
+  type: modified
+  span: {start_line: 689, end_line: 690}
+  summary: Assert fail-closed integrity error and single invocation.
+  rationale: Confirm tampered lineage leaves the caller checkout unchanged.
+- path: tests/test_source_run_lineage.py
+  type: modified
+  span: {start_line: 103, end_line: 122}
+  summary: Test deterministic audit replay and rejection of every emitted missing edge.
+  rationale: Complete stable graph integrity and repeatability coverage.
+- path: tests/test_source_run_lineage.py
+  type: modified
+  span: {start_line: 139, end_line: 149}
+  summary: Verify malformed artifact attributes produce findings without raising.
+  rationale: Ensure malformed lineage fails closed with machine-readable diagnostics.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []

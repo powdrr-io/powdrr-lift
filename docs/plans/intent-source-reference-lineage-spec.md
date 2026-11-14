@@ -217,8 +217,11 @@ at least:
   trigger a second worker invocation; and
 - deterministic audit replay for an unchanged record.
 
-Focused schema, run, dispatch, and story-transfer tests pass. The full suite
-passes with 2,799 tests passed and 16 skipped.
+The verification matrix covers every emitted lineage edge, deterministic
+replay, malformed attributes, tampered base/design/bundle/attempt/candidate/
+evidence fields, and a fail-closed dispatch that leaves the caller checkout
+untouched without a second worker attempt. The full suite passes with 2,820
+tests passed and 16 skipped.
 
 ## Completion criteria
 

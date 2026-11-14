@@ -1,5 +1,5 @@
 schema: https://powdrr.io/schema/changelog-v2
-change_id: PR-1519
+change_id: PR-1520
 title: Bind plan compilation to runtime execution preparation
 intent:
   problem: Planning validates source-reference designs separately from the preparation that runtime reconstructs, and dependency readiness can be checked against stale remote state.

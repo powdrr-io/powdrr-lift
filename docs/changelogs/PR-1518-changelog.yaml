@@ -10,6 +10,24 @@ intent:
 human-decisions: []
 structured_files: []
 files:
+- path: packages/service/src/powdrr_service/planning/source_reference_design.py
+  type: modified
+  span:
+    start_line: 5
+    end_line: 6
+  summary: Project typed cases and reference obligations into the canonical worker
+    design.
+  rationale: Keep serialized planning authority faithful and reject incomplete worker
+    contracts.
+- path: packages/service/src/powdrr_service/planning/source_reference_design.py
+  type: modified
+  span:
+    start_line: 74
+    end_line: 74
+  summary: Project typed cases and reference obligations into the canonical worker
+    design.
+  rationale: Keep serialized planning authority faithful and reject incomplete worker
+    contracts.
 - path: docs/plans/reliable-plan-execution.md
   type: modified
   span:

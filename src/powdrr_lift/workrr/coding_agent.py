@@ -49,7 +49,7 @@ from powdrr_lift.core.implementation_packet import ImplementationPacket
 
 CODING_AGENT_REQUEST_SCHEMA_VERSION = "implementation-request-v3"
 CODING_AGENT_ATTEMPT_SCHEMA_VERSION = "implementation-attempt-v2"
-MAX_SUPPORTING_EDIT_LINES = 20
+MAX_SUPPORTING_EDIT_LINES_PER_FILE = 20
 GitRunner = Callable[..., subprocess.CompletedProcess[Any]]
 MINISWEAGENT_MAX_TASK_ARGUMENT_BYTES = 64 * 1024
 DEFAULT_CODING_AGENT_TIMEOUT_SECONDS = 1800.0
@@ -498,7 +498,8 @@ class ImplementationRequest:
             "the allowed paths or declared ephemeral paths. You may also make "
             "small supporting edits to any number of existing regular text files "
             "outside those paths, with no more than "
-            f"{MAX_SUPPORTING_EDIT_LINES} added or removed lines total. These edits "
+            f"{MAX_SUPPORTING_EDIT_LINES_PER_FILE} added or removed lines per file. "
+            "These edits "
             "must directly support the acceptance criteria. Before coding, inspect "
             "the relevant existing tests and identify which assertions encode the "
             "behavior being changed. When the requested feature intentionally "
@@ -1800,7 +1801,6 @@ def permitted_supporting_edit_paths(
     if len(rows) != len(paths):
         return frozenset()
 
-    changed_lines = 0
     observed_paths: set[str] = set()
     for row in rows:
         parts = row.split("\t", 2)
@@ -1810,8 +1810,10 @@ def permitted_supporting_edit_paths(
         if additions == "-" or deletions == "-" or path not in paths:
             return frozenset()
         try:
-            changed_lines += int(additions) + int(deletions)
+            changed_lines = int(additions) + int(deletions)
         except ValueError:
+            return frozenset()
+        if changed_lines > MAX_SUPPORTING_EDIT_LINES_PER_FILE:
             return frozenset()
         baseline_file = runner(
             ["git", "cat-file", "-e", f"{base_commit}:{path}"],
@@ -1828,9 +1830,7 @@ def permitted_supporting_edit_paths(
             return frozenset()
         observed_paths.add(path)
 
-    if observed_paths != set(paths) or changed_lines == 0:
-        return frozenset()
-    if changed_lines > MAX_SUPPORTING_EDIT_LINES:
+    if observed_paths != set(paths):
         return frozenset()
     return frozenset(observed_paths)
 

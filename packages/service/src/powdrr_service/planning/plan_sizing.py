@@ -320,7 +320,6 @@ def _merge_is_valid(group: Sequence[Mapping[str, Any]]) -> bool:
     for field, limit in (
         ("scope", 3),
         ("acceptance_criteria", 5),
-        ("allowed_paths", 20),
     ):
         values = _unique_group_values(group, field)
         if values is None or not values or len(values) > limit:

@@ -397,6 +397,29 @@ items:
     assert plan.items[0].allowed_paths == ("src/first.py", "tests")
 
 
+def test_plan_validation_accepts_more_than_twenty_allowed_paths() -> None:
+    paths = ", ".join(f"src/module-{index}.py" for index in range(25))
+    text = f"""
+schema: https://powdrr.io/schemas/github-issue-execution-plan-v1
+plan_id: many-paths-v1
+items:
+  - id: first
+    title: First
+    objective: Implement the feature across modules.
+    scope: [Implement the feature.]
+    allowed_paths: [{paths}]
+    implementation_steps: [Implement the feature.]
+    acceptance_criteria: [The feature works.]
+    dependencies: []
+    workflow_file: docs/workflows/feature/first.yaml
+    workflow_id: feature-first
+"""
+
+    plan = _parse_plan(text)
+
+    assert len(plan.items[0].allowed_paths) == 25
+
+
 def test_plan_validation_preserves_timed_manual_prerequisite() -> None:
     text = """
 schema: https://powdrr.io/schemas/github-issue-execution-plan-v1
@@ -1176,21 +1199,20 @@ def test_worker_applies_inline_issue_adjustment_to_effective_item(
         plan_commit=PLAN_COMMIT,
         client=client,  # type: ignore[arg-type]
     )
+    adjusted_paths = [f"src/module-{index}.py" for index in range(25)]
+    adjustment = {
+        "schema": "https://powdrr.io/schemas/github-issue-plan-adjustment-v1",
+        "plan_id": "feature-v1",
+        "item_id": "base",
+        "reason": "The implementation steps update many related modules.",
+        "changes": {"allowed_paths": adjusted_paths},
+    }
     client.comments.append(
         (
             client.issues[0].number,
-            """<!-- powdrr-plan-adjustment:v1 -->
-```json
-{
-  "schema": "https://powdrr.io/schemas/github-issue-plan-adjustment-v1",
-  "plan_id": "feature-v1",
-  "item_id": "base",
-  "reason": "The implementation steps update the CI workflow.",
-  "changes": {
-    "allowed_paths": ["src", "tests", ".github/workflows/ci.yml"]
-  }
-}
-```""",
+            "<!-- powdrr-plan-adjustment:v1 -->\n```json\n"
+            + json.dumps(adjustment)
+            + "\n```",
         )
     )
     received: list[PlannedWorkItem] = []
@@ -1223,11 +1245,7 @@ def test_worker_applies_inline_issue_adjustment_to_effective_item(
     )
 
     assert report.outcome == "awaiting_review"
-    assert received[0].allowed_paths == (
-        "src",
-        "tests",
-        ".github/workflows/ci.yml",
-    )
+    assert received[0].allowed_paths == tuple(adjusted_paths)
 
 
 def test_fulfill_issue_without_pr_records_explicit_reason_and_closes_issue() -> None:

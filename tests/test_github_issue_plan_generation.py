@@ -212,6 +212,22 @@ def test_plan_sizing_groups_cohesive_items_to_target_work_size() -> None:
     ]
 
 
+def test_plan_sizing_merges_items_with_more_than_twenty_allowed_paths() -> None:
+    first = _item("codec-model")
+    first["scope"] = ["component: codec", "Define codec model"]
+    first["allowed_paths"] = [f"src/codec/model-{index}.py" for index in range(12)]
+    first["implementation_steps"] = ["Define the typed codec model."]
+    second = _item("codec-parser", dependencies=["codec-model"])
+    second["scope"] = ["component: codec", "Parse codec input"]
+    second["allowed_paths"] = [f"src/codec/parser-{index}.py" for index in range(12)]
+    second["implementation_steps"] = ["Parse codec input into the typed model."]
+
+    sized = size_plan_items([first, second])
+
+    assert len(sized) == 1
+    assert len(sized[0]["allowed_paths"]) == 24
+
+
 def test_plan_sizing_keeps_manual_prerequisite_on_its_own_work_item() -> None:
     prerequisite_item = _item("credential-setup")
     prerequisite_item["scope"] = ["component: repository", "Use CI credential"]
@@ -1417,6 +1433,20 @@ def test_generated_plan_records_source_document() -> None:
 
     assert "source_document: docs/plans/proposal.md" in rendered
     assert plan.source_document == "docs/plans/proposal.md"
+
+
+def test_plan_item_can_declare_more_than_twenty_allowed_paths() -> None:
+    item = _item("foundation")
+    item["allowed_paths"] = [f"src/foundation/{index}.py" for index in range(25)]
+
+    rendered, plan = generate_execution_plan_yaml(
+        source_plan="# Plan\nImplement a feature across modules.",
+        plan_id="many-paths-v1",
+        client=FakePlanningClient({"items": [item]}),
+    )
+
+    assert len(plan.items[0].allowed_paths) == 25
+    assert "src/foundation/24.py" in rendered
 
 
 def test_execute_pr_artifact_writer_requires_structrr_proposal(tmp_path: Path) -> None:

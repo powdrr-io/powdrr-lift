@@ -1704,17 +1704,12 @@ def _apply_issue_plan_adjustments(
                     "implementation_steps must contain between 1 and 8 entries"
                 )
             if field == "allowed_paths":
-                if (
-                    not normalized
-                    or len(normalized) > 20
-                    or any(
-                        Path(path).is_absolute() or ".." in Path(path).parts
-                        for path in normalized
-                    )
+                if not normalized or any(
+                    Path(path).is_absolute() or ".." in Path(path).parts
+                    for path in normalized
                 ):
                     raise GitHubIssueQueueError(
-                        "allowed_paths must contain at most 20 "
-                        "repository-relative paths"
+                        "allowed_paths must contain unique repository-relative paths"
                     )
             values[field] = normalized
         adjustment_record = {

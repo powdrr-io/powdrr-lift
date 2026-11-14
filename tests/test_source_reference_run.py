@@ -80,6 +80,8 @@ def prepare(
         git(root, "config", "user.email", "test@example.com")
         git(root, "config", "user.name", "Test")
         (root / "retry.py").write_text(BASELINE)
+        (root / "docs").mkdir()
+        (root / "docs" / "guide.md").write_text("original guidance\n")
         git(root, "add", ".")
         git(root, "commit", "-m", "baseline")
     document = {
@@ -310,6 +312,14 @@ def test_scope_review_identifies_candidate_paths_outside_accepted_scope() -> Non
     ) == ["docs/notes.md"]
     assert _out_of_scope_paths({"src/retry.py"}, ("src", "tests")) == []
     assert _out_of_scope_paths({"any/path"}, (".",)) == []
+    assert (
+        _out_of_scope_paths(
+            {"src/retry.py", "docs/guide.md"},
+            ("src", "tests"),
+            supporting_paths=("docs/guide.md",),
+        )
+        == []
+    )
 
 
 def _story_validation(*, receipt_tree: str = "sha256:story-tree") -> dict[str, Any]:
@@ -489,6 +499,73 @@ def test_completed_source_worker_cannot_retain_out_of_scope_changes(
 
     with pytest.raises(SourceRunFailure, match="outside accepted scope"):
         run.finalize_worker(attempt)
+
+
+def test_completed_source_worker_accepts_prevalidated_supporting_edits(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    run = prepare(tmp_path, monkeypatch, run_id="supporting-edit")
+    (run.workspace_root / "retry.py").write_text(CANDIDATE, encoding="utf-8")
+    (run.workspace_root / "docs" / "guide.md").write_text(
+        "small guidance edit\n", encoding="utf-8"
+    )
+    references = {
+        item["ref"]
+        for item in run.handoff.worker_prompt.to_data()["contract"]["obligations"]
+    }
+    run.public_root.mkdir(parents=True, exist_ok=True)
+    (run.public_root / f"{run.run_id}.traj.json").write_text(
+        json.dumps(
+            {
+                "messages": [
+                    {
+                        "content": json.dumps(
+                            {
+                                "schema_version": "structrr-reference-completion-v1",
+                                "reference_owners": [],
+                                "design_gaps": [],
+                            }
+                        ),
+                        "extra": {"exit_status": "Submitted"},
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    (run.private_root / f"{run.run_id}.source-events.ndjson").write_text(
+        json.dumps(
+            {
+                "catalog_digest": run.catalog.digest,
+                "enrichment_mode": "verified_reader",
+                "context_pages": [
+                    {
+                        "ref": reference,
+                        "offset": 0,
+                        "end_offset": 0,
+                        "total_characters": 0,
+                    }
+                    for reference in references
+                ],
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    attempt = CodingAgentAttempt(
+        attempt_id=run.run_id,
+        request_id=run.run_id,
+        provider="minisweagent",
+        status=CodingAgentStatus.COMPLETED,
+        exit_code=0,
+        changed_paths=("docs/guide.md", "retry.py"),
+        supporting_edit_paths=("docs/guide.md",),
+        diff_fingerprint="sha256:supporting-edit-candidate",
+    )
+
+    run.finalize_worker(attempt)
+
+    assert run._candidate_after_worker == run._candidate_state()
 
 
 @pytest.mark.parametrize(

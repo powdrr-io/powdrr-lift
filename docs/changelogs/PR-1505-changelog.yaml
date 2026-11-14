@@ -1,0 +1,88 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1505
+title: Handle eventual consistency in PR observation
+intent:
+  problem: The CI observer can reject a valid PR when the issue-side reference has not appeared yet, and it does not report whether the PR is a draft.
+  goal: Accept PR-side issue-closing references, retry issue lookups briefly, and preserve draft status in CI observation output.
+human-decisions: []
+structured_files: []
+files:
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 16, end_line: 16}
+  summary: Import the retry delay helper for repeated issue reads.
+  rationale: Allow the observer to tolerate delayed issue-side PR references.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 2991, end_line: 3016}
+  summary: Match issue-side PR references and PR-side issue-closing directives.
+  rationale: Validate the PR's own link to its issue when GitHub has not recorded the reverse association yet.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 3069, end_line: 3073}
+  summary: Check both issue references and the PR's closing reference before rejecting an association.
+  rationale: Treat the PR body as direct evidence connecting the PR to the issue.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 3075, end_line: 3098}
+  summary: Retry issue reads briefly when the PR link is not immediately visible.
+  rationale: Tolerate delayed issue comments while continuing to reject unrelated PRs.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 3126, end_line: 3127}
+  summary: Read the PR draft flag from GitHub's observation.
+  rationale: Preserve the distinction between draft and review-ready PRs.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 3149, end_line: 3149}
+  summary: Pass draft status into checkpoint generation.
+  rationale: Make draft status visible in the durable CI observation.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 3168, end_line: 3168}
+  summary: Include draft status in the command result metadata.
+  rationale: Let downstream workflow steps distinguish a draft PR from a ready-for-review PR.
+- path: packages/service/src/powdrr_service/ci_response/checkpoint.py
+  type: modified
+  span: {start_line: 33, end_line: 33}
+  summary: Accept draft status as checkpoint input.
+  rationale: Capture whether the observed PR is still a draft.
+- path: packages/service/src/powdrr_service/ci_response/checkpoint.py
+  type: modified
+  span: {start_line: 45, end_line: 45}
+  summary: Include draft status in the observation identity.
+  rationale: Give draft and review-ready observations distinct identities.
+- path: packages/service/src/powdrr_service/ci_response/checkpoint.py
+  type: modified
+  span: {start_line: 69, end_line: 74}
+  summary: Explain that required checks may not start while the PR is a draft.
+  rationale: Avoid reading pending checks as evidence of a failed CI observation.
+- path: packages/service/src/powdrr_service/ci_response/checkpoint.py
+  type: modified
+  span: {start_line: 86, end_line: 89}
+  summary: State that a draft PR remains not ready for review.
+  rationale: Keep the checkpoint's review status explicit.
+- path: tests/test_ci_response_cli.py
+  type: modified
+  span: {start_line: 29, end_line: 30}
+  summary: Give the fixture a PR closing reference and draft status.
+  rationale: Verify the PR itself can identify its issue and draft state reaches output and checkpoint.
+- path: tests/test_ci_response_cli.py
+  type: modified
+  span: {start_line: 67, end_line: 67}
+  summary: Remove the issue-side PR reference from the fixture body.
+  rationale: Ensure association comes from the PR body rather than pre-existing issue text.
+- path: tests/test_ci_response_cli.py
+  type: modified
+  span: {start_line: 91, end_line: 92}
+  summary: Assert draft status is returned and documented in the checkpoint.
+  rationale: Verify draft PR state is preserved for downstream workflow steps.
+- path: tests/test_ci_response_cli.py
+  type: modified
+  span: {start_line: 124, end_line: 175}
+  summary: Cover an issue comment that becomes visible on a retry.
+  rationale: Protect the eventual-consistency path from regressing to an immediate rejection.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []

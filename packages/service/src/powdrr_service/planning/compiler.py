@@ -14,7 +14,10 @@ import yaml
 
 from powdrr_service.planning.dependencies import combine_manual_prerequisite_data
 from powdrr_service.planning.evidence import Evidence, EvidenceError
-from powdrr_service.planning.multipr_structrr import MultiPRStructrrProposal
+from powdrr_service.planning.multipr_structrr import (
+    MultiPRStructrrProposal,
+    multi_pr_proposal_from_data,
+)
 from powdrr_service.planning.plan_document import (
     PlanDocumentError,
     parse_reviewed_plan_yaml,
@@ -183,6 +186,9 @@ def compile_plan(
     }
     workflow_ids = {item.item_id: item.workflow_id for item in plan.items}
     plan_slug = slugify_workflow_id(plan.plan_id)
+    base_record = manifest.data["base"]
+    assert isinstance(base_record, Mapping)
+    base_commit = str(base_record["commit_sha"])
     for item in plan.items:
         if item.source_reference_design_file is not None:
             _repository_path(
@@ -195,6 +201,10 @@ def compile_plan(
                     plan_id=plan.plan_id,
                     item_id=item.item_id,
                     proposal=item_proposal.to_data(),
+                    baseline_snapshot=structrr_proposal.item_baselines[item.item_id],
+                    base_commit=base_commit,
+                    objective=item.objective,
+                    allowed_paths=item.allowed_paths,
                 )
             except (TypeError, ValueError) as error:
                 raise PlanningCompilationError(
@@ -301,6 +311,7 @@ def validate_compiled_plan(
         manifest_structrr = manifest.data["structrr"]
         assert isinstance(manifest_structrr, Mapping)
         proposal = json.loads(compiled.files[compiled.proposal_path])
+        decoded_proposal: MultiPRStructrrProposal | None = None
         if (
             not isinstance(proposal, Mapping)
             or proposal.get("plan_id") != compiled.plan.plan_id
@@ -311,6 +322,11 @@ def validate_compiled_plan(
             or not _matches_content_fingerprint(proposal)
         ):
             errors.append("Structrr proposal file differs from planning manifest")
+        if isinstance(proposal, Mapping):
+            try:
+                decoded_proposal = multi_pr_proposal_from_data(proposal)
+            except (TypeError, ValueError) as error:
+                errors.append(f"Structrr proposal is invalid: {error}")
         workflow_ids = {item.item_id: item.workflow_id for item in compiled.plan.items}
         if isinstance(proposal, Mapping) and isinstance(
             proposal.get("expected_final_snapshot"), Mapping
@@ -342,17 +358,33 @@ def validate_compiled_plan(
         )
         if actual_workflow_paths != expected_workflow_paths:
             errors.append("workflow destinations differ from plan workflow references")
-        item_proposals = proposal.get("item_proposals", {})
+        item_proposals = (
+            decoded_proposal.item_proposals if decoded_proposal is not None else {}
+        )
+        manifest_base = manifest.data.get("base")
+        base_commit = (
+            manifest_base.get("commit_sha")
+            if isinstance(manifest_base, Mapping)
+            else None
+        )
         for item in parsed_plan.items:
             design_path = item.source_reference_design_file
             if design_path is None:
                 continue
             try:
                 raw_item_proposal = item_proposals[item.item_id]
+                if decoded_proposal is None or not isinstance(base_commit, str):
+                    raise ValueError(
+                        "proposal baseline or planning base is unavailable"
+                    )
                 expected_design = compile_source_reference_design(
                     plan_id=parsed_plan.plan_id,
                     item_id=item.item_id,
-                    proposal=raw_item_proposal,
+                    proposal=raw_item_proposal.to_data(),
+                    baseline_snapshot=decoded_proposal.item_baselines[item.item_id],
+                    base_commit=base_commit,
+                    objective=item.objective,
+                    allowed_paths=item.allowed_paths,
                 )
                 actual_design = yaml.safe_load(compiled.files[design_path])
                 if actual_design != expected_design:

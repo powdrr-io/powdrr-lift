@@ -795,6 +795,13 @@ def compile_source_reference_handoff(
     private_validation_data: Mapping[str, Any] | None = None,
     workspace_root: str | None = None,
 ) -> CompiledSourceReferenceHandoff:
+    if accepted_design.get("compilation_status") == "requires_replan":
+        requirement = accepted_design.get("amendment_requirement")
+        raise ValueError(
+            requirement
+            if isinstance(requirement, str) and requirement.strip()
+            else "accepted plan requires amendment before protected execution"
+        )
     if catalog.accepted_document_digest != content_fingerprint(accepted_design):
         raise ValueError("accepted design and frozen catalog do not match")
     desired = DesiredState.from_snapshot(accepted_design)

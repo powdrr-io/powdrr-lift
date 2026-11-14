@@ -1,0 +1,502 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1518
+title: Preserve accepted obligations in worker designs
+intent:
+  problem: Accepted behavior cases and source-reference obligations were dropped or
+    synthesized while compiling planning proposals into worker designs.
+  goal: Preserve accepted typed cases and reference operations through serialized
+    source designs and the protected worker handoff, and explicitly require replanning
+    when authority is incomplete.
+human-decisions: []
+structured_files: []
+files:
+- path: packages/service/src/powdrr_service/planning/source_reference_design.py
+  type: modified
+  span:
+    start_line: 5
+    end_line: 6
+  summary: Project typed cases and reference obligations into the canonical worker
+    design.
+  rationale: Keep serialized planning authority faithful and reject incomplete worker
+    contracts.
+- path: packages/service/src/powdrr_service/planning/source_reference_design.py
+  type: modified
+  span:
+    start_line: 74
+    end_line: 74
+  summary: Project typed cases and reference obligations into the canonical worker
+    design.
+  rationale: Keep serialized planning authority faithful and reject incomplete worker
+    contracts.
+- path: docs/plans/reliable-plan-execution.md
+  type: modified
+  span:
+    start_line: 63
+    end_line: 64
+  summary: Update task status.
+  rationale: Keep serialized planning authority faithful and reject incomplete worker
+    contracts.
+- path: packages/service/src/powdrr_service/planning/compiler.py
+  type: modified
+  span:
+    start_line: 17
+    end_line: 20
+  summary: Compile and validate the emitted worker design from its accepted proposal
+    and pinned baseline.
+  rationale: Keep serialized planning authority faithful and reject incomplete worker
+    contracts.
+- path: packages/service/src/powdrr_service/planning/compiler.py
+  type: modified
+  span:
+    start_line: 189
+    end_line: 191
+  summary: Compile and validate the emitted worker design from its accepted proposal
+    and pinned baseline.
+  rationale: Keep serialized planning authority faithful and reject incomplete worker
+    contracts.
+- path: packages/service/src/powdrr_service/planning/compiler.py
+  type: modified
+  span:
+    start_line: 204
+    end_line: 207
+  summary: Compile and validate the emitted worker design from its accepted proposal
+    and pinned baseline.
+  rationale: Keep serialized planning authority faithful and reject incomplete worker
+    contracts.
+- path: packages/service/src/powdrr_service/planning/compiler.py
+  type: modified
+  span:
+    start_line: 314
+    end_line: 314
+  summary: Compile and validate the emitted worker design from its accepted proposal
+    and pinned baseline.
+  rationale: Keep serialized planning authority faithful and reject incomplete worker
+    contracts.
+- path: packages/service/src/powdrr_service/planning/compiler.py
+  type: modified
+  span:
+    start_line: 325
+    end_line: 329
+  summary: Compile and validate the emitted worker design from its accepted proposal
+    and pinned baseline.
+  rationale: Keep serialized planning authority faithful and reject incomplete worker
+    contracts.
+- path: packages/service/src/powdrr_service/planning/compiler.py
+  type: modified
+  span:
+    start_line: 361
+    end_line: 369
+  summary: Compile and validate the emitted worker design from its accepted proposal
+    and pinned baseline.
+  rationale: Keep serialized planning authority faithful and reject incomplete worker
+    contracts.
+- path: packages/service/src/powdrr_service/planning/compiler.py
+  type: modified
+  span:
+    start_line: 376
+    end_line: 379
+  summary: Compile and validate the emitted worker design from its accepted proposal
+    and pinned baseline.
+  rationale: Keep serialized planning authority faithful and reject incomplete worker
+    contracts.
+- path: packages/service/src/powdrr_service/planning/compiler.py
+  type: modified
+  span:
+    start_line: 383
+    end_line: 387
+  summary: Compile and validate the emitted worker design from its accepted proposal
+    and pinned baseline.
+  rationale: Keep serialized planning authority faithful and reject incomplete worker
+    contracts.
+- path: packages/service/src/powdrr_service/planning/multipr_structrr.py
+  type: modified
+  span:
+    start_line: 35
+    end_line: 43
+  summary: Preserve accepted operation and test case data through proposal compilation
+    and serialization.
+  rationale: Keep serialized planning authority faithful and reject incomplete worker
+    contracts.
+- path: packages/service/src/powdrr_service/planning/multipr_structrr.py
+  type: modified
+  span:
+    start_line: 168
+    end_line: 174
+  summary: Preserve accepted operation and test case data through proposal compilation
+    and serialization.
+  rationale: Keep serialized planning authority faithful and reject incomplete worker
+    contracts.
+- path: packages/service/src/powdrr_service/planning/multipr_structrr.py
+  type: modified
+  span:
+    start_line: 259
+    end_line: 264
+  summary: Preserve accepted operation and test case data through proposal compilation
+    and serialization.
+  rationale: Keep serialized planning authority faithful and reject incomplete worker
+    contracts.
+- path: packages/service/src/powdrr_service/planning/multipr_structrr.py
+  type: modified
+  span:
+    start_line: 268
+    end_line: 268
+  summary: Preserve accepted operation and test case data through proposal compilation
+    and serialization.
+  rationale: Keep serialized planning authority faithful and reject incomplete worker
+    contracts.
+- path: packages/service/src/powdrr_service/planning/multipr_structrr.py
+  type: modified
+  span:
+    start_line: 377
+    end_line: 381
+  summary: Preserve accepted operation and test case data through proposal compilation
+    and serialization.
+  rationale: Keep serialized planning authority faithful and reject incomplete worker
+    contracts.
+- path: packages/service/src/powdrr_service/planning/multipr_structrr.py
+  type: modified
+  span:
+    start_line: 821
+    end_line: 827
+  summary: Preserve accepted operation and test case data through proposal compilation
+    and serialization.
+  rationale: Keep serialized planning authority faithful and reject incomplete worker
+    contracts.
+- path: packages/service/src/powdrr_service/planning/multipr_structrr.py
+  type: modified
+  span:
+    start_line: 888
+    end_line: 888
+  summary: Preserve accepted operation and test case data through proposal compilation
+    and serialization.
+  rationale: Keep serialized planning authority faithful and reject incomplete worker
+    contracts.
+- path: packages/service/src/powdrr_service/planning/source_reference_design.py
+  type: modified
+  span:
+    start_line: 1
+    end_line: 1
+  summary: Project typed cases and reference obligations into the canonical worker
+    design.
+  rationale: Keep serialized planning authority faithful and reject incomplete worker
+    contracts.
+- path: packages/service/src/powdrr_service/planning/source_reference_design.py
+  type: modified
+  span:
+    start_line: 8
+    end_line: 14
+  summary: Project typed cases and reference obligations into the canonical worker
+    design.
+  rationale: Keep serialized planning authority faithful and reject incomplete worker
+    contracts.
+- path: packages/service/src/powdrr_service/planning/source_reference_design.py
+  type: modified
+  span:
+    start_line: 17
+    end_line: 42
+  summary: Project typed cases and reference obligations into the canonical worker
+    design.
+  rationale: Keep serialized planning authority faithful and reject incomplete worker
+    contracts.
+- path: packages/service/src/powdrr_service/planning/source_reference_design.py
+  type: modified
+  span:
+    start_line: 47
+    end_line: 54
+  summary: Project typed cases and reference obligations into the canonical worker
+    design.
+  rationale: Keep serialized planning authority faithful and reject incomplete worker
+    contracts.
+- path: packages/service/src/powdrr_service/planning/source_reference_design.py
+  type: modified
+  span:
+    start_line: 56
+    end_line: 69
+  summary: Project typed cases and reference obligations into the canonical worker
+    design.
+  rationale: Keep serialized planning authority faithful and reject incomplete worker
+    contracts.
+- path: packages/service/src/powdrr_service/planning/source_reference_design.py
+  type: modified
+  span:
+    start_line: 80
+    end_line: 80
+  summary: Project typed cases and reference obligations into the canonical worker
+    design.
+  rationale: Keep serialized planning authority faithful and reject incomplete worker
+    contracts.
+- path: packages/service/src/powdrr_service/planning/source_reference_design.py
+  type: modified
+  span:
+    start_line: 85
+    end_line: 113
+  summary: Project typed cases and reference obligations into the canonical worker
+    design.
+  rationale: Keep serialized planning authority faithful and reject incomplete worker
+    contracts.
+- path: packages/service/src/powdrr_service/planning/source_reference_design.py
+  type: modified
+  span:
+    start_line: 115
+    end_line: 118
+  summary: Project typed cases and reference obligations into the canonical worker
+    design.
+  rationale: Keep serialized planning authority faithful and reject incomplete worker
+    contracts.
+- path: packages/service/src/powdrr_service/planning/source_reference_design.py
+  type: modified
+  span:
+    start_line: 120
+    end_line: 147
+  summary: Project typed cases and reference obligations into the canonical worker
+    design.
+  rationale: Keep serialized planning authority faithful and reject incomplete worker
+    contracts.
+- path: packages/service/src/powdrr_service/planning/source_reference_design.py
+  type: modified
+  span:
+    start_line: 155
+    end_line: 159
+  summary: Project typed cases and reference obligations into the canonical worker
+    design.
+  rationale: Keep serialized planning authority faithful and reject incomplete worker
+    contracts.
+- path: packages/service/src/powdrr_service/planning/source_reference_design.py
+  type: modified
+  span:
+    start_line: 162
+    end_line: 173
+  summary: Project typed cases and reference obligations into the canonical worker
+    design.
+  rationale: Keep serialized planning authority faithful and reject incomplete worker
+    contracts.
+- path: packages/service/src/powdrr_service/planning/source_reference_design.py
+  type: modified
+  span:
+    start_line: 175
+    end_line: 181
+  summary: Project typed cases and reference obligations into the canonical worker
+    design.
+  rationale: Keep serialized planning authority faithful and reject incomplete worker
+    contracts.
+- path: packages/service/src/powdrr_service/planning/source_reference_design.py
+  type: modified
+  span:
+    start_line: 188
+    end_line: 188
+  summary: Project typed cases and reference obligations into the canonical worker
+    design.
+  rationale: Keep serialized planning authority faithful and reject incomplete worker
+    contracts.
+- path: packages/service/src/powdrr_service/structrr/source_reference_handoff.py
+  type: modified
+  span:
+    start_line: 798
+    end_line: 804
+  summary: Block protected execution when the accepted design requires replanning.
+  rationale: Keep serialized planning authority faithful and reject incomplete worker
+    contracts.
+- path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 368
+    end_line: 375
+  summary: Permit accepted source-reference operations in generated proposals.
+  rationale: Keep serialized planning authority faithful and reject incomplete worker
+    contracts.
+- path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 431
+    end_line: 434
+  summary: Permit accepted source-reference operations in generated proposals.
+  rationale: Keep serialized planning authority faithful and reject incomplete worker
+    contracts.
+- path: tests/test_multipr_structrr.py
+  type: modified
+  span:
+    start_line: 19
+    end_line: 23
+  summary: Verify proposal fidelity and dependency-projected definitions.
+  rationale: Keep serialized planning authority faithful and reject incomplete worker
+    contracts.
+- path: tests/test_multipr_structrr.py
+  type: modified
+  span:
+    start_line: 25
+    end_line: 27
+  summary: Verify proposal fidelity and dependency-projected definitions.
+  rationale: Keep serialized planning authority faithful and reject incomplete worker
+    contracts.
+- path: tests/test_multipr_structrr.py
+  type: modified
+  span:
+    start_line: 84
+    end_line: 138
+  summary: Verify proposal fidelity and dependency-projected definitions.
+  rationale: Keep serialized planning authority faithful and reject incomplete worker
+    contracts.
+- path: tests/test_multipr_structrr.py
+  type: modified
+  span:
+    start_line: 140
+    end_line: 141
+  summary: Verify proposal fidelity and dependency-projected definitions.
+  rationale: Keep serialized planning authority faithful and reject incomplete worker
+    contracts.
+- path: tests/test_multipr_structrr.py
+  type: modified
+  span:
+    start_line: 144
+    end_line: 210
+  summary: Verify proposal fidelity and dependency-projected definitions.
+  rationale: Keep serialized planning authority faithful and reject incomplete worker
+    contracts.
+- path: tests/test_multipr_structrr.py
+  type: modified
+  span:
+    start_line: 212
+    end_line: 273
+  summary: Verify proposal fidelity and dependency-projected definitions.
+  rationale: Keep serialized planning authority faithful and reject incomplete worker
+    contracts.
+- path: tests/test_planning_compiler.py
+  type: modified
+  span:
+    start_line: 5
+    end_line: 5
+  summary: Verify end-to-end artifact fidelity and fail-closed runtime handoff.
+  rationale: Keep serialized planning authority faithful and reject incomplete worker
+    contracts.
+- path: tests/test_planning_compiler.py
+  type: modified
+  span:
+    start_line: 7
+    end_line: 7
+  summary: Verify end-to-end artifact fidelity and fail-closed runtime handoff.
+  rationale: Keep serialized planning authority faithful and reject incomplete worker
+    contracts.
+- path: tests/test_planning_compiler.py
+  type: modified
+  span:
+    start_line: 11
+    end_line: 11
+  summary: Verify end-to-end artifact fidelity and fail-closed runtime handoff.
+  rationale: Keep serialized planning authority faithful and reject incomplete worker
+    contracts.
+- path: tests/test_planning_compiler.py
+  type: modified
+  span:
+    start_line: 30
+    end_line: 31
+  summary: Verify end-to-end artifact fidelity and fail-closed runtime handoff.
+  rationale: Keep serialized planning authority faithful and reject incomplete worker
+    contracts.
+- path: tests/test_planning_compiler.py
+  type: modified
+  span:
+    start_line: 33
+    end_line: 35
+  summary: Verify end-to-end artifact fidelity and fail-closed runtime handoff.
+  rationale: Keep serialized planning authority faithful and reject incomplete worker
+    contracts.
+- path: tests/test_planning_compiler.py
+  type: modified
+  span:
+    start_line: 37
+    end_line: 41
+  summary: Verify end-to-end artifact fidelity and fail-closed runtime handoff.
+  rationale: Keep serialized planning authority faithful and reject incomplete worker
+    contracts.
+- path: tests/test_planning_compiler.py
+  type: modified
+  span:
+    start_line: 52
+    end_line: 87
+  summary: Verify end-to-end artifact fidelity and fail-closed runtime handoff.
+  rationale: Keep serialized planning authority faithful and reject incomplete worker
+    contracts.
+- path: tests/test_planning_compiler.py
+  type: modified
+  span:
+    start_line: 89
+    end_line: 107
+  summary: Verify end-to-end artifact fidelity and fail-closed runtime handoff.
+  rationale: Keep serialized planning authority faithful and reject incomplete worker
+    contracts.
+- path: tests/test_planning_compiler.py
+  type: modified
+  span:
+    start_line: 111
+    end_line: 115
+  summary: Verify end-to-end artifact fidelity and fail-closed runtime handoff.
+  rationale: Keep serialized planning authority faithful and reject incomplete worker
+    contracts.
+- path: tests/test_planning_compiler.py
+  type: modified
+  span:
+    start_line: 122
+    end_line: 125
+  summary: Verify end-to-end artifact fidelity and fail-closed runtime handoff.
+  rationale: Keep serialized planning authority faithful and reject incomplete worker
+    contracts.
+- path: tests/test_planning_compiler.py
+  type: modified
+  span:
+    start_line: 129
+    end_line: 167
+  summary: Verify end-to-end artifact fidelity and fail-closed runtime handoff.
+  rationale: Keep serialized planning authority faithful and reject incomplete worker
+    contracts.
+- path: tests/test_planning_compiler.py
+  type: modified
+  span:
+    start_line: 169
+    end_line: 169
+  summary: Verify end-to-end artifact fidelity and fail-closed runtime handoff.
+  rationale: Keep serialized planning authority faithful and reject incomplete worker
+    contracts.
+- path: tests/test_planning_compiler.py
+  type: modified
+  span:
+    start_line: 172
+    end_line: 335
+  summary: Verify end-to-end artifact fidelity and fail-closed runtime handoff.
+  rationale: Keep serialized planning authority faithful and reject incomplete worker
+    contracts.
+- path: tests/test_planning_compiler.py
+  type: modified
+  span:
+    start_line: 339
+    end_line: 580
+  summary: Verify end-to-end artifact fidelity and fail-closed runtime handoff.
+  rationale: Keep serialized planning authority faithful and reject incomplete worker
+    contracts.
+- path: tests/test_planning_compiler.py
+  type: modified
+  span:
+    start_line: 600
+    end_line: 601
+  summary: Verify end-to-end artifact fidelity and fail-closed runtime handoff.
+  rationale: Keep serialized planning authority faithful and reject incomplete worker
+    contracts.
+entities:
+- id: multi-pr-proposal-decoder
+  type: Function
+  action: added
+entity_relationships: []
+invariants:
+- id: worker-design-obligation-fidelity
+  description: Source designs retain accepted typed behavior scenarios, source clauses,
+    reference definitions, placements, and preservation obligations from the item
+    baseline and proposal operations.
+  action: added
+  rationale: Protected workers must receive the exact accepted contract and its canonical
+    source references.
+- id: incomplete-worker-contract-replan
+  description: A source design with missing typed behavior authority is marked requires_replan
+    and rejected by the protected handoff compiler.
+  action: added
+  rationale: Legacy prose-only cases cannot be executed as if they had source-faithful
+    behavior contracts.
+guidance: []

@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Mapping
 from dataclasses import replace
+from pathlib import Path
 from typing import Any
 
 import pytest
+import yaml
 from powdrr_service.planning.assembly import PlannedWrite, WorkUnit
 from powdrr_service.planning.compiler import (
     PLANNING_MANIFEST_SCHEMA,
@@ -24,8 +27,18 @@ from powdrr_service.planning.plan_document import (
 from powdrr_service.planning.source_reference_design import (
     compile_source_reference_design,
 )
+from powdrr_service.structrr.reference_catalog import compile_reference_catalog
+from powdrr_service.structrr.reference_definitions import ReferenceDefinition
 from powdrr_service.structrr.snapshot import snapshot_digest
+from powdrr_service.structrr.source_reference_handoff import (
+    compile_source_reference_handoff,
+)
 
+from powdrr_lift.core.contract_closure import (
+    collect_python_evidence,
+    compile_contract_closure,
+    validate_contract_closure,
+)
 from powdrr_lift.workrr.github_issue_queue import (
     PlannedWorkItem,
     ReviewedExecutionPlan,
@@ -36,40 +49,533 @@ def _source_digest(value: str) -> str:
     return hashlib.sha256(value.encode()).hexdigest()
 
 
+def _behavior_scenario(scenario_id: str = "scenario:positive") -> dict[str, Any]:
+    return {
+        "schema_version": "behavior-scenario-v1",
+        "scenario_id": scenario_id,
+        "subject": "public operation",
+        "given": {"input": "valid"},
+        "when": "the operation is called",
+        "then": {"result": "accepted"},
+        "dimensions": {
+            "normal_result": "returns the accepted result",
+            "error_behavior": "not_applicable",
+            "continuation": "not_applicable",
+            "unsupported_behavior": "not_applicable",
+            "cancellation_cleanup": "not_applicable",
+            "compatibility": "preserves the public result shape",
+            "negative_boundaries": "not_applicable",
+        },
+        "evidence": ["source-clause:positive"],
+        "validator": "focused public behavior test",
+        "faithfulness_ref": {"fingerprint": "sha256:" + "a" * 64},
+    }
+
+
+def _source_design_proposal(
+    baseline: Mapping[str, Any],
+    cases: list[dict[str, Any]],
+    operations: list[dict[str, Any]] | None = None,
+) -> dict[str, Any]:
+    return {
+        "structrr_baseline_fingerprint": snapshot_digest(baseline),
+        "operations": operations or [],
+        "allowed_paths": ["src"],
+        "verification": {"required_test_cases": cases},
+    }
+
+
 def test_source_design_binds_accepted_test_cases_to_plan_and_item() -> None:
+    baseline: dict[str, Any] = {"reference_definitions": []}
+    scenario = _behavior_scenario()
+    proposal = {
+        "structrr_baseline_fingerprint": snapshot_digest(baseline),
+        "operations": [],
+        "verification": {
+            "required_test_cases": [
+                {
+                    "id": "AC-01",
+                    "description": "The implementation is covered.",
+                    "test_type": "integration",
+                    "scenario": "Exercise the public behavior.",
+                    "expected_outcome": "The result satisfies the criterion.",
+                    "source_clauses": ["clause:positive"],
+                    "behavior_scenario": scenario,
+                }
+            ]
+        },
+    }
     design = compile_source_reference_design(
         plan_id="bounded-plan",
         item_id="item-01",
-        proposal={
-            "verification": {
-                "required_test_cases": [
-                    {
-                        "id": "AC-01",
-                        "description": "The implementation is covered.",
-                        "test_type": "integration",
-                        "scenario": "Exercise the public behavior.",
-                        "expected_outcome": "The result satisfies the criterion.",
-                    }
-                ]
-            }
-        },
+        proposal=proposal,
+        baseline_snapshot=baseline,
+        base_commit="a" * 40,
+        objective="Implement accepted behavior.",
+        allowed_paths=("src",),
     )
 
     assert design["plan_id"] == "bounded-plan"
     assert design["item_id"] == "item-01"
     assert design["design"]["required_test_cases"][0]["id"] == "AC-01"
     scenario = design["design"]["required_test_cases"][0]["behavior_scenario"]
-    assert scenario["when"] == "Exercise the public behavior."
-    assert scenario["then"] == "The result satisfies the criterion."
-    assert scenario["faithfulness_ref"]["fingerprint"]
+    assert scenario == _behavior_scenario()
+    assert design["design"]["required_test_cases"][0]["source_clauses"] == [
+        "clause:positive"
+    ]
     assert design["design"]["source_reference_placements"] == []
 
 
+def test_source_design_blocks_prose_only_cases_pending_replanning() -> None:
+    baseline: dict[str, Any] = {}
+    proposal = {
+        "structrr_baseline_fingerprint": snapshot_digest(baseline),
+        "operations": [],
+        "verification": {
+            "required_test_cases": [
+                {
+                    "id": "AC-01",
+                    "description": "The implementation is covered.",
+                    "test_type": "integration",
+                    "scenario": "Exercise the public behavior.",
+                    "expected_outcome": "The result satisfies the criterion.",
+                }
+            ]
+        },
+    }
+    design = compile_source_reference_design(
+        plan_id="bounded-plan",
+        item_id="item-01",
+        proposal=proposal,
+        baseline_snapshot=baseline,
+        base_commit="a" * 40,
+        objective="Implement accepted behavior.",
+        allowed_paths=("src",),
+    )
+
+    assert design["status"] == "requires_replan"
+    assert "Amend or replan" in design["amendment_requirement"]
+    catalog = compile_reference_catalog(design["design"], base_commit="a" * 40)
+    with pytest.raises(ValueError, match="Amend or replan"):
+        compile_source_reference_handoff(
+            design["design"],
+            catalog,
+            objective="Implement accepted behavior.",
+            allowed_paths=("src",),
+        )
+
+
 def test_source_design_rejects_items_without_accepted_test_cases() -> None:
+    baseline: dict[str, Any] = {}
     with pytest.raises(ValueError, match="no accepted required test cases"):
         compile_source_reference_design(
-            plan_id="bounded-plan", item_id="item-01", proposal={}
+            plan_id="bounded-plan",
+            item_id="item-01",
+            proposal={
+                "structrr_baseline_fingerprint": snapshot_digest(baseline),
+                "operations": [],
+            },
+            baseline_snapshot=baseline,
+            base_commit="a" * 40,
+            objective="Implement accepted behavior.",
+            allowed_paths=("src",),
         )
+
+
+def test_source_design_rejects_unrecognized_top_level_reference_records() -> None:
+    baseline: dict[str, Any] = {}
+    proposal = _source_design_proposal(
+        baseline,
+        [{"id": "case:one", "behavior_scenario": _behavior_scenario()}],
+    )
+    proposal["source_reference_placements"] = []
+
+    with pytest.raises(ValueError, match="accepted proposal operations"):
+        compile_source_reference_design(
+            plan_id="bounded-plan",
+            item_id="item-01",
+            proposal=proposal,
+            baseline_snapshot=baseline,
+            base_commit="a" * 40,
+            objective="Implement accepted behavior.",
+            allowed_paths=("src",),
+        )
+
+
+def test_source_design_rejects_a_placement_with_unknown_verification_reference() -> (
+    None
+):
+    baseline: dict[str, Any] = {"reference_definitions": []}
+    definition = ReferenceDefinition(
+        "feature:one", "feature", "Implement one behavior.", "source:one"
+    )
+    placement = {
+        "obligation_id": "placement:one",
+        "ref": definition.id,
+        "relationship": "implements",
+        "requirement": definition.statement,
+        "owner": {
+            "path": "src/app.py",
+            "kind": "function",
+            "qualified_name": "run",
+        },
+        "cardinality": "exactly_one",
+        "verification_refs": ["case:missing"],
+    }
+    operations = [
+        {
+            "operation_id": "definition:one",
+            "section": "reference_definitions",
+            "subject_id": definition.id,
+            "action": "add",
+            "content": definition.to_data(),
+        },
+        {
+            "operation_id": "placement:one",
+            "section": "source_reference_placements",
+            "subject_id": placement["obligation_id"],
+            "action": "add",
+            "content": placement,
+        },
+    ]
+    proposal = _source_design_proposal(
+        baseline,
+        [{"id": "case:one", "behavior_scenario": _behavior_scenario()}],
+        operations,
+    )
+
+    with pytest.raises(ValueError, match="no accepted behavior case"):
+        compile_source_reference_design(
+            plan_id="bounded-plan",
+            item_id="item-01",
+            proposal=proposal,
+            baseline_snapshot=baseline,
+            base_commit="a" * 40,
+            objective="Implement accepted behavior.",
+            allowed_paths=("src",),
+        )
+
+
+def test_source_design_rejects_placement_without_accepted_definition() -> None:
+    baseline: dict[str, Any] = {"reference_definitions": []}
+    placement = {
+        "obligation_id": "placement:unknown",
+        "ref": "feature:unknown",
+        "relationship": "implements",
+        "requirement": "Implement an undefined feature.",
+        "owner": {
+            "path": "src/app.py",
+            "kind": "function",
+            "qualified_name": "run",
+        },
+        "cardinality": "exactly_one",
+        "verification_refs": ["case:one"],
+    }
+    proposal = _source_design_proposal(
+        baseline,
+        [{"id": "case:one", "behavior_scenario": _behavior_scenario()}],
+        [
+            {
+                "operation_id": "placement:unknown",
+                "section": "source_reference_placements",
+                "subject_id": placement["obligation_id"],
+                "action": "add",
+                "content": placement,
+            }
+        ],
+    )
+
+    with pytest.raises(ValueError, match="undefined source clause"):
+        compile_source_reference_design(
+            plan_id="bounded-plan",
+            item_id="item-01",
+            proposal=proposal,
+            baseline_snapshot=baseline,
+            base_commit="a" * 40,
+            objective="Implement accepted behavior.",
+            allowed_paths=("src",),
+        )
+
+
+def test_source_design_rejects_unresolved_or_duplicate_behavior_authority() -> None:
+    baseline: dict[str, Any] = {}
+    unresolved = _behavior_scenario()
+    unresolved["unresolved_dimensions"] = ["normal_result"]
+    proposal = _source_design_proposal(
+        baseline,
+        [{"id": "case:one", "behavior_scenario": unresolved}],
+    )
+    with pytest.raises(ValueError, match="unresolved dimensions"):
+        compile_source_reference_design(
+            plan_id="bounded-plan",
+            item_id="item-01",
+            proposal=proposal,
+            baseline_snapshot=baseline,
+            base_commit="a" * 40,
+            objective="Implement accepted behavior.",
+            allowed_paths=("src",),
+        )
+
+    duplicated = _behavior_scenario("scenario:duplicate")
+    proposal = _source_design_proposal(
+        baseline,
+        [
+            {"id": "case:one", "behavior_scenario": duplicated},
+            {"id": "case:two", "behavior_scenario": duplicated},
+        ],
+    )
+    with pytest.raises(ValueError, match="duplicate behavior scenario"):
+        compile_source_reference_design(
+            plan_id="bounded-plan",
+            item_id="item-01",
+            proposal=proposal,
+            baseline_snapshot=baseline,
+            base_commit="a" * 40,
+            objective="Implement accepted behavior.",
+            allowed_paths=("src",),
+        )
+
+
+def test_accepted_reference_obligations_reach_serialized_design_and_private_handoff(
+    tmp_path: Path,
+) -> None:
+    plan, manifest, _ = _fixture()
+    old_definition = ReferenceDefinition(
+        "invariant:preserve-cache-key",
+        "invariant",
+        "Preserve the existing cache key during the change.",
+        "source:clause:preserve-cache-key",
+    )
+    new_definition = ReferenceDefinition(
+        "feature:typed-response",
+        "feature",
+        "Return typed responses for every accepted input class.",
+        "source:clause:typed-response",
+    )
+    baseline = {
+        "entities": [],
+        "reference_definitions": [old_definition.to_data()],
+        "source_reference_placements": [],
+        "source_reference_preservations": [],
+    }
+    cases: list[dict[str, Any]] = []
+    for case_id, scenario_id, dimension, behavior in (
+        ("case:positive", "scenario:positive", "normal_result", "returns a value"),
+        (
+            "case:negative",
+            "scenario:negative",
+            "negative_boundaries",
+            "rejects invalid input",
+        ),
+        (
+            "case:conditional",
+            "scenario:conditional",
+            "normal_result",
+            "uses the configured branch",
+        ),
+        ("case:error", "scenario:error", "error_behavior", "raises a typed error"),
+        (
+            "case:optional",
+            "scenario:optional",
+            "normal_result",
+            "uses the accepted default when omitted",
+        ),
+        (
+            "case:preserve",
+            "scenario:preserve",
+            "compatibility",
+            "preserves existing cache-key behavior",
+        ),
+    ):
+        scenario = _behavior_scenario(scenario_id)
+        dimensions = dict(scenario["dimensions"])
+        dimensions[dimension] = behavior
+        scenario["dimensions"] = dimensions
+        scenario["evidence"] = [f"source-clause:{scenario_id}"]
+        scenario["faithfulness_ref"] = {
+            "fingerprint": f"sha256:{_source_digest(scenario_id)}"
+        }
+        if scenario_id == "scenario:conditional":
+            scenario["validation_group_id"] = "group:conditional"
+            scenario["validation_relation"] = "conditional"
+        cases.append(
+            {
+                "id": case_id,
+                "description": f"Check {behavior}.",
+                "test_type": "integration",
+                "scenario": f"exercise {behavior}",
+                "expected_outcome": behavior,
+                "source_clauses": [f"source-clause:{scenario_id}"],
+                "behavior_scenario": scenario,
+            }
+        )
+    placement = {
+        "obligation_id": "placement:typed-response",
+        "ref": new_definition.id,
+        "relationship": "implements",
+        "requirement": new_definition.statement,
+        "owner": {
+            "path": "src/app.py",
+            "kind": "function",
+            "qualified_name": "respond",
+        },
+        "cardinality": "exactly_one",
+        "verification_refs": [case["id"] for case in cases],
+    }
+    preservation = {
+        "id": "preserve:cache-key",
+        "ref": old_definition.id,
+        "owner": {
+            "path": "src/cache.py",
+            "kind": "function",
+            "qualified_name": "cache_key",
+        },
+        "disposition": "preserve",
+        "reason": "The accepted change must retain this existing behavior.",
+        "successor": None,
+        "destination": None,
+        "verification_refs": ["case:preserve"],
+    }
+    proposal = compile_multi_pr_proposal(
+        plan_id=plan.plan_id,
+        baseline_snapshot=baseline,
+        items=[
+            {
+                "id": "item-01",
+                "acceptance_criteria": ["Return typed responses."],
+                "allowed_paths": ["src"],
+                "verification": {"required_test_cases": cases},
+            }
+        ],
+        proposed_operations=[
+            {
+                "operation_id": "definition:typed-response",
+                "item_id": "item-01",
+                "section": "reference_definitions",
+                "subject_id": new_definition.id,
+                "action": "added",
+                "content": new_definition.to_data(),
+            },
+            {
+                "operation_id": "placement:typed-response",
+                "item_id": "item-01",
+                "section": "source_reference_placements",
+                "subject_id": placement["obligation_id"],
+                "action": "added",
+                "content": placement,
+            },
+            {
+                "operation_id": "preservation:cache-key",
+                "item_id": "item-01",
+                "section": "source_reference_preservations",
+                "subject_id": preservation["id"],
+                "action": "added",
+                "content": preservation,
+            },
+        ],
+        source_ref="docs/plan.md#sha256:abc",
+    )
+    plan_item = replace(
+        plan.items[0],
+        source_reference_design_file="docs/design/accepted.yaml",
+        allowed_paths=("src",),
+    )
+    plan = replace(plan, items=(plan_item,))
+    records = manifest.to_data()
+    records.pop("schema")
+    records.pop("semantic_revision_digest")
+    records["base"]["structrr_fingerprint"] = snapshot_digest(baseline)
+    records["structrr"]["baseline_fingerprint"] = proposal.to_data()[
+        "baseline_fingerprint"
+    ]
+    records["structrr"]["proposal_fingerprint"] = proposal.to_data()["fingerprint"]
+    accepted_manifest = PlanningManifest.create(records)
+    repository_snapshot = {
+        "source": accepted_manifest.data["source"],
+        "base": accepted_manifest.data["base"],
+    }
+
+    compiled = compile_plan(
+        plan=plan,
+        planning_manifest=accepted_manifest,
+        repository_snapshot=repository_snapshot,
+        structrr_proposal=proposal,
+        verification_command="pytest -q",
+        plan_path="docs/plans/bounded-plan.yaml",
+    )
+    assert validate_compiled_plan(compiled, repository_snapshot).valid
+    source_design = yaml.safe_load(compiled.files["docs/design/accepted.yaml"])
+    design = source_design["design"]
+    assert design["source_reference_placements"] == [placement]
+    assert design["source_reference_preservations"] == [preservation]
+    assert {item["id"] for item in design["reference_definitions"]} == {
+        old_definition.id,
+        new_definition.id,
+    }
+    expected_cases = {item["id"]: {**item, "status": "planned"} for item in cases}
+    assert {
+        item["id"]: item for item in design["required_test_cases"]
+    } == expected_cases
+
+    catalog = compile_reference_catalog(design, base_commit="a" * 40)
+    handoff = compile_source_reference_handoff(
+        design,
+        catalog,
+        objective="Return typed responses.",
+        allowed_paths=("src",),
+    )
+    contract = handoff.validation_manifest["contract"]
+    assert {item["scenario_id"] for item in contract["behavior_scenarios"]} == {
+        item["behavior_scenario"]["scenario_id"] for item in cases
+    }
+    assert [item["obligation_id"] for item in contract["obligations"]] == [
+        placement["obligation_id"]
+    ]
+    assert [item["id"] for item in contract["preservation"]] == [preservation["id"]]
+    scenarios_by_id = {
+        item["scenario_id"]: item for item in contract["behavior_scenarios"]
+    }
+    for case in cases:
+        accepted = case["behavior_scenario"]
+        compiled_scenario = scenarios_by_id[accepted["scenario_id"]]
+        for field in ("dimensions", "evidence", "faithfulness_ref"):
+            assert compiled_scenario[field] == accepted[field]
+    private = handoff.validation_manifest["private_validation_data"]
+    assert private["obligation_evidence_contracts"]
+
+    source_path = tmp_path / "src" / "app.py"
+    source_path.parent.mkdir(parents=True)
+    source_path.write_text(
+        "def respond(value: object) -> object:\n    return value\n",
+        encoding="utf-8",
+    )
+    repository_evidence = collect_python_evidence(
+        tmp_path, base_commit="a" * 40, tracked_paths=("src/app.py",)
+    )
+    closure = compile_contract_closure(
+        contract["behavior_scenarios"],
+        repository_evidence,
+        design_revision=catalog.accepted_document_digest,
+    )
+    validated_closure = validate_contract_closure(closure, repository_evidence)
+    closure_by_id = {
+        operation["operation_ref"]: operation["behavior"]
+        for operation in validated_closure["operations"]
+    }
+    for case in cases:
+        accepted = case["behavior_scenario"]
+        closure_behavior = closure_by_id[accepted["scenario_id"]]
+        assert closure_behavior["evidence"] == accepted["evidence"]
+        assert closure_behavior["faithfulness_ref"] == accepted["faithfulness_ref"]
+
+    altered_files = dict(compiled.files)
+    altered_design = yaml.safe_load(altered_files["docs/design/accepted.yaml"])
+    altered_design["design"]["source_reference_placements"] = []
+    altered_files["docs/design/accepted.yaml"] = yaml.safe_dump(
+        altered_design, sort_keys=False
+    )
+    altered = replace(compiled, files=altered_files)
+    assert not validate_compiled_plan(altered, repository_snapshot).valid
 
 
 def _fixture() -> tuple[ReviewedExecutionPlan, PlanningManifest, Any]:
@@ -91,6 +597,8 @@ def _fixture() -> tuple[ReviewedExecutionPlan, PlanningManifest, Any]:
                             "test_type": "integration",
                             "scenario": "Exercise the public behavior.",
                             "expected_outcome": "The result satisfies the criterion.",
+                            "source_clauses": ["clause:positive"],
+                            "behavior_scenario": _behavior_scenario("scenario:item-01"),
                         }
                     ]
                 },

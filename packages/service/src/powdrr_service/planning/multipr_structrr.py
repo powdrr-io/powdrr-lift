@@ -32,7 +32,15 @@ from powdrr_service.verification.test_obligations import acceptance_criteria_con
 
 MULTIPR_STRUCTRR_SCHEMA = "multipr-structrr-proposal-v2"
 _LEGACY_MULTIPR_STRUCTRR_SCHEMA = "multipr-structrr-proposal-v1"
-_STRUCTURAL_SECTIONS = {"entities", "entity_relationships", "files", *STORY_SECTIONS}
+_STRUCTURAL_SECTIONS = {
+    "entities",
+    "entity_relationships",
+    "files",
+    "reference_definitions",
+    "source_reference_placements",
+    "source_reference_preservations",
+    *STORY_SECTIONS,
+}
 _ACTIONS = {"added", "changed", "deleted", "removed"}
 
 
@@ -157,7 +165,13 @@ def compile_multi_pr_proposal(
             )
         if not isinstance(content, Mapping):
             raise ValueError(f"Structrr operation {operation_id!r} has no content")
-        identity_key = "stable_key" if section == "files" else "id"
+        identity_key = (
+            "stable_key"
+            if section == "files"
+            else "obligation_id"
+            if section == "source_reference_placements"
+            else "id"
+        )
         if content.get(identity_key, subject_id) != subject_id:
             raise ValueError(
                 f"Structrr operation {operation_id!r} content identity differs "
@@ -242,10 +256,16 @@ def compile_multi_pr_proposal(
                     else []
                 )
             for case in cases:
-                case_id = str(case.get("id", case.get("obligation_id", "")))
+                raw_case_id = case.get("id", case.get("obligation_id"))
+                if not isinstance(raw_case_id, str) or not raw_case_id.strip():
+                    raise ValueError(
+                        f"plan item {item_id!r} has a test case without an ID"
+                    )
+                case_id = raw_case_id
                 description = str(case.get("description", case.get("source_text", "")))
                 test_cases.append(
                     {
+                        **dict(case),
                         "id": (
                             case_id
                             if len(selected_items) == 1
@@ -354,6 +374,11 @@ def load_multi_pr_proposal(path: str | Path) -> MultiPRStructrrProposal:
         raise ValueError(
             f"could not read multi-PR Structrr proposal: {error}"
         ) from error
+    return multi_pr_proposal_from_data(raw)
+
+
+def multi_pr_proposal_from_data(raw: object) -> MultiPRStructrrProposal:
+    """Decode and validate a serialized multi-PR proposal without filesystem IO."""
     if not isinstance(raw, Mapping) or raw.get("schema_version") not in {
         MULTIPR_STRUCTRR_SCHEMA,
         _LEGACY_MULTIPR_STRUCTRR_SCHEMA,
@@ -793,7 +818,13 @@ def project_structural_operations(
             raise ValueError(f"Structrr operation {operation_id!r} is unsupported")
         if not isinstance(content, Mapping):
             raise ValueError(f"Structrr operation {operation_id!r} has no content")
-        identity_key = "stable_key" if section == "files" else "id"
+        identity_key = (
+            "stable_key"
+            if section == "files"
+            else "obligation_id"
+            if section == "source_reference_placements"
+            else "id"
+        )
         if content.get(identity_key, subject_id) != subject_id:
             raise ValueError(
                 f"Structrr operation {operation_id!r} content identity differs "
@@ -854,6 +885,7 @@ __all__ = [
     "active_decision_drift_findings",
     "inherited_decision_records",
     "compile_multi_pr_proposal",
+    "multi_pr_proposal_from_data",
     "project_structural_operations",
     "project_item_proposal",
     "load_multi_pr_proposal",

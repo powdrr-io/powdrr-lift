@@ -91,8 +91,9 @@ def test_response_command_writes_idempotent_runner_failure_checkpoint(
     assert first["checkpoint_written"] is True
     assert first["pull_request_metadata"]["draft"] is True
     assert first["observation_schema_version"] == 1
-    assert first["tested_sha"] is None
+    assert first["tested_sha"] == head_sha
     assert first["required_checks_status"] == "unavailable"
+    assert first["response_state"] == "blocked"
     assert "PR is a draft" in comment_bodies[0]
     assert first["failures"][0]["phase"] == "runner_provisioning"
     failure = CIFailureUnit.from_dict(first["failures"][0])

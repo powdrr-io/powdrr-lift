@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, Literal
 
 from powdrr_contracts.ci import (
     CIAnnotation,
@@ -13,6 +13,7 @@ from powdrr_contracts.ci import (
     CIJobObservation,
     CIObservation,
     CIObservationStatus,
+    CIRequiredCheck,
 )
 from powdrr_contracts.models import ContractError
 
@@ -182,20 +183,53 @@ def normalize_ci_observation(
     head_sha = head.get("sha") if isinstance(head, Mapping) else None
     if not isinstance(head_sha, str):
         raise ContractError("CI snapshot is missing the pull request head SHA")
+    raw_required = snapshot.get("required_checks")
+    required_checks: list[CIRequiredCheck] = []
+    required_status: Literal["available", "unavailable"] = "unavailable"
+    required_source = None
+    if isinstance(raw_required, (tuple, list)) and raw_required:
+        for item in raw_required:
+            if not isinstance(item, Mapping):
+                required_checks = []
+                break
+            name = item.get("name")
+            state = item.get("state")
+            workflow = item.get("workflow")
+            if (
+                not isinstance(name, str)
+                or not isinstance(state, str)
+                or (workflow is not None and not isinstance(workflow, str))
+            ):
+                required_checks = []
+                break
+            required_checks.append(
+                CIRequiredCheck(
+                    name=name,
+                    state=state,
+                    workflow=workflow,
+                    head_sha=head_sha,
+                )
+            )
+        if required_checks:
+            required_status = "available"
+            required_source = "gh pr checks --required"
+    jobs = normalize_github_snapshot(snapshot)
+    tested_shas = {job.tested_sha for job in jobs if job.tested_sha is not None}
     return CIObservation(
         repository=repository,
         pull_request_number=pull_request_number,
         head_sha=head_sha,
-        tested_sha=None,
+        tested_sha=next(iter(tested_shas)) if len(tested_shas) == 1 else None,
         merge_base_sha=None,
         observed_at=(
             snapshot.get("observed_at")
             if isinstance(snapshot.get("observed_at"), str)
             else None
         ),
-        required_checks_status="unavailable",
-        required_check_source=None,
-        jobs=normalize_github_snapshot(snapshot),
+        required_checks_status=required_status,
+        required_check_source=required_source,
+        required_checks=tuple(required_checks),
+        jobs=jobs,
     )
 
 

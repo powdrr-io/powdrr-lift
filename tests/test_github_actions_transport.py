@@ -27,7 +27,9 @@ def test_observation_fetches_annotations_even_when_runner_never_started() -> Non
         calls.append(call)
         endpoint = call[-1]
         payload: Any
-        if endpoint == "repos/example/project/pulls/270":
+        if call[1:3] == ["pr", "checks"]:
+            payload = [{"name": "CI / unit", "state": "pass", "workflow": "CI"}]
+        elif endpoint == "repos/example/project/pulls/270":
             payload = {"head": {"sha": HEAD}}
         elif endpoint == "repos/example/project/pulls/270/files?per_page=100":
             payload = [
@@ -85,6 +87,10 @@ def test_observation_fetches_annotations_even_when_runner_never_started() -> Non
         "The configuration"
     )
     assert snapshot.observed_at is not None
+    assert snapshot.required_checks == (
+        {"name": "CI / unit", "state": "pass", "workflow": "CI"},
+    )
+    assert snapshot.required_checks_reason is None
     assert any("annotations?per_page=100" in item[-1] for item in calls)
 
 
@@ -171,6 +177,20 @@ def test_required_check_observations_use_current_head_and_preserve_unknowns() ->
     assert observations[0].observed_at == "2026-11-13T12:00:00Z"
     assert observations[0].run_id == 1
     assert observations[-1].reason == "no matching job was observed on the current head"
+
+
+def test_required_check_permission_error_is_explicitly_unavailable() -> None:
+    client = GitHubActionsClient(
+        "example/project",
+        run=lambda arguments, **_kwargs: subprocess.CompletedProcess(
+            arguments, 1, "", "Resource not accessible by integration"
+        ),
+    )
+
+    checks, reason = client._required_checks(270)
+
+    assert checks is None
+    assert reason == "GitHub did not make required-check policy available"
 
 
 def test_pagination_merges_object_collection_fields() -> None:

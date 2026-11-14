@@ -1,5 +1,9 @@
 """Service-owned CI evidence and diagnosis policy."""
 
+from powdrr_service.ci_response.assessment import (
+    CIResponseAssessment,
+    assess_ci_observation,
+)
 from powdrr_service.ci_response.checkpoint import (
     render_ci_observation_checkpoint,
     render_stale_ci_observation_checkpoint,
@@ -16,7 +20,9 @@ from powdrr_service.ci_response.observation import (
 from powdrr_service.ci_response.reproduction import compare_local_reproduction
 
 __all__ = [
+    "CIResponseAssessment",
     "CIFailureUnit",
+    "assess_ci_observation",
     "build_failure_units",
     "compare_local_reproduction",
     "normalize_failure_signature",

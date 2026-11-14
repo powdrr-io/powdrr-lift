@@ -1,7 +1,10 @@
 # Procedrr CI response action
 
-Status: implementation in progress. Delivery follows the three-PR sequence below;
-this branch contains the versioned observation and failure records for PR 1.
+Status: implementation in progress. PR #1517 merged the initial versioned CI
+observation and failure contracts. This follow-up adds exact-head required-check
+capture and conservative state assessment. It does not complete reproduction,
+durable waiting, repair dispatch, or publication integration; those remain in
+the three-PR sequence below.
 
 ## Outcome
 

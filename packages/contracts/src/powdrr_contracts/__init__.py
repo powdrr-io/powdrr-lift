@@ -5,6 +5,7 @@ from powdrr_contracts.ci import (
     CIFailureUnit,
     CIJobObservation,
     CIObservation,
+    CIRequiredCheck,
     LocalReproduction,
 )
 from powdrr_contracts.models import (
@@ -42,6 +43,7 @@ __all__ = [
     "CIFailureUnit",
     "CIJobObservation",
     "CIObservation",
+    "CIRequiredCheck",
     "ContractError",
     "EvidenceStatus",
     "LocalAction",

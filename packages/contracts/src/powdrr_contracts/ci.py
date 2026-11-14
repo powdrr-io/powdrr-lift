@@ -29,6 +29,47 @@ LocalReproductionStatus = Literal[
 
 
 @dataclass(frozen=True, slots=True)
+class CIRequiredCheck:
+    """A required GitHub check as reported for the observed PR head."""
+
+    name: str
+    state: str
+    head_sha: str
+    workflow: str | None = None
+
+    def __post_init__(self) -> None:
+        if not self.name.strip() or not self.state.strip():
+            raise ContractError("ci_required_check name and state are required")
+        _validate_sha(self.head_sha, "ci_required_check.head_sha")
+        if self.workflow is not None and not isinstance(self.workflow, str):
+            raise ContractError("ci_required_check.workflow must be a string or null")
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": 1,
+            "name": self.name,
+            "state": self.state,
+            "head_sha": self.head_sha,
+            "workflow": self.workflow,
+        }
+
+    @classmethod
+    def from_dict(cls, value: object) -> Self:
+        data = _object(value, "ci_required_check")
+        if data.get("schema_version") != 1:
+            raise ContractError("unsupported ci_required_check schema_version")
+        workflow = data.get("workflow")
+        if workflow is not None and not isinstance(workflow, str):
+            raise ContractError("ci_required_check.workflow must be a string or null")
+        return cls(
+            name=_string(data.get("name"), "ci_required_check.name"),
+            state=_string(data.get("state"), "ci_required_check.state"),
+            head_sha=_string(data.get("head_sha"), "ci_required_check.head_sha"),
+            workflow=workflow,
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class CIObservation:
     """Versioned envelope binding job evidence to one observed pull request head."""
 
@@ -41,6 +82,7 @@ class CIObservation:
     merge_base_sha: str | None = None
     required_checks_status: Literal["available", "unavailable"] = "unavailable"
     required_check_source: str | None = None
+    required_checks: tuple[CIRequiredCheck, ...] = ()
 
     def __post_init__(self) -> None:
         if self.repository.count("/") != 1 or not all(self.repository.split("/")):
@@ -62,6 +104,12 @@ class CIObservation:
             raise ContractError(
                 "available required checks must identify their policy source"
             )
+        if self.required_checks_status == "available" and not self.required_checks:
+            raise ContractError(
+                "available required-check policy must contain observed checks"
+            )
+        if any(check.head_sha != self.head_sha for check in self.required_checks):
+            raise ContractError("required checks must match the observed PR head")
         if any(job.head_sha != self.head_sha for job in self.jobs):
             raise ContractError("ci_observation jobs must match its PR head SHA")
 
@@ -76,6 +124,7 @@ class CIObservation:
             "observed_at": self.observed_at,
             "required_checks_status": self.required_checks_status,
             "required_check_source": self.required_check_source,
+            "required_checks": [check.to_dict() for check in self.required_checks],
             "jobs": [job.to_dict() for job in self.jobs],
         }
 
@@ -87,7 +136,13 @@ class CIObservation:
         jobs = data.get("jobs")
         if not isinstance(jobs, list):
             raise ContractError("ci_observation.jobs must be an array")
+        required_checks = data.get("required_checks", [])
+        if not isinstance(required_checks, list):
+            raise ContractError("ci_observation.required_checks must be an array")
         parsed_jobs = tuple(CIJobObservation.from_dict(item) for item in jobs)
+        parsed_required_checks = tuple(
+            CIRequiredCheck.from_dict(item) for item in required_checks
+        )
         observed_at = data.get("observed_at")
         source = data.get("required_check_source")
         if observed_at is not None and not isinstance(observed_at, str):
@@ -111,6 +166,7 @@ class CIObservation:
             observed_at=observed_at,
             required_checks_status=data.get("required_checks_status", "unavailable"),
             required_check_source=source,
+            required_checks=parsed_required_checks,
             jobs=parsed_jobs,
         )
 

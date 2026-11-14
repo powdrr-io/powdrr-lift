@@ -131,7 +131,14 @@ def test_ci_response_procedure_runs_declared_verification_at_pinned_head() -> No
         "value": "verification_command",
     }
     assert len(process.document["steps"]) == 2
-    assert process.document["steps"][-1] == {"terminal": "succeeded"}
+    branch = process.document["steps"][-1]["branch"]
+    assert branch["subject"] == "ci_observation_result.response_state"
+    assert branch["cases"] == {
+        "awaiting_review": [{"terminal": "succeeded"}],
+        "awaiting_ci": [{"terminal": "succeeded"}],
+        "failed": [{"terminal": "succeeded"}],
+        "blocked": [{"terminal": "succeeded"}],
+    }
     assert all(
         item["name"] != "implementation_context" for item in process.document["inputs"]
     )

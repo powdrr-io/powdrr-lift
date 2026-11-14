@@ -60,8 +60,8 @@ alone does not establish completion. Report blocked acceptance honestly.
 
 | Task | Deliverable | Depends on | Status |
 | --- | --- | --- | --- |
-| 1 | Shared terminal result and durable failure reporting | None | Pending |
-| 2 | Faithful planning-to-worker contract compilation | None | Pending |
+| 1 | Shared terminal result and durable failure reporting | None | Complete (PR #1516) |
+| 2 | Faithful planning-to-worker contract compilation | None | In progress (PR #1518) |
 | 3 | Shared execution preparation and plan executability checks | 2 | Pending |
 | 4 | Controlled implementation correction and restart | 1, 3 | Pending |
 | 5 | Verified candidate publication and safe preparation repair | 1, 4 | Pending |

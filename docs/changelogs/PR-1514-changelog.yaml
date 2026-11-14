@@ -52,6 +52,11 @@ files:
   span: {start_line: 5, end_line: 5}
   summary: Update its link to the completed lineage plan.
   rationale: Keep the historical document’s current-direction reference working.
+- path: science/deepswe/acceptance_templates/catalog.json
+  type: modified
+  span: {start_line: 3, end_line: 3}
+  summary: Refresh the catalog fingerprint from the current source proposal.
+  rationale: Restore reproducibility between the checked-in catalog and its source after CI detected a stale generated fingerprint.
 entities: []
 entity_relationships: []
 invariants: []

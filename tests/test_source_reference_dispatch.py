@@ -169,7 +169,15 @@ def _write_minimal_lineage(private_root: Path, run_id: str) -> dict[str, Any]:
         },
         terminal={
             "outcome": "accepted",
-            "validation": {"results": []},
+            "validation": {
+                "results": [
+                    {
+                        "profile": "behavior",
+                        "status": "passed",
+                        "fingerprint": "sha256:validation-evidence",
+                    }
+                ]
+            },
             "obligation_route_evidence": {
                 "candidate_tree": "candidate-tree-id",
                 "routes": [],
@@ -563,11 +571,24 @@ def test_failed_source_invocation_retries_only_from_a_new_reviewed_revision(
     assert invocations == [0, 1]
 
 
-def test_dispatch_blocks_patch_when_stable_lineage_link_is_missing(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize(
+    "tamper_kind",
+    [
+        "missing_link",
+        "base_commit",
+        "design_fingerprint",
+        "bundle_fingerprint",
+        "attempt_id",
+        "candidate_identity",
+        "evidence_fingerprint",
+    ],
+)
+def test_dispatch_blocks_patch_when_stable_lineage_record_is_tampered(
+    tamper_kind: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     repo, base, proposed = fixture(tmp_path)
     candidate_roots: list[Path] = []
+    invocation_count = 0
 
     class Run:
         run_id = "implementation"
@@ -578,16 +599,43 @@ def test_dispatch_blocks_patch_when_stable_lineage_link_is_missing(
             self.workspace_root = workspace_root
 
         def execute(self, _handler: Any) -> Any:
+            nonlocal invocation_count
+            invocation_count += 1
             (self.workspace_root / "twice.py").write_text(CANDIDATE)
             original_record = _write_minimal_lineage(self.private_root, self.run_id)
             tampered_record = json.loads(
                 (self.private_root / "lineage.json").read_text()
             )
-            tampered_record["links"] = [
-                link
-                for link in tampered_record["links"]
-                if link["relation"] != "invoked"
-            ]
+            if tamper_kind == "missing_link":
+                tampered_record["links"] = [
+                    link
+                    for link in tampered_record["links"]
+                    if link["relation"] != "invoked"
+                ]
+            else:
+                artifact_kind, attribute = {
+                    "base_commit": ("accepted_design", "base_commit"),
+                    "design_fingerprint": (
+                        "accepted_design",
+                        "design_fingerprint",
+                    ),
+                    "bundle_fingerprint": (
+                        "compiled_handoff",
+                        "bundle_fingerprint",
+                    ),
+                    "attempt_id": ("worker_attempt", "attempt_id"),
+                    "candidate_identity": ("candidate", "tree_identity"),
+                    "evidence_fingerprint": (
+                        "validation_evidence",
+                        "evidence_fingerprint",
+                    ),
+                }[tamper_kind]
+                artifact = next(
+                    item
+                    for item in tampered_record["artifacts"]
+                    if item["kind"] == artifact_kind
+                )
+                artifact["attributes"][attribute] = "tampered-value"
             (self.private_root / "lineage.json").write_text(json.dumps(tampered_record))
             return SimpleNamespace(
                 accepted=True,
@@ -638,6 +686,8 @@ def test_dispatch_blocks_patch_when_stable_lineage_link_is_missing(
     assert result["passed"] is False
     assert result["status"] == "lineage_failed"
     assert result["lineage_audit"]["passed"] is False
+    assert result["error"] == "Source run lineage integrity check failed"
+    assert invocation_count == 1
     assert git(repo, "rev-parse", "HEAD") == base
     assert (repo / "twice.py").read_text() == BASELINE
     assert not (repo / "added.py").exists()

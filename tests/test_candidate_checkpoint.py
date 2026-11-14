@@ -155,6 +155,34 @@ def test_candidate_checkpoint_ignores_untracked_path_removed_after_status_scan(
     assert checkpoint.cumulative_paths == ("src/state.py",)
 
 
+def test_candidate_checkpoint_accepts_more_than_twenty_small_supporting_files(
+    tmp_path: Path,
+) -> None:
+    root, _ = _repo(tmp_path)
+    supporting_paths = tuple(f"docs/note-{index:02}.md" for index in range(25))
+    for relative in supporting_paths:
+        target = root / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("before\n", encoding="utf-8")
+    _git(root, "add", "docs")
+    _git(root, "commit", "-m", "add supporting documentation")
+    submission_base = _git(root, "rev-parse", "HEAD")
+    for relative in supporting_paths:
+        (root / relative).write_text("after\n", encoding="utf-8")
+
+    checkpoint = checkpoint_candidate_changes(
+        root,
+        submission_base=submission_base,
+        allowed_paths=("src",),
+        supporting_paths=supporting_paths,
+        artifact_exclusions=(),
+        message="candidate with many small supporting edits",
+    )
+
+    assert checkpoint.committed is True
+    assert checkpoint.committed_paths == supporting_paths
+
+
 def test_candidate_checkpoint_stages_tracked_rename(tmp_path: Path) -> None:
     root, submission_base = _repo(tmp_path)
     old_path = root / "src" / "removed.py"

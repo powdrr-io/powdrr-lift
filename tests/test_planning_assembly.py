@@ -139,6 +139,24 @@ def test_swift_write_remains_swift_when_description_mentions_python() -> None:
     assert proposal.planned_writes[0].source_refs == (anchor,)
 
 
+def test_work_unit_accepts_more_than_twenty_planned_write_paths() -> None:
+    context, anchor = _context()
+    proposal_data = _proposal(context, anchor)
+    proposal_data["planned_writes"] = [
+        {
+            "path": f"Tests/Validator{index}.swift",
+            "role": "test",
+            "requirement_ids": ["req-0001"],
+            "evidence_ids": [],
+        }
+        for index in range(25)
+    ]
+
+    proposal = parse_work_unit_proposal(proposal_data, context=context)
+
+    assert len(proposal.planned_writes) == 25
+
+
 def test_work_unit_response_schema_derives_source_refs_from_requirement_ids() -> None:
     context, anchor = _context()
     request = build_work_unit_proposal_request(

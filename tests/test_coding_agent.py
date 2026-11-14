@@ -72,7 +72,7 @@ class FakeProvider:
             (worktree_root / "README.md").write_text("changed\n" * 25)
             return subprocess.CompletedProcess(["fake"], 0, "", "")
         if self.action == "supporting-edits":
-            for index in range(10):
+            for index in range(25):
                 (worktree_root / "supporting" / f"notes-{index:02}.md").write_text(
                     "value = new\n"
                 )
@@ -900,12 +900,12 @@ def test_worker_out_of_scope_change_is_policy_denied(tmp_path: Path) -> None:
     assert attempt.out_of_scope_paths == ("README.md",)
 
 
-def test_worker_accepts_small_supporting_edits_across_many_files(
+def test_worker_accepts_small_supporting_edits_across_unlimited_files(
     tmp_path: Path,
 ) -> None:
     worktree = _git_repo(tmp_path)
     (worktree / "supporting").mkdir()
-    for index in range(10):
+    for index in range(25):
         (worktree / "supporting" / f"notes-{index:02}.md").write_text("value = old\n")
     subprocess.run(["git", "add", "supporting"], cwd=worktree, check=True)
     subprocess.run(
@@ -933,7 +933,7 @@ def test_worker_accepts_small_supporting_edits_across_many_files(
 
     assert attempt.status is CodingAgentStatus.COMPLETED
     assert attempt.changed_paths == tuple(
-        f"supporting/notes-{index:02}.md" for index in range(10)
+        f"supporting/notes-{index:02}.md" for index in range(25)
     )
     assert attempt.out_of_scope_paths == ()
     assert attempt.supporting_edit_paths == attempt.changed_paths
@@ -945,7 +945,7 @@ def test_worker_accepts_small_supporting_edits_across_many_files(
     )
 
 
-def test_worker_rejects_supporting_edits_over_twenty_changed_lines(
+def test_worker_rejects_supporting_file_over_twenty_changed_lines(
     tmp_path: Path,
 ) -> None:
     worktree = _git_repo(tmp_path)

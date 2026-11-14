@@ -179,7 +179,6 @@ PLAN_ITEMS_RESPONSE_SCHEMA: dict[str, Any] = {
                     "allowed_paths": {
                         "type": "array",
                         "minItems": 1,
-                        "maxItems": 20,
                         "items": {
                             "type": "string",
                             "minLength": 1,
@@ -2242,9 +2241,6 @@ def generate_execution_plan_yaml(
             )
         scope = item.get("scope")
         allowed_paths = item.get("allowed_paths")
-        allowed_path_limit = (
-            MAX_PLAN_ITEMS * 20 if item.get("id") == "final-integration-review" else 20
-        )
         implementation_steps = item.get("implementation_steps")
         if not isinstance(scope, list) or len(scope) > MAX_ITEM_SCOPE_ENTRIES:
             raise PlanGenerationError(
@@ -2253,7 +2249,7 @@ def generate_execution_plan_yaml(
             )
         if (
             not isinstance(allowed_paths, list)
-            or not 1 <= len(allowed_paths) <= allowed_path_limit
+            or not allowed_paths
             or not all(isinstance(path, str) and path.strip() for path in allowed_paths)
             or len(set(allowed_paths)) != len(allowed_paths)
             or any(
@@ -2777,7 +2773,7 @@ def _ensure_ci_bootstrap(
         if isinstance(allowed_paths, list) and not any(
             ".github/workflows" in str(path) for path in allowed_paths
         ):
-            first_item["allowed_paths"] = [*allowed_paths[:19], workflow_path]
+            first_item["allowed_paths"] = [*allowed_paths, workflow_path]
         items[0] = first_item
     else:
         ids = {

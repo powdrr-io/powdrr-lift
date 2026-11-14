@@ -140,6 +140,7 @@ def _candidate_route_evidence(
     *,
     candidate_tree: str,
     changed_paths: tuple[str, ...],
+    supporting_edit_paths: tuple[str, ...] = (),
     invariant_reviews: tuple[Mapping[str, Any], ...] = (),
     source_validation_fingerprint: str | None = None,
 ) -> dict[str, Any]:
@@ -185,7 +186,9 @@ def _candidate_route_evidence(
                     else "candidate diff does not touch an accepted owner scope"
                 )
             elif route == "scope_review":
-                out_of_scope = _out_of_scope_paths(changed, allowed_paths)
+                out_of_scope = _out_of_scope_paths(
+                    changed, allowed_paths, supporting_paths=supporting_edit_paths
+                )
                 evidence = out_of_scope
                 status = "failed" if out_of_scope else "passed"
                 reason = (
@@ -281,11 +284,14 @@ def _candidate_route_evidence(
 
 
 def _out_of_scope_paths(
-    changed_paths: set[str], allowed_paths: tuple[str, ...]
+    changed_paths: set[str],
+    allowed_paths: tuple[str, ...],
+    *,
+    supporting_paths: tuple[str, ...] = (),
 ) -> list[str]:
     return sorted(
         path
-        for path in changed_paths
+        for path in changed_paths - set(supporting_paths)
         if not any(
             scope == "." or path == scope or path.startswith(scope.rstrip("/") + "/")
             for scope in allowed_paths
@@ -1072,10 +1078,10 @@ class SourceReferenceRun:
                 "policy_violation",
                 f"Source worker changed paths outside accepted scope: {paths}",
             )
-        if attempt.worker_committed or attempt.supporting_edit_paths:
+        if attempt.worker_committed:
             raise SourceRunFailure(
                 "policy_violation",
-                "Source workers may not commit or expand the accepted path scope",
+                "Source workers may not commit changes",
             )
         if (
             classify_coding_agent_attempt(attempt)
@@ -1327,6 +1333,7 @@ class SourceReferenceRun:
                     self.handoff,
                     candidate_tree=self._candidate_state(),
                     changed_paths=tuple(sorted(changed_paths)),
+                    supporting_edit_paths=execution.attempt.supporting_edit_paths,
                     invariant_reviews=tuple(reference_report.get("reviews", ())),
                     source_validation_fingerprint=reference_report.get("fingerprint"),
                 )

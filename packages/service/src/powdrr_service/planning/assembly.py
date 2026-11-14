@@ -113,7 +113,6 @@ WORK_UNIT_PROPOSAL_PAGE_JSON_SCHEMA: dict[str, Any] = {
                     "planned_writes": {
                         "type": "array",
                         "minItems": 1,
-                        "maxItems": 20,
                         "items": {
                             "type": "object",
                             "additionalProperties": False,
@@ -418,7 +417,7 @@ def parse_work_unit_proposal(
             "/component", "component cannot be derived from the supplied catalog"
         )
     component = next(iter(context.component_ids))
-    raw_writes = _array(value["planned_writes"], "/planned_writes", maximum=20)
+    raw_writes = _array(value["planned_writes"], "/planned_writes")
     if not raw_writes:
         raise PlanningContractError(
             "/planned_writes", "must contain at least one write"
@@ -715,7 +714,7 @@ def _split_mixed_runtime_proposal(
         minimum=1,
         maximum=MAX_WORK_UNIT_REQUIREMENTS_PER_PROPOSAL,
     )
-    raw_writes = _array(value.get("planned_writes"), "/planned_writes", maximum=20)
+    raw_writes = _array(value.get("planned_writes"), "/planned_writes")
     writes_by_runtime: dict[str | None, list[tuple[PlannedWrite, tuple[str, ...]]]] = {}
     for index, item in enumerate(raw_writes):
         write_requirement_ids = _planned_write_requirement_ids(
@@ -1875,12 +1874,19 @@ def _exact_fields(value: Mapping[str, Any], expected: set[str], pointer: str) ->
         raise PlanningContractError(pointer, detail)
 
 
-def _array(value: Any, pointer: str, *, minimum: int = 0, maximum: int) -> list[Any]:
+def _array(
+    value: Any, pointer: str, *, minimum: int = 0, maximum: int | None = None
+) -> list[Any]:
     if not isinstance(value, list):
         raise PlanningContractError(pointer, "must be an array")
-    if not minimum <= len(value) <= maximum:
+    if len(value) < minimum or (maximum is not None and len(value) > maximum):
         raise PlanningContractError(
-            pointer, f"must contain between {minimum} and {maximum} entries"
+            pointer,
+            (
+                f"must contain at least {minimum} entries"
+                if maximum is None
+                else f"must contain between {minimum} and {maximum} entries"
+            ),
         )
     return value
 

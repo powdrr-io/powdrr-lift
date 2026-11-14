@@ -1,0 +1,320 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1510
+title: Apply small supporting edits consistently
+intent:
+  problem: >-
+    The bounded supporting-edit policy was inconsistent. One code path rejected
+    all supporting edits, the line budget was aggregate rather than per file,
+    and planning rejected file lists above twenty entries.
+  goal: >-
+    Accept existing regular text-file edits of at most twenty changed lines per
+    file across any number of files, and carry that decision through source-reference
+    validation, candidate review, checkpoints, and planning.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/plans/github-issue-plan-worker.md
+  type: modified
+  span:
+    start_line: 217
+    end_line: 217
+  summary: Remove the file-count limit from inline path adjustments.
+  rationale: Keep issue adjustments consistent with plans that can declare any number of repository-relative paths.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 116
+    end_line: 116
+  summary: Allow work-unit proposals to describe any number of planned writes.
+  rationale: Prevent the work-unit schema and parser from imposing an arbitrary twenty-file ceiling.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 420
+    end_line: 420
+  summary: Allow work-unit proposals to describe any number of planned writes.
+  rationale: Remove the file-count ceiling from the deterministic parser.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 717
+    end_line: 717
+  summary: Allow work-unit proposals to describe any number of planned writes.
+  rationale: Preserve unrestricted write lists while splitting mixed-runtime proposals.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 1877
+    end_line: 1879
+  summary: Allow work-unit proposals to describe any number of planned writes.
+  rationale: Keep the shared array parser bounded only when a caller declares a real maximum.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 1882
+    end_line: 1882
+  summary: Allow work-unit proposals to describe any number of planned writes.
+  rationale: Apply optional upper bounds without imposing a default path limit.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 1884
+    end_line: 1889
+  summary: Allow work-unit proposals to describe any number of planned writes.
+  rationale: Report lower-bound errors separately from optional upper bounds.
+- path: packages/service/src/powdrr_service/planning/plan_sizing.py
+  type: modified
+  span:
+    start_line: 323
+    end_line: 323
+  summary: Allow cohesive plan items to merge regardless of their combined path count.
+  rationale: Keep deterministic plan sizing from reintroducing a twenty-path limit.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 52
+    end_line: 52
+  summary: Enforce the supporting-edit line budget separately for each file.
+  rationale: Name the intended per-file threshold explicitly.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 501
+    end_line: 502
+  summary: Enforce the supporting-edit line budget separately for each file.
+  rationale: Tell coding agents that up to twenty changed lines are allowed in each supporting file.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 1803
+    end_line: 1803
+  summary: Enforce the supporting-edit line budget separately for each file.
+  rationale: Remove the aggregate counter.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 1813
+    end_line: 1813
+  summary: Enforce the supporting-edit line budget separately for each file.
+  rationale: Count changed lines for each file independently.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 1816
+    end_line: 1817
+  summary: Enforce the supporting-edit line budget separately for each file.
+  rationale: Reject an individual supporting file only when its own changed-line count exceeds twenty.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 1833
+    end_line: 1833
+  summary: Enforce the supporting-edit line budget separately for each file.
+  rationale: Permit small edits across any number of existing text files while retaining the twenty-changed-lines safety bound.
+- path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 182
+    end_line: 182
+  summary: Remove the twenty-path cap from generated execution plans.
+  rationale: Allow the model schema to carry every planned path.
+- path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 2245
+    end_line: 2247
+  summary: Remove the twenty-path cap from generated execution plans.
+  rationale: Validate path safety and uniqueness without imposing a file-count limit.
+- path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 2252
+    end_line: 2252
+  summary: Remove the twenty-path cap from generated execution plans.
+  rationale: Validate path safety and uniqueness without imposing a file-count limit.
+- path: src/powdrr_lift/workrr/github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 2776
+    end_line: 2776
+  summary: Remove the twenty-path cap from generated execution plans.
+  rationale: Let plans and final integration reviews name all relevant paths without truncation.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span:
+    start_line: 1707
+    end_line: 1709
+  summary: Remove the twenty-path cap from reviewed plan adjustments.
+  rationale: Preserve complete repository-relative path lists when applying issue comments.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span:
+    start_line: 1712
+    end_line: 1712
+  summary: Remove the twenty-path cap from reviewed plan adjustments.
+  rationale: Keep the validation error message aligned with the remaining uniqueness and path-safety checks.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span:
+    start_line: 143
+    end_line: 143
+  summary: Retain validated supporting edits through source-reference completion.
+  rationale: Keep prevalidated supporting paths in candidate scope evidence.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span:
+    start_line: 189
+    end_line: 191
+  summary: Retain validated supporting edits through source-reference completion.
+  rationale: Exclude validated support paths from candidate-scope failures.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span:
+    start_line: 287
+    end_line: 290
+  summary: Retain validated supporting edits through source-reference completion.
+  rationale: Exclude prevalidated supporting files from the later generic scope failure route.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span:
+    start_line: 294
+    end_line: 294
+  summary: Retain validated supporting edits through source-reference completion.
+  rationale: Filter only paths already approved by the coding-agent boundary.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span:
+    start_line: 1081
+    end_line: 1081
+  summary: Retain validated supporting edits through source-reference completion.
+  rationale: Keep the worker commit restriction while accepting small edits already approved by the coding-agent boundary.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span:
+    start_line: 1084
+    end_line: 1084
+  summary: Retain validated supporting edits through source-reference completion.
+  rationale: Clarify that source workers may not commit candidate changes.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span:
+    start_line: 1336
+    end_line: 1336
+  summary: Retain validated supporting edits through source-reference completion.
+  rationale: Carry the worker's validated supporting-path evidence into candidate route review.
+- path: tests/test_candidate_checkpoint.py
+  type: modified
+  span:
+    start_line: 158
+    end_line: 185
+  summary: Verify checkpoints retain more than twenty small supporting edits.
+  rationale: Protect the no-file-count-cap behavior at candidate checkpointing.
+- path: tests/test_coding_agent.py
+  type: modified
+  span:
+    start_line: 75
+    end_line: 75
+  summary: Verify acceptance across more than twenty supporting files.
+  rationale: Keep the fake coding agent aligned with the uncapped file-count regression.
+- path: tests/test_coding_agent.py
+  type: modified
+  span:
+    start_line: 903
+    end_line: 903
+  summary: Verify per-file line limits and acceptance across more than twenty files.
+  rationale: Prevent an aggregate line budget or a file-count limit from returning.
+- path: tests/test_coding_agent.py
+  type: modified
+  span:
+    start_line: 908
+    end_line: 908
+  summary: Verify per-file line limits and acceptance across more than twenty files.
+  rationale: Exercise the worker with more than twenty supporting files.
+- path: tests/test_coding_agent.py
+  type: modified
+  span:
+    start_line: 936
+    end_line: 936
+  summary: Verify per-file line limits and acceptance across more than twenty files.
+  rationale: Assert that the full supporting-file set remains accepted.
+- path: tests/test_coding_agent.py
+  type: modified
+  span:
+    start_line: 948
+    end_line: 948
+  summary: Verify per-file line limits and acceptance across more than twenty files.
+  rationale: Keep the over-budget boundary tied to a single file.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 215
+    end_line: 230
+  summary: Verify plan sizing can merge more than twenty allowed paths.
+  rationale: Protect deterministic path merging from a file-count cap.
+- path: tests/test_github_issue_plan_generation.py
+  type: modified
+  span:
+    start_line: 1438
+    end_line: 1451
+  summary: Verify plan generation preserves more than twenty allowed paths.
+  rationale: Cover plan validation in addition to deterministic path merging.
+- path: tests/test_github_issue_queue.py
+  type: modified
+  span:
+    start_line: 400
+    end_line: 422
+  summary: Verify reviewed plans accept more than twenty allowed paths.
+  rationale: Protect queue parsing from restoring an arbitrary path-count limit.
+- path: tests/test_github_issue_queue.py
+  type: modified
+  span:
+    start_line: 1202
+    end_line: 1209
+  summary: Verify inline adjustments accept more than twenty allowed paths.
+  rationale: Protect the issue-adjustment application boundary.
+- path: tests/test_github_issue_queue.py
+  type: modified
+  span:
+    start_line: 1213
+    end_line: 1215
+  summary: Serialize a generated adjustment with a large path list.
+  rationale: Keep the issue comment fixture readable while testing the full path list.
+- path: tests/test_github_issue_queue.py
+  type: modified
+  span:
+    start_line: 1248
+    end_line: 1248
+  summary: Assert that inline adjustments preserve every declared path.
+  rationale: Prevent truncation when the adjustment is applied.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 142
+    end_line: 159
+  summary: Verify work-unit proposals accept more than twenty planned writes.
+  rationale: Protect the planning assembly schema and parser from a file-count cap.
+- path: tests/test_source_reference_run.py
+  type: modified
+  span:
+    start_line: 83
+    end_line: 84
+  summary: Prepare an existing guidance file for source-reference supporting-edit tests.
+  rationale: Ensure the accepted support path is an existing tracked text file.
+- path: tests/test_source_reference_run.py
+  type: modified
+  span:
+    start_line: 315
+    end_line: 322
+  summary: Verify scope review excludes prevalidated supporting paths.
+  rationale: Prevent generic candidate-scope evidence from rejecting accepted support edits.
+- path: tests/test_source_reference_run.py
+  type: modified
+  span:
+    start_line: 504
+    end_line: 570
+  summary: Verify source-reference completion preserves bounded supporting edits.
+  rationale: Cover the previously rejecting handoff and ensure scope evidence recognizes prevalidated supporting paths.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []

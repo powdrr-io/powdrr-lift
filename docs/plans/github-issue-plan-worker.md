@@ -214,7 +214,7 @@ and `allowed_paths`; each supplied field replaces that item's value for this
 execution. Adjustments apply to generated workflow instance files. `title` is
 limited to 120 characters, `objective` to 2,000, `scope` to five entries,
 `acceptance_criteria` and `implementation_steps` to ten and eight entries, and
-`allowed_paths` to twenty repository-relative paths. Each adjustment needs a
+`allowed_paths` to unique repository-relative paths. Each adjustment needs a
 reason. Dependencies, workflow IDs, and workflow definitions cannot be changed
 inline because they affect the plan's execution graph or reviewed workflow
 identity; correct those in a reviewed plan PR.

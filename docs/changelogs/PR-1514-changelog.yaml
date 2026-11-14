@@ -59,9 +59,19 @@ files:
   rationale: Restore reproducibility between the checked-in catalog and its source after CI detected a stale generated fingerprint.
 - path: tests/test_agent_feature.py
   type: modified
-  span: {start_line: 142, end_line: 183}
-  summary: Isolate timeout reporting coverage from real worktree setup and allow setup time before the deadline.
-  rationale: Keep the timeout test deterministic on CI while exercising the same timed out report behavior.
+  span: {start_line: 142, end_line: 154}
+  summary: Stub worktree preparation in the timeout reporting test.
+  rationale: Ensure the test exercises deadline handling during feature execution instead of Git setup.
+- path: tests/test_agent_feature.py
+  type: modified
+  span: {start_line: 167, end_line: 167}
+  summary: Give the timeout test enough time to complete its lightweight setup.
+  rationale: Avoid a 50 ms CI scheduling race before the mocked slow feature runs.
+- path: tests/test_agent_feature.py
+  type: modified
+  span: {start_line: 180, end_line: 180}
+  summary: Update the asserted timeout metadata to match the test deadline.
+  rationale: Keep the report assertion aligned with the more reliable timeout duration.
 entities: []
 entity_relationships: []
 invariants: []

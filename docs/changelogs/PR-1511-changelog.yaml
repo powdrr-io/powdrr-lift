@@ -54,7 +54,7 @@ files:
   rationale: Document the fail-closed patch gate.
 - path: docs/plans/intent-source-reference-lineage-spec.md
   type: modified
-  span: {start_line: 220, end_line: 223}
+  span: {start_line: 220, end_line: 222}
   summary: Record focused and full-suite verification results.
   rationale: Close the final milestone after all project tests pass.
 - path: packages/service/src/powdrr_service/structrr/source_run_lineage.py

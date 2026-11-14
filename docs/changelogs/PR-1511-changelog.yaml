@@ -1,5 +1,5 @@
 schema: https://powdrr.io/schema/changelog-v2
-change_id: PR-1510
+change_id: PR-1511
 title: Implement stable-ID lineage for protected source handoffs
 intent:
   problem: Protected source-reference runs do not record lineage across accepted design, attempts, evidence, candidates, and patch transfer.

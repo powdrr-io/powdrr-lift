@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "proposal_sha256": "dbfc682a60f135bfe4f2c1527b28859be19e0f4e57b37cc0736c0b023d5cce6d",
+  "proposal_sha256": "5e97317cd7d0d62ba06a4257efe7b9c0a743c3a7b49fbdd59ee6cd7f6a46ce73",
   "slot_representation": "Typed semantic slots use nonempty prose strings; type/evidence validation is structural, not proof of entailment.",
   "templates": [
     {

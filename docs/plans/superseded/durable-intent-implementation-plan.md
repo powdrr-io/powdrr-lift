@@ -1,5 +1,9 @@
 # Durable User Intent Implementation Plan
 
+> **Superseded.** This broad intent-memory plan is historical and is not an
+> implementation guide for Powdrr's current protected source-reference route.
+> See [Intent lineage for protected source-reference runs](../intent-source-reference-lineage-spec.md).
+
 ## Purpose
 
 This is the implementation plan for making Powdrr reliably remember and honor

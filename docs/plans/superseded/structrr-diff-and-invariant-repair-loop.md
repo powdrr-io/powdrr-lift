@@ -1,5 +1,9 @@
 # Structrr diff and invariant repair loop
 
+> **Superseded.** This proposal's automatic correction loop is not part of the
+> current protected route. Use [Intent lineage for protected source-reference
+> runs](../intent-source-reference-lineage-spec.md) for current remaining work.
+
 ## Purpose and outcome
 
 Implement a closed loop that translates instructions into a proposed Structrr

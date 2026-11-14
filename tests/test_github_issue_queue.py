@@ -1480,6 +1480,14 @@ def test_worker_marks_failed_execution_blocked(tmp_path: Path) -> None:
     )
     assert report.outcome == "blocked"
     assert QUEUE_LABELS["blocked"] in client.issues[0].labels
+    result_path = tmp_path / ".powdrr/github-issue-worker/results/issue-100.json"
+    result = json.loads(result_path.read_text(encoding="utf-8"))
+    assert result["schema"] == "https://powdrr.io/schemas/task-execution-result-v1"
+    assert result["stage"] == "implementation"
+    assert result["runner_exit_code"] == 1
+    assert result["plan_id"] == "feature-v1"
+    assert report.failure_record == str(result_path)
+    assert "Durable diagnostic:" in client.comments[-1][1]
 
 
 def test_worker_updates_issue_after_task_retries_are_exhausted(tmp_path: Path) -> None:
@@ -1525,10 +1533,14 @@ def test_worker_updates_issue_after_task_retries_are_exhausted(tmp_path: Path) -
     final_status_comments = [
         body
         for issue_number, body in client.comments
-        if issue_number == 100 and "did not finish successfully" in body
+        if issue_number == 100 and "execution failed during implementation" in body
     ]
     assert len(final_status_comments) == 1
     assert "RuntimeError: final retry failed" in final_status_comments[0]
+    result_path = tmp_path / ".powdrr/github-issue-worker/results/issue-100.json"
+    result = json.loads(result_path.read_text(encoding="utf-8"))
+    assert result["detail"] == "RuntimeError: final retry failed"
+    assert result["runner_exit_code"] == 1
     assert not any(
         "powdrr-task-checkpoint" in body
         for issue_number, body in client.comments

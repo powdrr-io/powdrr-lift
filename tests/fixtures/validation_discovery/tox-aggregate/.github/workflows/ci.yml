@@ -1,0 +1,6 @@
+name: CI
+on: [pull_request]
+jobs:
+  checks:
+    steps:
+      - run: tox -e lint,test

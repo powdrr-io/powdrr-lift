@@ -517,30 +517,82 @@ def discover_validation_profiles(
                 kind = _validation_command_kind(command)
                 if kind is None:
                     continue
-                match_index = next(
+                exact_match_index = next(
                     (
                         index
                         for index, profile in enumerate(profiles)
                         if profile.cwd == cwd
+                        and profile.command == command
                         and _validation_command_kind(profile.command) == kind
                     ),
                     None,
                 )
-                if match_index is not None:
-                    profiles[match_index] = replace(
-                        profiles[match_index],
-                        command=command,
+                if exact_match_index is not None:
+                    profiles[exact_match_index] = replace(
+                        profiles[exact_match_index],
                         source="GitHub Actions workflow",
                         declaration="declared",
-                        ci_origins=(origin,),
+                        ci_origins=(
+                            *profiles[exact_match_index].ci_origins,
+                            origin,
+                        ),
                     )
                 else:
-                    profiles.append(
-                        DiscoveredValidationProfile(
-                            name=f"ci-{cwd.replace('/', '-')}-{kind}-{index}",
+                    fallback_match_index = next(
+                        (
+                            index
+                            for index, profile in enumerate(profiles)
+                            if profile.cwd == cwd
+                            and profile.source != "GitHub Actions workflow"
+                            and _validation_command_kind(profile.command) == kind
+                        ),
+                        None,
+                    )
+                    if fallback_match_index is not None:
+                        profiles[fallback_match_index] = replace(
+                            profiles[fallback_match_index],
                             command=command,
                             source="GitHub Actions workflow",
-                            provider_name=kind,
+                            declaration="declared",
+                            ci_origins=(origin,),
+                        )
+                        continue
+                    variant = (
+                        sum(
+                            profile.cwd == cwd
+                            and _validation_command_kind(profile.command) == kind
+                            for profile in profiles
+                        )
+                        + 1
+                    )
+                    cwd_name = cwd.strip("./").replace("/", "-") or "root"
+                    profiles.append(
+                        DiscoveredValidationProfile(
+                            name=f"ci-{cwd_name}-{kind}-{variant}",
+                            command=command,
+                            source="GitHub Actions workflow",
+                            provider_name=next(
+                                (
+                                    token
+                                    for token in command
+                                    if token
+                                    in {
+                                        "pytest",
+                                        "stestr",
+                                        "vitest",
+                                        "unittest",
+                                        "ruff",
+                                        "mypy",
+                                        "pyright",
+                                        "basedpyright",
+                                        "npm",
+                                        "pnpm",
+                                        "go",
+                                        "cargo",
+                                    }
+                                ),
+                                kind,
+                            ),
                             cwd=cwd,
                             declaration="declared",
                             evidence=(str(origin.get("workflow", "")),),
@@ -563,7 +615,25 @@ def discover_validation_profiles(
                 for command in _commands_from_script(str(origin.get("run", "")))
             )
         )
-        enriched.append(replace(profile, ci_origins=matches) if matches else profile)
+        if matches:
+            evidence_items = list(profile.evidence)
+            known_evidence = {
+                item.removeprefix("validation-input:") for item in evidence_items
+            }
+            for origin in matches:
+                workflow = str(origin.get("workflow", ""))
+                if workflow and workflow not in known_evidence:
+                    evidence_items.append(workflow)
+                    known_evidence.add(workflow)
+            enriched.append(
+                replace(
+                    profile,
+                    ci_origins=matches,
+                    evidence=tuple(evidence_items),
+                )
+            )
+        else:
+            enriched.append(profile)
     return tuple(enriched)
 
 
@@ -590,6 +660,9 @@ def _discover_nested_validation_profiles(
         ".ruff_cache",
         ".tox",
         ".venv",
+        "fixtures",
+        "test",
+        "tests",
         "__pycache__",
         "build",
         "dist",
@@ -627,12 +700,9 @@ def _discover_nested_validation_profiles(
 
 def _validation_command_kind(command: tuple[str, ...]) -> str | None:
     tokens = tuple(token.lower() for token in command)
-    joined = " ".join(tokens)
     if (
-        "pytest" in tokens
-        or "stestr" in tokens
-        or " test" in f" {joined}"
-        or "vitest" in tokens
+        any(tool in tokens for tool in ("pytest", "stestr", "vitest", "unittest"))
+        or "test" in tokens
     ):
         return "test"
     if "ruff" in tokens and "format" in tokens:

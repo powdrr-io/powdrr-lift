@@ -1,0 +1,375 @@
+schema_version: validation-corpus-v1
+corpus_revision: 2026-11-14
+review_policy:
+  scope: Pull-request validation declarations and their local wrapper/configuration evidence.
+  requiredness: unknown unless repository branch-protection or ruleset evidence is recorded; this corpus does not query repository rules.
+  license_source: GitHub repository metadata SPDX identifier, cross-checked against the named license file where one exists.
+  expected_inventory: Expected obligations below were reviewed against the pinned workflow/configuration paths. A selected subset is used for exact command comparison; other discovered candidates are reported as unreviewed, never promoted to required checks.
+repositories:
+  - id: powdrr-lift
+    repository: https://github.com/powdrr-io/powdrr-lift
+    revision: 7e1d8c2c7a0d4ca9aa82c887061858a22c82ccef
+    default_branch: main
+    license: NOASSERTION
+    license_evidence: GitHub repository metadata reported no SPDX license identifier; the repository has no top-level license file at this revision.
+    coverage: [this-repository, Ruff, mypy, pytest, custom-CI, workflow-scenarios]
+    evidence: [.github/workflows/ci.yml, pyproject.toml]
+    obligations:
+      - id: formatter
+        profile: ruff-format-check
+        command: [uv, run, ruff, format, --check, .]
+        cwd: .
+        state: executable
+        requiredness: unknown
+        evidence: [.github/workflows/ci.yml]
+      - id: lint
+        profile: ruff-check
+        command: [uv, run, ruff, check, .]
+        cwd: .
+        state: executable
+        requiredness: unknown
+        evidence: [.github/workflows/ci.yml]
+      - id: types
+        profile: mypy
+        provider: mypy
+        command: [uv, run, mypy, src, tests]
+        cwd: .
+        state: executable
+        requiredness: unknown
+        evidence: [.github/workflows/ci.yml]
+      - id: tests
+        profile: ci-root-test-3
+        provider: pytest
+        command: [uv, run, pytest, -n, auto, --cov=powdrr_lift, --cov=powdrr_service, --cov=powdrr_contracts, --cov=powdrr_local, --cov=powdrr_agent, --cov-branch, --cov-report=term-missing, --cov-report=xml, tests]
+        cwd: .
+        state: executable
+        requiredness: unknown
+        evidence: [.github/workflows/ci.yml]
+      - id: procedural-catalog
+        profile: validate-procedrr-processes
+        command: []
+        cwd: .
+        state: unresolved
+        requiredness: unknown
+        evidence: [.github/workflows/ci.yml]
+      - id: deterministic-workflow-scenarios
+        profile: workflow-scenario-suite
+        command: []
+        cwd: .
+        state: unresolved
+        requiredness: unknown
+        evidence: [.github/workflows/ci.yml]
+
+  - id: pytest
+    repository: https://github.com/pytest-dev/pytest
+    revision: fc9a7ef678f64d17f1c03b619f3842ea1d127e74
+    default_branch: main
+    license: MIT
+    license_evidence: LICENSE
+    coverage: [pytest, tox, coverage, GitHub-matrix]
+    evidence: [.github/workflows/test.yml, .github/workflows/doc-check-links.yml, tox.ini]
+    obligations:
+      - id: docs-link-check
+        profile: tox-1-docs-checklinks
+        command: []
+        cwd: .
+        state: unresolved
+        requiredness: unknown
+        evidence: [.github/workflows/doc-check-links.yml, tox.ini]
+      - id: dynamic-test-matrix
+        profile: tox-2-${{
+        command: []
+        cwd: .
+        state: unresolved
+        requiredness: unknown
+        evidence: [.github/workflows/test.yml]
+
+  - id: flask
+    repository: https://github.com/pallets/flask
+    revision: 49943b5a94413a530761350f04e896f76e8d620e
+    default_branch: main
+    license: BSD-3-Clause
+    license_evidence: LICENSE.txt
+    coverage: [Python, uv, tox, pytest, typing, pre-commit, GitHub-matrix]
+    evidence: [.github/workflows/tests.yaml, .github/workflows/pre-commit.yaml, pyproject.toml]
+    obligations:
+      - id: test-matrix
+        profile: tox-1-default
+        command: [uv, run, --locked, --no-default-groups, --group, dev, tox, run]
+        cwd: .
+        state: executable
+        requiredness: unknown
+        evidence: [.github/workflows/tests.yaml, pyproject.toml]
+      - id: typing
+        profile: tox-2-typing
+        command: [uv, run, --locked, --no-default-groups, --group, dev, tox, run, -e, typing]
+        cwd: .
+        state: executable
+        requiredness: unknown
+        evidence: [.github/workflows/tests.yaml, pyproject.toml]
+      - id: pre-commit-hooks
+        profile: pre-commit-1
+        command: [uv, run, --locked, --no-default-groups, --group, pre-commit, pre-commit, run, --show-diff-on-failure, --color=always, --all-files]
+        cwd: .
+        state: unresolved
+        requiredness: unknown
+        evidence: [.github/workflows/pre-commit.yaml, .pre-commit-config.yaml]
+
+  - id: django
+    repository: https://github.com/django/django
+    revision: f24f38c6b2825f15628c07bf2892f1664eed9361
+    default_branch: main
+    license: BSD-3-Clause
+    license_evidence: LICENSE.python
+    coverage: [Django, unittest, tox, migrations, documentation]
+    evidence: [.github/workflows/tests.yml, .github/workflows/check-migrations.yml, tox.ini]
+    obligations:
+      - id: django-unittest
+        profile: pytest
+        provider: unittest
+        command: [python, -m, unittest, discover, -v, -s, scripts/]
+        cwd: .
+        state: executable
+        requiredness: unknown
+        evidence: [.github/workflows/tests.yml]
+      - id: migrations
+        profile: django-migration-check
+        command: []
+        cwd: .
+        state: unresolved
+        requiredness: unknown
+        evidence: [.github/workflows/check-migrations.yml]
+
+  - id: poetry
+    repository: https://github.com/python-poetry/poetry
+    revision: 4acc75e19f128c8340c6f977a35e53b5f7f39071
+    default_branch: main
+    license: MIT
+    license_evidence: LICENSE
+    coverage: [Poetry, pytest, mypy, Ruff, fixture-projects]
+    evidence: [.github/workflows/tests.yaml, pyproject.toml]
+    obligations:
+      - id: type-check
+        profile: mypy
+        command: [poetry, run, mypy]
+        cwd: .
+        state: executable
+        requiredness: unknown
+        evidence: [.github/workflows/tests.yaml, pyproject.toml]
+      - id: integration-tests
+        profile: pytest
+        command: [poetry, run, pytest, --integration, -v]
+        cwd: .
+        state: executable
+        requiredness: unknown
+        evidence: [.github/workflows/tests.yaml, pyproject.toml]
+
+  - id: uv
+    repository: https://github.com/astral-sh/uv
+    revision: d5c3f174417418c24ec3c276e01b0f62b961b13c
+    default_branch: main
+    license: Apache-2.0
+    license_evidence: LICENSE-APACHE
+    coverage: [uv, Rust-workspace, Python-integration, reusable-workflows, matrices]
+    evidence: [.github/workflows/ci.yml, .github/workflows/check-fmt.yml, .github/workflows/check-lint.yml, Cargo.toml, pyproject.toml]
+    obligations:
+      - id: formatting
+        profile: ruff-format-check
+        command: [uv, run, --only-group=check, ruff, format, --diff, .]
+        cwd: .
+        state: executable
+        requiredness: unknown
+        evidence: [.github/workflows/check-fmt.yml, pyproject.toml]
+      - id: lint
+        profile: ruff-check
+        command: [uv, run, --only-group, check, ruff, check, .]
+        cwd: .
+        state: executable
+        requiredness: unknown
+        evidence: [.github/workflows/check-lint.yml, pyproject.toml]
+      - id: reusable-check-workflow
+        profile: reusable-check-workflow
+        command: []
+        cwd: .
+        state: unresolved
+        requiredness: unknown
+        evidence: [.github/workflows/ci.yml]
+
+  - id: pdm
+    repository: https://github.com/pdm-project/pdm
+    revision: 9af22ebcd76e966f4cbdddd2d50f2ebcf8b727bd
+    default_branch: main
+    license: MIT
+    license_evidence: LICENSE
+    coverage: [PDM, tox, pytest, coverage]
+    evidence: [.github/workflows/ci.yml, pyproject.toml, tox.ini]
+    obligations:
+      - id: pdm-test-suite
+        profile: pdm-4-pytest
+        command: [pdm, run, pytest, -n, auto, --cov=pdm, --cov-config=pyproject.toml, --cov-report=xml, tests]
+        cwd: .
+        state: unresolved
+        requiredness: unknown
+        evidence: [.github/workflows/ci.yml, pyproject.toml]
+
+  - id: hatch
+    repository: https://github.com/pypa/hatch
+    revision: 893fa13ccd6129550194a4964c22c1cc6b63bc0d
+    default_branch: master
+    license: MIT
+    license_evidence: LICENSE.txt
+    coverage: [Hatch, pytest, type-checking, documentation]
+    evidence: [.github/workflows/test.yml, pyproject.toml]
+    obligations:
+      - id: documentation-build
+        profile: hatch-1-docs-build-check
+        command: [hatch, -v, run, docs:build-check]
+        cwd: .
+        state: unresolved
+        requiredness: unknown
+        evidence: [.github/workflows/test.yml, pyproject.toml]
+      - id: type-check
+        profile: hatch-5-types-check
+        command: [hatch, run, types:check]
+        cwd: .
+        state: unresolved
+        requiredness: unknown
+        evidence: [.github/workflows/test.yml, pyproject.toml]
+
+  - id: conda
+    repository: https://github.com/conda/conda
+    revision: 742ee78785602d903e0568452296ca3daee44490
+    default_branch: main
+    license: NOASSERTION
+    license_evidence: GitHub repository metadata did not return an SPDX identifier; LICENSE is present and must be reviewed before redistributing repository contents.
+    coverage: [Conda, pytest, Ruff, mypy, cross-platform]
+    evidence: [.github/workflows/tests.yml, .github/workflows/linters.yml, pyproject.toml]
+    obligations:
+      - id: unit-test-workflow
+        profile: pytest
+        provider: pytest
+        command: [python, -m, pytest, -k, memray, --memray]
+        cwd: .
+        state: executable
+        requiredness: unknown
+        evidence: [.github/workflows/tests.yml]
+
+  - id: nox
+    repository: https://github.com/wntrblm/nox
+    revision: 00e921b3c00a88485903e06226e8ff56755da6f6
+    default_branch: main
+    license: Apache-2.0
+    license_evidence: LICENSE
+    coverage: [Nox, Python-matrix, Conda, lint, pytest]
+    evidence: [.github/workflows/ci.yml, noxfile.py, pyproject.toml]
+    obligations:
+      - id: dynamic-python-matrix
+        profile: nox-tests-${{ matrix.python-version }}
+        command: []
+        cwd: .
+        state: unresolved
+        requiredness: unknown
+        evidence: [.github/workflows/ci.yml, noxfile.py]
+      - id: conda-test-session
+        profile: nox-conda_tests
+        command: [nox, --session, conda_tests, --, --durations=5]
+        cwd: .
+        state: executable
+        requiredness: unknown
+        evidence: [.github/workflows/ci.yml, noxfile.py]
+
+  - id: pre-commit
+    repository: https://github.com/pre-commit/pre-commit
+    revision: ba5c4209a6d561b0dff5db24620778d2133d068e
+    default_branch: main
+    license: MIT
+    license_evidence: LICENSE
+    coverage: [pre-commit, tox, hooks, multiple-Python-versions]
+    evidence: [.github/workflows/main.yml, tox.ini, .pre-commit-config.yaml]
+    obligations:
+      - id: tox-checks
+        profile: tox-py,pypy3,pre-commit
+        command: [tox, -e, py,pypy3,pre-commit]
+        cwd: .
+        state: executable
+        requiredness: unknown
+        evidence: [.github/workflows/main.yml, tox.ini]
+
+  - id: tox
+    repository: https://github.com/tox-dev/tox
+    revision: a72221e1a618abdb79c5b0723c0c96015b25fae0
+    default_branch: main
+    license: MIT
+    license_evidence: LICENSE
+    coverage: [tox, reusable-workflows, Python-matrix, hooks]
+    evidence: [.github/workflows/check.yaml, tox.toml, pyproject.toml]
+    obligations:
+      - id: dynamic-test-matrix
+        profile: tox-1-${{ 
+        command: []
+        cwd: .
+        state: unresolved
+        requiredness: unknown
+        evidence: [.github/workflows/check.yaml]
+      - id: reusable-workflow
+        profile: tox-shared-check-workflow
+        command: []
+        cwd: .
+        state: unresolved
+        requiredness: unknown
+        evidence: [.github/workflows/check.yaml]
+
+  - id: httpx
+    repository: https://github.com/encode/httpx
+    revision: b5addb64f0161ff6bfe94c124ef76f6a1fba5254
+    default_branch: master
+    license: BSD-3-Clause
+    license_evidence: LICENSE.md
+    coverage: [pytest, custom-shell-scripts, coverage, Python-matrix]
+    evidence: [.github/workflows/test-suite.yml, scripts/install, scripts/check, scripts/test, scripts/coverage]
+    obligations:
+      - id: native-check-script
+        profile: httpx-check-script
+        command: []
+        cwd: .
+        state: unresolved
+        requiredness: unknown
+        evidence: [.github/workflows/test-suite.yml, scripts/check]
+      - id: native-test-script
+        profile: httpx-test-script
+        command: []
+        cwd: .
+        state: unresolved
+        requiredness: unknown
+        evidence: [.github/workflows/test-suite.yml, scripts/test]
+
+  - id: pydantic
+    repository: https://github.com/pydantic/pydantic
+    revision: 560f0f96a37d6913afdfddb2de22030ef08e68c3
+    default_branch: main
+    license: MIT
+    license_evidence: LICENSE
+    coverage: [monorepo, Rust-native-extension, Make, PDM, pytest, mypy, type-checking, custom-CI]
+    evidence: [.github/workflows/ci.yml, .github/workflows/third-party.yml, Makefile, pyproject.toml]
+    obligations:
+      - id: typechecking-pyright
+        profile: make-test-typechecking-pyright
+        command: [make, test-typechecking-pyright]
+        cwd: .
+        state: unresolved
+        requiredness: unknown
+        evidence: [.github/workflows/ci.yml, Makefile]
+      - id: typechecking-mypy
+        profile: make-test-typechecking-mypy
+        command: [make, test-typechecking-mypy]
+        cwd: .
+        state: unresolved
+        requiredness: unknown
+        evidence: [.github/workflows/ci.yml, Makefile]
+      - id: typechecking-pyrefly
+        profile: make-test-typechecking-pyrefly
+        command: [make, test-typechecking-pyrefly]
+        cwd: .
+        state: unresolved
+        requiredness: unknown
+        evidence: [.github/workflows/ci.yml, Makefile]

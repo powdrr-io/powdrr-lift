@@ -211,6 +211,31 @@ jobs:
     assert "uv run ruff check ." in str(origin["run"])
 
 
+def test_preserves_distinct_test_commands_from_separate_ci_steps(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\nname = "sample"\n', encoding="utf-8"
+    )
+    (tmp_path / "tests").mkdir()
+    workflow = tmp_path / ".github" / "workflows"
+    workflow.mkdir(parents=True)
+    (workflow / "ci.yml").write_text(
+        "jobs:\n  test:\n    steps:\n"
+        "      - run: uv run pytest -q tests/test_smoke.py\n"
+        "      - run: uv run pytest -n auto tests\n",
+        encoding="utf-8",
+    )
+
+    profiles = discover_validation_profiles(tmp_path)
+    test_profiles = [profile for profile in profiles if profile.provider == "pytest"]
+
+    assert [(profile.name, profile.command) for profile in test_profiles] == [
+        ("pytest", ("uv", "run", "pytest", "-q", "tests/test_smoke.py")),
+        ("ci-root-test-2", ("uv", "run", "pytest", "-n", "auto", "tests")),
+    ]
+
+
 def test_discovers_polyglot_project_validation(tmp_path: Path) -> None:
     (tmp_path / "package.json").write_text(
         '{"scripts": {"test": "vitest", "lint": "eslint ."}}\n',

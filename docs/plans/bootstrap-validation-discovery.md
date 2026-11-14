@@ -1,7 +1,7 @@
 # Bootstrap Structure and Validation Discovery Implementation Plan
 
-Status: implementation is in progress. Work package 8 is complete; work package
-9 breadth evaluation and documentation, plus the final completion gate, remain.
+Status: implementation is in progress. Work packages 8 and 9 are complete; the
+final completion gate remains open.
 
 Current WP8 progress: Workrr now evaluates discovered applicability against the
 feature run's target event, base branch, and changed paths. Missing context,
@@ -626,6 +626,17 @@ workflow, included script, lockfile, tool version, or package boundary
 invalidates the correct evidence; existing non-Python profiles still execute.
 
 ## Work package 9: Breadth evaluation and documentation
+
+WP9 progress: complete. Five reviewed fixture repositories assert command,
+provider, working directory, evidence anchors, applicability, prerequisites,
+and unresolved facts. The pinned corpus covers 14 repositories and 32 reviewed
+obligations; its evaluator reports discovery misses, mismatches, evidence gaps,
+and unresolved findings separately. User documentation describes output
+formats, supported coverage, execution boundaries, migration, and corpus use.
+The current corpus results are in
+`docs/reports/validation-discovery-corpus-2026-11-14.md`; the reported misses
+remain inputs to the final completion gate rather than being treated as
+successful discovery.
 
 Files: `tests/fixtures/validation_discovery/`, adapter conformance tests,
 integration tests, user documentation, optional corpus evaluation script.

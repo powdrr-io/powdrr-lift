@@ -362,6 +362,11 @@ class PytestVerificationProvider:
                 check=False,
             )
         except subprocess.TimeoutExpired as error:
+            if junit_path is not None:
+                try:
+                    os.unlink(junit_path)
+                except OSError:
+                    pass
             return ProviderExecutionResult(
                 self.name,
                 request.selector,
@@ -375,6 +380,11 @@ class PytestVerificationProvider:
                 provider_version=request.provider_version,
             )
         except OSError as error:
+            if junit_path is not None:
+                try:
+                    os.unlink(junit_path)
+                except OSError:
+                    pass
             return ProviderExecutionResult(
                 self.name,
                 request.selector,

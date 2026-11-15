@@ -315,6 +315,36 @@ def test_failed_step_label_is_not_misused_as_a_failure_signature() -> None:
     assert result.status == "not_comparable"
 
 
+def test_failure_unit_uses_a_structured_pytest_summary_from_job_logs() -> None:
+    raw_log = "FAILED tests/test_calc.py::test_sum - AssertionError: expected 2, got 3"
+    (failure,) = build_failure_units(
+        (
+            CIJobObservation(
+                job_id=21,
+                run_id=22,
+                run_attempt=1,
+                head_sha=HEAD,
+                status="completed",
+                conclusion="failure",
+                check_context="CI / unit",
+                steps=({"name": "pytest", "conclusion": "failure"},),
+                log_evidence=CIJobLogEvidence(
+                    status="available",
+                    excerpt=raw_log,
+                    raw_sha256=hashlib.sha256(raw_log.encode()).hexdigest(),
+                ),
+            ),
+        )
+    )
+
+    assert failure.phase == "test_failure"
+    assert failure.test_node_id == "tests/test_calc.py::test_sum"
+    assert failure.signature == (
+        "failed tests/test_calc.py::test_sum - assertionerror: expected 2, got 3"
+    )
+    assert any(item.startswith("job_log:21:sha256:") for item in failure.evidence)
+
+
 def test_different_earlier_local_setup_error_is_not_a_non_reproduction() -> None:
     result = compare_local_reproduction(
         ci_signature="test_failure: expected 2, got 3",

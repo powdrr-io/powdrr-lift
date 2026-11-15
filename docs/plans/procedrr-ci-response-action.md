@@ -4,9 +4,9 @@ Status: implementation in progress. PR #1517 added the initial versioned CI
 observation and failure contracts. PR #1519 added exact-head required-check
 capture and conservative state assessment. PR #1521 made cancellation
 assessment evidence-aware. This follow-up captures bounded, redacted failed-job
-logs with integrity metadata. Durable waiting, broader evidence collection,
-repair dispatch, and publication integration remain in the three-PR sequence
-below.
+logs with integrity metadata and targets pytest cases named in those logs for
+local reproduction. Durable waiting, broader evidence collection, repair
+dispatch, and publication integration remain in the three-PR sequence below.
 
 ## Outcome
 
@@ -152,6 +152,10 @@ typed projection of prior evidence, not the entire workflow transcript.
 4. **Reproduce locally.** Execute the service-selected, authorized command at
    the immutable candidate/tested tree in an isolated clean worktree. Resolve
    workflow `working-directory`, shell, matrix, setup versions and environment.
+   When a structured pytest summary identifies a test node, narrow a declared
+   pytest command to that node; otherwise use the declared command unchanged.
+   A nonmatching result remains inconclusive unless execution environments are
+   known to be comparable.
    Compare capability requirements before execution. Reproduce the tested
    merge tree when reconstructable; if unavailable, record the difference.
    Capture the actual command's exit status directly. Never infer success

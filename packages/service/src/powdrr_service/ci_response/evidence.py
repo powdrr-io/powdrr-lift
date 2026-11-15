@@ -6,12 +6,15 @@ import hashlib
 import re
 from dataclasses import dataclass
 
-from powdrr_contracts.ci import CIJobObservation
+from powdrr_contracts.ci import CIJobLogEvidence, CIJobObservation
 
 _RUNNER_REJECTION_PATTERNS = (
     re.compile(r"configuration .+ is not supported", re.IGNORECASE),
     re.compile(r"requested labels? .+ (?:not found|not supported)", re.IGNORECASE),
     re.compile(r"no runner matching the specified labels", re.IGNORECASE),
+)
+_PYTEST_FAILURE_SUMMARY_RE = re.compile(
+    r"^\s*FAILED\s+(?P<node>\S+::\S+)(?:\s+-\s+(?P<reason>.*))?$"
 )
 
 
@@ -28,6 +31,7 @@ class CIFailureUnit:
     signature: str
     evidence: tuple[str, ...]
     locally_executable: bool
+    test_node_id: str | None = None
 
 
 def normalize_failure_signature(message: str) -> str:
@@ -93,6 +97,27 @@ def build_failure_units(
             for step in job.steps
             if step.get("conclusion") in {"failure", "timed_out"}
         ]
+        pytest_failures = _pytest_failure_summaries(job.log_evidence)
+        if pytest_failures:
+            step_refs = tuple(
+                f"step:{step.get('name') or 'unnamed step'}" for step in step_failures
+            )
+            for test_node_id, signature in pytest_failures:
+                units.append(
+                    _failure_unit(
+                        job,
+                        "test_failure",
+                        signature,
+                        (
+                            f"test_node:{test_node_id}",
+                            *step_refs,
+                            *_log_evidence_reference(job),
+                        ),
+                        True,
+                        test_node_id=test_node_id,
+                    )
+                )
+            continue
         for step in step_failures:
             name = str(step.get("name") or "unnamed step")
             # The Actions job API exposes the failed step label but not its
@@ -130,12 +155,47 @@ def _log_evidence_reference(job: CIJobObservation) -> tuple[str, ...]:
     return (f"job_log_unavailable:{job.job_id}:{evidence.reason}",)
 
 
+def _pytest_failure_summaries(
+    log_evidence: CIJobLogEvidence | None,
+) -> tuple[tuple[str, str], ...]:
+    if (
+        log_evidence is None
+        or log_evidence.status != "available"
+        or log_evidence.excerpt is None
+    ):
+        return ()
+    summaries: list[tuple[str, str]] = []
+    for line in log_evidence.excerpt.splitlines():
+        match = _PYTEST_FAILURE_SUMMARY_RE.match(line)
+        if match is None:
+            continue
+        node_id = match.group("node")
+        path, separator, test_name = node_id.partition("::")
+        if (
+            not separator
+            or not test_name
+            or not path.endswith(".py")
+            or path.startswith(("/", "-"))
+            or ".." in path.replace("\\", "/").split("/")
+            or any(ord(char) < 32 for char in node_id)
+        ):
+            continue
+        reason = (match.group("reason") or "").strip()
+        signature = f"FAILED {node_id}"
+        if reason:
+            signature += f" - {reason}"
+        summaries.append((node_id, normalize_failure_signature(signature)))
+    return tuple(dict.fromkeys(summaries))
+
+
 def _failure_unit(
     job: CIJobObservation,
     phase: str,
     signature: str,
     evidence: tuple[str, ...],
     locally_executable: bool,
+    *,
+    test_node_id: str | None = None,
 ) -> CIFailureUnit:
     identity = "\0".join(
         (
@@ -157,4 +217,5 @@ def _failure_unit(
         signature=signature,
         evidence=evidence,
         locally_executable=locally_executable,
+        test_node_id=test_node_id,
     )

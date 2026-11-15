@@ -3223,6 +3223,7 @@ def _run_respond_to_pr_ci(args: argparse.Namespace) -> int:
                             )
                             else None
                         ),
+                        test_node_id=item.test_node_id,
                     ).to_dict(),
                     "runner_labels": list(
                         jobs_by_id[item.job_id].runner_labels
@@ -3372,6 +3373,7 @@ def _reproduce_ci_failures(
             ) from error
         if not command:
             raise GitHubActionsError("verification command must not be empty")
+        command = _target_pytest_command(command, eligible)
         try:
             run_result = execute_pinned_local_command(
                 repository_root, head_sha, command
@@ -3412,7 +3414,9 @@ def _reproduce_ci_failures(
             local_output=output,
             command=command,
             exit_code=run_result.exit_code,
-            phase_exercised=False,
+            phase_exercised=(
+                failure.test_node_id is not None and failure.test_node_id in output
+            ),
             environment_comparable=False,
         )
         results[failure.failure_id] = replace(
@@ -3421,6 +3425,67 @@ def _reproduce_ci_failures(
             stderr_sha256=run_result.stderr_sha256,
         )
     return results
+
+
+def _target_pytest_command(
+    command: tuple[str, ...], failures: Sequence[Any]
+) -> tuple[str, ...]:
+    """Narrow a declared pytest command to validated CI-reported test nodes."""
+    if not any(token in {"pytest", "py.test"} for token in command) and not any(
+        command[index : index + 2] == ("-m", "pytest")
+        for index in range(len(command) - 1)
+    ):
+        return command
+    nodes = tuple(
+        dict.fromkeys(
+            node
+            for failure in failures
+            if isinstance((node := getattr(failure, "test_node_id", None)), str)
+            and _is_safe_pytest_node_id(node)
+        )
+    )
+    if not nodes:
+        return command
+    narrowed = tuple(
+        argument for argument in command if argument not in {"-q", "--quiet"}
+    )
+    if "-vv" not in narrowed:
+        command_list = list(narrowed)
+        pytest_index = next(
+            (
+                index
+                for index, argument in enumerate(command_list)
+                if argument in {"pytest", "py.test"}
+            ),
+            None,
+        )
+        if pytest_index is None:
+            pytest_index = next(
+                (
+                    index + 1
+                    for index in range(len(command_list) - 1)
+                    if command_list[index : index + 2] == ["-m", "pytest"]
+                ),
+                None,
+            )
+        if pytest_index is not None:
+            command_list.insert(pytest_index + 1, "-vv")
+        narrowed = tuple(command_list)
+    present_nodes = tuple(node for node in nodes if node not in narrowed)
+    return (*narrowed, *present_nodes)
+
+
+def _is_safe_pytest_node_id(value: str) -> bool:
+    path, separator, test_name = value.partition("::")
+    normalized_path = path.replace("\\", "/")
+    return (
+        separator == "::"
+        and bool(test_name)
+        and path.endswith(".py")
+        and not normalized_path.startswith(("/", "-"))
+        and ".." not in normalized_path.split("/")
+        and not any(ord(character) < 32 for character in value)
+    )
 
 
 def _run_list_plan_issues(args: argparse.Namespace) -> int:

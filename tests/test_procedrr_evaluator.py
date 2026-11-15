@@ -129,7 +129,12 @@ def test_for_each_batches_judgments_without_parallel_execution() -> None:
         ) -> list[dict[str, Any]]:
             self.batch_sizes.append(len(requests))
             return [
-                {"positive": "yes" in messages[1]["content"]}
+                {
+                    "positive": any(
+                        "yes, include this" in message["content"]
+                        for message in messages
+                    )
+                }
                 for messages, _ in requests
             ]
 
@@ -164,11 +169,21 @@ steps:
 """
     )
     client = BatchLLM()
-    result = Evaluator(client, lambda *_: None).evaluate(
+    telemetry: list[Mapping[str, Any]] = []
+    wrapped_client = ProcedrrModelClient(
+        client,
+        process_directory=bundled_process_directory(),
+        telemetry_sink=telemetry.append,
+    )
+    result = Evaluator(wrapped_client, lambda *_: None).evaluate(
         document, {"clauses": ["yes, include this", "no, exclude this"]}
     )
 
     assert client.batch_sizes == [2]
+    assert len(telemetry) == 1
+    assert telemetry[0]["transport_kind"] == "batch"
+    assert telemetry[0]["batch_member_count"] == 2
+    assert telemetry[0]["outcome"] == "succeeded"
     assert result.bindings["decisions"] == [
         {"item": "yes, include this", "result": {"positive": True}},
         {"item": "no, exclude this", "result": {"positive": False}},
@@ -280,6 +295,35 @@ steps:
     assert streamed == list(result.events)
     assert operation.data["inputs"] == {"command": ["record"], "value": "hello"}
     assert operation.data["output"] == {"seen": "hello"}
+    assert operation.data["duration_ms"] >= 0
+
+
+def test_evaluator_persists_failed_operation_timing_before_reraising() -> None:
+    from powdrr_service.procedrr import parse_and_validate
+
+    document = parse_and_validate(
+        """
+version: 1
+name: failed-operation-timing
+steps:
+  - operation:
+      tool: internal
+      parameters: {command: [fail]}
+  - terminal: succeeded
+"""
+    )
+    streamed: list[Any] = []
+
+    def fail(_tool: str, _parameters: Mapping[str, Any]) -> None:
+        raise RuntimeError("tool failed")
+
+    with pytest.raises(RuntimeError, match="tool failed"):
+        Evaluator(FakeLLM(), fail, event_sink=streamed.append).evaluate(document)
+
+    failure = next(event for event in streamed if event.kind == "operation_failure")
+    assert failure.data["tool"] == "internal"
+    assert failure.data["error_type"] == "RuntimeError"
+    assert failure.data["duration_ms"] >= 0
 
 
 def test_evaluator_records_failed_judge_path_and_request_trace() -> None:

@@ -11,6 +11,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import time
 from collections.abc import Callable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
@@ -518,6 +519,7 @@ class Evaluator:
                 if isinstance(schema, Mapping):
                     self._schemas_for_state(state)[name] = dict(schema)
             return
+        process_started = time.perf_counter()
         process_inputs = process.get("inputs", [])
         if not isinstance(process_inputs, list):
             raise EvaluationError(f"{path}.call process has malformed inputs")
@@ -587,6 +589,21 @@ class Evaluator:
                 terminal_status = terminal.status
                 if terminal_status != "succeeded":
                     raise
+            except Exception as error:
+                events.append(
+                    EvaluationEvent(
+                        "process_failure",
+                        path,
+                        {
+                            "name": process_name,
+                            "duration_ms": round(
+                                (time.perf_counter() - process_started) * 1000, 3
+                            ),
+                            "error_type": type(error).__name__,
+                        },
+                    )
+                )
+                raise
         finally:
             self._document_recoveries = parent_recoveries
         for parent_name, child_reference in outputs.items():
@@ -618,6 +635,9 @@ class Evaluator:
                         parent_name: state[parent_name] for parent_name in outputs
                     },
                     "terminal_status": terminal_status,
+                    "duration_ms": round(
+                        (time.perf_counter() - process_started) * 1000, 3
+                    ),
                 },
             )
         )
@@ -878,6 +898,7 @@ class Evaluator:
                     )
                 except ValueError as exc:
                     raise EvaluationError(str(exc)) from exc
+        operation_started = time.perf_counter()
         try:
             result = self.operation_executor(tool, parameters)
         except SuspendEvaluation as suspension:
@@ -885,6 +906,21 @@ class Evaluator:
             suspended_reason = suspension.reason
             resume_data = suspension.resume_data
             resume_with_executor = suspension.resume_with_executor
+        except Exception as error:
+            events.append(
+                EvaluationEvent(
+                    "operation_failure",
+                    path,
+                    {
+                        "tool": tool,
+                        "duration_ms": round(
+                            (time.perf_counter() - operation_started) * 1000, 3
+                        ),
+                        "error_type": type(error).__name__,
+                    },
+                )
+            )
+            raise
         else:
             suspended_reason = None
             resume_data = {}
@@ -911,6 +947,9 @@ class Evaluator:
                     "replay_output": result,
                     "resume_data": resume_data,
                     "resume_with_executor": resume_with_executor,
+                    "duration_ms": round(
+                        (time.perf_counter() - operation_started) * 1000, 3
+                    ),
                 },
             )
         )

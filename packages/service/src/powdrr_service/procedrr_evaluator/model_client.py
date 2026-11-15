@@ -7,6 +7,7 @@ import json
 import os
 import re
 import time
+import uuid
 from collections.abc import Callable, Mapping
 from pathlib import Path
 from typing import Any, cast
@@ -39,6 +40,44 @@ def _safe_provider_error(error: Exception) -> str:
     return message[:500]
 
 
+def _usage_fields(client: Any) -> dict[str, Any]:
+    usage = getattr(client, "last_usage", None)
+    if not isinstance(usage, Mapping):
+        return {
+            "prompt_tokens": None,
+            "completion_tokens": None,
+            "cost_amount": None,
+            "cost_currency": None,
+        }
+    prompt = usage.get("prompt_tokens", usage.get("input_tokens"))
+    completion = usage.get("completion_tokens", usage.get("output_tokens"))
+    return {
+        "prompt_tokens": (
+            prompt if isinstance(prompt, int) and not isinstance(prompt, bool) else None
+        ),
+        "completion_tokens": (
+            completion
+            if isinstance(completion, int) and not isinstance(completion, bool)
+            else None
+        ),
+        "cost_amount": (
+            cost
+            if isinstance(
+                (cost := usage.get("cost_amount", usage.get("cost"))), (int, float)
+            )
+            and not isinstance(cost, bool)
+            else None
+        ),
+        "cost_currency": (
+            currency
+            if isinstance(
+                (currency := usage.get("cost_currency", usage.get("currency"))), str
+            )
+            else None
+        ),
+    }
+
+
 class ProcedrrResponseError(RuntimeError):
     """A procedrr judge could not produce a schema-valid response."""
 
@@ -56,6 +95,7 @@ class ProcedrrModelClient:
         provider_retry_delay_seconds: float = 1.0,
         replay_responses: Mapping[str, Mapping[str, Any]] | None = None,
         telemetry_sink: Callable[[Mapping[str, Any]], None] | None = None,
+        telemetry_role: str = "unknown",
     ) -> None:
         self._client = client
         self._process_directory = process_directory
@@ -64,6 +104,7 @@ class ProcedrrModelClient:
         self._provider_retry_delay_seconds = provider_retry_delay_seconds
         self._replay_responses = dict(replay_responses or {})
         self._telemetry_sink = telemetry_sink
+        self._telemetry_role = telemetry_role
 
     @staticmethod
     def replay_key(messages: list[dict[str, str]]) -> str:
@@ -97,7 +138,11 @@ class ProcedrrModelClient:
                     # JSON Schema keyword.
                     result = self._client.complete_json(messages)
                 self._record_provider_attempt(
-                    trace_id, attempt, started, outcome="succeeded"
+                    trace_id,
+                    attempt,
+                    started,
+                    outcome="succeeded",
+                    **_usage_fields(self._client),
                 )
                 return result
             except Exception as exc:  # noqa: BLE001 - classify provider failures below
@@ -137,6 +182,12 @@ class ProcedrrModelClient:
         error_message: str | None = None,
         error_status_code: int | None = None,
         retryable: bool | None = None,
+        transport_kind: str = "single",
+        batch_member_count: int | None = None,
+        prompt_tokens: int | None = None,
+        completion_tokens: int | None = None,
+        cost_amount: int | float | None = None,
+        cost_currency: str | None = None,
     ) -> None:
         if self._telemetry_sink is None:
             return
@@ -148,6 +199,7 @@ class ProcedrrModelClient:
                 "trace_id": trace_id,
                 "attempt": attempt + 1,
                 "provider_client": type(client).__name__,
+                "role": self._telemetry_role,
                 "model": getattr(client, "model_name", None)
                 or getattr(client, "_model", None),
                 "provider_delegate": (
@@ -166,6 +218,12 @@ class ProcedrrModelClient:
                 "error_message": error_message,
                 "error_status_code": error_status_code,
                 "retryable": retryable,
+                "transport_kind": transport_kind,
+                "batch_member_count": batch_member_count,
+                "prompt_tokens": prompt_tokens,
+                "completion_tokens": completion_tokens,
+                "cost_amount": cost_amount,
+                "cost_currency": cost_currency,
             }
         )
 
@@ -232,6 +290,7 @@ class ProcedrrModelClient:
                     )
             else:
                 started = time.monotonic()
+                batch_error: Exception | None = None
                 try:
                     batch_outputs = batch_method(
                         [(messages, schema) for _, messages, schema, _ in pending]
@@ -245,7 +304,8 @@ class ProcedrrModelClient:
                     ):
                         validate_json(output, schema)
                         outputs[index] = output
-                except Exception:
+                except Exception as error:
+                    batch_error = error
                     # The batch boundary is an optimization. Preserve the
                     # established individual structured-repair path on error.
                     for index, _, schema, _ in pending:
@@ -253,15 +313,22 @@ class ProcedrrModelClient:
                             requests[index][0], response_schema=schema
                         )
                 finally:
-                    for _, _, _, trace_id in pending:
-                        self._record_provider_attempt(
-                            trace_id,
-                            0,
-                            started,
-                            outcome="succeeded"
-                            if all(output is not None for output in outputs)
-                            else "failed",
-                        )
+                    self._record_provider_attempt(
+                        f"batch-{uuid.uuid4().hex}",
+                        0,
+                        started,
+                        outcome="failed" if batch_error is not None else "succeeded",
+                        error_type=(
+                            type(batch_error).__name__ if batch_error else None
+                        ),
+                        error_module=(
+                            type(batch_error).__module__ if batch_error else None
+                        ),
+                        error_message=(str(batch_error) if batch_error else None),
+                        transport_kind="batch",
+                        batch_member_count=len(pending),
+                        **(_usage_fields(self._client) if batch_error is None else {}),
+                    )
         return [output for output in outputs if output is not None]
 
     def complete_json(

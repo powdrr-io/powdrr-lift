@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import shutil
 import subprocess
@@ -28,6 +29,106 @@ _STANDARD_PR_DESCRIPTION_SECTIONS = (
     ("validation", _STANDARD_PR_DESCRIPTION_HEADINGS[4]),
     ("advisory_test_quality_notes", _STANDARD_PR_DESCRIPTION_HEADINGS[5]),
 )
+
+
+def build_publication_authorization(
+    *,
+    base: str,
+    files: Sequence[str],
+    accepted_contract_digest: str,
+    verification_receipts: Sequence[Mapping[str, Any]],
+    lineage: Mapping[str, Any],
+    worktree_root: Path,
+) -> dict[str, Any]:
+    """Bind publication to the exact current candidate and its accepted evidence."""
+    normalized_files = sorted(_relative_paths(files))
+    if (
+        not isinstance(accepted_contract_digest, str)
+        or not accepted_contract_digest.strip()
+    ):
+        raise PowdrrExecutionError("accepted_contract_digest must be non-empty.")
+    if not verification_receipts or any(
+        not isinstance(receipt, Mapping) or receipt.get("passed") is not True
+        for receipt in verification_receipts
+    ):
+        raise PowdrrExecutionError(
+            "Publication requires successful verification receipts for the candidate."
+        )
+    if not isinstance(lineage, Mapping) or not lineage:
+        raise PowdrrExecutionError("Publication requires source-run lineage.")
+    root = worktree_root.resolve()
+    content: dict[str, str] = {}
+    for relative in normalized_files:
+        path = root / relative
+        try:
+            path.resolve().relative_to(root)
+        except ValueError as exc:
+            raise PowdrrExecutionError(
+                f"Publication path escapes the worktree: {relative}"
+            ) from exc
+        if path.is_symlink() or not path.is_file():
+            raise PowdrrExecutionError(
+                f"Publication candidate must contain regular files: {relative}"
+            )
+        content[relative] = hashlib.sha256(path.read_bytes()).hexdigest()
+    base_ref = _resolve_base_ref(root, _branch(base, field="base"))
+    base_commit = _run(["git", "rev-parse", f"{base_ref}^{{commit}}"], cwd=root).strip()
+    body = {
+        "schema_version": "powdrr-publication-authorization-v1",
+        "base": base,
+        "base_commit": base_commit,
+        "candidate_content": content,
+        "candidate_digest": hashlib.sha256(
+            json.dumps(content, sort_keys=True, separators=(",", ":")).encode()
+        ).hexdigest(),
+        "accepted_contract_digest": accepted_contract_digest,
+        "changed_paths": normalized_files,
+        "verification_receipts": [dict(receipt) for receipt in verification_receipts],
+        "lineage": dict(lineage),
+    }
+    body["authorization_digest"] = hashlib.sha256(
+        json.dumps(body, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+    return body
+
+
+def _validate_publication_authorization(
+    authorization: object,
+    *,
+    base: str,
+    files: Sequence[str],
+    worktree_root: Path,
+) -> dict[str, Any]:
+    if not isinstance(authorization, Mapping):
+        raise PowdrrExecutionError("A publication authorization is required.")
+    required = {
+        "schema_version",
+        "base",
+        "base_commit",
+        "candidate_content",
+        "candidate_digest",
+        "accepted_contract_digest",
+        "changed_paths",
+        "verification_receipts",
+        "lineage",
+        "authorization_digest",
+    }
+    if set(authorization) != required:
+        raise PowdrrExecutionError("Publication authorization has an invalid shape.")
+    expected = build_publication_authorization(
+        base=base,
+        files=files,
+        accepted_contract_digest=str(authorization.get("accepted_contract_digest", "")),
+        verification_receipts=authorization.get("verification_receipts", []),
+        lineage=authorization.get("lineage", {}),
+        worktree_root=worktree_root,
+    )
+    if dict(authorization) != expected:
+        raise PowdrrExecutionError(
+            "Publication candidate changed after verification; regenerate its "
+            "authorization."
+        )
+    return expected
 
 
 def render_standard_pr_description(sections: Mapping[str, Any]) -> str:
@@ -98,6 +199,14 @@ def normalize_clean_pr_publication_parameters(
         "publication_branch": ("publication-branch", "publication_branch"),
         "title": ("feature-name", "pull-request-title", "title"),
         "commit_message": ("commit-message", "commit_message"),
+        "publication_authorization": (
+            "publication-authorization",
+            "publication_authorization",
+        ),
+        "require_publication_authorization": (
+            "require-publication-authorization",
+            "require_publication_authorization",
+        ),
     }
     for target, keys in aliases.items():
         if target not in normalized:
@@ -201,6 +310,25 @@ def publish_clean_pull_request(
     source_branch = _run(["git", "branch", "--show-current"], cwd=source_root).strip()
     if not source_branch:
         raise PowdrrExecutionError("Cannot publish from a detached source worktree.")
+    authorization_value = parameters.get("publication_authorization")
+    require_authorization = parameters.get("require_publication_authorization") is True
+    if require_authorization or authorization_value is not None:
+        authorization = _validate_publication_authorization(
+            authorization_value,
+            base=base,
+            files=files,
+            worktree_root=source_root,
+        )
+        intent_path = _persist_publication_intent(
+            source_root,
+            branch=branch,
+            authorization=authorization,
+            title=title,
+            body=body,
+        )
+    else:
+        authorization = None
+        intent_path = None
 
     with tempfile.TemporaryDirectory(prefix="powdrr-publication-") as temp_root:
         publication_root = Path(temp_root) / "worktree"
@@ -213,6 +341,13 @@ def publish_clean_pull_request(
                 ["git", "rev-parse", "HEAD"], cwd=publication_root
             ).strip()
             _copy_publication_files(source_root, publication_root, files)
+            if authorization is not None:
+                _validate_publication_authorization(
+                    authorization,
+                    base=base,
+                    files=files,
+                    worktree_root=publication_root,
+                )
             _run(["git", "add", "--", *files], cwd=publication_root)
             staged = _run(
                 ["git", "diff", "--cached", "--name-only"], cwd=publication_root
@@ -251,6 +386,14 @@ def publish_clean_pull_request(
                 title=title,
                 body=body,
             )
+            if intent_path is not None:
+                _complete_publication_intent(
+                    intent_path,
+                    pull_request_url=url,
+                    head=_run(
+                        ["git", "rev-parse", "HEAD"], cwd=publication_root
+                    ).strip(),
+                )
             return url
         finally:
             subprocess.run(
@@ -260,6 +403,93 @@ def publish_clean_pull_request(
                 text=True,
                 check=False,
             )
+
+
+def _persist_publication_intent(
+    source_root: Path,
+    *,
+    branch: str,
+    authorization: Mapping[str, Any],
+    title: str,
+    body: str,
+) -> Path:
+    intent_id = hashlib.sha256(
+        f"{branch}\0{authorization['authorization_digest']}".encode()
+    ).hexdigest()
+    path = source_root / ".powdrr" / "publication-intents" / f"{intent_id}.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    intent = {
+        "schema_version": "powdrr-publication-intent-v1",
+        "intent_id": intent_id,
+        "branch": branch,
+        "authorization": dict(authorization),
+        "title": title,
+        "body_digest": hashlib.sha256(body.encode()).hexdigest(),
+    }
+    if path.exists():
+        try:
+            existing = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise PowdrrExecutionError(
+                "Persisted publication intent is unreadable."
+            ) from exc
+        if not isinstance(existing, Mapping) or any(
+            existing.get(key) != value
+            for key, value in intent.items()
+            if key not in {"title", "body_digest"}
+        ):
+            raise PowdrrExecutionError(
+                "Publication intent identity conflicts with stored state."
+            )
+        existing_intent = dict(existing)
+        if (
+            existing_intent.get("title") != title
+            or existing_intent.get("body_digest") != intent["body_digest"]
+        ):
+            existing_intent.update(
+                {"title": title, "body_digest": intent["body_digest"]}
+            )
+            temporary = path.with_suffix(".tmp")
+            temporary.write_text(
+                json.dumps(existing_intent, sort_keys=True, ensure_ascii=False) + "\n",
+                encoding="utf-8",
+            )
+            temporary.replace(path)
+        return path
+    temporary = path.with_suffix(".tmp")
+    temporary.write_text(
+        json.dumps(intent, sort_keys=True, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+    temporary.replace(path)
+    return path
+
+
+def _complete_publication_intent(
+    path: Path, *, pull_request_url: str, head: str
+) -> None:
+    try:
+        intent = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise PowdrrExecutionError(
+            "Persisted publication intent is unreadable."
+        ) from exc
+    if not isinstance(intent, dict):
+        raise PowdrrExecutionError("Persisted publication intent is malformed.")
+    prior_url = intent.get("pull_request_url")
+    prior_head = intent.get("head")
+    if prior_url is not None and (prior_url != pull_request_url or prior_head != head):
+        raise PowdrrExecutionError(
+            "Publication intent was completed with a different PR head."
+        )
+    intent["pull_request_url"] = pull_request_url
+    intent["head"] = head
+    temporary = path.with_suffix(".tmp")
+    temporary.write_text(
+        json.dumps(intent, sort_keys=True, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+    temporary.replace(path)
 
 
 def _prepare_publication_worktree(

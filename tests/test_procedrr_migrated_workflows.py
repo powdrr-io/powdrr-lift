@@ -3,8 +3,10 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+import pytest
 from powdrr_service.procedrr import ProcessCatalog
 from powdrr_service.procedrr.fragments import apply_fragment_step_json, start_fragment
+from powdrr_service.procedrr_evaluator.evaluator import ValidationGateError
 from powdrr_service.procedrr_evaluator.runtime import ProcedrrExecutionService
 from powdrr_service.resources import bundled_process_directory
 
@@ -274,18 +276,10 @@ def test_finish_pr_prep_reviews_large_scope_without_runtime_paths() -> None:
     assert all(path not in calls[0][1]["paths"] for path in runtime)
 
 
-def test_finish_pr_prep_repairs_then_reruns_all_validations() -> None:
+def test_finish_pr_prep_fails_without_editing_a_verified_candidate() -> None:
     Path(__file__).resolve().parents[1]
     catalog = ProcessCatalog.load(bundled_process_directory())
-    responses = [
-        *_scope_and_label_responses(),
-        {
-            "repairs": [
-                {"file_path": "README.md", "reason": "Fix the reported lint issue."}
-            ]
-        },
-        {"file_path": "README.md", "start": 2, "end": 2, "new_text": "fixed\n"},
-    ]
+    responses = _scope_and_label_responses()
     validation_calls = 0
     restaged_paths: list[str] = []
     edits: list[dict[str, Any]] = []
@@ -321,27 +315,19 @@ def test_finish_pr_prep_repairs_then_reruns_all_validations() -> None:
         "read_document": lambda _parameters: "line one\nline two\n",
         "edit": edit,
     }
-    result = ProcedrrExecutionService(
-        catalog,
-        SequenceLLM(responses),
-        lambda tool, parameters: executor[tool](parameters),
-    ).execute(
-        "finish-pr-prep",
-        {
-            "files_to_publish": ["src/app.py", "README.md"],
-            "language_labels": ["python", "markdown"],
-        },
-    )
+    with pytest.raises(ValidationGateError, match="validation gate failed"):
+        ProcedrrExecutionService(
+            catalog,
+            SequenceLLM(responses),
+            lambda tool, parameters: executor[tool](parameters),
+        ).execute(
+            "finish-pr-prep",
+            {
+                "files_to_publish": ["src/app.py", "README.md"],
+                "language_labels": ["python", "markdown"],
+            },
+        )
 
-    assert result.terminal_status.value == "succeeded"
-    assert validation_calls == 2
-    assert restaged_paths == ["src/app.py", "README.md"]
-    assert edits == [
-        {
-            "operation": "replace_lines",
-            "file_path": "README.md",
-            "start_line": 2,
-            "end_line": 2,
-            "replacement": "fixed\n",
-        }
-    ]
+    assert validation_calls == 1
+    assert restaged_paths == []
+    assert edits == []

@@ -70,6 +70,7 @@ from powdrr_lift.workrr.task_agent import (
     _implementation_paths_against_base,
     _issue_worker_implementation_request,
     _issue_worker_plan_amendment_paths,
+    _issue_worker_pr_changelog,
     _issue_worker_structrr_context,
     _list_worktree_files,
     _normalize_execute_pr_coding_attempt,
@@ -84,6 +85,58 @@ from powdrr_lift.workrr.task_agent import (
     _workflow_file_command_error,
     run_workflow_task,
 )
+
+
+def test_issue_worker_changelog_validates_against_the_published_branch(
+    tmp_path: Path,
+) -> None:
+    remote = tmp_path / "remote.git"
+    repo = tmp_path / "repo"
+
+    def git(*args: str, cwd: Path) -> str:
+        result = subprocess.run(
+            ["git", *args], cwd=cwd, capture_output=True, text=True, check=True
+        )
+        return result.stdout
+
+    git("init", "--bare", str(remote), cwd=tmp_path)
+    git("init", "-b", "main", str(repo), cwd=tmp_path)
+    git("config", "user.name", "Powdrr Test", cwd=repo)
+    git("config", "user.email", "powdrr-test@example.invalid", cwd=repo)
+    readme = repo / "README.md"
+    readme.write_text("first line\noriginal second line\n", encoding="utf-8")
+    git("add", "README.md", cwd=repo)
+    git("commit", "-m", "initial", cwd=repo)
+    git("remote", "add", "origin", str(remote), cwd=repo)
+    git("push", "-u", "origin", "main", cwd=repo)
+    git("switch", "-c", "powdrr/demo", cwd=repo)
+    readme.write_text("first line\nupdated second line\n", encoding="utf-8")
+    git("add", "README.md", cwd=repo)
+    git("commit", "-m", "update readme", cwd=repo)
+    git("push", "-u", "origin", "powdrr/demo", cwd=repo)
+
+    path = _issue_worker_pr_changelog(
+        repo_root=repo,
+        pr_number="99",
+        proposed={
+            "title": "Update the README",
+            "objective": "Keep the README current.",
+            "problem": "The README text is out of date.",
+        },
+        files_to_publish=["README.md"],
+        publication_branch="powdrr/demo",
+    )
+
+    changelog = yaml.safe_load((repo / path).read_text(encoding="utf-8"))
+    assert changelog["files"] == [
+        {
+            "path": "README.md",
+            "type": "modified",
+            "span": {"start_line": 2, "end_line": 2},
+            "summary": "Changed as part of Update the README.",
+            "rationale": "Keep the README current.",
+        }
+    ]
 
 
 def test_pr_body_discloses_inline_plan_adjustments_to_reviewer() -> None:

@@ -2514,6 +2514,7 @@ def _issue_worker_pr_changelog(
     pr_number: str,
     proposed: Mapping[str, Any],
     files_to_publish: Sequence[str],
+    publication_branch: str,
 ) -> str:
     """Compile a PR changelog from reviewed intent and the published file list."""
     title = str(
@@ -2537,34 +2538,100 @@ def _issue_worker_pr_changelog(
         if isinstance(loaded, Mapping):
             structured_diff = loaded
             break
-    type_by_path = {
-        path: (
-            "Test file"
-            if path.startswith("tests/")
-            else "Configuration file"
-            if path.endswith((".yaml", ".yml", ".json", ".toml"))
-            else "Documentation"
-            if path.startswith("docs/")
-            else "Source file"
+    base_ref_result = subprocess.run(
+        ["git", "rev-parse", "--verify", "refs/remotes/origin/main^{commit}"],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    base_ref = "refs/remotes/origin/main" if base_ref_result.returncode == 0 else "main"
+    fetch = subprocess.run(
+        ["git", "fetch", "origin", publication_branch],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if fetch.returncode != 0:
+        raise PowdrrExecutionError(
+            "could not refresh the published branch for changelog validation: "
+            f"{fetch.stderr.strip() or fetch.stdout.strip()}"
         )
+    branch_ref = f"refs/remotes/origin/{publication_branch}"
+    file_records: list[dict[str, Any]] = []
+    for path in sorted(
+        path
         for path in files_to_publish
         if path != f"docs/changelogs/PR-{pr_number}-changelog.yaml"
-    }
+    ):
+        existed = (
+            subprocess.run(
+                ["git", "cat-file", "-e", f"{base_ref}:{path}"],
+                cwd=repo_root,
+                capture_output=True,
+                check=False,
+            ).returncode
+            == 0
+        )
+        diff = subprocess.run(
+            [
+                "git",
+                "diff",
+                "--unified=0",
+                "--no-color",
+                f"{base_ref}...{branch_ref}",
+                "--",
+                path,
+            ],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if diff.returncode != 0:
+            raise PowdrrExecutionError(
+                f"could not read published diff for changelog path {path!r}: "
+                f"{diff.stderr.strip() or diff.stdout.strip()}"
+            )
+        spans = [
+            (int(match.group(1)), int(match.group(2) or "1"))
+            for line in diff.stdout.splitlines()
+            if (match := re.match(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@", line))
+            and int(match.group(2) or "1") > 0
+        ]
+        if not spans:
+            raise PowdrrExecutionError(
+                f"published diff has no source span for changelog path {path!r}"
+            )
+        file_records.extend(
+            {
+                "path": path,
+                "type": "modified" if existed else "added",
+                "span": {
+                    "start_line": start,
+                    "end_line": start + count - 1,
+                },
+                "summary": f"Changed as part of {title}.",
+                "rationale": objective,
+            }
+            for start, count in spans
+        )
+    generated_path = f"docs/changelogs/PR-{pr_number}-changelog.yaml"
+    product_paths = [path for path in files_to_publish if path != generated_path]
     descriptor = {
         "schema": "https://powdrr.io/schema/changelog-v2",
         "change_id": f"PR-{pr_number}",
         "title": title,
         "intent": {"problem": problem, "goal": objective},
         "human-decisions": proposed.get("human-decisions", []),
+        "structured_files": sorted(
+            path for path in product_paths if is_structured_document_path(path)
+        ),
         "files": [
-            {
-                "path": path,
-                "type": type_by_path[path],
-                "span": {"start_line": 1, "end_line": 1},
-                "summary": f"Changed as part of {title}.",
-                "rationale": objective,
-            }
-            for path in sorted(type_by_path)
+            record
+            for record in file_records
+            if not is_structured_document_path(str(record["path"]))
         ],
         **{
             key: structured_diff.get(key, proposed.get(key, []))
@@ -2591,7 +2658,20 @@ def _issue_worker_pr_changelog(
         raise PowdrrExecutionError(
             f"generated PR changelog is invalid: {error}"
         ) from error
-    relative_path = f"docs/changelogs/PR-{pr_number}-changelog.yaml"
+    from powdrr_lift.change_log_validation import build_validation_report
+
+    report = build_validation_report(
+        text,
+        branch_name=f"origin/{publication_branch}",
+        repo_root=repo_root,
+        default_branch="origin/main",
+    )
+    if not report.validation_successful:
+        findings = "; ".join(issue.message for issue in report.issues)
+        raise PowdrrExecutionError(
+            f"generated PR changelog failed diff validation: {findings}"
+        )
+    relative_path = generated_path
     output_path = (repo_root / relative_path).resolve()
     try:
         output_path.relative_to(repo_root.resolve())
@@ -2652,19 +2732,48 @@ def _finish_issue_worker_pull_request(
         pr_number=match.group(1),
         proposed=proposed,
         files_to_publish=files_value,
+        publication_branch=str(action.parameters.get("publication_branch", "")),
     )
     parameters = action.parameters
     from powdrr_lift.clean_pr_publisher import publish_clean_pull_request
 
+    changelog_publication: dict[str, Any] = {
+        "files_to_publish": [changelog_path],
+        "base": parameters.get("base"),
+        "publication_branch": parameters.get("publication_branch"),
+        "title": parameters.get("title"),
+        "body": parameters.get("body"),
+        "commit_message": f"Add PR-{match.group(1)} changelog descriptor",
+    }
+    original_authorization = parameters.get("publication_authorization")
+    if isinstance(original_authorization, Mapping):
+        from powdrr_lift.clean_pr_publisher import build_publication_authorization
+
+        changelog_bytes = (strategy.repo_root / changelog_path).read_bytes()
+        changelog_publication["publication_authorization"] = (
+            build_publication_authorization(
+                base=str(parameters.get("base", "main")),
+                files=[changelog_path],
+                accepted_contract_digest=str(
+                    original_authorization.get("accepted_contract_digest", "")
+                ),
+                verification_receipts=[
+                    {
+                        "id": "changelog-v2-diff-validation",
+                        "passed": True,
+                        "content_sha256": hashlib.sha256(changelog_bytes).hexdigest(),
+                    }
+                ],
+                lineage=(
+                    original_authorization.get("lineage", {})
+                    if isinstance(original_authorization.get("lineage"), Mapping)
+                    else {}
+                ),
+                worktree_root=strategy.repo_root,
+            )
+        )
     publish_clean_pull_request(
-        {
-            "files_to_publish": [changelog_path],
-            "base": parameters.get("base"),
-            "publication_branch": parameters.get("publication_branch"),
-            "title": parameters.get("title"),
-            "body": parameters.get("body"),
-            "commit_message": f"Add PR-{match.group(1)} changelog descriptor",
-        },
+        changelog_publication,
         worktree_root=strategy.repo_root,
     )
 

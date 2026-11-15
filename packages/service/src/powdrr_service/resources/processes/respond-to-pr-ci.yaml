@@ -1,6 +1,6 @@
 version: 1
 name: respond-to-pr-ci
-description: Observe the current PR head, reproduce failures, and checkpoint evidence without starting a repair worker.
+description: Observe and reproduce CI at the current PR head, checkpoint evidence before waiting for required checks, and return a bounded response state without starting a repair worker.
 inputs:
   - {name: repository, type: string, required: true}
   - {name: issue_number, type: integer, required: true}

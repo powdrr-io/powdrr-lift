@@ -418,6 +418,8 @@ class GitHubActionsClient:
                 "pr",
                 "checks",
                 str(pull_request_number),
+                "--repo",
+                self.repository,
                 "--required",
                 "--json",
                 "name,state,workflow",
@@ -426,7 +428,8 @@ class GitHubActionsClient:
             text=True,
             check=False,
         )
-        if result.returncode != 0:
+        # gh returns 8 for a valid observation while one or more checks are pending.
+        if result.returncode not in (0, 8):
             return None, "GitHub did not make required-check policy available"
         try:
             raw = json.loads(result.stdout)
@@ -451,6 +454,33 @@ class GitHubActionsClient:
                 return None, "GitHub returned malformed required-check data"
             checks.append(dict(item))
         return tuple(checks), None
+
+    def refresh_required_checks(
+        self, pull_request_number: int, expected_head_sha: str
+    ) -> tuple[tuple[Mapping[str, Any], ...] | None, str | None]:
+        """Refresh required statuses only if the PR still has the pinned head."""
+        try:
+            before = self._object(
+                f"repos/{self.repository}/pulls/{pull_request_number}", "pull request"
+            )
+        except GitHubActionsError as error:
+            return None, f"could not confirm PR head before check refresh: {error}"
+        head = before.get("head")
+        head_sha = head.get("sha") if isinstance(head, Mapping) else None
+        if head_sha != expected_head_sha:
+            return None, "pull request head changed while waiting for required checks"
+        checks, reason = self._required_checks(pull_request_number)
+        try:
+            after = self._object(
+                f"repos/{self.repository}/pulls/{pull_request_number}", "pull request"
+            )
+        except GitHubActionsError as error:
+            return None, f"could not confirm PR head after check refresh: {error}"
+        head = after.get("head")
+        confirmed_sha = head.get("sha") if isinstance(head, Mapping) else None
+        if confirmed_sha != expected_head_sha:
+            return None, "pull request head changed while waiting for required checks"
+        return checks, reason
 
     def get_issue(self, issue_number: int) -> Mapping[str, Any]:
         return self._object(f"repos/{self.repository}/issues/{issue_number}", "issue")

@@ -5,8 +5,11 @@ observation and failure contracts. PR #1519 added exact-head required-check
 capture and conservative state assessment. PR #1521 made cancellation
 assessment evidence-aware. This follow-up captures bounded, redacted failed-job
 logs with integrity metadata and targets pytest cases named in those logs for
-local reproduction. Durable waiting, broader evidence collection, repair
-dispatch, and publication integration remain in the three-PR sequence below.
+local reproduction. The response command now checkpoints required-check states
+and bounded evidence before a capped wait, refreshes only the pinned PR head,
+and records the terminal or deadline state. Durable queue continuation, broader
+evidence collection, repair dispatch, and publication integration remain in the
+three-PR sequence below.
 
 ## Outcome
 

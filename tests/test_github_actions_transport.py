@@ -241,6 +241,58 @@ def test_required_check_observations_use_current_head_and_preserve_unknowns() ->
     assert observations[-1].reason == "no matching job was observed on the current head"
 
 
+def test_required_check_refresh_accepts_pending_cli_status_for_pinned_head() -> None:
+    calls: list[list[str]] = []
+
+    def run(
+        arguments: Sequence[str], **_kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
+        call = list(arguments)
+        calls.append(call)
+        if call[-1] == "repos/example/project/pulls/270":
+            return subprocess.CompletedProcess(
+                call, 0, json.dumps({"head": {"sha": HEAD}}), ""
+            )
+        if call[1:3] == ["pr", "checks"]:
+            return subprocess.CompletedProcess(
+                call,
+                8,
+                json.dumps(
+                    [{"name": "unit", "state": "PENDING", "workflow": "ci.yml"}]
+                ),
+                "",
+            )
+        raise AssertionError(f"unexpected gh command: {call}")
+
+    client = GitHubActionsClient("example/project", run=run)
+    checks, reason = client.refresh_required_checks(270, HEAD)
+
+    assert reason is None
+    assert checks == ({"name": "unit", "state": "PENDING", "workflow": "ci.yml"},)
+    assert len(calls) == 3
+    assert "--repo" in calls[1]
+    assert calls[1][calls[1].index("--repo") + 1] == "example/project"
+
+
+def test_required_check_refresh_stops_when_pr_head_moves() -> None:
+    calls = 0
+
+    def run(
+        arguments: Sequence[str], **_kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
+        nonlocal calls
+        calls += 1
+        payload = {"head": {"sha": HEAD if calls == 1 else "a" * 40}}
+        return subprocess.CompletedProcess(arguments, 0, json.dumps(payload), "")
+
+    client = GitHubActionsClient("example/project", run=run)
+    checks, reason = client.refresh_required_checks(270, HEAD)
+
+    assert checks is None
+    assert reason == "pull request head changed while waiting for required checks"
+    assert calls == 3
+
+
 def test_required_check_permission_error_is_explicitly_unavailable() -> None:
     client = GitHubActionsClient(
         "example/project",

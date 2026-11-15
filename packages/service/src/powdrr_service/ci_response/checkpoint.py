@@ -7,7 +7,7 @@ import json
 import re
 from collections.abc import Mapping, Sequence
 
-from powdrr_contracts.ci import CIJobObservation, LocalReproduction
+from powdrr_contracts.ci import CIJobObservation, CIRequiredCheck, LocalReproduction
 
 from powdrr_service.ci_response.evidence import CIFailureUnit, build_failure_units
 
@@ -32,6 +32,9 @@ def render_ci_observation_checkpoint(
     required_check_count: int = 0,
     required_check_source: str | None = None,
     required_check_reason: str | None = None,
+    required_checks: Sequence[CIRequiredCheck] = (),
+    wait_status: str = "not_started",
+    waited_seconds: int = 0,
     failures: Sequence[CIFailureUnit] | None = None,
     reproductions: dict[str, LocalReproduction] | None = None,
     observed_at: str | None = None,
@@ -51,6 +54,9 @@ def render_ci_observation_checkpoint(
         "required_check_count": required_check_count,
         "required_check_source": required_check_source,
         "required_check_reason": required_check_reason,
+        "required_checks": [check.to_dict() for check in required_checks],
+        "wait_status": wait_status,
+        "waited_seconds": waited_seconds,
         "jobs": [job.to_dict() for job in jobs],
         "pull_request_draft": pull_request_draft,
         "reproductions": {
@@ -80,6 +86,21 @@ def render_ci_observation_checkpoint(
         f"{required_check_count} check(s) observed. Response state: "
         f"**{response_state}**.{required_reason}",
     )
+    rows.insert(
+        1,
+        f"Check wait **{_safe_inline(wait_status)}**; "
+        f"{max(0, waited_seconds)} second(s) elapsed.",
+    )
+    rows[1:1] = [
+        f"- Required check `{_safe_inline(check.name)}`: "
+        f"**{_safe_inline(check.state)}**"
+        + (f" (workflow `{_safe_inline(check.workflow)}`)" if check.workflow else "")
+        for check in required_checks[:20]
+    ]
+    if len(required_checks) > 20:
+        rows.append(
+            f"- {len(required_checks) - 20} additional required checks omitted."
+        )
     if len(units) > len(visible_units):
         rows.append(
             f"- {len(units) - len(visible_units)} additional failure units "
@@ -237,6 +258,10 @@ def _render_failure(unit: CIFailureUnit, reproduction: LocalReproduction | None)
         f"evidence `{', '.join(unit.evidence)}`; local reproduction `{repro}`"
         f"{output_fingerprint}{reason}."
     )
+
+
+def _safe_inline(value: str) -> str:
+    return " ".join(value.replace("`", "'").split())[:240]
 
 
 __all__ = ["render_ci_observation_checkpoint"]

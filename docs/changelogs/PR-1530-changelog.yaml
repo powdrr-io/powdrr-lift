@@ -1,0 +1,157 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1530
+title: Capture bounded CI research evidence
+intent:
+  problem: The CI response path can identify a hosted-runner question but cannot retrieve authoritative evidence for later applicability assessment.
+  goal: Search only with a validated public query, capture at most three official GitHub sources, and return integrity-bound excerpts without accepting claims or authorizing a repair.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/plans/procedrr-ci-response-action.md
+    type: modified
+    span: {start_line: 12, end_line: 19}
+    summary: Record bounded CI source retrieval and excerpt capture as the current slice while retaining claim assessment and repair work as open.
+    rationale: Keep plan status explicit about what this research subprocess does and does not complete.
+  - path: packages/service/src/powdrr_service/ci_response/__init__.py
+    type: modified
+    span: {start_line: 24, end_line: 24}
+    summary: Export the official source selection binder.
+    rationale: Expose the service-owned publisher restriction through the CI response API.
+  - path: packages/service/src/powdrr_service/ci_response/__init__.py
+    type: modified
+    span: {start_line: 26, end_line: 26}
+    summary: Export the validated search request preparation function.
+    rationale: Let the CI research subprocess validate and reconstruct safe provider inputs.
+  - path: packages/service/src/powdrr_service/ci_response/__init__.py
+    type: modified
+    span: {start_line: 35, end_line: 35}
+    summary: Add the official source selection binder to public exports.
+    rationale: Keep the package API aligned with its service-owned research policy.
+  - path: packages/service/src/powdrr_service/ci_response/__init__.py
+    type: modified
+    span: {start_line: 42, end_line: 42}
+    summary: Add the validated search request preparation function to public exports.
+    rationale: Provide a stable API for constructing bounded search inputs.
+  - path: packages/service/src/powdrr_service/ci_response/research.py
+    type: modified
+    span: {start_line: 6, end_line: 6}
+    summary: Import mapping support for validating serialized research plans.
+    rationale: Validate query provenance after it crosses a Procedrr boundary.
+  - path: packages/service/src/powdrr_service/ci_response/research.py
+    type: modified
+    span: {start_line: 9, end_line: 9}
+    summary: Import URL parsing for source publisher validation.
+    rationale: Check the exact HTTPS hostname before binding selected search results.
+  - path: packages/service/src/powdrr_service/ci_response/research.py
+    type: modified
+    span: {start_line: 14, end_line: 16}
+    summary: Reuse generic source selection binding after CI publisher checks.
+    rationale: Preserve the exact query and result rank provenance for selected URLs.
+  - path: packages/service/src/powdrr_service/ci_response/research.py
+    type: modified
+    span: {start_line: 24, end_line: 24}
+    summary: Allow only official GitHub documentation and blog hostnames for CI research.
+    rationale: Keep CI source selection within the platform publisher boundary.
+  - path: packages/service/src/powdrr_service/ci_response/research.py
+    type: modified
+    span: {start_line: 128, end_line: 277}
+    summary: Validate the serialized plan, reconstruct its search query, and bind up to three selections only when their HTTPS hosts are official GitHub publishers.
+    rationale: Prevent altered query text, repository details, or nonofficial sources from entering the retrieval path.
+  - path: packages/service/src/powdrr_service/ci_response/research.py
+    type: modified
+    span: {start_line: 287, end_line: 293}
+    summary: Export the CI research query preparation and source selection functions.
+    rationale: Make the bounded research policy available to the service operation adapter.
+  - path: packages/service/src/powdrr_service/external_contract_research.py
+    type: modified
+    span: {start_line: 1140, end_line: 1140}
+    summary: Add an optional allowed-host restriction to source capture.
+    rationale: Reuse the generic capture implementation while supporting CI-specific publisher limits.
+  - path: packages/service/src/powdrr_service/external_contract_research.py
+    type: modified
+    span: {start_line: 1182, end_line: 1182}
+    summary: Reject a requested source whose hostname is outside the allowed publisher list.
+    rationale: Do not fetch unapproved third-party results selected by the research model.
+  - path: packages/service/src/powdrr_service/external_contract_research.py
+    type: modified
+    span: {start_line: 1185, end_line: 1185}
+    summary: Reject redirects that leave the allowed publisher host list.
+    rationale: Keep the captured canonical source within the same authority boundary as its requested URL.
+  - path: packages/service/src/powdrr_service/external_contract_research.py
+    type: modified
+    span: {start_line: 1307, end_line: 1316}
+    summary: Validate exact host membership when source capture supplies an allowed-host list.
+    rationale: Enforce the CI research publisher restriction on both the original and final URL.
+  - path: packages/service/src/powdrr_service/resources/processes/research-ci-response-failure.yaml
+    type: added
+    span: {start_line: 1, end_line: 138}
+    summary: Add a CI research subprocess that validates one bounded query, selects official GitHub sources, captures at most three sources, and extracts bounded excerpts.
+    rationale: Reuse the existing research tools while keeping CI research limited to source retrieval and evidence capture.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 20, end_line: 23}
+    summary: Import the CI research query preparation and official source selection policy.
+    rationale: Register service-owned CI research operations with the existing Procedrr adapter.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 242, end_line: 336}
+    summary: Register typed operations for preparing search inputs, binding official GitHub selections, and capturing at most three sources.
+    rationale: Expose the CI subprocess through the existing command catalog with explicit limits.
+  - path: src/powdrr_lift/workrr/command_catalog.py
+    type: modified
+    span: {start_line: 1250, end_line: 1287}
+    summary: Dispatch the CI research operations and restrict captured source hosts to official GitHub domains.
+    rationale: Keep credentials, artifacts, and retrieval execution in the existing service runtime.
+  - path: tests/test_ci_response_research.py
+    type: modified
+    span: {start_line: 3, end_line: 9}
+    summary: Import test support for source integrity and process execution coverage.
+    rationale: Verify the CI research path through the existing Procedrr evaluator.
+  - path: tests/test_ci_response_research.py
+    type: modified
+    span: {start_line: 12, end_line: 17}
+    summary: Import CI research query preparation and source binding APIs.
+    rationale: Exercise the service-owned validation boundaries directly.
+  - path: tests/test_ci_response_research.py
+    type: modified
+    span: {start_line: 115, end_line: 347}
+    summary: Cover plan tampering, query reconstruction, exact publisher filtering, end-to-end source capture, and hash-bound excerpt extraction.
+    rationale: Prove the research subprocess does not forward altered/private query text or accept third-party sources.
+  - path: tests/test_external_contract_research.py
+    type: modified
+    span: {start_line: 83, end_line: 130}
+    summary: Verify requested hosts are filtered before fetch and redirected hosts are rejected before content is persisted.
+    rationale: Protect the reusable allowed-host restriction added to source capture.
+entities:
+  - id: prepare-ci-research-search
+    type: Function
+    action: added
+  - id: bind-ci-research-source-selections
+    type: Function
+    action: added
+  - id: research-ci-response-failure
+    type: Workflow
+    action: added
+entity_relationships:
+  - source: research-ci-response-failure
+    target: prepare-ci-research-search
+    relationship: invokes
+    description: The subprocess validates and reconstructs the search request before calling the configured search provider.
+  - source: research-ci-response-failure
+    target: bind-ci-research-source-selections
+    relationship: invokes
+    description: The subprocess binds only selected search results published by an allowed GitHub host before source capture.
+invariants:
+  - id: ci-research-publisher-allowlist
+    description: CI source capture accepts only HTTPS sources hosted on docs.github.com or github.blog and rejects redirects to other hosts.
+    action: added
+    rationale: Search selection alone must not authorize third-party evidence.
+  - id: ci-research-capture-bounds
+    description: The CI research subprocess searches with one validated query, captures at most three sources, and extracts only bounded excerpts with content hashes.
+    action: added
+    rationale: Keep the external evidence retrieval small and traceable.
+  - id: ci-research-does-not-authorize-repair
+    description: Captured excerpts are returned as evidence and do not establish accepted claims or authorize a correction.
+    action: added
+    rationale: Source applicability and repair contract decisions remain separate work.
+guidance: []

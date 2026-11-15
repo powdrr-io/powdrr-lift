@@ -17,33 +17,10 @@ steps:
       subject: implementation_result.integration_tests.passed
       equals: true
       on_failure: {terminal: failed}
-  - judge:
-      kind: construct_one
-      question: Which repository validation labels apply to the implementation files?
-      subject: implementation_result.changed_paths
-      prompt_system: Return only the declared JSON object.
-      instructions:
-        - Derive language_labels from the implementation file extensions and include every applicable repository validation category.
-        - Do not reconstruct, shorten, or omit the implementation file list; the workflow passes changed_paths directly to publication.
-      context: [task_context, implementation_result]
-      output:
-        name: publication_scope
-        schema:
-          type: object
-          required: [language_labels]
-          additionalProperties: false
-          properties:
-            language_labels:
-              type: array
-              minItems: 1
-              uniqueItems: true
-              items: {type: string, minLength: 1}
-      validation: {kind: json_schema}
   - call:
       process: finish-pr-prep
       inputs:
         files_to_publish: {type: reference, value: implementation_result.changed_paths}
-        language_labels: {type: reference, value: publication_scope.language_labels}
       outputs:
         validation_results: validation_results
   - judge:
@@ -63,7 +40,7 @@ steps:
         - Set base-branch to main.
         - "Set publication-branch to powdrr/<proposed-pr-id>-implementation, using task_context.proposed_pr_id exactly. When workflow metadata includes a publication ID, Workrr appends it to create a unique branch for this PR; do not invent the ID."
         - Provide a clear commit message and a complete populated PR description. Do not claim any unrun check passed.
-      context: [task_context, implementation_result, publication_scope, validation_results]
+      context: [task_context, implementation_result, validation_results]
       output:
         name: pull_request_request
         schema:

@@ -1531,6 +1531,13 @@ def test_source_question_machine_accounts_for_normative_and_context_blocks() -> 
     assert [item["id"] for item in compiled.plan.planning["evidence"]] == [
         searched_evidence.id
     ]
+    criterion_coverage = compiled.plan.planning["validation_coverage"]
+    assert criterion_coverage
+    assert all(record["validation_ids"] == [] for record in criterion_coverage)
+    assert all(record["obligation_test_ids"] for record in criterion_coverage)
+    assert all(
+        "repository health check" in record["reason"] for record in criterion_coverage
+    )
     assert machine.next_question(answers) is None
     assert searched_requirements == ["req-0001"]
 

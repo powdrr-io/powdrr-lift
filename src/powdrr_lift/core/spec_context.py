@@ -458,7 +458,7 @@ def _item_matches(
 
 
 def _gather_context_report_to_data(report: GatherContextReport) -> dict[str, Any]:
-    return {
+    data = {
         "repo_root": report.repo_root,
         "types": report.types,
         "keywords": report.keywords,
@@ -475,3 +475,6 @@ def _gather_context_report_to_data(report: GatherContextReport) -> dict[str, Any
             for match in report.matches
         ],
     }
+    if "tools" in report.types and "pr-prep" in report.filters.get("labels", []):
+        data["validation_inventory_status"] = "ready" if report.matches else "missing"
+    return data

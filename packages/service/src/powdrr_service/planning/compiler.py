@@ -927,9 +927,12 @@ def _validate_manifest(value: Mapping[str, Any]) -> None:
         raise PlanningCompilationError("validation_coverage must be a list of mappings")
     criterion_keys: set[tuple[str, str]] = set()
     for binding in validation_coverage:
+        coverage_fields = {"item_id", "criterion", "validation_ids", "reason"}
         _exact(
             binding,
-            {"item_id", "criterion", "validation_ids", "reason"},
+            coverage_fields
+            if set(binding) == coverage_fields
+            else coverage_fields | {"obligation_test_ids"},
             "validation_coverage record",
         )
         item_id = binding.get("item_id")
@@ -948,11 +951,25 @@ def _validate_manifest(value: Mapping[str, Any]) -> None:
             )
         criterion_keys.add(key)
         if set(
-            _string_refs(binding.get("validation_ids"), "criterion validations")
+            _string_refs(
+                binding.get("validation_ids"),
+                "criterion validations",
+                allow_empty=True,
+            )
         ) - set(validations):
             raise PlanningCompilationError(
                 "criterion coverage references unknown validation"
             )
+        if "obligation_test_ids" in binding:
+            test_ids = _string_refs(
+                binding.get("obligation_test_ids"),
+                "criterion obligation tests",
+                allow_empty=True,
+            )
+            if len(test_ids) != len(set(test_ids)):
+                raise PlanningCompilationError(
+                    "criterion obligation tests must be unique"
+                )
     block_ids, anchor_ids = set(blocks), set(anchors)
     requirement_ids, evidence_ids = set(requirements), set(evidence)
     unit_ids, validation_ids = set(units), set(validations)

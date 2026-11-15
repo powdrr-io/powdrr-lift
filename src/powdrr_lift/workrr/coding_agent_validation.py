@@ -3,13 +3,19 @@
 from __future__ import annotations
 
 import ast
+import hashlib
+import json
 import os
+import platform
 import re
 import shlex
 import signal
 import subprocess
+import sys
+import tempfile
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
+from datetime import UTC, datetime
 from enum import StrEnum
 from fnmatch import fnmatchcase
 from pathlib import Path
@@ -26,6 +32,8 @@ from powdrr_lift.workrr.source_reference_validation import (
 )
 
 CODING_AGENT_VALIDATION_REPORT_SCHEMA_VERSION = "coding-agent-validation-report-v1"
+VALIDATION_RECEIPT_SCHEMA_VERSION = "coding-agent-validation-receipts-v1"
+_VALIDATION_RECEIPT_LIMIT = 128
 _UNKNOWN_CONDITION_VALUE = object()
 _CONDITION_TOKEN = re.compile(
     r"\s*(?:(?P<operator>&&|\|\||==|!=|!|\(|\))"
@@ -474,6 +482,10 @@ class ValidationResult:
     applicability_status: str | None = None
     applicability_reason: str | None = None
     applicability_context: Mapping[str, Any] | None = None
+    receipt_key: str | None = None
+    receipt_reused: bool = False
+    receipt_created_at: str | None = None
+    receipt_error: str | None = None
 
     def to_data(self) -> dict[str, Any]:
         return {
@@ -496,6 +508,10 @@ class ValidationResult:
                 if self.applicability_context is not None
                 else None
             ),
+            "receipt_key": self.receipt_key,
+            "receipt_reused": self.receipt_reused,
+            "receipt_created_at": self.receipt_created_at,
+            "receipt_error": self.receipt_error,
         }
 
 
@@ -779,9 +795,10 @@ class ValidationRunner:
         # the final bytes after every ordinary verification command has finished.
         context = applicability_context or ValidationApplicabilityContext()
         ordinary_results = tuple(
-            self._run_profile_for_context(
+            self._run_profile_with_receipt(
                 profile,
                 request,
+                attempt,
                 worktree_root,
                 context,
             )
@@ -838,6 +855,91 @@ class ValidationRunner:
             results=results,
             error="no validation profiles produced results" if not results else None,
             profile_contexts=tuple(profile.to_data() for profile in profiles),
+        )
+
+    def _run_profile_with_receipt(
+        self,
+        profile: ValidationProfile,
+        request: ImplementationRequest,
+        attempt: CodingAgentAttempt,
+        worktree_root: Path,
+        context: ValidationApplicabilityContext,
+    ) -> ValidationResult:
+        applicable, _reason = evaluate_validation_applicability(profile, context)
+        receipt_key, receipt_error = _validation_receipt_key(
+            profile,
+            request,
+            attempt,
+            worktree_root,
+            context,
+            environment_overrides=self.environment_overrides,
+            has_command_wrapper=self.command_wrapper is not None,
+        )
+        if applicable is ValidationApplicabilityStatus.APPLICABLE and receipt_key:
+            receipt = _load_validation_receipt(worktree_root, receipt_key)
+            if receipt is not None:
+                result_data = receipt.get("result")
+                created_at = receipt.get("created_at")
+                if isinstance(result_data, Mapping) and isinstance(created_at, str):
+                    try:
+                        result = _validation_result_from_data(result_data)
+                    except (KeyError, TypeError, ValueError):
+                        result = None
+                    if (
+                        result is not None
+                        and result.status is ValidationResultStatus.PASSED
+                        and result.command == profile.command
+                    ):
+                        return replace(
+                            result,
+                            receipt_key=receipt_key,
+                            receipt_reused=True,
+                            receipt_created_at=created_at,
+                            receipt_error=None,
+                        )
+
+        result = self._run_profile_for_context(profile, request, worktree_root, context)
+        if receipt_error is not None:
+            return replace(result, receipt_error=receipt_error)
+        if not receipt_key or result.status is not ValidationResultStatus.PASSED:
+            return replace(result, receipt_key=receipt_key)
+        current_key, current_error = _validation_receipt_key(
+            profile,
+            request,
+            attempt,
+            worktree_root,
+            context,
+            environment_overrides=self.environment_overrides,
+            has_command_wrapper=self.command_wrapper is not None,
+        )
+        if current_error is not None or current_key != receipt_key:
+            return replace(
+                result,
+                receipt_key=receipt_key,
+                receipt_error=(
+                    current_error
+                    or "candidate inputs changed while validation was running"
+                ),
+            )
+        created_at = datetime.now(UTC).isoformat()
+        try:
+            _store_validation_receipt(
+                worktree_root,
+                receipt_key,
+                created_at=created_at,
+                result=result,
+            )
+        except OSError as error:
+            return replace(
+                result,
+                receipt_key=receipt_key,
+                receipt_error=f"could not persist validation receipt: {error}",
+            )
+        return replace(
+            result,
+            receipt_key=receipt_key,
+            receipt_reused=False,
+            receipt_created_at=created_at,
         )
 
     def _profile_contexts(self, names: Sequence[str]) -> tuple[Mapping[str, Any], ...]:
@@ -1130,6 +1232,22 @@ def validation_report_from_data(data: Mapping[str, Any]) -> ValidationReport:
                 if isinstance(item.get("applicability_context"), Mapping)
                 else None
             ),
+            receipt_key=(
+                item.get("receipt_key")
+                if isinstance(item.get("receipt_key"), str)
+                else None
+            ),
+            receipt_reused=item.get("receipt_reused") is True,
+            receipt_created_at=(
+                item.get("receipt_created_at")
+                if isinstance(item.get("receipt_created_at"), str)
+                else None
+            ),
+            receipt_error=(
+                item.get("receipt_error")
+                if isinstance(item.get("receipt_error"), str)
+                else None
+            ),
         )
         for item in data.get("results", [])
     )
@@ -1145,6 +1263,229 @@ def validation_report_from_data(data: Mapping[str, Any]) -> ValidationReport:
             if isinstance(item, Mapping)
         ),
         schema_version=str(data["schema_version"]),
+    )
+
+
+def _validation_receipt_key(
+    profile: ValidationProfile,
+    request: ImplementationRequest,
+    attempt: CodingAgentAttempt,
+    worktree_root: Path,
+    context: ValidationApplicabilityContext,
+    *,
+    environment_overrides: Mapping[str, str],
+    has_command_wrapper: bool,
+) -> tuple[str | None, str | None]:
+    environment_id = profile.environment_id
+    if (
+        not isinstance(environment_id, str)
+        or not environment_id.strip()
+        or (environment_id.strip().lower() in {"unknown", "unavailable", "pending"})
+    ):
+        return None, "validation environment identity is unknown"
+    if environment_overrides or has_command_wrapper:
+        return None, "runtime command environment cannot be fingerprinted safely"
+    root = worktree_root.resolve()
+    candidate_paths = sorted(
+        set(attempt.changed_paths) | set(context.changed_paths or ())
+    )
+    if not candidate_paths:
+        return None, "candidate file identity is unavailable"
+    candidate_files, error = _validation_file_fingerprints(root, candidate_paths)
+    if error is not None:
+        return None, error
+    verifier_paths = set(profile.config_files) | set(profile.evidence)
+    verifier_paths.update(
+        selector.split("::", 1)[0]
+        for selector in profile.selectors
+        if selector.split("::", 1)[0]
+    )
+    relative_cwd = Path(profile.cwd)
+    for argument in profile.command:
+        candidate = Path(argument.split("::", 1)[0])
+        if candidate.is_absolute() or ".." in candidate.parts:
+            continue
+        relative = relative_cwd / candidate
+        try:
+            resolved = (root / relative).resolve()
+        except OSError:
+            continue
+        if resolved.is_file() and resolved.is_relative_to(root):
+            verifier_paths.add(relative.as_posix())
+    verifier_files, error = _validation_file_fingerprints(root, sorted(verifier_paths))
+    if error is not None:
+        return None, error
+    contract = {
+        "objective": request.objective,
+        "prompt": request.prompt,
+        "base_commit": request.base_commit,
+        "plan_fingerprint": request.plan_fingerprint,
+        "allowed_paths": request.allowed_paths,
+        "acceptance_criteria": request.acceptance_criteria,
+        "validation_profiles": request.validation_profiles,
+        "validation_profile_contexts": request.validation_profile_contexts,
+        "source_reference_mode": request.source_reference_mode,
+    }
+    inputs = {
+        "candidate_files": candidate_files,
+        "verifier_files": verifier_files,
+        "profile": profile.to_data(),
+        "contract": contract,
+        "applicability_context": context.to_data(),
+        "environment": {
+            "id": environment_id,
+            "platform": platform.platform(),
+            "python": sys.version,
+        },
+    }
+    try:
+        encoded = json.dumps(inputs, sort_keys=True, separators=(",", ":"))
+    except (TypeError, ValueError) as error:
+        return None, f"validation inputs could not be fingerprinted: {error}"
+    return hashlib.sha256(encoded.encode("utf-8")).hexdigest(), None
+
+
+def _validation_file_fingerprints(
+    root: Path, paths: Sequence[str]
+) -> tuple[list[dict[str, str]], str | None]:
+    records: list[dict[str, str]] = []
+    for raw_path in sorted(set(paths)):
+        candidate = Path(raw_path)
+        if candidate.is_absolute() or ".." in candidate.parts:
+            return [], f"validation input path is not repository-relative: {raw_path}"
+        target = (root / candidate).resolve()
+        if not target.is_relative_to(root):
+            return [], f"validation input path escapes candidate worktree: {raw_path}"
+        if not target.is_file():
+            records.append({"path": candidate.as_posix(), "sha256": "missing"})
+            continue
+        digest = hashlib.sha256()
+        try:
+            with target.open("rb") as stream:
+                for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                    digest.update(chunk)
+        except OSError as error:
+            return [], f"could not fingerprint validation input {raw_path}: {error}"
+        records.append({"path": candidate.as_posix(), "sha256": digest.hexdigest()})
+    return records, None
+
+
+def _validation_receipt_path(worktree_root: Path) -> Path:
+    return worktree_root / ".powdrr" / "validation-receipts.json"
+
+
+def _load_validation_receipt(
+    worktree_root: Path, receipt_key: str
+) -> Mapping[str, Any] | None:
+    try:
+        document = json.loads(_validation_receipt_path(worktree_root).read_text())
+    except (OSError, json.JSONDecodeError):
+        return None
+    if (
+        not isinstance(document, Mapping)
+        or document.get("schema") != VALIDATION_RECEIPT_SCHEMA_VERSION
+        or not isinstance(document.get("receipts"), Mapping)
+    ):
+        return None
+    receipt = document["receipts"].get(receipt_key)
+    return receipt if isinstance(receipt, Mapping) else None
+
+
+def _store_validation_receipt(
+    worktree_root: Path,
+    receipt_key: str,
+    *,
+    created_at: str,
+    result: ValidationResult,
+) -> None:
+    path = _validation_receipt_path(worktree_root)
+    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    receipts: dict[str, Any] = {}
+    try:
+        current = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        current = None
+    if (
+        isinstance(current, Mapping)
+        and current.get("schema") == VALIDATION_RECEIPT_SCHEMA_VERSION
+        and isinstance(current.get("receipts"), Mapping)
+    ):
+        receipts.update(
+            (str(key), value)
+            for key, value in current["receipts"].items()
+            if isinstance(value, Mapping)
+        )
+    receipts.pop(receipt_key, None)
+    receipts[receipt_key] = {
+        "created_at": created_at,
+        "result": replace(
+            result,
+            receipt_key=receipt_key,
+            receipt_reused=False,
+            receipt_created_at=created_at,
+            receipt_error=None,
+        ).to_data(),
+    }
+    receipts = dict(list(receipts.items())[-_VALIDATION_RECEIPT_LIMIT:])
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=".validation-receipts-", suffix=".tmp", dir=path.parent
+    )
+    temporary = Path(temporary_name)
+    try:
+        os.fchmod(descriptor, 0o600)
+        with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+            json.dump(
+                {"schema": VALIDATION_RECEIPT_SCHEMA_VERSION, "receipts": receipts},
+                stream,
+                ensure_ascii=False,
+                indent=2,
+                sort_keys=True,
+            )
+            stream.write("\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def _validation_result_from_data(data: Mapping[str, Any]) -> ValidationResult:
+    return ValidationResult(
+        profile=str(data["profile"]),
+        command=tuple(data.get("command", [])),
+        status=ValidationResultStatus(str(data["status"])),
+        returncode=data.get("returncode"),
+        stdout=str(data.get("stdout", "")),
+        stderr=str(data.get("stderr", "")),
+        error=data.get("error"),
+        test_id=data.get("test_id"),
+        expected=data.get("expected"),
+        actual=data.get("actual"),
+        source_location=data.get("source_location"),
+        evidence_path=data.get("evidence_path"),
+        applicability_status=data.get("applicability_status"),
+        applicability_reason=data.get("applicability_reason"),
+        applicability_context=(
+            dict(data["applicability_context"])
+            if isinstance(data.get("applicability_context"), Mapping)
+            else None
+        ),
+        receipt_key=(
+            data.get("receipt_key")
+            if isinstance(data.get("receipt_key"), str)
+            else None
+        ),
+        receipt_reused=data.get("receipt_reused") is True,
+        receipt_created_at=(
+            data.get("receipt_created_at")
+            if isinstance(data.get("receipt_created_at"), str)
+            else None
+        ),
+        receipt_error=(
+            data.get("receipt_error")
+            if isinstance(data.get("receipt_error"), str)
+            else None
+        ),
     )
 
 

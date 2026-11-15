@@ -2575,12 +2575,13 @@
         "powdrr_service.intent_packet",
         "powdrr_agent.execution.minisweagent_monitor",
         "powdrr_agent.execution.opencode_monitor",
+        "powdrr_contracts.ci",
         "powdrr_lift.workrr.coding_agent_validation"
       ],
       "kind": "python_module",
       "owner": "agent",
       "path": "src/powdrr_lift/workrr/coding_agent.py",
-      "rationale": "local MiniSWE process, session, and execution monitoring",
+      "rationale": "generic coding worker enforcement, including contract-bound CI repair paths and protected artifacts",
       "reviewed": false
     },
     {
@@ -4006,11 +4007,13 @@
     },
     {
       "extraction_pr": "1381",
-      "internal_imports": [],
+      "internal_imports": [
+        "powdrr_contracts.ci"
+      ],
       "kind": "python_module",
       "owner": "agent",
       "path": "src/powdrr_lift/workrr/coding_agent.py",
-      "rationale": "generic coding worker enforcement for explicitly protected paths",
+      "rationale": "generic coding worker enforces contract-bound CI repair paths and protected artifact hashes",
       "reviewed": false
     },
     {

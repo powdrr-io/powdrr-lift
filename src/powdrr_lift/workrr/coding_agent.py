@@ -18,6 +18,7 @@ import tempfile
 from collections.abc import Callable, Mapping, Sequence
 from contextlib import ExitStack
 from dataclasses import dataclass, field, replace
+from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol, cast
@@ -32,6 +33,7 @@ from powdrr_agent.execution.minisweagent_monitor import (
     run_minisweagent,
 )
 from powdrr_agent.execution.opencode_monitor import run_opencode
+from powdrr_contracts.ci import RepairContract
 from powdrr_contracts.models import ChatCompletionRequest, ChatCompletionResponse
 from powdrr_local.structrr_context import StructrrContextBridge
 from powdrr_service.behavior_contract import BehaviorScenario
@@ -48,6 +50,7 @@ from powdrr_lift.core.execution_plan import ExecutionPlan, ExecutionUnit
 from powdrr_lift.core.implementation_packet import ImplementationPacket
 
 CODING_AGENT_REQUEST_SCHEMA_VERSION = "implementation-request-v3"
+REPAIR_CODING_AGENT_REQUEST_SCHEMA_VERSION = "implementation-request-v4"
 CODING_AGENT_ATTEMPT_SCHEMA_VERSION = "implementation-attempt-v2"
 MAX_SUPPORTING_EDIT_LINES_PER_FILE = 20
 GitRunner = Callable[..., subprocess.CompletedProcess[Any]]
@@ -130,6 +133,7 @@ class ImplementationRequest:
     correction_context: Mapping[str, Any] | None = None
     source_reference_mode: str = "off"
     source_reference_prompt: SourceReferencePrompt | None = None
+    repair_contract: RepairContract | None = None
     schema_version: str = CODING_AGENT_REQUEST_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
@@ -137,6 +141,7 @@ class ImplementationRequest:
             "implementation-request-v1",
             "implementation-request-v2",
             CODING_AGENT_REQUEST_SCHEMA_VERSION,
+            REPAIR_CODING_AGENT_REQUEST_SCHEMA_VERSION,
         }:
             raise ValueError("unsupported implementation request schema")
         if self.source_reference_mode not in {"off", "observe", "enforce"}:
@@ -148,11 +153,34 @@ class ImplementationRequest:
             ):
                 raise ValueError("correction context must be a non-empty object")
             json.dumps(dict(self.correction_context), allow_nan=False)
+        if self.schema_version == REPAIR_CODING_AGENT_REQUEST_SCHEMA_VERSION:
+            if self.repair_contract is None:
+                raise ValueError("v4 implementation requests require a repair contract")
+            contract = RepairContract.from_dict(self.repair_contract.to_dict())
+            protected = {item.path for item in contract.protected_artifacts}
+            if (
+                self.base_commit != contract.head_sha
+                or self.allowed_paths != contract.allowed_paths
+                or not protected.issubset(self.protected_paths)
+                or not set(contract.required_behavior).issubset(
+                    self.acceptance_criteria
+                )
+            ):
+                raise ValueError("request differs from its CI repair contract")
+            if self.source_reference_prompt is not None:
+                raise ValueError(
+                    "CI repair contracts cannot bypass their protected run boundary"
+                )
+        elif self.repair_contract is not None:
+            raise ValueError("repair contracts require implementation request v4")
         if self.source_reference_prompt is None:
             if self.source_reference_mode != "off":
                 raise ValueError("enabled source references require a compiled prompt")
             return
-        if self.schema_version != CODING_AGENT_REQUEST_SCHEMA_VERSION:
+        if self.schema_version not in {
+            CODING_AGENT_REQUEST_SCHEMA_VERSION,
+            REPAIR_CODING_AGENT_REQUEST_SCHEMA_VERSION,
+        }:
             raise ValueError(
                 "legacy requests cannot carry source reference obligations"
             )
@@ -197,6 +225,33 @@ class ImplementationRequest:
             context_refs=(f"source-reference-contract:{data['contract_fingerprint']}",),
             source_reference_mode="enforce",
             source_reference_prompt=prompt,
+        )
+
+    @classmethod
+    def from_repair_contract(
+        cls,
+        contract: RepairContract,
+        *,
+        request_id: str,
+        objective: str,
+        prompt: str,
+        validation_profiles: tuple[str, ...] = (),
+    ) -> ImplementationRequest:
+        """Bind one validated CI repair contract to the generic coding worker."""
+        validated = RepairContract.from_dict(contract.to_dict())
+        return cls(
+            request_id=request_id,
+            objective=objective,
+            prompt=prompt,
+            base_commit=validated.head_sha,
+            plan_fingerprint=validated.content_sha256,
+            allowed_paths=validated.allowed_paths,
+            acceptance_criteria=validated.required_behavior,
+            validation_profiles=validation_profiles,
+            allowed_command_argv=validated.verification_commands,
+            protected_paths=tuple(item.path for item in validated.protected_artifacts),
+            repair_contract=validated,
+            schema_version=REPAIR_CODING_AGENT_REQUEST_SCHEMA_VERSION,
         )
 
     def require_supported_execution(
@@ -262,7 +317,11 @@ class ImplementationRequest:
                     if self.source_reference_prompt is not None
                     else None,
                 }
-                if self.schema_version == CODING_AGENT_REQUEST_SCHEMA_VERSION
+                if self.schema_version
+                in {
+                    CODING_AGENT_REQUEST_SCHEMA_VERSION,
+                    REPAIR_CODING_AGENT_REQUEST_SCHEMA_VERSION,
+                }
                 else {}
             ),
             "schema_version": self.schema_version,
@@ -286,6 +345,15 @@ class ImplementationRequest:
             "planned_additions": [dict(item) for item in self.planned_additions],
             "planned_deletions": [dict(item) for item in self.planned_deletions],
             "protected_paths": list(self.protected_paths),
+            **(
+                {
+                    "repair_contract": self.repair_contract.to_dict()
+                    if self.repair_contract is not None
+                    else None
+                }
+                if self.schema_version == REPAIR_CODING_AGENT_REQUEST_SCHEMA_VERSION
+                else {}
+            ),
             "allow_existing_changes": self.allow_existing_changes,
             "correction_context": (
                 dict(self.correction_context)
@@ -307,21 +375,35 @@ class ImplementationRequest:
 
     @property
     def worker_prompt(self) -> str:
-        if self.correction_context is None:
-            return self.prompt
-        return (
-            self.prompt
-            + "\n\nRequired correction from the previous immutable attempt:\n"
-            + json.dumps(
-                dict(self.correction_context),
-                indent=2,
-                sort_keys=True,
-                ensure_ascii=False,
+        prompt = self.prompt
+        if self.correction_context is not None:
+            prompt += (
+                "\n\nRequired correction from the previous immutable attempt:\n"
+                + json.dumps(
+                    dict(self.correction_context),
+                    indent=2,
+                    sort_keys=True,
+                    ensure_ascii=False,
+                )
+                + "\n\nPreserve the accepted design, independent tests, "
+                "protected verifier "
+                "boundary, and original base. Correct only the reported failure within "
+                "the reviewed candidate scope."
             )
-            + "\n\nPreserve the accepted design, independent tests, protected verifier "
-            "boundary, and original base. Correct only the reported failure within "
-            "the reviewed candidate scope."
-        )
+        if self.repair_contract is not None:
+            contract = self.repair_contract
+            prompt += (
+                "\n\nCI correction contract (enforced by the worker boundary):\n"
+                f"- Contract ID: {contract.contract_id}\n"
+                f"- Exact editable paths: {', '.join(contract.allowed_paths)}\n"
+                f"- Protected artifacts: "
+                f"{', '.join(item.path for item in contract.protected_artifacts)}\n"
+                f"- Required behavior: {'; '.join(contract.required_behavior)}\n"
+                f"- Stop conditions: {'; '.join(contract.stop_conditions)}\n"
+                "Do not edit protected artifacts or change behavior outside "
+                "this contract."
+            )
+        return prompt
 
     def repair_prompt(self, issue: Mapping[str, Any]) -> str:
         """Render a finding-specific prompt without replaying the full packet.
@@ -373,14 +455,34 @@ class ImplementationRequest:
     @classmethod
     def from_data(cls, data: Mapping[str, Any]) -> ImplementationRequest:
         version = data["schema_version"]
-        if version != CODING_AGENT_REQUEST_SCHEMA_VERSION and any(
-            key in data for key in ("source_reference_mode", "source_reference_prompt")
+        if version not in {
+            CODING_AGENT_REQUEST_SCHEMA_VERSION,
+            REPAIR_CODING_AGENT_REQUEST_SCHEMA_VERSION,
+        } and any(
+            key in data
+            for key in (
+                "source_reference_mode",
+                "source_reference_prompt",
+                "repair_contract",
+            )
         ):
             raise ValueError("legacy request cannot declare source reference fields")
-        if version == CODING_AGENT_REQUEST_SCHEMA_VERSION and not all(
+        if version in {
+            CODING_AGENT_REQUEST_SCHEMA_VERSION,
+            REPAIR_CODING_AGENT_REQUEST_SCHEMA_VERSION,
+        } and not all(
             key in data for key in ("source_reference_mode", "source_reference_prompt")
         ):
-            raise ValueError("v3 request requires explicit source reference fields")
+            raise ValueError("v3+ request requires explicit source reference fields")
+        if version == REPAIR_CODING_AGENT_REQUEST_SCHEMA_VERSION and not isinstance(
+            data.get("repair_contract"), Mapping
+        ):
+            raise ValueError("v4 request requires a serialized repair contract")
+        if (
+            version != REPAIR_CODING_AGENT_REQUEST_SCHEMA_VERSION
+            and "repair_contract" in data
+        ):
+            raise ValueError("repair contract field requires implementation request v4")
         return cls(
             source_reference_mode=data.get("source_reference_mode", "off"),
             source_reference_prompt=(
@@ -412,6 +514,11 @@ class ImplementationRequest:
                 cast(list[Mapping[str, Any]], data.get("planned_deletions", []))
             ),
             protected_paths=tuple(cast(list[str], data.get("protected_paths", []))),
+            repair_contract=(
+                RepairContract.from_dict(data["repair_contract"])
+                if isinstance(data.get("repair_contract"), Mapping)
+                else None
+            ),
             allow_existing_changes=bool(data.get("allow_existing_changes", False)),
             correction_context=(
                 dict(correction_context)
@@ -977,19 +1084,27 @@ class OpenCodeProvider:
         if self.session_id is not None:
             command.extend(("--session", self.session_id))
         command.append(request.worker_prompt)
-        completed = run_opencode(
-            command,
-            log_path=(
-                self.diagnostics_root / f"{attempt_id}.ndjson"
-                if self.diagnostics_root is not None
-                else None
-            ),
-            cwd=worktree_root,
-            env=environment,
-            inactivity_timeout=self.timeout_seconds,
-            absolute_timeout=self.absolute_timeout_seconds,
-            max_events=self.max_events,
+        denied_paths = _repair_contract_protected_paths(request, worktree_root)
+        sandboxed_command, sandbox_profile = _write_denied_command(
+            command, denied_paths
         )
+        try:
+            completed = run_opencode(
+                sandboxed_command,
+                log_path=(
+                    self.diagnostics_root / f"{attempt_id}.ndjson"
+                    if self.diagnostics_root is not None
+                    else None
+                ),
+                cwd=worktree_root,
+                env=environment,
+                inactivity_timeout=self.timeout_seconds,
+                absolute_timeout=self.absolute_timeout_seconds,
+                max_events=self.max_events,
+            )
+        finally:
+            if sandbox_profile is not None:
+                sandbox_profile.unlink(missing_ok=True)
         session_id = _extract_opencode_session_id(_json_events(completed.stdout))
         if session_id is not None:
             self.session_id = session_id
@@ -1195,7 +1310,12 @@ class MiniSWEAgentProvider:
             last_reported_at = snapshot.elapsed_seconds
 
         sandbox_profile: Path | None = None
-        if self.write_denied_paths and execution is None:
+        sandbox_write_denied_paths = self.write_denied_paths + (
+            _repair_contract_protected_paths(request, workspace_root)
+            if execution is None
+            else ()
+        )
+        if sandbox_write_denied_paths and execution is None:
             if sys.platform != "darwin":
                 raise RuntimeError(
                     "MiniSWE write protection is supported only on macOS; "
@@ -1215,7 +1335,7 @@ class MiniSWEAgentProvider:
                 delete=False,
             ) as profile_stream:
                 profile_stream.write(
-                    _seatbelt_write_deny_profile(self.write_denied_paths)
+                    _seatbelt_write_deny_profile(sandbox_write_denied_paths)
                 )
                 sandbox_profile = Path(profile_stream.name)
             command = [sandbox_executable, "-f", str(sandbox_profile), *command]
@@ -1309,6 +1429,44 @@ def _seatbelt_write_deny_profile(paths: Sequence[Path]) -> str:
         f"(deny file-write* (subpath {json.dumps(path)}))" for path in denied_paths
     )
     return "\n".join(rules) + "\n"
+
+
+def _repair_contract_protected_paths(
+    request: ImplementationRequest, worktree_root: Path
+) -> tuple[Path, ...]:
+    if request.repair_contract is None:
+        return ()
+    root = worktree_root.resolve()
+    return tuple(
+        root.joinpath(*artifact.path.split("/"))
+        for artifact in request.repair_contract.protected_artifacts
+    )
+
+
+def _write_denied_command(
+    command: Sequence[str], denied_paths: Sequence[Path]
+) -> tuple[list[str], Path | None]:
+    if not denied_paths:
+        return list(command), None
+    if sys.platform != "darwin":
+        raise RuntimeError(
+            "CI repair contracts require macOS write protection for protected artifacts"
+        )
+    sandbox_executable = "/usr/bin/sandbox-exec"
+    if not Path(sandbox_executable).is_file():
+        raise RuntimeError(
+            "macOS sandbox-exec is unavailable; refusing to run a CI repair"
+        )
+    with tempfile.NamedTemporaryFile(
+        mode="w",
+        encoding="utf-8",
+        prefix="powdrr-repair-sandbox-",
+        suffix=".sb",
+        delete=False,
+    ) as profile_stream:
+        profile_stream.write(_seatbelt_write_deny_profile(denied_paths))
+        profile_path = Path(profile_stream.name)
+    return [sandbox_executable, "-f", str(profile_path), *command], profile_path
 
 
 _PROVIDER_ENVIRONMENT_NAMES = frozenset(
@@ -1642,6 +1800,16 @@ def run_coding_agent(
                 f"base commit: base {request.base_commit}, found {before_head}"
             ),
         )
+    protected_baseline_error = _repair_contract_integrity_error(worktree_root, request)
+    if protected_baseline_error is not None:
+        return CodingAgentAttempt(
+            attempt_id,
+            request.request_id,
+            provider.provider_name,
+            CodingAgentStatus.POLICY_DENIED,
+            None,
+            error=protected_baseline_error,
+        )
     before_status = _working_paths(worktree_root)
     before_snapshot = _working_tree_snapshot(worktree_root, before_status)
     if before_status and not request.allow_existing_changes:
@@ -1658,6 +1826,16 @@ def run_coding_agent(
             request, worktree_root=worktree_root, attempt_id=attempt_id
         )
     except OSError as error:
+        protected_error = _repair_contract_integrity_error(worktree_root, request)
+        if protected_error is not None:
+            return CodingAgentAttempt(
+                attempt_id,
+                request.request_id,
+                provider.provider_name,
+                CodingAgentStatus.POLICY_DENIED,
+                None,
+                error=protected_error,
+            )
         return CodingAgentAttempt(
             attempt_id=attempt_id,
             request_id=request.request_id,
@@ -1665,6 +1843,17 @@ def run_coding_agent(
             status=CodingAgentStatus.FAILED,
             exit_code=None,
             error=f"could not start coding-agent provider: {error}",
+        )
+    except RuntimeError as error:
+        if request.repair_contract is None:
+            raise
+        return CodingAgentAttempt(
+            attempt_id,
+            request.request_id,
+            provider.provider_name,
+            CodingAgentStatus.POLICY_DENIED,
+            None,
+            error=f"CI repair worker boundary is unavailable: {error}",
         )
     _remove_ephemeral_paths(worktree_root, request, before_status)
     after_head = _git_output(worktree_root, "rev-parse", "HEAD")
@@ -1694,6 +1883,7 @@ def run_coding_agent(
         for path in changed_paths
         if _path_is_allowed(path, request.protected_paths)
     )
+    protected_integrity_error = _repair_contract_integrity_error(worktree_root, request)
     supporting_edits = permitted_supporting_edit_paths(
         worktree_root, before_head, out_of_scope, request.protected_paths
     )
@@ -1704,13 +1894,18 @@ def run_coding_agent(
     head_rewritten = before_head != after_head and not _git_is_ancestor(
         worktree_root, before_head, after_head
     )
-    if head_rewritten or denied_out_of_scope or protected_changes:
+    if (
+        head_rewritten
+        or denied_out_of_scope
+        or protected_changes
+        or protected_integrity_error is not None
+    ):
         status = CodingAgentStatus.POLICY_DENIED
         terminal_error = (
             "worker rewrote HEAD instead of adding commits"
             if head_rewritten
             else "worker changed protected paths"
-            if protected_changes
+            if protected_changes or protected_integrity_error is not None
             else "worker changed paths outside the implementation request"
         )
     elif completed.returncode == 124:
@@ -1822,6 +2017,30 @@ def _working_tree_snapshot(
         else:
             snapshot[relative_path] = None
     return snapshot
+
+
+def _repair_contract_integrity_error(
+    worktree_root: Path, request: ImplementationRequest
+) -> str | None:
+    contract = request.repair_contract
+    if contract is None:
+        return None
+    expiry = datetime.fromisoformat(contract.expires_at.replace("Z", "+00:00"))
+    if expiry <= datetime.now(UTC):
+        return "CI repair contract has expired"
+    root = worktree_root.resolve()
+    for artifact in contract.protected_artifacts:
+        path = root
+        for part in artifact.path.split("/"):
+            path = path / part
+            if path.is_symlink():
+                return f"protected artifact became a symlink: {artifact.path}"
+        if not path.is_file():
+            return f"protected artifact is missing: {artifact.path}"
+        actual = hashlib.sha256(path.read_bytes()).hexdigest()
+        if actual != artifact.sha256:
+            return f"protected artifact hash changed: {artifact.path}"
+    return None
 
 
 def _path_is_allowed(path: str, allowed_paths: Sequence[str]) -> bool:
@@ -1987,6 +2206,7 @@ def _find_session_id(value: Any) -> str | None:
 __all__ = [
     "CODING_AGENT_ATTEMPT_SCHEMA_VERSION",
     "CODING_AGENT_REQUEST_SCHEMA_VERSION",
+    "REPAIR_CODING_AGENT_REQUEST_SCHEMA_VERSION",
     "CodingAgentAttempt",
     "CodingAgentAttemptStore",
     "CodingAgentProvider",

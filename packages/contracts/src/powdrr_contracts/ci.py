@@ -799,9 +799,13 @@ class RepairContract:
         _validate_unique_paths(self.allowed_paths, "repair_contract.allowed_paths")
         protected_paths = [artifact.path for artifact in self.protected_artifacts]
         _validate_unique_paths(protected_paths, "repair_contract.protected_artifacts")
-        if set(self.allowed_paths) & set(protected_paths):
+        if any(
+            _repository_paths_overlap(allowed, protected)
+            for allowed in self.allowed_paths
+            for protected in protected_paths
+        ):
             raise ContractError(
-                "repair_contract cannot allow edits to protected artifacts"
+                "repair_contract allowed paths overlap protected artifacts"
             )
         _validate_text_items(
             self.required_behavior, "repair_contract.required_behavior", 20
@@ -1032,6 +1036,16 @@ def _validate_unique_paths(paths: list[str] | tuple[str, ...], name: str) -> Non
         raise ContractError(f"{name} must not contain duplicate paths")
     for path in paths:
         _validate_repository_path(path, name)
+
+
+def _repository_paths_overlap(left: str, right: str) -> bool:
+    return (
+        left == right
+        or left == "."
+        or right == "."
+        or left.startswith(right + "/")
+        or right.startswith(left + "/")
+    )
 
 
 def _validate_text_items(items: tuple[str, ...], name: str, maximum: int) -> None:

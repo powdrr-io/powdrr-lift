@@ -7,6 +7,10 @@ from typing import Any
 
 from powdrr_service.structrr.actions import normalize_action
 from powdrr_service.structrr.design import DesiredState, project_sections
+from powdrr_service.structrr.execution_preparation import (
+    compile_execution_preparation,
+    parse_command_spec,
+)
 from powdrr_service.structrr.reference_catalog import (
     compile_reference_catalog,
     resolve_reference,
@@ -52,6 +56,8 @@ def compile_source_reference_design(
     base_commit: str,
     objective: str,
     allowed_paths: tuple[str, ...],
+    verification_command: str = "python -m pytest",
+    dependency_preconditions: tuple[Mapping[str, Any], ...] = (),
 ) -> dict[str, Any]:
     """Materialize accepted obligations from the item's pinned baseline and diff.
 
@@ -178,6 +184,14 @@ def compile_source_reference_design(
         final_catalog,
         objective=objective,
         allowed_paths=allowed_paths,
+    )
+    result["preparation"] = compile_execution_preparation(
+        result["design"],
+        planning_base_commit=base_commit,
+        objective=objective,
+        allowed_paths=allowed_paths,
+        verification_commands=(parse_command_spec(verification_command),),
+        dependency_preconditions=dependency_preconditions,
     )
     return result
 

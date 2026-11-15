@@ -27,6 +27,10 @@ from powdrr_service.planning.plan_document import (
 from powdrr_service.planning.source_reference_design import (
     compile_source_reference_design,
 )
+from powdrr_service.structrr.execution_preparation import (
+    parse_command_spec,
+    validate_execution_preparation,
+)
 from powdrr_service.structrr.reference_catalog import compile_reference_catalog
 from powdrr_service.structrr.reference_definitions import ReferenceDefinition
 from powdrr_service.structrr.snapshot import snapshot_digest
@@ -124,6 +128,32 @@ def test_source_design_binds_accepted_test_cases_to_plan_and_item() -> None:
         "clause:positive"
     ]
     assert design["design"]["source_reference_placements"] == []
+    preparation = design["preparation"]
+    assert preparation["planning_base_commit"] == "a" * 40
+    assert preparation["scope_policy"]["allowed_paths"] == ["src"]
+    assert preparation["required_evidence_routes"]["behavior_scenarios"] == [
+        "scenario:positive"
+    ]
+    assert (
+        validate_execution_preparation(
+            preparation,
+            design["design"],
+            planning_base_commit="a" * 40,
+            objective="Implement accepted behavior.",
+            allowed_paths=("src",),
+            verification_commands=(parse_command_spec("python -m pytest"),),
+        )
+        == preparation
+    )
+    with pytest.raises(ValueError, match="amendment is required"):
+        validate_execution_preparation(
+            preparation,
+            design["design"],
+            planning_base_commit="a" * 40,
+            objective="A different objective.",
+            allowed_paths=("src",),
+            verification_commands=(parse_command_spec("python -m pytest"),),
+        )
 
 
 def test_source_design_blocks_prose_only_cases_pending_replanning() -> None:

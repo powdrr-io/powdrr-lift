@@ -21,4 +21,16 @@ steps:
         verification_command: {type: reference, value: verification_command}
       returns: {type: object, additionalProperties: true}
       bind: ci_observation_result
-  - terminal: succeeded
+  - branch:
+      subject: ci_observation_result.response_state
+      cases:
+        awaiting_review:
+          - terminal: succeeded
+        awaiting_ci:
+          - terminal: succeeded
+        failed:
+          - terminal: succeeded
+        blocked:
+          - terminal: succeeded
+      default:
+        - terminal: blocked

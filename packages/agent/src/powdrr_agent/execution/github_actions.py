@@ -27,6 +27,8 @@ class GitHubActionsSnapshot:
     annotations_by_check_run: Mapping[str, tuple[Mapping[str, Any], ...]]
     changed_paths: tuple[str, ...] = ()
     observed_at: str | None = None
+    required_checks: tuple[Mapping[str, Any], ...] | None = None
+    required_checks_reason: str | None = None
 
 
 class RemoteCheckObservationStatus(StrEnum):
@@ -217,6 +219,14 @@ class GitHubActionsClient:
         pr = self._object(
             f"repos/{self.repository}/pulls/{pull_request_number}", "pull request"
         )
+        initial_head = pr.get("head")
+        initial_head_sha = (
+            initial_head.get("sha") if isinstance(initial_head, Mapping) else None
+        )
+        if not isinstance(initial_head_sha, str) or not initial_head_sha:
+            raise GitHubActionsError(
+                "GitHub did not return the current pull request head SHA"
+            )
         file_data = self._get(
             f"repos/{self.repository}/pulls/{pull_request_number}/files?per_page=100",
             paginated=True,
@@ -288,6 +298,20 @@ class GitHubActionsClient:
                         f"{check_run_id}"
                     )
                 annotations[check_run_id] = tuple(values)
+        required_checks, required_checks_reason = self._required_checks(
+            pull_request_number
+        )
+        confirmed_pr = self._object(
+            f"repos/{self.repository}/pulls/{pull_request_number}", "pull request"
+        )
+        confirmed_head = confirmed_pr.get("head")
+        confirmed_head_sha = (
+            confirmed_head.get("sha") if isinstance(confirmed_head, Mapping) else None
+        )
+        if confirmed_head_sha != initial_head_sha:
+            raise GitHubActionsError(
+                "pull request head changed while CI evidence was being collected"
+            )
         return GitHubActionsSnapshot(
             repository=self.repository,
             pull_request=pr,
@@ -296,7 +320,52 @@ class GitHubActionsClient:
             annotations_by_check_run=annotations,
             changed_paths=changed_paths,
             observed_at=datetime.now(UTC).isoformat(),
+            required_checks=required_checks,
+            required_checks_reason=required_checks_reason,
         )
+
+    def _required_checks(
+        self, pull_request_number: int
+    ) -> tuple[tuple[Mapping[str, Any], ...] | None, str | None]:
+        result = self._run(
+            [
+                self.executable,
+                "pr",
+                "checks",
+                str(pull_request_number),
+                "--required",
+                "--json",
+                "name,state,workflow",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if result.returncode != 0:
+            return None, "GitHub did not make required-check policy available"
+        try:
+            raw = json.loads(result.stdout)
+        except json.JSONDecodeError:
+            return None, "GitHub returned malformed required-check data"
+        if not isinstance(raw, list) or not raw:
+            return None, "GitHub reported no required checks; policy is unknown"
+        checks: list[Mapping[str, Any]] = []
+        for item in raw:
+            if not isinstance(item, Mapping):
+                return None, "GitHub returned malformed required-check data"
+            name = item.get("name")
+            state = item.get("state")
+            workflow = item.get("workflow")
+            if (
+                not isinstance(name, str)
+                or not name.strip()
+                or not isinstance(state, str)
+            ):
+                return None, "GitHub returned incomplete required-check data"
+            if workflow is not None and not isinstance(workflow, str):
+                return None, "GitHub returned malformed required-check data"
+            checks.append(dict(item))
+        return tuple(checks), None
 
     def get_issue(self, issue_number: int) -> Mapping[str, Any]:
         return self._object(f"repos/{self.repository}/issues/{issue_number}", "issue")

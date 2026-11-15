@@ -45,6 +45,7 @@ from powdrr_local.planning.repair_publication import (
     publish_repair_pull_request,
 )
 from powdrr_service.ci_response import (
+    assess_ci_observation,
     build_failure_units,
     compare_local_reproduction,
     normalize_ci_observation,
@@ -3108,12 +3109,16 @@ def _run_respond_to_pr_ci(args: argparse.Namespace) -> int:
                 "runs": snapshot.runs,
                 "jobs_by_run": snapshot.jobs_by_run,
                 "annotations_by_check_run": snapshot.annotations_by_check_run,
+                "required_checks": snapshot.required_checks,
                 "observed_at": snapshot.observed_at,
             },
             repository=args.repository,
             pull_request_number=pr_number,
         )
         jobs = observation.jobs
+        draft = snapshot.pull_request.get("draft")
+        draft_status = draft if isinstance(draft, bool) else None
+        assessment = assess_ci_observation(observation, pull_request_draft=draft_status)
         failures = build_failure_units(jobs)
         head = snapshot.pull_request.get("head")
         head_sha = head.get("sha") if isinstance(head, Mapping) else None
@@ -3128,8 +3133,6 @@ def _run_respond_to_pr_ci(args: argparse.Namespace) -> int:
         base_ref = base.get("ref") if isinstance(base, Mapping) else None
         title = snapshot.pull_request.get("title")
         body = snapshot.pull_request.get("body")
-        draft = snapshot.pull_request.get("draft")
-        draft_status = draft if isinstance(draft, bool) else None
         reproductions = _reproduce_ci_failures(
             failures,
             repository_root=clone_root,
@@ -3148,6 +3151,11 @@ def _run_respond_to_pr_ci(args: argparse.Namespace) -> int:
             issue_number=args.issue,
             head_sha=head_sha,
             jobs=jobs,
+            response_state=assessment.state,
+            required_checks_status=observation.required_checks_status,
+            required_check_count=len(observation.required_checks),
+            required_check_source=observation.required_check_source,
+            required_check_reason=snapshot.required_checks_reason,
             failures=failures,
             reproductions=reproductions,
             observed_at=snapshot.observed_at,
@@ -3165,10 +3173,16 @@ def _run_respond_to_pr_ci(args: argparse.Namespace) -> int:
             "pull_request": pr_number,
             "issue": args.issue,
             "head_sha": head_sha,
+            "response_state": assessment.state,
+            "response_reason": assessment.reason,
             "observation_schema_version": 1,
             "tested_sha": observation.tested_sha,
             "required_checks_status": observation.required_checks_status,
             "required_check_source": observation.required_check_source,
+            "required_checks": [
+                check.to_dict() for check in observation.required_checks
+            ],
+            "required_checks_reason": snapshot.required_checks_reason,
             "pull_request_metadata": {
                 "head_ref": head_ref if isinstance(head_ref, str) else None,
                 "base_ref": base_ref if isinstance(base_ref, str) else None,

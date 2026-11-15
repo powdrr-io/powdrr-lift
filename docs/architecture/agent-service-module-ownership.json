@@ -3905,7 +3905,7 @@
       "kind": "python_module",
       "owner": "agent",
       "path": "packages/agent/src/powdrr_agent/execution/github_actions.py",
-      "rationale": "authenticated GitHub Actions evidence transport and issue checkpoint publication",
+      "rationale": "authenticated GitHub Actions evidence and required-check transport with issue checkpoint publication",
       "reviewed": false
     },
     {
@@ -3917,6 +3917,17 @@
       "owner": "service",
       "path": "packages/service/src/powdrr_service/ci_response/__init__.py",
       "rationale": "public imports for service-owned CI response policy",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "1519",
+      "internal_imports": [
+        "powdrr_contracts.ci"
+      ],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/ci_response/assessment.py",
+      "rationale": "service-owned required-check policy and deterministic response state assessment",
       "reviewed": false
     },
     {

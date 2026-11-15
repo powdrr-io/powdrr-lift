@@ -11,6 +11,7 @@ from powdrr_contracts.ci import (
     LocalReproduction,
 )
 from powdrr_service.ci_response import (
+    assess_ci_observation,
     build_failure_units,
     compare_local_reproduction,
     normalize_ci_observation,
@@ -79,6 +80,68 @@ def test_observation_keeps_tested_sha_separate_from_pull_request_head() -> None:
 
     assert observation.head_sha == HEAD
     assert observation.jobs[0].tested_sha == tested_sha
+
+
+@pytest.mark.parametrize(
+    ("state", "expected"),
+    [
+        ("pass", "awaiting_review"),
+        ("pending", "awaiting_ci"),
+        ("failure", "failed"),
+        ("skipped", "failed"),
+        ("stale", "failed"),
+    ],
+)
+def test_required_check_assessment_never_treats_non_success_as_green(
+    state: str, expected: str
+) -> None:
+    observation = normalize_ci_observation(
+        {
+            "pull_request": {"head": {"sha": HEAD}},
+            "runs": [],
+            "jobs_by_run": {},
+            "annotations_by_check_run": {},
+            "required_checks": [{"name": "CI / unit", "state": state}],
+        },
+        repository="example/project",
+        pull_request_number=270,
+    )
+
+    assert assess_ci_observation(observation).state == expected
+
+
+def test_required_check_assessment_blocks_when_policy_is_unavailable() -> None:
+    observation = normalize_ci_observation(
+        {
+            "pull_request": {"head": {"sha": HEAD}},
+            "runs": [],
+            "jobs_by_run": {},
+            "annotations_by_check_run": {},
+        },
+        repository="example/project",
+        pull_request_number=270,
+    )
+
+    assert assess_ci_observation(observation).state == "blocked"
+
+
+def test_required_check_success_does_not_make_draft_pr_review_ready() -> None:
+    observation = normalize_ci_observation(
+        {
+            "pull_request": {"head": {"sha": HEAD}},
+            "runs": [],
+            "jobs_by_run": {},
+            "annotations_by_check_run": {},
+            "required_checks": [{"name": "CI / unit", "state": "pass"}],
+        },
+        repository="example/project",
+        pull_request_number=270,
+    )
+
+    assessment = assess_ci_observation(observation, pull_request_draft=True)
+
+    assert assessment.state == "blocked"
+    assert "draft" in assessment.reason
 
 
 def test_runner_rejection_without_steps_is_not_locally_executable() -> None:

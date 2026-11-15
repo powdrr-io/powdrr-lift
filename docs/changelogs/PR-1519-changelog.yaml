@@ -1,0 +1,255 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1519
+title: Capture and assess exact-head required CI checks
+intent:
+  problem: The CI response command cannot determine current review readiness when required-check policy is not transported from GitHub.
+  goal: Capture required checks for a stable PR head, preserve unavailable policy explicitly, and return a deterministic response state.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 3908, end_line: 3908}
+    summary: Record required-check transport ownership.
+    rationale: Keep the architecture inventory aligned with the agent transport change.
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 3922, end_line: 3932}
+    summary: Register the service-owned CI response assessor.
+    rationale: Preserve the repository's module ownership metadata.
+  - path: docs/plans/procedrr-ci-response-action.md
+    type: modified
+    span: {start_line: 3, end_line: 7}
+    summary: Record merged and remaining CI response milestones.
+    rationale: Keep plan status precise as implementation continues.
+  - path: packages/agent/src/powdrr_agent/execution/github_actions.py
+    type: modified
+    span: {start_line: 30, end_line: 31}
+    summary: Add required-check data and unavailability reason to snapshots.
+    rationale: Carry policy observation results through the authenticated GitHub adapter.
+  - path: packages/agent/src/powdrr_agent/execution/github_actions.py
+    type: modified
+    span: {start_line: 222, end_line: 229}
+    summary: Capture the initial PR head before collecting CI evidence.
+    rationale: Bind the observation to an exact candidate commit.
+  - path: packages/agent/src/powdrr_agent/execution/github_actions.py
+    type: modified
+    span: {start_line: 301, end_line: 314}
+    summary: Fetch required checks and verify the PR head remained stable.
+    rationale: Avoid combining evidence from different PR generations.
+  - path: packages/agent/src/powdrr_agent/execution/github_actions.py
+    type: modified
+    span: {start_line: 323, end_line: 324}
+    summary: Return validated required-check data in the snapshot.
+    rationale: Carry available policy through the authenticated GitHub adapter.
+  - path: packages/agent/src/powdrr_agent/execution/github_actions.py
+    type: modified
+    span: {start_line: 327, end_line: 369}
+    summary: Return an explicit unavailable reason for invalid or inaccessible policy.
+    rationale: Do not infer that no required checks exist from missing API data.
+  - path: packages/contracts/src/powdrr_contracts/__init__.py
+    type: modified
+    span: {start_line: 8, end_line: 8}
+    summary: Export the required-check contract.
+    rationale: Make the typed observation record available through the public package API.
+  - path: packages/contracts/src/powdrr_contracts/__init__.py
+    type: modified
+    span: {start_line: 46, end_line: 46}
+    summary: Add the required-check export to the package API.
+    rationale: Support consumers importing the public contract.
+  - path: packages/contracts/src/powdrr_contracts/ci.py
+    type: modified
+    span: {start_line: 31, end_line: 71}
+    summary: Define a versioned record for required GitHub checks.
+    rationale: Preserve each check name, native state, workflow, and observed head.
+  - path: packages/contracts/src/powdrr_contracts/ci.py
+    type: modified
+    span: {start_line: 85, end_line: 85}
+    summary: Attach required checks to the CI observation contract.
+    rationale: Keep policy and job evidence in one typed observation.
+  - path: packages/contracts/src/powdrr_contracts/ci.py
+    type: modified
+    span: {start_line: 107, end_line: 112}
+    summary: Validate required-check availability and head identity.
+    rationale: Reject empty available policy and checks from another PR head.
+  - path: packages/contracts/src/powdrr_contracts/ci.py
+    type: modified
+    span: {start_line: 127, end_line: 127}
+    summary: Serialize required-check records.
+    rationale: Preserve policy evidence across the service boundary.
+  - path: packages/contracts/src/powdrr_contracts/ci.py
+    type: modified
+    span: {start_line: 139, end_line: 141}
+    summary: Validate the serialized required-check collection.
+    rationale: Reject malformed policy data during observation parsing.
+  - path: packages/contracts/src/powdrr_contracts/ci.py
+    type: modified
+    span: {start_line: 143, end_line: 145}
+    summary: Parse required-check records into the public observation.
+    rationale: Support safe round trips of the public observation contract.
+  - path: packages/contracts/src/powdrr_contracts/ci.py
+    type: modified
+    span: {start_line: 169, end_line: 169}
+    summary: Populate required checks when parsing an observation.
+    rationale: Retain policy evidence in reconstructed contract instances.
+  - path: packages/service/src/powdrr_service/ci_response/assessment.py
+    type: added
+    span: {start_line: 1, end_line: 75}
+    summary: Assess current-head checks as awaiting CI, awaiting review, failed, or blocked.
+    rationale: Keep review-readiness decisions deterministic and conservative.
+  - path: packages/service/src/powdrr_service/ci_response/__init__.py
+    type: modified
+    span: {start_line: 3, end_line: 6}
+    summary: Export the CI response assessment API.
+    rationale: Expose the service-owned policy to the CLI adapter.
+  - path: packages/service/src/powdrr_service/ci_response/__init__.py
+    type: modified
+    span: {start_line: 23, end_line: 23}
+    summary: Export the response assessment result type.
+    rationale: Support stable imports from the service package.
+  - path: packages/service/src/powdrr_service/ci_response/__init__.py
+    type: modified
+    span: {start_line: 25, end_line: 25}
+    summary: Export the assessment function.
+    rationale: Expose deterministic policy through the service API.
+  - path: packages/service/src/powdrr_service/ci_response/checkpoint.py
+    type: modified
+    span: {start_line: 30, end_line: 34}
+    summary: Add required-check state and source to checkpoint inputs.
+    rationale: Make the observation checkpoint explain review readiness.
+  - path: packages/service/src/powdrr_service/ci_response/checkpoint.py
+    type: modified
+    span: {start_line: 49, end_line: 53}
+    summary: Include policy metadata in checkpoint identity.
+    rationale: Avoid treating different policy observations as the same checkpoint.
+  - path: packages/service/src/powdrr_service/ci_response/checkpoint.py
+    type: modified
+    span: {start_line: 69, end_line: 82}
+    summary: Render required-check availability and response state in the checkpoint.
+    rationale: Give operators a concise explanation of the observed policy.
+  - path: packages/service/src/powdrr_service/ci_response/observation.py
+    type: modified
+    span: {start_line: 8, end_line: 8}
+    summary: Import the policy availability type.
+    rationale: Type the normalized required-check result.
+  - path: packages/service/src/powdrr_service/ci_response/observation.py
+    type: modified
+    span: {start_line: 16, end_line: 16}
+    summary: Import the required-check contract.
+    rationale: Normalize GitHub data into the public record.
+  - path: packages/service/src/powdrr_service/ci_response/observation.py
+    type: modified
+    span: {start_line: 186, end_line: 217}
+    summary: Normalize required checks and record their policy source.
+    rationale: Keep malformed or empty results explicitly unavailable.
+  - path: packages/service/src/powdrr_service/ci_response/observation.py
+    type: modified
+    span: {start_line: 222, end_line: 222}
+    summary: Set tested SHA from observed workflow jobs.
+    rationale: Preserve workflow-tested identity separately from the PR head.
+  - path: packages/service/src/powdrr_service/ci_response/observation.py
+    type: modified
+    span: {start_line: 229, end_line: 232}
+    summary: Include normalized required checks in the observation.
+    rationale: Carry exact-head policy into the versioned record.
+  - path: packages/service/src/powdrr_service/resources/processes/respond-to-pr-ci.yaml
+    type: modified
+    span: {start_line: 24, end_line: 36}
+    summary: Route recognized response states through the observation process.
+    rationale: Ensure unknown states do not terminate as a successful observation.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 48, end_line: 48}
+    summary: Import the service assessment API.
+    rationale: Keep CI policy out of the CLI adapter.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 3112, end_line: 3112}
+    summary: Pass required-check evidence into observation normalization.
+    rationale: Bind the GitHub result to the public observation contract.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 3119, end_line: 3121}
+    summary: Assess observation state using PR draft status.
+    rationale: Keep drafts from being marked review-ready.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 3131, end_line: 3132}
+    summary: Remove duplicate draft handling after assessment.
+    rationale: Use one normalized draft value for the response state.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 3154, end_line: 3158}
+    summary: Include assessment and policy provenance in the checkpoint.
+    rationale: Make the compact issue checkpoint actionable.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 3176, end_line: 3177}
+    summary: Emit response state and reason in the command result.
+    rationale: Let Procedrr distinguish pending, ready, failed, and unknown policy.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 3182, end_line: 3185}
+    summary: Serialize required-check records and unavailability reason.
+    rationale: Preserve check evidence for downstream steps.
+  - path: tests/test_ci_response_cli.py
+    type: modified
+    span: {start_line: 94, end_line: 94}
+    summary: Assert tested-SHA separation in CLI output.
+    rationale: Preserve workflow-tested identity separately from the PR head.
+  - path: tests/test_ci_response_cli.py
+    type: modified
+    span: {start_line: 96, end_line: 96}
+    summary: Assert unavailable policy is blocked in CLI output.
+    rationale: Prevent unknown required-check policy from appearing review-ready.
+  - path: tests/test_ci_response_policy.py
+    type: modified
+    span: {start_line: 14, end_line: 14}
+    summary: Import the CI assessment API for policy tests.
+    rationale: Exercise the public service-owned assessment path.
+  - path: tests/test_ci_response_policy.py
+    type: modified
+    span: {start_line: 85, end_line: 146}
+    summary: Cover pass, pending, failed, unavailable, and draft policy cases.
+    rationale: Protect conservative required-check state decisions.
+  - path: tests/test_github_actions_transport.py
+    type: modified
+    span: {start_line: 30, end_line: 32}
+    summary: Return required-check data from the transport fixture.
+    rationale: Exercise the GitHub required-check command path.
+  - path: tests/test_github_actions_transport.py
+    type: modified
+    span: {start_line: 90, end_line: 93}
+    summary: Assert successfully captured required checks.
+    rationale: Verify the transport retains native check metadata.
+  - path: tests/test_github_actions_transport.py
+    type: modified
+    span: {start_line: 182, end_line: 195}
+    summary: Cover unavailable required-check policy on permission failure.
+    rationale: Prevent permission errors from becoming false policy absence.
+  - path: tests/test_procedrr_chat.py
+    type: modified
+    span: {start_line: 134, end_line: 141}
+    summary: Assert response-state routing in the service process.
+    rationale: Verify the process handles all defined assessment outcomes.
+entities:
+  - id: ci-required-check
+    type: Class
+    action: added
+  - id: ci-response-assessment
+    type: Class
+    action: added
+  - id: assess-ci-observation
+    type: Function
+    action: added
+entity_relationships: []
+invariants:
+  - id: exact-head-required-checks
+    description: Required checks are attached only to the PR head that remained stable during collection.
+    action: added
+    rationale: Do not mix observations across concurrent PR updates.
+  - id: unavailable-policy-is-not-green
+    description: Unavailable or empty required-check policy cannot produce awaiting-review.
+    action: added
+    rationale: Unknown policy must remain visible and block review-readiness assessment.
+guidance: []

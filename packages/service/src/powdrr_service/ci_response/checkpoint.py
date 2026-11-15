@@ -27,6 +27,11 @@ def render_ci_observation_checkpoint(
     issue_number: int,
     head_sha: str,
     jobs: Sequence[CIJobObservation],
+    response_state: str = "blocked",
+    required_checks_status: str = "unavailable",
+    required_check_count: int = 0,
+    required_check_source: str | None = None,
+    required_check_reason: str | None = None,
     failures: Sequence[CIFailureUnit] | None = None,
     reproductions: dict[str, LocalReproduction] | None = None,
     observed_at: str | None = None,
@@ -41,6 +46,11 @@ def render_ci_observation_checkpoint(
         "pull_request": pull_request_number,
         "issue": issue_number,
         "head_sha": head_sha,
+        "response_state": response_state,
+        "required_checks_status": required_checks_status,
+        "required_check_count": required_check_count,
+        "required_check_source": required_check_source,
+        "required_check_reason": required_check_reason,
         "jobs": [job.to_dict() for job in jobs],
         "pull_request_draft": pull_request_draft,
         "reproductions": {
@@ -56,6 +66,20 @@ def render_ci_observation_checkpoint(
         _render_failure(unit, (reproductions or {}).get(unit.failure_id))
         for unit in visible_units
     ]
+    required_source = (
+        f" from `{required_check_source}`" if required_check_source else ""
+    )
+    required_reason = (
+        f" Reason: {' '.join(required_check_reason.split())[:240]}"
+        if required_check_reason
+        else ""
+    )
+    rows.insert(
+        0,
+        f"Required-check policy **{required_checks_status}**{required_source}; "
+        f"{required_check_count} check(s) observed. Response state: "
+        f"**{response_state}**.{required_reason}",
+    )
     if len(units) > len(visible_units):
         rows.append(
             f"- {len(units) - len(visible_units)} additional failure units "

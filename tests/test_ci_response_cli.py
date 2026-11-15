@@ -7,7 +7,8 @@ from types import SimpleNamespace
 from typing import Any
 
 from powdrr_agent.execution.github_actions import GitHubActionsSnapshot
-from powdrr_contracts.ci import CIFailureUnit, CIJobLogEvidence
+from powdrr_contracts.ci import CIFailureUnit, CIJobLogEvidence, CIJobObservation
+from powdrr_service.ci_response import build_failure_units
 
 from powdrr_lift import cli
 
@@ -138,6 +139,59 @@ def test_response_command_writes_idempotent_runner_failure_checkpoint(
     )
     assert cli._run_respond_to_pr_ci(url_args) == 0
     assert json.loads(capsys.readouterr().out)["pull_request"] == 270
+
+
+def test_local_reproduction_targets_the_test_node_from_ci_logs(
+    monkeypatch: Any,
+) -> None:
+    head_sha = "6c85b1e5c334a113b3db274b2c1b7a8f350b9707"
+    log_line = "FAILED tests/test_calc.py::test_sum - AssertionError: expected 2, got 3"
+    (failure,) = build_failure_units(
+        (
+            CIJobObservation(
+                job_id=21,
+                run_id=22,
+                run_attempt=1,
+                head_sha=head_sha,
+                status="completed",
+                conclusion="failure",
+                check_context="CI / unit",
+                steps=({"name": "pytest", "conclusion": "failure"},),
+                log_evidence=CIJobLogEvidence(
+                    status="available",
+                    excerpt=log_line,
+                    raw_sha256=sha256(log_line.encode()).hexdigest(),
+                ),
+            ),
+        )
+    )
+    commands: list[tuple[str, ...]] = []
+
+    def run_pinned(
+        _root: Any, _commit: str, command: tuple[str, ...]
+    ) -> SimpleNamespace:
+        commands.append(command)
+        return SimpleNamespace(
+            stdout=log_line,
+            stderr="",
+            exit_code=1,
+            stdout_sha256=sha256(log_line.encode()).hexdigest(),
+            stderr_sha256=sha256(b"").hexdigest(),
+        )
+
+    monkeypatch.setattr(cli, "execute_pinned_local_command", run_pinned)
+
+    reproductions = cli._reproduce_ci_failures(
+        (failure,),
+        repository_root=cli.Path.cwd(),
+        head_sha=head_sha,
+        verification_command="pytest -q",
+    )
+
+    assert commands == [
+        ("pytest", "-vv", "tests/test_calc.py::test_sum"),
+    ]
+    assert reproductions[failure.failure_id].status == "reproduced"
 
 
 def test_response_command_retries_issue_link_lookup_for_eventual_consistency(

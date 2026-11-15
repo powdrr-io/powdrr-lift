@@ -260,6 +260,7 @@ class CIFailureUnit:
     start_line: int | None = None
     end_line: int | None = None
     command: tuple[str, ...] = ()
+    test_node_id: str | None = None
 
     def __post_init__(self) -> None:
         for name in ("failure_id", "observation_id", "phase", "signature"):
@@ -270,6 +271,8 @@ class CIFailureUnit:
             _positive_int(getattr(self, name), f"ci_failure_unit.{name}")
         if not self.evidence or any(not item.strip() for item in self.evidence):
             raise ContractError("ci_failure_unit.evidence must contain references")
+        if self.test_node_id is not None and not self.test_node_id.strip():
+            raise ContractError("ci_failure_unit.test_node_id must not be empty")
         if any(
             value is not None and value < 1
             for value in (self.start_line, self.end_line)
@@ -293,6 +296,7 @@ class CIFailureUnit:
             "start_line": self.start_line,
             "end_line": self.end_line,
             "command": list(self.command),
+            "test_node_id": self.test_node_id,
         }
 
     @classmethod
@@ -318,6 +322,9 @@ class CIFailureUnit:
             raise ContractError(
                 "ci_failure_unit.workflow_path must be a string or null"
             )
+        test_node_id = data.get("test_node_id")
+        if test_node_id is not None and not isinstance(test_node_id, str):
+            raise ContractError("ci_failure_unit.test_node_id must be a string or null")
         line_values: dict[str, int | None] = {}
         for name in ("start_line", "end_line"):
             item = data.get(name)
@@ -345,6 +352,7 @@ class CIFailureUnit:
             start_line=line_values["start_line"],
             end_line=line_values["end_line"],
             command=tuple(command),
+            test_node_id=test_node_id,
         )
 
 

@@ -72,6 +72,8 @@ def prepare(
     profile_code: str | None = None,
     post_worker_reconciler: Any = None,
     readonly_support_files: dict[str, str] | None = None,
+    seed_candidate_files: dict[str, str | None] | None = None,
+    correction_context: dict[str, Any] | None = None,
 ) -> SourceReferenceRun:
     root = tmp_path / "repo"
     if not root.exists():
@@ -201,6 +203,8 @@ def prepare(
             private_validation_data={"oracle": "PRIVATE-ORACLE"},
             review_client=Reviewer(),
             readonly_support_files=readonly_support_files,
+            seed_candidate_files=seed_candidate_files,
+            correction_context=correction_context,
             post_worker_reconciler=post_worker_reconciler,
             worker_timeout_seconds=30,
             validation_timeout_seconds=30,
@@ -218,6 +222,54 @@ def prepare(
 
 def unused_inference(request: ChatCompletionRequest) -> ChatCompletionResponse:
     raise AssertionError("No inference expected")
+
+
+def test_correction_run_keeps_original_base_and_seeded_candidate_authority(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    run = prepare(
+        tmp_path,
+        monkeypatch,
+        run_id="implementation-attempt-02",
+        seed_candidate_files={"retry.py": CANDIDATE},
+        correction_context={
+            "previous_attempt_id": "implementation-attempt-01",
+            "failed_checks": {"profile": "behavior", "status": "failed"},
+            "permitted_candidate_files": ["retry.py"],
+        },
+    )
+    base_commit = git(run.workspace_root, "rev-parse", "HEAD")
+    assert run.catalog.base_commit == base_commit
+    assert (run.workspace_root / "retry.py").read_text() == CANDIDATE
+    assert run.request.allow_existing_changes is True
+    assert "implementation-attempt-01" in run.request.worker_prompt
+    provider = MiniSWEAgentProvider(
+        inference_handler=lambda _request: ChatCompletionResponse(
+            content="unused", tool_calls=(), finish_reason="stop"
+        ),
+        model=run.model,
+        timeout_seconds=run.worker_timeout_seconds,
+        diagnostics_root=run.private_root,
+        source_reference_mode="enforce",
+        source_reference_catalog=run.catalog,
+        source_reader_limits=run.reader_limits,
+        source_reference_execution=run,
+    )
+    run.authorize(run.request, provider=provider, worktree_root=run.workspace_root)
+
+
+def test_correction_seed_cannot_replace_read_only_verifier_files(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with pytest.raises(
+        ValueError, match="Correction candidate contains an invalid path"
+    ):
+        prepare(
+            tmp_path,
+            monkeypatch,
+            readonly_support_files={"tests/test_oracle.py": "assert True\n"},
+            seed_candidate_files={"tests/test_oracle.py": "assert False\n"},
+        )
 
 
 def test_candidate_route_evidence_is_scoped_and_marks_uncollected_routes(

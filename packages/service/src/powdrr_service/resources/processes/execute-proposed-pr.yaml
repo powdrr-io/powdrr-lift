@@ -47,10 +47,18 @@ outputs:
           repair_findings: {type: array, items: {type: string}}
       validation: {type: object}
 description: >-
-  Have MiniSWE author independent integration tests before coding. For new story
+  Have MiniSWE author independent integration tests before coding. The source
+  reference dispatcher owns a durable correction coordinator: every coding call
+  is one immutable linked attempt, recoverable validation failures receive a
+  fresh attempt with the exact failed checks and permitted candidate files, and
+  accepted intent, private verification, protected files, and original base stay
+  fixed. Stop unchanged failure repeats and exhausted explicit attempt budgets;
+  preserve ambiguous, provider, and environment failures for their typed recovery
+  paths. Do not start a duplicate invocation when a prior transition lacks a
+  terminal response. For new story
   behavior require a behavioral failure or a classified approved missing public
   interface on baseline; the compiler-owned existing-behavior integration item
-  may pass on baseline. Preserve the agreed oracle. Implement one
+  may pass on baseline. Preserve the agreed oracle. Implement the
   reviewed plan item. Permit one bounded correction to generated tests when
   they conflict with their linked criterion or repository evidence; require
   each corrected test to satisfy its original baseline policy and pass

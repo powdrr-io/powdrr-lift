@@ -1,6 +1,6 @@
 version: 1
 name: execute-proposed-pr-workflow
-description: Implement one reviewed plan item and publish either an implementation PR or a plan-amendment PR when execution proves the plan defective.
+description: Implement one reviewed plan item through the durable correction coordinator and publish either an implementation PR or a plan-amendment PR when execution proves the plan defective.
 inputs:
   - {name: task_context, type: object, required: true}
 outputs:

@@ -494,6 +494,9 @@ def build_parser() -> argparse.ArgumentParser:
     fulfill_plan_issue_parser.add_argument("--repository", required=True)
     fulfill_plan_issue_parser.add_argument("--issue-number", type=int, required=True)
     fulfill_plan_issue_parser.add_argument(
+        "--repo-root", type=Path, help="Checkout containing the pinned plan revision."
+    )
+    fulfill_plan_issue_parser.add_argument(
         "--reason", required=True, help="Why the planned work is already fulfilled."
     )
     fulfill_plan_issue_parser.set_defaults(func=_run_fulfill_plan_issue_without_pr)
@@ -3685,6 +3688,7 @@ def _run_fulfill_plan_issue_without_pr(args: argparse.Namespace) -> int:
             issue_number=args.issue_number,
             reason=args.reason,
             client=GitHubIssueClient(args.repository),
+            repo_root=resolve_repo_root(args.repo_root),
         )
     except GitHubIssueQueueError as error:
         print(str(error), file=sys.stderr)
@@ -3746,6 +3750,7 @@ def _run_github_issue_worker(args: argparse.Namespace) -> int:
                 "item_id": report.item_id,
                 "detail": report.detail,
                 "ci_outcome": getattr(report, "ci_outcome", None),
+                "readiness": getattr(report, "readiness", None),
             },
             indent=2,
         )

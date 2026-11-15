@@ -1085,6 +1085,13 @@ def test_worker_skips_unmet_dependency_then_executes_ready_item(
         plan_loader=load_plan,
     )
     assert waiting.outcome == "no_eligible_work"
+    assert waiting.readiness is not None
+    assert waiting.readiness["counts"]["waiting_dependencies"] == 1
+    assert waiting.readiness["blocking_reasons"][0]["reason"] == (
+        "dependency_not_fulfilled"
+    )
+    assert waiting.detail is not None
+    assert "verified fulfillment" in waiting.detail
     assert executed == ["base"]
     assert waits == []
 
@@ -1096,6 +1103,54 @@ def test_worker_skips_unmet_dependency_then_executes_ready_item(
         client.issues[0].labels,
         client.issues[0].url,
     )
+    manual_close_wait = run_worker_once(
+        client=client,  # type: ignore[arg-type]
+        repo_root=root,
+        worker_id="worker-a",
+        run_task=run_task,
+        plan_loader=load_plan,
+    )
+    assert manual_close_wait.outcome == "no_eligible_work"
+
+    client.pull_requests[100] = {
+        "state": "open",
+        "merged": False,
+        "draft": True,
+        "body": "Closes #100",
+        "merge_commit_sha": None,
+    }
+    draft_wait = run_worker_once(
+        client=client,  # type: ignore[arg-type]
+        repo_root=root,
+        worker_id="worker-a",
+        run_task=run_task,
+        plan_loader=load_plan,
+    )
+    assert draft_wait.outcome == "no_eligible_work"
+    assert draft_wait.readiness is not None
+    assert draft_wait.readiness["counts"]["waiting_dependencies"] == 1
+
+    client.pull_requests[100] = {
+        "state": "closed",
+        "merged": True,
+        "body": "Closes #999",
+        "merge_commit_sha": "d" * 40,
+    }
+    unrelated_wait = run_worker_once(
+        client=client,  # type: ignore[arg-type]
+        repo_root=root,
+        worker_id="worker-a",
+        run_task=run_task,
+        plan_loader=load_plan,
+    )
+    assert unrelated_wait.outcome == "no_eligible_work"
+
+    client.pull_requests[100] = {
+        "state": "closed",
+        "merged": True,
+        "body": "Closes #100",
+        "merge_commit_sha": "d" * 40,
+    }
     second = run_worker_once(
         client=client,  # type: ignore[arg-type]
         repo_root=root,
@@ -1123,14 +1178,10 @@ def test_worker_passes_explicit_no_pr_dependency_to_workflow(
         plan_commit=PLAN_COMMIT,
         client=client,  # type: ignore[arg-type]
     )
-    prerequisite = client.issues[0]
-    client.issues[0] = QueueIssue(
-        prerequisite.number,
-        prerequisite.title,
-        prerequisite.body,
-        "closed",
-        (FULFILLED_WITHOUT_PR_LABEL, _plan_label("feature-v1")),
-        prerequisite.url,
+    fulfill_issue_without_pr(
+        issue_number=client.issues[0].number,
+        reason="The requested capability is already present.",
+        client=client,  # type: ignore[arg-type]
     )
     received: list[tuple[str, ...]] = []
 
@@ -1274,6 +1325,46 @@ def test_fulfill_issue_without_pr_records_explicit_reason_and_closes_issue() -> 
     assert "powdrr-issue-fulfillment:v1" in comment
     assert '"fulfillment": "without_implementation_pr"' in comment
     assert "already present on main" in comment
+
+
+def test_stale_no_pr_receipt_does_not_unblock_dependency(tmp_path: Path) -> None:
+    client = FakeIssueClient()
+    publish_plan_issues(
+        plan=plan(),
+        plan_path="docs/plans/feature.yaml",
+        plan_commit=PLAN_COMMIT,
+        client=client,  # type: ignore[arg-type]
+    )
+    fulfill_issue_without_pr(
+        issue_number=client.issues[0].number,
+        reason="The requested capability is already present.",
+        client=client,  # type: ignore[arg-type]
+    )
+    stale = client.issues[0]
+    client.update_issue(
+        stale,
+        body=github_issue_queue._issue_pointer_body(
+            "feature-v1",
+            "base",
+            "docs/plans/feature.yaml",
+            "e" * 40,
+            repository=client.repository,
+        ),
+    )
+
+    report = run_worker_once(
+        client=client,  # type: ignore[arg-type]
+        repo_root=tmp_path,
+        worker_id="worker-stale-receipt",
+        run_task=lambda *_args: pytest.fail("stale fulfillment must not unblock"),
+        plan_loader=lambda *_args, **_kwargs: plan(),
+    )
+
+    assert report.outcome == "no_eligible_work"
+    assert report.readiness is not None
+    assert report.readiness["blocking_reasons"][0]["reason"] == (
+        "dependency_not_fulfilled"
+    )
 
 
 def test_publisher_reconciles_old_ready_issues_with_plan_dependencies() -> None:
@@ -1422,13 +1513,10 @@ def test_worker_blocks_when_workflow_dependencies_disagree_with_plan(
         plan_commit=PLAN_COMMIT,
         client=client,  # type: ignore[arg-type]
     )
-    client.issues[0] = QueueIssue(
-        client.issues[0].number,
-        client.issues[0].title,
-        client.issues[0].body,
-        "closed",
-        client.issues[0].labels,
-        client.issues[0].url,
+    fulfill_issue_without_pr(
+        issue_number=client.issues[0].number,
+        reason="The requested capability is already present.",
+        client=client,  # type: ignore[arg-type]
     )
 
     report = run_worker_once(

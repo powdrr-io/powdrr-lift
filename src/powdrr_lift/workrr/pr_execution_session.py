@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import TextIO
 
@@ -73,6 +73,8 @@ class PrExecutionSessionConfig:
     coding_agent_timeout_seconds: float = 1800.0
     coding_agent_validation_timeout_seconds: float = 1800.0
     coding_agent_recovery_attempts: int = 3
+    max_concurrency: int = 4
+    multi_host: bool = False
 
 
 def run_pr_execution_worker(
@@ -133,7 +135,10 @@ def run_pr_execution_worker(
             fulfilled_without_pr_dependencies=fulfilled_without_pr_dependencies,
             checkpoint_callback=checkpoint_callback,
             repo_root=repo_root,
-            options=options,
+            options=replace(
+                options,
+                claim_guard=getattr(checkpoint_callback, "assert_claim_owned", None),
+            ),
             stdout=output,
             stderr=captured_stderr,  # type: ignore[arg-type]
         )
@@ -147,4 +152,6 @@ def run_pr_execution_worker(
         repo_root=repo_root,
         worker_id=config.worker_id,
         run_task=run_task,
+        max_concurrency=config.max_concurrency,
+        multi_host=config.multi_host,
     )

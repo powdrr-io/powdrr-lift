@@ -3,11 +3,14 @@ from __future__ import annotations
 import json
 import re
 import subprocess
+import threading
 from collections.abc import Mapping
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
 import pytest
+from powdrr_local.file_lock import Timeout
 from powdrr_service.planning.checkpoints import (
     PlanningCheckpoint,
     render_checkpoint_archive_comments,
@@ -26,8 +29,10 @@ from powdrr_lift.workrr.github_issue_queue import (
     ReviewedExecutionPlan,
     TaskCheckpoint,
     TaskCheckpointCallback,
+    _ItemClaim,
     _parse_plan,
     _plan_label,
+    _worker_store_root,
     continue_awaiting_ci_issue,
     continue_manual_prerequisite_issue,
     find_plan_issues,
@@ -41,6 +46,214 @@ from powdrr_lift.workrr.github_issue_queue import (
 )
 
 PLAN_COMMIT = "a" * 40
+
+
+def test_item_claim_is_exclusive_and_recovery_increments_generation(
+    tmp_path: Path,
+) -> None:
+    claim_path = _worker_store_root(tmp_path) / "claims" / "issue-17.json"
+    first = _ItemClaim(tmp_path, 17, "worker-a", ("src/a.py",), 2)
+    with first:
+        assert first.generation == 1
+        with pytest.raises(Timeout):
+            with _ItemClaim(tmp_path, 17, "worker-b", ("src/a.py",), 2):
+                pytest.fail("a second worker acquired an active item claim")
+        claim_record = json.loads(claim_path.read_text(encoding="utf-8"))
+        claim_record["generation"] += 1
+        claim_path.write_text(json.dumps(claim_record), encoding="utf-8")
+        with pytest.raises(GitHubIssueQueueError, match="lost claim generation"):
+            first.assert_current()
+    recovered = _ItemClaim(tmp_path, 17, "worker-b", ("src/a.py",), 2)
+    with recovered:
+        assert recovered.generation == 2
+        record = json.loads(claim_path.read_text(encoding="utf-8"))
+        assert record["owner"] == "worker-b"
+        assert record["attempt_id"] == recovered.attempt_id
+        assert record["recovery_state"] == "fresh"
+
+
+def test_item_claims_allow_disjoint_scopes_and_serialize_overlaps(
+    tmp_path: Path,
+) -> None:
+    first = _ItemClaim(tmp_path, 18, "worker-a", ("src/a.py",), 2)
+    second = _ItemClaim(tmp_path, 19, "worker-b", ("src/b.py",), 2)
+    with first, second:
+        assert first.generation == second.generation == 1
+        with pytest.raises(Timeout):
+            with _ItemClaim(tmp_path, 20, "worker-c", ("src/a.py",), 2):
+                pytest.fail("overlapping path scopes were acquired concurrently")
+
+
+def test_item_claims_enforce_configured_concurrency(tmp_path: Path) -> None:
+    first = _ItemClaim(tmp_path, 21, "worker-a", ("src/a.py",), 1)
+    with first:
+        with pytest.raises(Timeout):
+            with _ItemClaim(tmp_path, 22, "worker-b", ("tests/b.py",), 1):
+                pytest.fail("claim exceeded the configured concurrency")
+
+
+def test_item_claim_can_resume_only_after_reconciliation(tmp_path: Path) -> None:
+    claim_path = _worker_store_root(tmp_path) / "claims" / "issue-23.json"
+    claim_path.parent.mkdir(parents=True, exist_ok=True)
+    github_issue_queue._atomic_write_json(
+        claim_path,
+        {"generation": 3, "state": "reconciliation_required"},
+    )
+    github_issue_queue._atomic_write_json(
+        claim_path.parent / "scope-claims.json",
+        {
+            "claims": [
+                {
+                    "issue_number": 23,
+                    "attempt_id": "abandoned-attempt",
+                    "scopes": ["src/a.py"],
+                }
+            ]
+        },
+    )
+    with _ItemClaim(tmp_path, 23, "worker-reconciled", ("src/a.py",), 1) as claim:
+        assert claim.generation == 4
+        record = json.loads(claim_path.read_text(encoding="utf-8"))
+        assert record["recovery_state"] == "reconciled"
+
+
+def test_worker_rejects_multi_host_without_a_shared_atomic_store(
+    tmp_path: Path,
+) -> None:
+    with pytest.raises(GitHubIssueQueueError, match="multi-host.*unsupported"):
+        run_worker_once(
+            client=object(),  # type: ignore[arg-type]
+            repo_root=tmp_path,
+            worker_id="worker-a",
+            run_task=lambda *_args: 0,
+            multi_host=True,
+        )
+
+
+def test_worker_fences_abandoned_claim_until_reconciliation(tmp_path: Path) -> None:
+    client = FakeIssueClient()
+    publish_plan_issues(
+        plan=plan(),
+        plan_path="docs/plans/feature.yaml",
+        plan_commit=PLAN_COMMIT,
+        client=client,  # type: ignore[arg-type]
+    )
+    issue = client.issues[0]
+    client.update_issue(
+        issue,
+        labels=github_issue_queue._replace_queue_status(issue.labels, "claimed"),
+    )
+    claims_dir = github_issue_queue._worker_store_root(tmp_path) / "claims"
+    claims_dir.mkdir(parents=True, exist_ok=True)
+    github_issue_queue._atomic_write_json(
+        claims_dir / f"issue-{issue.number}.json",
+        {
+            "owner": "worker-before-crash",
+            "attempt_id": "attempt-before-crash",
+            "generation": 1,
+            "state": "running",
+            "recovery_state": "heartbeat",
+        },
+    )
+
+    report = run_worker_once(
+        client=client,  # type: ignore[arg-type]
+        repo_root=tmp_path,
+        worker_id="worker-recovery",
+        run_task=lambda *_args: pytest.fail("abandoned work must not rerun blindly"),
+        plan_loader=lambda *_args, **_kwargs: plan(),
+    )
+
+    updated = client.get_issue(issue.number)
+    claim = json.loads(
+        (claims_dir / f"issue-{issue.number}.json").read_text(encoding="utf-8")
+    )
+    assert report.outcome == "no_eligible_work"
+    assert QUEUE_LABELS["blocked"] in updated.labels
+    assert claim["state"] == "reconciliation_required"
+    assert claim["recovery_state"] == "owner_exited"
+    assert any(
+        "Reconcile its durable checkpoint" in body
+        for number, body in client.comments
+        if number == issue.number
+    )
+
+
+def test_worker_executes_independent_items_concurrently(tmp_path: Path) -> None:
+    first_item = PlannedWorkItem(
+        "first",
+        "First",
+        "First task.",
+        (),
+        ("Works.",),
+        (),
+        "docs/workflows/first",
+        "first",
+        allowed_paths=("src/first.py",),
+    )
+    second_item = PlannedWorkItem(
+        "second",
+        "Second",
+        "Second task.",
+        (),
+        ("Works.",),
+        (),
+        "docs/workflows/second",
+        "second",
+        allowed_paths=("src/second.py",),
+    )
+    independent_plan = ReviewedExecutionPlan(
+        "independent-v1", (first_item, second_item)
+    )
+    for item in independent_plan.items:
+        assert item.workflow_directory is not None
+        (tmp_path / item.workflow_directory).mkdir(parents=True)
+    client = FakeIssueClient()
+    publish_plan_issues(
+        plan=independent_plan,
+        plan_path="docs/plans/independent.yaml",
+        plan_commit=PLAN_COMMIT,
+        client=client,  # type: ignore[arg-type]
+    )
+    first_started = threading.Event()
+    second_started = threading.Event()
+
+    def run_task(
+        _workflow_path: Path,
+        workflow_id: str,
+        *_args: Any,
+    ) -> int:
+        if workflow_id == "first":
+            first_started.set()
+            assert second_started.wait(timeout=5), (
+                "independent queue item did not start before the first finished"
+            )
+        else:
+            assert first_started.is_set()
+            second_started.set()
+        return 1
+
+    def run(worker_id: str) -> Any:
+        return run_worker_once(
+            client=client,  # type: ignore[arg-type]
+            repo_root=tmp_path,
+            worker_id=worker_id,
+            run_task=run_task,
+            plan_loader=lambda *_args, **_kwargs: independent_plan,
+        )
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        first_future = pool.submit(run, "worker-a")
+        assert first_started.wait(timeout=5)
+        second_future = pool.submit(run, "worker-b")
+        first_report = first_future.result(timeout=10)
+        second_report = second_future.result(timeout=10)
+
+    assert first_report.outcome == second_report.outcome == "blocked", (
+        first_report,
+        second_report,
+    )
+    assert {first_report.item_id, second_report.item_id} == {"first", "second"}
 
 
 def _write_test_validation_inventory(root: Path) -> None:

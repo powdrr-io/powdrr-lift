@@ -381,6 +381,7 @@ class WorkflowTaskAgentConfig:
     task_checkpoint_callback: Callable[[str, str, Any, str | None], None] | None = None
     github_issue_number: int | None = None
     github_repository: str | None = None
+    claim_guard: Callable[[], None] | None = None
 
 
 def _issue_worker_string_list(value: object) -> tuple[str, ...]:
@@ -3609,6 +3610,9 @@ class _TaskWorkflowExecutionStrategy:
             repo_root=self.repo_root,
             events=self.events,
         )
+        claim_guard = getattr(self.config, "claim_guard", None)
+        if claim_guard is not None:
+            claim_guard()
         command_error = _workflow_file_command_error(
             action.parameters,
             self.workflow.directory,

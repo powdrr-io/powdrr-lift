@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import uuid
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, TextIO
@@ -50,6 +50,7 @@ class PlannedWorkflowTaskOptions:
     coding_agent_timeout_seconds: float = 1800.0
     coding_agent_validation_timeout_seconds: float = 1800.0
     coding_agent_recovery_attempts: int = 3
+    claim_guard: Callable[[], None] | None = None
 
 
 def run_planned_workflow_task(
@@ -212,6 +213,7 @@ def _task_config(
         task_checkpoint_callback=checkpoint_callback,
         github_issue_number=issue_number,
         github_repository=options.repository,
+        claim_guard=options.claim_guard,
     )
 
 

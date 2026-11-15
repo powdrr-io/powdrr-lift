@@ -13,8 +13,9 @@ import posixpath
 import re
 import subprocess
 import tempfile
+import threading
 from collections.abc import Callable, Iterator, Mapping, Sequence
-from contextlib import contextmanager
+from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
@@ -173,6 +174,358 @@ TaskCheckpointCallback = Callable[[str, str, Any, str | None], None]
 
 class GitHubIssueQueueError(RuntimeError):
     """Invalid queue data or failed GitHub operation."""
+
+
+class _WorkerCoordination:
+    """Short-lived local coordination lock shared by repository worktrees."""
+
+    def __init__(self, lock_path: Path) -> None:
+        self.lock_path = lock_path
+        self._context: Any = None
+        self.held = False
+
+    def acquire(self, *, blocking: bool = True) -> None:
+        if self.held:
+            return
+        self._context = file_lock(self.lock_path, blocking=blocking)
+        self._context.__enter__()
+        self.held = True
+
+    def release(self) -> None:
+        if self.held:
+            self._context.__exit__(None, None, None)
+            self._context = None
+            self.held = False
+
+
+class _ItemClaim:
+    """Crash-released local claim with durable generation and heartbeat data."""
+
+    def __init__(
+        self,
+        repo_root: Path,
+        issue_number: int,
+        worker_id: str,
+        scopes: Sequence[str],
+        max_concurrency: int,
+    ) -> None:
+        self.repo_root = repo_root
+        self.issue_number = issue_number
+        self.worker_id = worker_id
+        normalized_scopes = tuple(
+            sorted({posixpath.normpath(value.replace("\\", "/")) for value in scopes})
+        )
+        self.scopes = (
+            ("__repository__",)
+            if not normalized_scopes or "." in normalized_scopes
+            else normalized_scopes
+        )
+        self.max_concurrency = max_concurrency
+        self.directory = _worker_store_root(repo_root) / "claims"
+        self.claim_path = self.directory / f"issue-{issue_number}.json"
+        self.registry_path = self.directory / "scope-claims.json"
+        self._stack = ExitStack()
+        self.attempt_id = hashlib.sha256(os.urandom(32)).hexdigest()[:24]
+        self.generation = 0
+        self._closed = False
+        self._entered = False
+        self._registry_registered = False
+        self._stop_heartbeat = threading.Event()
+        self._heartbeat_thread: threading.Thread | None = None
+
+    def __enter__(self) -> _ItemClaim:
+        self.directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+        try:
+            self._stack.enter_context(
+                file_lock(
+                    self.directory / f"issue-{self.issue_number}.lock",
+                    blocking=False,
+                )
+            )
+            self._register_scopes()
+            slot = next(
+                (
+                    index
+                    for index in range(self.max_concurrency)
+                    if self._try_slot(index)
+                ),
+                None,
+            )
+            if slot is None:
+                raise Timeout("configured worker concurrency is full")
+            previous = _read_json_mapping(self.claim_path)
+            if previous.get("state") == "running":
+                raise GitHubIssueQueueError(
+                    f"issue #{self.issue_number} has an abandoned running claim; "
+                    "reconcile it before retrying"
+                )
+            self.generation = int(previous.get("generation", 0)) + 1
+            recovery_state = (
+                "reconciled"
+                if previous.get("state") == "reconciliation_required"
+                else "fresh"
+            )
+            self._write("running", recovery_state)
+            self._entered = True
+            self._heartbeat_thread = threading.Thread(
+                target=_claim_heartbeat_loop,
+                args=(
+                    self.claim_path,
+                    self.issue_number,
+                    self.worker_id,
+                    self.attempt_id,
+                    self.generation,
+                    self.scopes,
+                    self._stop_heartbeat,
+                ),
+                name=f"powdrr-claim-heartbeat-{self.issue_number}",
+                daemon=True,
+            )
+            self._heartbeat_thread.start()
+            return self
+        except BaseException:
+            if self._registry_registered:
+                self._remove_scopes()
+            self._stack.close()
+            raise
+
+    def _register_scopes(self) -> None:
+        with file_lock(self.directory / "scope-claims.lock"):
+            registry = _read_json_mapping(self.registry_path)
+            claims_value = registry.get("claims", [])
+            if not isinstance(claims_value, list):
+                raise GitHubIssueQueueError("scope claim registry is malformed")
+            active: list[Mapping[str, Any]] = []
+            for entry in claims_value:
+                if not isinstance(entry, Mapping):
+                    continue
+                try:
+                    raw_other_issue = entry.get("issue_number")
+                    if not isinstance(raw_other_issue, (int, str)):
+                        continue
+                    other_issue = int(raw_other_issue)
+                    if other_issue == self.issue_number:
+                        # This worker owns the issue lock, so an earlier
+                        # registry entry for this issue is abandoned.
+                        continue
+                    with file_lock(
+                        self.directory / f"issue-{other_issue}.lock",
+                        blocking=False,
+                    ):
+                        continue
+                except (Timeout, TypeError, ValueError):
+                    active.append(entry)
+            for entry in active:
+                other_scopes = entry.get("scopes", [])
+                if isinstance(other_scopes, list) and _write_scopes_overlap(
+                    self.scopes, tuple(str(scope) for scope in other_scopes)
+                ):
+                    raise Timeout("an active worker owns an overlapping write scope")
+            active.append(
+                {
+                    "issue_number": self.issue_number,
+                    "owner": self.worker_id,
+                    "attempt_id": self.attempt_id,
+                    "generation": self.generation,
+                    "scopes": list(self.scopes),
+                }
+            )
+            _atomic_write_json(self.registry_path, {"claims": active})
+            self._registry_registered = True
+
+    def _remove_scopes(self) -> None:
+        with file_lock(self.directory / "scope-claims.lock"):
+            registry = _read_json_mapping(self.registry_path)
+            claims_value = registry.get("claims", [])
+            if isinstance(claims_value, list):
+                remaining = [
+                    entry
+                    for entry in claims_value
+                    if not (
+                        isinstance(entry, Mapping)
+                        and entry.get("issue_number") == self.issue_number
+                        and entry.get("attempt_id") == self.attempt_id
+                    )
+                ]
+                _atomic_write_json(self.registry_path, {"claims": remaining})
+        self._registry_registered = False
+
+    def _try_slot(self, index: int) -> bool:
+        try:
+            self._stack.enter_context(
+                file_lock(self.directory / f"worker-slot-{index}.lock", blocking=False)
+            )
+            return True
+        except Timeout:
+            return False
+
+    def __exit__(self, *_exc: object) -> None:
+        if self._closed:
+            return
+        if not self._entered:
+            self._stack.close()
+            self._closed = True
+            return
+        self._stop_heartbeat.set()
+        if self._heartbeat_thread is not None:
+            self._heartbeat_thread.join(timeout=2)
+        if self._registry_registered:
+            self._remove_scopes()
+        self._write("released", "completed")
+        self._stack.close()
+        self._closed = True
+
+    def __del__(self) -> None:
+        try:
+            self.__exit__()
+        except Exception:
+            self._stack.close()
+
+    def _write(self, state: str, recovery_state: str) -> None:
+        document = {
+            "schema": "powdrr-issue-claim-v1",
+            "issue_number": self.issue_number,
+            "owner": self.worker_id,
+            "attempt_id": self.attempt_id,
+            "generation": self.generation,
+            "heartbeat_at": datetime.now(UTC).isoformat(),
+            "state": state,
+            "recovery_state": recovery_state,
+            "scopes": list(self.scopes),
+        }
+        _atomic_write_json(self.claim_path, document)
+
+    def assert_current(self) -> None:
+        record = _read_json_mapping(self.claim_path)
+        if (
+            record.get("owner") != self.worker_id
+            or record.get("attempt_id") != self.attempt_id
+            or record.get("generation") != self.generation
+            or record.get("state") != "running"
+        ):
+            raise GitHubIssueQueueError(
+                f"worker lost claim generation {self.generation} "
+                f"for issue #{self.issue_number}"
+            )
+        self._write("running", "active")
+
+
+def _worker_store_root(repo_root: Path) -> Path:
+    result = subprocess.run(
+        ["git", "-C", str(repo_root), "rev-parse", "--git-common-dir"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        return repo_root / ".powdrr" / "github-issue-worker"
+    common_dir = Path(result.stdout.strip())
+    if not common_dir.is_absolute():
+        common_dir = repo_root / common_dir
+    return common_dir.resolve() / "powdrr-github-issue-worker"
+
+
+def _mark_abandoned_claims_for_reconciliation(
+    client: GitHubIssueClient, repo_root: Path
+) -> None:
+    """Fence crashed owners; a new attempt needs explicit state reconciliation."""
+    directory = _worker_store_root(repo_root) / "claims"
+    for issue in client.list_issues(labels=(QUEUE_LABELS["claimed"],), state="open"):
+        claim_path = directory / f"issue-{issue.number}.json"
+        record = _read_json_mapping(claim_path)
+        if record.get("state") != "running":
+            continue
+        try:
+            with file_lock(directory / f"issue-{issue.number}.lock", blocking=False):
+                # The OS lock, not heartbeat age, distinguishes an exited owner
+                # from a slow but live model invocation.
+                record = dict(_read_json_mapping(claim_path))
+                if record.get("state") != "running":
+                    continue
+                record["state"] = "reconciliation_required"
+                record["recovery_state"] = "owner_exited"
+                record["heartbeat_at"] = datetime.now(UTC).isoformat()
+                _atomic_write_json(claim_path, record)
+        except Timeout:
+            continue
+        refreshed = client.get_issue(issue.number)
+        client.update_issue(
+            refreshed,
+            labels=_replace_queue_status(refreshed.labels, "blocked"),
+        )
+        client.add_comment(
+            refreshed,
+            "Powdrr found that the previous worker exited while holding this item. "
+            "The item was fenced to prevent duplicate commits or publication. "
+            "Reconcile its durable checkpoint, worktree, and any pull request, then "
+            "move it back to `powdrr:ready` to resume.",
+        )
+
+
+def _read_json_mapping(path: Path) -> Mapping[str, Any]:
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return value if isinstance(value, Mapping) else {}
+
+
+def _atomic_write_json(path: Path, value: Mapping[str, Any]) -> None:
+    descriptor, temporary = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+            json.dump(value, stream, sort_keys=True)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+    finally:
+        Path(temporary).unlink(missing_ok=True)
+
+
+def _claim_heartbeat_loop(
+    path: Path,
+    issue_number: int,
+    owner: str,
+    attempt_id: str,
+    generation: int,
+    scopes: tuple[str, ...],
+    stop: threading.Event,
+) -> None:
+    while not stop.wait(15):
+        _atomic_write_json(
+            path,
+            {
+                "schema": "powdrr-issue-claim-v1",
+                "issue_number": issue_number,
+                "owner": owner,
+                "attempt_id": attempt_id,
+                "generation": generation,
+                "heartbeat_at": datetime.now(UTC).isoformat(),
+                "state": "running",
+                "recovery_state": "heartbeat",
+                "scopes": list(scopes),
+            },
+        )
+
+
+def _sha256_text(value: str) -> str:
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()
+
+
+def _write_scopes_overlap(first: Sequence[str], second: Sequence[str]) -> bool:
+    if "__repository__" in first or "__repository__" in second:
+        return True
+    for left in first:
+        normalized_left = posixpath.normpath(left.replace("\\", "/"))
+        for right in second:
+            normalized_right = posixpath.normpath(right.replace("\\", "/"))
+            if (
+                normalized_left == normalized_right
+                or normalized_left.startswith(normalized_right.rstrip("/") + "/")
+                or normalized_right.startswith(normalized_left.rstrip("/") + "/")
+            ):
+                return True
+    return False
 
 
 class GitHubIssueClient:
@@ -798,15 +1151,25 @@ def run_worker_once(
         int,
     ],
     plan_loader: Callable[..., ReviewedExecutionPlan] = load_reviewed_plan_at_commit,
+    max_concurrency: int = 4,
+    multi_host: bool = False,
 ) -> WorkerReport:
     """Claim and execute the first ready item whose dependencies are closed."""
     root = Path(repo_root).resolve()
-    with _worker_lock(root):
+    if max_concurrency < 1:
+        raise GitHubIssueQueueError("max_concurrency must be at least 1")
+    if multi_host:
+        raise GitHubIssueQueueError(
+            "multi-host issue workers are unsupported by the local Git common-dir "
+            "claim store; configure a shared atomic claim store before enabling them"
+        )
+    with _worker_lock(root) as coordination:
         _requeue_merged_plan_amendments(
             client=client,
             repo_root=root,
             plan_loader=plan_loader,
         )
+        _mark_abandoned_claims_for_reconciliation(client, root)
         _promote_unblocked_issues(
             client=client,
             repo_root=root,
@@ -876,11 +1239,6 @@ def run_worker_once(
             if QUEUE_LABELS["ready"] not in issue.labels:
                 continue
             issue = client.get_issue(issue.number)
-            client.update_issue(
-                issue,
-                labels=_replace_queue_status(issue.labels, "claimed"),
-            )
-            client.add_comment(issue, f"Powdrr worker {worker_id} claimed this item.")
             detail: str | None = None
             planned_item = item
             try:
@@ -986,6 +1344,7 @@ def run_worker_once(
                     )
                     return WorkerReport("blocked", issue.number, item.item_id, detail)
             try:
+                claim: _ItemClaim | None = None
                 item = replace(item, github_issue_number=issue.number)
                 item_by_id = {candidate.item_id: candidate for candidate in plan.items}
                 fulfilled_without_pr_dependencies = tuple(
@@ -1002,24 +1361,52 @@ def run_worker_once(
                         )
                     )
                 )
-                # The task runner owns its retry policy. Keep the GitHub issue
-                # untouched while it retries, then publish one final status below.
-                return_code = run_task(
-                    workflow_path,
-                    item.workflow_id,
+                claim = _ItemClaim(
+                    root,
+                    issue.number,
                     worker_id,
-                    item,
-                    plan,
-                    fulfilled_without_pr_dependencies,
-                    _task_checkpoint_callback(
-                        client=client,
-                        repo_root=root,
-                        issue=issue,
-                        plan=plan,
-                        item=item,
-                        plan_loader=plan_loader,
-                    ),
+                    item.allowed_paths,
+                    max_concurrency,
                 )
+                try:
+                    claim.__enter__()
+                except Timeout:
+                    # A competing worker owns this item or an overlapping write
+                    # scope. Leave it ready so a later pass can retry it.
+                    continue
+                client.update_issue(
+                    issue,
+                    labels=_replace_queue_status(issue.labels, "claimed"),
+                )
+                client.add_comment(
+                    issue, f"Powdrr worker {worker_id} claimed this item."
+                )
+                # Keep queue discovery and GitHub mutations serialized, but let
+                # independent item executions proceed concurrently.
+                checkpoint_callback = _task_checkpoint_callback(
+                    client=client,
+                    repo_root=root,
+                    issue=issue,
+                    plan=plan,
+                    item=item,
+                    plan_loader=plan_loader,
+                )
+                checkpoint_callback.assert_claim_owned = claim.assert_current  # type: ignore[attr-defined]
+                coordination.release()
+                try:
+                    claim.assert_current()
+                    return_code = run_task(
+                        workflow_path,
+                        item.workflow_id,
+                        worker_id,
+                        item,
+                        plan,
+                        fulfilled_without_pr_dependencies,
+                        checkpoint_callback,
+                    )
+                    claim.assert_current()
+                finally:
+                    coordination.acquire()
                 prerequisite = None
                 if return_code == 0:
                     local_record = _read_local_task_checkpoint(root, issue.number)
@@ -1122,6 +1509,8 @@ def run_worker_once(
                 repo_root=root,
                 plan_loader=plan_loader,
             )
+            if claim is not None:
+                claim.__exit__(None, None, None)
             return WorkerReport(
                 outcome,
                 issue.number,
@@ -3776,28 +4165,19 @@ def _no_eligible_work_readiness(
 
 
 @contextmanager
-def _worker_lock(repo_root: Path) -> Iterator[None]:
-    common_dir = subprocess.run(
-        ["git", "-C", str(repo_root), "rev-parse", "--git-common-dir"],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if common_dir.returncode == 0:
-        common_path = Path(common_dir.stdout.strip())
-        if not common_path.is_absolute():
-            common_path = repo_root / common_path
-        lock_path = common_path.resolve() / "powdrr-github-issue-worker.lock"
-    else:
-        lock_path = repo_root / ".powdrr" / "github-issue-worker.lock"
-    lock_path.parent.mkdir(parents=True, exist_ok=True)
+def _worker_lock(repo_root: Path) -> Iterator[_WorkerCoordination]:
+    lock_path = _worker_store_root(repo_root) / "coordination.lock"
+    lock_path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    coordination = _WorkerCoordination(lock_path)
     try:
-        with file_lock(lock_path, blocking=False):
-            yield
+        coordination.acquire(blocking=False)
+        yield coordination
     except Timeout as error:
         raise GitHubIssueQueueError(
             "another issue worker is already running"
         ) from error
+    finally:
+        coordination.release()
 
 
 def _issue_from_api(text: str) -> QueueIssue:

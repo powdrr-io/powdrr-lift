@@ -544,6 +544,17 @@ def build_parser() -> argparse.ArgumentParser:
     )
     github_issue_worker_parser.add_argument("--max-roundtrips", type=int, default=128)
     github_issue_worker_parser.add_argument(
+        "--max-concurrency",
+        type=int,
+        default=4,
+        help="Maximum concurrently claimed issue items across local workers.",
+    )
+    github_issue_worker_parser.add_argument(
+        "--multi-host-workers",
+        action="store_true",
+        help="Request multi-host execution (requires a shared atomic claim store).",
+    )
+    github_issue_worker_parser.add_argument(
         "--context-compaction-threshold", type=float, default=0.75
     )
     github_issue_worker_parser.add_argument("--verbose", action="store_true")
@@ -3736,6 +3747,8 @@ def _run_github_issue_worker(args: argparse.Namespace) -> int:
         coding_agent_recovery_attempts=getattr(
             args, "coding_agent_recovery_attempts", 3
         ),
+        max_concurrency=getattr(args, "max_concurrency", 4),
+        multi_host=getattr(args, "multi_host_workers", False),
     )
     try:
         report = run_pr_execution_worker(config)

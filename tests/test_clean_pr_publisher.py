@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 from pathlib import Path
@@ -7,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from powdrr_lift.clean_pr_publisher import (
+    build_publication_authorization,
     publish_clean_pull_request,
     render_standard_pr_description,
     validate_standard_pr_description,
@@ -20,6 +22,17 @@ def _git(*args: str, cwd: Path) -> str:
         ["git", *args], cwd=cwd, capture_output=True, text=True, check=True
     )
     return result.stdout
+
+
+def _authorization(source: Path, files: list[str]) -> dict[str, object]:
+    return build_publication_authorization(
+        base="main",
+        files=files,
+        accepted_contract_digest="sha256:accepted-contract",
+        verification_receipts=[{"id": "pytest", "passed": True}],
+        lineage={"record_id": "source-run:test", "audit_passed": True},
+        worktree_root=source,
+    )
 
 
 def test_standard_pr_description_requires_ordered_nonempty_sections() -> None:
@@ -157,7 +170,10 @@ def test_clean_publication_branch_excludes_checkpoint_commits(
     _git("config", "user.name", "Powdrr Test", cwd=source)
     _git("config", "user.email", "powdrr-test@example.invalid", cwd=source)
     (source / "README.md").write_text("base\n", encoding="utf-8")
-    _git("add", "README.md", cwd=source)
+    (source / ".gitignore").write_text(
+        ".powdrr/publication-intents/\n", encoding="utf-8"
+    )
+    _git("add", "README.md", ".gitignore", cwd=source)
     _git("commit", "-m", "initial", cwd=source)
     _git("remote", "add", "origin", str(remote), cwd=source)
     _git("push", "-u", "origin", "main", cwd=source)
@@ -185,46 +201,67 @@ def test_clean_publication_branch_excludes_checkpoint_commits(
     fake_bin = tmp_path / "bin"
     fake_bin.mkdir()
     gh_calls = tmp_path / "gh-calls.txt"
+    gh_state = tmp_path / "gh-pr-created"
     fake_gh = fake_bin / "gh"
     fake_gh.write_text(
         "#!/bin/sh\n"
         'printf \'%s\\n\' "$*" >> "$GH_CALLS"\n'
         'if [ "$1" = "pr" ] && [ "$2" = "view" ]; then\n'
+        '  if [ -f "$GH_STATE" ]; then\n'
+        '    printf \'%s\\n\' \'{"url":"https://github.com/powdrr-io/powdrr-gaterr/pull/902","state":"OPEN"}\'\n'
+        "    exit 0\n"
+        "  fi\n"
         '  printf \'%s\\n\' \'{"url":"https://github.com/powdrr-io/powdrr-gaterr/pull/901","state":"CLOSED"}\'\n'
         "  exit 1\n"
         "fi\n"
         'if [ "$1" = "pr" ] && [ "$2" = "create" ]; then\n'
+        '  touch "$GH_STATE"\n'
         "  printf '%s\\n' 'https://github.com/powdrr-io/powdrr-gaterr/pull/902'\n"
         "  exit 0\n"
         "fi\n"
+        'if [ "$1" = "pr" ] && [ "$2" = "edit" ]; then exit 0; fi\n'
         "exit 2\n",
         encoding="utf-8",
     )
     fake_gh.chmod(0o755)
     monkeypatch.setenv("PATH", f"{fake_bin}{os.pathsep}{os.environ['PATH']}")
     monkeypatch.setenv("GH_CALLS", str(gh_calls))
+    monkeypatch.setenv("GH_STATE", str(gh_state))
 
-    result = publish_clean_pull_request(
-        {
-            "files_to_publish": product_paths,
-            "base": "main",
-            "publication_branch": "powdrr/attestation-pr-01-implementation",
-            "title": "Add local validation attestation implementation",
-            "description_sections": {
-                "objective": "Publish the validated protocol implementation.",
-                "scope": "- Implement the reviewed attestation behavior.",
-                "implementation_details": "- Add the manifest, CLI, schema, and tests.",
-                "acceptance_criteria": "- The local validation workflow works.",
-                "validation": "- `bash attestation/scripts/verify-all.sh`: passed.",
-                "advisory_test_quality_notes": "None.",
-            },
-            "require_standard_pr_description": True,
-            "commit_message": "Implement local validation attestation PR-01",
+    authorization = _authorization(source, product_paths)
+    publication_parameters = {
+        "files_to_publish": product_paths,
+        "publication_authorization": authorization,
+        "base": "main",
+        "publication_branch": "powdrr/attestation-pr-01-implementation",
+        "title": "Add local validation attestation implementation",
+        "description_sections": {
+            "objective": "Publish the validated protocol implementation.",
+            "scope": "- Implement the reviewed attestation behavior.",
+            "implementation_details": "- Add the manifest, CLI, schema, and tests.",
+            "acceptance_criteria": "- The local validation workflow works.",
+            "validation": "- `bash attestation/scripts/verify-all.sh`: passed.",
+            "advisory_test_quality_notes": "None.",
         },
-        worktree_root=source,
+        "require_standard_pr_description": True,
+        "commit_message": "Implement local validation attestation PR-01",
+    }
+    changed_after_verification = source / product_paths[0]
+    changed_after_verification.write_text(
+        "tampered after verification\n", encoding="utf-8"
+    )
+    with pytest.raises(PowdrrExecutionError, match="changed after verification"):
+        publish_clean_pull_request(publication_parameters, worktree_root=source)
+    changed_after_verification.write_text("implementation 0\n", encoding="utf-8")
+    result = publish_clean_pull_request(publication_parameters, worktree_root=source)
+    retry_result = publish_clean_pull_request(
+        publication_parameters, worktree_root=source
     )
 
     assert result == "https://github.com/powdrr-io/powdrr-gaterr/pull/902"
+    assert retry_result == result
+    assert _git("status", "--short", cwd=source).count("publication-intents") == 0
+    assert Path(gh_calls).read_text(encoding="utf-8").count("pr create") == 1
     remote_paths = set(
         _git(
             "--git-dir",
@@ -248,6 +285,11 @@ def test_clean_publication_branch_excludes_checkpoint_commits(
     )
     assert remote_changed_paths == set(product_paths)
     assert not (set(runtime_paths) & remote_paths)
+    intent_files = list((source / ".powdrr/publication-intents").glob("*.json"))
+    assert len(intent_files) == 1
+    intent = json.loads(intent_files[0].read_text(encoding="utf-8"))
+    assert intent["pull_request_url"] == result
+    assert intent["head"]
     assert ".powdrr/procedrr-runs/current.events.jsonl" not in remote_paths
     assert (
         _git("branch", "--show-current", cwd=source).strip()
@@ -325,6 +367,9 @@ def test_clean_publisher_updates_existing_pr_branch_with_only_repair_commit_path
     result = publish_clean_pull_request(
         {
             "files_to_publish": [".github/workflows/ci.yml"],
+            "publication_authorization": _authorization(
+                source, [".github/workflows/ci.yml"]
+            ),
             "base": "main",
             "publication_branch": pr_branch,
             "title": "Repair CI runner configuration",

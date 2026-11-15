@@ -2,7 +2,8 @@ version: 1
 name: finish-pr-prep
 description: >-
   Verify the complete implementation file list, discover validation commands from
-  repository guidance, run every declared command, and repair failures before succeeding.
+  repository guidance, and run every declared command. A source repair invalidates
+  candidate verification and must return to the implementation correction process.
 inputs:
   - {name: files_to_publish, type: array, required: true}
   - {name: language_labels, type: array, required: true}
@@ -51,104 +52,19 @@ steps:
         types: [tools]
         filters: {labels: "${validation_labels.labels}"}
       bind: validation_tools
-  - attempt:
-      id: pr-prep-validation
-      max_attempts: 5
+  - for_each:
+      snapshot: {name: validation_tools.matches, max_items: 32}
+      item_binding: validation_tool
+      collect: {binding: validation_results, mode: list, key: id, value: validation_result}
       body:
-        - for_each:
-            snapshot: {name: validation_tools.matches, max_items: 32}
-            item_binding: validation_tool
-            collect: {binding: validation_results, mode: list, key: id, value: validation_result}
-            body:
-              - operation:
-                  tool: invoke_tool
-                  parameters:
-                    tool: "${validation_tool.item.validation_action.tool}"
-                    parameters: "${validation_tool.item.validation_action.parameters}"
-                  bind: validation_result
-              - gate:
-                  subject: validation_result.returncode
-                  equals: 0
-                  on_failure: {retry: {max_attempts: 1, on_exhausted: failed}}
-      on_failure: {recovery: pr-prep-validation-repair, resume: pr-prep-validation}
+        - operation:
+            tool: invoke_tool
+            parameters:
+              tool: "${validation_tool.item.validation_action.tool}"
+              parameters: "${validation_tool.item.validation_action.parameters}"
+            bind: validation_result
+        - gate:
+            subject: validation_result.returncode
+            equals: 0
+            on_failure: {retry: {max_attempts: 1, on_exhausted: failed}}
   - terminal: succeeded
-
-recoveries:
-  pr-prep-validation-repair:
-    steps:
-      - judge:
-          kind: construct_one
-          question: What exact source repairs address this failed validation?
-          subject: failure
-          prompt_system: Return only the declared JSON object.
-          instructions:
-            - Treat failure.validation as authoritative evidence of the failed command and its output.
-            - Inspect only files_to_publish and the reported failure surface.
-            - Return one repair record per required file, naming its repository-relative path and the reason for the correction.
-            - Do not repeat a materially unchanged repair when the same validation state recurs.
-          context: [failure, files_to_publish, validation_tools]
-          output:
-            name: repair_plan
-            schema:
-              type: object
-              required: [repairs]
-              additionalProperties: false
-              properties:
-                repairs:
-                  type: array
-                  minItems: 1
-                  maxItems: 16
-                  items:
-                    type: object
-                    required: [file_path, reason]
-                    additionalProperties: false
-                    properties:
-                      file_path: {type: string, minLength: 1}
-                      reason: {type: string, minLength: 1}
-          validation: {kind: json_schema}
-      - for_each:
-          snapshot: {name: repair_plan.repairs, max_items: 16}
-          item_binding: repair
-          collect: {binding: repair_results, mode: list}
-          body:
-            - operation:
-                tool: read_document
-                parameters: {file_path: "${repair.file_path}"}
-                bind: repair_source
-            - judge:
-                kind: plan_one_repair
-                question: What one semantic edit corrects this validation failure?
-                subject: failure.validation
-                prompt_system: Return only the declared JSON object.
-                instructions:
-                  - Use repair.reason and the exact current repair_source to choose one concrete edit.
-                  - Return a one-based inclusive line range and a non-empty replacement that implements the correction.
-                  - Do not use whitespace-only or no-op edits, alter unrelated content, or guess a line range outside repair_source.
-                context: [failure, repair, repair_source, files_to_publish]
-                output:
-                  name: repair_edit
-                  schema:
-                    type: object
-                    required: [file_path, start, end, new_text]
-                    additionalProperties: false
-                    properties:
-                      file_path: {type: string, minLength: 1}
-                      start: {type: integer, minimum: 1}
-                      end: {type: integer, minimum: 1}
-                      new_text: {type: string, minLength: 1}
-                validation: {kind: json_schema}
-            - operation:
-                tool: edit
-                parameters:
-                  operation: replace_lines
-                  file_path: "${repair_edit.file_path}"
-                  start_line: "${repair_edit.start}"
-                  end_line: "${repair_edit.end}"
-                  replacement: "${repair_edit.new_text}"
-                bind: repair_result
-      - operation:
-          tool: invoke_tool
-          parameters:
-            tool: git
-            parameters: {operation: add, paths: "${files_to_publish}"}
-          bind: restage_result

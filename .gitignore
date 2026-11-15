@@ -21,3 +21,4 @@ build/
 .powdrr/
 uv.lock
 opencode.json
+.powdrr/publication-intents/

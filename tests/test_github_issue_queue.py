@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 import subprocess
 from collections.abc import Mapping
 from pathlib import Path
@@ -2287,7 +2288,7 @@ def test_worker_keeps_pending_required_checks_out_of_review_queue(
         plan_loader=lambda *_args, **_kwargs: plan(),
     )
 
-    assert report.outcome == "awaiting_ci"
+    assert report.outcome == "awaiting_ci", report.detail
     assert report.ci_outcome == "awaiting_ci"
     assert QUEUE_LABELS["awaiting_ci"] in client.issues[0].labels
     assert QUEUE_LABELS["awaiting_review"] not in client.issues[0].labels
@@ -2296,6 +2297,64 @@ def test_worker_keeps_pending_required_checks_out_of_review_queue(
         for number, body in client.comments
         if number == 100
     )
+
+
+def test_worker_persists_ci_response_result_but_uses_fresh_queue_observation(
+    tmp_path: Path,
+) -> None:
+    (tmp_path / "docs/workflows/base").mkdir(parents=True)
+    client = FakeIssueClient()
+    client.required_checks = [{"name": "test", "state": "pending", "workflow": "ci"}]
+    publish_plan_issues(
+        plan=plan(),
+        plan_path="docs/plans/feature.yaml",
+        plan_commit=PLAN_COMMIT,
+        client=client,  # type: ignore[arg-type]
+    )
+
+    def run_task(*args: Any) -> int:
+        checkpoint: TaskCheckpointCallback = args[-1]
+        checkpoint(
+            "implementation-task",
+            "execute-proposed-pr-workflow-result-state",
+            {
+                "pull_request_url": "https://github.com/example/project/pull/100",
+                "ci_response_result": {
+                    "observation_schema_version": 1,
+                    "response_state": "awaiting_review",
+                    "response_reason": "response observation initially looked green",
+                    "head_sha": client.pr_head,
+                    "observation_id": "e" * 64,
+                    "required_checks_status": "available",
+                    "waited_seconds": 20,
+                    "wait_deadline_reached": False,
+                },
+            },
+            "b" * 40,
+        )
+        return 0
+
+    report = run_worker_once(
+        client=client,  # type: ignore[arg-type]
+        repo_root=tmp_path,
+        worker_id="worker-response-result",
+        run_task=run_task,
+        plan_loader=lambda *_args, **_kwargs: plan(),
+    )
+
+    assert report.outcome == "awaiting_ci", report.detail
+    assert report.ci_outcome == "awaiting_ci"
+    ci_comment = next(
+        body
+        for number, body in client.comments
+        if number == 100 and "powdrr-ci-outcome:v1" in body
+    )
+    payload_match = re.search(r"```json\s*(.*?)\s*```", ci_comment, re.DOTALL)
+    assert payload_match is not None
+    payload = json.loads(payload_match.group(1))
+    assert payload["outcome"] == "awaiting_ci"
+    assert payload["ci_response_result"]["response_state"] == "awaiting_review"
+    assert payload["ci_response_result"]["matches_queue_head"] is True
 
 
 def test_continue_awaiting_ci_rechecks_current_head_and_records_result(
@@ -2330,6 +2389,32 @@ def test_continue_awaiting_ci_rechecks_current_head_and_records_result(
             ),
         )
     )
+    response_result = {
+        "schema_version": 1,
+        "head_sha": client.pr_head,
+        "observation_id": "f" * 64,
+        "response_state": "awaiting_ci",
+        "response_reason": "wait deadline reached",
+        "required_checks_status": "available",
+        "waited_seconds": 900,
+        "wait_deadline_reached": True,
+    }
+    client.comments.append(
+        (
+            100,
+            github_issue_queue._render_ci_outcome_checkpoint(
+                pull_request_url="https://github.com/example/project/pull/123",
+                observation={
+                    "outcome": "awaiting_ci",
+                    "head_sha": client.pr_head,
+                    "observed_at": "2026-11-15T00:00:00+00:00",
+                    "checks": [],
+                    "reason": "checks pending",
+                },
+                ci_response_result=response_result,
+            ),
+        )
+    )
 
     report = continue_awaiting_ci_issue(
         client=client,  # type: ignore[arg-type]
@@ -2340,6 +2425,12 @@ def test_continue_awaiting_ci_rechecks_current_head_and_records_result(
     assert report.outcome == "awaiting_review"
     assert QUEUE_LABELS["awaiting_review"] in client.get_issue(100).labels
     assert QUEUE_LABELS["awaiting_ci"] not in client.get_issue(100).labels
+    latest = github_issue_queue._latest_ci_outcome_observation(
+        client.list_comments(100), "https://github.com/example/project/pull/123"
+    )
+    assert latest is not None
+    assert latest["ci_response_result"]["response_state"] == "awaiting_ci"
+    assert latest["ci_response_result"]["matches_queue_head"] is True
 
 
 def test_required_ci_observation_rejects_head_change_during_check_read(

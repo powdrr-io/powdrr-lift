@@ -151,6 +151,13 @@ def test_ci_response_procedure_runs_declared_verification_at_pinned_head() -> No
     ci_inputs = execute.document["steps"][1]["branch"]["cases"][True][1]["call"][
         "inputs"
     ]
+    assert execute.document["outputs"]["ci_response_result"] == {
+        "type": "object",
+        "additionalProperties": True,
+    }
+    assert execute.document["steps"][1]["branch"]["cases"][True][1]["call"][
+        "outputs"
+    ] == {"ci_response_result": "ci_observation_result"}
     assert ci_inputs["repository"] == {
         "type": "reference",
         "value": "task_context.input_state.github_repository",

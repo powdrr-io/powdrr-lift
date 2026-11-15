@@ -8,6 +8,8 @@ from powdrr_contracts.ci import (
     CIObservation,
     CIRequiredCheck,
     LocalReproduction,
+    ProtectedArtifact,
+    RepairContract,
 )
 from powdrr_contracts.models import (
     ActionReceipt,
@@ -57,7 +59,9 @@ __all__ = [
     "PostRunProbe",
     "PostRunProbeResult",
     "PowdrrService",
+    "ProtectedArtifact",
     "RepositorySnapshot",
+    "RepairContract",
     "ServiceError",
     "UserAnswer",
     "UserQuestion",

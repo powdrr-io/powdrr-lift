@@ -3911,12 +3911,19 @@
     {
       "extraction_pr": "1380",
       "internal_imports": [
-        "powdrr_contracts.ci"
+        "powdrr_contracts.ci",
+        "powdrr_service.ci_response.assessment",
+        "powdrr_service.ci_response.checkpoint",
+        "powdrr_service.ci_response.evidence",
+        "powdrr_service.ci_response.observation",
+        "powdrr_service.ci_response.repair_contract",
+        "powdrr_service.ci_response.reproduction",
+        "powdrr_service.ci_response.research"
       ],
       "kind": "python_module",
       "owner": "service",
       "path": "packages/service/src/powdrr_service/ci_response/__init__.py",
-      "rationale": "public imports for service-owned CI response policy",
+      "rationale": "service-owned CI evidence, diagnosis, research, and repair-contract policy",
       "reviewed": false
     },
     {
@@ -3974,6 +3981,27 @@
       "owner": "service",
       "path": "packages/service/src/powdrr_service/ci_response/reproduction.py",
       "rationale": "deterministic local versus remote failure comparison policy",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "1534",
+      "internal_imports": [],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/ci_response/repair_contract.py",
+      "rationale": "service-owned CI evidence, diagnosis, research, and repair-contract policy",
+      "reviewed": false
+    },
+    {
+      "extraction_pr": "1532",
+      "internal_imports": [
+        "powdrr_service.ci_response.evidence",
+        "powdrr_service.external_contract_research"
+      ],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/ci_response/research.py",
+      "rationale": "service-owned CI evidence, diagnosis, research, and repair-contract policy",
       "reviewed": false
     },
     {

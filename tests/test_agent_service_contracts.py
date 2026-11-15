@@ -138,6 +138,7 @@ def test_contract_package_imports_without_application_dependencies() -> None:
         "math",
         "re",
         "dataclasses",
+        "datetime",
         "enum",
         "typing",
     }

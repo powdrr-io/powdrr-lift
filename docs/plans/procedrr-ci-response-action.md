@@ -17,8 +17,13 @@ returns hash-bound excerpts (PR #1530). This follow-up binds source quotes to
 captured hashes, assesses whether each claim applies to the observed runner label
 and repository visibility, and records unresolved or accepted guidance with its
 retrieval time and applicability inputs. This result never authorizes a repair.
-Durable continuation through the response procedure, broader evidence
-collection, protected repair dispatch, and full publication integration remain.
+This follow-up defines a head-bound repair contract with exact editable paths,
+protected artifact hashes, required behaviors and commands, complete required
+checks, accepted research references, and explicit stop conditions. Its service
+compiler issues a contract only for reproduced failures or non-local failures
+with accepted source-backed guidance; it does not dispatch edits. Agent-side
+enforcement, correction acceptance and dispatch, durable continuation, broader
+evidence collection, and full publication integration remain.
 
 ## Outcome
 

@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any, Literal, Self
 
 from powdrr_contracts.models import ContractError, _object, _string
@@ -719,3 +722,328 @@ class LocalReproduction:
             stderr_sha256=data.get("stderr_sha256"),
             matching_failure=matching,
         )
+
+
+@dataclass(frozen=True, slots=True)
+class ProtectedArtifact:
+    """A repository artifact that a CI correction must leave unchanged."""
+
+    path: str
+    sha256: str
+
+    def __post_init__(self) -> None:
+        _validate_repository_path(self.path, "protected_artifact.path")
+        _validate_sha256(self.sha256, "protected_artifact.sha256")
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"path": self.path, "sha256": self.sha256}
+
+    @classmethod
+    def from_dict(cls, value: object) -> Self:
+        data = _object(value, "protected_artifact")
+        return cls(
+            path=_string(data.get("path"), "protected_artifact.path"),
+            sha256=_string(data.get("sha256"), "protected_artifact.sha256"),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class RepairContract:
+    """Immutable, head-bound limits and obligations for one CI correction."""
+
+    contract_id: str
+    content_sha256: str
+    repository: str
+    pull_request_number: int
+    head_sha: str
+    observation_id: str
+    failure_id: str
+    reproduction_id: str
+    reproduction_status: LocalReproductionStatus
+    allowed_paths: tuple[str, ...]
+    protected_artifacts: tuple[ProtectedArtifact, ...]
+    required_behavior: tuple[str, ...]
+    verification_commands: tuple[tuple[str, ...], ...]
+    required_checks: tuple[str, ...]
+    research_claim_refs: tuple[str, ...]
+    stop_conditions: tuple[str, ...]
+    expires_at: str
+
+    def __post_init__(self) -> None:
+        for name in ("contract_id", "observation_id", "failure_id", "reproduction_id"):
+            value = getattr(self, name)
+            if not isinstance(value, str) or not value.strip():
+                raise ContractError(f"repair_contract.{name} must not be empty")
+        if self.repository.count("/") != 1 or not all(self.repository.split("/")):
+            raise ContractError("repair_contract.repository must use owner/name form")
+        _positive_int(self.pull_request_number, "repair_contract.pull_request_number")
+        _validate_sha(self.head_sha, "repair_contract.head_sha")
+        if self.reproduction_status not in {"reproduced", "not_executable_locally"}:
+            raise ContractError(
+                "repair_contract reproduction is not eligible for repair"
+            )
+        if not 1 <= len(self.allowed_paths) <= 30:
+            raise ContractError(
+                "repair_contract.allowed_paths must contain 1 to 30 paths"
+            )
+        if not isinstance(self.allowed_paths, tuple):
+            raise ContractError("repair_contract.allowed_paths must be immutable")
+        if not 1 <= len(self.protected_artifacts) <= 100:
+            raise ContractError(
+                "repair_contract.protected_artifacts must contain 1 to 100 artifacts"
+            )
+        if not isinstance(self.protected_artifacts, tuple) or not all(
+            isinstance(item, ProtectedArtifact) for item in self.protected_artifacts
+        ):
+            raise ContractError("repair_contract.protected_artifacts are malformed")
+        _validate_unique_paths(self.allowed_paths, "repair_contract.allowed_paths")
+        protected_paths = [artifact.path for artifact in self.protected_artifacts]
+        _validate_unique_paths(protected_paths, "repair_contract.protected_artifacts")
+        if set(self.allowed_paths) & set(protected_paths):
+            raise ContractError(
+                "repair_contract cannot allow edits to protected artifacts"
+            )
+        _validate_text_items(
+            self.required_behavior, "repair_contract.required_behavior", 20
+        )
+        if not 1 <= len(self.verification_commands) <= 12:
+            raise ContractError(
+                "repair_contract.verification_commands must contain 1 to 12 commands"
+            )
+        for command in self.verification_commands:
+            _validate_text_items(command, "repair_contract.verification_command", 32)
+        _validate_text_items(
+            self.required_checks, "repair_contract.required_checks", 20
+        )
+        if len(set(self.required_checks)) != len(self.required_checks):
+            raise ContractError("repair_contract.required_checks contains duplicates")
+        if (
+            not isinstance(self.research_claim_refs, tuple)
+            or len(self.research_claim_refs) > 6
+        ):
+            raise ContractError(
+                "repair_contract.research_claim_refs exceeds six claims"
+            )
+        if any(not item.strip() for item in self.research_claim_refs):
+            raise ContractError(
+                "repair_contract.research_claim_refs contains an empty ref"
+            )
+        if len(set(self.research_claim_refs)) != len(self.research_claim_refs):
+            raise ContractError(
+                "repair_contract.research_claim_refs contains duplicates"
+            )
+        _validate_text_items(
+            self.stop_conditions, "repair_contract.stop_conditions", 20
+        )
+        if not isinstance(self.expires_at, str):
+            raise ContractError("repair_contract.expires_at must be an ISO timestamp")
+        try:
+            expiry = datetime.fromisoformat(self.expires_at.replace("Z", "+00:00"))
+        except ValueError as error:
+            raise ContractError(
+                "repair_contract.expires_at must be an ISO timestamp"
+            ) from error
+        if expiry.tzinfo is None or expiry.utcoffset() is None:
+            raise ContractError("repair_contract.expires_at must include a timezone")
+        payload = self._content_payload()
+        expected_digest = hashlib.sha256(_canonical_json(payload)).hexdigest()
+        if self.content_sha256 != expected_digest:
+            raise ContractError(
+                "repair_contract.content_sha256 does not match its content"
+            )
+        if self.contract_id != f"repair-{expected_digest[:20]}":
+            raise ContractError("repair_contract.contract_id is not deterministic")
+
+    @classmethod
+    def create(
+        cls,
+        *,
+        repository: str,
+        pull_request_number: int,
+        head_sha: str,
+        observation_id: str,
+        failure_id: str,
+        reproduction_id: str,
+        reproduction_status: LocalReproductionStatus,
+        allowed_paths: tuple[str, ...],
+        protected_artifacts: tuple[ProtectedArtifact, ...],
+        required_behavior: tuple[str, ...],
+        verification_commands: tuple[tuple[str, ...], ...],
+        required_checks: tuple[str, ...],
+        research_claim_refs: tuple[str, ...],
+        stop_conditions: tuple[str, ...],
+        expires_at: str,
+    ) -> Self:
+        payload = {
+            "schema_version": 1,
+            "repository": repository,
+            "pull_request_number": pull_request_number,
+            "head_sha": head_sha,
+            "observation_id": observation_id,
+            "failure_id": failure_id,
+            "reproduction_id": reproduction_id,
+            "reproduction_status": reproduction_status,
+            "allowed_paths": list(allowed_paths),
+            "protected_artifacts": [item.to_dict() for item in protected_artifacts],
+            "required_behavior": list(required_behavior),
+            "verification_commands": [list(item) for item in verification_commands],
+            "required_checks": list(required_checks),
+            "research_claim_refs": list(research_claim_refs),
+            "stop_conditions": list(stop_conditions),
+            "expires_at": expires_at,
+        }
+        digest = hashlib.sha256(_canonical_json(payload)).hexdigest()
+        return cls(
+            contract_id=f"repair-{digest[:20]}",
+            content_sha256=digest,
+            repository=repository,
+            pull_request_number=pull_request_number,
+            head_sha=head_sha,
+            observation_id=observation_id,
+            failure_id=failure_id,
+            reproduction_id=reproduction_id,
+            reproduction_status=reproduction_status,
+            allowed_paths=allowed_paths,
+            protected_artifacts=protected_artifacts,
+            required_behavior=required_behavior,
+            verification_commands=verification_commands,
+            required_checks=required_checks,
+            research_claim_refs=research_claim_refs,
+            stop_conditions=stop_conditions,
+            expires_at=expires_at,
+        )
+
+    def _content_payload(self) -> dict[str, Any]:
+        return {
+            "schema_version": 1,
+            "repository": self.repository,
+            "pull_request_number": self.pull_request_number,
+            "head_sha": self.head_sha,
+            "observation_id": self.observation_id,
+            "failure_id": self.failure_id,
+            "reproduction_id": self.reproduction_id,
+            "reproduction_status": self.reproduction_status,
+            "allowed_paths": list(self.allowed_paths),
+            "protected_artifacts": [
+                item.to_dict() for item in self.protected_artifacts
+            ],
+            "required_behavior": list(self.required_behavior),
+            "verification_commands": [
+                list(item) for item in self.verification_commands
+            ],
+            "required_checks": list(self.required_checks),
+            "research_claim_refs": list(self.research_claim_refs),
+            "stop_conditions": list(self.stop_conditions),
+            "expires_at": self.expires_at,
+        }
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            **self._content_payload(),
+            "contract_id": self.contract_id,
+            "content_sha256": self.content_sha256,
+        }
+
+    @classmethod
+    def from_dict(cls, value: object) -> Self:
+        data = _object(value, "repair_contract")
+        if data.get("schema_version") != 1:
+            raise ContractError("unsupported repair_contract schema_version")
+        protected = data.get("protected_artifacts")
+        if not isinstance(protected, list):
+            raise ContractError("repair_contract.protected_artifacts must be an array")
+        allowed_paths = _string_tuple(data.get("allowed_paths"), "allowed_paths")
+        behavior = _string_tuple(data.get("required_behavior"), "required_behavior")
+        checks = _string_tuple(data.get("required_checks"), "required_checks")
+        claim_refs = _string_tuple(
+            data.get("research_claim_refs"), "research_claim_refs"
+        )
+        stops = _string_tuple(data.get("stop_conditions"), "stop_conditions")
+        raw_commands = data.get("verification_commands")
+        if not isinstance(raw_commands, list):
+            raise ContractError(
+                "repair_contract.verification_commands must be an array"
+            )
+        commands = tuple(
+            _string_tuple(item, "verification_command") for item in raw_commands
+        )
+        status = data.get("reproduction_status")
+        if status not in {
+            "reproduced",
+            "not_reproduced",
+            "not_comparable",
+            "not_executable_locally",
+            "execution_error",
+        }:
+            raise ContractError("repair_contract.reproduction_status is unsupported")
+        return cls(
+            contract_id=_string(data.get("contract_id"), "repair_contract.contract_id"),
+            content_sha256=_string(
+                data.get("content_sha256"), "repair_contract.content_sha256"
+            ),
+            repository=_string(data.get("repository"), "repair_contract.repository"),
+            pull_request_number=_positive_int(
+                data.get("pull_request_number"), "repair_contract.pull_request_number"
+            ),
+            head_sha=_string(data.get("head_sha"), "repair_contract.head_sha"),
+            observation_id=_string(
+                data.get("observation_id"), "repair_contract.observation_id"
+            ),
+            failure_id=_string(data.get("failure_id"), "repair_contract.failure_id"),
+            reproduction_id=_string(
+                data.get("reproduction_id"), "repair_contract.reproduction_id"
+            ),
+            reproduction_status=status,
+            allowed_paths=allowed_paths,
+            protected_artifacts=tuple(
+                ProtectedArtifact.from_dict(item) for item in protected
+            ),
+            required_behavior=behavior,
+            verification_commands=commands,
+            required_checks=checks,
+            research_claim_refs=claim_refs,
+            stop_conditions=stops,
+            expires_at=_string(data.get("expires_at"), "repair_contract.expires_at"),
+        )
+
+
+def _canonical_json(value: object) -> bytes:
+    return json.dumps(
+        value, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    ).encode("utf-8")
+
+
+def _validate_repository_path(value: str, name: str) -> None:
+    if (
+        not isinstance(value, str)
+        or not value.strip()
+        or value.startswith("/")
+        or "\\" in value
+        or ":" in value
+        or any(ord(char) < 32 for char in value)
+        or any(part in {"", ".", ".."} for part in value.split("/"))
+        or any(char in value for char in "*?[]")
+    ):
+        raise ContractError(f"{name} must be a normalized exact repository path")
+
+
+def _validate_unique_paths(paths: list[str] | tuple[str, ...], name: str) -> None:
+    if len(set(paths)) != len(paths):
+        raise ContractError(f"{name} must not contain duplicate paths")
+    for path in paths:
+        _validate_repository_path(path, name)
+
+
+def _validate_text_items(items: tuple[str, ...], name: str, maximum: int) -> None:
+    if (
+        not isinstance(items, tuple)
+        or not 1 <= len(items) <= maximum
+        or any(not isinstance(item, str) or not item.strip() for item in items)
+    ):
+        raise ContractError(f"{name} must contain 1 to {maximum} non-empty strings")
+
+
+def _string_tuple(value: object, name: str) -> tuple[str, ...]:
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        raise ContractError(f"repair_contract.{name} must be an array of strings")
+    return tuple(value)

@@ -845,6 +845,7 @@ def test_native_dispatch_validates_before_applying_candidate(
     if scenario == "preexisting_parent_no_progress":
         (repo / "twice.py").write_text(preexisting_parent_edit)
     requests = []
+    requests_by_candidate: dict[Path, int] = {}
 
     def infer(request: ChatCompletionRequest) -> ChatCompletionResponse:
         requests.append(request)
@@ -885,12 +886,14 @@ def test_native_dispatch_validates_before_applying_candidate(
         if scenario == "preexisting_parent_no_progress":
             commands[2] = "true"
         assert str(candidate) in request.messages[1]["content"]
+        candidate_request = requests_by_candidate.get(candidate, 0)
+        requests_by_candidate[candidate] = candidate_request + 1
         call = {
             "id": str(len(requests)),
             "type": "function",
             "function": {
                 "name": "bash",
-                "arguments": json.dumps({"command": commands[len(requests) - 1]}),
+                "arguments": json.dumps({"command": commands[candidate_request]}),
             },
         }
         return ChatCompletionResponse(
@@ -935,16 +938,16 @@ def test_native_dispatch_validates_before_applying_candidate(
     # This fixture has no protected story receipts, so its behavior route cannot
     # be reconciled and the candidate must not transfer to the task checkout.
     assert result["passed"] is False, result
-    assert result["continuations"] == 0
+    assert result["continuations"] == (1 if scenario == "behavior_failure" else 0)
     assert not result["retryable"]
-    assert len(requests) == 4, result
+    assert len(requests) == 4 * (2 if scenario == "behavior_failure" else 1), result
     assert runtime.read_text() == "workflow state"
     assert git(repo, "rev-parse", "HEAD") == base
     if scenario == "parent_conflict":
         assert (repo / "twice.py").read_text() == "concurrent parent edit\n"
         assert not (repo / "added.py").exists()
     elif scenario == "preexisting_parent_no_progress":
-        assert result["status"] == "submitted_without_progress", result
+        assert result["status"] == "no_progress", result
         assert result["attempts"][0]["attempt"]["changed_paths"] == []
         assert (repo / "twice.py").read_text() == preexisting_parent_edit
         assert not (repo / "added.py").exists()
@@ -954,6 +957,7 @@ def test_native_dispatch_validates_before_applying_candidate(
         if scenario == "success":
             assert result["status"] == "route_evidence_incomplete"
         elif scenario == "behavior_failure":
-            assert result["status"] == "validation_failed", result
+            assert result["status"] == "no_progress", result
+            assert result["attempts"][0]["outcome"] == "validation_failed"
     resumed = dispatch.dispatch_source_reference_task(**parameters)
     assert resumed == result

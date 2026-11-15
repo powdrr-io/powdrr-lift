@@ -3109,6 +3109,10 @@ def _run_respond_to_pr_ci(args: argparse.Namespace) -> int:
                 "runs": snapshot.runs,
                 "jobs_by_run": snapshot.jobs_by_run,
                 "annotations_by_check_run": snapshot.annotations_by_check_run,
+                "logs_by_job": {
+                    job_id: evidence.to_dict()
+                    for job_id, evidence in (snapshot.logs_by_job or {}).items()
+                },
                 "required_checks": snapshot.required_checks,
                 "observed_at": snapshot.observed_at,
             },
@@ -3194,6 +3198,11 @@ def _run_respond_to_pr_ci(args: argparse.Namespace) -> int:
             "checkpoint_written": not duplicate,
             "jobs_observed": len(jobs),
             "changed_paths": list(snapshot.changed_paths),
+            "job_log_evidence": {
+                str(job.job_id): job.log_evidence.to_dict()
+                for job in jobs
+                if job.log_evidence is not None
+            },
             "failures": [
                 {
                     **CIResponseFailureUnit(

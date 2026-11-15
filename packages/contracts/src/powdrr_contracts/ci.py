@@ -26,6 +26,7 @@ LocalReproductionStatus = Literal[
     "not_executable_locally",
     "execution_error",
 ]
+MAX_CI_LOG_EXCERPT_BYTES = 4_000
 
 
 @dataclass(frozen=True, slots=True)
@@ -66,6 +67,76 @@ class CIRequiredCheck:
             state=_string(data.get("state"), "ci_required_check.state"),
             head_sha=_string(data.get("head_sha"), "ci_required_check.head_sha"),
             workflow=workflow,
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class CIJobLogEvidence:
+    """A bounded, redacted failed-job log excerpt with raw-content integrity."""
+
+    status: Literal["available", "unavailable"]
+    excerpt: str | None = None
+    raw_sha256: str | None = None
+    truncated: bool = False
+    reason: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.status not in {"available", "unavailable"}:
+            raise ContractError("ci_job_log_evidence.status is unsupported")
+        if not isinstance(self.truncated, bool):
+            raise ContractError("ci_job_log_evidence.truncated must be boolean")
+        if self.status == "available":
+            if (
+                self.excerpt is None
+                or self.raw_sha256 is None
+                or self.reason is not None
+            ):
+                raise ContractError(
+                    "available log evidence requires an excerpt and raw digest only"
+                )
+            if len(self.excerpt.encode("utf-8")) > MAX_CI_LOG_EXCERPT_BYTES:
+                raise ContractError(
+                    "ci_job_log_evidence.excerpt exceeds the size limit"
+                )
+            _validate_sha256(self.raw_sha256, "ci_job_log_evidence.raw_sha256")
+        elif (
+            self.excerpt is not None
+            or self.raw_sha256 is not None
+            or self.truncated
+            or not isinstance(self.reason, str)
+            or not self.reason.strip()
+        ):
+            raise ContractError("unavailable log evidence requires only a reason")
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "schema_version": 1,
+            "status": self.status,
+            "excerpt": self.excerpt,
+            "raw_sha256": self.raw_sha256,
+            "truncated": self.truncated,
+            "reason": self.reason,
+        }
+
+    @classmethod
+    def from_dict(cls, value: object) -> Self:
+        data = _object(value, "ci_job_log_evidence")
+        if data.get("schema_version") != 1:
+            raise ContractError("unsupported ci_job_log_evidence schema_version")
+        for name in ("excerpt", "raw_sha256", "reason"):
+            if data.get(name) is not None and not isinstance(data[name], str):
+                raise ContractError(
+                    f"ci_job_log_evidence.{name} must be a string or null"
+                )
+        truncated = data.get("truncated", False)
+        if not isinstance(truncated, bool):
+            raise ContractError("ci_job_log_evidence.truncated must be boolean")
+        return cls(
+            status=data.get("status"),
+            excerpt=data.get("excerpt"),
+            raw_sha256=data.get("raw_sha256"),
+            truncated=truncated,
+            reason=data.get("reason"),
         )
 
 
@@ -277,6 +348,11 @@ class CIFailureUnit:
         )
 
 
+def _validate_sha256(value: str, name: str) -> None:
+    if len(value) != 64 or any(char not in "0123456789abcdef" for char in value):
+        raise ContractError(f"{name} must be a SHA-256 digest")
+
+
 def _validate_sha(value: str, name: str) -> None:
     if len(value) not in (40, 64) or any(
         char not in "0123456789abcdef" for char in value
@@ -320,10 +396,7 @@ class CIAnnotation:
             for value in (self.start_line, self.end_line)
         ):
             raise ContractError("ci_annotation line numbers must be positive")
-        if len(self.raw_sha256) != 64 or any(
-            char not in "0123456789abcdef" for char in self.raw_sha256
-        ):
-            raise ContractError("ci_annotation.raw_sha256 must be a SHA-256 digest")
+        _validate_sha256(self.raw_sha256, "ci_annotation.raw_sha256")
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -363,8 +436,7 @@ class CIAnnotation:
                     f"ci_annotation.{name} must be a positive integer or null"
                 )
         digest = _string(data.get("raw_sha256"), "ci_annotation.raw_sha256")
-        if len(digest) != 64 or any(char not in "0123456789abcdef" for char in digest):
-            raise ContractError("ci_annotation.raw_sha256 must be a SHA-256 digest")
+        _validate_sha256(digest, "ci_annotation.raw_sha256")
         return cls(
             check_run_id=check_run_id,
             path=data.get("path"),
@@ -397,6 +469,7 @@ class CIJobObservation:
     runner_labels: tuple[str, ...] = ()
     steps: tuple[dict[str, Any], ...] = ()
     annotations: tuple[CIAnnotation, ...] = ()
+    log_evidence: CIJobLogEvidence | None = None
 
     def __post_init__(self) -> None:
         for name in ("job_id", "run_id", "run_attempt"):
@@ -447,6 +520,10 @@ class CIJobObservation:
             raise ContractError(
                 "ci_job.runner_id must be a non-negative integer or null"
             )
+        if self.log_evidence is not None and not isinstance(
+            self.log_evidence, CIJobLogEvidence
+        ):
+            raise ContractError("ci_job.log_evidence must be CIJobLogEvidence or null")
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -468,6 +545,9 @@ class CIJobObservation:
             "runner_labels": list(self.runner_labels),
             "steps": list(self.steps),
             "annotations": [item.to_dict() for item in self.annotations],
+            "log_evidence": (
+                self.log_evidence.to_dict() if self.log_evidence is not None else None
+            ),
         }
 
     @classmethod
@@ -478,6 +558,7 @@ class CIJobObservation:
         labels = data.get("runner_labels", [])
         steps = data.get("steps", [])
         annotations = data.get("annotations", [])
+        log_evidence = data.get("log_evidence")
         if not isinstance(labels, list) or not all(
             isinstance(item, str) for item in labels
         ):
@@ -488,6 +569,8 @@ class CIJobObservation:
             raise ContractError("ci_job.steps must be an array of objects")
         if not isinstance(annotations, list):
             raise ContractError("ci_job.annotations must be an array")
+        if log_evidence is not None and not isinstance(log_evidence, dict):
+            raise ContractError("ci_job.log_evidence must be an object or null")
         optional_strings = ("runner_name", "runner_group_name")
         for name in optional_strings:
             if data.get(name) is not None and not isinstance(data[name], str):
@@ -530,6 +613,11 @@ class CIJobObservation:
             runner_labels=tuple(labels),
             steps=tuple(steps),
             annotations=tuple(CIAnnotation.from_dict(item) for item in annotations),
+            log_evidence=(
+                CIJobLogEvidence.from_dict(log_evidence)
+                if log_evidence is not None
+                else None
+            ),
         )
 
 

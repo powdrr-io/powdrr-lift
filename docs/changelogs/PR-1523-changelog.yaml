@@ -1,0 +1,238 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1523
+title: Capture bounded failed-job log evidence
+intent:
+  problem: CI response observations retain annotations and failed step labels but omit the job log text needed to understand many failures.
+  goal: Capture a small redacted excerpt with a raw-content digest and explicit truncation or unavailability, and carry it through typed observations.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/architecture/agent-service-module-ownership.json
+    type: modified
+    span: {start_line: 3908, end_line: 3908}
+    summary: Add bounded failed-job log transport to the agent ownership description.
+    rationale: Keep architecture ownership aligned with the new GitHub evidence capability.
+  - path: docs/plans/procedrr-ci-response-action.md
+    type: modified
+    span: {start_line: 5, end_line: 9}
+    summary: Record completed response milestones and bounded log evidence behavior.
+    rationale: Keep the staged plan status current.
+  - path: docs/plans/procedrr-ci-response-action.md
+    type: modified
+    span: {start_line: 147, end_line: 151}
+    summary: Specify redaction, integrity, truncation, and unavailable log handling.
+    rationale: Make bounded evidence collection requirements explicit.
+  - path: packages/agent/src/powdrr_agent/execution/github_actions.py
+    type: modified
+    span: {start_line: 7, end_line: 7}
+    summary: Import regular expressions for log sanitization.
+    rationale: Remove common secret forms before excerpts cross the agent boundary.
+  - path: packages/agent/src/powdrr_agent/execution/github_actions.py
+    type: modified
+    span: {start_line: 17, end_line: 34}
+    summary: Define log redaction patterns and collection bounds.
+    rationale: Bound the number and size of log excerpts and redact credential patterns.
+  - path: packages/agent/src/powdrr_agent/execution/github_actions.py
+    type: modified
+    span: {start_line: 51, end_line: 51}
+    summary: Add per-job log evidence to GitHub snapshots.
+    rationale: Transport evidence alongside job observations.
+  - path: packages/agent/src/powdrr_agent/execution/github_actions.py
+    type: modified
+    span: {start_line: 283, end_line: 284}
+    summary: Initialize bounded per-observation log collection.
+    rationale: Restrict collection to a small set of failing jobs.
+  - path: packages/agent/src/powdrr_agent/execution/github_actions.py
+    type: modified
+    span: {start_line: 304, end_line: 318}
+    summary: Fetch failed-step logs for a bounded number of failed jobs.
+    rationale: Capture actionable evidence while marking jobs beyond the limit unavailable.
+  - path: packages/agent/src/powdrr_agent/execution/github_actions.py
+    type: modified
+    span: {start_line: 362, end_line: 409}
+    summary: Return explicit log availability and integrity evidence for each failed job.
+    rationale: Preserve fetch failures and hash the raw log before redaction.
+  - path: packages/agent/src/powdrr_agent/execution/github_actions.py
+    type: modified
+    span: {start_line: 656, end_line: 683}
+    summary: Redact credentials and truncate failed-job log excerpts.
+    rationale: Limit sensitive and oversized text crossing the agent/service boundary.
+  - path: packages/contracts/src/powdrr_contracts/__init__.py
+    type: modified
+    span: {start_line: 6, end_line: 6}
+    summary: Export the job log evidence contract.
+    rationale: Make the typed evidence record public.
+  - path: packages/contracts/src/powdrr_contracts/__init__.py
+    type: modified
+    span: {start_line: 45, end_line: 45}
+    summary: Add the job log evidence export to the package API.
+    rationale: Support imports through powdrr_contracts.
+  - path: packages/contracts/src/powdrr_contracts/ci.py
+    type: modified
+    span: {start_line: 29, end_line: 29}
+    summary: Define the maximum serialized log excerpt size.
+    rationale: Enforce the same bound at the transport and contract boundaries.
+  - path: packages/contracts/src/powdrr_contracts/ci.py
+    type: modified
+    span: {start_line: 73, end_line: 142}
+    summary: Define versioned available and unavailable job log evidence records.
+    rationale: Preserve redacted excerpts, raw hashes, truncation, and retrieval status.
+  - path: packages/contracts/src/powdrr_contracts/ci.py
+    type: modified
+    span: {start_line: 351, end_line: 355}
+    summary: Add reusable SHA-256 digest validation.
+    rationale: Validate raw log and annotation integrity fields consistently.
+  - path: packages/contracts/src/powdrr_contracts/ci.py
+    type: modified
+    span: {start_line: 399, end_line: 399}
+    summary: Use shared digest validation for annotation records.
+    rationale: Keep annotation hash validation consistent with log evidence.
+  - path: packages/contracts/src/powdrr_contracts/ci.py
+    type: modified
+    span: {start_line: 439, end_line: 439}
+    summary: Use shared digest validation when parsing annotations.
+    rationale: Reject malformed evidence hashes during deserialization.
+  - path: packages/contracts/src/powdrr_contracts/ci.py
+    type: modified
+    span: {start_line: 472, end_line: 472}
+    summary: Attach optional log evidence to each job observation.
+    rationale: Bind excerpts and unavailable results to their source job.
+  - path: packages/contracts/src/powdrr_contracts/ci.py
+    type: modified
+    span: {start_line: 523, end_line: 526}
+    summary: Validate job log evidence values.
+    rationale: Reject untyped evidence on public contract instances.
+  - path: packages/contracts/src/powdrr_contracts/ci.py
+    type: modified
+    span: {start_line: 548, end_line: 550}
+    summary: Serialize optional job log evidence.
+    rationale: Preserve logs across service boundaries.
+  - path: packages/contracts/src/powdrr_contracts/ci.py
+    type: modified
+    span: {start_line: 561, end_line: 561}
+    summary: Read log evidence when parsing job records.
+    rationale: Support versioned job observation round trips.
+  - path: packages/contracts/src/powdrr_contracts/ci.py
+    type: modified
+    span: {start_line: 572, end_line: 573}
+    summary: Validate serialized job log evidence shape.
+    rationale: Reject malformed records during parsing.
+  - path: packages/contracts/src/powdrr_contracts/ci.py
+    type: modified
+    span: {start_line: 616, end_line: 620}
+    summary: Reconstruct typed job log evidence from serialized data.
+    rationale: Preserve evidence availability and integrity through deserialization.
+  - path: packages/service/src/powdrr_service/ci_response/evidence.py
+    type: modified
+    span: {start_line: 83, end_line: 86}
+    summary: Include log evidence references with annotation-based failure units.
+    rationale: Bind failures to the captured job log digest where available.
+  - path: packages/service/src/powdrr_service/ci_response/evidence.py
+    type: modified
+    span: {start_line: 103, end_line: 109}
+    summary: Include log evidence references with step failures.
+    rationale: Keep precise evidence references for downstream diagnosis.
+  - path: packages/service/src/powdrr_service/ci_response/evidence.py
+    type: modified
+    span: {start_line: 117, end_line: 117}
+    summary: Include log evidence references with job-level failures.
+    rationale: Preserve log provenance when step evidence is unavailable.
+  - path: packages/service/src/powdrr_service/ci_response/evidence.py
+    type: modified
+    span: {start_line: 124, end_line: 132}
+    summary: Format available and unavailable log evidence references.
+    rationale: Let consumers distinguish captured logs from retrieval failures.
+  - path: packages/service/src/powdrr_service/ci_response/observation.py
+    type: modified
+    span: {start_line: 13, end_line: 13}
+    summary: Import the job log evidence contract.
+    rationale: Normalize transport results into typed observations.
+  - path: packages/service/src/powdrr_service/ci_response/observation.py
+    type: modified
+    span: {start_line: 35, end_line: 40}
+    summary: Validate the job log collection in GitHub snapshots.
+    rationale: Reject malformed collections at the service boundary.
+  - path: packages/service/src/powdrr_service/ci_response/observation.py
+    type: modified
+    span: {start_line: 42, end_line: 42}
+    summary: Include log collections in malformed snapshot errors.
+    rationale: Make transport validation failures actionable.
+  - path: packages/service/src/powdrr_service/ci_response/observation.py
+    type: modified
+    span: {start_line: 176, end_line: 180}
+    summary: Attach typed job log evidence during normalization.
+    rationale: Keep excerpts bound to their job records.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 3112, end_line: 3115}
+    summary: Pass bounded log evidence into observation normalization.
+    rationale: Preserve transport evidence in the typed observation.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 3201, end_line: 3205}
+    summary: Return job log excerpts separately from checkpoint comments.
+    rationale: Keep issue comments summary-only while exposing structured evidence to the process.
+  - path: tests/test_ci_response_cli.py
+    type: modified
+    span: {start_line: 10, end_line: 10}
+    summary: Import the job log evidence type for CLI fixtures.
+    rationale: Exercise typed evidence in the response output.
+  - path: tests/test_ci_response_cli.py
+    type: modified
+    span: {start_line: 60, end_line: 66}
+    summary: Provide bounded log evidence in the response fixture.
+    rationale: Verify logs are available to procedural consumers.
+  - path: tests/test_ci_response_cli.py
+    type: modified
+    span: {start_line: 120, end_line: 122}
+    summary: Assert logs remain out of comments and are returned in structured output.
+    rationale: Prevent raw log evidence from leaking into issue comments.
+  - path: tests/test_ci_response_policy.py
+    type: modified
+    span: {start_line: 8, end_line: 8}
+    summary: Import the bounded log record for normalization tests.
+    rationale: Validate the public evidence contract.
+  - path: tests/test_ci_response_policy.py
+    type: modified
+    span: {start_line: 94, end_line: 103}
+    summary: Include typed log evidence in normalized job fixtures.
+    rationale: Verify observations bind evidence to the correct job.
+  - path: tests/test_ci_response_policy.py
+    type: modified
+    span: {start_line: 111, end_line: 126}
+    summary: Test log evidence round trips and size validation.
+    rationale: Protect contract integrity and the excerpt size limit.
+  - path: tests/test_github_actions_transport.py
+    type: modified
+    span: {start_line: 16, end_line: 16}
+    summary: Import the shared log excerpt size limit.
+    rationale: Test transport bounds against the public contract.
+  - path: tests/test_github_actions_transport.py
+    type: modified
+    span: {start_line: 29, end_line: 46}
+    summary: Return secret-bearing text from the mock failed-job log command.
+    rationale: Verify redaction is applied before data leaves the agent.
+  - path: tests/test_github_actions_transport.py
+    type: modified
+    span: {start_line: 113, end_line: 122}
+    summary: Assert log capture, redaction, and raw digest metadata.
+    rationale: Validate the GitHub transport contract end to end.
+  - path: tests/test_github_actions_transport.py
+    type: modified
+    span: {start_line: 126, end_line: 158}
+    summary: Test explicit unavailability and excerpt truncation.
+    rationale: Preserve retrieval failures and bounded output state.
+entities:
+  - id: ci-job-log-evidence
+    type: Class
+    action: added
+invariants:
+  - id: bounded-redacted-ci-logs
+    description: Captured failing-job logs are redacted and bounded before entering service observations.
+    action: added
+    rationale: Keep diagnostics useful while limiting leaked and oversized log data.
+  - id: log-integrity-preserved
+    description: Each available excerpt retains the SHA-256 of the raw fetched content and an explicit truncation flag.
+    action: added
+    rationale: Preserve provenance despite redaction and excerpting.
+guidance: []

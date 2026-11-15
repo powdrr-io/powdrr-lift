@@ -13,10 +13,12 @@ result (PR #1527). PR #1529 adds deterministic selection of one bounded query
 for a safely identified hosted-runner rejection. This follow-up adds a CI
 research subprocess that validates the query before search, selects only
 official GitHub sources, captures at most three bounded source snapshots, and
-returns hash-bound excerpts. It does not assess source claims or dispatch a
-repair. Durable continuation through the response procedure, broader evidence
-collection, source-backed claim assessment, protected repair dispatch, and full
-publication integration remain.
+returns hash-bound excerpts (PR #1530). This follow-up binds source quotes to
+captured hashes, assesses whether each claim applies to the observed runner label
+and repository visibility, and records unresolved or accepted guidance with its
+retrieval time and applicability inputs. This result never authorizes a repair.
+Durable continuation through the response procedure, broader evidence
+collection, protected repair dispatch, and full publication integration remain.
 
 ## Outcome
 

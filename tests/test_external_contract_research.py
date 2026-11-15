@@ -160,6 +160,11 @@ def test_extract_external_evidence_is_bounded_visible_and_hash_verified(
     assert "optional label argument" in evidence["excerpts"][0]["text"]
     assert "ignore @defer label" not in json.dumps(evidence["excerpts"])
     assert sum(len(item["text"]) for item in evidence["excerpts"]) <= 8_000
+    assert (
+        evidence["excerpts"][0]["retrieved_at"]
+        == captured["sources"][0]["retrieved_at"]
+    )
+    assert evidence["excerpts"][0]["source_revision"] is None
     claim = {
         "source_ref": "external:1",
         "source_quote": "The @defer directive accepts an optional label argument.",
@@ -170,6 +175,7 @@ def test_extract_external_evidence_is_bounded_visible_and_hash_verified(
     assert bound["claim_ref"] == "claim:1"
     assert bound["canonical_url"] == "https://spec.example.org/defer"
     assert bound["content_sha256"] == hashlib.sha256(body).hexdigest()
+    assert bound["retrieved_at"] == captured["sources"][0]["retrieved_at"]
 
     reflowed_claim = {
         **claim,

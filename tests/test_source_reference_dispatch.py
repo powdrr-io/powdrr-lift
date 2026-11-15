@@ -848,7 +848,12 @@ def test_native_dispatch_validates_before_applying_candidate(
 
     def infer(request: ChatCompletionRequest) -> ChatCompletionResponse:
         requests.append(request)
-        candidate = next((tmp_path / "powdrr-source-tasks").glob("*/candidate"))
+        prompt = request.messages[1]["content"]
+        candidate = next(
+            path
+            for path in (tmp_path / "powdrr-source-tasks").rglob("candidate")
+            if str(path) in prompt
+        )
         if scenario == "parent_conflict":
             (repo / "twice.py").write_text("concurrent parent edit\n")
         if scenario == "preexisting_parent_no_progress":
@@ -950,5 +955,5 @@ def test_native_dispatch_validates_before_applying_candidate(
             assert result["status"] == "route_evidence_incomplete"
         elif scenario == "behavior_failure":
             assert result["status"] == "validation_failed", result
-    with pytest.raises(PowdrrExecutionError, match="already dispatched"):
-        dispatch.dispatch_source_reference_task(**parameters)
+    resumed = dispatch.dispatch_source_reference_task(**parameters)
+    assert resumed == result

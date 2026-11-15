@@ -8,6 +8,9 @@ outputs:
     type: string
     minLength: 1
     pattern: ^https?://[^ ]+/pull/[0-9]+$
+  ci_response_result:
+    type: object
+    additionalProperties: true
 limits: {context_chars: 60000, context_value_chars: 16000}
 steps:
   - call:
@@ -38,7 +41,7 @@ steps:
                 verification_command:
                   {type: reference, value: task_context.input_state.proposed_pr_context.verification_command}
               outputs:
-                ci_observation_result: ci_observation_result
+                ci_response_result: ci_observation_result
       default:
         - judge:
             kind: construct_one
@@ -92,7 +95,7 @@ steps:
                       verification_command:
                         {type: reference, value: task_context.input_state.proposed_pr_context.verification_command}
                     outputs:
-                      ci_observation_result: ci_observation_result
+                      ci_response_result: ci_observation_result
               implementation_defect:
                 - terminal: failed
               unclear:

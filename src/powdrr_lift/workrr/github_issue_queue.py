@@ -1033,9 +1033,13 @@ def run_worker_once(
                     )
                 else:
                     comments = client.list_comments(issue.number)
+                    task_record = _read_local_task_checkpoint(root, issue.number)
                     pull_request_url = _pull_request_url_from_task_record(
-                        _read_local_task_checkpoint(root, issue.number)
+                        task_record
                     ) or _latest_checkpoint_pull_request_url(comments)
+                    ci_response_result = _ci_response_result_from_task_record(
+                        task_record
+                    )
                     inventory = _read_repository_validation_inventory(root)
                     observation = _observe_required_ci_outcome(
                         client,
@@ -1059,6 +1063,7 @@ def run_worker_once(
                         issue=issue,
                         pull_request_url=pull_request_url,
                         observation=observation,
+                        ci_response_result=ci_response_result,
                     )
                     status = _queue_status_for_ci_outcome(ci_outcome)
                     outcome = ci_outcome
@@ -1342,6 +1347,7 @@ def continue_awaiting_ci_issue(
             f"issue #{issue_number} has no published PR checkpoint to observe"
         )
     inventory = _read_repository_validation_inventory(repo_root)
+    previous_observation = _latest_ci_outcome_observation(comments, pull_request_url)
     observation = _observe_required_ci_outcome(
         client,
         pull_request_url,
@@ -1350,13 +1356,19 @@ def continue_awaiting_ci_issue(
         validation_input_paths=(
             inventory["input_paths"] if inventory is not None else None
         ),
-        previous_observation=_latest_ci_outcome_observation(comments, pull_request_url),
+        previous_observation=previous_observation,
     )
     _append_ci_outcome_checkpoint(
         client=client,
         issue=issue,
         pull_request_url=pull_request_url,
         observation=observation,
+        ci_response_result=(
+            previous_observation.get("ci_response_result")
+            if previous_observation is not None
+            and isinstance(previous_observation.get("ci_response_result"), Mapping)
+            else None
+        ),
     )
     outcome = str(observation["outcome"])
     status = _queue_status_for_ci_outcome(outcome)
@@ -2639,6 +2651,59 @@ def _pull_request_url_from_task_record(
     return value if isinstance(value, str) else None
 
 
+def _ci_response_result_from_task_record(
+    record: Mapping[str, Any] | None,
+) -> dict[str, Any] | None:
+    """Read the structured CI response produced by the completed task workflow."""
+    if (
+        record is None
+        or record.get("status") != "completed"
+        or record.get("output_state_type")
+        != "execute-proposed-pr-workflow-result-state"
+    ):
+        return None
+    output_state = record.get("output_state")
+    result = (
+        output_state.get("ci_response_result")
+        if isinstance(output_state, Mapping)
+        else None
+    )
+    if not isinstance(result, Mapping):
+        return None
+    response_state = result.get("response_state")
+    head_sha = result.get("head_sha")
+    observation_id = result.get("observation_id")
+    if (
+        result.get("observation_schema_version") != 1
+        or not isinstance(response_state, str)
+        or response_state not in {"awaiting_ci", "awaiting_review", "failed", "blocked"}
+        or not isinstance(head_sha, str)
+        or re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", head_sha) is None
+        or not isinstance(observation_id, str)
+        or re.fullmatch(r"[0-9a-f]{64}", observation_id) is None
+    ):
+        return None
+    waited_seconds = result.get("waited_seconds", 0)
+    if not isinstance(waited_seconds, int) or waited_seconds < 0:
+        waited_seconds = 0
+    required_checks_status = result.get("required_checks_status")
+    if not isinstance(required_checks_status, str) or required_checks_status not in {
+        "available",
+        "unavailable",
+    }:
+        required_checks_status = "unavailable"
+    return {
+        "schema_version": 1,
+        "head_sha": head_sha,
+        "observation_id": observation_id,
+        "response_state": response_state,
+        "response_reason": str(result.get("response_reason", ""))[:500],
+        "required_checks_status": required_checks_status,
+        "waited_seconds": waited_seconds,
+        "wait_deadline_reached": result.get("wait_deadline_reached") is True,
+    }
+
+
 _CI_OUTCOME_MARKER = "<!-- powdrr-ci-outcome:v1 -->"
 
 
@@ -3192,7 +3257,10 @@ def _queue_status_for_ci_outcome(outcome: str) -> str:
 
 
 def _render_ci_outcome_checkpoint(
-    *, pull_request_url: str | None, observation: Mapping[str, Any]
+    *,
+    pull_request_url: str | None,
+    observation: Mapping[str, Any],
+    ci_response_result: Mapping[str, Any] | None = None,
 ) -> str:
     checkpoint_url = pull_request_url or observation.get("pull_request_url")
     payload = {
@@ -3211,6 +3279,11 @@ def _render_ci_outcome_checkpoint(
         ),
         "last_remote_observed_at": observation.get("last_remote_observed_at"),
     }
+    response_result = _normalize_ci_response_for_checkpoint(
+        ci_response_result, expected_head_sha=observation.get("head_sha")
+    )
+    if response_result is not None:
+        payload["ci_response_result"] = response_result
     fingerprint = hashlib.sha256(
         json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
     ).hexdigest()[:16]
@@ -3264,7 +3337,7 @@ def _latest_ci_outcome_observation(
         ).hexdigest()[:16]
         if fingerprint != fingerprint_match.group(1):
             continue
-        return {
+        result = {
             "pull_request_url": payload.get("pull_request_url"),
             "outcome": payload.get("outcome"),
             "head_sha": payload.get("head_sha"),
@@ -3279,6 +3352,14 @@ def _latest_ci_outcome_observation(
             ),
             "last_remote_observed_at": payload.get("last_remote_observed_at"),
         }
+        response_result = payload.get("ci_response_result")
+        if isinstance(response_result, Mapping):
+            normalized_response = _normalize_ci_response_for_checkpoint(
+                response_result, expected_head_sha=payload.get("head_sha")
+            )
+            if normalized_response is not None:
+                result["ci_response_result"] = normalized_response
+        return result
     return None
 
 
@@ -3288,9 +3369,12 @@ def _append_ci_outcome_checkpoint(
     issue: QueueIssue,
     pull_request_url: str | None,
     observation: Mapping[str, Any],
+    ci_response_result: Mapping[str, Any] | None = None,
 ) -> None:
     comment = _render_ci_outcome_checkpoint(
-        pull_request_url=pull_request_url, observation=observation
+        pull_request_url=pull_request_url,
+        observation=observation,
+        ci_response_result=ci_response_result,
     )
     fingerprint = re.search(r"Observation `([0-9a-f]{16})`", comment)
     if fingerprint is not None and any(
@@ -3300,6 +3384,42 @@ def _append_ci_outcome_checkpoint(
     ):
         return
     client.add_comment(issue, comment)
+
+
+def _normalize_ci_response_for_checkpoint(
+    result: Mapping[str, Any] | None, *, expected_head_sha: object
+) -> dict[str, Any] | None:
+    if result is None:
+        return None
+    head_sha = result.get("head_sha")
+    observation_id = result.get("observation_id")
+    response_state = result.get("response_state")
+    if (
+        not isinstance(head_sha, str)
+        or re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", head_sha) is None
+        or not isinstance(observation_id, str)
+        or re.fullmatch(r"[0-9a-f]{64}", observation_id) is None
+        or not isinstance(response_state, str)
+        or response_state not in {"awaiting_ci", "awaiting_review", "failed", "blocked"}
+    ):
+        return None
+    checks_status = result.get("required_checks_status")
+    waited_seconds = result.get("waited_seconds", 0)
+    if checks_status not in {"available", "unavailable"}:
+        checks_status = "unavailable"
+    if not isinstance(waited_seconds, int) or waited_seconds < 0:
+        waited_seconds = 0
+    return {
+        "schema_version": 1,
+        "head_sha": head_sha,
+        "observation_id": observation_id,
+        "response_state": response_state,
+        "response_reason": str(result.get("response_reason", ""))[:500],
+        "required_checks_status": checks_status,
+        "waited_seconds": min(waited_seconds, 3600),
+        "wait_deadline_reached": result.get("wait_deadline_reached") is True,
+        "matches_queue_head": head_sha == expected_head_sha,
+    }
 
 
 def _ci_outcome_note(

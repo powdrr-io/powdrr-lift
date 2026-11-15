@@ -1,0 +1,149 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1527
+title: Persist Procedrr CI response outcomes in the issue queue
+intent:
+  problem: The issue queue independently observed required CI but discarded the structured response result produced by the Procedrr workflow.
+  goal: Preserve the response result beside the queue's fresh current-head validation observation, without treating the workflow exit code or response state as proof that review can proceed.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/plans/procedrr-ci-response-action.md
+    type: modified
+    span: {start_line: 10, end_line: 14}
+    summary: Record structured response checkpointing as implemented and list remaining response continuation and repair work.
+    rationale: Keep plan progress accurate after queue integration.
+  - path: packages/service/src/powdrr_service/resources/processes/execute-proposed-pr-workflow.yaml
+    type: modified
+    span: {start_line: 11, end_line: 13}
+    summary: Add the structured CI response result to the durable workflow output.
+    rationale: Make the response available to the issue worker after publication.
+  - path: packages/service/src/powdrr_service/resources/processes/execute-proposed-pr-workflow.yaml
+    type: modified
+    span: {start_line: 44, end_line: 44}
+    summary: Bind the successful implementation PR response result to the workflow output.
+    rationale: Preserve CI state on the normal publication path.
+  - path: packages/service/src/powdrr_service/resources/processes/execute-proposed-pr-workflow.yaml
+    type: modified
+    span: {start_line: 98, end_line: 98}
+    summary: Bind the plan-amendment PR response result to the workflow output.
+    rationale: Preserve CI state when implementation discovers a reviewed plan defect.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 1036, end_line: 1036}
+    summary: Read the completed task checkpoint once after the worker returns.
+    rationale: Use its published PR URL and structured response result consistently.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 1038, end_line: 1038}
+    summary: Reuse the loaded task checkpoint for PR URL lookup.
+    rationale: Avoid a redundant local checkpoint read.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 1040, end_line: 1042}
+    summary: Extract the validated response result from completed workflow output.
+    rationale: Carry Procedrr's state into the durable queue observation.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 1066, end_line: 1066}
+    summary: Attach response evidence to the queue checkpoint.
+    rationale: Keep the response result alongside independently observed check status.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 1350, end_line: 1350}
+    summary: Load the last intact queue observation before awaiting-CI continuation.
+    rationale: Preserve response evidence across resumed check observations.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 1359, end_line: 1359}
+    summary: Reuse the loaded observation when refreshing current required checks.
+    rationale: Keep continuation bound to the prior observation for staleness checks.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 1366, end_line: 1371}
+    summary: Carry the prior structured response into the continuation checkpoint.
+    rationale: Retain response evidence while the queue records a fresh CI outcome.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 2654, end_line: 2706}
+    summary: Validate and normalize response results from completed task checkpoints.
+    rationale: Reject malformed state, head, and observation identifiers at the queue boundary.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 3260, end_line: 3263}
+    summary: Accept an optional response result when rendering a required-CI checkpoint.
+    rationale: Keep the task response and queue decision in one durable record.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 3282, end_line: 3286}
+    summary: Add normalized response evidence to the checkpoint fingerprint and payload.
+    rationale: Make response-state changes visible and integrity-bound.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 3340, end_line: 3340}
+    summary: Build a mutable parsed observation before adding optional response evidence.
+    rationale: Retain the original queue fields while parsing the response result.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 3355, end_line: 3362}
+    summary: Read valid response evidence from the latest intact queue checkpoint.
+    rationale: Allow awaiting-CI continuation to retain its original response result.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 3372, end_line: 3372}
+    summary: Accept response evidence when appending a queue checkpoint.
+    rationale: Pass structured state through to deterministic rendering.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 3375, end_line: 3377}
+    summary: Forward response evidence into checkpoint rendering.
+    rationale: Store the validated result with the current queue observation.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 3389, end_line: 3424}
+    summary: Normalize response state and mark whether its head matches the queue observation.
+    rationale: Preserve mismatched-head evidence without allowing it to authorize review.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 4, end_line: 4}
+    summary: Import regular-expression parsing for checkpoint assertions.
+    rationale: Inspect the serialized queue result in worker tests.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 2291, end_line: 2291}
+    summary: Include worker detail when the pending-check assertion fails.
+    rationale: Improve diagnosis of queue-state regressions.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 2302, end_line: 2359}
+    summary: Verify an `awaiting_review` response cannot override fresh pending required checks.
+    rationale: Ensure the queue keeps its independent current-head validation as the review gate.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 2392, end_line: 2417}
+    summary: Seed an awaiting-CI continuation with structured response evidence.
+    rationale: Exercise response-state persistence across the existing continuation path.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 2428, end_line: 2433}
+    summary: Verify continuation preserves the response result and head binding.
+    rationale: Prevent durable response evidence from disappearing after refresh.
+  - path: tests/test_procedrr_chat.py
+    type: modified
+    span: {start_line: 154, end_line: 160}
+    summary: Verify both the declared workflow output and successful publication mapping.
+    rationale: Protect the serialized handoff from Procedrr to the issue worker.
+entities: []
+entity_relationships: []
+invariants:
+  - id: queue-review-requires-fresh-required-checks
+    description: The worker's queue outcome comes from its fresh current-head required-check and validation-inventory observation, not from the workflow exit code or response result alone.
+    action: added
+    rationale: Keep queue review readiness tied to independently verified GitHub state.
+  - id: ci-response-result-retains-head-binding
+    description: Response evidence is normalized with its head SHA and explicitly records whether it matches the queue observation head.
+    action: added
+    rationale: Prevent a stale response state from being mistaken for evidence about a newer PR commit.
+guidance:
+  - id: ci-response-result-is-evidence
+    description: Treat the serialized CI response as diagnostic evidence; use the queue's fresh required-check observation to assign the issue's queue state.
+    action: added

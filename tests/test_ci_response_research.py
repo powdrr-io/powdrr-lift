@@ -231,6 +231,9 @@ def test_ci_research_procedure_captures_only_official_sources_and_excerpts(
         "GitHub Actions macOS 14 hosted runners are available for public repositories. "
         "Runner labels determine the selected image."
     )
+    source_quote = (
+        "GitHub Actions macOS 14 hosted runners are available for public repositories."
+    )
 
     def search_with_fixture(
         queries: object,
@@ -299,24 +302,65 @@ def test_ci_research_procedure_captures_only_official_sources_and_excerpts(
             response_schema: Mapping[str, Any] | None = None,
         ) -> dict[str, Any]:
             assert response_schema is not None
-            assert set(response_schema["required"]) == {"rationale", "selections"}
-            return {
-                "rationale": "Select the official GitHub documentation.",
-                "selections": [
-                    {
-                        "query_index": 1,
-                        "result_rank": 1,
-                        "why_applicable": (
-                            "This is the official hosted-runner reference."
-                        ),
-                    },
-                    {
-                        "query_index": 1,
-                        "result_rank": 2,
-                        "why_applicable": "This third-party list is not authoritative.",
-                    },
-                ],
-            }
+            required = set(response_schema["required"])
+            if required == {"rationale", "selections"}:
+                return {
+                    "rationale": "Select the official GitHub documentation.",
+                    "selections": [
+                        {
+                            "query_index": 1,
+                            "result_rank": 1,
+                            "why_applicable": (
+                                "This is the official hosted-runner reference."
+                            ),
+                        },
+                        {
+                            "query_index": 1,
+                            "result_rank": 2,
+                            "why_applicable": (
+                                "This third-party list is not authoritative."
+                            ),
+                        },
+                    ],
+                }
+            if required == {"claims"}:
+                return {
+                    "claims": [
+                        {
+                            "source_quote": source_quote,
+                            "candidate_requirement": (
+                                "The macOS 14 hosted runner is available for "
+                                "public repositories."
+                            ),
+                            "affected_surface": (
+                                "GitHub Actions hosted runner label macos-14"
+                            ),
+                        }
+                    ]
+                }
+            if required == {
+                "decision",
+                "requirement",
+                "rationale",
+                "profile_compatibility",
+                "assumption_basis",
+            }:
+                return {
+                    "decision": "accept",
+                    "requirement": (
+                        "Treat macos-14 as available for the observed public "
+                        "repository."
+                    ),
+                    "rationale": (
+                        "The official excerpt explicitly covers public repositories."
+                    ),
+                    "profile_compatibility": (
+                        "The source matches the observed macos-14 label and "
+                        "public visibility."
+                    ),
+                    "assumption_basis": None,
+                }
+            pytest.fail(f"Unexpected model schema: {required}")
 
     evaluator = Evaluator(
         ProcedrrModelClient(Planning(), process_directory=process_dir),
@@ -332,6 +376,7 @@ def test_ci_research_procedure_captures_only_official_sources_and_excerpts(
 
     sources = result.bindings["ci_research_sources"]
     evidence = result.bindings["ci_research_evidence"]
+    assessment = result.bindings["ci_research_assessment"]
     assert sources["captured_count"] == 1
     assert sources["unavailable_count"] == 0
     assert len(sources["sources"]) == 1
@@ -343,6 +388,159 @@ def test_ci_research_procedure_captures_only_official_sources_and_excerpts(
         == hashlib.sha256(source_text.encode("utf-8")).hexdigest()
     )
     assert json.loads(Path(evidence["path"]).read_text())["has_excerpts"] is True
+    assert assessment["status"] == "applicable_guidance"
+    assert assessment["repair_authorized"] is False
+    assert assessment["claims"][0]["source_quote"] == source_quote
+    assert assessment["claims"][0]["retrieved_at"] == "2026-11-15T00:00:00+00:00"
+    assert assessment["claims"][0]["applicability_inputs"] == {
+        "runner_label": "macos-14-arm64-us-default",
+        "repository_visibility": "public",
+        "runner_assignment": "not_assigned",
+    }
+    assert (
+        json.loads(Path(assessment["path"]).read_text())["repair_authorized"] is False
+    )
+
+    from powdrr_service.ci_response.research import (
+        finalize_ci_research_assessment,
+    )
+
+    forged_claims = [{**assessment["claims"][0], "content_sha256": "0" * 64}]
+    with pytest.raises(ValueError, match="not bound to a captured source"):
+        finalize_ci_research_assessment(
+            plan.to_dict(),
+            sources,
+            evidence,
+            forged_claims,
+            [],
+            {
+                "requirements": assessment["requirements"],
+                "dispositions": assessment["dispositions"],
+            },
+            artifact_root=tmp_path / "forged",
+        )
+    forged_quote_claims = [
+        {**assessment["claims"][0], "source_quote": "unsubstantiated platform fact"}
+    ]
+    with pytest.raises(ValueError, match="quote does not match its bound excerpt"):
+        finalize_ci_research_assessment(
+            plan.to_dict(),
+            sources,
+            evidence,
+            forged_quote_claims,
+            [],
+            {
+                "requirements": assessment["requirements"],
+                "dispositions": assessment["dispositions"],
+            },
+            artifact_root=tmp_path / "forged-quote",
+        )
+
+
+def test_ci_research_finalizer_records_no_sources_as_unavailable(
+    tmp_path: Path,
+) -> None:
+    from powdrr_service.ci_response.research import finalize_ci_research_assessment
+
+    plan = build_ci_research_plan(_failure(), _job()).to_dict()
+    result = finalize_ci_research_assessment(
+        plan,
+        {"path": str(tmp_path / "sources.json"), "sources": []},
+        {
+            "path": str(tmp_path / "evidence.json"),
+            "sources": [],
+            "excerpts": [],
+            "has_excerpts": False,
+        },
+        [],
+        [],
+        {"requirements": [], "dispositions": []},
+        artifact_root=tmp_path / "artifacts",
+    )
+
+    assert result["status"] == "sources_unavailable"
+    assert result["repair_authorized"] is False
+    assert result["claims"] == []
+
+
+def test_ci_research_finalizer_preserves_unresolved_source_claims(
+    tmp_path: Path,
+) -> None:
+    from powdrr_service.ci_response.research import (
+        bind_ci_research_assessments,
+        finalize_ci_research_assessment,
+    )
+
+    head = "a" * 40
+    plan = build_ci_research_plan(
+        _failure(head_sha=head), _job(head_sha=head)
+    ).to_dict()
+    source_ref = "external:1"
+    body = (
+        "GitHub Actions macOS 14 hosted runners are available for public repositories."
+    )
+    digest = hashlib.sha256(body.encode("utf-8")).hexdigest()
+    source = {
+        "source_ref": source_ref,
+        "status": "captured",
+        "canonical_url": "https://docs.github.com/actions/hosted-runners",
+        "content_sha256": digest,
+        "retrieved_at": "2026-11-15T00:00:00+00:00",
+        "source_revision": None,
+    }
+    quote = body
+    claim = {
+        "claim_ref": "claim:1",
+        "source_ref": source_ref,
+        "canonical_url": source["canonical_url"],
+        "content_sha256": digest,
+        "source_quote": quote,
+        "quoted_char_span": [0, len(quote)],
+        "candidate_requirement": "macos-14 is supported for public repositories",
+        "affected_surface": "macos-14 hosted runner",
+    }
+    assessment_result = bind_ci_research_assessments(
+        [claim],
+        [
+            {
+                "decision": "unresolved",
+                "requirement": None,
+                "rationale": "The repository visibility is not established.",
+                "profile_compatibility": "Visibility does not match the source claim.",
+                "assumption_basis": None,
+            }
+        ],
+    )
+    result = finalize_ci_research_assessment(
+        plan,
+        {"path": str(tmp_path / "sources.json"), "sources": [source]},
+        {
+            "path": str(tmp_path / "evidence.json"),
+            "sources": [{"source_ref": source_ref, "status": "available"}],
+            "excerpts": [
+                {
+                    "source_ref": source_ref,
+                    "canonical_url": source["canonical_url"],
+                    "content_sha256": digest,
+                    "normalized_char_span": [0, len(quote)],
+                    "text": quote,
+                }
+            ],
+            "has_excerpts": True,
+        },
+        [claim],
+        [],
+        assessment_result,
+        artifact_root=tmp_path / "artifacts",
+    )
+
+    assert result["status"] == "unresolved"
+    assert result["requirements"] == []
+    assert (
+        result["unresolved_claims"][0]["claim"]["retrieved_at"]
+        == source["retrieved_at"]
+    )
+    assert result["repair_authorized"] is False
 
 
 @pytest.mark.parametrize(

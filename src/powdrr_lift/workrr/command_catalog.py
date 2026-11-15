@@ -18,7 +18,9 @@ from powdrr_service.behavior_contract import (
     validate_normative_assumptions,
 )
 from powdrr_service.ci_response.research import (
+    bind_ci_research_assessments,
     bind_ci_research_source_selections,
+    finalize_ci_research_assessment,
     prepare_ci_research_search,
 )
 from powdrr_service.decision_obligation import content_fingerprint
@@ -333,6 +335,72 @@ def feature_command_catalog(
                 },
             },
             logic=implementations.get("capture_ci_research_sources"),
+        ),
+        "finalize_ci_research_assessment": CommandSpec(
+            name="finalize_ci_research_assessment",
+            input_schema=object_schema(
+                {
+                    "research_plan": {"type": "object"},
+                    "captured_sources": {"type": "object"},
+                    "evidence": {"type": "object"},
+                    "claims": {"type": "array", "maxItems": 6},
+                    "rejected_claims": {"type": "array", "maxItems": 6},
+                    "assessment_result": {"type": "object"},
+                },
+                required=(
+                    "research_plan",
+                    "captured_sources",
+                    "evidence",
+                    "claims",
+                    "rejected_claims",
+                    "assessment_result",
+                ),
+                additional_properties=False,
+            ),
+            output_schema={
+                "type": "object",
+                "required": [
+                    "path",
+                    "status",
+                    "claims",
+                    "rejected_claims",
+                    "requirements",
+                    "dispositions",
+                    "unresolved_claims",
+                    "repair_authorized",
+                ],
+                "properties": {
+                    "path": {"type": "string"},
+                    "status": {"type": "string"},
+                    "claims": {"type": "array", "maxItems": 6},
+                    "rejected_claims": {"type": "array", "maxItems": 6},
+                    "requirements": {"type": "array", "maxItems": 6},
+                    "dispositions": {"type": "array", "maxItems": 6},
+                    "unresolved_claims": {"type": "array", "maxItems": 6},
+                    "repair_authorized": {"type": "boolean", "const": False},
+                },
+            },
+            logic=implementations.get("finalize_ci_research_assessment"),
+        ),
+        "bind_ci_research_assessments": CommandSpec(
+            name="bind_ci_research_assessments",
+            input_schema=object_schema(
+                {
+                    "claims": {"type": "array", "maxItems": 6},
+                    "assessments": {"type": "array", "maxItems": 6},
+                },
+                required=("claims", "assessments"),
+                additional_properties=False,
+            ),
+            output_schema={
+                "type": "object",
+                "required": ["requirements", "dispositions"],
+                "properties": {
+                    "requirements": {"type": "array", "maxItems": 6},
+                    "dispositions": {"type": "array", "maxItems": 6},
+                },
+            },
+            logic=implementations.get("bind_ci_research_assessments"),
         ),
         "bind_external_contract_search_selections": CommandSpec(
             name="bind_external_contract_search_selections",
@@ -1285,6 +1353,65 @@ class FeatureCommandRuntime:
                 rationale=str(parameters.get("rationale", "")),
                 allowed_hosts=("docs.github.com", "github.blog"),
             )
+        if name == "finalize_ci_research_assessment":
+            mapping_fields = (
+                "research_plan",
+                "captured_sources",
+                "evidence",
+                "assessment_result",
+            )
+            if any(
+                not isinstance(parameters.get(field), Mapping)
+                for field in mapping_fields
+            ):
+                raise PowdrrExecutionError(
+                    "CI research assessment records are malformed"
+                )
+            claims = parameters.get("claims")
+            rejected_claims = parameters.get("rejected_claims")
+            if (
+                not isinstance(claims, list)
+                or not isinstance(rejected_claims, list)
+                or len(claims) > 6
+                or len(rejected_claims) > 6
+                or not all(
+                    isinstance(item, Mapping) for item in (*claims, *rejected_claims)
+                )
+            ):
+                raise PowdrrExecutionError(
+                    "CI research claims exceed the validated limit"
+                )
+            try:
+                return finalize_ci_research_assessment(
+                    parameters["research_plan"],
+                    parameters["captured_sources"],
+                    parameters["evidence"],
+                    claims,
+                    rejected_claims,
+                    parameters["assessment_result"],
+                    artifact_root=output_root,
+                )
+            except (OSError, TypeError, ValueError) as error:
+                raise PowdrrExecutionError(
+                    f"CI research assessment could not be finalized: {error}"
+                ) from error
+        if name == "bind_ci_research_assessments":
+            claims = parameters.get("claims")
+            assessments = parameters.get("assessments")
+            if (
+                not isinstance(claims, list)
+                or not isinstance(assessments, list)
+                or len(claims) > 6
+                or len(assessments) > 6
+                or not all(
+                    isinstance(item, Mapping) for item in (*claims, *assessments)
+                )
+            ):
+                raise PowdrrExecutionError("CI research assessment lists are malformed")
+            try:
+                return bind_ci_research_assessments(claims, assessments)
+            except ValueError as error:
+                raise PowdrrExecutionError(str(error)) from error
         if name == "bind_external_contract_search_selections":
             search_results = parameters.get("search_results")
             if not isinstance(search_results, Mapping):

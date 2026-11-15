@@ -1,0 +1,167 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1532
+title: Assess CI research source claims
+intent:
+  problem: Bounded CI research captured official source excerpts but did not determine whether their claims applied to the observed runner label and repository visibility.
+  goal: Bind exact source claims, record applicability or uncertainty with retrieval context, and ensure research never authorizes a repair.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/plans/procedrr-ci-response-action.md
+  type: modified
+  span: {start_line: 16, end_line: 21}
+  summary: Record source claim assessment and the remaining CI response work.
+  rationale: Keep the implementation plan aligned with the completed claim assessment slice.
+- path: packages/service/src/powdrr_service/ci_response/__init__.py
+  type: modified
+  span: {start_line: 24, end_line: 24}
+  summary: Export CI research assessment binding.
+  rationale: Make the CI-specific non-normative claim assessment available to the process runtime.
+- path: packages/service/src/powdrr_service/ci_response/__init__.py
+  type: modified
+  span: {start_line: 27, end_line: 27}
+  summary: Export CI research assessment finalization.
+  rationale: Allow the process runtime to persist the validated assessment artifact.
+- path: packages/service/src/powdrr_service/ci_response/__init__.py
+  type: modified
+  span: {start_line: 37, end_line: 37}
+  summary: Publish the assessment binder in the package API.
+  rationale: Keep the package export list consistent with the imported function.
+- path: packages/service/src/powdrr_service/ci_response/__init__.py
+  type: modified
+  span: {start_line: 42, end_line: 42}
+  summary: Publish the assessment finalizer in the package API.
+  rationale: Keep the package export list consistent with the imported function.
+- path: packages/service/src/powdrr_service/ci_response/research.py
+  type: modified
+  span: {start_line: 5, end_line: 5}
+  summary: Import JSON serialization for the persisted research assessment.
+  rationale: Write the assessment as a stable, readable JSON artifact.
+- path: packages/service/src/powdrr_service/ci_response/research.py
+  type: modified
+  span: {start_line: 7, end_line: 7}
+  summary: Accept bounded assessment sequences.
+  rationale: Type the claims and dispositions handled by CI-specific assessment functions.
+- path: packages/service/src/powdrr_service/ci_response/research.py
+  type: modified
+  span: {start_line: 9, end_line: 9}
+  summary: Import filesystem paths for assessment artifact storage.
+  rationale: Place the final assessment under the configured artifact root.
+- path: packages/service/src/powdrr_service/ci_response/research.py
+  type: modified
+  span: {start_line: 17, end_line: 17}
+  summary: Reuse external claim assessment binding.
+  rationale: Apply shared source lineage checks while disabling benchmark assumptions for CI guidance.
+- path: packages/service/src/powdrr_service/ci_response/research.py
+  type: modified
+  span: {start_line: 281, end_line: 474}
+  summary: Validate source hashes and quote spans, retain retrieval and applicability context, and persist bounded dispositions.
+  rationale: Make CI research guidance auditable while keeping repair authorization false.
+- path: packages/service/src/powdrr_service/ci_response/research.py
+  type: modified
+  span: {start_line: 487, end_line: 487}
+  summary: Export CI assessment binding.
+  rationale: Expose the function to package and runtime integration.
+- path: packages/service/src/powdrr_service/ci_response/research.py
+  type: modified
+  span: {start_line: 490, end_line: 490}
+  summary: Export CI assessment finalization.
+  rationale: Expose the artifact finalizer to package and runtime integration.
+- path: packages/service/src/powdrr_service/external_contract_research.py
+  type: modified
+  span: {start_line: 163, end_line: 164}
+  summary: Attach retrieval time and source revision to extracted excerpts.
+  rationale: Preserve source freshness metadata through evidence extraction.
+- path: packages/service/src/powdrr_service/external_contract_research.py
+  type: modified
+  span: {start_line: 382, end_line: 383}
+  summary: Carry retrieval time and source revision into bound claims.
+  rationale: Retain the provenance required for applicability review.
+- path: packages/service/src/powdrr_service/resources/processes/research-ci-response-failure.yaml
+  type: modified
+  span: {start_line: 25, end_line: 38}
+  summary: Declare the assessment artifact contract and bounded process budget.
+  rationale: Constrain output statuses, list sizes, model activations, and the false repair authorization state.
+- path: packages/service/src/powdrr_service/resources/processes/research-ci-response-failure.yaml
+  type: modified
+  span: {start_line: 152, end_line: 305}
+  summary: Derive exact source claims, bind them to excerpts, assess applicability, and finalize the research artifact.
+  rationale: Separate source-supported claims from unresolved or inapplicable guidance without granting repair authority.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span: {start_line: 21, end_line: 21}
+  summary: Import the CI-specific assessment binder.
+  rationale: Register the typed operation in the feature command catalog.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span: {start_line: 23, end_line: 23}
+  summary: Import the CI research assessment finalizer.
+  rationale: Register the typed artifact operation in the feature command catalog.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span: {start_line: 339, end_line: 404}
+  summary: Define schemas and bounds for assessment binding and finalization operations.
+  rationale: Keep process inputs and outputs within the claim and artifact limits.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span: {start_line: 1356, end_line: 1414}
+  summary: Validate assessment arguments and dispatch the CI-specific operations.
+  rationale: Reject malformed and oversized data before binding or writing artifacts.
+- path: tests/test_ci_response_research.py
+  type: modified
+  span: {start_line: 234, end_line: 236}
+  summary: Define an exact captured quote for the research workflow test.
+  rationale: Exercise verbatim source claim binding.
+- path: tests/test_ci_response_research.py
+  type: modified
+  span: {start_line: 305, end_line: 363}
+  summary: Exercise source claim generation and applicability assessment in the research process.
+  rationale: Verify the model outputs are bound through validated process operations.
+- path: tests/test_ci_response_research.py
+  type: modified
+  span: {start_line: 379, end_line: 379}
+  summary: Read the assessment result from the process output.
+  rationale: Assert persisted assessment behavior alongside captured sources and excerpts.
+- path: tests/test_ci_response_research.py
+  type: modified
+  span: {start_line: 391, end_line: 543}
+  summary: Verify applicable, unavailable, unresolved, and forged assessment cases.
+  rationale: Confirm exact quote and hash validation, retained provenance, and disabled repair authorization.
+- path: tests/test_external_contract_research.py
+  type: modified
+  span: {start_line: 163, end_line: 167}
+  summary: Assert excerpts retain retrieval and source revision metadata.
+  rationale: Ensure evidence extraction preserves the context needed for assessment.
+- path: tests/test_external_contract_research.py
+  type: modified
+  span: {start_line: 178, end_line: 178}
+  summary: Assert bound claims retain source revision metadata.
+  rationale: Verify provenance passes through claim binding.
+entities:
+- id: bind-ci-research-assessments
+  type: Function
+  action: added
+- id: finalize-ci-research-assessment
+  type: Function
+  action: added
+- id: ci-research-assessment-process
+  type: Workflow
+  action: added
+- id: ci-research-assessment-tests
+  type: Unit test
+  action: added
+entity_relationships: []
+invariants:
+- id: ci-research-claim-requires-exact-captured-quote
+  description: A CI research claim is retained only when its quote span and source hash bind to captured evidence.
+  action: added
+- id: ci-research-never-authorizes-repair
+  description: The CI research assessment artifact always records repair_authorized as false.
+  action: added
+- id: ci-research-ambiguity-remains-unresolved
+  description: Ambiguous source applicability remains unresolved rather than being inferred as a runner replacement or repair instruction.
+  action: added
+guidance:
+- id: ci-research-applicability-requires-observed-context
+  description: Assess source claims against the observed runner label, repository visibility, and runner assignment while retaining retrieval time and source revision.
+  action: added

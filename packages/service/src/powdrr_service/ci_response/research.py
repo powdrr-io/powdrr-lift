@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import json
 import re
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Literal
 from urllib.parse import urlsplit
 
@@ -12,6 +14,7 @@ from powdrr_contracts.ci import CIJobObservation
 
 from powdrr_service.ci_response.evidence import CIFailureUnit
 from powdrr_service.external_contract_research import (
+    bind_external_contract_assessments,
     bind_external_contract_search_selections,
 )
 
@@ -275,6 +278,200 @@ def bind_ci_research_source_selections(
     return {"requests": requests, "rejected_selections": rejected}
 
 
+def finalize_ci_research_assessment(
+    research_plan: Mapping[str, Any],
+    captured_sources: Mapping[str, Any],
+    evidence: Mapping[str, Any],
+    claims: Sequence[Mapping[str, Any]],
+    rejected_claims: Sequence[Mapping[str, Any]],
+    assessment_result: Mapping[str, Any],
+    *,
+    artifact_root: Path,
+) -> dict[str, Any]:
+    """Persist source-backed claim dispositions without authorizing repairs."""
+    prepared = prepare_ci_research_search(research_plan)
+    original_query = research_plan["queries"][0]
+    query_applicability = original_query["applicability"]
+    applicability_inputs = {
+        "runner_label": query_applicability["runner_label"],
+        "repository_visibility": query_applicability["repository_visibility"],
+        "runner_assignment": query_applicability["runner_assignment"],
+    }
+    sources = captured_sources.get("sources")
+    excerpts = evidence.get("excerpts")
+    requirements = assessment_result.get("requirements")
+    dispositions = assessment_result.get("dispositions")
+    if (
+        not isinstance(sources, list)
+        or not isinstance(excerpts, list)
+        or not isinstance(requirements, list)
+        or not isinstance(dispositions, list)
+        or len(sources) > 3
+        or len(excerpts) > 6
+        or len(requirements) > 6
+        or len(dispositions) > 6
+    ):
+        raise ValueError("CI research assessment inputs are malformed")
+    if evidence.get("has_excerpts") is not bool(excerpts):
+        raise ValueError("CI research evidence excerpt status is inconsistent")
+    source_by_ref = {
+        str(source.get("source_ref")): source
+        for source in sources
+        if isinstance(source, Mapping)
+        and source.get("status") == "captured"
+        and isinstance(source.get("source_ref"), str)
+        and isinstance(source.get("content_sha256"), str)
+    }
+    for excerpt in excerpts:
+        if not isinstance(excerpt, Mapping):
+            raise ValueError("CI research evidence excerpt is malformed")
+        source = source_by_ref.get(str(excerpt.get("source_ref")))
+        if (
+            source is None
+            or excerpt.get("content_sha256") != source.get("content_sha256")
+            or excerpt.get("canonical_url") != source.get("canonical_url")
+        ):
+            raise ValueError("CI research excerpt does not match its captured source")
+    excerpts_by_source: dict[str, list[Mapping[str, Any]]] = {}
+    for excerpt in excerpts:
+        source_ref = excerpt.get("source_ref")
+        if isinstance(source_ref, str):
+            excerpts_by_source.setdefault(source_ref, []).append(excerpt)
+
+    if len(claims) > 6 or len(rejected_claims) > 6:
+        raise ValueError("CI research claims exceed the excerpt-bound limit")
+    for claim in claims:
+        claim_ref = claim.get("claim_ref")
+        source = source_by_ref.get(str(claim.get("source_ref")))
+        if (
+            not isinstance(claim_ref, str)
+            or source is None
+            or claim.get("content_sha256") != source.get("content_sha256")
+            or claim.get("canonical_url") != source.get("canonical_url")
+        ):
+            raise ValueError("CI research claim is not bound to a captured source")
+        quote = claim.get("source_quote")
+        quote_span = claim.get("quoted_char_span")
+        quote_is_bound = False
+        if (
+            isinstance(quote, str)
+            and isinstance(quote_span, list)
+            and len(quote_span) == 2
+            and all(isinstance(offset, int) for offset in quote_span)
+        ):
+            for excerpt in excerpts_by_source.get(str(claim.get("source_ref")), []):
+                excerpt_span = excerpt.get("normalized_char_span")
+                excerpt_text = excerpt.get("text")
+                if (
+                    not isinstance(excerpt_span, list)
+                    or len(excerpt_span) != 2
+                    or not all(isinstance(offset, int) for offset in excerpt_span)
+                    or not isinstance(excerpt_text, str)
+                ):
+                    continue
+                start = quote_span[0] - excerpt_span[0]
+                end = quote_span[1] - excerpt_span[0]
+                if (
+                    0 <= start <= end <= len(excerpt_text)
+                    and excerpt_text[start:end] == quote
+                ):
+                    quote_is_bound = True
+                    break
+        if not quote_is_bound:
+            raise ValueError("CI research claim quote does not match its bound excerpt")
+        if not isinstance(source.get("retrieved_at"), str):
+            raise ValueError("CI research source has no retrieval time")
+    enriched_claims: list[dict[str, Any]] = []
+    for claim in claims:
+        source = source_by_ref[str(claim["source_ref"])]
+        enriched_claims.append(
+            {
+                **dict(claim),
+                "retrieved_at": source.get("retrieved_at"),
+                "source_revision": source.get("source_revision"),
+                "applicability_inputs": applicability_inputs,
+            }
+        )
+    enriched_claims_by_ref = {
+        str(claim["claim_ref"]): claim for claim in enriched_claims
+    }
+    enriched_requirements: list[dict[str, Any]] = []
+    for requirement in requirements:
+        if not isinstance(requirement, Mapping):
+            raise ValueError("CI research requirement is malformed")
+        claim = enriched_claims_by_ref.get(str(requirement.get("claim_ref")))
+        if (
+            claim is None
+            or requirement.get("source_ref") != claim.get("source_ref")
+            or requirement.get("canonical_url") != claim.get("canonical_url")
+            or requirement.get("content_sha256") != claim.get("content_sha256")
+        ):
+            raise ValueError("CI research requirement lost source claim lineage")
+        enriched_requirements.append(
+            {
+                **dict(requirement),
+                "retrieved_at": claim.get("retrieved_at"),
+                "source_revision": claim.get("source_revision"),
+                "applicability_inputs": applicability_inputs,
+            }
+        )
+
+    unresolved_claims = [
+        {
+            **dict(disposition),
+            "claim": dict(enriched_claims_by_ref[str(disposition.get("claim_ref"))]),
+        }
+        for disposition in dispositions
+        if isinstance(disposition, Mapping)
+        and disposition.get("unresolved") is True
+        and str(disposition.get("claim_ref")) in enriched_claims_by_ref
+    ]
+    has_excerpts = evidence.get("has_excerpts") is True and bool(excerpts)
+    if requirements:
+        status = "applicable_guidance"
+    elif unresolved_claims:
+        status = "unresolved"
+    elif claims:
+        status = "no_applicable_claim"
+    elif has_excerpts:
+        status = "no_supported_claim"
+    elif source_by_ref:
+        status = "no_relevant_excerpt"
+    else:
+        status = "sources_unavailable"
+    artifact_root.mkdir(parents=True, exist_ok=True)
+    artifact_path = artifact_root / "ci-research-assessment.json"
+    document = {
+        "schema_version": "ci-research-assessment-v1",
+        "failure_id": research_plan["failure_id"],
+        "head_sha": research_plan["head_sha"],
+        "research_question": prepared["research_context"],
+        "source_path": captured_sources.get("path"),
+        "evidence_path": evidence.get("path"),
+        "status": status,
+        "claims": enriched_claims,
+        "rejected_claims": [dict(claim) for claim in rejected_claims],
+        "requirements": enriched_requirements,
+        "dispositions": [dict(item) for item in dispositions],
+        "unresolved_claims": unresolved_claims,
+        "repair_authorized": False,
+    }
+    artifact_path.write_text(
+        json.dumps(document, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    return {"path": str(artifact_path), **document}
+
+
+def bind_ci_research_assessments(
+    claims: Sequence[Mapping[str, Any]],
+    assessments: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    """Bind CI claim decisions without applying benchmark defaults."""
+    if len(claims) > 6 or len(assessments) > 6:
+        raise ValueError("CI research assessments exceed the excerpt-bound limit")
+    return bind_external_contract_assessments(claims, assessments, benchmark_mode=False)
+
+
 def _skip(failure: CIFailureUnit, reason_code: str) -> CIResearchPlan:
     return CIResearchPlan(
         decision="skip",
@@ -287,7 +484,9 @@ def _skip(failure: CIFailureUnit, reason_code: str) -> CIResearchPlan:
 __all__ = [
     "CIResearchPlan",
     "CIResearchQuery",
+    "bind_ci_research_assessments",
     "bind_ci_research_source_selections",
     "build_ci_research_plan",
+    "finalize_ci_research_assessment",
     "prepare_ci_research_search",
 ]

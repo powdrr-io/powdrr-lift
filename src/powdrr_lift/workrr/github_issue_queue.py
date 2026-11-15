@@ -121,6 +121,7 @@ class WorkerReport:
     detail: str | None = None
     ci_outcome: str | None = None
     failure_record: str | None = None
+    readiness: Mapping[str, Any] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -714,7 +715,13 @@ def publish_plan_issues(
         if not current_statuses.intersection(issue.labels):
             continue
         dependencies_closed = all(
-            _dependency_is_closed(existing.get((plan.plan_id, dependency)), by_number)
+            _dependency_is_fulfilled(
+                existing.get((plan.plan_id, dependency)),
+                by_number,
+                client=client,
+                plan=plan,
+                dependency_id=dependency,
+            )
             for dependency in item.dependencies
         )
         status = "ready" if dependencies_closed else "blocked_on_dependency"
@@ -845,8 +852,12 @@ def run_worker_once(
             unmet = [
                 dependency
                 for dependency in item.dependencies
-                if not _dependency_is_closed(
-                    indexed.get((plan.plan_id, dependency)), by_number
+                if not _dependency_is_fulfilled(
+                    indexed.get((plan.plan_id, dependency)),
+                    by_number,
+                    client=client,
+                    plan=plan,
+                    dependency_id=dependency,
                 )
             ]
             if unmet:
@@ -983,8 +994,12 @@ def run_worker_once(
                     if (
                         (dependency_issue := indexed.get((plan.plan_id, dependency)))
                         is not None
-                        and dependency_issue.state == "closed"
-                        and FULFILLED_WITHOUT_PR_LABEL in dependency_issue.labels
+                        and _dependency_has_verified_noop_receipt(
+                            dependency_issue,
+                            client=client,
+                            plan=plan,
+                            dependency_id=dependency,
+                        )
                     )
                 )
                 # The task runner owns its retry policy. Keep the GitHub issue
@@ -1110,7 +1125,17 @@ def run_worker_once(
                 ci_outcome=ci_outcome,
                 failure_record=(str(failure_path) if return_code != 0 else None),
             )
-    return WorkerReport("no_eligible_work")
+    readiness = _no_eligible_work_readiness(
+        client, repo_root=root, plan_loader=plan_loader
+    )
+    waiting = readiness["blocking_reasons"]
+    detail = (
+        "; ".join(
+            f"{entry['item_id']}: {entry['explanation']}" for entry in waiting[:3]
+        )
+        or "No open planned work item is currently eligible."
+    )
+    return WorkerReport("no_eligible_work", detail=detail, readiness=readiness)
 
 
 def _write_task_execution_result(repo_root: Path, result: TaskExecutionResult) -> Path:
@@ -1641,6 +1666,7 @@ def fulfill_issue_without_pr(
     issue_number: int,
     reason: str,
     client: GitHubIssueClient,
+    repo_root: str | Path | None = None,
 ) -> QueueIssue:
     """Record that a planned item is already fulfilled without an implementation PR."""
     normalized_reason = reason.strip()
@@ -1654,6 +1680,22 @@ def fulfill_issue_without_pr(
         raise GitHubIssueQueueError(
             f"issue #{issue_number} is not a Powdrr plan work item"
         )
+    contract_digest: str | None = None
+    if repo_root is not None:
+        pinned_plan = load_reviewed_plan_at_commit(
+            pointer["plan_path"], pointer["plan_commit"], repo_root=repo_root
+        )
+        planned_item = next(
+            (item for item in pinned_plan.items if item.item_id == pointer["item_id"]),
+            None,
+        )
+        if pinned_plan.plan_id != pointer["plan_id"] or planned_item is None:
+            raise GitHubIssueQueueError(
+                f"issue #{issue_number} does not match an item in its pinned plan"
+            )
+        from powdrr_service.planning.repair import item_input_contract_digest
+
+        contract_digest = item_input_contract_digest(planned_item, pinned_plan.planning)
     client.ensure_fulfilled_without_pr_label()
     labels = tuple(
         sorted(
@@ -1673,6 +1715,8 @@ def fulfill_issue_without_pr(
                 plan_id=pointer["plan_id"],
                 item_id=pointer["item_id"],
                 reason=normalized_reason,
+                plan_commit=pointer["plan_commit"],
+                input_contract_digest=contract_digest,
             ),
         )
     client.update_issue(
@@ -1805,12 +1849,19 @@ def _apply_issue_plan_adjustments(
 
 
 def render_fulfilled_without_pr_comment(
-    *, plan_id: str, item_id: str, reason: str
+    *,
+    plan_id: str,
+    item_id: str,
+    reason: str,
+    plan_commit: str | None = None,
+    input_contract_digest: str | None = None,
 ) -> str:
     payload = {
         "schema": _FULFILLMENT_SCHEMA,
         "plan_id": plan_id,
         "item_id": item_id,
+        "plan_commit": plan_commit,
+        "input_contract_digest": input_contract_digest,
         "fulfillment": "without_implementation_pr",
         "reason": reason,
     }
@@ -2006,7 +2057,13 @@ def _promote_unblocked_issues(
             issue_indexes[plan.plan_id] = indexed
         by_number = {value.number: value for value in indexed.values()}
         if all(
-            _dependency_is_closed(indexed.get((plan.plan_id, dependency)), by_number)
+            _dependency_is_fulfilled(
+                indexed.get((plan.plan_id, dependency)),
+                by_number,
+                client=client,
+                plan=plan,
+                dependency_id=dependency,
+            )
             for dependency in item.dependencies
         ):
             client.update_issue(
@@ -2473,8 +2530,12 @@ def _reconcile_merged_plan_repair(
                     status = "awaiting_human"
                 else:
                     dependencies_closed = all(
-                        _dependency_is_closed(
-                            by_item.get((plan_id, dependency)), by_number
+                        _dependency_is_fulfilled(
+                            by_item.get((plan_id, dependency)),
+                            by_number,
+                            client=client,
+                            plan=plan,
+                            dependency_id=dependency,
                         )
                         for dependency in item.dependencies
                     )
@@ -3395,13 +3456,203 @@ def _replace_queue_status(labels: Sequence[str], status: str) -> tuple[str, ...]
     return tuple(sorted((set(labels) - queue_labels) | {target}))
 
 
-def _dependency_is_closed(
-    issue: QueueIssue | None, by_number: Mapping[int, QueueIssue]
+def _dependency_is_fulfilled(
+    issue: QueueIssue | None,
+    by_number: Mapping[int, QueueIssue],
+    *,
+    client: GitHubIssueClient,
+    plan: ReviewedExecutionPlan,
+    dependency_id: str,
 ) -> bool:
     if issue is None:
         return False
     current = by_number.get(issue.number, issue)
-    return current.state == "closed"
+    if current.state != "closed":
+        return False
+    if _dependency_has_verified_noop_receipt(
+        current, client=client, plan=plan, dependency_id=dependency_id
+    ):
+        return True
+    from powdrr_service.planning.repair import item_input_contract_digest
+
+    item = next((value for value in plan.items if value.item_id == dependency_id), None)
+    if item is None:
+        return False
+    expected_digest = item_input_contract_digest(item, plan.planning)
+    pointer = parse_issue_pointer(current.body)
+    if pointer is None or pointer["plan_id"] != plan.plan_id:
+        return False
+    for checkpoint in _task_checkpoint_payloads(client.list_comments(current.number)):
+        if (
+            checkpoint.get("schema")
+            != "https://powdrr.io/schemas/github-issue-task-checkpoint-v1"
+            or checkpoint.get("plan_id") != plan.plan_id
+            or checkpoint.get("item_id") != dependency_id
+            or checkpoint.get("status") != "completed"
+            or checkpoint.get("input_contract_digest") != expected_digest
+        ):
+            continue
+        output_state = checkpoint.get("output_state")
+        pull_request_url = (
+            output_state.get("pull_request_url")
+            if isinstance(output_state, Mapping)
+            else None
+        )
+        number = _same_repository_pull_request_number(
+            pull_request_url, client.repository
+        )
+        if number is None:
+            continue
+        pull_request = client.pull_request(number)
+        merge_commit = pull_request.get("merge_commit_sha")
+        body = pull_request.get("body")
+        closes_dependency = (
+            isinstance(body, str)
+            and re.search(
+                rf"\b(?:close[sd]?|fix(?:es)?|resolve[sd]?)\s+"
+                rf"(?:{re.escape(client.repository)}#|#){current.number}\b",
+                body,
+                re.IGNORECASE,
+            )
+            is not None
+        )
+        if (
+            pull_request.get("merged") is True
+            and closes_dependency
+            and isinstance(merge_commit, str)
+            and re.fullmatch(r"[0-9a-fA-F]{40}|[0-9a-fA-F]{64}", merge_commit)
+        ):
+            return True
+    return False
+
+
+def _dependency_has_verified_noop_receipt(
+    issue: QueueIssue,
+    *,
+    client: GitHubIssueClient,
+    plan: ReviewedExecutionPlan,
+    dependency_id: str,
+) -> bool:
+    if issue.state != "closed" or FULFILLED_WITHOUT_PR_LABEL not in issue.labels:
+        return False
+    pointer = parse_issue_pointer(issue.body)
+    if pointer is None or pointer["plan_id"] != plan.plan_id:
+        return False
+    from powdrr_service.planning.repair import item_input_contract_digest
+
+    planned_item = next(
+        (item for item in plan.items if item.item_id == dependency_id), None
+    )
+    if planned_item is None:
+        return False
+    expected_digest = item_input_contract_digest(planned_item, plan.planning)
+    for comment in client.list_comments(issue.number):
+        body = comment.get("body")
+        if not isinstance(body, str) or _FULFILLMENT_MARKER not in body:
+            continue
+        payload = _json_payload_after_marker(body, _FULFILLMENT_MARKER)
+        if (
+            isinstance(payload, Mapping)
+            and payload.get("schema") == _FULFILLMENT_SCHEMA
+            and payload.get("fulfillment") == "without_implementation_pr"
+            and payload.get("plan_id") == plan.plan_id
+            and payload.get("item_id") == dependency_id
+            and (
+                payload.get("input_contract_digest") == expected_digest
+                or (
+                    payload.get("input_contract_digest") is None
+                    and payload.get("plan_commit") == pointer["plan_commit"]
+                )
+            )
+            and isinstance(payload.get("reason"), str)
+            and bool(payload.get("reason", "").strip())
+        ):
+            return True
+    return False
+
+
+def _no_eligible_work_readiness(
+    client: GitHubIssueClient,
+    *,
+    repo_root: Path,
+    plan_loader: Callable[..., ReviewedExecutionPlan],
+) -> dict[str, Any]:
+    blocking: list[dict[str, Any]] = []
+    counts = {"open": 0, "ready": 0, "waiting_dependencies": 0, "other": 0}
+    for issue in client.list_issues(state="open"):
+        pointer = parse_issue_pointer(issue.body)
+        if pointer is None:
+            continue
+        counts["open"] += 1
+        if (
+            QUEUE_LABELS["ready"] not in issue.labels
+            and QUEUE_LABELS["blocked_on_dependency"] not in issue.labels
+        ):
+            counts["other"] += 1
+            continue
+        plan = plan_loader(
+            pointer["plan_path"], pointer["plan_commit"], repo_root=repo_root
+        )
+        item = next(
+            (
+                candidate
+                for candidate in plan.items
+                if candidate.item_id == pointer["item_id"]
+            ),
+            None,
+        )
+        if item is None or plan.plan_id != pointer["plan_id"]:
+            blocking.append(
+                {
+                    "issue_number": issue.number,
+                    "item_id": pointer["item_id"],
+                    "reason": "invalid_plan_item",
+                    "explanation": "the item is missing from its pinned plan",
+                }
+            )
+            continue
+        index = _plan_issue_index(
+            client.list_issues(labels=(_plan_label(plan.plan_id),))
+        )
+        by_number = {value.number: value for value in index.values()}
+        unmet = [
+            dependency
+            for dependency in item.dependencies
+            if not _dependency_is_fulfilled(
+                index.get((plan.plan_id, dependency)),
+                by_number,
+                client=client,
+                plan=plan,
+                dependency_id=dependency,
+            )
+        ]
+        if unmet:
+            counts["waiting_dependencies"] += 1
+            blocking.append(
+                {
+                    "issue_number": issue.number,
+                    "item_id": item.item_id,
+                    "reason": "dependency_not_fulfilled",
+                    "dependencies": unmet,
+                    "explanation": (
+                        f"waiting for verified fulfillment of {', '.join(unmet)}"
+                    ),
+                }
+            )
+        else:
+            counts["ready"] += 1
+            blocking.append(
+                {
+                    "issue_number": issue.number,
+                    "item_id": item.item_id,
+                    "reason": "not_claimed",
+                    "dependencies": [],
+                    "explanation": (
+                        "eligible item was not claimed during this worker pass"
+                    ),
+                }
+            )
+    return {"counts": counts, "blocking_reasons": blocking}
 
 
 @contextmanager

@@ -1,0 +1,133 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1534
+title: Define protected CI repair contracts
+intent:
+  problem: CI response research and reproduction records did not yet define the immutable scope, protected artifacts, or checks a future correction must preserve.
+  goal: Add a versioned, head-bound repair contract and fail-closed service compiler before implementing agent enforcement or correction dispatch.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 3914, end_line: 3921}
+  summary: Record the service-owned CI response module dependencies.
+  rationale: Keep policy ownership and internal imports visible in the architecture inventory.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 3926, end_line: 3926}
+  summary: Update CI response package ownership rationale.
+  rationale: Identify the package as service-owned evidence, diagnosis, research, and repair-contract policy.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 3986, end_line: 4006}
+  summary: Add ownership entries for CI research and repair-contract modules.
+  rationale: Make the new policy module traceable to its plan stage and keep it in the service package.
+- path: docs/plans/procedrr-ci-response-action.md
+  type: modified
+  span: {start_line: 20, end_line: 26}
+  summary: Record the repair-contract milestone and remaining enforcement and dispatch work.
+  rationale: Distinguish contract groundwork from implementation of protected corrections.
+- path: packages/contracts/src/powdrr_contracts/__init__.py
+  type: modified
+  span: {start_line: 11, end_line: 12}
+  summary: Export the protected artifact and repair contract records.
+  rationale: Make the versioned CI transport types available through the public contracts package.
+- path: packages/contracts/src/powdrr_contracts/__init__.py
+  type: modified
+  span: {start_line: 62, end_line: 62}
+  summary: Export protected artifact records.
+  rationale: Expose immutable file path and digest records to consumers.
+- path: packages/contracts/src/powdrr_contracts/__init__.py
+  type: modified
+  span: {start_line: 64, end_line: 64}
+  summary: Export repair contract records.
+  rationale: Expose content-digested correction boundaries to consumers.
+- path: packages/contracts/src/powdrr_contracts/ci.py
+  type: modified
+  span: {start_line: 5, end_line: 6}
+  summary: Import hashing and serialization support for deterministic repair contract digests.
+  rationale: Make contract IDs and content hashes stable across serialization.
+- path: packages/contracts/src/powdrr_contracts/ci.py
+  type: modified
+  span: {start_line: 8, end_line: 8}
+  summary: Import timestamp parsing for expiry validation.
+  rationale: Require timezone-qualified contract expiry timestamps.
+- path: packages/contracts/src/powdrr_contracts/ci.py
+  type: modified
+  span: {start_line: 725, end_line: 1049}
+  summary: Define immutable protected artifact and repair contract records with strict bounds and round-trip validation.
+  rationale: Bind correction scope, protected hashes, behavior, commands, required checks, research claims, and stop conditions to one PR head.
+- path: packages/service/src/powdrr_service/ci_response/__init__.py
+  type: modified
+  span: {start_line: 20, end_line: 20}
+  summary: Export the repair contract compiler.
+  rationale: Make the service-owned contract policy available to future process operations.
+- path: packages/service/src/powdrr_service/ci_response/__init__.py
+  type: modified
+  span: {start_line: 43, end_line: 43}
+  summary: Publish the repair contract compiler in the package API.
+  rationale: Keep the public service exports consistent with imported policy functions.
+- path: packages/service/src/powdrr_service/ci_response/repair_contract.py
+  type: added
+  span: {start_line: 1, end_line: 178}
+  summary: Compile repair contracts only for a matching completed failure with eligible reproduction evidence and complete required-check policy.
+  rationale: Reject stale heads, inconclusive reproduction, broad or protected paths, incomplete check obligations, and non-local failures without accepted source-backed guidance.
+- path: scripts/build-agent-service-ownership-inventory.py
+  type: modified
+  span: {start_line: 16, end_line: 29}
+  summary: Classify public CI records and service-owned CI response policy.
+  rationale: Preserve the contracts, service policy, and agent effect boundary in future inventory generation.
+- path: scripts/build-agent-service-ownership-inventory.py
+  type: modified
+  span: {start_line: 423, end_line: 424}
+  summary: Include CI response modules and public CI contracts in inventory inputs.
+  rationale: Ensure the inventory generator sees the new service and contract files.
+- path: tests/test_agent_service_contracts.py
+  type: modified
+  span: {start_line: 141, end_line: 141}
+  summary: Permit standard-library datetime in the isolated contracts package.
+  rationale: Allow strict timestamp validation without adding application dependencies.
+- path: tests/test_ci_response_repair_contract.py
+  type: added
+  span: {start_line: 1, end_line: 229}
+  summary: Cover deterministic contract identity, exact path restrictions, protected artifacts, full required checks, reproduction eligibility, and research lineage.
+  rationale: Verify repair boundaries fail closed before agent enforcement is added.
+entities:
+- id: protected-artifact
+  type: Class
+  action: added
+- id: repair-contract
+  type: Class
+  action: added
+- id: compile-repair-contract
+  type: Function
+  action: added
+- id: ci-repair-contract-tests
+  type: Unit test
+  action: added
+entity_relationships:
+- id: repair-contract-records-protected-artifacts
+  source: repair-contract
+  target: protected-artifact
+  type: contains
+- id: repair-contract-compiled-from-observed-failure
+  source: compile-repair-contract
+  target: repair-contract
+  type: creates
+invariants:
+- id: repair-contract-head-is-exact
+  description: A repair contract must bind to the same PR head and exactly one observed failed job.
+  action: added
+- id: repair-contract-preserves-protected-artifacts
+  description: Allowed paths cannot include protected artifact paths, and every protected artifact carries a SHA-256 baseline.
+  action: added
+- id: repair-contract-retains-required-checks
+  description: A repair contract must carry the complete observed required-check set.
+  action: added
+- id: repair-contract-requires-comparable-evidence
+  description: Inconclusive reproductions cannot produce a repair contract; non-local failures require accepted source-backed claims.
+  action: added
+guidance:
+- id: ci-repair-contract-is-not-dispatch-enforcement
+  description: The service compiler defines a bounded contract; agent-side filesystem enforcement and correction dispatch remain separate unfinished work.
+  action: added

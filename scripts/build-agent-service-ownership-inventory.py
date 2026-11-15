@@ -25,7 +25,7 @@ def _owner(path: str) -> tuple[str, str, str]:
             "service",
             "service-owned CI evidence, diagnosis, research, and repair-contract "
             "policy",
-            "2",
+            "1534",
         )
     if path.startswith("packages/agent/src/powdrr_agent/execution/"):
         if path.endswith(

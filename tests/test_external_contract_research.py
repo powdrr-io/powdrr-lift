@@ -80,6 +80,54 @@ def test_capture_external_source_persists_bytes_and_content_hash(
     assert record["profile"] == "graphql-defer-v1"
 
 
+def test_capture_can_restrict_requested_and_redirected_publisher_hosts(
+    tmp_path: Path,
+) -> None:
+    fetched: list[str] = []
+
+    def fetch(url: str) -> tuple[int, str, bytes]:
+        fetched.append(url)
+        if url.endswith("/redirect"):
+            return 200, "https://example.org/elsewhere", b"untrusted redirect body"
+        return 200, url, b"official content"
+
+    result = capture_external_sources(
+        [
+            {
+                "url": "https://example.org/unapproved",
+                "research_question": "Check hosted runner support.",
+                "why_applicable": "The failure names a hosted runner.",
+            },
+            {
+                "url": "https://docs.github.com/redirect",
+                "research_question": "Check hosted runner support.",
+                "why_applicable": "The failure names a hosted runner.",
+            },
+            {
+                "url": "https://docs.github.com/actions/hosted-runners",
+                "research_question": "Check hosted runner support.",
+                "why_applicable": "The failure names a hosted runner.",
+            },
+        ],
+        artifact_root=tmp_path,
+        rationale="Research the official hosted-runner contract.",
+        fetch=fetch,
+        allowed_hosts=("docs.github.com", "github.blog"),
+    )
+
+    assert fetched == [
+        "https://docs.github.com/redirect",
+        "https://docs.github.com/actions/hosted-runners",
+    ]
+    assert result["captured_count"] == 1
+    assert result["unavailable_count"] == 2
+    assert result["sources"][0]["reason"] == (
+        "external source host is not in the allowed publisher list"
+    )
+    assert "content_path" not in result["sources"][1]
+    assert result["sources"][2]["status"] == "captured"
+
+
 def test_extract_external_evidence_is_bounded_visible_and_hash_verified(
     tmp_path: Path,
 ) -> None:

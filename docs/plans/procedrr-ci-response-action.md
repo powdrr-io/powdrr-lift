@@ -9,11 +9,14 @@ local reproduction. The response command now checkpoints required-check states
 and bounded evidence before a capped wait, refreshes only the pinned PR head,
 and records the terminal or deadline state (PR #1525). The issue queue now
 checkpoints that structured response beside its own current-head validation
-result (PR #1527). This follow-up adds deterministic selection of one bounded
-research query for a safely identified hosted-runner rejection; it does not yet
-fetch sources, validate claims, or dispatch a repair. Durable continuation
-through the response procedure, broader evidence collection, source-backed
-research, protected repair dispatch, and full publication integration remain.
+result (PR #1527). PR #1529 adds deterministic selection of one bounded query
+for a safely identified hosted-runner rejection. This follow-up adds a CI
+research subprocess that validates the query before search, selects only
+official GitHub sources, captures at most three bounded source snapshots, and
+returns hash-bound excerpts. It does not assess source claims or dispatch a
+repair. Durable continuation through the response procedure, broader evidence
+collection, source-backed claim assessment, protected repair dispatch, and full
+publication integration remain.
 
 ## Outcome
 

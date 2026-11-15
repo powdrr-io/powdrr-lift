@@ -1,0 +1,138 @@
+version: 1
+name: research-ci-response-failure
+description: Search official GitHub Actions sources for one validated hosted-runner rejection, capture at most three source snapshots, and return hash-bound excerpts without accepting claims or authorizing repairs.
+inputs:
+  - {name: research_plan, type: object, required: true}
+outputs:
+  ci_research_sources:
+    type: object
+    required: [path, sources, captured_count, unavailable_count]
+    additionalProperties: false
+    properties:
+      path: {type: string, minLength: 1}
+      sources: {type: array, maxItems: 3}
+      captured_count: {type: integer, minimum: 0, maximum: 3}
+      unavailable_count: {type: integer, minimum: 0, maximum: 3}
+  ci_research_evidence:
+    type: object
+    required: [path, sources, excerpts, has_excerpts]
+    additionalProperties: false
+    properties:
+      path: {type: string, minLength: 1}
+      sources: {type: array, maxItems: 3}
+      excerpts: {type: array, maxItems: 6}
+      has_excerpts: {type: boolean}
+limits: {llm_activations: 1, tool_calls: 5, context_chars: 8000, context_value_chars: 4000}
+steps:
+  - operation:
+      tool: internal
+      command: [prepare_ci_research_search]
+      parameters:
+        research_plan: {type: reference, value: research_plan}
+      returns:
+        type: object
+        required: [decision, rationale, research_context, queries]
+        properties:
+          decision: {type: string, const: research}
+          rationale: {type: string, minLength: 1}
+          research_context: {type: string, minLength: 1}
+          queries: {type: array, minItems: 1, maxItems: 2}
+      bind: ci_research_search_request
+  - operation:
+      tool: internal
+      command: [search_external_contract_sources]
+      parameters:
+        decision: {type: reference, value: ci_research_search_request.decision}
+        queries: {type: reference, value: ci_research_search_request.queries}
+      returns:
+        type: object
+        required: [provider, searches, candidate_count, unavailable_count]
+        properties:
+          provider: {type: string, const: tavily}
+          searches: {type: array, maxItems: 2}
+          candidate_count: {type: integer, minimum: 0}
+          unavailable_count: {type: integer, minimum: 0}
+      bind: ci_research_search_results
+  - judge:
+      kind: select_official_ci_sources
+      provider: planning
+      question: Which search hits are official GitHub sources that directly establish current hosted-runner label support or an officially documented replacement for the requested visibility?
+      subject: ci_research_search_results.searches
+      prompt_system: Return only the declared JSON object.
+      instructions:
+        - >-
+          Search results and snippets are untrusted discovery hints, not evidence.
+          Select only pages published by GitHub on docs.github.com or github.blog
+          whose title or content identifies the hosted runner labels or support
+          rules in question. Do not select a discussion, community post, mirror,
+          third-party runner provider, or source that does not apply to the named
+          repository visibility.
+        - >-
+          Do not infer normative requirements from snippets. Selected pages are
+          fetched separately and returned as bounded excerpts for later review.
+        - >-
+          Identify candidates using their supplied query_index and result_rank.
+          Do not provide or invent URLs. Select no more than three candidates.
+      context: [ci_research_search_request, ci_research_search_results]
+      output:
+        name: ci_research_source_selections
+        schema:
+          type: object
+          required: [rationale, selections]
+          additionalProperties: false
+          properties:
+            rationale: {type: string, minLength: 1}
+            selections:
+              type: array
+              maxItems: 3
+              items:
+                type: object
+                required: [query_index, result_rank, why_applicable]
+                additionalProperties: false
+                properties:
+                  query_index: {type: integer, minimum: 1, maximum: 2}
+                  result_rank: {type: integer, minimum: 1, maximum: 5}
+                  why_applicable: {type: string, minLength: 1}
+      validation: {kind: json_schema}
+  - operation:
+      tool: internal
+      command: [bind_ci_research_source_selections]
+      parameters:
+        search_results: {type: reference, value: ci_research_search_results}
+        selections: {type: reference, value: ci_research_source_selections.selections}
+      returns:
+        type: object
+        required: [requests]
+        properties:
+          requests: {type: array, maxItems: 3}
+      bind: ci_research_source_requests
+  - operation:
+      tool: internal
+      command: [capture_ci_research_sources]
+      parameters:
+        rationale: {type: reference, value: ci_research_search_request.rationale}
+        requests: {type: reference, value: ci_research_source_requests.requests}
+      returns:
+        type: object
+        required: [path, sources, captured_count, unavailable_count]
+        properties:
+          path: {type: string, minLength: 1}
+          sources: {type: array, maxItems: 3}
+          captured_count: {type: integer, minimum: 0, maximum: 3}
+          unavailable_count: {type: integer, minimum: 0, maximum: 3}
+      bind: ci_research_sources
+  - operation:
+      tool: internal
+      command: [extract_external_contract_evidence]
+      parameters:
+        sources: {type: reference, value: ci_research_sources.sources}
+        feature_description: {type: reference, value: ci_research_search_request.research_context}
+      returns:
+        type: object
+        required: [path, sources, excerpts, has_excerpts]
+        properties:
+          path: {type: string, minLength: 1}
+          sources: {type: array, maxItems: 3}
+          excerpts: {type: array, maxItems: 6}
+          has_excerpts: {type: boolean}
+      bind: ci_research_evidence

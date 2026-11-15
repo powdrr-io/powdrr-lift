@@ -17,6 +17,10 @@ from powdrr_service.behavior_contract import (
     compile_behavior_scenarios,
     validate_normative_assumptions,
 )
+from powdrr_service.ci_response.research import (
+    bind_ci_research_source_selections,
+    prepare_ci_research_search,
+)
 from powdrr_service.decision_obligation import content_fingerprint
 from powdrr_service.external_contract_research import (
     bind_external_contract_assessments,
@@ -234,6 +238,101 @@ def feature_command_catalog(
             ),
             output_schema={},
             logic=implementations.get("search_external_contract_sources"),
+        ),
+        "prepare_ci_research_search": CommandSpec(
+            name="prepare_ci_research_search",
+            input_schema=object_schema(
+                {"research_plan": {"type": "object"}},
+                required=("research_plan",),
+                additional_properties=False,
+            ),
+            output_schema={
+                "type": "object",
+                "required": ["decision", "rationale", "research_context", "queries"],
+                "properties": {
+                    "decision": {"type": "string", "const": "research"},
+                    "rationale": {"type": "string", "minLength": 1},
+                    "research_context": {"type": "string", "minLength": 1},
+                    "queries": {"type": "array", "maxItems": 2},
+                },
+            },
+            logic=implementations.get("prepare_ci_research_search"),
+        ),
+        "bind_ci_research_source_selections": CommandSpec(
+            name="bind_ci_research_source_selections",
+            input_schema=object_schema(
+                {
+                    "search_results": {"type": "object"},
+                    "selections": {
+                        "type": "array",
+                        "maxItems": 3,
+                        "items": {
+                            "type": "object",
+                            "required": [
+                                "query_index",
+                                "result_rank",
+                                "why_applicable",
+                            ],
+                            "additionalProperties": False,
+                            "properties": {
+                                "query_index": {"type": "integer", "minimum": 1},
+                                "result_rank": {"type": "integer", "minimum": 1},
+                                "why_applicable": {"type": "string", "minLength": 1},
+                            },
+                        },
+                    },
+                },
+                required=("search_results", "selections"),
+                additional_properties=False,
+            ),
+            output_schema={
+                "type": "object",
+                "required": ["requests", "rejected_selections"],
+                "properties": {
+                    "requests": {
+                        "type": "array",
+                        "maxItems": 3,
+                        "items": {
+                            "type": "object",
+                            "required": ["url", "research_question", "why_applicable"],
+                            "additionalProperties": False,
+                            "properties": {
+                                "url": {"type": "string", "minLength": 1},
+                                "search_source_ref": {"type": "string"},
+                                "search_title": {"type": "string"},
+                                "search_query": {"type": "string"},
+                                "profile": {"type": "string"},
+                                "research_question": {"type": "string", "minLength": 1},
+                                "why_applicable": {"type": "string", "minLength": 1},
+                            },
+                        },
+                    },
+                    "rejected_selections": {"type": "array", "maxItems": 3},
+                },
+            },
+            logic=implementations.get("bind_ci_research_source_selections"),
+        ),
+        "capture_ci_research_sources": CommandSpec(
+            name="capture_ci_research_sources",
+            input_schema=object_schema(
+                {
+                    "requests": {"type": "array", "maxItems": 3},
+                    "rationale": {"type": "string", "minLength": 1},
+                },
+                required=("requests", "rationale"),
+                additional_properties=False,
+            ),
+            output_schema={
+                "type": "object",
+                "required": ["path", "sources", "captured_count", "unavailable_count"],
+                "properties": {
+                    "path": {"type": "string"},
+                    "sources": {"type": "array", "maxItems": 3},
+                    "captured_count": {"type": "integer"},
+                    "unavailable_count": {"type": "integer"},
+                },
+            },
+            logic=implementations.get("capture_ci_research_sources"),
         ),
         "bind_external_contract_search_selections": CommandSpec(
             name="bind_external_contract_search_selections",
@@ -1147,6 +1246,44 @@ class FeatureCommandRuntime:
                 decision=str(parameters.get("decision", "research")),
                 api_key=os.environ.get("TAVILY_API_KEY"),
                 cache_path=cache_root / "external-contract-search.sqlite3",
+            )
+        if name == "prepare_ci_research_search":
+            research_plan = parameters.get("research_plan")
+            if not isinstance(research_plan, Mapping):
+                raise PowdrrExecutionError("CI research plan is malformed")
+            try:
+                return prepare_ci_research_search(research_plan)
+            except ValueError as error:
+                raise PowdrrExecutionError(str(error)) from error
+        if name == "bind_ci_research_source_selections":
+            search_results = parameters.get("search_results")
+            selections = parameters.get("selections")
+            if (
+                not isinstance(search_results, Mapping)
+                or not isinstance(selections, list)
+                or not all(isinstance(item, Mapping) for item in selections)
+            ):
+                raise PowdrrExecutionError("CI research selections are malformed")
+            try:
+                return bind_ci_research_source_selections(search_results, selections)
+            except ValueError as error:
+                raise PowdrrExecutionError(str(error)) from error
+        if name == "capture_ci_research_sources":
+            requests = parameters.get("requests")
+            if (
+                not isinstance(requests, list)
+                or len(requests) > 3
+                or not all(isinstance(item, Mapping) for item in requests)
+            ):
+                raise PowdrrExecutionError(
+                    "CI research source requests exceed the limit"
+                )
+            return capture_external_sources(
+                requests,
+                artifact_root=output_root,
+                decision="research",
+                rationale=str(parameters.get("rationale", "")),
+                allowed_hosts=("docs.github.com", "github.blog"),
             )
         if name == "bind_external_contract_search_selections":
             search_results = parameters.get("search_results")

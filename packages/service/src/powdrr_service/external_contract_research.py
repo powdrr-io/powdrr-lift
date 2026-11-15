@@ -1137,6 +1137,7 @@ def capture_external_sources(
     rationale: str = "",
     fetch: Callable[[str], tuple[int, str, bytes]] | None = None,
     retrieved_at: str | None = None,
+    allowed_hosts: Sequence[str] | None = None,
 ) -> dict[str, Any]:
     """Fetch bounded HTTPS URLs and persist content plus deterministic metadata.
 
@@ -1178,8 +1179,10 @@ def capture_external_sources(
                 source[field] = value.strip()[:500]
         try:
             _validate_url(url)
+            _validate_allowed_host(url, allowed_hosts)
             status, final_url, body = fetcher(url)
             _validate_url(final_url)
+            _validate_allowed_host(final_url, allowed_hosts)
             if len(body) > MAX_RESPONSE_BYTES:
                 raise ValueError("response exceeds the 1,000,000-byte limit")
             source.update(
@@ -1299,6 +1302,16 @@ def _validate_resolved_host(url: str) -> None:
         address = ipaddress.ip_address(str(item[4][0]).split("%", 1)[0])
         if not address.is_global:
             raise ValueError("external source host resolves to a non-public address")
+
+
+def _validate_allowed_host(url: str, allowed_hosts: Sequence[str] | None) -> None:
+    if allowed_hosts is None:
+        return
+    host = urllib.parse.urlsplit(url).hostname
+    if host is None or host.casefold().rstrip(".") not in {
+        item.casefold().rstrip(".") for item in allowed_hosts
+    }:
+        raise ValueError("external source host is not in the allowed publisher list")
 
 
 __all__ = [

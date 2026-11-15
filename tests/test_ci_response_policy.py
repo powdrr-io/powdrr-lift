@@ -7,6 +7,7 @@ from powdrr_contracts.ci import (
     CIAnnotation,
     CIJobObservation,
     CIObservation,
+    CIRequiredCheck,
     ContractError,
     LocalReproduction,
 )
@@ -20,6 +21,22 @@ from powdrr_service.ci_response import (
 )
 
 HEAD = "6c85b1e5c334a113b3db274b2c1b7a8f350b9707"
+
+
+def _required_check_observation(
+    *jobs: CIJobObservation,
+) -> CIObservation:
+    return CIObservation(
+        repository="example/project",
+        pull_request_number=270,
+        head_sha=HEAD,
+        jobs=jobs,
+        required_checks_status="available",
+        required_check_source="test fixture",
+        required_checks=(
+            CIRequiredCheck(name="CI / unit", state="cancelled", head_sha=HEAD),
+        ),
+    )
 
 
 def test_public_ci_observation_round_trips_with_unavailable_required_policy() -> None:
@@ -88,6 +105,7 @@ def test_observation_keeps_tested_sha_separate_from_pull_request_head() -> None:
         ("pass", "awaiting_review"),
         ("pending", "awaiting_ci"),
         ("failure", "failed"),
+        ("cancelled", "blocked"),
         ("skipped", "failed"),
         ("stale", "failed"),
     ],
@@ -108,6 +126,65 @@ def test_required_check_assessment_never_treats_non_success_as_green(
     )
 
     assert assess_ci_observation(observation).state == expected
+
+
+def test_canceled_check_waits_for_a_newer_matching_running_generation() -> None:
+    observation = _required_check_observation(
+        CIJobObservation(
+            job_id=10,
+            run_id=20,
+            run_attempt=1,
+            head_sha=HEAD,
+            status="completed",
+            conclusion="cancelled",
+            check_context="CI / unit",
+        ),
+        CIJobObservation(
+            job_id=11,
+            run_id=21,
+            run_attempt=2,
+            head_sha=HEAD,
+            status="in_progress",
+            conclusion=None,
+            check_context="CI / unit",
+        ),
+    )
+
+    assessment = assess_ci_observation(observation)
+
+    assert assessment.state == "awaiting_ci"
+    assert "newer matching job generation" in assessment.reason
+
+
+def test_canceled_check_with_annotations_is_routed_as_failure_evidence() -> None:
+    message = "Runner configuration was rejected"
+    observation = _required_check_observation(
+        CIJobObservation(
+            job_id=10,
+            run_id=20,
+            run_attempt=1,
+            head_sha=HEAD,
+            status="completed",
+            conclusion="cancelled",
+            check_context="CI / unit",
+            annotations=(
+                CIAnnotation(
+                    check_run_id=30,
+                    path=None,
+                    start_line=None,
+                    end_line=None,
+                    level="failure",
+                    message=message,
+                    raw_sha256=hashlib.sha256(message.encode()).hexdigest(),
+                ),
+            ),
+        )
+    )
+
+    assessment = assess_ci_observation(observation)
+
+    assert assessment.state == "failed"
+    assert "failure evidence" in assessment.reason
 
 
 def test_required_check_assessment_blocks_when_policy_is_unavailable() -> None:

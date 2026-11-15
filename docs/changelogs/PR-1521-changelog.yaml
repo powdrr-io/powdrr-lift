@@ -1,0 +1,61 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1521
+title: Treat canceled CI checks as unresolved until inspected
+intent:
+  problem: A canceled required check is currently treated as a diagnosed failure even when a newer matching job is still running or no failure evidence exists.
+  goal: Wait for a newer active generation, route cancellation with failure evidence for investigation, and keep unexplained cancellation blocked.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/plans/procedrr-ci-response-action.md
+    type: modified
+    span: {start_line: 3, end_line: 8}
+    summary: Record merged milestones and the current cancellation-handling slice.
+    rationale: Keep the implementation plan status aligned with delivered behavior.
+  - path: packages/service/src/powdrr_service/ci_response/assessment.py
+    type: modified
+    span: {start_line: 46, end_line: 48}
+    summary: Remove canceled states from generic failure classification.
+    rationale: Cancellation alone does not establish a diagnosed CI failure.
+  - path: packages/service/src/powdrr_service/ci_response/assessment.py
+    type: modified
+    span: {start_line: 57, end_line: 81}
+    summary: Assess canceled required checks using matching job generations and evidence.
+    rationale: Wait on active replacements and preserve unresolved cases for investigation.
+  - path: packages/service/src/powdrr_service/ci_response/assessment.py
+    type: modified
+    span: {start_line: 98, end_line: 114}
+    summary: Inspect the latest matching job generation for cancellation evidence.
+    rationale: Distinguish a newer active run from an unexplained canceled result.
+  - path: tests/test_ci_response_policy.py
+    type: modified
+    span: {start_line: 10, end_line: 10}
+    summary: Import the required-check contract for direct assessment fixtures.
+    rationale: Test cancellation handling with explicit matching jobs.
+  - path: tests/test_ci_response_policy.py
+    type: modified
+    span: {start_line: 26, end_line: 41}
+    summary: Add a reusable required-check observation fixture.
+    rationale: Keep scenario tests bound to an exact head and policy source.
+  - path: tests/test_ci_response_policy.py
+    type: modified
+    span: {start_line: 108, end_line: 108}
+    summary: Expect unexplained cancellation to remain blocked.
+    rationale: Prevent cancellation from being mistaken for a diagnosis.
+  - path: tests/test_ci_response_policy.py
+    type: modified
+    span: {start_line: 131, end_line: 189}
+    summary: Test active replacement runs and cancellation annotations.
+    rationale: Verify only a matching newer job waits and evidence-bearing cancellation is investigated.
+entities: []
+entity_relationships: []
+invariants:
+  - id: canceled-check-needs-evidence
+    description: A canceled required check is not classified as a diagnosed failure without supporting failure evidence.
+    action: added
+    rationale: Cancellation may be superseded or may need investigation before retrying.
+  - id: replacement-run-matches-required-context
+    description: A canceled required check waits only when a matching job generation remains active.
+    action: added
+    rationale: Unrelated queued jobs cannot make a canceled required context look pending.
+guidance: []

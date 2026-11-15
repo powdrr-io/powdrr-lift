@@ -43,9 +43,6 @@ def assess_ci_observation(
     failed = {
         "fail",
         "failure",
-        "cancel",
-        "cancelled",
-        "canceled",
         "timed_out",
         "action_required",
         "skipped",
@@ -56,6 +53,31 @@ def assess_ci_observation(
         return CIResponseAssessment(
             "failed",
             "One or more required checks did not succeed on the current PR head.",
+        )
+    cancelled = {"cancel", "cancelled", "canceled"}
+    cancelled_checks = [
+        item
+        for item in observation.required_checks
+        if item.state.casefold().replace(" ", "_") in cancelled
+    ]
+    if cancelled_checks:
+        dispositions = [
+            _assess_cancelled_check(observation, item.name) for item in cancelled_checks
+        ]
+        if "failed" in dispositions:
+            return CIResponseAssessment(
+                "failed",
+                "A canceled required check has failure evidence that needs review.",
+            )
+        if "blocked" in dispositions:
+            return CIResponseAssessment(
+                "blocked",
+                "A required check was canceled without a confirmed replacement run; "
+                "inspect its evidence before retrying.",
+            )
+        return CIResponseAssessment(
+            "awaiting_ci",
+            "A newer matching job generation is still running after cancellation.",
         )
     passed = {"pass", "passed", "success", "successful"}
     pending = {"pending", "queued", "in_progress", "expected", "waiting"}
@@ -73,3 +95,20 @@ def assess_ci_observation(
     return CIResponseAssessment(
         "blocked", "A required check has an unknown state; review readiness is unknown."
     )
+
+
+def _assess_cancelled_check(observation: CIObservation, check_name: str) -> str:
+    matching_jobs = [job for job in observation.jobs if job.check_context == check_name]
+    if not matching_jobs:
+        return "blocked"
+    latest_job = max(
+        matching_jobs,
+        key=lambda job: (job.run_attempt, job.run_id, job.job_id),
+    )
+    if latest_job.status in {"queued", "in_progress"}:
+        return "awaiting_ci"
+    if latest_job.conclusion in {"failure", "timed_out"} or latest_job.annotations:
+        return "failed"
+    # A canceled or successful job cannot explain why GitHub still reports the
+    # required context as canceled. Keep the outcome unresolved for evidence review.
+    return "blocked"

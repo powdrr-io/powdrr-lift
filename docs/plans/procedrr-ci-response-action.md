@@ -1,10 +1,11 @@
 # Procedrr CI response action
 
-Status: implementation in progress. PR #1517 merged the initial versioned CI
-observation and failure contracts. This follow-up adds exact-head required-check
-capture and conservative state assessment. It does not complete reproduction,
-durable waiting, repair dispatch, or publication integration; those remain in
-the three-PR sequence below.
+Status: implementation in progress. PR #1517 added the initial versioned CI
+observation and failure contracts. PR #1519 added exact-head required-check
+capture and conservative state assessment. This follow-up handles canceled
+checks without treating cancellation alone as a diagnosis. Durable waiting,
+bounded evidence collection, repair dispatch, and publication integration
+remain in the three-PR sequence below.
 
 ## Outcome
 

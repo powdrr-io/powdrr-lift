@@ -1,0 +1,126 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1524
+title: Target CI reported pytest failures during reproduction
+intent:
+  problem: Failure units reduce failed steps to generic labels, so reproduction reruns a broad command without targeting or matching the reported test.
+  goal: Extract safe pytest node IDs from bounded CI summaries and narrow declared pytest commands while preserving inconclusive results across incomparable environments.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/plans/procedrr-ci-response-action.md
+    type: modified
+    span: {start_line: 7, end_line: 9}
+    summary: Record targeted pytest reproduction as the current plan slice.
+    rationale: Keep implementation status and remaining work accurate.
+  - path: docs/plans/procedrr-ci-response-action.md
+    type: modified
+    span: {start_line: 155, end_line: 158}
+    summary: Specify narrow pytest targeting and conservative nonmatching results.
+    rationale: Prevent a broad local run from being mistaken for reproduction evidence.
+  - path: packages/contracts/src/powdrr_contracts/ci.py
+    type: modified
+    span: {start_line: 263, end_line: 263}
+    summary: Add optional test node identity to failure records.
+    rationale: Preserve the precise CI reported test through the public contract.
+  - path: packages/contracts/src/powdrr_contracts/ci.py
+    type: modified
+    span: {start_line: 274, end_line: 275}
+    summary: Validate that optional test node identifiers are non-empty.
+    rationale: Reject malformed failure targets at the contract boundary.
+  - path: packages/contracts/src/powdrr_contracts/ci.py
+    type: modified
+    span: {start_line: 299, end_line: 299}
+    summary: Serialize test node identity in failure records.
+    rationale: Carry targeted reproduction context across process boundaries.
+  - path: packages/contracts/src/powdrr_contracts/ci.py
+    type: modified
+    span: {start_line: 325, end_line: 327}
+    summary: Validate serialized test node identity.
+    rationale: Reject malformed record values while retaining optionality.
+  - path: packages/contracts/src/powdrr_contracts/ci.py
+    type: modified
+    span: {start_line: 355, end_line: 355}
+    summary: Restore test node identity when parsing a failure record.
+    rationale: Retain the target through contract round trips.
+  - path: packages/service/src/powdrr_service/ci_response/evidence.py
+    type: modified
+    span: {start_line: 9, end_line: 9}
+    summary: Import the bounded log evidence type.
+    rationale: Read typed excerpts during failure normalization.
+  - path: packages/service/src/powdrr_service/ci_response/evidence.py
+    type: modified
+    span: {start_line: 16, end_line: 18}
+    summary: Define a parser for pytest failure summary lines.
+    rationale: Retain test identity and the reported error kind.
+  - path: packages/service/src/powdrr_service/ci_response/evidence.py
+    type: modified
+    span: {start_line: 34, end_line: 34}
+    summary: Add optional test node identity to service failure units.
+    rationale: Keep selected test provenance with its normalized signature.
+  - path: packages/service/src/powdrr_service/ci_response/evidence.py
+    type: modified
+    span: {start_line: 100, end_line: 120}
+    summary: Create test failure units from structured pytest summaries.
+    rationale: Replace generic step labels when precise evidence is available.
+  - path: packages/service/src/powdrr_service/ci_response/evidence.py
+    type: modified
+    span: {start_line: 158, end_line: 190}
+    summary: Parse safe pytest node IDs and normalize failure summaries.
+    rationale: Reject absolute and traversing paths before command selection.
+  - path: packages/service/src/powdrr_service/ci_response/evidence.py
+    type: modified
+    span: {start_line: 197, end_line: 198}
+    summary: Accept an optional test node when constructing a failure unit.
+    rationale: Bind selected test identity to the deterministic record.
+  - path: packages/service/src/powdrr_service/ci_response/evidence.py
+    type: modified
+    span: {start_line: 220, end_line: 220}
+    summary: Populate test node identity in generated failure units.
+    rationale: Make structured log identity available to local reproduction.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 3226, end_line: 3226}
+    summary: Emit test node identity in failure results.
+    rationale: Preserve targeting details for procedural consumers.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 3376, end_line: 3376}
+    summary: Narrow eligible pytest commands to observed test nodes.
+    rationale: Run the smallest supported local reproduction first.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 3417, end_line: 3419}
+    summary: Record whether local output exercised the selected test node.
+    rationale: Avoid inferring phase coverage from an unrelated verification run.
+  - path: src/powdrr_lift/cli.py
+    type: modified
+    span: {start_line: 3430, end_line: 3490}
+    summary: Build a safe targeted pytest command from validated node IDs.
+    rationale: Preserve the declared command while adding exact test targets.
+  - path: tests/test_ci_response_cli.py
+    type: modified
+    span: {start_line: 10, end_line: 11}
+    summary: Import job observations and failure extraction for reproduction tests.
+    rationale: Exercise the structured log to command path.
+  - path: tests/test_ci_response_cli.py
+    type: modified
+    span: {start_line: 144, end_line: 196}
+    summary: Verify pytest node targeting and exact local failure matching.
+    rationale: Prevent broad verification from standing in for reproduction.
+  - path: tests/test_ci_response_policy.py
+    type: modified
+    span: {start_line: 318, end_line: 347}
+    summary: Test pytest summary extraction, signature, and safe node identity.
+    rationale: Protect deterministic evidence normalization.
+entities: []
+entity_relationships: []
+invariants:
+  - id: pytest-reproduction-targets-observed-node
+    description: A pytest reproduction narrows only to a safe test node observed in a structured CI failure summary.
+    action: added
+    rationale: Keep execution focused and prevent untrusted log text from becoming shell input.
+  - id: unmatched-reproduction-remains-inconclusive
+    description: A local nonmatch is not reported as not-reproduced unless the relevant phase and comparable environment are established.
+    action: added
+    rationale: Distinguish a green unrelated command from a meaningful comparison.
+guidance: []

@@ -579,15 +579,57 @@ files:
 - path: tests/test_source_reference_dispatch.py
   type: modified
   span:
-    start_line: 851
-    end_line: 856
+    start_line: 848
+    end_line: 848
   summary: Cover corrected and unchanged attempts plus restart terminal reconciliation.
   rationale: Verify attempt linking, explicit budgets, and duplicate-invocation prevention.
 - path: tests/test_source_reference_dispatch.py
   type: modified
   span:
-    start_line: 958
-    end_line: 959
+    start_line: 852
+    end_line: 857
+  summary: Cover corrected and unchanged attempts plus restart terminal reconciliation.
+  rationale: Verify attempt linking, explicit budgets, and duplicate-invocation prevention.
+- path: tests/test_source_reference_dispatch.py
+  type: modified
+  span:
+    start_line: 889
+    end_line: 890
+  summary: Cover corrected and unchanged attempts plus restart terminal reconciliation.
+  rationale: Verify attempt linking, explicit budgets, and duplicate-invocation prevention.
+- path: tests/test_source_reference_dispatch.py
+  type: modified
+  span:
+    start_line: 896
+    end_line: 896
+  summary: Cover corrected and unchanged attempts plus restart terminal reconciliation.
+  rationale: Verify attempt linking, explicit budgets, and duplicate-invocation prevention.
+- path: tests/test_source_reference_dispatch.py
+  type: modified
+  span:
+    start_line: 941
+    end_line: 941
+  summary: Cover corrected and unchanged attempts plus restart terminal reconciliation.
+  rationale: Verify attempt linking, explicit budgets, and duplicate-invocation prevention.
+- path: tests/test_source_reference_dispatch.py
+  type: modified
+  span:
+    start_line: 943
+    end_line: 943
+  summary: Cover corrected and unchanged attempts plus restart terminal reconciliation.
+  rationale: Verify attempt linking, explicit budgets, and duplicate-invocation prevention.
+- path: tests/test_source_reference_dispatch.py
+  type: modified
+  span:
+    start_line: 950
+    end_line: 950
+  summary: Cover corrected and unchanged attempts plus restart terminal reconciliation.
+  rationale: Verify attempt linking, explicit budgets, and duplicate-invocation prevention.
+- path: tests/test_source_reference_dispatch.py
+  type: modified
+  span:
+    start_line: 960
+    end_line: 963
   summary: Cover corrected and unchanged attempts plus restart terminal reconciliation.
   rationale: Verify attempt linking, explicit budgets, and duplicate-invocation prevention.
 - path: tests/test_source_reference_run.py

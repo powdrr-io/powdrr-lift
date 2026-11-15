@@ -1,0 +1,419 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1525
+title: Bind publication to verified candidates
+intent:
+  problem: PR preparation could edit implementation files after validation, and publication
+    retries did not durably bind candidate content, accepted contract, and evidence
+    to one PR intent.
+  goal: Publish the exact authorized candidate, preserve an idempotent publication
+    intent, and validate generated changelog metadata against the pushed branch.
+human-decisions: []
+structured_files: []
+files:
+- path: .gitignore
+  type: modified
+  span:
+    start_line: 24
+    end_line: 24
+  summary: Update .gitignore for verified, recoverable PR publication.
+  rationale: Bind publication artifacts to the checked candidate and preserve exact
+    verification evidence.
+- path: docs/plans/reliable-plan-execution.md
+  type: modified
+  span:
+    start_line: 3
+    end_line: 3
+  summary: Update docs/plans/reliable-plan-execution.md for verified, recoverable
+    PR publication.
+  rationale: Bind publication artifacts to the checked candidate and preserve exact
+    verification evidence.
+- path: docs/plans/reliable-plan-execution.md
+  type: modified
+  span:
+    start_line: 63
+    end_line: 67
+  summary: Update docs/plans/reliable-plan-execution.md for verified, recoverable
+    PR publication.
+  rationale: Bind publication artifacts to the checked candidate and preserve exact
+    verification evidence.
+- path: packages/service/src/powdrr_service/resources/processes/finish-pr-prep.yaml
+  type: modified
+  span:
+    start_line: 5
+    end_line: 6
+  summary: Update packages/service/src/powdrr_service/resources/processes/finish-pr-prep.yaml
+    for verified, recoverable PR publication.
+  rationale: Bind publication artifacts to the checked candidate and preserve exact
+    verification evidence.
+- path: packages/service/src/powdrr_service/resources/processes/finish-pr-prep.yaml
+  type: modified
+  span:
+    start_line: 55
+    end_line: 58
+  summary: Update packages/service/src/powdrr_service/resources/processes/finish-pr-prep.yaml
+    for verified, recoverable PR publication.
+  rationale: Bind publication artifacts to the checked candidate and preserve exact
+    verification evidence.
+- path: packages/service/src/powdrr_service/resources/processes/finish-pr-prep.yaml
+  type: modified
+  span:
+    start_line: 60
+    end_line: 69
+  summary: Update packages/service/src/powdrr_service/resources/processes/finish-pr-prep.yaml
+    for verified, recoverable PR publication.
+  rationale: Bind publication artifacts to the checked candidate and preserve exact
+    verification evidence.
+- path: packages/service/src/powdrr_service/resources/processes/finish-pr-prep.yaml
+  type: modified
+  span:
+    start_line: 75
+    end_line: 154
+  summary: Remove source editing from preparation recovery.
+  rationale: Route source repair back through implementation correction and fresh verification.
+- path: src/powdrr_lift/clean_pr_publisher.py
+  type: modified
+  span:
+    start_line: 5
+    end_line: 5
+  summary: Update src/powdrr_lift/clean_pr_publisher.py for verified, recoverable
+    PR publication.
+  rationale: Bind publication artifacts to the checked candidate and preserve exact
+    verification evidence.
+- path: src/powdrr_lift/clean_pr_publisher.py
+  type: modified
+  span:
+    start_line: 34
+    end_line: 133
+  summary: Update src/powdrr_lift/clean_pr_publisher.py for verified, recoverable
+    PR publication.
+  rationale: Bind publication artifacts to the checked candidate and preserve exact
+    verification evidence.
+- path: src/powdrr_lift/clean_pr_publisher.py
+  type: modified
+  span:
+    start_line: 202
+    end_line: 209
+  summary: Update src/powdrr_lift/clean_pr_publisher.py for verified, recoverable
+    PR publication.
+  rationale: Bind publication artifacts to the checked candidate and preserve exact
+    verification evidence.
+- path: src/powdrr_lift/clean_pr_publisher.py
+  type: modified
+  span:
+    start_line: 313
+    end_line: 331
+  summary: Update src/powdrr_lift/clean_pr_publisher.py for verified, recoverable
+    PR publication.
+  rationale: Bind publication artifacts to the checked candidate and preserve exact
+    verification evidence.
+- path: src/powdrr_lift/clean_pr_publisher.py
+  type: modified
+  span:
+    start_line: 344
+    end_line: 350
+  summary: Update src/powdrr_lift/clean_pr_publisher.py for verified, recoverable
+    PR publication.
+  rationale: Bind publication artifacts to the checked candidate and preserve exact
+    verification evidence.
+- path: src/powdrr_lift/clean_pr_publisher.py
+  type: modified
+  span:
+    start_line: 389
+    end_line: 396
+  summary: Update src/powdrr_lift/clean_pr_publisher.py for verified, recoverable
+    PR publication.
+  rationale: Bind publication artifacts to the checked candidate and preserve exact
+    verification evidence.
+- path: src/powdrr_lift/clean_pr_publisher.py
+  type: modified
+  span:
+    start_line: 408
+    end_line: 494
+  summary: Update src/powdrr_lift/clean_pr_publisher.py for verified, recoverable
+    PR publication.
+  rationale: Bind publication artifacts to the checked candidate and preserve exact
+    verification evidence.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 2517
+    end_line: 2517
+  summary: Update src/powdrr_lift/workrr/task_agent.py for verified, recoverable PR
+    publication.
+  rationale: Bind publication artifacts to the checked candidate and preserve exact
+    verification evidence.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 2541
+    end_line: 2559
+  summary: Update src/powdrr_lift/workrr/task_agent.py for verified, recoverable PR
+    publication.
+  rationale: Bind publication artifacts to the checked candidate and preserve exact
+    verification evidence.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 2561
+    end_line: 2564
+  summary: Update src/powdrr_lift/workrr/task_agent.py for verified, recoverable PR
+    publication.
+  rationale: Bind publication artifacts to the checked candidate and preserve exact
+    verification evidence.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 2567
+    end_line: 2621
+  summary: Update src/powdrr_lift/workrr/task_agent.py for verified, recoverable PR
+    publication.
+  rationale: Bind publication artifacts to the checked candidate and preserve exact
+    verification evidence.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 2628
+    end_line: 2630
+  summary: Update src/powdrr_lift/workrr/task_agent.py for verified, recoverable PR
+    publication.
+  rationale: Bind publication artifacts to the checked candidate and preserve exact
+    verification evidence.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 2632
+    end_line: 2634
+  summary: Update src/powdrr_lift/workrr/task_agent.py for verified, recoverable PR
+    publication.
+  rationale: Bind publication artifacts to the checked candidate and preserve exact
+    verification evidence.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 2661
+    end_line: 2674
+  summary: Update src/powdrr_lift/workrr/task_agent.py for verified, recoverable PR
+    publication.
+  rationale: Bind publication artifacts to the checked candidate and preserve exact
+    verification evidence.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 2735
+    end_line: 2735
+  summary: Update src/powdrr_lift/workrr/task_agent.py for verified, recoverable PR
+    publication.
+  rationale: Bind publication artifacts to the checked candidate and preserve exact
+    verification evidence.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 2740
+    end_line: 2774
+  summary: Update src/powdrr_lift/workrr/task_agent.py for verified, recoverable PR
+    publication.
+  rationale: Bind publication artifacts to the checked candidate and preserve exact
+    verification evidence.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 2776
+    end_line: 2776
+  summary: Update src/powdrr_lift/workrr/task_agent.py for verified, recoverable PR
+    publication.
+  rationale: Bind publication artifacts to the checked candidate and preserve exact
+    verification evidence.
+- path: tests/test_clean_pr_publisher.py
+  type: modified
+  span:
+    start_line: 3
+    end_line: 3
+  summary: Update tests/test_clean_pr_publisher.py for verified, recoverable PR publication.
+  rationale: Bind publication artifacts to the checked candidate and preserve exact
+    verification evidence.
+- path: tests/test_clean_pr_publisher.py
+  type: modified
+  span:
+    start_line: 11
+    end_line: 11
+  summary: Update tests/test_clean_pr_publisher.py for verified, recoverable PR publication.
+  rationale: Bind publication artifacts to the checked candidate and preserve exact
+    verification evidence.
+- path: tests/test_clean_pr_publisher.py
+  type: modified
+  span:
+    start_line: 27
+    end_line: 37
+  summary: Update tests/test_clean_pr_publisher.py for verified, recoverable PR publication.
+  rationale: Bind publication artifacts to the checked candidate and preserve exact
+    verification evidence.
+- path: tests/test_clean_pr_publisher.py
+  type: modified
+  span:
+    start_line: 173
+    end_line: 176
+  summary: Update tests/test_clean_pr_publisher.py for verified, recoverable PR publication.
+  rationale: Bind publication artifacts to the checked candidate and preserve exact
+    verification evidence.
+- path: tests/test_clean_pr_publisher.py
+  type: modified
+  span:
+    start_line: 204
+    end_line: 204
+  summary: Update tests/test_clean_pr_publisher.py for verified, recoverable PR publication.
+  rationale: Bind publication artifacts to the checked candidate and preserve exact
+    verification evidence.
+- path: tests/test_clean_pr_publisher.py
+  type: modified
+  span:
+    start_line: 210
+    end_line: 213
+  summary: Update tests/test_clean_pr_publisher.py for verified, recoverable PR publication.
+  rationale: Bind publication artifacts to the checked candidate and preserve exact
+    verification evidence.
+- path: tests/test_clean_pr_publisher.py
+  type: modified
+  span:
+    start_line: 218
+    end_line: 218
+  summary: Update tests/test_clean_pr_publisher.py for verified, recoverable PR publication.
+  rationale: Bind publication artifacts to the checked candidate and preserve exact
+    verification evidence.
+- path: tests/test_clean_pr_publisher.py
+  type: modified
+  span:
+    start_line: 222
+    end_line: 222
+  summary: Update tests/test_clean_pr_publisher.py for verified, recoverable PR publication.
+  rationale: Bind publication artifacts to the checked candidate and preserve exact
+    verification evidence.
+- path: tests/test_clean_pr_publisher.py
+  type: modified
+  span:
+    start_line: 229
+    end_line: 244
+  summary: Update tests/test_clean_pr_publisher.py for verified, recoverable PR publication.
+  rationale: Bind publication artifacts to the checked candidate and preserve exact
+    verification evidence.
+- path: tests/test_clean_pr_publisher.py
+  type: modified
+  span:
+    start_line: 246
+    end_line: 258
+  summary: Update tests/test_clean_pr_publisher.py for verified, recoverable PR publication.
+  rationale: Bind publication artifacts to the checked candidate and preserve exact
+    verification evidence.
+- path: tests/test_clean_pr_publisher.py
+  type: modified
+  span:
+    start_line: 262
+    end_line: 264
+  summary: Update tests/test_clean_pr_publisher.py for verified, recoverable PR publication.
+  rationale: Bind publication artifacts to the checked candidate and preserve exact
+    verification evidence.
+- path: tests/test_clean_pr_publisher.py
+  type: modified
+  span:
+    start_line: 288
+    end_line: 292
+  summary: Update tests/test_clean_pr_publisher.py for verified, recoverable PR publication.
+  rationale: Bind publication artifacts to the checked candidate and preserve exact
+    verification evidence.
+- path: tests/test_clean_pr_publisher.py
+  type: modified
+  span:
+    start_line: 370
+    end_line: 372
+  summary: Update tests/test_clean_pr_publisher.py for verified, recoverable PR publication.
+  rationale: Bind publication artifacts to the checked candidate and preserve exact
+    verification evidence.
+- path: tests/test_procedrr_migrated_workflows.py
+  type: modified
+  span:
+    start_line: 6
+    end_line: 6
+  summary: Update tests/test_procedrr_migrated_workflows.py for verified, recoverable
+    PR publication.
+  rationale: Bind publication artifacts to the checked candidate and preserve exact
+    verification evidence.
+- path: tests/test_procedrr_migrated_workflows.py
+  type: modified
+  span:
+    start_line: 9
+    end_line: 9
+  summary: Update tests/test_procedrr_migrated_workflows.py for verified, recoverable
+    PR publication.
+  rationale: Bind publication artifacts to the checked candidate and preserve exact
+    verification evidence.
+- path: tests/test_procedrr_migrated_workflows.py
+  type: modified
+  span:
+    start_line: 279
+    end_line: 279
+  summary: Update tests/test_procedrr_migrated_workflows.py for verified, recoverable
+    PR publication.
+  rationale: Bind publication artifacts to the checked candidate and preserve exact
+    verification evidence.
+- path: tests/test_procedrr_migrated_workflows.py
+  type: modified
+  span:
+    start_line: 282
+    end_line: 282
+  summary: Update tests/test_procedrr_migrated_workflows.py for verified, recoverable
+    PR publication.
+  rationale: Bind publication artifacts to the checked candidate and preserve exact
+    verification evidence.
+- path: tests/test_procedrr_migrated_workflows.py
+  type: modified
+  span:
+    start_line: 318
+    end_line: 333
+  summary: Update tests/test_procedrr_migrated_workflows.py for verified, recoverable
+    PR publication.
+  rationale: Bind publication artifacts to the checked candidate and preserve exact
+    verification evidence.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 73
+    end_line: 73
+  summary: Update tests/test_workflow_task_agent.py for verified, recoverable PR publication.
+  rationale: Bind publication artifacts to the checked candidate and preserve exact
+    verification evidence.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 89
+    end_line: 140
+  summary: Update tests/test_workflow_task_agent.py for verified, recoverable PR publication.
+  rationale: Bind publication artifacts to the checked candidate and preserve exact
+    verification evidence.
+entities:
+- id: publication-authorization-builder
+  type: Function
+  action: added
+  rationale: Produce a deterministic authorization bound to candidate content and
+    evidence.
+- id: publication-intent-store
+  type: Function
+  action: added
+  rationale: Retain one PR write identity and reconcile ambiguous responses.
+entity_relationships: []
+invariants:
+- id: candidate-bound-publication
+  description: A publication authorization must match the base, candidate file content,
+    accepted contract, successful verification receipts, and source lineage immediately
+    before commit construction.
+  action: added
+  rationale: Prevent unverified source edits from entering a published PR.
+- id: idempotent-pr-publication
+  description: A persisted publication intent is reconciled against the branch and
+    existing PR before another PR is created.
+  action: added
+  rationale: Avoid duplicate pull requests after interrupted GitHub responses.
+guidance:
+- id: preparation-failure-restarts-implementation
+  description: A source repair after PR preparation validation must return to implementation
+    correction and regenerate candidate evidence.
+  action: added
+  rationale: Do not publish source changes that were not revalidated.

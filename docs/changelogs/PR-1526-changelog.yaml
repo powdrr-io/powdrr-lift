@@ -1,5 +1,5 @@
 schema: https://powdrr.io/schema/changelog-v2
-change_id: PR-1525
+change_id: PR-1526
 title: Bind publication to verified candidates
 intent:
   problem: PR preparation could edit implementation files after validation, and publication

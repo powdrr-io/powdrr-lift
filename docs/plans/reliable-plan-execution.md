@@ -64,7 +64,7 @@ alone does not establish completion. Report blocked acceptance honestly.
 | 2 | Faithful planning-to-worker contract compilation | None | Complete ([PR #1518](https://github.com/powdrr-io/powdrr-lift/pull/1518)) |
 | 3 | Shared execution preparation and plan executability checks | 2 | Complete ([PR #1520](https://github.com/powdrr-io/powdrr-lift/pull/1520)) |
 | 4 | Controlled implementation correction and restart | 1, 3 | Complete ([PR #1522](https://github.com/powdrr-io/powdrr-lift/pull/1522)) |
-| 5 | Verified candidate publication and safe preparation repair | 1, 4 | In review preparation |
+| 5 | Verified candidate publication and safe preparation repair | 1, 4 | In review ([PR #1526](https://github.com/powdrr-io/powdrr-lift/pull/1526)) |
 | 6 | Fulfillment-backed dependencies and readiness explanations | 1, 3 | Pending |
 | 7 | Validation inventory and evidence reuse | 3, 5 | Pending |
 | 8 | Complete run telemetry and mechanical-call removal | 1, 7 | Pending |

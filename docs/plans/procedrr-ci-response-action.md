@@ -7,11 +7,13 @@ assessment evidence-aware. This follow-up captures bounded, redacted failed-job
 logs with integrity metadata and targets pytest cases named in those logs for
 local reproduction. The response command now checkpoints required-check states
 and bounded evidence before a capped wait, refreshes only the pinned PR head,
-and records the terminal or deadline state. The issue queue now checkpoints that
-structured response beside its own current-head validation result. Durable
-continuation through the response procedure, broader evidence collection,
-research, protected repair dispatch, and full publication integration remain in
-the three-PR sequence below.
+and records the terminal or deadline state (PR #1525). The issue queue now
+checkpoints that structured response beside its own current-head validation
+result (PR #1527). This follow-up adds deterministic selection of one bounded
+research query for a safely identified hosted-runner rejection; it does not yet
+fetch sources, validate claims, or dispatch a repair. Durable continuation
+through the response procedure, broader evidence collection, source-backed
+research, protected repair dispatch, and full publication integration remain.
 
 ## Outcome
 

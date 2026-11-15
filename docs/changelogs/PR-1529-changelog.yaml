@@ -1,0 +1,64 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1529
+title: Select bounded CI contract research
+intent:
+  problem: CI response has no deterministic service policy for deciding when a runner provisioning failure warrants external platform research.
+  goal: Select a bounded, public-identifier-only research query for a safely identified hosted-runner rejection and skip unrelated or mismatched failures.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/plans/procedrr-ci-response-action.md
+    type: modified
+    span: {start_line: 10, end_line: 16}
+    summary: Record the research selection slice and distinguish it from source retrieval, claim validation, and repair dispatch.
+    rationale: Keep the active plan's completed integration and remaining work explicit.
+  - path: packages/service/src/powdrr_service/ci_response/__init__.py
+    type: modified
+    span: {start_line: 21, end_line: 25}
+    summary: Import the CI research plan, query, and deterministic selector.
+    rationale: Expose service-owned research selection through the CI response package API.
+  - path: packages/service/src/powdrr_service/ci_response/__init__.py
+    type: modified
+    span: {start_line: 30, end_line: 31}
+    summary: Add the CI research record types to the package exports.
+    rationale: Provide stable public imports for the research plan and query.
+  - path: packages/service/src/powdrr_service/ci_response/__init__.py
+    type: modified
+    span: {start_line: 33, end_line: 33}
+    summary: Export the deterministic CI research selector.
+    rationale: Let service consumers build research plans without importing an internal module.
+  - path: packages/service/src/powdrr_service/ci_response/research.py
+    type: added
+    span: {start_line: 1, end_line: 131}
+    summary: Select a bounded query only for matching pre-runner failures with a safely parsed hosted-runner label.
+    rationale: Keep research policy deterministic and prevent repository identity or raw evidence from entering external queries.
+  - path: tests/test_ci_response_research.py
+    type: added
+    span: {start_line: 1, end_line: 154}
+    summary: Cover safe query construction, hosted-label versions, visibility normalization, and skip conditions.
+    rationale: Protect query privacy and avoid researching unrelated or stale CI evidence.
+entities:
+  - id: ci-research-query
+    type: Class
+    action: added
+  - id: ci-research-plan
+    type: Class
+    action: added
+  - id: build-ci-research-plan
+    type: Function
+    action: added
+entity_relationships:
+  - source: ci-research-plan
+    target: ci-research-query
+    relationship: contains
+    description: A research plan contains zero queries when research is skipped or one bounded query for an eligible runner rejection.
+invariants:
+  - id: ci-research-query-minimization
+    description: Research queries include only the GitHub Actions platform and a validated hosted-runner label, without repository identity or raw annotation text.
+    action: added
+    rationale: Keep external queries limited to public identifiers and the unresolved platform fact.
+  - id: ci-research-evidence-alignment
+    description: Research is skipped when the failure job or head differs from the job observation, a runner was assigned, steps started, or no safe hosted label was found.
+    action: added
+    rationale: Avoid attaching external research to mismatched or non-runner failures.
+guidance: []

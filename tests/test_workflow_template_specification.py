@@ -364,20 +364,16 @@ def test_execute_proposed_pr_is_a_procedrr_workflow_process() -> None:
         implementation_steps[1]["gate"]["subject"]
         == "implementation_result.integration_tests.passed"
     )
-    assert implementation_steps[2]["judge"]["output"]["name"] == "publication_scope"
-    assert (
-        "files_to_publish"
-        not in implementation_steps[2]["judge"]["output"]["schema"]["required"]
-    )
-    assert implementation_steps[3]["call"]["inputs"]["files_to_publish"] == {
+    assert implementation_steps[2]["call"]["process"] == "finish-pr-prep"
+    assert implementation_steps[2]["call"]["inputs"]["files_to_publish"] == {
         "type": "reference",
         "value": "implementation_result.changed_paths",
     }
-    assert implementation_steps[3]["call"]["outputs"] == {
+    assert implementation_steps[2]["call"]["outputs"] == {
         "validation_results": "validation_results"
     }
-    assert implementation_steps[4]["judge"]["output"]["name"] == "pull_request_request"
-    title_judge = implementation_steps[4]["judge"]
+    assert implementation_steps[3]["judge"]["output"]["name"] == "pull_request_request"
+    title_judge = implementation_steps[3]["judge"]
     assert any(
         "task_context.proposed_pr_context.title" in instruction
         and "Prefer the reviewed item title verbatim" in instruction
@@ -406,7 +402,7 @@ def test_execute_proposed_pr_is_a_procedrr_workflow_process() -> None:
     ]["properties"]["pr-description-sections"]
     assert description_schema["type"] == "object"
     assert "objective" not in description_schema.get("required", [])
-    publish_call = implementation_steps[5]["call"]
+    publish_call = implementation_steps[4]["call"]
     assert publish_call["inputs"]["files_to_publish"] == {
         "type": "reference",
         "value": "implementation_result.changed_paths",

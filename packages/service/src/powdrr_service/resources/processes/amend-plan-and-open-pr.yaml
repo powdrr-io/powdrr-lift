@@ -99,7 +99,6 @@ steps:
       process: finish-pr-prep
       inputs:
         files_to_publish: {type: reference, value: amendment_result.changed_paths}
-        language_labels: [yaml, json]
       outputs:
         validation_results: validation_results
   - judge:

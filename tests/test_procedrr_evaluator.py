@@ -435,7 +435,6 @@ version: 1
 name: finish-pr-prep
 inputs:
   - {name: files_to_publish, type: array, required: true}
-  - {name: language_labels, type: array, required: true}
 outputs: {validation_results: {type: array, items: {type: object}}}
 steps:
   - operation:
@@ -512,10 +511,6 @@ steps:
             self, messages: list[dict[str, str]], **_: Any
         ) -> dict[str, Any]:
             question = messages[1]["content"]
-            if "Which repository validation labels" in question:
-                return {
-                    "language_labels": ["python"],
-                }
             if "Does the recorded failure demonstrate" in question:
                 if policy_denied_required_paths:
                     assert '"status": "policy_denied"' in question

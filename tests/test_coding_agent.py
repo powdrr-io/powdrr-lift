@@ -1375,6 +1375,66 @@ def test_validation_runner_executes_every_declared_profile_and_persists_report(
     assert store.load_validation_report("attempt-validation") == report
 
 
+def test_validation_runner_reuses_only_exact_known_environment_receipts(
+    tmp_path: Path,
+) -> None:
+    worktree = _git_repo(tmp_path / "repo")
+    request = _request(_head(worktree))
+    store = CodingAgentAttemptStore(tmp_path / "artifacts")
+    attempt = CodingAgentRunner(FakeProvider("allowed"), store).run(
+        request, worktree_root=worktree, attempt_id="attempt-receipt"
+    )
+    profile = ValidationProfile(
+        "python",
+        ("python3", "-c", "print('validation output')"),
+        environment_id="uv:python-3.12",
+        config_files=("pyproject.toml",),
+        selectors=("tests/test_change.py::test_behavior",),
+    )
+    runner = ValidationRunner({"python": profile})
+
+    first = runner.run(request, attempt, worktree_root=worktree)
+    second = runner.run(request, attempt, worktree_root=worktree)
+
+    assert first.results[0].status is ValidationResultStatus.PASSED
+    assert first.results[0].receipt_key is not None
+    assert first.results[0].receipt_reused is False
+    assert second.results[0].receipt_key == first.results[0].receipt_key
+    assert second.results[0].receipt_reused is True
+    assert second.results[0].stdout == "validation output\n"
+
+    (worktree / "src" / "change.py").write_text("value = 2\n", encoding="utf-8")
+    changed = runner.run(request, attempt, worktree_root=worktree)
+    assert changed.results[0].receipt_reused is False
+    assert changed.results[0].receipt_key != first.results[0].receipt_key
+
+
+def test_validation_runner_does_not_reuse_unknown_environment_receipts(
+    tmp_path: Path,
+) -> None:
+    worktree = _git_repo(tmp_path / "repo")
+    request = _request(_head(worktree))
+    store = CodingAgentAttemptStore(tmp_path / "artifacts")
+    attempt = CodingAgentRunner(FakeProvider("allowed"), store).run(
+        request, worktree_root=worktree, attempt_id="attempt-unknown-receipt"
+    )
+    profile = ValidationProfile(
+        "python",
+        ("python3", "-c", "print('validation output')"),
+        environment_id="unknown",
+    )
+    runner = ValidationRunner({"python": profile})
+
+    first = runner.run(request, attempt, worktree_root=worktree)
+    second = runner.run(request, attempt, worktree_root=worktree)
+
+    assert first.results[0].receipt_key is None
+    assert first.results[0].receipt_error == (
+        "validation environment identity is unknown"
+    )
+    assert second.results[0].receipt_reused is False
+
+
 def test_validation_runner_with_no_selected_profiles_cannot_pass(
     tmp_path: Path,
 ) -> None:

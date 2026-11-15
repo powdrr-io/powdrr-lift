@@ -25,6 +25,7 @@ class SequenceLLM:
 
 def _tool_catalog() -> dict[str, Any]:
     return {
+        "validation_inventory_status": "ready",
         "matches": [
             {
                 "item": {
@@ -35,12 +36,8 @@ def _tool_catalog() -> dict[str, Any]:
                     },
                 }
             }
-        ]
+        ],
     }
-
-
-def _scope_and_label_responses() -> list[dict[str, Any]]:
-    return [{"labels": ["pr-prep", "python"]}]
 
 
 def test_bundled_process_catalog_is_owned_by_the_service_package() -> None:
@@ -79,7 +76,7 @@ def _handle_ad_hoc_executor(
                 "language_labels": ["python"] if has_changes else [],
             }
         if tool == "gather_context":
-            return {"matches": []}
+            return {"validation_inventory_status": "missing", "matches": []}
         if tool == "invoke_tool":
             tool_name = str(parameters["tool"])
             tool_parameters = dict(parameters["parameters"])
@@ -129,17 +126,15 @@ def test_handle_ad_hoc_runs_finish_pr_prep_for_changed_files() -> None:
         ]
     )
 
-    result = ProcedrrExecutionService(catalog, llm, executor).execute(
-        "handle-ad-hoc",
-        {
-            "user_request": "Make the requested small correction.",
-            "workflow_context": {},
-            "language_labels": ["python"],
-        },
-    )
-
-    assert result.terminal_status.value == "succeeded"
-    assert result.bindings["pr_prep_results"] == []
+    with pytest.raises(ValidationGateError):
+        ProcedrrExecutionService(catalog, llm, executor).execute(
+            "handle-ad-hoc",
+            {
+                "user_request": "Make the requested small correction.",
+                "workflow_context": {},
+                "language_labels": ["python"],
+            },
+        )
     assert calls == [
         ("git", {"operation": "verify_pr_scope", "paths": ["src/app.py"]}),
     ]
@@ -149,6 +144,7 @@ def test_finish_pr_prep_runs_every_discovered_validation_tool() -> None:
     Path(__file__).resolve().parents[1]
     catalog = ProcessCatalog.load(bundled_process_directory())
     calls: list[tuple[str, dict[str, Any]]] = []
+    gathered: list[dict[str, Any]] = []
 
     def invoke_tool(parameters: Any) -> dict[str, Any]:
         tool = parameters["tool"]
@@ -162,13 +158,17 @@ def test_finish_pr_prep_runs_every_discovered_validation_tool() -> None:
             }
         return {"returncode": 0, "stdout": "passed", "stderr": ""}
 
+    def gather(parameters: Any) -> dict[str, Any]:
+        gathered.append(dict(parameters))
+        return _tool_catalog()
+
     executor = {
         "invoke_tool": invoke_tool,
-        "gather_context": lambda _parameters: _tool_catalog(),
+        "gather_context": gather,
     }
     result = ProcedrrExecutionService(
         catalog,
-        SequenceLLM(_scope_and_label_responses()),
+        SequenceLLM([]),
         lambda tool, parameters: executor[tool](parameters),
     ).execute(
         "finish-pr-prep",
@@ -184,6 +184,7 @@ def test_finish_pr_prep_runs_every_discovered_validation_tool() -> None:
         ("shell", {"command": "ruff check ."})
     ]
     assert result.bindings["validation_results"][0]["result"]["returncode"] == 0
+    assert gathered == [{"types": ["tools"], "filters": {"labels": ["pr-prep"]}}]
 
 
 def test_finish_pr_prep_accepts_files_already_committed_on_feature_branch() -> None:
@@ -203,7 +204,7 @@ def test_finish_pr_prep_accepts_files_already_committed_on_feature_branch() -> N
             }
         return {"returncode": 0, "stdout": "passed", "stderr": ""}
 
-    llm = SequenceLLM(_scope_and_label_responses())
+    llm = SequenceLLM([])
     result = ProcedrrExecutionService(
         catalog,
         llm,
@@ -256,7 +257,7 @@ def test_finish_pr_prep_reviews_large_scope_without_runtime_paths() -> None:
             }
         return {"returncode": 0, "stdout": "passed", "stderr": ""}
 
-    llm = SequenceLLM([{"labels": ["pr-prep", "python"]}])
+    llm = SequenceLLM([])
     result = ProcedrrExecutionService(
         catalog,
         llm,
@@ -279,7 +280,7 @@ def test_finish_pr_prep_reviews_large_scope_without_runtime_paths() -> None:
 def test_finish_pr_prep_fails_without_editing_a_verified_candidate() -> None:
     Path(__file__).resolve().parents[1]
     catalog = ProcessCatalog.load(bundled_process_directory())
-    responses = _scope_and_label_responses()
+    responses: list[dict[str, Any]] = []
     validation_calls = 0
     restaged_paths: list[str] = []
     edits: list[dict[str, Any]] = []

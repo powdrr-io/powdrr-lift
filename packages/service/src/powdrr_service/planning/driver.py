@@ -2709,25 +2709,46 @@ class SourceLedgerQuestionMachine:
                 "no unresolved requirement uses the repository verification command"
             )
         validation_coverage = []
-        units_by_id = {unit.id: unit for unit in assembly.units}
         for item in assembly.plan.items:
-            unit_ids = assembly.item_unit_ids[item.item_id]
-            item_validation_ids = tuple(
-                dict.fromkeys(
-                    validation_id
-                    for unit_id in unit_ids
-                    for validation_id in units_by_id[unit_id].validation_ids
-                )
+            item_proposal = proposal.item_proposals[item.item_id]
+            raw_test_cases = item_proposal.verification.get("required_test_cases", [])
+            test_cases = (
+                [case for case in raw_test_cases if isinstance(case, Mapping)]
+                if isinstance(raw_test_cases, list)
+                else []
             )
-            for criterion in item.acceptance_criteria:
+            for criterion_index, criterion in enumerate(
+                item.acceptance_criteria, start=1
+            ):
+                obligation_id = f"AC-{criterion_index:02d}"
+                matching_test_ids = tuple(
+                    f"{item.item_id}/{case_id}"
+                    for case in test_cases
+                    if (
+                        case.get("source_text") == criterion
+                        or case.get("acceptance_criterion") == criterion
+                        or case.get("obligation_id") == obligation_id
+                        or case.get("id") == obligation_id
+                    )
+                    and isinstance(
+                        case_id := case.get("id", case.get("obligation_id")), str
+                    )
+                    and case_id.strip()
+                )
                 validation_coverage.append(
                     {
                         "item_id": item.item_id,
                         "criterion": criterion,
-                        "validation_ids": list(item_validation_ids),
+                        "validation_ids": [],
+                        "obligation_test_ids": list(dict.fromkeys(matching_test_ids)),
                         "reason": (
-                            "The configured repository verification command is "
-                            "the accepted validation for this criterion."
+                            "The configured repository command is a repository "
+                            "health check, not behavioral evidence for this "
+                            "criterion; use its linked obligation test contract."
+                            if matching_test_ids
+                            else "No obligation-specific test contract is mapped "
+                            "to this criterion; the repository command remains "
+                            "repository health evidence only."
                         ),
                     }
                 )

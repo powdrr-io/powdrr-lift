@@ -32,7 +32,7 @@ from powdrr_agent.execution.github_actions import (
     execute_pinned_local_command,
 )
 from powdrr_contracts.ci import CIFailureUnit as CIResponseFailureUnit
-from powdrr_contracts.ci import LocalReproduction
+from powdrr_contracts.ci import CIRequiredCheck, LocalReproduction
 from powdrr_contracts.models import (
     Artifact,
     OperationRequest,
@@ -374,6 +374,18 @@ def build_parser() -> argparse.ArgumentParser:
     ci_response_parser.add_argument(
         "--verification-command",
         help="Run the task's declared verification command at the exact PR head.",
+    )
+    ci_response_parser.add_argument(
+        "--wait-deadline-seconds",
+        type=int,
+        default=900,
+        help="Maximum time to wait for current-head required checks (default: 900).",
+    )
+    ci_response_parser.add_argument(
+        "--poll-interval-seconds",
+        type=int,
+        default=30,
+        help="Delay between current-head required-check refreshes (default: 30).",
     )
     ci_response_parser.set_defaults(func=_run_respond_to_pr_ci)
 
@@ -3050,6 +3062,24 @@ def _run_respond_to_pr_ci(args: argparse.Namespace) -> int:
             pr_number = url_number
         if pr_number is None or pr_number < 1:
             raise GitHubActionsError("provide a positive --pr or a valid --pr-url")
+        wait_deadline_seconds = getattr(args, "wait_deadline_seconds", 900)
+        poll_interval_seconds = getattr(args, "poll_interval_seconds", 30)
+        if (
+            not isinstance(wait_deadline_seconds, int)
+            or wait_deadline_seconds < 0
+            or wait_deadline_seconds > 3600
+        ):
+            raise GitHubActionsError(
+                "--wait-deadline-seconds must be between 0 and 3600"
+            )
+        if (
+            not isinstance(poll_interval_seconds, int)
+            or poll_interval_seconds < 1
+            or poll_interval_seconds > 300
+        ):
+            raise GitHubActionsError(
+                "--poll-interval-seconds must be between 1 and 300"
+            )
         client = GitHubActionsClient(args.repository)
         issue = client.get_issue(args.issue)
         prior = client.list_issue_comments(args.issue)
@@ -3175,6 +3205,12 @@ def _run_respond_to_pr_ci(args: argparse.Namespace) -> int:
             required_check_count=len(observation.required_checks),
             required_check_source=observation.required_check_source,
             required_check_reason=snapshot.required_checks_reason,
+            required_checks=observation.required_checks,
+            wait_status=(
+                "waiting"
+                if assessment.state == "awaiting_ci" and wait_deadline_seconds > 0
+                else "not_started"
+            ),
             failures=failures,
             reproductions=reproductions,
             observed_at=snapshot.observed_at,
@@ -3187,6 +3223,89 @@ def _run_respond_to_pr_ci(args: argparse.Namespace) -> int:
         )
         if not duplicate:
             client.add_issue_comment(args.issue, comment)
+        checkpoint_written = not duplicate
+        wait_started = time.monotonic()
+        wait_deadline_reached = False
+        if assessment.state == "awaiting_ci" and wait_deadline_seconds > 0:
+            deadline = wait_started + wait_deadline_seconds
+            while True:
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    wait_deadline_reached = True
+                    break
+                time.sleep(min(poll_interval_seconds, remaining))
+                refreshed_checks, refresh_reason = client.refresh_required_checks(
+                    pr_number, head_sha
+                )
+                if refreshed_checks is None:
+                    observation = replace(
+                        observation,
+                        required_checks_status="unavailable",
+                        required_check_source=None,
+                        required_checks=(),
+                    )
+                    snapshot = replace(snapshot, required_checks_reason=refresh_reason)
+                else:
+                    observation = replace(
+                        observation,
+                        required_checks_status="available",
+                        required_check_source="gh pr checks --required",
+                        required_checks=tuple(
+                            CIRequiredCheck(
+                                name=item["name"],
+                                state=item["state"],
+                                workflow=item.get("workflow"),
+                                head_sha=head_sha,
+                            )
+                            for item in refreshed_checks
+                        ),
+                    )
+                    snapshot = replace(snapshot, required_checks_reason=None)
+                assessment = assess_ci_observation(
+                    observation, pull_request_draft=draft_status
+                )
+                if assessment.state != "awaiting_ci":
+                    break
+            waited_seconds = min(
+                wait_deadline_seconds, max(0, int(time.monotonic() - wait_started))
+            )
+            refreshed_id, refreshed_comment = render_ci_observation_checkpoint(
+                repository=args.repository,
+                pull_request_number=pr_number,
+                issue_number=args.issue,
+                head_sha=head_sha,
+                jobs=jobs,
+                response_state=assessment.state,
+                required_checks_status=observation.required_checks_status,
+                required_check_count=len(observation.required_checks),
+                required_check_source=observation.required_check_source,
+                required_check_reason=snapshot.required_checks_reason,
+                required_checks=observation.required_checks,
+                wait_status=(
+                    "deadline_reached" if wait_deadline_reached else "completed"
+                ),
+                waited_seconds=waited_seconds,
+                failures=failures,
+                reproductions=reproductions,
+                observed_at=snapshot.observed_at,
+                pull_request_draft=draft_status,
+            )
+            known_ids = {observation_id[:16]}
+            known_ids.update(
+                match.group(1)
+                for prior_comment in prior
+                if isinstance(prior_comment.get("body"), str)
+                if (
+                    match := re.search(
+                        r"CI response observation `([0-9a-f]{16})`",
+                        prior_comment["body"],
+                    )
+                )
+            )
+            if refreshed_id[:16] not in known_ids:
+                client.add_issue_comment(args.issue, refreshed_comment)
+                checkpoint_written = True
+            observation_id = refreshed_id
         result = {
             "repository": args.repository,
             "pull_request": pr_number,
@@ -3210,7 +3329,16 @@ def _run_respond_to_pr_ci(args: argparse.Namespace) -> int:
                 "draft": draft_status,
             },
             "observation_id": observation_id,
-            "checkpoint_written": not duplicate,
+            "checkpoint_written": checkpoint_written,
+            "waited_seconds": (
+                min(
+                    wait_deadline_seconds,
+                    max(0, int(time.monotonic() - wait_started)),
+                )
+                if assessment.state != "awaiting_ci" or wait_deadline_seconds > 0
+                else 0
+            ),
+            "wait_deadline_reached": wait_deadline_reached,
             "jobs_observed": len(jobs),
             "changed_paths": list(snapshot.changed_paths),
             "job_log_evidence": {

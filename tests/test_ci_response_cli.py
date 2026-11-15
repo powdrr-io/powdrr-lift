@@ -246,6 +246,161 @@ def test_response_command_retries_issue_link_lookup_for_eventual_consistency(
     assert len(checkpoints) == 1
 
 
+def test_response_command_checkpoints_before_wait_and_records_current_head_success(
+    monkeypatch: Any, capsys: Any
+) -> None:
+    head_sha = "6c85b1e5c334a113b3db274b2c1b7a8f350b9707"
+    comments: list[str] = []
+    refreshes = 0
+
+    class WaitingClient:
+        def __init__(self, _repository: str) -> None:
+            pass
+
+        def get_issue(self, _number: int) -> dict[str, str]:
+            return {"body": "Tracking implementation request"}
+
+        def list_issue_comments(self, _number: int) -> tuple[dict[str, str], ...]:
+            return tuple({"body": body} for body in comments)
+
+        def observe_pull_request(self, _number: int) -> GitHubActionsSnapshot:
+            return GitHubActionsSnapshot(
+                repository="example/project",
+                pull_request={
+                    "html_url": "https://github.com/example/project/pull/270",
+                    "body": "Closes #107",
+                    "draft": False,
+                    "head": {"sha": head_sha},
+                },
+                runs=(),
+                jobs_by_run={},
+                annotations_by_check_run={},
+                required_checks=(
+                    {"name": "unit", "state": "PENDING", "workflow": "ci.yml"},
+                ),
+            )
+
+        def refresh_required_checks(
+            self, _number: int, expected_head: str
+        ) -> tuple[tuple[dict[str, str], ...], None]:
+            nonlocal refreshes
+            assert expected_head == head_sha
+            refreshes += 1
+            return (
+                ({"name": "unit", "state": "SUCCESS", "workflow": "ci.yml"},),
+                None,
+            )
+
+        def add_issue_comment(self, _number: int, body: str) -> None:
+            comments.append(body)
+
+    monkeypatch.setattr(cli, "GitHubActionsClient", WaitingClient)
+    monkeypatch.setattr(
+        cli,
+        "_prepare_ci_observation_worktree",
+        lambda *_args, **_kwargs: (cli.Path.cwd(), cli.Path.cwd()),
+    )
+    monkeypatch.setattr(cli.time, "sleep", lambda _delay: None)
+    args = Namespace(
+        repository="example/project",
+        pr=270,
+        pr_url=None,
+        issue=107,
+        wait_deadline_seconds=5,
+        poll_interval_seconds=1,
+    )
+
+    assert cli._run_respond_to_pr_ci(args) == 0
+    result = json.loads(capsys.readouterr().out)
+
+    assert refreshes == 1
+    assert result["response_state"] == "awaiting_review"
+    assert result["required_checks"][0]["state"] == "SUCCESS"
+    assert result["checkpoint_written"] is True
+    assert len(comments) == 2
+    assert "**awaiting_ci**" in comments[0]
+    assert "**awaiting_review**" in comments[1]
+    assert "Required check `unit`: **SUCCESS**" in comments[1]
+
+
+def test_response_command_records_wait_deadline_when_checks_remain_pending(
+    monkeypatch: Any, capsys: Any
+) -> None:
+    head_sha = "6c85b1e5c334a113b3db274b2c1b7a8f350b9707"
+    comments: list[str] = []
+    refreshes = 0
+    ticks = iter((0.0, 0.0, 1.0, 1.0, 1.0, 1.0))
+
+    class PendingClient:
+        def __init__(self, _repository: str) -> None:
+            pass
+
+        def get_issue(self, _number: int) -> dict[str, str]:
+            return {"body": "Tracking implementation request"}
+
+        def list_issue_comments(self, _number: int) -> tuple[dict[str, str], ...]:
+            return tuple({"body": body} for body in comments)
+
+        def observe_pull_request(self, _number: int) -> GitHubActionsSnapshot:
+            return GitHubActionsSnapshot(
+                repository="example/project",
+                pull_request={
+                    "html_url": "https://github.com/example/project/pull/270",
+                    "body": "Closes #107",
+                    "draft": False,
+                    "head": {"sha": head_sha},
+                },
+                runs=(),
+                jobs_by_run={},
+                annotations_by_check_run={},
+                required_checks=(
+                    {"name": "unit", "state": "PENDING", "workflow": "ci.yml"},
+                ),
+            )
+
+        def refresh_required_checks(
+            self, _number: int, expected_head: str
+        ) -> tuple[tuple[dict[str, str], ...], None]:
+            nonlocal refreshes
+            assert expected_head == head_sha
+            refreshes += 1
+            return (
+                ({"name": "unit", "state": "PENDING", "workflow": "ci.yml"},),
+                None,
+            )
+
+        def add_issue_comment(self, _number: int, body: str) -> None:
+            comments.append(body)
+
+    monkeypatch.setattr(cli, "GitHubActionsClient", PendingClient)
+    monkeypatch.setattr(
+        cli,
+        "_prepare_ci_observation_worktree",
+        lambda *_args, **_kwargs: (cli.Path.cwd(), cli.Path.cwd()),
+    )
+    monkeypatch.setattr(cli.time, "sleep", lambda _delay: None)
+    monkeypatch.setattr(cli.time, "monotonic", lambda: next(ticks))
+    args = Namespace(
+        repository="example/project",
+        pr=270,
+        pr_url=None,
+        issue=107,
+        wait_deadline_seconds=1,
+        poll_interval_seconds=1,
+    )
+
+    assert cli._run_respond_to_pr_ci(args) == 0
+    result = json.loads(capsys.readouterr().out)
+
+    assert refreshes == 1
+    assert result["response_state"] == "awaiting_ci"
+    assert result["wait_deadline_reached"] is True
+    assert result["waited_seconds"] == 1
+    assert len(comments) == 2
+    assert "Check wait **waiting**" in comments[0]
+    assert "Check wait **deadline_reached**" in comments[1]
+
+
 def test_response_command_rejects_pull_request_url_from_another_repository(
     monkeypatch: Any, capsys: Any
 ) -> None:

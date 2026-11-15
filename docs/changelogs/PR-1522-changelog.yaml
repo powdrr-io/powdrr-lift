@@ -1,0 +1,651 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1522
+title: Correct failed source implementation attempts
+intent:
+  problem: A failed protected implementation attempt could not receive a bounded correction,
+    and implicit wall-clock limits could terminate active work without a durable correction
+    decision.
+  goal: Create linked immutable correction attempts that preserve accepted authority,
+    stop repeated failures with durable evidence, and use explicit attempt budgets.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/plans/reliable-plan-execution.md
+  type: modified
+  span:
+    start_line: 3
+    end_line: 3
+  summary: Record merged prerequisites and task 4 review status.
+  rationale: Keep the implementation plan aligned with the merged PRs and current
+    work.
+- path: docs/plans/reliable-plan-execution.md
+  type: modified
+  span:
+    start_line: 64
+    end_line: 66
+  summary: Record merged prerequisites and task 4 review status.
+  rationale: Keep the implementation plan aligned with the merged PRs and current
+    work.
+- path: packages/service/src/powdrr_service/resources/processes/execute-proposed-pr-workflow.yaml
+  type: modified
+  span:
+    start_line: 3
+    end_line: 3
+  summary: Route reviewed plan items through the durable correction coordinator.
+  rationale: Describe the execution policy used by the workflow process.
+- path: packages/service/src/powdrr_service/resources/processes/execute-proposed-pr.yaml
+  type: modified
+  span:
+    start_line: 50
+    end_line: 58
+  summary: Document linked correction attempts, explicit budgets, and no-progress
+    stops.
+  rationale: Keep process instructions consistent with protected runtime behavior.
+- path: packages/service/src/powdrr_service/resources/processes/execute-proposed-pr.yaml
+  type: modified
+  span:
+    start_line: 61
+    end_line: 61
+  summary: Document linked correction attempts, explicit budgets, and no-progress
+    stops.
+  rationale: Keep process instructions consistent with protected runtime behavior.
+- path: src/powdrr_lift/agent_feature.py
+  type: modified
+  span:
+    start_line: 31
+    end_line: 31
+  summary: Remove the default overall wall-clock limit from feature runs.
+  rationale: Keep active work from expiring under an implicit task deadline.
+- path: src/powdrr_lift/agent_feature.py
+  type: modified
+  span:
+    start_line: 38
+    end_line: 40
+  summary: Remove the default overall wall-clock limit from feature runs.
+  rationale: Keep active work from expiring under an implicit task deadline.
+- path: src/powdrr_lift/agent_feature.py
+  type: modified
+  span:
+    start_line: 82
+    end_line: 82
+  summary: Remove the default overall wall-clock limit from feature runs.
+  rationale: Keep active work from expiring under an implicit task deadline.
+- path: src/powdrr_lift/agent_feature.py
+  type: modified
+  span:
+    start_line: 113
+    end_line: 113
+  summary: Remove the default overall wall-clock limit from feature runs.
+  rationale: Keep active work from expiring under an implicit task deadline.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 516
+    end_line: 519
+  summary: Expose configured correction-attempt budgets and clarify optional overall
+    timeouts.
+  rationale: Make correction budgets explicit while preserving opt-in deadlines.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 524
+    end_line: 529
+  summary: Expose configured correction-attempt budgets and clarify optional overall
+    timeouts.
+  rationale: Make correction budgets explicit while preserving opt-in deadlines.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 569
+    end_line: 572
+  summary: Expose configured correction-attempt budgets and clarify optional overall
+    timeouts.
+  rationale: Make correction budgets explicit while preserving opt-in deadlines.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 577
+    end_line: 582
+  summary: Expose configured correction-attempt budgets and clarify optional overall
+    timeouts.
+  rationale: Make correction budgets explicit while preserving opt-in deadlines.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 818
+    end_line: 818
+  summary: Expose configured correction-attempt budgets and clarify optional overall
+    timeouts.
+  rationale: Make correction budgets explicit while preserving opt-in deadlines.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 3530
+    end_line: 3532
+  summary: Expose configured correction-attempt budgets and clarify optional overall
+    timeouts.
+  rationale: Make correction budgets explicit while preserving opt-in deadlines.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 3639
+    end_line: 3639
+  summary: Expose configured correction-attempt budgets and clarify optional overall
+    timeouts.
+  rationale: Make correction budgets explicit while preserving opt-in deadlines.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 130
+    end_line: 130
+  summary: Carry correction-only instructions in the worker prompt and remove the
+    default model deadline.
+  rationale: Preserve the accepted prompt while giving corrections exact prior failure
+    context.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 144
+    end_line: 150
+  summary: Carry correction-only instructions in the worker prompt and remove the
+    default model deadline.
+  rationale: Preserve the accepted prompt while giving corrections exact prior failure
+    context.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 290
+    end_line: 294
+  summary: Carry correction-only instructions in the worker prompt and remove the
+    default model deadline.
+  rationale: Preserve the accepted prompt while giving corrections exact prior failure
+    context.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 308
+    end_line: 325
+  summary: Carry correction-only instructions in the worker prompt and remove the
+    default model deadline.
+  rationale: Preserve the accepted prompt while giving corrections exact prior failure
+    context.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 416
+    end_line: 422
+  summary: Carry correction-only instructions in the worker prompt and remove the
+    default model deadline.
+  rationale: Preserve the accepted prompt while giving corrections exact prior failure
+    context.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 917
+    end_line: 917
+  summary: Carry correction-only instructions in the worker prompt and remove the
+    default model deadline.
+  rationale: Preserve the accepted prompt while giving corrections exact prior failure
+    context.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 979
+    end_line: 979
+  summary: Carry correction-only instructions in the worker prompt and remove the
+    default model deadline.
+  rationale: Preserve the accepted prompt while giving corrections exact prior failure
+    context.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 1044
+    end_line: 1044
+  summary: Carry correction-only instructions in the worker prompt and remove the
+    default model deadline.
+  rationale: Preserve the accepted prompt while giving corrections exact prior failure
+    context.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 1066
+    end_line: 1068
+  summary: Carry correction-only instructions in the worker prompt and remove the
+    default model deadline.
+  rationale: Preserve the accepted prompt while giving corrections exact prior failure
+    context.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 1082
+    end_line: 1094
+  summary: Carry correction-only instructions in the worker prompt and remove the
+    default model deadline.
+  rationale: Preserve the accepted prompt while giving corrections exact prior failure
+    context.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 1105
+    end_line: 1105
+  summary: Carry correction-only instructions in the worker prompt and remove the
+    default model deadline.
+  rationale: Preserve the accepted prompt while giving corrections exact prior failure
+    context.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 1109
+    end_line: 1109
+  summary: Carry correction-only instructions in the worker prompt and remove the
+    default model deadline.
+  rationale: Preserve the accepted prompt while giving corrections exact prior failure
+    context.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 1355
+    end_line: 1355
+  summary: Carry correction-only instructions in the worker prompt and remove the
+    default model deadline.
+  rationale: Preserve the accepted prompt while giving corrections exact prior failure
+    context.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 1463
+    end_line: 1463
+  summary: Carry correction-only instructions in the worker prompt and remove the
+    default model deadline.
+  rationale: Preserve the accepted prompt while giving corrections exact prior failure
+    context.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span:
+    start_line: 1473
+    end_line: 1473
+  summary: Carry correction-only instructions in the worker prompt and remove the
+    default model deadline.
+  rationale: Preserve the accepted prompt while giving corrections exact prior failure
+    context.
+- path: src/powdrr_lift/workrr/planned_workflow_task.py
+  type: modified
+  span:
+    start_line: 52
+    end_line: 52
+  summary: Carry the explicit correction-attempt budget into planned task execution.
+  rationale: Preserve budget configuration across the workflow task adapter.
+- path: src/powdrr_lift/workrr/planned_workflow_task.py
+  type: modified
+  span:
+    start_line: 211
+    end_line: 211
+  summary: Carry the explicit correction-attempt budget into planned task execution.
+  rationale: Preserve budget configuration across the workflow task adapter.
+- path: src/powdrr_lift/workrr/pr_execution_session.py
+  type: modified
+  span:
+    start_line: 75
+    end_line: 75
+  summary: Forward the correction-attempt budget through PR execution sessions.
+  rationale: Keep session configuration connected to the source task coordinator.
+- path: src/powdrr_lift/workrr/pr_execution_session.py
+  type: modified
+  span:
+    start_line: 111
+    end_line: 111
+  summary: Forward the correction-attempt budget through PR execution sessions.
+  rationale: Keep session configuration connected to the source task coordinator.
+- path: src/powdrr_lift/workrr/source_reference_dispatch.py
+  type: modified
+  span:
+    start_line: 11
+    end_line: 12
+  summary: Coordinate immutable correction attempts, durable transitions, failure
+    fingerprints, and terminal reconciliation.
+  rationale: Correct recoverable candidate failures without changing accepted intent
+    or duplicating an invocation.
+- path: src/powdrr_lift/workrr/source_reference_dispatch.py
+  type: modified
+  span:
+    start_line: 34
+    end_line: 37
+  summary: Coordinate immutable correction attempts, durable transitions, failure
+    fingerprints, and terminal reconciliation.
+  rationale: Correct recoverable candidate failures without changing accepted intent
+    or duplicating an invocation.
+- path: src/powdrr_lift/workrr/source_reference_dispatch.py
+  type: modified
+  span:
+    start_line: 46
+    end_line: 122
+  summary: Coordinate immutable correction attempts, durable transitions, failure
+    fingerprints, and terminal reconciliation.
+  rationale: Correct recoverable candidate failures without changing accepted intent
+    or duplicating an invocation.
+- path: src/powdrr_lift/workrr/source_reference_dispatch.py
+  type: modified
+  span:
+    start_line: 255
+    end_line: 255
+  summary: Coordinate immutable correction attempts, durable transitions, failure
+    fingerprints, and terminal reconciliation.
+  rationale: Correct recoverable candidate failures without changing accepted intent
+    or duplicating an invocation.
+- path: src/powdrr_lift/workrr/source_reference_dispatch.py
+  type: modified
+  span:
+    start_line: 260
+    end_line: 262
+  summary: Coordinate immutable correction attempts, durable transitions, failure
+    fingerprints, and terminal reconciliation.
+  rationale: Correct recoverable candidate failures without changing accepted intent
+    or duplicating an invocation.
+- path: src/powdrr_lift/workrr/source_reference_dispatch.py
+  type: modified
+  span:
+    start_line: 363
+    end_line: 417
+  summary: Coordinate immutable correction attempts, durable transitions, failure
+    fingerprints, and terminal reconciliation.
+  rationale: Correct recoverable candidate failures without changing accepted intent
+    or duplicating an invocation.
+- path: src/powdrr_lift/workrr/source_reference_dispatch.py
+  type: modified
+  span:
+    start_line: 473
+    end_line: 644
+  summary: Coordinate immutable correction attempts, durable transitions, failure
+    fingerprints, and terminal reconciliation.
+  rationale: Correct recoverable candidate failures without changing accepted intent
+    or duplicating an invocation.
+- path: src/powdrr_lift/workrr/source_reference_dispatch.py
+  type: modified
+  span:
+    start_line: 647
+    end_line: 650
+  summary: Coordinate immutable correction attempts, durable transitions, failure
+    fingerprints, and terminal reconciliation.
+  rationale: Correct recoverable candidate failures without changing accepted intent
+    or duplicating an invocation.
+- path: src/powdrr_lift/workrr/source_reference_dispatch.py
+  type: modified
+  span:
+    start_line: 655
+    end_line: 655
+  summary: Coordinate immutable correction attempts, durable transitions, failure
+    fingerprints, and terminal reconciliation.
+  rationale: Correct recoverable candidate failures without changing accepted intent
+    or duplicating an invocation.
+- path: src/powdrr_lift/workrr/source_reference_dispatch.py
+  type: modified
+  span:
+    start_line: 658
+    end_line: 662
+  summary: Coordinate immutable correction attempts, durable transitions, failure
+    fingerprints, and terminal reconciliation.
+  rationale: Correct recoverable candidate failures without changing accepted intent
+    or duplicating an invocation.
+- path: src/powdrr_lift/workrr/source_reference_dispatch.py
+  type: modified
+  span:
+    start_line: 664
+    end_line: 664
+  summary: Coordinate immutable correction attempts, durable transitions, failure
+    fingerprints, and terminal reconciliation.
+  rationale: Correct recoverable candidate failures without changing accepted intent
+    or duplicating an invocation.
+- path: src/powdrr_lift/workrr/source_reference_dispatch.py
+  type: modified
+  span:
+    start_line: 666
+    end_line: 669
+  summary: Coordinate immutable correction attempts, durable transitions, failure
+    fingerprints, and terminal reconciliation.
+  rationale: Correct recoverable candidate failures without changing accepted intent
+    or duplicating an invocation.
+- path: src/powdrr_lift/workrr/source_reference_dispatch.py
+  type: modified
+  span:
+    start_line: 872
+    end_line: 880
+  summary: Coordinate immutable correction attempts, durable transitions, failure
+    fingerprints, and terminal reconciliation.
+  rationale: Correct recoverable candidate failures without changing accepted intent
+    or duplicating an invocation.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span:
+    start_line: 20
+    end_line: 20
+  summary: Seed each correction from the previous candidate and retain immutable accepted
+    prompts and base identity.
+  rationale: Preserve candidate authority and record cancellation as a terminal outcome.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span:
+    start_line: 524
+    end_line: 525
+  summary: Seed each correction from the previous candidate and retain immutable accepted
+    prompts and base identity.
+  rationale: Preserve candidate authority and record cancellation as a terminal outcome.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span:
+    start_line: 555
+    end_line: 556
+  summary: Seed each correction from the previous candidate and retain immutable accepted
+    prompts and base identity.
+  rationale: Preserve candidate authority and record cancellation as a terminal outcome.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span:
+    start_line: 628
+    end_line: 659
+  summary: Seed each correction from the previous candidate and retain immutable accepted
+    prompts and base identity.
+  rationale: Preserve candidate authority and record cancellation as a terminal outcome.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span:
+    start_line: 736
+    end_line: 736
+  summary: Seed each correction from the previous candidate and retain immutable accepted
+    prompts and base identity.
+  rationale: Preserve candidate authority and record cancellation as a terminal outcome.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span:
+    start_line: 738
+    end_line: 743
+  summary: Seed each correction from the previous candidate and retain immutable accepted
+    prompts and base identity.
+  rationale: Preserve candidate authority and record cancellation as a terminal outcome.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span:
+    start_line: 795
+    end_line: 796
+  summary: Seed each correction from the previous candidate and retain immutable accepted
+    prompts and base identity.
+  rationale: Preserve candidate authority and record cancellation as a terminal outcome.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span:
+    start_line: 933
+    end_line: 944
+  summary: Seed each correction from the previous candidate and retain immutable accepted
+    prompts and base identity.
+  rationale: Preserve candidate authority and record cancellation as a terminal outcome.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span:
+    start_line: 1445
+    end_line: 1447
+  summary: Seed each correction from the previous candidate and retain immutable accepted
+    prompts and base identity.
+  rationale: Preserve candidate authority and record cancellation as a terminal outcome.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 173
+    end_line: 173
+  summary: Pass the configured correction-attempt budget into source dispatch.
+  rationale: Connect issue-worker settings to the durable coordinator.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 375
+    end_line: 375
+  summary: Pass the configured correction-attempt budget into source dispatch.
+  rationale: Connect issue-worker settings to the durable coordinator.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 3876
+    end_line: 3876
+  summary: Pass the configured correction-attempt budget into source dispatch.
+  rationale: Connect issue-worker settings to the durable coordinator.
+- path: tests/test_coding_agent.py
+  type: modified
+  span:
+    start_line: 1179
+    end_line: 1179
+  summary: Assert that OpenCode has no default absolute runtime deadline.
+  rationale: Protect the active-work timeout policy.
+- path: tests/test_source_reference_dispatch.py
+  type: modified
+  span:
+    start_line: 463
+    end_line: 467
+  summary: Cover corrected and unchanged attempts plus restart terminal reconciliation.
+  rationale: Verify attempt linking, explicit budgets, and duplicate-invocation prevention.
+- path: tests/test_source_reference_dispatch.py
+  type: modified
+  span:
+    start_line: 472
+    end_line: 472
+  summary: Cover corrected and unchanged attempts plus restart terminal reconciliation.
+  rationale: Verify attempt linking, explicit budgets, and duplicate-invocation prevention.
+- path: tests/test_source_reference_dispatch.py
+  type: modified
+  span:
+    start_line: 487
+    end_line: 487
+  summary: Cover corrected and unchanged attempts plus restart terminal reconciliation.
+  rationale: Verify attempt linking, explicit budgets, and duplicate-invocation prevention.
+- path: tests/test_source_reference_dispatch.py
+  type: modified
+  span:
+    start_line: 493
+    end_line: 495
+  summary: Cover corrected and unchanged attempts plus restart terminal reconciliation.
+  rationale: Verify attempt linking, explicit budgets, and duplicate-invocation prevention.
+- path: tests/test_source_reference_dispatch.py
+  type: modified
+  span:
+    start_line: 503
+    end_line: 503
+  summary: Cover corrected and unchanged attempts plus restart terminal reconciliation.
+  rationale: Verify attempt linking, explicit budgets, and duplicate-invocation prevention.
+- path: tests/test_source_reference_dispatch.py
+  type: modified
+  span:
+    start_line: 527
+    end_line: 527
+  summary: Cover corrected and unchanged attempts plus restart terminal reconciliation.
+  rationale: Verify attempt linking, explicit budgets, and duplicate-invocation prevention.
+- path: tests/test_source_reference_dispatch.py
+  type: modified
+  span:
+    start_line: 552
+    end_line: 555
+  summary: Cover corrected and unchanged attempts plus restart terminal reconciliation.
+  rationale: Verify attempt linking, explicit budgets, and duplicate-invocation prevention.
+- path: tests/test_source_reference_dispatch.py
+  type: modified
+  span:
+    start_line: 567
+    end_line: 567
+  summary: Cover corrected and unchanged attempts plus restart terminal reconciliation.
+  rationale: Verify attempt linking, explicit budgets, and duplicate-invocation prevention.
+- path: tests/test_source_reference_dispatch.py
+  type: modified
+  span:
+    start_line: 559
+    end_line: 601
+  summary: Cover corrected and unchanged attempts plus restart terminal reconciliation.
+  rationale: Verify attempt linking, explicit budgets, and duplicate-invocation prevention.
+- path: tests/test_source_reference_run.py
+  type: modified
+  span:
+    start_line: 75
+    end_line: 76
+  summary: Verify correction seed authority, original base identity, and protected-file
+    rejection.
+  rationale: Keep candidate corrections within the reviewed contract.
+- path: tests/test_source_reference_run.py
+  type: modified
+  span:
+    start_line: 206
+    end_line: 207
+  summary: Verify correction seed authority, original base identity, and protected-file
+    rejection.
+  rationale: Keep candidate corrections within the reviewed contract.
+- path: tests/test_source_reference_run.py
+  type: modified
+  span:
+    start_line: 227
+    end_line: 274
+  summary: Verify correction seed authority, original base identity, and protected-file
+    rejection.
+  rationale: Keep candidate corrections within the reviewed contract.
+- path: tests/test_story_execution.py
+  type: modified
+  span:
+    start_line: 840
+    end_line: 843
+  summary: Assert that a story regression remains rejected after a no-progress correction
+    attempt.
+  rationale: Preserve independent story verification and prevent patch transfer.
+- path: tests/test_story_execution.py
+  type: modified
+  span:
+    start_line: 845
+    end_line: 846
+  summary: Assert that a story regression remains rejected after a no-progress correction
+    attempt.
+  rationale: Preserve independent story verification and prevent patch transfer.
+entities:
+- id: dispatch-source-reference-corrections
+  type: Function
+  action: added
+- id: source-reference-run
+  type: Class
+  action: added
+- id: implementation-correction-prompt
+  type: Function
+  action: added
+entity_relationships: []
+invariants:
+- id: immutable-correction-authority
+  description: Every correction keeps the accepted design, verifier, protected files,
+    and original base unchanged.
+  action: added
+  rationale: A failed candidate cannot authorize a plan or verifier amendment.
+- id: one-invocation-per-attempt
+  description: A correction uses a fresh linked attempt, and restart reconciliation
+    never repeats a claimed invocation.
+  action: added
+  rationale: Persist transitions and terminal evidence before continuing work.
+- id: explicit-correction-budget
+  description: Correction attempts are bounded by a configured budget and unchanged
+    failure state stops with a recorded no-progress result.
+  action: added
+  rationale: Bound cost by explicit policy rather than elapsed time.
+guidance:
+- id: tool-timeout-semantics
+  description: MiniSWE inactivity limits measure the interval without stdout or trajectory
+    progress; validation limits remain tool-level limits. Neither is an overall active-run
+    deadline.
+  action: added

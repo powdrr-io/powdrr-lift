@@ -63,7 +63,7 @@ alone does not establish completion. Report blocked acceptance honestly.
 | 1 | Shared terminal result and durable failure reporting | None | Complete (PR #1516) |
 | 2 | Faithful planning-to-worker contract compilation | None | Complete (PR #1518) |
 | 3 | Shared execution preparation and plan executability checks | 2 | Complete (PR #1520) |
-| 4 | Controlled implementation correction and restart | 1, 3 | In progress (this PR) |
+| 4 | Controlled implementation correction and restart | 1, 3 | In review (PR #1522) |
 | 5 | Verified candidate publication and safe preparation repair | 1, 4 | Pending |
 | 6 | Fulfillment-backed dependencies and readiness explanations | 1, 3 | Pending |
 | 7 | Validation inventory and evidence reuse | 3, 5 | Pending |

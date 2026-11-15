@@ -7406,16 +7406,19 @@ def _run_workrr_feature(args: argparse.Namespace) -> int:
             )
         )
     except Exception:
+        _print_run_telemetry(output_root, sys.stderr)
         print(f"Run report JSON: {output_root / 'report.json'}", file=sys.stderr)
         print(f"Run report Markdown: {output_root / 'report.md'}", file=sys.stderr)
         raise
     if args.json:
+        _print_run_telemetry(output_root, sys.stderr)
         print(json.dumps(result.to_data(), indent=2, sort_keys=True))
     else:
         print(f"Workrr feature run {result.status}")
         print(f"Branch: {result.branch}")
         print(f"Worktree: {result.worktree}")
         print(f"Review passed: {result.review['passed']}")
+        _print_run_telemetry(output_root, sys.stdout)
         if result.pull_request_url:
             print(f"Pull request: {result.pull_request_url}")
         if result.changelog_path:
@@ -7430,10 +7433,15 @@ def _run_workrr_feature(args: argparse.Namespace) -> int:
 def _run_harbor_feature(args: argparse.Namespace) -> int:
     repo_root = resolve_repo_root(args.repo_root)
     console = sys.stdout
+    work_item = slugify_workflow_id(args.work_item_name)
+    output_root = (
+        args.output_root or repo_root / ".powdrr" / "feature-runs" / work_item
+    ).resolve()
     if args.json:
         result = _run_harbor_feature_with_streams(
             args, repo_root, console=console, progress_stream=sys.stderr
         )
+        _print_run_telemetry(output_root, sys.stderr)
         return (
             0
             if result.status
@@ -7446,10 +7454,6 @@ def _run_harbor_feature(args: argparse.Namespace) -> int:
             else 1
         )
 
-    work_item = slugify_workflow_id(args.work_item_name)
-    output_root = (
-        args.output_root or repo_root / ".powdrr" / "feature-runs" / work_item
-    ).resolve()
     output_root.mkdir(parents=True, exist_ok=True)
     log_path = output_root / "console.log"
     print(
@@ -7468,10 +7472,12 @@ def _run_harbor_feature(args: argparse.Namespace) -> int:
                     progress_stream=log_stream,
                 )
     except Exception:
+        _print_run_telemetry(output_root, console)
         print(f"Benchmark run failed. Details: {log_path}", file=console)
         raise
 
     print(f"Benchmark task {result.status}.", file=console)
+    _print_run_telemetry(output_root, console)
     if args.design_only:
         print(f"Design artifact: {result.plan_path}", file=console)
     elif args.capture_worker_prompts_only:
@@ -7500,6 +7506,44 @@ def _run_harbor_feature(args: argparse.Namespace) -> int:
         }
         else 1
     )
+
+
+def _print_run_telemetry(output_root: Path, stream: Any) -> None:
+    telemetry_path = output_root / "run-telemetry.json"
+    try:
+        telemetry = json.loads(telemetry_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        try:
+            report = json.loads(
+                (output_root / "report.json").read_text(encoding="utf-8")
+            )
+        except (OSError, json.JSONDecodeError):
+            return
+        telemetry = report.get("usage") if isinstance(report, dict) else None
+        if not isinstance(telemetry, dict):
+            return
+    if not isinstance(telemetry, dict):
+        return
+    wall_ms = telemetry.get("total_wall_ms")
+    wall_text = (
+        f"{wall_ms} ms wall"
+        if isinstance(wall_ms, (int, float))
+        else "wall time unknown"
+    )
+    print(
+        "Run telemetry: "
+        f"{wall_text}; "
+        f"{telemetry.get('logical_judgment_prompts', 0)} judgment prompts; "
+        f"{telemetry.get('provider_calls', 0)} provider calls / "
+        f"{telemetry.get('transport_requests', 0)} transport attempts; "
+        f"{telemetry.get('subprocess_executions', 0)} subprocess executions; "
+        "tokens and cost unavailable; "
+        f"details in {telemetry_path}",
+        file=stream,
+    )
+    errors = telemetry.get("telemetry_errors", [])
+    for error in errors if isinstance(errors, list) else []:
+        print(f"Run telemetry warning: {error}", file=stream)
 
 
 def _run_harbor_feature_with_streams(

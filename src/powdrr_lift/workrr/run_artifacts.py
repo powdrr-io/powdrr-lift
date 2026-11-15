@@ -7,7 +7,9 @@ import json
 import os
 import subprocess
 import tempfile
+from collections.abc import Mapping
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
 from typing import Any
@@ -120,6 +122,7 @@ def collect_run_metadata(
         "repo_root": str(repo_root),
         "output_root": str(output_root),
         "submission_base": submission_base,
+        "run_started_at": datetime.now(UTC).isoformat(),
     }
 
 
@@ -134,6 +137,7 @@ def write_run_report(
     *,
     result: dict[str, Any],
     metadata: dict[str, Any] | None = None,
+    finished_at: datetime | None = None,
 ) -> tuple[Path, Path]:
     """Write canonical JSON and deterministic Markdown from persisted evidence."""
     metadata = metadata or _read_json_mapping(output_root / "run-metadata.json")
@@ -186,6 +190,22 @@ def write_run_report(
         "count": len(paths) if isinstance(paths, list) else 0,
         "diff_fingerprint": attempt_map.get("diff_fingerprint"),
     }
+    telemetry = summarize_run_telemetry(
+        output_root,
+        result=result,
+        metadata=metadata,
+        finished_at=finished_at,
+    )
+    try:
+        telemetry_path = write_json_artifact(
+            output_root, "run-telemetry.json", telemetry
+        )
+    except OSError as error:
+        telemetry_path = None
+        telemetry["status"] = "partial"
+        telemetry.setdefault("telemetry_errors", []).append(
+            f"persist run telemetry: {type(error).__name__}: {error}"
+        )
     artifacts: dict[str, str] = {
         "run_result": "run-result.json",
         "run_metadata": "run-metadata.json",
@@ -193,6 +213,8 @@ def write_run_report(
         "report_json": "report.json",
         "report_markdown": "report.md",
     }
+    if telemetry_path is not None:
+        artifacts["run_telemetry"] = telemetry_path.name
     if failure_doc:
         artifacts["failure"] = "failure.json"
     for artifact_path in sorted(output_root.rglob("*")):
@@ -229,7 +251,7 @@ def write_run_report(
         review_findings=review_findings,
         operational_failures=failure,
         publication=publication,
-        usage={"status": "unknown", "cost": "unknown"},
+        usage=telemetry,
         artifacts=artifacts,
     )
     json_path = output_root / "report.json"
@@ -239,6 +261,277 @@ def write_run_report(
     )
     _atomic_write(markdown_path, render_run_report_markdown(report))
     return json_path, markdown_path
+
+
+def summarize_run_telemetry(
+    output_root: Path,
+    *,
+    result: Mapping[str, Any] | None = None,
+    metadata: Mapping[str, Any] | None = None,
+    finished_at: datetime | None = None,
+) -> dict[str, Any]:
+    """Join existing incremental Workrr events into a conservative run summary."""
+    result = result or _read_json_mapping(output_root / "run-result.json")
+    metadata = metadata or _read_json_mapping(output_root / "run-metadata.json")
+    records: list[dict[str, Any]] = []
+    event_path = output_root / "procedrr-events.jsonl"
+    try:
+        for line in event_path.read_text(encoding="utf-8").splitlines():
+            try:
+                record = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(record, dict):
+                records.append(record)
+    except OSError:
+        pass
+
+    provider_attempts = [
+        item
+        for item in records
+        if item.get("record_type") == "powdrr_service.procedrr.provider_attempt"
+    ]
+    provider_calls: dict[str, dict[str, Any]] = {}
+    traces: dict[str, list[dict[str, Any]]] = {}
+    for item in provider_attempts:
+        trace_id = item.get("trace_id")
+        trace_key = str(trace_id) if trace_id is not None else f"unkeyed-{len(traces)}"
+        traces.setdefault(trace_key, []).append(item)
+        role = str(item.get("role") or "unknown")
+        model = str(item.get("model") or item.get("provider_client") or "unknown")
+        label = f"{role}:{model}"
+        group = provider_calls.setdefault(
+            label,
+            {
+                "provider_calls": 0,
+                "transport_attempts": 0,
+                "failed_attempts": 0,
+                "duration_ms": 0,
+            },
+        )
+        group["transport_attempts"] += 1
+        group["failed_attempts"] += int(
+            item.get("outcome") not in {"success", "succeeded"}
+        )
+        duration = item.get("duration_ms")
+        if isinstance(duration, (int, float)):
+            group["duration_ms"] += duration
+    for attempts in traces.values():
+        first = attempts[0]
+        role = str(first.get("role") or "unknown")
+        model = str(first.get("model") or first.get("provider_client") or "unknown")
+        label = f"{role}:{model}"
+        provider_calls[label]["provider_calls"] += 1
+    batch_attempts = [
+        item for item in provider_attempts if item.get("transport_kind") == "batch"
+    ]
+    batch_members = sum(
+        int(item["batch_member_count"])
+        for item in batch_attempts
+        if isinstance(item.get("batch_member_count"), int)
+    )
+    prompt_token_values = [
+        item["prompt_tokens"]
+        for item in provider_attempts
+        if isinstance(item.get("prompt_tokens"), int)
+        and not isinstance(item.get("prompt_tokens"), bool)
+    ]
+    completion_token_values = [
+        item["completion_tokens"]
+        for item in provider_attempts
+        if isinstance(item.get("completion_tokens"), int)
+        and not isinstance(item.get("completion_tokens"), bool)
+    ]
+    token_status = (
+        "observed"
+        if prompt_token_values and completion_token_values
+        else "partial"
+        if prompt_token_values or completion_token_values
+        else "unknown"
+    )
+    cost_records = [
+        item
+        for item in provider_attempts
+        if isinstance(item.get("cost_amount"), (int, float))
+        and not isinstance(item.get("cost_amount"), bool)
+    ]
+    currencies = {
+        item.get("cost_currency")
+        for item in cost_records
+        if isinstance(item.get("cost_currency"), str)
+    }
+    cost_complete = (
+        bool(cost_records)
+        and len(currencies) == 1
+        and all(isinstance(item.get("cost_currency"), str) for item in cost_records)
+    )
+
+    steps = [
+        item
+        for item in records
+        if item.get("record_type") == "powdrr_service.procedrr.step"
+    ]
+    judges = [item for item in steps if item.get("kind") == "judge"]
+    operations = [item for item in steps if item.get("kind") == "operation"]
+    operation_failures = [
+        item for item in steps if item.get("kind") == "operation_failure"
+    ]
+    processes = [item for item in steps if item.get("kind") == "process"]
+    process_failures = [item for item in steps if item.get("kind") == "process_failure"]
+    stages: dict[str, dict[str, Any]] = {}
+    for item in (*processes, *process_failures):
+        name = str(item.get("name") or item.get("path") or "unknown")
+        stage = stages.setdefault(
+            name,
+            {"completed_processes": 0, "failed_processes": 0, "wall_ms": 0.0},
+        )
+        stage[
+            "failed_processes"
+            if item.get("kind") == "process_failure"
+            else "completed_processes"
+        ] += 1
+        duration = item.get("duration_ms")
+        if isinstance(duration, (int, float)):
+            stage["wall_ms"] += float(duration)
+
+    subprocess_records = _read_jsonl_records(output_root / "subprocess-events.jsonl")
+    shell_operations = [
+        item
+        for item in operations
+        if item.get("tool") == "shell"
+        or not subprocess_records
+        and isinstance(item.get("output"), Mapping)
+        and isinstance(item["output"].get("returncode"), int)
+    ]
+    validation = result.get("validation")
+    validation_results = (
+        validation.get("results", []) if isinstance(validation, Mapping) else []
+    )
+    if not isinstance(validation_results, list):
+        validation_results = []
+    validation_runs = [
+        item
+        for item in validation_results
+        if isinstance(item, Mapping)
+        and isinstance(item.get("command"), list)
+        and item.get("command")
+        and not item.get("receipt_reused", False)
+    ]
+    validation_receipt_hits = sum(
+        bool(item.get("receipt_reused"))
+        for item in validation_results
+        if isinstance(item, Mapping)
+    )
+    started_raw = metadata.get("run_started_at")
+    started = _parse_datetime(started_raw)
+    ended = finished_at or datetime.now(UTC)
+    total_wall_ms = (
+        round(max(0.0, (ended - started).total_seconds() * 1000), 3)
+        if started is not None
+        else None
+    )
+    replay_hits = sum(item.get("kind") == "resume" for item in steps)
+    repeated_traces = sum(max(0, len(items) - 1) for items in traces.values())
+    telemetry_errors = result.get("telemetry_errors", [])
+    if not isinstance(telemetry_errors, list):
+        telemetry_errors = []
+    return {
+        "schema_version": "powdrr-run-telemetry-v1",
+        "status": "observed" if records else "partial",
+        "total_wall_ms": total_wall_ms,
+        "stage_wall_ms": stages,
+        "stage_wall_ms_overlap": "nested process stages overlap; do not sum",
+        "logical_judgment_prompts": len(judges),
+        "provider_calls": len(traces),
+        "transport_requests": len(provider_attempts),
+        "provider_calls_by_model": provider_calls,
+        "provider_batches": {
+            "count": len(batch_attempts),
+            "member_count": batch_members,
+            "status": "observed" if provider_attempts else "unknown",
+        },
+        "concurrent_requests": {"count": None, "status": "unknown"},
+        "questions_inside_prompt": {"count": None, "status": "unknown"},
+        "tokens": {
+            "prompt": sum(prompt_token_values) if prompt_token_values else None,
+            "completion": (
+                sum(completion_token_values) if completion_token_values else None
+            ),
+            "status": token_status,
+        },
+        "cost": {
+            "amount": (
+                sum(float(item["cost_amount"]) for item in cost_records)
+                if cost_complete
+                else None
+            ),
+            "currency": next(iter(currencies)) if cost_complete else None,
+            "status": "observed" if cost_complete else "unknown",
+        },
+        "subprocess_executions": (
+            len(subprocess_records) + len(shell_operations) + len(validation_runs)
+        ),
+        "subprocesses_by_category": _subprocess_category_summary(subprocess_records),
+        "operation_failures": len(operation_failures),
+        "stage_failures": len(process_failures),
+        "cache_hits": {
+            "workflow_replays": replay_hits,
+            "validation_receipts": validation_receipt_hits,
+        },
+        "repeated_work": {
+            "provider_retry_attempts": repeated_traces,
+            "provider_failure_attempts": sum(
+                item.get("outcome") not in {"success", "succeeded"}
+                for item in provider_attempts
+            ),
+            "reasons": [
+                "provider requests were retried after a failed transport attempt"
+            ]
+            if repeated_traces
+            else [],
+        },
+        "telemetry_errors": [str(item) for item in telemetry_errors],
+    }
+
+
+def _parse_datetime(value: object) -> datetime | None:
+    if not isinstance(value, str):
+        return None
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError:
+        return None
+    return parsed.replace(tzinfo=UTC) if parsed.tzinfo is None else parsed
+
+
+def _read_jsonl_records(path: Path) -> list[dict[str, Any]]:
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return []
+    records: list[dict[str, Any]] = []
+    for line in lines:
+        try:
+            value = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(value, dict):
+            records.append(value)
+    return records
+
+
+def _subprocess_category_summary(
+    records: list[dict[str, Any]],
+) -> dict[str, dict[str, Any]]:
+    summary: dict[str, dict[str, Any]] = {}
+    for record in records:
+        category = str(record.get("category") or "unknown")
+        group = summary.setdefault(category, {"count": 0, "duration_ms": 0.0})
+        group["count"] += 1
+        duration = record.get("duration_ms")
+        if isinstance(duration, (int, float)):
+            group["duration_ms"] += duration
+    return summary
 
 
 def render_run_report_markdown(report: RunReport) -> str:

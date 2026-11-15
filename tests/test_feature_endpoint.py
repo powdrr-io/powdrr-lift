@@ -98,6 +98,7 @@ from powdrr_lift.workrr.feature_endpoint import (
     _run_code_agent_phase,
     _run_code_task_agent,
     _run_validation_profile,
+    _RunTelemetryRunner,
     _runtime_validation_profile,
     _structrr_taxonomy_path,
     _task_structrr_changes,
@@ -113,6 +114,48 @@ from powdrr_lift.workrr.feature_endpoint import (
     run_feature_endpoint,
     run_feature_in_place,
 )
+
+
+def test_run_telemetry_runner_records_safe_subprocess_counts_and_failures(
+    tmp_path: Path,
+) -> None:
+    event_path = tmp_path / "subprocess-events.jsonl"
+
+    def fake_runner(
+        command: list[str], **_: object
+    ) -> subprocess.CompletedProcess[str]:
+        if command[0] == "git":
+            return subprocess.CompletedProcess(command, 0, "ok", "")
+        raise subprocess.CalledProcessError(7, command)
+
+    runner = _RunTelemetryRunner(fake_runner, event_path)
+    runner(["git", "status", "--short"])
+    with pytest.raises(subprocess.CalledProcessError):
+        runner(["provider-cli", "--token", "private-value"])
+
+    records = [json.loads(line) for line in event_path.read_text().splitlines()]
+    assert [item["category"] for item in records] == ["git", "other"]
+    assert [item["returncode"] for item in records] == [0, 7]
+    assert all(isinstance(item["duration_ms"], (int, float)) for item in records)
+    assert "private-value" not in event_path.read_text()
+
+
+def test_subprocess_telemetry_write_failure_does_not_fail_the_command(
+    tmp_path: Path,
+) -> None:
+    blocked_parent = tmp_path / "not-a-directory"
+    blocked_parent.write_text("file", encoding="utf-8")
+    runner = _RunTelemetryRunner(
+        lambda command, **_: subprocess.CompletedProcess(command, 0, "ok", ""),
+        blocked_parent / "events.jsonl",
+    )
+
+    result = runner(["git", "status"])
+
+    assert result.returncode == 0
+    assert any(
+        "persist subprocess telemetry" in item for item in runner.telemetry_errors
+    )
 
 
 def test_miniswe_probe_authoring_uses_compact_context_and_clean_baseline(

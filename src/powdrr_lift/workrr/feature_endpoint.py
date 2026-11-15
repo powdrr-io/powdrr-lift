@@ -8,7 +8,9 @@ import re
 import shlex
 import shutil
 import subprocess
+import sys
 import threading
+import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from importlib.resources import files
@@ -181,6 +183,68 @@ from powdrr_lift.workrr.run_artifacts import (
 Runner = Callable[..., subprocess.CompletedProcess[str]]
 
 
+class _RunTelemetryRunner:
+    """Record subprocess counts and durations without retaining command secrets."""
+
+    def __init__(self, runner: Runner, event_path: Path) -> None:
+        self.runner = runner
+        self.event_path = event_path
+        self.telemetry_errors: list[str] = []
+        self._lock = threading.Lock()
+
+    def __call__(self, command: Any, *args: Any, **kwargs: Any) -> Any:
+        started = time.perf_counter()
+        try:
+            result = self.runner(command, *args, **kwargs)
+        except BaseException as error:
+            self._record(
+                command,
+                started,
+                returncode=getattr(error, "returncode", None),
+                error=error,
+            )
+            raise
+        self._record(command, started, returncode=getattr(result, "returncode", None))
+        return result
+
+    def _record(
+        self,
+        command: Any,
+        started: float,
+        *,
+        returncode: int | None = None,
+        error: BaseException | None = None,
+    ) -> None:
+        first = (
+            command[0]
+            if isinstance(command, (list, tuple)) and command
+            else command.split()[0]
+            if isinstance(command, str) and command.split()
+            else "unknown"
+        )
+        category = Path(str(first)).name
+        record = {
+            "record_type": "powdrr.workrr.subprocess",
+            "category": (
+                category if category in {"git", "gh", "uv", "pytest"} else "other"
+            ),
+            "duration_ms": round((time.perf_counter() - started) * 1000, 3),
+            "returncode": returncode,
+            "error_type": type(error).__name__ if error is not None else None,
+        }
+        try:
+            self.event_path.parent.mkdir(parents=True, exist_ok=True)
+            with self._lock, self.event_path.open("a", encoding="utf-8") as stream:
+                stream.write(json.dumps(record, sort_keys=True) + "\n")
+                stream.flush()
+        except OSError as write_error:
+            _record_run_telemetry_error(
+                {"telemetry_errors": self.telemetry_errors},
+                "persist subprocess telemetry",
+                write_error,
+            )
+
+
 def _load_probe_faithfulness_evidence(
     scenarios: Sequence[Mapping[str, Any]], contract_directory: Path
 ) -> tuple[list[dict[str, Any]], dict[str, dict[str, Any]]]:
@@ -284,6 +348,7 @@ class FeatureEndpointResult:
     report_json_path: Path | None = None
     report_markdown_path: Path | None = None
     publication: dict[str, Any] | None = None
+    telemetry_errors: tuple[str, ...] = ()
 
     def to_data(self) -> dict[str, Any]:
         return {
@@ -316,6 +381,7 @@ class FeatureEndpointResult:
                 str(self.report_markdown_path) if self.report_markdown_path else None
             ),
             "publication": self.publication,
+            "telemetry_errors": list(self.telemetry_errors),
         }
 
 
@@ -372,20 +438,23 @@ def run_feature_endpoint(
         config.output_root or root / ".powdrr" / "feature-runs" / slug
     ).resolve()
     output_root.mkdir(parents=True, exist_ok=True)
+    telemetry_runner = _RunTelemetryRunner(
+        runner, output_root / "subprocess-events.jsonl"
+    )
     _write_run_metadata(config, root, output_root)
 
     try:
         _exclude_telemetry_from_patch(root, output_root)
         initial_head = (
-            _git_output(runner, worktree, ["git", "rev-parse", "HEAD"])
+            _git_output(telemetry_runner, worktree, ["git", "rev-parse", "HEAD"])
             if config.prepared_worktree is not None
             else None
         )
         if config.prepared_worktree is None:
-            _require_clean_root(root, runner)
-            _run(runner, root, ["git", "fetch", "origin", config.base_branch])
+            _require_clean_root(root, telemetry_runner)
+            _run(telemetry_runner, root, ["git", "fetch", "origin", config.base_branch])
             _run(
-                runner,
+                telemetry_runner,
                 root,
                 [
                     "git",
@@ -398,10 +467,12 @@ def run_feature_endpoint(
                 ],
             )
         if initial_head is None:
-            initial_head = _git_output(runner, worktree, ["git", "rev-parse", "HEAD"])
+            initial_head = _git_output(
+                telemetry_runner, worktree, ["git", "rev-parse", "HEAD"]
+            )
         result = _execute_procedrr_flow(
             config,
-            runner=runner,
+            runner=telemetry_runner,
             worktree=worktree,
             output_root=output_root,
             branch=branch,
@@ -413,13 +484,21 @@ def run_feature_endpoint(
             and not config.capture_worker_prompts_only
         ):
             _remove_temporary_feature_artifacts(
-                runner,
+                telemetry_runner,
                 worktree,
                 slug=slug,
                 initial_head=initial_head,
                 commit_changes=False,
             )
-        return result
+        result = replace(
+            result,
+            telemetry_errors=tuple(
+                dict.fromkeys(
+                    (*result.telemetry_errors, *telemetry_runner.telemetry_errors)
+                )
+            ),
+        )
+        return _write_run_result(output_root, result)
     except Exception as error:
         failure = _failure_for_exception(error, output_root, config)
         _write_failure_artifact(output_root, failure)
@@ -431,9 +510,14 @@ def run_feature_endpoint(
                 worktree=worktree,
                 error=error,
                 failure=failure,
+                telemetry_errors=telemetry_runner.telemetry_errors,
             )
         result = _feature_endpoint_result(
-            {}, branch, worktree, "failed", failure=failure
+            {"telemetry_errors": telemetry_runner.telemetry_errors},
+            branch,
+            worktree,
+            "failed",
+            failure=failure,
         )
         _write_run_result(output_root, result)
         raise
@@ -443,7 +527,11 @@ def run_feature_endpoint(
         _write_run_result(
             output_root,
             _feature_endpoint_result(
-                {}, branch, worktree, "interrupted", failure=failure
+                {"telemetry_errors": telemetry_runner.telemetry_errors},
+                branch,
+                worktree,
+                "interrupted",
+                failure=failure,
             ),
         )
         raise
@@ -473,19 +561,25 @@ def run_feature_in_place(
         config.output_root or root / ".powdrr" / "feature-runs" / slug
     ).resolve()
     output_root.mkdir(parents=True, exist_ok=True)
+    telemetry_runner = _RunTelemetryRunner(
+        runner, output_root / "subprocess-events.jsonl"
+    )
+    _write_run_metadata(config, root, output_root)
     branch = "HEAD"
     initial_head: str | None = None
     try:
         _exclude_telemetry_from_patch(root, output_root)
-        _require_clean_root(root, runner)
-        branch = _git_output(runner, root, ["git", "branch", "--show-current"])
+        _require_clean_root(root, telemetry_runner)
+        branch = _git_output(
+            telemetry_runner, root, ["git", "branch", "--show-current"]
+        )
         if not branch:
             branch = "HEAD"
-        initial_head = _git_output(runner, root, ["git", "rev-parse", "HEAD"])
+        initial_head = _git_output(telemetry_runner, root, ["git", "rev-parse", "HEAD"])
         _write_run_metadata(config, root, output_root, submission_base=initial_head)
         result = _execute_procedrr_flow(
             replace(config, open_pr=False, push_changes=False),
-            runner=runner,
+            runner=telemetry_runner,
             worktree=root,
             output_root=output_root,
             branch=branch,
@@ -496,12 +590,20 @@ def run_feature_in_place(
             and not config.capture_worker_prompts_only
         ):
             _remove_temporary_feature_artifacts(
-                runner,
+                telemetry_runner,
                 root,
                 slug=slug,
                 initial_head=initial_head,
             )
-        return result
+        result = replace(
+            result,
+            telemetry_errors=tuple(
+                dict.fromkeys(
+                    (*result.telemetry_errors, *telemetry_runner.telemetry_errors)
+                )
+            ),
+        )
+        return _write_run_result(output_root, result)
     except Exception as error:
         failure = _failure_for_exception(error, output_root, config)
         _write_failure_artifact(output_root, failure)
@@ -512,13 +614,20 @@ def run_feature_in_place(
             worktree=root,
             error=error,
             failure=failure,
+            telemetry_errors=telemetry_runner.telemetry_errors,
         )
     except KeyboardInterrupt as error:
         failure = _failure_for_exception(error, output_root, config)
         _write_failure_artifact(output_root, failure)
         _write_run_result(
             output_root,
-            _feature_endpoint_result({}, branch, root, "interrupted", failure=failure),
+            _feature_endpoint_result(
+                {"telemetry_errors": telemetry_runner.telemetry_errors},
+                branch,
+                root,
+                "interrupted",
+                failure=failure,
+            ),
         )
         raise
 
@@ -547,6 +656,7 @@ def _execute_procedrr_flow(
             "normative_default" if config.benchmark_mode else config.uncertainty_policy
         ),
         "benchmark_gate_warnings": [],
+        "telemetry_errors": getattr(runner, "telemetry_errors", []),
         "submission_base": _git_output(runner, worktree, ["git", "rev-parse", "HEAD"]),
         "validation_runner": runner,
         "validation_target_event": "pull_request" if config.open_pr else "local",
@@ -579,9 +689,13 @@ def _execute_procedrr_flow(
         flow_source = _worker_prompt_capture_flow_source(flow_source)
     flow = parse_and_validate(flow_source, command_catalog=command_catalog)
     procedrr_event_path = output_root / "procedrr-events.jsonl"
-    procedrr_event_path.parent.mkdir(parents=True, exist_ok=True)
-    replay_responses = _load_procedrr_replay_responses(procedrr_event_path)
-    procedrr_event_path.touch()
+    try:
+        procedrr_event_path.parent.mkdir(parents=True, exist_ok=True)
+        replay_responses = _load_procedrr_replay_responses(procedrr_event_path)
+        procedrr_event_path.touch()
+    except OSError as error:
+        replay_responses = {}
+        _record_run_telemetry_error(state, "initialize workflow event log", error)
     procedrr_event_lock = threading.Lock()
     external_search_event_state = {"pending": False}
     benchmark_gate_warnings: list[dict[str, Any]] = []
@@ -613,11 +727,14 @@ def _execute_procedrr_flow(
         }
         if replay_key is not None:
             record["replay_key"] = replay_key
-        with (
-            procedrr_event_lock,
-            procedrr_event_path.open("a", encoding="utf-8") as stream,
-        ):
-            stream.write(json.dumps(record, sort_keys=True, default=str) + "\n")
+        try:
+            with (
+                procedrr_event_lock,
+                procedrr_event_path.open("a", encoding="utf-8") as stream,
+            ):
+                stream.write(json.dumps(record, sort_keys=True, default=str) + "\n")
+        except OSError as error:
+            _record_run_telemetry_error(state, "persist workflow event", error)
         if config.progress_callback is not None:
             label = event.path.rsplit(".", 1)[-1].replace("_", " ")
             if event.kind == "operation":
@@ -639,11 +756,16 @@ def _execute_procedrr_flow(
             config.progress_callback(message)
 
     def record_provider_attempt(record: Mapping[str, Any]) -> None:
-        with (
-            procedrr_event_lock,
-            procedrr_event_path.open("a", encoding="utf-8") as stream,
-        ):
-            stream.write(json.dumps(dict(record), sort_keys=True, default=str) + "\n")
+        try:
+            with (
+                procedrr_event_lock,
+                procedrr_event_path.open("a", encoding="utf-8") as stream,
+            ):
+                stream.write(
+                    json.dumps(dict(record), sort_keys=True, default=str) + "\n"
+                )
+        except OSError as error:
+            _record_run_telemetry_error(state, "persist provider attempt", error)
 
     validation_profiles = _bootstrap_validation_profiles(
         worktree,
@@ -753,6 +875,7 @@ def _execute_procedrr_flow(
             process_directory=flow_directory,
             replay_responses=replay_responses,
             telemetry_sink=record_provider_attempt,
+            telemetry_role="planning",
         )
         decision_provider = create_decision_provider(config.planning_client)
         if decision_provider is None:
@@ -763,6 +886,7 @@ def _execute_procedrr_flow(
                 process_directory=flow_directory,
                 replay_responses=replay_responses,
                 telemetry_sink=record_provider_attempt,
+                telemetry_role="decision",
             )
         process_catalog = ProcessCatalog.from_document(flow_path, flow)
         execution_service = ProcedrrExecutionService(
@@ -5070,6 +5194,7 @@ def _feature_endpoint_result(
         None,
         None,
         state.get("publication"),
+        tuple(str(item) for item in state.get("telemetry_errors", ())),
     )
 
 
@@ -5081,10 +5206,12 @@ def _benchmark_issues_result(
     worktree: Path,
     error: Exception,
     failure: RunFailure | None = None,
+    telemetry_errors: Sequence[str] = (),
 ) -> FeatureEndpointResult:
     result = _feature_endpoint_result(
         {
             "task_id": config.task_id or config.work_item_name,
+            "telemetry_errors": list(telemetry_errors),
             "review": {
                 "passed": False,
                 "benchmark_mode": True,
@@ -5134,6 +5261,9 @@ def _write_run_metadata(
         output_root=output_root,
         submission_base=submission_base,
     )
+    previous_metadata = _read_json_mapping(output_root / "run-metadata.json")
+    if isinstance(previous_metadata.get("run_started_at"), str):
+        metadata["run_started_at"] = previous_metadata["run_started_at"]
     planning_client = config.planning_client
     metadata.update(
         {
@@ -5187,6 +5317,28 @@ def _write_run_metadata(
 
 def _profile_text(value: Any) -> str | None:
     return value if isinstance(value, str) else None
+
+
+def _read_json_mapping(path: Path) -> dict[str, Any]:
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return dict(value) if isinstance(value, Mapping) else {}
+
+
+def _record_run_telemetry_error(
+    state: dict[str, Any], operation: str, error: OSError
+) -> None:
+    message = f"{operation}: {type(error).__name__}: {error}"
+    errors = state.setdefault("telemetry_errors", [])
+    if message in errors:
+        return
+    errors.append(message)
+    try:
+        print(f"Run telemetry could not be recorded: {message}", file=sys.stderr)
+    except OSError:
+        pass
 
 
 def _write_failure_artifact(output_root: Path, failure: RunFailure) -> Path:

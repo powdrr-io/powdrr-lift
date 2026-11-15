@@ -18,11 +18,19 @@ from powdrr_service.ci_response.observation import (
     normalize_github_snapshot,
 )
 from powdrr_service.ci_response.reproduction import compare_local_reproduction
+from powdrr_service.ci_response.research import (
+    CIResearchPlan,
+    CIResearchQuery,
+    build_ci_research_plan,
+)
 
 __all__ = [
     "CIResponseAssessment",
     "CIFailureUnit",
+    "CIResearchPlan",
+    "CIResearchQuery",
     "assess_ci_observation",
+    "build_ci_research_plan",
     "build_failure_units",
     "compare_local_reproduction",
     "normalize_failure_signature",

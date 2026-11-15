@@ -68,7 +68,7 @@ alone does not establish completion. Report blocked acceptance honestly.
 | 6 | Fulfillment-backed dependencies and readiness explanations | 1, 3 | Complete ([PR #1528](https://github.com/powdrr-io/powdrr-lift/pull/1528)) |
 | 7 | Validation inventory and evidence reuse | 3, 5 | Complete ([PR #1531](https://github.com/powdrr-io/powdrr-lift/pull/1531)) |
 | 8 | Complete run telemetry and mechanical-call removal | 1, 7 | Complete ([PR #1533](https://github.com/powdrr-io/powdrr-lift/pull/1533)) |
-| 9 | Recoverable claims and independent item concurrency | 4, 6 | In progress |
+| 9 | Recoverable claims and independent item concurrency | 4, 6 | In review ([PR #1535](https://github.com/powdrr-io/powdrr-lift/pull/1535)) |
 | 10 | Full deterministic planning/execution/recovery scenario | 1–9 | Pending |
 | 11 | Live Gaterr acceptance and measured report | 10 | Pending |
 

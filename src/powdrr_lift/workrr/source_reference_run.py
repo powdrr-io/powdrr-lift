@@ -17,7 +17,7 @@ import subprocess
 import sys
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, replace
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 from powdrr_contracts.models import ChatCompletionRequest, ChatCompletionResponse
@@ -521,6 +521,8 @@ class SourceReferenceRun:
     completion: dict[str, Any] | None
     delivery: dict[str, Any] | None
     readonly_support_files: dict[str, str]
+    seed_candidate_files: dict[str, str | None]
+    _seed_candidate_fingerprint: str
     _candidate_after_worker: str | None
     _post_worker_reconciler: (
         Callable[[SourceReferenceRun], Mapping[str, Any] | None] | None
@@ -550,6 +552,8 @@ class SourceReferenceRun:
         reader_limits: ReaderLimits | None = None,
         readonly_support_files: Mapping[str, str] | None = None,
         accepted_preparation: Mapping[str, Any] | None = None,
+        seed_candidate_files: Mapping[str, str | None] | None = None,
+        correction_context: Mapping[str, Any] | None = None,
         post_worker_reconciler: (
             Callable[[SourceReferenceRun], Mapping[str, Any] | None] | None
         ) = None,
@@ -621,6 +625,38 @@ class SourceReferenceRun:
         if support_files:
             _git(self.workspace_root, "add", "-f", "--", *sorted(support_files))
         self.readonly_support_files = dict(sorted(support_files.items()))
+        seeded: dict[str, str | None] = {}
+        for seed_path, seed_content in sorted((seed_candidate_files or {}).items()):
+            seed_relative = PurePosixPath(seed_path)
+            if (
+                "\\" in seed_path
+                or seed_relative.is_absolute()
+                or not seed_relative.parts
+                or any(part in {"", ".", ".."} for part in seed_relative.parts)
+                or seed_path in self.readonly_support_files
+                or (seed_content is not None and not isinstance(seed_content, str))
+            ):
+                raise ValueError("Correction candidate contains an invalid path")
+            target = self.workspace_root.joinpath(*seed_relative.parts)
+            if any(
+                parent.is_symlink()
+                for parent in (target, *target.parents)
+                if parent != self.workspace_root.parent
+                and parent.is_relative_to(self.workspace_root)
+            ):
+                raise ValueError("Correction candidate paths cannot traverse symlinks")
+            if not target.resolve(strict=False).is_relative_to(self.workspace_root):
+                raise ValueError("Correction candidate path escapes the workspace")
+            if seed_content is None:
+                target.unlink(missing_ok=True)
+            else:
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text(seed_content, encoding="utf-8")
+            seeded[seed_path] = seed_content
+        self.seed_candidate_files = dict(sorted(seeded.items()))
+        self._seed_candidate_fingerprint = content_fingerprint(
+            self.seed_candidate_files
+        )
         self.catalog = compile_reference_catalog(
             accepted_design,
             base_commit=base_commit,
@@ -697,8 +733,14 @@ class SourceReferenceRun:
                 shlex.join(p.command) for p in self.profiles.values()
             ),
             protected_paths=tuple(support_files),
-            allow_existing_changes=bool(support_files),
+            allow_existing_changes=bool(support_files or seeded),
         )
+        if correction_context is not None:
+            self.request = replace(
+                self.request,
+                correction_context=dict(correction_context),
+                allow_existing_changes=True,
+            )
         self.model = model
         self.worker_timeout_seconds = worker_timeout_seconds
         self.validation_timeout_seconds = validation_timeout_seconds
@@ -750,6 +792,8 @@ class SourceReferenceRun:
             "isolation": self._isolation_name(),
             "profiles": {name: p.to_data() for name, p in self.profiles.items()},
             "readonly_support_files": self.readonly_support_files,
+            "seed_candidate_fingerprint": self._seed_candidate_fingerprint,
+            "correction_context": dict(correction_context or {}),
             "lineage_context": self.lineage_context,
             "post_worker_reconciliation": post_worker_reconciler is not None,
         }
@@ -886,6 +930,18 @@ class SourceReferenceRun:
             or unstaged_paths
             or untracked_paths
         ):
+            expected_unstaged = set(self.seed_candidate_files)
+            if (
+                _git(self.workspace_root, "rev-parse", "HEAD").decode().strip()
+                == self.catalog.base_commit
+                and _working_paths(self.workspace_root, output=_paths_output)
+                == expected_support_paths | expected_unstaged
+                and staged_paths == expected_support_paths
+                and unstaged_paths | untracked_paths == expected_unstaged
+                and content_fingerprint(self.seed_candidate_files)
+                == self._seed_candidate_fingerprint
+            ):
+                return
             raise ValueError(
                 "Source implementation must start from its clean exact base"
             )
@@ -1386,6 +1442,9 @@ class SourceReferenceRun:
                 )
             else:
                 result["outcome"] = "accepted"
+        except KeyboardInterrupt:
+            result["outcome"] = "cancelled"
+            result["error"] = "Source implementation was cancelled by the user."
         except Exception as error:
             result["outcome"] = (
                 error.outcome if isinstance(error, SourceRunFailure) else "failed"

@@ -49,6 +49,7 @@ class PlannedWorkflowTaskOptions:
     minisweagent_model: str = "deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731"
     coding_agent_timeout_seconds: float = 1800.0
     coding_agent_validation_timeout_seconds: float = 1800.0
+    coding_agent_recovery_attempts: int = 3
 
 
 def run_planned_workflow_task(
@@ -207,6 +208,7 @@ def _task_config(
         coding_agent_validation_timeout_seconds=(
             options.coding_agent_validation_timeout_seconds
         ),
+        coding_agent_recovery_attempts=options.coding_agent_recovery_attempts,
         task_checkpoint_callback=checkpoint_callback,
         github_issue_number=issue_number,
         github_repository=options.repository,

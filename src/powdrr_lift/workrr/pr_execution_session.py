@@ -72,6 +72,7 @@ class PrExecutionSessionConfig:
     minisweagent_model: str = "deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731"
     coding_agent_timeout_seconds: float = 1800.0
     coding_agent_validation_timeout_seconds: float = 1800.0
+    coding_agent_recovery_attempts: int = 3
 
 
 def run_pr_execution_worker(
@@ -107,6 +108,7 @@ def run_pr_execution_worker(
         coding_agent_validation_timeout_seconds=(
             config.coding_agent_validation_timeout_seconds
         ),
+        coding_agent_recovery_attempts=config.coding_agent_recovery_attempts,
     )
 
     def run_task(

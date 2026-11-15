@@ -460,12 +460,16 @@ def test_story_context_is_bound_into_protected_source_objective(
     assert callable(captured["post_worker_reconciler"])
 
 
-def test_failed_source_invocation_retries_only_from_a_new_reviewed_revision(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize("accept_second_attempt", [True, False])
+def test_failed_source_attempt_is_corrected_or_stopped_without_progress(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    accept_second_attempt: bool,
 ) -> None:
     repo, base, proposed = fixture(tmp_path)
     artifact_roots: list[Path] = []
     invocations: list[int] = []
+    correction_seeds: list[dict[str, str | None]] = []
 
     class Run:
         def __init__(
@@ -480,12 +484,15 @@ def test_failed_source_invocation_retries_only_from_a_new_reviewed_revision(
 
         def execute(self, _handler: Any) -> Any:
             invocations.append(self.invocation)
-            accepted = self.invocation == 1
+            accepted = accept_second_attempt and self.invocation == 1
             if accepted:
                 record = _write_minimal_lineage(self.private_root, self.run_id)
                 (self.workspace_root / "twice.py").write_text(CANDIDATE)
             else:
                 record = None
+                (self.workspace_root / "twice.py").write_text(
+                    "def twice(x): return x\n"
+                )
             return SimpleNamespace(
                 accepted=accepted,
                 to_data=lambda: {
@@ -493,7 +500,7 @@ def test_failed_source_invocation_retries_only_from_a_new_reviewed_revision(
                     "attempt": {
                         "attempt_id": f"run-{self.invocation}",
                         "status": "completed",
-                        "changed_paths": ["twice.py"] if accepted else [],
+                        "changed_paths": ["twice.py"],
                     },
                     "validation": {"status": "passed" if accepted else "failed"},
                     "error": None if accepted else "verification failed",
@@ -517,6 +524,7 @@ def test_failed_source_invocation_retries_only_from_a_new_reviewed_revision(
     def prepare(**kwargs: Any) -> Run:
         invocation = len(artifact_roots)
         artifact_roots.append(Path(kwargs["artifact_root"]))
+        correction_seeds.append(dict(kwargs.get("seed_candidate_files", {})))
         return Run(
             invocation,
             artifact_roots[-1],
@@ -541,33 +549,56 @@ def test_failed_source_invocation_retries_only_from_a_new_reviewed_revision(
         "review_client": Reviewer(),
     }
 
-    failed = dispatch.dispatch_source_reference_task(**arguments)
-    assert failed["passed"] is False
-    assert failed["source_reference_outcome"] == "validation_failed"
-    with pytest.raises(PowdrrExecutionError, match="already dispatched"):
-        dispatch.dispatch_source_reference_task(**arguments)
-    assert invocations == [0]
-
-    revised_design = yaml.safe_load((repo / "design.yaml").read_text())
-    revised_design["plan_id"] = "plan-2"
-    revised_design["item_id"] = "item-2"
-    (repo / "design.yaml").write_text(yaml.safe_dump(revised_design))
-    git(repo, "add", "design.yaml")
-    git(repo, "commit", "-m", "review revised implementation design")
-    revised_arguments = {
-        **arguments,
-        "proposed": {**proposed, "plan_id": "plan-2", "item_id": "item-2"},
-        "base_commit": git(repo, "rev-parse", "HEAD"),
-    }
-
-    retried = dispatch.dispatch_source_reference_task(**revised_arguments)
-    assert retried["passed"] is True, retried.get("error")
+    retried = dispatch.dispatch_source_reference_task(**arguments)
+    assert retried["continuations"] == 1
+    assert len(retried["attempts"]) == 2
+    assert correction_seeds[1] == {"twice.py": "def twice(x): return x\n"}
     assert len(set(artifact_roots)) == 2
     assert invocations == [0, 1]
-    assert Path(failed["source_reference_artifact_root"], "dispatch.json").is_file()
     assert Path(retried["source_reference_artifact_root"], "dispatch.json").is_file()
-    with pytest.raises(PowdrrExecutionError, match="already dispatched"):
-        dispatch.dispatch_source_reference_task(**revised_arguments)
+    resumed = dispatch.dispatch_source_reference_task(**arguments)
+    if accept_second_attempt:
+        assert retried["passed"] is True, retried.get("error")
+        assert resumed["passed"] is True
+    else:
+        assert retried["passed"] is False
+        assert retried["status"] == "no_progress"
+        assert resumed["status"] == "no_progress"
+    assert invocations == [0, 1]
+
+    root = Path(retried["source_reference_artifact_root"])
+    (root / "dispatch.json").unlink()
+    terminal_path = (
+        root
+        / "attempts"
+        / "02"
+        / "runs"
+        / "implementation-attempt-02"
+        / "private"
+        / "terminal.json"
+    )
+    terminal_path.parent.mkdir(parents=True)
+    terminal_path.write_text(
+        json.dumps(
+            {
+                "fingerprint": "terminal-fingerprint",
+                "outcome": "accepted" if accept_second_attempt else "validation_failed",
+                "lineage_record_id": "source-run:implementation-attempt-02",
+            }
+        )
+    )
+    (root / "coordinator.json").write_text(
+        json.dumps(
+            {
+                "current_attempt_id": "implementation-attempt-02",
+                "next_attempt": 2,
+                "attempts": [],
+            }
+        )
+    )
+    reconciled = dispatch.dispatch_source_reference_task(**arguments)
+    assert reconciled["status"] == "interrupted_attempt_requires_reconciliation"
+    assert reconciled["recovered_terminal"]["fingerprint"] == "terminal-fingerprint"
     assert invocations == [0, 1]
 
 

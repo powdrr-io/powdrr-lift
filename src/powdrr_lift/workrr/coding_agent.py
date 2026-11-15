@@ -127,6 +127,7 @@ class ImplementationRequest:
     intent_packet: IntentPacket | None = None
     implementation_packet: ImplementationPacket | None = None
     allow_existing_changes: bool = False
+    correction_context: Mapping[str, Any] | None = None
     source_reference_mode: str = "off"
     source_reference_prompt: SourceReferencePrompt | None = None
     schema_version: str = CODING_AGENT_REQUEST_SCHEMA_VERSION
@@ -140,6 +141,13 @@ class ImplementationRequest:
             raise ValueError("unsupported implementation request schema")
         if self.source_reference_mode not in {"off", "observe", "enforce"}:
             raise ValueError("invalid source reference mode")
+        if self.correction_context is not None:
+            if (
+                not isinstance(self.correction_context, Mapping)
+                or not self.correction_context
+            ):
+                raise ValueError("correction context must be a non-empty object")
+            json.dumps(dict(self.correction_context), allow_nan=False)
         if self.source_reference_prompt is None:
             if self.source_reference_mode != "off":
                 raise ValueError("enabled source references require a compiled prompt")
@@ -279,6 +287,11 @@ class ImplementationRequest:
             "planned_deletions": [dict(item) for item in self.planned_deletions],
             "protected_paths": list(self.protected_paths),
             "allow_existing_changes": self.allow_existing_changes,
+            "correction_context": (
+                dict(self.correction_context)
+                if self.correction_context is not None
+                else None
+            ),
             "intent_packet": (
                 self.intent_packet.to_data() if self.intent_packet is not None else None
             ),
@@ -291,6 +304,24 @@ class ImplementationRequest:
 
     def to_json(self) -> str:
         return json.dumps(self.to_data(), indent=2, sort_keys=True) + "\n"
+
+    @property
+    def worker_prompt(self) -> str:
+        if self.correction_context is None:
+            return self.prompt
+        return (
+            self.prompt
+            + "\n\nRequired correction from the previous immutable attempt:\n"
+            + json.dumps(
+                dict(self.correction_context),
+                indent=2,
+                sort_keys=True,
+                ensure_ascii=False,
+            )
+            + "\n\nPreserve the accepted design, independent tests, protected verifier "
+            "boundary, and original base. Correct only the reported failure within "
+            "the reviewed candidate scope."
+        )
 
     def repair_prompt(self, issue: Mapping[str, Any]) -> str:
         """Render a finding-specific prompt without replaying the full packet.
@@ -382,6 +413,13 @@ class ImplementationRequest:
             ),
             protected_paths=tuple(cast(list[str], data.get("protected_paths", []))),
             allow_existing_changes=bool(data.get("allow_existing_changes", False)),
+            correction_context=(
+                dict(correction_context)
+                if isinstance(
+                    correction_context := data.get("correction_context"), Mapping
+                )
+                else None
+            ),
             intent_packet=(
                 IntentPacket.from_data(cast(Mapping[str, Any], packet))
                 if isinstance(packet := data.get("intent_packet"), Mapping)
@@ -876,7 +914,7 @@ class OpenCodeProvider:
     executable: str = "opencode"
     agent: str = "build"
     timeout_seconds: float = 300.0
-    absolute_timeout_seconds: float | None = 900.0
+    absolute_timeout_seconds: float | None = None
     max_events: int | None = 256
     permission_policy: OpenCodePermissionPolicy = field(
         default_factory=OpenCodePermissionPolicy
@@ -938,7 +976,7 @@ class OpenCodeProvider:
             command.extend(("--model", self.model))
         if self.session_id is not None:
             command.extend(("--session", self.session_id))
-        command.append(request.prompt)
+        command.append(request.worker_prompt)
         completed = run_opencode(
             command,
             log_path=(
@@ -1003,7 +1041,7 @@ class MiniSWEAgentProvider:
             raise ValueError(
                 "source references require a frozen catalog and diagnostics root"
             )
-        worker_prompt = request.prompt.replace(
+        worker_prompt = request.worker_prompt.replace(
             "{{powdrr_workspace_root}}", str(workspace_root)
         )
         task_prompt = (
@@ -1025,9 +1063,9 @@ class MiniSWEAgentProvider:
                 "Ordinary shell output discovers visible markers only."
             )
         if execution is not None:
-            # The compiled prompt already carries the concrete workspace and
-            # protocol. Never prepend, append, substitute, or repair its bytes.
-            task_prompt = request.prompt
+            # Keep the compiled contract bytes intact. The separately stored
+            # correction context is an execution instruction, not accepted intent.
+            task_prompt = request.worker_prompt
             execution.claim_invocation(request, attempt_id)
         environment = os.environ.copy()
         for name in tuple(environment):
@@ -1041,6 +1079,19 @@ class MiniSWEAgentProvider:
         environment["MSWEA_CONFIGURED"] = "true"
         environment["MSWEA_SILENT_STARTUP"] = "true"
         environment["PWD"] = str(workspace_root)
+        source_root = Path(__file__).resolve().parents[3]
+        mini_source_paths = [
+            source_root / "src",
+            *sorted((source_root / "packages").glob("*/src")),
+        ]
+        mini_source_paths = [path for path in mini_source_paths if path.is_dir()]
+        if mini_source_paths:
+            environment["PYTHONPATH"] = os.pathsep.join(
+                [
+                    *(str(path) for path in mini_source_paths),
+                    environment.get("PYTHONPATH", ""),
+                ]
+            )
         inference_config_root = Path(
             tempfile.mkdtemp(
                 prefix="powdrr-miniswe-config-",
@@ -1051,11 +1102,11 @@ class MiniSWEAgentProvider:
             # The worker uses the shared interpreter, so make the source tree
             # under execution available to its module entry point and tools.
             validation_environment = execution.validation_environment()
-            source_paths = environment.get("PYTHONPATH", "")
+            existing_pythonpath = environment.get("PYTHONPATH", "")
             validation_paths = validation_environment.get("PYTHONPATH", "")
             environment.update(validation_environment)
             environment["PYTHONPATH"] = os.pathsep.join(
-                path for path in (source_paths, validation_paths) if path
+                path for path in (existing_pythonpath, validation_paths) if path
             )
         environment["MSWEA_GLOBAL_CONFIG_DIR"] = str(inference_config_root)
         inference_parent, inference_child = socket.socketpair()
@@ -1352,7 +1403,6 @@ def build_coding_agent_provider(
             executable=opencode_executable,
             model=opencode_model,
             timeout_seconds=timeout_seconds,
-            absolute_timeout_seconds=max(timeout_seconds, 900.0),
             diagnostics_root=diagnostics_root,
             permission_policy=permission_policy,
             prompt_prefix=prompt_prefix,
@@ -1410,7 +1460,7 @@ class CodingAgentAttemptStore:
         """Persist the exact prompt sent for one attempt without overwriting history."""
         prompt_path = self._path(self.prompts_root, attempt_id, suffix=".txt")
         prompt_path.parent.mkdir(parents=True, exist_ok=True)
-        prompt_path.write_text(request.prompt, encoding="utf-8")
+        prompt_path.write_text(request.worker_prompt, encoding="utf-8")
         metadata_path = self._path(self.prompts_root, attempt_id)
         metadata_path.write_text(
             json.dumps(
@@ -1420,7 +1470,7 @@ class CodingAgentAttemptStore:
                     "provider": provider,
                     "prompt_path": str(prompt_path.relative_to(self.root)),
                     "prompt_sha256": hashlib.sha256(
-                        request.prompt.encode("utf-8")
+                        request.worker_prompt.encode("utf-8")
                     ).hexdigest(),
                 },
                 indent=2,

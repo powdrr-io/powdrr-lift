@@ -513,10 +513,19 @@ def build_parser() -> argparse.ArgumentParser:
         default="deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731",
     )
     github_issue_worker_parser.add_argument(
-        "--coding-agent-timeout-seconds", type=float, default=1800.0
+        "--coding-agent-timeout-seconds",
+        type=float,
+        default=1800.0,
+        help="Tool inactivity limit; active coding runs have no wall-clock deadline.",
     )
     github_issue_worker_parser.add_argument(
         "--coding-agent-validation-timeout-seconds", type=float, default=1800.0
+    )
+    github_issue_worker_parser.add_argument(
+        "--coding-agent-recovery-attempts",
+        type=int,
+        default=3,
+        help="Maximum immutable source implementation attempts, including corrections.",
     )
     github_issue_worker_parser.add_argument("--max-roundtrips", type=int, default=128)
     github_issue_worker_parser.add_argument(
@@ -557,10 +566,19 @@ def build_parser() -> argparse.ArgumentParser:
         default="deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731",
     )
     continue_issue_worker_parser.add_argument(
-        "--coding-agent-timeout-seconds", type=float, default=1800.0
+        "--coding-agent-timeout-seconds",
+        type=float,
+        default=1800.0,
+        help="Tool inactivity limit; active coding runs have no wall-clock deadline.",
     )
     continue_issue_worker_parser.add_argument(
         "--coding-agent-validation-timeout-seconds", type=float, default=1800.0
+    )
+    continue_issue_worker_parser.add_argument(
+        "--coding-agent-recovery-attempts",
+        type=int,
+        default=3,
+        help="Maximum immutable source implementation attempts, including corrections.",
     )
     continue_issue_worker_parser.add_argument("--max-roundtrips", type=int, default=128)
     continue_issue_worker_parser.add_argument(
@@ -797,10 +815,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--timeout-seconds",
         type=_positive_finite_seconds,
         default=DEFAULT_FEATURE_TIMEOUT_SECONDS,
-        help=(
-            "Overall feature execution wall-clock limit after credential preflight "
-            f"(default: {DEFAULT_FEATURE_TIMEOUT_SECONDS} seconds)."
-        ),
+        help="Optional explicit overall feature wall-clock limit; no limit by default.",
     )
     implement_parser.add_argument(
         "--max-repair-attempts",
@@ -3512,6 +3527,9 @@ def _run_github_issue_worker(args: argparse.Namespace) -> int:
         coding_agent_validation_timeout_seconds=getattr(
             args, "coding_agent_validation_timeout_seconds", 1800.0
         ),
+        coding_agent_recovery_attempts=getattr(
+            args, "coding_agent_recovery_attempts", 3
+        ),
     )
     try:
         report = run_pr_execution_worker(config)
@@ -3618,6 +3636,7 @@ def _run_github_issue_worker_continue(args: argparse.Namespace) -> int:
                 coding_agent_validation_timeout_seconds=(
                     args.coding_agent_validation_timeout_seconds
                 ),
+                coding_agent_recovery_attempts=args.coding_agent_recovery_attempts,
                 task_checkpoint_callback=checkpoint_callback,
                 github_issue_number=args.issue_number,
                 github_repository=args.repository,

@@ -8,8 +8,8 @@ import os
 import re
 import subprocess
 import tempfile
-from collections.abc import Mapping
-from pathlib import Path
+from collections.abc import Mapping, Sequence
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 import yaml
@@ -31,7 +31,10 @@ from powdrr_service.structrr.source_run_lineage import (
 )
 
 from powdrr_lift.errors import PowdrrExecutionError
-from powdrr_lift.workrr.coding_agent import _remove_provider_credentials
+from powdrr_lift.workrr.coding_agent import (
+    DEFAULT_CODING_AGENT_RECOVERY_ATTEMPTS,
+    _remove_provider_credentials,
+)
 from powdrr_lift.workrr.coding_agent_validation import ValidationProfile
 from powdrr_lift.workrr.llm import WorkflowLLMClient, complete_json
 from powdrr_lift.workrr.source_reference_postrun import reconcile_source_task
@@ -40,6 +43,83 @@ from powdrr_lift.workrr.story_execution_operations import execute_story_validati
 
 DESIGN_SCHEMA = "structrr-source-reference-task-v1"
 MAX_DESIGN_BYTES = 1_000_000
+CORRECTION_SCHEMA = "source-reference-correction-coordinator-v1"
+
+
+def _write_coordinator(root: Path, value: Mapping[str, Any]) -> None:
+    path = root / "coordinator.json"
+    temporary = root / "coordinator.json.tmp"
+    temporary.write_text(
+        json.dumps(dict(value), indent=2, sort_keys=True, ensure_ascii=False) + "\n",
+        encoding="utf-8",
+    )
+    os.replace(temporary, path)
+
+
+def _capture_candidate_files(
+    candidate: Path, paths: Sequence[str], *, excluded: set[str]
+) -> dict[str, str | None]:
+    captured: dict[str, str | None] = {}
+    for relative in sorted(set(paths) - excluded):
+        parsed = PurePosixPath(relative)
+        if (
+            "\\" in relative
+            or parsed.is_absolute()
+            or not parsed.parts
+            or any(part in {"", ".", ".."} for part in parsed.parts)
+        ):
+            raise ValueError("Correction candidate contains an invalid path")
+        target = candidate.joinpath(*parsed.parts)
+        if any(
+            parent.is_symlink()
+            for parent in (target, *target.parents)
+            if parent != candidate.parent and parent.is_relative_to(candidate)
+        ):
+            raise ValueError("Correction candidate contains a symlink")
+        if target.is_file():
+            content = target.read_text(encoding="utf-8")
+            if len(content.encode("utf-8")) > MAX_DESIGN_BYTES:
+                raise ValueError("Correction candidate file exceeds the size limit")
+            captured[relative] = content
+        else:
+            captured[relative] = None
+    return captured
+
+
+def _correction_failure_summary(data: Mapping[str, Any]) -> dict[str, Any]:
+    validation = data.get("validation")
+    failures: list[dict[str, Any]] = []
+    if isinstance(validation, Mapping) and isinstance(validation.get("results"), list):
+        for result in validation["results"]:
+            if not isinstance(result, Mapping) or result.get("status") == "passed":
+                continue
+            failures.append(
+                {
+                    "profile": result.get("profile"),
+                    "status": result.get("status"),
+                    "returncode": result.get("returncode"),
+                    "test_id": result.get("test_id"),
+                    "classification": (
+                        "environment_failure"
+                        if result.get("status") in {"blocked", "pending", "timed_out"}
+                        else "test_failure"
+                    ),
+                }
+            )
+    diff_check = data.get("diff_check")
+    return {
+        "outcome": data.get("outcome"),
+        "error": str(data.get("error") or "")[:500],
+        "failed_checks": failures,
+        "diff_check": (
+            {
+                "passed": diff_check.get("passed"),
+                "returncode": diff_check.get("returncode"),
+            }
+            if isinstance(diff_check, Mapping)
+            else None
+        ),
+    }
 
 
 def _git(root: Path, *arguments: str, data: bytes | None = None) -> bytes:
@@ -172,11 +252,14 @@ def dispatch_source_reference_task(
     model: str | None,
     worker_timeout_seconds: float,
     validation_timeout_seconds: float,
+    max_correction_attempts: int = DEFAULT_CODING_AGENT_RECOVERY_ATTEMPTS,
     review_client: WorkflowLLMClient,
     story_context: Mapping[str, Any] | None = None,
     story_validation_bundle: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Run once in a clean candidate, then transfer only an accepted patch."""
+    """Correct failed candidates in linked attempts and transfer only a pass."""
+    if max_correction_attempts < 1:
+        raise ValueError("max_correction_attempts must be positive")
     if proposed.get("source_reference_mode", "enforce") != "enforce":
         raise PowdrrExecutionError(
             "Source reference tasks cannot downgrade enforce mode"
@@ -277,12 +360,61 @@ def dispatch_source_reference_task(
     root.parent.mkdir(parents=True, exist_ok=True)
     try:
         root.mkdir(mode=0o700)
-    except FileExistsError as error:
-        raise PowdrrExecutionError(
-            f"Source task already dispatched; inspect {root}. "
-            "Accept a new design revision before another implementation attempt."
-        ) from error
-    candidate = root / "candidate"
+    except FileExistsError:
+        dispatch_record = root / "dispatch.json"
+        if dispatch_record.is_file():
+            saved = json.loads(dispatch_record.read_text(encoding="utf-8"))
+            if isinstance(saved, dict):
+                return saved
+        coordinator_record = root / "coordinator.json"
+        state = (
+            json.loads(coordinator_record.read_text(encoding="utf-8"))
+            if coordinator_record.is_file()
+            else {}
+        )
+        attempt_id = state.get("current_attempt_id")
+        attempt_number = state.get("next_attempt")
+        recovered_terminal = None
+        if isinstance(attempt_id, str) and isinstance(attempt_number, int):
+            terminal_path = (
+                root
+                / "attempts"
+                / f"{attempt_number:02d}"
+                / "runs"
+                / attempt_id
+                / "private"
+                / "terminal.json"
+            )
+            if terminal_path.is_file():
+                terminal = json.loads(terminal_path.read_text(encoding="utf-8"))
+                if isinstance(terminal, dict):
+                    recovered_terminal = {
+                        "path": str(terminal_path),
+                        "fingerprint": terminal.get("fingerprint"),
+                        "outcome": terminal.get("outcome"),
+                        "lineage_record_id": terminal.get("lineage_record_id"),
+                    }
+        interrupted = {
+            "passed": False,
+            "retryable": False,
+            "status": "interrupted_attempt_requires_reconciliation",
+            "error": (
+                "A source attempt was already claimed for this immutable task. "
+                "No duplicate invocation was started; reconcile the retained "
+                "attempt artifacts before continuing."
+            ),
+            "source_reference_artifact_root": str(root),
+            "coordinator": state,
+            "attempts": state.get("attempts", []),
+            "recovered_terminal": recovered_terminal,
+        }
+        temporary = root / "dispatch.json.tmp"
+        temporary.write_text(
+            json.dumps(interrupted, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        os.replace(temporary, dispatch_record)
+        return interrupted
     profiles: dict[str, ValidationProfile] = {profile.name: profile}
     test_sources: dict[str, str] = {}
     story_snapshot: Mapping[str, Any] | None = None
@@ -338,57 +470,203 @@ def dispatch_source_reference_task(
             raise ValueError(
                 "Reviewed source base is not an ancestor of the task checkout"
             )
-        _git(repo_root, "worktree", "add", "--detach", str(candidate), base_commit)
-        run = SourceReferenceRun.prepare(
-            workspace_root=candidate,
-            accepted_design=design,
-            base_commit=base_commit,
-            objective=objective,
-            allowed_paths=allowed_paths,
-            profiles=profiles,
-            artifact_root=root / "runs",
-            run_id="implementation",
-            lineage_context={
-                "workflow_id": workflow_id,
-                "task_id": task_id,
-                "plan_id": proposed["plan_id"],
-                "item_id": proposed["item_id"],
-                "design_path": design_path,
-                "design_blob_id": design_blob_id,
-            },
-            model=model,
-            worker_timeout_seconds=worker_timeout_seconds,
-            validation_timeout_seconds=validation_timeout_seconds,
-            accepted_preparation=(
-                preparation
-                if proposed.get("execution_preparation_schema")
-                == "source-reference-preparation-v1"
-                else None
-            ),
-            review_client=_ReferenceReviewer(review_client),
-            readonly_support_files=test_sources,
-            post_worker_reconciler=lambda current_run: reconcile_source_task(
-                current_run, _ReferenceReviewer(review_client)
-            ),
-        )
-        outcome = run.execute(create_miniswe_inference_handler(worker_timeout_seconds))
-        data = outcome.to_data()
+        attempt_records: list[dict[str, Any]] = []
+        seed_candidate_files: dict[str, str | None] = {}
+        correction_context: dict[str, Any] | None = None
+        previous_failure_fingerprint: str | None = None
+        coordinator: dict[str, Any] = {
+            "schema_version": CORRECTION_SCHEMA,
+            "task_identity": identity,
+            "base_commit": base_commit,
+            "plan_id": proposed["plan_id"],
+            "item_id": proposed["item_id"],
+            "accepted_design_blob_id": design_blob_id,
+            "attempt_budget": max_correction_attempts,
+            "attempts": [],
+            "status": "preparing",
+        }
+        _write_coordinator(root, coordinator)
+        for attempt_number in range(1, max_correction_attempts + 1):
+            attempt_id = f"implementation-attempt-{attempt_number:02d}"
+            attempt_root = root / "attempts" / f"{attempt_number:02d}"
+            attempt_root.mkdir(parents=True, exist_ok=False)
+            candidate = attempt_root / "candidate"
+            coordinator.update(
+                status="invocation_pending",
+                current_attempt_id=attempt_id,
+                next_attempt=attempt_number,
+            )
+            _write_coordinator(root, coordinator)
+            _git(repo_root, "worktree", "add", "--detach", str(candidate), base_commit)
+            run = SourceReferenceRun.prepare(
+                workspace_root=candidate,
+                accepted_design=design,
+                base_commit=base_commit,
+                objective=objective,
+                allowed_paths=allowed_paths,
+                profiles=profiles,
+                artifact_root=attempt_root / "runs",
+                run_id=attempt_id,
+                lineage_context={
+                    "workflow_id": workflow_id,
+                    "task_id": task_id,
+                    "plan_id": proposed["plan_id"],
+                    "item_id": proposed["item_id"],
+                    "attempt_number": attempt_number,
+                    "correction_of": (
+                        attempt_records[-1].get("attempt_id")
+                        if attempt_records
+                        else None
+                    ),
+                    "design_path": design_path,
+                    "design_blob_id": design_blob_id,
+                },
+                model=model,
+                worker_timeout_seconds=worker_timeout_seconds,
+                validation_timeout_seconds=validation_timeout_seconds,
+                accepted_preparation=(
+                    preparation
+                    if proposed.get("execution_preparation_schema")
+                    == "source-reference-preparation-v1"
+                    else None
+                ),
+                seed_candidate_files=seed_candidate_files,
+                correction_context=correction_context,
+                review_client=_ReferenceReviewer(review_client),
+                readonly_support_files=test_sources,
+                post_worker_reconciler=lambda current_run: reconcile_source_task(
+                    current_run, _ReferenceReviewer(review_client)
+                ),
+            )
+            coordinator["status"] = "invocation_running"
+            _write_coordinator(root, coordinator)
+            outcome = run.execute(
+                create_miniswe_inference_handler(worker_timeout_seconds)
+            )
+            data = outcome.to_data()
+            attempt = data["attempt"] or {}
+            attempt_record = {
+                "attempt_id": attempt_id,
+                "attempt_number": attempt_number,
+                "source_reference_outcome": data["outcome"],
+                "attempt_status": attempt.get("status", "failed"),
+                "terminal_path": str(run.private_root / "terminal.json"),
+                "candidate_path": str(candidate),
+                "error": data.get("error"),
+                "data": data,
+            }
+            attempt_records.append(attempt_record)
+            coordinator["attempts"] = [
+                {key: value for key, value in item.items() if key != "data"}
+                for item in attempt_records
+            ]
+            coordinator["status"] = "attempt_completed"
+            _write_coordinator(root, coordinator)
+            if outcome.accepted:
+                break
+            recoverable = (
+                data.get("outcome") == "validation_failed"
+                and attempt.get("status") == "completed"
+            )
+            if not recoverable:
+                if data.get("outcome") == "submitted_without_progress":
+                    coordinator.update(
+                        status="no_progress",
+                        stopped_attempt_id=attempt_id,
+                        reason=(
+                            "worker submitted without attributable candidate changes"
+                        ),
+                    )
+                    _write_coordinator(root, coordinator)
+                break
+            try:
+                run.verify_candidate()
+                seed_candidate_files = _capture_candidate_files(
+                    candidate,
+                    tuple(attempt.get("changed_paths", ())),
+                    excluded=set(test_sources),
+                )
+            except (TypeError, ValueError, OSError) as error:
+                coordinator.update(
+                    status="blocked_by_candidate_policy", error=str(error)
+                )
+                _write_coordinator(root, coordinator)
+                break
+            failure_evidence = _correction_failure_summary(data)
+            failure_evidence["attempt_id"] = attempt_id
+            failure_fingerprint = content_fingerprint(
+                {
+                    "failure": {
+                        key: value
+                        for key, value in failure_evidence.items()
+                        if key != "attempt_id"
+                    },
+                    "candidate": seed_candidate_files,
+                }
+            )
+            if failure_fingerprint == previous_failure_fingerprint:
+                coordinator.update(
+                    status="no_progress",
+                    failure_fingerprint=failure_fingerprint,
+                )
+                _write_coordinator(root, coordinator)
+                break
+            previous_failure_fingerprint = failure_fingerprint
+            if attempt_number >= max_correction_attempts:
+                coordinator.update(
+                    status="attempt_budget_exhausted",
+                    failure_fingerprint=failure_fingerprint,
+                )
+                _write_coordinator(root, coordinator)
+                break
+            correction_context = {
+                "schema_version": CORRECTION_SCHEMA,
+                "previous_attempt_id": attempt_id,
+                "failure_fingerprint": failure_fingerprint,
+                "failed_checks": _correction_failure_summary(data),
+                "permitted_candidate_files": sorted(seed_candidate_files),
+                "required_correction": (
+                    "Repair the exact candidate validation failures while preserving "
+                    "the accepted source design, independent tests, original base, "
+                    "and all protected files."
+                ),
+            }
+            coordinator.update(
+                status="correction_pending",
+                correction_of=attempt_id,
+                failure_fingerprint=failure_fingerprint,
+            )
+            _write_coordinator(root, coordinator)
+
+        if not attempt_records:
+            raise PowdrrExecutionError("Source correction coordinator made no attempt")
+        final_record = attempt_records[-1]
+        data = final_record["data"]
         attempt = data["attempt"] or {}
         result.update(
-            attempt_id=attempt.get("attempt_id"),
-            status=data["outcome"],
+            attempt_id=final_record["attempt_id"],
+            status=(
+                "accepted" if data["outcome"] == "accepted" else coordinator["status"]
+            ),
             attempt_status=attempt.get("status", "failed"),
             validation=_validation_result(data),
             diff_check=data.get("diff_check"),
             source_reference_outcome=data["outcome"],
-            source_reference_terminal=str(run.private_root / "terminal.json"),
+            source_reference_terminal=final_record["terminal_path"],
             lineage_record_id=data.get("lineage_record_id"),
             lineage_audit=data.get("lineage_audit"),
-            attempts=[data],
-            error=data["error"],
+            attempts=[item["data"] for item in attempt_records],
+            continuations=max(0, len(attempt_records) - 1),
+            attempt_budget=max_correction_attempts,
+            correction_coordinator=str(root / "coordinator.json"),
+            error=data.get("error"),
         )
-        if not outcome.accepted:
+        if data.get("outcome") != "accepted":
             return result
+        coordinator.update(
+            status="accepted", accepted_attempt_id=final_record["attempt_id"]
+        )
+        _write_coordinator(root, coordinator)
         run.verify_candidate()
         route_evidence: Any = data.get("obligation_route_evidence")
         if story_validation_bundle is not None:
@@ -591,6 +869,15 @@ def dispatch_source_reference_task(
             return result
         _git(repo_root, "apply", "--binary", "-", data=patch)
         result.update(passed=True, changed_paths=list(changed))
+    except KeyboardInterrupt:
+        result.update(
+            status="cancelled",
+            error="Source correction was cancelled by the user.",
+            retryable=False,
+        )
+        if "coordinator" in locals():
+            coordinator.update(status="cancelled")
+            _write_coordinator(root, coordinator)
     except Exception as error:
         result["error"] = str(error)
         result["status"] = "failed"

@@ -837,9 +837,13 @@ def test_protected_source_dispatch_proves_story_before_patch_transfer(
     )
     if break_behavior:
         assert result["passed"] is False
-        assert result["source_reference_outcome"] == "validation_failed"
+        assert result["status"] == "no_progress"
+        assert result["source_reference_outcome"] == "submitted_without_progress"
+        assert len(result["attempts"]) == 2
+        assert result["attempts"][0]["outcome"] == "validation_failed"
         validation_statuses = {
-            item["profile"]: item["status"] for item in result["validation"]["results"]
+            item["profile"]: item["status"]
+            for item in result["attempts"][0]["validation"]["results"]
         }
         assert validation_statuses["structrr-references"] == "passed"
         assert validation_statuses["import-check"] == "passed"

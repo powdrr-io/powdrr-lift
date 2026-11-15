@@ -170,6 +170,7 @@ from powdrr_lift.workrr.action_operations import (
     _resolve_pre_step_template,
 )
 from powdrr_lift.workrr.coding_agent import (
+    DEFAULT_CODING_AGENT_RECOVERY_ATTEMPTS,
     DEFAULT_CODING_AGENT_TIMEOUT_SECONDS,
     DEFAULT_CODING_AGENT_VALIDATION_TIMEOUT_SECONDS,
     CodingAgentAttemptStore,
@@ -371,6 +372,7 @@ class WorkflowTaskAgentConfig:
     coding_agent_validation_timeout_seconds: float = (
         DEFAULT_CODING_AGENT_VALIDATION_TIMEOUT_SECONDS
     )
+    coding_agent_recovery_attempts: int = DEFAULT_CODING_AGENT_RECOVERY_ATTEMPTS
     allow_unmanaged_git: bool = False
     publish_workflow_progress: bool = True
     resume_locked_task: bool = False
@@ -3871,6 +3873,7 @@ class _TaskWorkflowExecutionStrategy:
                 model=self.config.minisweagent_model,
                 worker_timeout_seconds=self.config.coding_agent_timeout_seconds,
                 validation_timeout_seconds=self.config.coding_agent_validation_timeout_seconds,
+                max_correction_attempts=self.config.coding_agent_recovery_attempts,
                 review_client=self.client,
                 story_context=pinned_story_context,
                 story_validation_bundle=story_validation_bundle,

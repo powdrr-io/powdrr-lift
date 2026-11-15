@@ -1176,7 +1176,7 @@ def test_opencode_policy_is_noninteractive_and_denies_publication() -> None:
 
 def test_opencode_provider_defaults_to_five_minutes_of_inactivity() -> None:
     assert OpenCodeProvider().timeout_seconds == 300.0
-    assert OpenCodeProvider().absolute_timeout_seconds == 900.0
+    assert OpenCodeProvider().absolute_timeout_seconds is None
 
 
 def test_coding_agent_attempt_classification_distinguishes_partial_timeout() -> None:

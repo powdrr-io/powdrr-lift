@@ -1,6 +1,6 @@
 # Reliable planning and execution: implementation handoff
 
-Status: proposed; implementation has not started.
+Status: in progress; tasks 1–3 are merged and task 4 is in review preparation.
 
 Audited baseline: `f7c0becf`. Recheck each finding against latest `main` before
 implementing its task. This document specifies intended behavior; it does not
@@ -61,9 +61,9 @@ alone does not establish completion. Report blocked acceptance honestly.
 | Task | Deliverable | Depends on | Status |
 | --- | --- | --- | --- |
 | 1 | Shared terminal result and durable failure reporting | None | Complete (PR #1516) |
-| 2 | Faithful planning-to-worker contract compilation | None | In progress (PR #1518) |
-| 3 | Shared execution preparation and plan executability checks | 2 | Pending |
-| 4 | Controlled implementation correction and restart | 1, 3 | Pending |
+| 2 | Faithful planning-to-worker contract compilation | None | Complete (PR #1518) |
+| 3 | Shared execution preparation and plan executability checks | 2 | Complete (PR #1520) |
+| 4 | Controlled implementation correction and restart | 1, 3 | In progress (this PR) |
 | 5 | Verified candidate publication and safe preparation repair | 1, 4 | Pending |
 | 6 | Fulfillment-backed dependencies and readiness explanations | 1, 3 | Pending |
 | 7 | Validation inventory and evidence reuse | 3, 5 | Pending |

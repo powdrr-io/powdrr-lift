@@ -28,14 +28,16 @@ from powdrr_lift.workrr.feature_endpoint import (
 )
 from powdrr_lift.workrr.run_artifacts import write_json_artifact
 
-DEFAULT_FEATURE_TIMEOUT_SECONDS = 14_400
+DEFAULT_FEATURE_TIMEOUT_SECONDS: float | None = None
 
 
 class HeadlessFeatureTimeout(TimeoutError):
     """The overall wall-clock budget for a headless feature run expired."""
 
 
-def _start_overall_timeout(timeout_seconds: float) -> Any:
+def _start_overall_timeout(timeout_seconds: float | None) -> Any:
+    if timeout_seconds is None:
+        return None
     if not math.isfinite(timeout_seconds) or timeout_seconds <= 0:
         raise ValueError("timeout_seconds must be a finite positive number")
     if current_thread() is not main_thread():
@@ -77,7 +79,7 @@ class AgentFeatureTaskResult:
     report_markdown_path: Path
     pull_request_url: str | None = None
     error: str | None = None
-    timeout_seconds: float = DEFAULT_FEATURE_TIMEOUT_SECONDS
+    timeout_seconds: float | None = DEFAULT_FEATURE_TIMEOUT_SECONDS
     max_repair_attempts: int = 2
 
     def to_data(self) -> dict[str, Any]:
@@ -108,7 +110,7 @@ def run_agent_feature_task(
     run_id: str | None = None,
     output_root: Path | None = None,
     preflight: dict[str, Any] | None = None,
-    timeout_seconds: float = DEFAULT_FEATURE_TIMEOUT_SECONDS,
+    timeout_seconds: float | None = DEFAULT_FEATURE_TIMEOUT_SECONDS,
     runner: Any = subprocess.run,
 ) -> AgentFeatureTaskResult:
     """Prepare an isolated task tree, run feature gates, and publish on request."""

@@ -10,6 +10,7 @@ from typing import Any, Literal
 from powdrr_contracts.ci import (
     CIAnnotation,
     CIConclusion,
+    CIJobLogEvidence,
     CIJobObservation,
     CIObservation,
     CIObservationStatus,
@@ -31,9 +32,14 @@ def normalize_github_snapshot(
         raise ContractError("CI snapshot is missing the pull request head SHA")
     raw_jobs = snapshot.get("jobs_by_run")
     raw_annotations = snapshot.get("annotations_by_check_run", {})
-    if not isinstance(raw_jobs, Mapping) or not isinstance(raw_annotations, Mapping):
+    raw_logs = snapshot.get("logs_by_job", {})
+    if (
+        not isinstance(raw_jobs, Mapping)
+        or not isinstance(raw_annotations, Mapping)
+        or not isinstance(raw_logs, Mapping)
+    ):
         raise ContractError(
-            "CI snapshot job and annotation collections must be objects"
+            "CI snapshot job, annotation, and log collections must be objects"
         )
     normalized: list[CIJobObservation] = []
     for run_key in sorted(raw_jobs):
@@ -167,6 +173,11 @@ def normalize_github_snapshot(
                     if isinstance(steps, list)
                     else (),
                     annotations=tuple(annotations),
+                    log_evidence=(
+                        CIJobLogEvidence.from_dict(raw_logs[str(job_id)])
+                        if str(job_id) in raw_logs
+                        else None
+                    ),
                 )
             )
     return tuple(normalized)

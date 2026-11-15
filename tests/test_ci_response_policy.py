@@ -5,6 +5,7 @@ import hashlib
 import pytest
 from powdrr_contracts.ci import (
     CIAnnotation,
+    CIJobLogEvidence,
     CIJobObservation,
     CIObservation,
     CIRequiredCheck,
@@ -90,6 +91,16 @@ def test_observation_keeps_tested_sha_separate_from_pull_request_head() -> None:
                 "9": [{"id": 10, "status": "completed", "conclusion": "success"}]
             },
             "annotations_by_check_run": {},
+            "logs_by_job": {
+                "10": {
+                    "schema_version": 1,
+                    "status": "available",
+                    "excerpt": "error: assertion failed",
+                    "raw_sha256": hashlib.sha256(b"raw log").hexdigest(),
+                    "truncated": False,
+                    "reason": None,
+                }
+            },
         },
         repository="example/project",
         pull_request_number=270,
@@ -97,6 +108,22 @@ def test_observation_keeps_tested_sha_separate_from_pull_request_head() -> None:
 
     assert observation.head_sha == HEAD
     assert observation.jobs[0].tested_sha == tested_sha
+    assert observation.jobs[0].log_evidence == CIJobLogEvidence(
+        status="available",
+        excerpt="error: assertion failed",
+        raw_sha256=hashlib.sha256(b"raw log").hexdigest(),
+        truncated=False,
+    )
+    assert CIObservation.from_dict(observation.to_dict()) == observation
+
+
+def test_ci_job_log_contract_rejects_oversized_excerpts() -> None:
+    with pytest.raises(ContractError, match="size limit"):
+        CIJobLogEvidence(
+            status="available",
+            excerpt="x" * 4_001,
+            raw_sha256=hashlib.sha256(b"raw").hexdigest(),
+        )
 
 
 @pytest.mark.parametrize(

@@ -13,6 +13,7 @@ from powdrr_agent.execution.github_actions import (
     execute_pinned_local_command,
     observe_required_checks,
 )
+from powdrr_contracts.ci import MAX_CI_LOG_EXCERPT_BYTES
 
 HEAD = "6c85b1e5c334a113b3db274b2c1b7a8f350b9707"
 
@@ -25,6 +26,24 @@ def test_observation_fetches_annotations_even_when_runner_never_started() -> Non
     ) -> subprocess.CompletedProcess[str]:
         call = list(arguments)
         calls.append(call)
+        if call[1:3] == ["run", "view"]:
+            assert call[3:10] == [
+                "42107708170",
+                "--attempt",
+                "2",
+                "--job",
+                "127527360223",
+                "--log-failed",
+                "--repo",
+            ]
+            return subprocess.CompletedProcess(
+                call,
+                0,
+                'failure: password="example secret" '
+                "ghp_abcdefghijklmnopqrstuvwxyz1234567890 "
+                "github_pat_abcdefghijklmnopqrstuvwxyz1234567890\n",
+                "",
+            )
         endpoint = call[-1]
         payload: Any
         if call[1:3] == ["pr", "checks"]:
@@ -91,7 +110,50 @@ def test_observation_fetches_annotations_even_when_runner_never_started() -> Non
         {"name": "CI / unit", "state": "pass", "workflow": "CI"},
     )
     assert snapshot.required_checks_reason is None
+    assert snapshot.logs_by_job is not None
+    log = snapshot.logs_by_job["127527360223"]
+    assert log.status == "available"
+    assert log.excerpt is not None
+    assert "<redacted>" in log.excerpt
+    assert "example secret" not in log.excerpt
+    assert "ghp_" not in log.excerpt
+    assert "github_pat_" not in log.excerpt
+    assert log.raw_sha256 is not None
+    assert len(log.raw_sha256) == 64
     assert any("annotations?per_page=100" in item[-1] for item in calls)
+
+
+def test_failed_job_logs_can_be_explicitly_unavailable() -> None:
+    client = GitHubActionsClient(
+        "example/project",
+        run=lambda arguments, **_kwargs: subprocess.CompletedProcess(
+            arguments, 1, "", "Resource not accessible by integration"
+        ),
+    )
+
+    evidence = client._job_log_evidence(1, 2, 3)
+
+    assert evidence.status == "unavailable"
+    assert evidence.excerpt is None
+    assert evidence.raw_sha256 is None
+
+
+def test_failed_job_log_excerpt_is_size_limited_and_marked_truncated() -> None:
+    raw_log = "start of job log\n" + "x" * (MAX_CI_LOG_EXCERPT_BYTES + 100)
+    client = GitHubActionsClient(
+        "example/project",
+        run=lambda arguments, **_kwargs: subprocess.CompletedProcess(
+            arguments, 0, raw_log, ""
+        ),
+    )
+
+    evidence = client._job_log_evidence(1, 1, 1)
+
+    assert evidence.status == "available"
+    assert evidence.truncated is True
+    assert evidence.excerpt is not None
+    assert len(evidence.excerpt.encode("utf-8")) <= MAX_CI_LOG_EXCERPT_BYTES
+    assert evidence.excerpt.startswith("<log excerpt truncated>")
 
 
 def test_required_check_observations_use_current_head_and_preserve_unknowns() -> None:

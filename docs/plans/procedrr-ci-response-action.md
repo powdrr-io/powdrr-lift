@@ -2,10 +2,11 @@
 
 Status: implementation in progress. PR #1517 added the initial versioned CI
 observation and failure contracts. PR #1519 added exact-head required-check
-capture and conservative state assessment. This follow-up handles canceled
-checks without treating cancellation alone as a diagnosis. Durable waiting,
-bounded evidence collection, repair dispatch, and publication integration
-remain in the three-PR sequence below.
+capture and conservative state assessment. PR #1521 made cancellation
+assessment evidence-aware. This follow-up captures bounded, redacted failed-job
+logs with integrity metadata. Durable waiting, broader evidence collection,
+repair dispatch, and publication integration remain in the three-PR sequence
+below.
 
 ## Outcome
 
@@ -143,9 +144,11 @@ typed projection of prior evidence, not the entire workflow transcript.
    are investigable configuration failures, not endless waits.
 3. **Collect bounded evidence.** Fetch failing job metadata, annotations,
    relevant log spans, test reports, workflow YAML, referenced local scripts,
-   dependency lockfiles and runtime versions. Read pre-job annotations even
-   when steps and logs are empty. Paginate APIs completely or mark evidence
-   incomplete. Attach integrity and truncation indicators to every excerpt.
+   dependency lockfiles and runtime versions. Store only a bounded, redacted
+   failed-job log excerpt with its raw-content digest and truncation status; log
+   fetch failures are explicit. Read pre-job annotations even when steps and
+   logs are empty. Paginate APIs completely or mark evidence incomplete. Attach
+   integrity and truncation indicators to every excerpt.
 4. **Reproduce locally.** Execute the service-selected, authorized command at
    the immutable candidate/tested tree in an isolated clean worktree. Resolve
    workflow `working-directory`, shell, matrix, setup versions and environment.

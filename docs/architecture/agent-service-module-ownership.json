@@ -3905,7 +3905,7 @@
       "kind": "python_module",
       "owner": "agent",
       "path": "packages/agent/src/powdrr_agent/execution/github_actions.py",
-      "rationale": "authenticated GitHub Actions evidence and required-check transport with issue checkpoint publication",
+      "rationale": "authenticated GitHub Actions evidence, required-check and bounded log transport with issue checkpoint publication",
       "reviewed": false
     },
     {

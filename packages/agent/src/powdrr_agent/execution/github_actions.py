@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import subprocess
 import tempfile
 from collections.abc import Callable, Mapping, Sequence
@@ -12,6 +13,24 @@ from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
 from typing import Any
+
+from powdrr_contracts.ci import MAX_CI_LOG_EXCERPT_BYTES, CIJobLogEvidence
+
+_MAX_CI_LOG_JOBS = 2
+_ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
+_GITHUB_TOKEN_RE = re.compile(r"\bgh[pousr]_[A-Za-z0-9_]{20,}\b")
+_GITHUB_PAT_RE = re.compile(r"\bgithub_pat_[A-Za-z0-9_]{20,}\b", re.IGNORECASE)
+_BEARER_RE = re.compile(r"(?i)\bBearer\s+\S+")
+_SECRET_ASSIGNMENT_RE = re.compile(
+    r"(?i)\b(password|token|secret|api[_-]?key|client[_-]?secret)"
+    r"(\s*[=:]\s*)(\"[^\"]*\"|'[^']*'|[^\s,;]+)"
+)
+_AWS_ACCESS_KEY_RE = re.compile(r"\b(?:AKIA|ASIA)[A-Z0-9]{16}\b")
+_URL_CREDENTIAL_RE = re.compile(r"(?i)(https?://)[^/\s:@]+:[^/\s@]+@")
+_PRIVATE_KEY_RE = re.compile(
+    r"-----BEGIN [^-]*PRIVATE KEY-----.*?-----END [^-]*PRIVATE KEY-----",
+    re.DOTALL,
+)
 
 
 class GitHubActionsError(RuntimeError):
@@ -29,6 +48,7 @@ class GitHubActionsSnapshot:
     observed_at: str | None = None
     required_checks: tuple[Mapping[str, Any], ...] | None = None
     required_checks_reason: str | None = None
+    logs_by_job: Mapping[str, CIJobLogEvidence] | None = None
 
 
 class RemoteCheckObservationStatus(StrEnum):
@@ -260,6 +280,8 @@ class GitHubActionsClient:
         runs = tuple(item for item in raw_runs if item.get("head_sha") == head_sha)
         jobs_by_run: dict[str, tuple[Mapping[str, Any], ...]] = {}
         annotations: dict[str, tuple[Mapping[str, Any], ...]] = {}
+        logs_by_job: dict[str, CIJobLogEvidence] = {}
+        failing_jobs_seen = 0
         for workflow_run in runs:
             run_id = workflow_run.get("id")
             attempt = workflow_run.get("run_attempt", 1)
@@ -279,6 +301,21 @@ class GitHubActionsClient:
                 )
             jobs_by_run[str(run_id)] = tuple(raw_jobs)
             for job in raw_jobs:
+                job_id = job.get("id")
+                if (
+                    isinstance(job_id, int)
+                    and job.get("status") == "completed"
+                    and job.get("conclusion") in {"failure", "timed_out", "cancelled"}
+                ):
+                    failing_jobs_seen += 1
+                    logs_by_job[str(job_id)] = (
+                        self._job_log_evidence(run_id, attempt, job_id)
+                        if failing_jobs_seen <= _MAX_CI_LOG_JOBS
+                        else CIJobLogEvidence(
+                            status="unavailable",
+                            reason="failing-job log collection limit reached",
+                        )
+                    )
                 check_url = job.get("check_run_url")
                 if not isinstance(check_url, str):
                     continue
@@ -322,6 +359,54 @@ class GitHubActionsClient:
             observed_at=datetime.now(UTC).isoformat(),
             required_checks=required_checks,
             required_checks_reason=required_checks_reason,
+            logs_by_job=logs_by_job,
+        )
+
+    def _job_log_evidence(
+        self, run_id: int, attempt: int, job_id: int
+    ) -> CIJobLogEvidence:
+        try:
+            result = self._run(
+                [
+                    self.executable,
+                    "run",
+                    "view",
+                    str(run_id),
+                    "--attempt",
+                    str(attempt),
+                    "--job",
+                    str(job_id),
+                    "--log-failed",
+                    "--repo",
+                    self.repository,
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=120,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            return CIJobLogEvidence(
+                status="unavailable", reason="GitHub job logs could not be fetched"
+            )
+        if result.returncode != 0:
+            return CIJobLogEvidence(
+                status="unavailable", reason="GitHub job logs could not be fetched"
+            )
+        raw_log = result.stdout or ""
+        if not raw_log.strip():
+            return CIJobLogEvidence(
+                status="unavailable",
+                reason="GitHub returned no failed-step log content",
+            )
+        raw_bytes = raw_log.encode("utf-8")
+        raw_sha256 = hashlib.sha256(raw_bytes).hexdigest()
+        excerpt, truncated = _redacted_log_excerpt(raw_log)
+        return CIJobLogEvidence(
+            status="available",
+            excerpt=excerpt,
+            raw_sha256=raw_sha256,
+            truncated=truncated,
         )
 
     def _required_checks(
@@ -566,6 +651,34 @@ def _bounded_text(value: str, limit: int) -> str:
     if len(encoded) <= limit:
         return value
     return encoded[:limit].decode("utf-8", errors="replace") + "\n<output truncated>"
+
+
+def _redacted_log_excerpt(value: str) -> tuple[str, bool]:
+    raw = value.encode("utf-8")
+    truncated = len(raw) > MAX_CI_LOG_EXCERPT_BYTES
+    if truncated:
+        raw = raw[-MAX_CI_LOG_EXCERPT_BYTES:]
+    excerpt = raw.decode("utf-8", errors="replace")
+    excerpt = _ANSI_ESCAPE_RE.sub("", excerpt)
+    excerpt = _PRIVATE_KEY_RE.sub("<redacted private key>", excerpt)
+    excerpt = _URL_CREDENTIAL_RE.sub(r"\1<redacted>@", excerpt)
+    excerpt = _GITHUB_TOKEN_RE.sub("<redacted-token>", excerpt)
+    excerpt = _GITHUB_PAT_RE.sub("<redacted-token>", excerpt)
+    excerpt = _BEARER_RE.sub("Bearer <redacted>", excerpt)
+    excerpt = _AWS_ACCESS_KEY_RE.sub("<redacted-aws-key>", excerpt)
+    excerpt = _SECRET_ASSIGNMENT_RE.sub(r"\1\2<redacted>", excerpt)
+    encoded = excerpt.encode("utf-8")
+    if len(encoded) > MAX_CI_LOG_EXCERPT_BYTES:
+        encoded = encoded[-MAX_CI_LOG_EXCERPT_BYTES:]
+        excerpt = encoded.decode("utf-8", errors="replace")
+        truncated = True
+    if truncated:
+        marker = "<log excerpt truncated>\n"
+        marker_bytes = marker.encode("utf-8")
+        excerpt = marker + excerpt.encode("utf-8")[
+            -(MAX_CI_LOG_EXCERPT_BYTES - len(marker_bytes)) :
+        ].decode("utf-8", errors="replace")
+    return excerpt, truncated
 
 
 __all__ = [

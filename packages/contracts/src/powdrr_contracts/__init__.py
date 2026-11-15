@@ -3,6 +3,7 @@
 from powdrr_contracts.ci import (
     CIAnnotation,
     CIFailureUnit,
+    CIJobLogEvidence,
     CIJobObservation,
     CIObservation,
     CIRequiredCheck,
@@ -41,6 +42,7 @@ __all__ = [
     "ChatCompletionResponse",
     "CIAnnotation",
     "CIFailureUnit",
+    "CIJobLogEvidence",
     "CIJobObservation",
     "CIObservation",
     "CIRequiredCheck",

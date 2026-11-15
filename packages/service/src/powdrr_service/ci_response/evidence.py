@@ -80,7 +80,10 @@ def build_failure_units(
                         job,
                         phase,
                         signature,
-                        (f"annotation:{annotation.check_run_id}",),
+                        (
+                            f"annotation:{annotation.check_run_id}",
+                            *_log_evidence_reference(job),
+                        ),
                         not (runner_rejected and before_runner),
                     )
                 )
@@ -97,7 +100,13 @@ def build_failure_units(
             # accidentally match a generic word such as "pytest".
             signature = f"failed step: {normalize_failure_signature(name)}"
             units.append(
-                _failure_unit(job, "step_failure", signature, (f"step:{name}",), True)
+                _failure_unit(
+                    job,
+                    "step_failure",
+                    signature,
+                    (f"step:{name}", *_log_evidence_reference(job)),
+                    True,
+                )
             )
         if not step_failures:
             units.append(
@@ -105,11 +114,20 @@ def build_failure_units(
                     job,
                     "unknown_job_failure",
                     "job failed without step evidence",
-                    (f"job:{job.job_id}",),
+                    (f"job:{job.job_id}", *_log_evidence_reference(job)),
                     bool(job.steps),
                 )
             )
     return tuple(units)
+
+
+def _log_evidence_reference(job: CIJobObservation) -> tuple[str, ...]:
+    evidence = job.log_evidence
+    if evidence is None:
+        return ()
+    if evidence.status == "available":
+        return (f"job_log:{job.job_id}:sha256:{evidence.raw_sha256}",)
+    return (f"job_log_unavailable:{job.job_id}:{evidence.reason}",)
 
 
 def _failure_unit(

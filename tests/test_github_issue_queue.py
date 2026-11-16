@@ -2622,7 +2622,7 @@ def test_ci_repair_artifact_round_trips_through_issue_comments() -> None:
         "https://github.com/example/project/issues/123",
     )
     client = FakeIssueClient((issue,))
-    contract_id = "a" * 64
+    contract_id = "repair-" + "a" * 20
     record = {
         "contract_id": contract_id,
         "observation_id": "b" * 64,

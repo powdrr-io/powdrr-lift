@@ -77,6 +77,7 @@ _CI_REPAIR_POINTER_END = "<!-- powdrr-ci-repair-artifact-pointer:end -->"
 _CI_REPAIR_ARTIFACT_CHUNK_BYTES = 20 * 1024
 _CI_REPAIR_ARTIFACT_MAX_BYTES = 10 * 1024 * 1024
 _CI_REPAIR_ARTIFACT_MAX_COMMENT_PAGES = 8
+_CI_REPAIR_CONTRACT_ID_RE = re.compile(r"repair-[0-9a-f]{20}")
 _PLAN_REPAIR_PENDING_MARKER = "<!-- powdrr-plan-repair-pending:v1 -->"
 _PLAN_REPAIR_RECONCILED_MARKER = "<!-- powdrr-plan-repair-reconciled:v1 -->"
 _PLAN_REPAIR_RESOLVED_MARKER = "<!-- powdrr-plan-repair-resolved:v1 -->"
@@ -2466,7 +2467,7 @@ def _ci_repair_artifact_pointers(body: str) -> dict[str, str]:
     pointers = payload.get("contracts")
     if not isinstance(pointers, Mapping) or not all(
         isinstance(key, str)
-        and re.fullmatch(r"[0-9a-f]{64}", key)
+        and _CI_REPAIR_CONTRACT_ID_RE.fullmatch(key)
         and isinstance(value, str)
         and re.fullmatch(r"[0-9a-f]{64}", value)
         for key, value in pointers.items()
@@ -2546,7 +2547,7 @@ def _persist_ci_repair_artifact(
     record: Mapping[str, Any],
 ) -> None:
     """Store a bounded, integrity-checked CI repair continuation in issue comments."""
-    if not re.fullmatch(r"[0-9a-f]{64}", contract_id):
+    if _CI_REPAIR_CONTRACT_ID_RE.fullmatch(contract_id) is None:
         raise GitHubIssueQueueError("CI repair artifact contract ID is malformed")
     payload = {"schema": "ci-repair-continuation-v1", **dict(record)}
     if payload.get("contract_id") != contract_id:

@@ -1,0 +1,32 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1550
+title: Require concrete paths in planned work proposals
+intent:
+  problem: Work-unit proposals could copy brace notation from source prose into a planned-write path, causing valid path validation to block planning.
+  goal: Make proposal prompts require one normalized literal file path per planned write and expand source path shorthand into concrete paths.
+human-decisions: []
+structured_files: []
+files:
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span: {start_line: 1242, end_line: 1245}
+  summary: Tell work-unit planning to use concrete normalized repository-relative paths and expand brace notation.
+  rationale: Prevent source shorthand such as {a,b} from being proposed as a literal file path.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span: {start_line: 178, end_line: 181}
+  summary: Assert the work-unit prompt includes the concrete-path and brace-expansion instructions.
+  rationale: Keep future prompt edits from reintroducing invalid planned paths.
+entities: []
+entity_relationships: []
+invariants:
+- id: planned-write-paths-are-concrete
+  description: Each planned write names one concrete normalized repository-relative file path.
+  action: added
+- id: source-path-shorthand-is-expanded
+  description: Brace notation, globs, and path lists in source prose are expanded into literal planned paths rather than copied.
+  action: added
+guidance:
+- id: expand-brace-notation-in-work-unit-paths
+  description: Expand grouped source paths into separate concrete file writes; do not use braces or globs in planned paths.
+  action: added

@@ -1,6 +1,6 @@
 # Reliable planning and execution: implementation handoff
 
-Status: in progress; tasks 1–4 are merged and task 5 is in review preparation.
+Status: in progress; tasks 1–9 are merged and task 10 is in progress.
 
 Audited baseline: `f7c0becf`. Recheck each finding against latest `main` before
 implementing its task. This document specifies intended behavior; it does not
@@ -68,8 +68,8 @@ alone does not establish completion. Report blocked acceptance honestly.
 | 6 | Fulfillment-backed dependencies and readiness explanations | 1, 3 | Complete ([PR #1528](https://github.com/powdrr-io/powdrr-lift/pull/1528)) |
 | 7 | Validation inventory and evidence reuse | 3, 5 | Complete ([PR #1531](https://github.com/powdrr-io/powdrr-lift/pull/1531)) |
 | 8 | Complete run telemetry and mechanical-call removal | 1, 7 | Complete ([PR #1533](https://github.com/powdrr-io/powdrr-lift/pull/1533)) |
-| 9 | Recoverable claims and independent item concurrency | 4, 6 | In review ([PR #1535](https://github.com/powdrr-io/powdrr-lift/pull/1535)) |
-| 10 | Full deterministic planning/execution/recovery scenario | 1–9 | Pending |
+| 9 | Recoverable claims and independent item concurrency | 4, 6 | Complete ([PR #1535](https://github.com/powdrr-io/powdrr-lift/pull/1535)) |
+| 10 | Full deterministic planning/execution/recovery scenario | 1–9 | In progress |
 | 11 | Live Gaterr acceptance and measured report | 10 | Pending |
 
 ## 1. Return a typed result and publish exact failure evidence

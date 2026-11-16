@@ -1,0 +1,29 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1552
+title: Keep extensionless test fixtures runtime neutral when known to the repository
+intent:
+  problem: An extensionless planned test fixture still required runtime evidence when the repository path catalog included it without a runtime classification.
+  goal: Treat extensionless paths under fixture directories as runtime neutral for test writes, whether or not the path has a repository entry.
+human-decisions: []
+structured_files: []
+files:
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span: {start_line: 868, end_line: 868}
+  summary: Classify extensionless test fixture paths as runtime neutral even when the repository catalog contains the path.
+  rationale: Repository presence alone does not provide a programming runtime for extensionless fixture data.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span: {start_line: 350, end_line: 361}
+  summary: Cover an existing extensionless fixture path with no runtime fact.
+  rationale: Reproduce the planner blocker for fixture paths already represented in repository evidence.
+entities: []
+entity_relationships: []
+invariants:
+- id: extensionless-test-fixtures-do-not-require-runtime-evidence
+  description: Extensionless planned test writes under a fixtures directory are runtime neutral, including when the repository path catalog has no runtime classification for them.
+  action: added
+guidance:
+- id: do-not-infer-runtime-from-fixture-path-presence
+  description: Treat extensionless paths under fixtures as runtime-neutral test data when no language suffix determines a runtime.
+  action: added

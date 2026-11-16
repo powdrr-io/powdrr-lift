@@ -886,18 +886,10 @@ def build_extract_requirements_request(
     context_anchor_ids = pagination_candidates
     anchor_id = pagination_candidates[0] if pagination_candidates else None
     valid = {
-        "records": (
-            [
-                {
-                    "statement": "The block's independently checkable obligation.",
-                    "kind": "behavior",
-                    "source_refs": [anchor_id],
-                    "related_source_refs": [],
-                }
-            ]
-            if anchor_id is not None
-            else []
-        ),
+        # A positive example cannot be valid for every source block: some
+        # blocks are navigation or context and impose no obligation. Reuse the
+        # empty shape while retaining the correct pagination cursor.
+        "records": [],
         "has_more": len(pagination_candidates) > 1,
         "next_anchor": anchor_id if len(pagination_candidates) > 1 else None,
     }

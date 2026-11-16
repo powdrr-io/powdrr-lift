@@ -3083,6 +3083,10 @@ def test_ci_repair_dispatch_runs_contract_validations_and_acceptance(
         "head_sha": head_sha,
         "observation_id": contract.observation_id,
         "response_state": "failed",
+        "pull_request_metadata": {
+            "head_ref": "feature/example",
+            "head_repository": "example/project",
+        },
         "failures": [
             {
                 **failure.to_dict(),
@@ -3148,6 +3152,148 @@ def test_ci_repair_dispatch_runs_contract_validations_and_acceptance(
     assert result["dispatch_status"] == expected_status, result
     assert result["validation_status"] == "passed"
     assert result["acceptance"]["status"] == expected_status
+    if expected_status == "accepted":
+        bare_remote = tmp_path / "remote.git"
+        subprocess.run(
+            ["git", "clone", "--bare", str(repository), str(bare_remote)],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        subprocess.run(
+            [
+                "git",
+                "--git-dir",
+                str(bare_remote),
+                "update-ref",
+                "refs/heads/feature/example",
+                head_sha,
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        def route_test_remote(
+            command: Sequence[str], **kwargs: Any
+        ) -> subprocess.CompletedProcess[str]:
+            rewritten = list(command)
+            if len(rewritten) > 2 and rewritten[0:2] == ["git", "ls-remote"]:
+                rewritten[3] = str(bare_remote)
+            elif len(rewritten) > 2 and rewritten[0:2] == ["git", "push"]:
+                rewritten[3] = str(bare_remote)
+            return subprocess.run(rewritten, **kwargs)
+
+        publication = task_agent.publish_ci_repair_candidate(
+            contract,
+            observation_result,
+            result,
+            worktree_root=worker_root,
+            attempt_store=task_agent.CodingAgentAttemptStore(
+                worker_root.parent / "repair-attempts" / contract.contract_id
+            ),
+            git_runner=route_test_remote,
+        )
+        assert publication["publication_status"] == "published", publication
+        assert publication["already_published"] is False
+        remote_head = subprocess.run(
+            [
+                "git",
+                "--git-dir",
+                str(bare_remote),
+                "rev-parse",
+                "refs/heads/feature/example",
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+        assert remote_head == publication["head_sha"]
+        assert remote_head != head_sha
+
+        repeated = task_agent.publish_ci_repair_candidate(
+            contract,
+            observation_result,
+            result,
+            worktree_root=worker_root,
+            attempt_store=task_agent.CodingAgentAttemptStore(
+                worker_root.parent / "repair-attempts" / contract.contract_id
+            ),
+            git_runner=route_test_remote,
+        )
+        assert repeated["publication_status"] == "published", repeated
+        assert repeated["already_published"] is True
+
+        fork_observation = {
+            **observation_result,
+            "pull_request_metadata": {
+                "head_ref": "feature/example",
+                "head_repository": "contributor/project",
+            },
+        }
+        fork_publication = task_agent.publish_ci_repair_candidate(
+            contract,
+            fork_observation,
+            result,
+            worktree_root=worker_root,
+            attempt_store=task_agent.CodingAgentAttemptStore(
+                worker_root.parent / "repair-attempts" / contract.contract_id
+            ),
+            git_runner=route_test_remote,
+        )
+        assert fork_publication["publication_status"] == "blocked"
+        assert "fork branches" in fork_publication["reasons"][0]
+
+        subprocess.run(
+            ["git", "-C", str(repository), "commit", "--allow-empty", "-m", "moved"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        moved_head = subprocess.run(
+            ["git", "-C", str(repository), "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+        subprocess.run(
+            [
+                "git",
+                "--git-dir",
+                str(bare_remote),
+                "fetch",
+                str(repository),
+                moved_head,
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        subprocess.run(
+            [
+                "git",
+                "--git-dir",
+                str(bare_remote),
+                "update-ref",
+                "refs/heads/feature/example",
+                moved_head,
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        moved_publication = task_agent.publish_ci_repair_candidate(
+            contract,
+            observation_result,
+            result,
+            worktree_root=worker_root,
+            attempt_store=task_agent.CodingAgentAttemptStore(
+                worker_root.parent / "repair-attempts" / contract.contract_id
+            ),
+            git_runner=route_test_remote,
+        )
+        assert moved_publication["publication_status"] == "blocked"
+        assert "branch moved" in moved_publication["reasons"][0]
 
 
 def test_coding_agent_error_result_is_normalized_at_operation_boundary() -> None:

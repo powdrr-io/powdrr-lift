@@ -1,0 +1,145 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1542
+title: Publish accepted CI repair candidates safely
+intent:
+  problem: Accepted local CI repair candidates had no safe publication path or subsequent observation of checks on the new PR head.
+  goal: Revalidate accepted candidate evidence, fast-forward only the unchanged same-repository PR branch, and observe checks again after publication.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/plans/procedrr-ci-response-action.md
+  type: modified
+  span: {start_line: 35, end_line: 42}
+  summary: Record limited publication and exact-head re-observation while keeping workflow integration and continuation open.
+  rationale: Keep implementation status and remaining milestones aligned with delivered behavior.
+- path: docs/plans/procedrr-ci-response-action.md
+  type: modified
+  span: {start_line: 423, end_line: 431}
+  summary: Replace the original three-PR outline with the remaining integration and continuation milestone.
+  rationale: Avoid listing already delivered observation, research, repair, dispatch, and publication work as future work.
+- path: packages/service/src/powdrr_service/procedrr/parser.py
+  type: modified
+  span: {start_line: 36, end_line: 36}
+  summary: Register the CI repair publication operation in the Procedrr parser.
+  rationale: Allow process resources to invoke the bounded publication capability.
+- path: packages/service/src/powdrr_service/resources/processes/respond-to-pr-ci.yaml
+  type: modified
+  span: {start_line: 3, end_line: 3}
+  summary: Describe publication and re-observation for accepted repair candidates.
+  rationale: State the additional capability of the response procedure.
+- path: packages/service/src/powdrr_service/resources/processes/respond-to-pr-ci.yaml
+  type: modified
+  span: {start_line: 18, end_line: 20}
+  summary: Expose the publication result as a process output.
+  rationale: Return structured status for branch-head publication.
+- path: packages/service/src/powdrr_service/resources/processes/respond-to-pr-ci.yaml
+  type: modified
+  span: {start_line: 52, end_line: 89}
+  summary: Publish accepted repair candidates, re-observe the PR head, and route the new CI state.
+  rationale: Keep local acceptance, GitHub publication, and GitHub check success as distinct transitions.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 3199, end_line: 3204}
+  summary: Capture the repository that owns the observed PR head branch.
+  rationale: Let publication reject fork branches before attempting a push.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 3354, end_line: 3358}
+  summary: Include head repository identity in structured CI observation metadata.
+  rationale: Bind publication eligibility to the observed PR source repository.
+- path: src/powdrr_lift/workrr/ci_repair_publication.py
+  type: added
+  span: {start_line: 1, end_line: 351}
+  summary: Revalidate persisted candidate evidence, verify same-repository branch identity and base head, commit accepted paths, and make a normal fast-forward push.
+  rationale: Prevent stale, fork, modified, or out-of-scope candidates from being published while allowing safe idempotent continuation.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 183, end_line: 185}
+  summary: Import the guarded candidate publication capability.
+  rationale: Keep publication behind the task agent operation boundary.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 5215, end_line: 5257}
+  summary: Validate and execute Procedrr publication requests, returning blocked outcomes for malformed or unsafe publication inputs.
+  rationale: Expose publication as a bounded procedural operation with structured results.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 5666, end_line: 5687}
+  summary: Persist a versioned candidate manifest with path, fingerprint, protected-artifact, and validation evidence.
+  rationale: Make acceptance evidence available for independent revalidation at publication time.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 6348, end_line: 6348}
+  summary: Add CI repair publication to the task agent operation allowlist.
+  rationale: Permit the response process to use the new operation.
+- path: tests/test_ci_response_cli.py
+  type: modified
+  span: {start_line: 33, end_line: 37}
+  summary: Verify CI observation metadata includes the source repository and head branch.
+  rationale: Preserve the branch identity required by publication checks.
+- path: tests/test_ci_response_cli.py
+  type: modified
+  span: {start_line: 105, end_line: 105}
+  summary: Assert that the source repository identity is returned in CI observation metadata.
+  rationale: Cover the metadata used to distinguish same-repository PRs from forks.
+- path: tests/test_procedrr_chat.py
+  type: modified
+  span: {start_line: 152, end_line: 169}
+  summary: Verify accepted dispatch flows through publication and post-publication observation.
+  rationale: Guard the procedural ordering and terminal routing contract.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span: {start_line: 3086, end_line: 3089}
+  summary: Provide same-repository PR head metadata to the contract-bound dispatch test.
+  rationale: Supply the observed branch identity needed by the publication operation.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span: {start_line: 3155, end_line: 3296}
+  summary: Exercise accepted publication against a local bare remote, idempotent repeat, fork rejection, and rejection after the PR branch moves.
+  rationale: Verify publication safety without network access or force pushes.
+entities:
+- id: publish-ci-repair-candidate
+  type: Function
+  action: added
+- id: ci-repair-publication-operation
+  type: Internal API
+  action: added
+- id: respond-to-pr-ci-publication-flow
+  type: Workflow
+  action: added
+- id: assess-ci-repair-candidate
+  type: Function
+  action: modified
+- id: ci-repair-publication-tests
+  type: Unit test
+  action: added
+entity_relationships:
+- id: publication-revalidates-accepted-candidate
+  source: publish-ci-repair-candidate
+  target: assess-ci-repair-candidate
+  type: consumes
+- id: response-flow-publishes-before-reobserving
+  source: respond-to-pr-ci-publication-flow
+  target: ci-repair-publication-operation
+  type: invokes
+- id: publication-tests-cover-branch-safety
+  source: ci-repair-publication-tests
+  target: publish-ci-repair-candidate
+  type: verifies
+invariants:
+- id: ci-repair-publication-revalidates-persisted-evidence
+  description: Publication requires a matching accepted dispatch result and persisted attempt manifest whose paths, diff fingerprint, protected artifacts, and contracted validation receipts still pass service acceptance.
+  action: added
+- id: ci-repair-push-requires-unchanged-same-repository-head
+  description: Publication is blocked for fork branches, invalid branch references, mismatched origins, or a remote PR branch that no longer points to the contract head; pushes are normal fast-forward pushes without force.
+  action: added
+- id: ci-repair-publication-reobserves-github
+  description: A successful publication triggers a fresh CI observation; only that new observation determines whether the response process succeeds or blocks.
+  action: added
+- id: ci-repair-local-acceptance-is-not-github-success
+  description: Passing local repair validations and publishing the patch do not establish successful GitHub checks on the new PR head.
+  action: added
+guidance:
+- id: remaining-ci-response-work-is-durable-integration
+  description: Limited publication and exact-head re-observation are implemented; durable queue continuation, broader evidence collection, and automatic integration with implementation PR publication remain unfinished.
+  action: altered

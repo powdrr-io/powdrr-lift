@@ -180,6 +180,9 @@ from powdrr_lift.workrr.action_operations import (
     _list_worktree_files,
     _resolve_pre_step_template,
 )
+from powdrr_lift.workrr.ci_repair_publication import (
+    publish_ci_repair_candidate,
+)
 from powdrr_lift.workrr.coding_agent import (
     DEFAULT_CODING_AGENT_RECOVERY_ATTEMPTS,
     DEFAULT_CODING_AGENT_TIMEOUT_SECONDS,
@@ -5209,6 +5212,49 @@ class _TaskProcedrrOperations:
                     ),
                 }
             )
+        if operation == "ci_repair_publish":
+            raw_contract = parameters.get("repair_contract")
+            observation = parameters.get("observation_result")
+            candidate_result = parameters.get("candidate_result")
+            if (
+                not isinstance(raw_contract, Mapping)
+                or not isinstance(observation, Mapping)
+                or not isinstance(candidate_result, Mapping)
+            ):
+                return {
+                    "passed": False,
+                    "publication_status": "blocked",
+                    "reasons": ["publication inputs are malformed"],
+                }
+            try:
+                contract = RepairContract.from_dict(raw_contract)
+                root = (
+                    Path(tempfile.gettempdir())
+                    / "powdrr-lift-ci-response"
+                    / (
+                        f"{contract.repository.replace('/', '--')}-pr-"
+                        f"{contract.pull_request_number}-{contract.head_sha[:12]}"
+                    )
+                )
+                result = publish_ci_repair_candidate(
+                    contract,
+                    observation,
+                    candidate_result,
+                    worktree_root=root / "worktree",
+                    attempt_store=CodingAgentAttemptStore(
+                        root / "repair-attempts" / contract.contract_id
+                    ),
+                )
+            except (OSError, RuntimeError, ValueError) as error:
+                return {
+                    "passed": False,
+                    "publication_status": "blocked",
+                    "reasons": [str(error)[:1000]],
+                }
+            self.strategy.events.append(
+                {"kind": "ci_repair_publication", "result": result}
+            )
+            return result
         if operation == "procedrr_fragment_start":
             from powdrr_service.procedrr.fragments import start_fragment
 
@@ -5616,6 +5662,28 @@ class _TaskProcedrrOperations:
             protected_artifacts=protected_artifacts,
             diff_fingerprint=diff_fingerprint,
             validations=tuple(validations_by_command.values()),
+        )
+        manifest = {
+            "schema_version": "ci-repair-candidate-v1",
+            "contract_id": contract.contract_id,
+            "attempt_id": attempt.attempt_id,
+            "base_sha": contract.head_sha,
+            "worker_status": attempt.status.value,
+            "changed_paths": list(changed_paths),
+            "diff_fingerprint": diff_fingerprint,
+            "protected_artifacts": [item.to_dict() for item in protected_artifacts],
+            "validations": [
+                {
+                    "command": list(item.command),
+                    "status": item.status,
+                    "diff_fingerprint": item.diff_fingerprint,
+                }
+                for item in validations_by_command.values()
+            ],
+        }
+        (store_root / "candidate.json").write_text(
+            json.dumps(manifest, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
         )
         outcome = {
             "passed": acceptance.status == "accepted",
@@ -6277,6 +6345,7 @@ def run_workflow_task(
         operation_names = (
             "ci_observe",
             "ci_repair_dispatch",
+            "ci_repair_publish",
             "procedrr_fragment_start",
             "procedrr_fragment_apply_edit",
             "internal",

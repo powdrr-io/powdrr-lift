@@ -34,6 +34,7 @@ from powdrr_service.ci_response.research import (
     finalize_ci_research_assessment,
     prepare_ci_research_search,
 )
+from powdrr_service.ci_response.result import build_ci_response_result
 
 __all__ = [
     "CIResponseAssessment",
@@ -47,6 +48,7 @@ __all__ = [
     "bind_ci_research_assessments",
     "bind_ci_research_source_selections",
     "build_ci_research_plan",
+    "build_ci_response_result",
     "build_failure_units",
     "compare_local_reproduction",
     "compile_ci_repair_prompt",

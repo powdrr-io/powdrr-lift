@@ -3562,7 +3562,7 @@ def _ci_response_result_from_task_record(
         "unavailable",
     }:
         required_checks_status = "unavailable"
-    return {
+    normalized = {
         "schema_version": 1,
         "head_sha": head_sha,
         "observation_id": observation_id,
@@ -3572,6 +3572,31 @@ def _ci_response_result_from_task_record(
         "waited_seconds": waited_seconds,
         "wait_deadline_reached": result.get("wait_deadline_reached") is True,
     }
+    dispatch_status = result.get("repair_dispatch_status")
+    if isinstance(dispatch_status, str) and dispatch_status in {
+        "accepted",
+        "blocked",
+        "interrupted",
+        "not_requested",
+        "rejected",
+    }:
+        normalized["repair_dispatch_status"] = dispatch_status
+    publication_status = result.get("publication_status")
+    if isinstance(publication_status, str) and publication_status in {
+        "blocked",
+        "not_attempted",
+        "published",
+    }:
+        normalized["publication_status"] = publication_status
+    repair_reasons = _normalize_ci_response_reasons(result.get("repair_reasons"))
+    publication_reasons = _normalize_ci_response_reasons(
+        result.get("publication_reasons")
+    )
+    if repair_reasons:
+        normalized["repair_reasons"] = repair_reasons
+    if publication_reasons:
+        normalized["publication_reasons"] = publication_reasons
+    return normalized
 
 
 _CI_OUTCOME_MARKER = "<!-- powdrr-ci-outcome:v1 -->"
@@ -4279,7 +4304,7 @@ def _normalize_ci_response_for_checkpoint(
         checks_status = "unavailable"
     if not isinstance(waited_seconds, int) or waited_seconds < 0:
         waited_seconds = 0
-    return {
+    normalized = {
         "schema_version": 1,
         "head_sha": head_sha,
         "observation_id": observation_id,
@@ -4290,6 +4315,41 @@ def _normalize_ci_response_for_checkpoint(
         "wait_deadline_reached": result.get("wait_deadline_reached") is True,
         "matches_queue_head": head_sha == expected_head_sha,
     }
+    dispatch_status = result.get("repair_dispatch_status")
+    if isinstance(dispatch_status, str) and dispatch_status in {
+        "accepted",
+        "blocked",
+        "interrupted",
+        "not_requested",
+        "rejected",
+    }:
+        normalized["repair_dispatch_status"] = dispatch_status
+    publication_status = result.get("publication_status")
+    if isinstance(publication_status, str) and publication_status in {
+        "blocked",
+        "not_attempted",
+        "published",
+    }:
+        normalized["publication_status"] = publication_status
+    repair_reasons = _normalize_ci_response_reasons(result.get("repair_reasons"))
+    publication_reasons = _normalize_ci_response_reasons(
+        result.get("publication_reasons")
+    )
+    if repair_reasons:
+        normalized["repair_reasons"] = repair_reasons
+    if publication_reasons:
+        normalized["publication_reasons"] = publication_reasons
+    return normalized
+
+
+def _normalize_ci_response_reasons(value: object) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return [
+        " ".join(reason.split())[:240]
+        for reason in value[:8]
+        if isinstance(reason, str) and reason.strip()
+    ]
 
 
 def _ci_outcome_note(

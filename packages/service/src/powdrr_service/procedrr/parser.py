@@ -34,6 +34,7 @@ KNOWN_TOOLS = frozenset(
         "ci_observe",
         "ci_repair_dispatch",
         "ci_repair_publish",
+        "ci_response_finalize",
     }
 )
 KNOWN_VALIDATORS = frozenset({"json_schema"})

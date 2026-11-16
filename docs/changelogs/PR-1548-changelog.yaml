@@ -1,0 +1,204 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1548
+title: Preserve terminal CI repair outcomes in queue checkpoints
+intent:
+  problem: The CI response process returned only its observation, so repair dispatch and publication failures could be lost before the issue queue checkpointed the result.
+  goal: Return a bounded combined terminal result from every response path and preserve its repair and publication status and reasons in the durable issue outcome checkpoint.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/plans/procedrr-ci-response-action.md
+  type: modified
+  span: {start_line: 44, end_line: 59}
+  summary: Record cross-host continuation as implemented and clarify that human-prerequisite continuation and broader evidence collection remain.
+  rationale: Keep the plan status aligned with merged work and this terminal-outcome slice.
+- path: packages/service/src/powdrr_service/ci_response/result.py
+  type: added
+  span: {start_line: 1, end_line: 125}
+  summary: Build a bounded terminal response from the latest observation and optional repair and publication outcomes.
+  rationale: Preserve the observation identity while surfacing blocked dispatch or publication reasons to downstream queue handling.
+- path: packages/service/src/powdrr_service/ci_response/__init__.py
+  type: modified
+  span: {start_line: 37, end_line: 37}
+  summary: Import the CI response result builder into the service package.
+  rationale: Make the service-owned result builder available to the Procedrr operation adapter.
+- path: packages/service/src/powdrr_service/ci_response/__init__.py
+  type: modified
+  span: {start_line: 51, end_line: 51}
+  summary: Export the CI response result builder from the service package.
+  rationale: Make the service-owned result builder available to the Procedrr operation adapter.
+- path: packages/service/src/powdrr_service/procedrr/parser.py
+  type: modified
+  span: {start_line: 37, end_line: 37}
+  summary: Register the CI response finalization operation as a supported process tool.
+  rationale: Allow the response process to invoke the service-owned finalizer.
+- path: packages/service/src/powdrr_service/resources/processes/respond-to-pr-ci.yaml
+  type: modified
+  span: {start_line: 12, end_line: 12}
+  summary: Replace intermediate process outputs with one combined terminal response result.
+  rationale: Keep the child process output contract focused on the result consumed by the parent workflow.
+- path: packages/service/src/powdrr_service/resources/processes/respond-to-pr-ci.yaml
+  type: modified
+  span: {start_line: 30, end_line: 35}
+  summary: Finalize awaiting-review outcomes before successful termination.
+  rationale: Ensure every terminal path produces the declared output.
+- path: packages/service/src/powdrr_service/resources/processes/respond-to-pr-ci.yaml
+  type: modified
+  span: {start_line: 38, end_line: 43}
+  summary: Finalize awaiting-CI outcomes before successful termination.
+  rationale: Ensure every terminal path produces the declared output.
+- path: packages/service/src/powdrr_service/resources/processes/respond-to-pr-ci.yaml
+  type: modified
+  span: {start_line: 79, end_line: 87}
+  summary: Finalize the latest observation with repair and publication outcomes after re-observation.
+  rationale: Preserve full outcome context after publishing a repair.
+- path: packages/service/src/powdrr_service/resources/processes/respond-to-pr-ci.yaml
+  type: modified
+  span: {start_line: 89, end_line: 97}
+  summary: Finalize and persist blocked publication outcomes.
+  rationale: Preserve publication reasons without losing the observed head identity.
+- path: packages/service/src/powdrr_service/resources/processes/respond-to-pr-ci.yaml
+  type: modified
+  span: {start_line: 99, end_line: 107}
+  summary: Finalize unrecognized publication states as structured outcomes.
+  rationale: Ensure every publication branch binds a stable result.
+- path: packages/service/src/powdrr_service/resources/processes/respond-to-pr-ci.yaml
+  type: modified
+  span: {start_line: 109, end_line: 115}
+  summary: Finalize a repair that was not requested.
+  rationale: Keep no-repair outcomes explicit in the response result.
+- path: packages/service/src/powdrr_service/resources/processes/respond-to-pr-ci.yaml
+  type: modified
+  span: {start_line: 118, end_line: 125}
+  summary: Finalize rejected repair dispatch results.
+  rationale: Persist dispatch status and bounded reasons for operator review.
+- path: packages/service/src/powdrr_service/resources/processes/respond-to-pr-ci.yaml
+  type: modified
+  span: {start_line: 127, end_line: 134}
+  summary: Finalize other repair dispatch outcomes.
+  rationale: Ensure unexpected dispatch status still produces a structured result.
+- path: packages/service/src/powdrr_service/resources/processes/respond-to-pr-ci.yaml
+  type: modified
+  span: {start_line: 136, end_line: 141}
+  summary: Finalize blocked observations.
+  rationale: Return a stable result for queue-side state assessment.
+- path: packages/service/src/powdrr_service/resources/processes/respond-to-pr-ci.yaml
+  type: modified
+  span: {start_line: 144, end_line: 150}
+  summary: Finalize fallback observation outcomes.
+  rationale: Bind the declared process output on every terminal path.
+- path: packages/service/src/powdrr_service/resources/processes/execute-proposed-pr-workflow.yaml
+  type: modified
+  span: {start_line: 44, end_line: 44}
+  summary: Map the response process's combined result into the successful implementation task output.
+  rationale: Keep terminal repair and publication details available to the issue queue.
+- path: packages/service/src/powdrr_service/resources/processes/execute-proposed-pr-workflow.yaml
+  type: modified
+  span: {start_line: 98, end_line: 98}
+  summary: Map the response process's combined result after a plan-amendment PR.
+  rationale: Preserve the same outcome contract for both task branches.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 50, end_line: 50}
+  summary: Import the service-owned CI response result builder.
+  rationale: Use service policy for normalization and terminal-state selection.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 5444, end_line: 5471}
+  summary: Implement the finalization operation with input validation and a structured result event.
+  rationale: Bind the process result through the existing task execution boundary.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 6730, end_line: 6730}
+  summary: Include the finalization operation in the task operation registry.
+  rationale: Make the declared process operation executable.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 3565, end_line: 3565}
+  summary: Build a normalized response object before adding terminal action fields.
+  rationale: Keep the observed CI state and identity as the basis for structured queue state.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 3575, end_line: 3599}
+  summary: Preserve validated dispatch and publication states and bounded reasons when reading task output.
+  rationale: Retain terminal repair details for the queue's structured outcome.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 4307, end_line: 4307}
+  summary: Build a normalized queue response object before preserving terminal action fields.
+  rationale: Keep queue checkpoint normalization explicit and bounded.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 4318, end_line: 4352}
+  summary: Preserve bounded repair and publication details when normalizing the durable queue checkpoint.
+  rationale: Keep operator-visible reasons while limiting comment payload size.
+- path: tests/test_ci_response_result.py
+  type: added
+  span: {start_line: 1, end_line: 78}
+  summary: Cover successful publication, blocked publication, interrupted dispatch, no repair request, and invalid observations.
+  rationale: Verify terminal response mapping and input validation.
+- path: tests/test_github_issue_queue.py
+  type: modified
+  span: {start_line: 2729, end_line: 2732}
+  summary: Add dispatch and publication outcomes to the task result fixture.
+  rationale: Exercise persistence of terminal action fields at the queue boundary.
+- path: tests/test_github_issue_queue.py
+  type: modified
+  span: {start_line: 2760, end_line: 2764}
+  summary: Assert dispatch status, reason, and publication status survive into the issue outcome checkpoint.
+  rationale: Verify durable queue serialization of the newly exposed fields.
+- path: tests/test_procedrr_chat.py
+  type: modified
+  span: {start_line: 164, end_line: 165}
+  summary: Assert the post-publication observation is finalized.
+  rationale: Verify that the latest observation binds the terminal process output.
+- path: tests/test_procedrr_chat.py
+  type: modified
+  span: {start_line: 167, end_line: 179}
+  summary: Assert blocked and alternate dispatch outcomes finalize the combined result.
+  rationale: Cover terminal result binding across repair branches.
+- path: tests/test_procedrr_chat.py
+  type: modified
+  span: {start_line: 198, end_line: 198}
+  summary: Assert the parent workflow maps the combined child output.
+  rationale: Verify the task result reaches queue persistence.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span: {start_line: 537, end_line: 537}
+  summary: Declare the combined response result in the evaluator child-process fixture.
+  rationale: Align the fixture contract with the production child process.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span: {start_line: 547, end_line: 547}
+  summary: Bind the evaluator fixture's combined result output.
+  rationale: Keep end-to-end task workflow evaluation valid.
+entities:
+- id: build-ci-response-result
+  type: Function
+  action: added
+- id: ci-response-finalize-operation
+  type: Tool
+  action: added
+- id: ci-response-terminal-outcome-tests
+  type: Unit test
+  action: added
+entity_relationships:
+- id: finalizer-builds-response-result
+  source: ci-response-finalize-operation
+  target: build-ci-response-result
+  type: invokes
+- id: queue-test-verifies-terminal-fields
+  source: ci-response-terminal-outcome-tests
+  target: ci-response-finalize-operation
+  type: verifies
+invariants:
+- id: ci-response-terminal-result-keeps-current-observation
+  description: A terminal response retains the head SHA and observation ID of the latest observation while reporting repair and publication outcomes separately.
+  action: added
+- id: ci-response-terminal-reasons-are-bounded
+  description: Queue checkpoints accept only known dispatch and publication states and at most eight normalized reasons of 240 characters each.
+  action: added
+guidance:
+- id: ci-response-plan-remains-open
+  description: Durable human-prerequisite continuation and broader evidence collection remain; publication is limited to accepted candidates on the existing same-repository PR branch.
+  action: added

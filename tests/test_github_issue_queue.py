@@ -2726,6 +2726,10 @@ def test_worker_persists_ci_response_result_but_uses_fresh_queue_observation(
                     "required_checks_status": "available",
                     "waited_seconds": 20,
                     "wait_deadline_reached": False,
+                    "repair_dispatch_status": "rejected",
+                    "repair_reasons": ["candidate changed a protected workflow"],
+                    "publication_status": "not_attempted",
+                    "publication_reasons": [],
                 },
             },
             "b" * 40,
@@ -2753,6 +2757,11 @@ def test_worker_persists_ci_response_result_but_uses_fresh_queue_observation(
     assert payload["outcome"] == "awaiting_ci"
     assert payload["ci_response_result"]["response_state"] == "awaiting_review"
     assert payload["ci_response_result"]["matches_queue_head"] is True
+    assert payload["ci_response_result"]["repair_dispatch_status"] == "rejected"
+    assert payload["ci_response_result"]["repair_reasons"] == [
+        "candidate changed a protected workflow"
+    ]
+    assert payload["ci_response_result"]["publication_status"] == "not_attempted"
 
 
 def test_continue_awaiting_ci_rechecks_current_head_and_records_result(

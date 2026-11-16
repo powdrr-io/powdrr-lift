@@ -9,13 +9,7 @@ inputs:
   - {name: repair_contract, schema: {type: [object, "null"]}, required: false, default: null}
   - {name: accepted_research_claims, type: array, required: false, default: []}
 outputs:
-  ci_observation_result:
-    type: object
-    additionalProperties: true
-  ci_repair_result:
-    type: object
-    additionalProperties: true
-  ci_publication_result:
+  ci_response_result:
     type: object
     additionalProperties: true
 limits: {llm_activations: 1, tool_calls: 32, context_chars: 12000, context_value_chars: 5000}
@@ -33,8 +27,20 @@ steps:
       subject: ci_observation_result.response_state
       cases:
         awaiting_review:
+          - operation:
+              tool: ci_response_finalize
+              parameters:
+                observation_result: {type: reference, value: ci_observation_result}
+              returns: {type: object, additionalProperties: true}
+              bind: ci_response_result
           - terminal: succeeded
         awaiting_ci:
+          - operation:
+              tool: ci_response_finalize
+              parameters:
+                observation_result: {type: reference, value: ci_observation_result}
+              returns: {type: object, additionalProperties: true}
+              bind: ci_response_result
           - terminal: succeeded
         failed:
           - operation:
@@ -70,30 +76,75 @@ steps:
                                 verification_command: {type: reference, value: verification_command}
                               returns: {type: object, additionalProperties: true}
                               bind: ci_observation_result
-                          - branch:
-                              subject: ci_observation_result.response_state
-                              cases:
-                                awaiting_review:
-                                  - terminal: succeeded
-                                awaiting_ci:
-                                  - terminal: succeeded
-                                failed:
-                                  - terminal: blocked
-                                blocked:
-                                  - terminal: blocked
-                              default:
-                                - terminal: blocked
+                          - operation:
+                              tool: ci_response_finalize
+                              parameters:
+                                observation_result: {type: reference, value: ci_observation_result}
+                                repair_result: {type: reference, value: ci_repair_result}
+                                publication_result: {type: reference, value: ci_publication_result}
+                              returns: {type: object, additionalProperties: true}
+                              bind: ci_response_result
+                          - terminal: succeeded
                         blocked:
-                          - terminal: blocked
+                          - operation:
+                              tool: ci_response_finalize
+                              parameters:
+                                observation_result: {type: reference, value: ci_observation_result}
+                                repair_result: {type: reference, value: ci_repair_result}
+                                publication_result: {type: reference, value: ci_publication_result}
+                              returns: {type: object, additionalProperties: true}
+                              bind: ci_response_result
+                          - terminal: succeeded
                       default:
-                        - terminal: blocked
+                        - operation:
+                            tool: ci_response_finalize
+                            parameters:
+                              observation_result: {type: reference, value: ci_observation_result}
+                              repair_result: {type: reference, value: ci_repair_result}
+                              publication_result: {type: reference, value: ci_publication_result}
+                            returns: {type: object, additionalProperties: true}
+                            bind: ci_response_result
+                        - terminal: succeeded
                 not_requested:
+                  - operation:
+                      tool: ci_response_finalize
+                      parameters:
+                        observation_result: {type: reference, value: ci_observation_result}
+                        repair_result: {type: reference, value: ci_repair_result}
+                      returns: {type: object, additionalProperties: true}
+                      bind: ci_response_result
                   - terminal: succeeded
                 rejected:
-                  - terminal: blocked
+                  - operation:
+                      tool: ci_response_finalize
+                      parameters:
+                        observation_result: {type: reference, value: ci_observation_result}
+                        repair_result: {type: reference, value: ci_repair_result}
+                      returns: {type: object, additionalProperties: true}
+                      bind: ci_response_result
+                  - terminal: succeeded
               default:
-                - terminal: blocked
+                - operation:
+                    tool: ci_response_finalize
+                    parameters:
+                      observation_result: {type: reference, value: ci_observation_result}
+                      repair_result: {type: reference, value: ci_repair_result}
+                    returns: {type: object, additionalProperties: true}
+                    bind: ci_response_result
+                - terminal: succeeded
         blocked:
+          - operation:
+              tool: ci_response_finalize
+              parameters:
+                observation_result: {type: reference, value: ci_observation_result}
+              returns: {type: object, additionalProperties: true}
+              bind: ci_response_result
           - terminal: succeeded
       default:
-        - terminal: blocked
+        - operation:
+            tool: ci_response_finalize
+            parameters:
+              observation_result: {type: reference, value: ci_observation_result}
+            returns: {type: object, additionalProperties: true}
+            bind: ci_response_result
+        - terminal: succeeded

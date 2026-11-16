@@ -534,7 +534,7 @@ inputs:
   - {name: pull_request_url, type: string, required: true}
   - {name: verification_command, type: string, required: true}
 outputs:
-  ci_observation_result: {type: object}
+  ci_response_result: {type: object}
 steps:
   - operation:
       tool: internal
@@ -544,7 +544,7 @@ steps:
         issue_number: "${issue_number}"
         pull_request_url: "${pull_request_url}"
         verification_command: "${verification_command}"
-      bind: ci_observation_result
+      bind: ci_response_result
   - terminal: succeeded
 """,
         encoding="utf-8",

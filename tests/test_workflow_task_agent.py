@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import shutil
 import subprocess
 import sys
 from collections.abc import Mapping, Sequence
@@ -3124,6 +3125,19 @@ def test_ci_repair_dispatch_runs_contract_validations_and_acceptance(
     monkeypatch.setattr(
         task_agent, "create_miniswe_inference_handler", lambda _timeout: object()
     )
+    durable_artifacts: dict[str, Mapping[str, Any]] = {}
+
+    def checkpoint_callback(*_args: Any, **_kwargs: Any) -> None:
+        return None
+
+    checkpoint_callback.persist_ci_repair_artifact = (  # type: ignore[attr-defined]
+        lambda contract_id, record: durable_artifacts.__setitem__(
+            contract_id, dict(record)
+        )
+    )
+    checkpoint_callback.load_ci_repair_artifact = (  # type: ignore[attr-defined]
+        lambda contract_id: durable_artifacts.get(contract_id)
+    )
     strategy: Any = SimpleNamespace(
         workflow=SimpleNamespace(),
         task=SimpleNamespace(task_id="task-001", process_checkpoint=None),
@@ -3135,6 +3149,7 @@ def test_ci_repair_dispatch_runs_contract_validations_and_acceptance(
             minisweagent_model=None,
             coding_agent_timeout_seconds=30,
             coding_agent_validation_timeout_seconds=30,
+            task_checkpoint_callback=checkpoint_callback,
         ),
         events=[],
     )
@@ -3156,6 +3171,23 @@ def test_ci_repair_dispatch_runs_contract_validations_and_acceptance(
     assert result["dispatch_status"] == expected_status, result
     assert result["validation_status"] == "passed"
     assert result["acceptance"]["status"] == expected_status
+    if expected_status == "accepted":
+        assert durable_artifacts[contract.contract_id]["phase"] == "completed"
+        subprocess.run(
+            ["git", "reset", "--hard", head_sha],
+            cwd=worker_root,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        subprocess.run(
+            ["git", "clean", "-fd"],
+            cwd=worker_root,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        shutil.rmtree(worker_root.parent / "repair-attempts" / contract.contract_id)
     resumed = operations.execute(
         "ci_repair_dispatch",
         {

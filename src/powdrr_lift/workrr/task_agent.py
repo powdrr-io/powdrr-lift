@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import base64
 import hashlib
 import json
 import os
@@ -5131,6 +5132,177 @@ def _write_ci_repair_json(path: Path, value: Mapping[str, Any]) -> None:
         temporary.unlink(missing_ok=True)
 
 
+def _ci_repair_portable_files(root: Path, paths: Sequence[str]) -> list[dict[str, Any]]:
+    files: list[dict[str, Any]] = []
+    for relative in sorted(set(paths)):
+        path = PurePosixPath(relative)
+        if path.is_absolute() or ".." in path.parts or "\\" in relative:
+            raise PowdrrExecutionError("CI repair artifact contains an unsafe path")
+        target = root.joinpath(*path.parts)
+        if target.is_symlink():
+            raise PowdrrExecutionError("CI repair artifact cannot contain symlinks")
+        if not target.exists():
+            files.append({"path": relative, "deleted": True})
+            continue
+        if not target.is_file():
+            raise PowdrrExecutionError("CI repair artifact path is not a regular file")
+        data = target.read_bytes()
+        files.append(
+            {
+                "path": relative,
+                "deleted": False,
+                "executable": bool(target.stat().st_mode & 0o111),
+                "sha256": hashlib.sha256(data).hexdigest(),
+                "content_base64": base64.b64encode(data).decode("ascii"),
+            }
+        )
+    return files
+
+
+def _restore_ci_repair_portable_artifact(
+    record: Mapping[str, Any],
+    *,
+    contract: RepairContract,
+    worker_root: Path,
+    attempt_store: CodingAgentAttemptStore,
+    dispatch_path: Path,
+) -> None:
+    """Restore a verified candidate bundle from the durable issue checkpoint."""
+    if (
+        record.get("phase") != "completed"
+        or record.get("observation_id") != contract.observation_id
+        or record.get("attempt_id") != f"{contract.contract_id}-dispatch"
+    ):
+        raise PowdrrExecutionError("durable CI repair artifact does not match contract")
+    base = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=worker_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if base.returncode or base.stdout.strip() != contract.head_sha:
+        raise PowdrrExecutionError(
+            "CI repair worktree is not at the contract head: "
+            f"expected {contract.head_sha}, got {base.stdout.strip()}"
+        )
+    status = subprocess.run(
+        ["git", "status", "--porcelain"],
+        cwd=worker_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if status.returncode or status.stdout.strip():
+        raise PowdrrExecutionError(
+            "CI repair worktree must be clean before restore: "
+            f"{status.stdout.strip() or status.stderr.strip()}"
+        )
+    raw_files = record.get("files")
+    raw_attempt = record.get("attempt")
+    manifest = record.get("candidate_manifest")
+    if (
+        not isinstance(raw_files, list)
+        or not isinstance(raw_attempt, Mapping)
+        or not isinstance(manifest, Mapping)
+    ):
+        raise PowdrrExecutionError("durable CI repair artifact is malformed")
+    manifest_paths = manifest.get("changed_paths")
+    if not isinstance(manifest_paths, list) or not all(
+        isinstance(path, str) for path in manifest_paths
+    ):
+        raise PowdrrExecutionError("durable CI repair paths are malformed")
+    allowed = set(manifest_paths)
+    if (
+        manifest.get("schema_version") != "ci-repair-candidate-v1"
+        or manifest.get("contract_id") != contract.contract_id
+        or manifest.get("base_sha") != contract.head_sha
+        or len(allowed) != len(manifest_paths)
+    ):
+        raise PowdrrExecutionError("durable CI repair manifest does not match contract")
+    if any(
+        not any(
+            scope == "."
+            or relative == scope
+            or relative.startswith(scope.rstrip("/") + "/")
+            for scope in contract.allowed_paths
+        )
+        or relative in {item.path for item in contract.protected_artifacts}
+        for relative in allowed
+    ):
+        raise PowdrrExecutionError("durable CI repair paths exceed the contract")
+    attempt_paths = raw_attempt.get("changed_paths")
+    if (
+        raw_attempt.get("request_id") != contract.contract_id
+        or raw_attempt.get("provider") != "minisweagent"
+        or raw_attempt.get("status") != "completed"
+        or not isinstance(attempt_paths, list)
+        or not all(isinstance(path, str) for path in attempt_paths)
+        or set(attempt_paths) != allowed
+        or len(attempt_paths) != len(allowed)
+    ):
+        raise PowdrrExecutionError("durable CI repair attempt does not match manifest")
+    restored: set[str] = set()
+    for item in raw_files:
+        if not isinstance(item, Mapping):
+            raise PowdrrExecutionError("durable CI repair file record is malformed")
+        relative = item.get("path")
+        if not isinstance(relative, str) or relative not in allowed:
+            raise PowdrrExecutionError("durable CI repair file path is unexpected")
+        pure = PurePosixPath(relative)
+        if pure.is_absolute() or ".." in pure.parts or "\\" in relative:
+            raise PowdrrExecutionError("durable CI repair file path is unsafe")
+        target = worker_root.joinpath(*pure.parts)
+        if target.is_symlink():
+            raise PowdrrExecutionError("durable CI repair target is a symlink")
+        parent = worker_root
+        for part in pure.parts[:-1]:
+            parent = parent / part
+            if parent.is_symlink():
+                raise PowdrrExecutionError("durable CI repair path crosses a symlink")
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if item.get("deleted") is True:
+            target.unlink(missing_ok=True)
+        else:
+            encoded = item.get("content_base64")
+            expected_hash = item.get("sha256")
+            if not isinstance(encoded, str) or not isinstance(expected_hash, str):
+                raise PowdrrExecutionError(
+                    "durable CI repair file content is malformed"
+                )
+            try:
+                content = base64.b64decode(encoded, validate=True)
+            except ValueError as error:
+                raise PowdrrExecutionError(
+                    "durable CI repair file encoding is invalid"
+                ) from error
+            if hashlib.sha256(content).hexdigest() != expected_hash:
+                raise PowdrrExecutionError("durable CI repair file hash does not match")
+            target.write_bytes(content)
+            target.chmod(0o755 if item.get("executable") is True else 0o644)
+        restored.add(relative)
+    if restored != allowed or len(restored) != len(raw_files):
+        raise PowdrrExecutionError("durable CI repair artifact is incomplete")
+    if raw_attempt.get("attempt_id") != f"{contract.contract_id}-dispatch":
+        raise PowdrrExecutionError("durable CI repair attempt ID does not match")
+    _write_ci_repair_json(
+        attempt_store.attempts_root / f"{contract.contract_id}-dispatch.json",
+        raw_attempt,
+    )
+    _write_ci_repair_json(attempt_store.root / "candidate.json", manifest)
+    _write_ci_repair_json(
+        dispatch_path,
+        {
+            "schema_version": "ci-repair-dispatch-v1",
+            "contract_id": contract.contract_id,
+            "observation_id": contract.observation_id,
+            "attempt_id": f"{contract.contract_id}-dispatch",
+            "phase": "completed",
+            "dispatch_status": record.get("dispatch_status"),
+        },
+    )
+
+
 class _TaskProcedrrOperations:
     """Expose only this claimed task's authorized Workrr operations."""
 
@@ -5532,6 +5704,22 @@ class _TaskProcedrrOperations:
         attempt_id = f"{contract.contract_id}-dispatch"
         attempt_path = attempt_store.attempts_root / f"{attempt_id}.json"
         dispatch_path = store_root / "dispatch.json"
+        checkpoint_callback = getattr(
+            self.strategy.config, "task_checkpoint_callback", None
+        )
+        persist_artifact = (
+            getattr(checkpoint_callback, "persist_ci_repair_artifact", None)
+            if checkpoint_callback is not None
+            else None
+        )
+        load_artifact = (
+            getattr(checkpoint_callback, "load_ci_repair_artifact", None)
+            if checkpoint_callback is not None
+            else None
+        )
+        remote_artifact = (
+            load_artifact(contract.contract_id) if callable(load_artifact) else None
+        )
         prior_attempt = None
         if attempt_path.is_file():
             try:
@@ -5546,6 +5734,36 @@ class _TaskProcedrrOperations:
             ):
                 raise PowdrrExecutionError(
                     "saved CI repair attempt does not match the contract request"
+                )
+        elif isinstance(remote_artifact, Mapping) and not dispatch_path.is_file():
+            if remote_artifact.get("phase") == "invoking":
+                return {
+                    "passed": False,
+                    "dispatch_status": "interrupted",
+                    "attempt_id": attempt_id,
+                    "attempt_status": "interrupted",
+                    "reasons": [
+                        "a durable MiniSWE invocation receipt exists without a "
+                        "saved result; automatic redispatch is blocked"
+                    ],
+                }
+            if remote_artifact.get("phase") == "completed":
+                try:
+                    _restore_ci_repair_portable_artifact(
+                        remote_artifact,
+                        contract=contract,
+                        worker_root=worker_root,
+                        attempt_store=attempt_store,
+                        dispatch_path=dispatch_path,
+                    )
+                    prior_attempt = attempt_store.load_attempt(attempt_id)
+                except (OSError, ValueError, PowdrrExecutionError) as error:
+                    raise PowdrrExecutionError(
+                        f"saved cross-host CI repair artifact is invalid: {error}"
+                    ) from error
+            else:
+                raise PowdrrExecutionError(
+                    "saved cross-host CI repair artifact has an unknown phase"
                 )
         elif dispatch_path.is_file():
             try:
@@ -5694,6 +5912,16 @@ class _TaskProcedrrOperations:
                     "phase": "invoking",
                 },
             )
+            if callable(persist_artifact):
+                persist_artifact(
+                    contract.contract_id,
+                    {
+                        "contract_id": contract.contract_id,
+                        "observation_id": contract.observation_id,
+                        "attempt_id": attempt_id,
+                        "phase": "invoking",
+                    },
+                )
             attempt = runner.run(
                 request,
                 worktree_root=worker_root,
@@ -5780,6 +6008,24 @@ class _TaskProcedrrOperations:
             ],
         }
         _write_ci_repair_json(store_root / "candidate.json", manifest)
+        if callable(persist_artifact):
+            portable_attempt = attempt.to_data()
+            portable_attempt.update(
+                {"events": [], "stdout": "", "stderr": "", "error": None}
+            )
+            persist_artifact(
+                contract.contract_id,
+                {
+                    "contract_id": contract.contract_id,
+                    "observation_id": contract.observation_id,
+                    "attempt_id": attempt.attempt_id,
+                    "phase": "completed",
+                    "dispatch_status": acceptance.status,
+                    "attempt": portable_attempt,
+                    "candidate_manifest": manifest,
+                    "files": _ci_repair_portable_files(worker_root, changed_paths),
+                },
+            )
         outcome = {
             "passed": acceptance.status == "accepted",
             "dispatch_status": acceptance.status,

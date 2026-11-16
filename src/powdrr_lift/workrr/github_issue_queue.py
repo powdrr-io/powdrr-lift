@@ -6,6 +6,7 @@ and contain only stable pointers back to the reviewed plan revision.
 
 from __future__ import annotations
 
+import base64
 import hashlib
 import json
 import os
@@ -14,6 +15,7 @@ import re
 import subprocess
 import tempfile
 import threading
+import zlib
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass, replace
@@ -69,6 +71,12 @@ PLAN_REPAIR_PENDING_LABEL = "powdrr:plan-repair-pending"
 _MARKER_START = "<!-- powdrr-queue-item:v1 "
 _MARKER_END = " -->"
 _TASK_CHECKPOINT_START = "<!-- powdrr-task-checkpoint:v1 -->"
+_CI_REPAIR_ARTIFACT_MARKER = "<!-- powdrr-ci-repair-artifact:v1 -->"
+_CI_REPAIR_POINTER_START = "<!-- powdrr-ci-repair-artifact-pointer:start -->"
+_CI_REPAIR_POINTER_END = "<!-- powdrr-ci-repair-artifact-pointer:end -->"
+_CI_REPAIR_ARTIFACT_CHUNK_BYTES = 20 * 1024
+_CI_REPAIR_ARTIFACT_MAX_BYTES = 10 * 1024 * 1024
+_CI_REPAIR_ARTIFACT_MAX_COMMENT_PAGES = 8
 _PLAN_REPAIR_PENDING_MARKER = "<!-- powdrr-plan-repair-pending:v1 -->"
 _PLAN_REPAIR_RECONCILED_MARKER = "<!-- powdrr-plan-repair-reconciled:v1 -->"
 _PLAN_REPAIR_RESOLVED_MARKER = "<!-- powdrr-plan-repair-resolved:v1 -->"
@@ -825,6 +833,65 @@ class GitHubIssueClient:
                 )
         return tuple(
             comment for page_values in reversed(pages) for comment in page_values
+        )
+
+    def list_ci_repair_artifact_comments(
+        self, issue_number: int, *, contract_id: str, bundle_digest: str
+    ) -> tuple[Mapping[str, Any], ...]:
+        """Read bounded recent comments until the pointed repair bundle is complete."""
+        operation = f"GET repos/{self.repository}/issues/{issue_number}/comments"
+        issue_result = self._invoke_comment_api(
+            ["api", f"repos/{self.repository}/issues/{issue_number}"],
+            operation=f"GET repos/{self.repository}/issues/{issue_number}",
+        )
+        try:
+            issue = json.loads(issue_result.stdout)
+        except json.JSONDecodeError as error:
+            raise GitHubIssueQueueError(
+                "gh returned malformed issue metadata"
+            ) from error
+        count = issue.get("comments") if isinstance(issue, Mapping) else None
+        if isinstance(count, bool) or not isinstance(count, int) or count < 0:
+            raise GitHubIssueQueueError(
+                "gh returned issue metadata without a valid comment count"
+            )
+        if count == 0:
+            return ()
+        pages: list[list[Mapping[str, Any]]] = []
+        first_page = (count + 99) // 100
+        last_page = max(1, first_page - _CI_REPAIR_ARTIFACT_MAX_COMMENT_PAGES + 1)
+        for page in range(first_page, last_page - 1, -1):
+            result = self._invoke_comment_api(
+                [
+                    "api",
+                    f"repos/{self.repository}/issues/{issue_number}/comments"
+                    f"?per_page=100&page={page}",
+                ],
+                operation=operation,
+            )
+            try:
+                values = json.loads(result.stdout)
+            except json.JSONDecodeError as error:
+                raise GitHubIssueQueueError(
+                    "gh returned malformed issue comments"
+                ) from error
+            if not isinstance(values, list):
+                raise GitHubIssueQueueError(
+                    "gh returned a non-array issue-comment page"
+                )
+            pages.append([value for value in values if isinstance(value, Mapping)])
+            comments = [comment for page_values in pages for comment in page_values]
+            if _has_complete_ci_repair_artifact(
+                comments, contract_id, bundle_digest=bundle_digest
+            ):
+                return tuple(
+                    comment
+                    for page_values in reversed(pages)
+                    for comment in page_values
+                )
+        raise GitHubIssueQueueError(
+            "pointed CI repair artifact is incomplete or outside the recent "
+            "checkpoint window"
         )
 
     def _invoke_comment_api(
@@ -2378,6 +2445,265 @@ def render_task_checkpoint_comment(checkpoint: TaskCheckpoint) -> str:
     )
 
 
+def _ci_repair_artifact_pointers(body: str) -> dict[str, str]:
+    if _CI_REPAIR_POINTER_START not in body and _CI_REPAIR_POINTER_END not in body:
+        return {}
+    if (
+        body.count(_CI_REPAIR_POINTER_START) != 1
+        or body.count(_CI_REPAIR_POINTER_END) != 1
+    ):
+        raise GitHubIssueQueueError("CI repair artifact pointer is malformed")
+    start = body.index(_CI_REPAIR_POINTER_START) + len(_CI_REPAIR_POINTER_START)
+    end = body.index(_CI_REPAIR_POINTER_END, start)
+    try:
+        payload = json.loads(body[start:end].strip())
+    except json.JSONDecodeError as error:
+        raise GitHubIssueQueueError(
+            "CI repair artifact pointer is malformed"
+        ) from error
+    if not isinstance(payload, Mapping):
+        raise GitHubIssueQueueError("CI repair artifact pointer must be an object")
+    pointers = payload.get("contracts")
+    if not isinstance(pointers, Mapping) or not all(
+        isinstance(key, str)
+        and re.fullmatch(r"[0-9a-f]{64}", key)
+        and isinstance(value, str)
+        and re.fullmatch(r"[0-9a-f]{64}", value)
+        for key, value in pointers.items()
+    ):
+        raise GitHubIssueQueueError("CI repair artifact pointer entries are malformed")
+    return dict(pointers)
+
+
+def _render_ci_repair_artifact_pointer(
+    body: str, *, contract_id: str, bundle_digest: str
+) -> str:
+    pointers = _ci_repair_artifact_pointers(body)
+    pointers[contract_id] = bundle_digest
+    block = (
+        f"{_CI_REPAIR_POINTER_START}\n"
+        f"{json.dumps({'contracts': pointers}, sort_keys=True)}\n"
+        f"{_CI_REPAIR_POINTER_END}"
+    )
+    if _CI_REPAIR_POINTER_START in body:
+        start = body.index(_CI_REPAIR_POINTER_START)
+        end = body.index(_CI_REPAIR_POINTER_END, start) + len(_CI_REPAIR_POINTER_END)
+        return body[:start] + block + body[end:]
+    return f"{body.rstrip()}\n\n{block}" if body.strip() else block
+
+
+def _has_complete_ci_repair_artifact(
+    comments: Sequence[Mapping[str, Any]],
+    contract_id: str,
+    *,
+    bundle_digest: str,
+) -> bool:
+    bundles: dict[str, tuple[int, set[int]]] = {}
+    for comment in comments:
+        body = comment.get("body")
+        if not isinstance(body, str) or _CI_REPAIR_ARTIFACT_MARKER not in body:
+            continue
+        match = re.search(r"\x60{3}json\s*\n(.*?)\n\x60{3}", body, re.DOTALL)
+        if match is None:
+            continue
+        try:
+            payload = json.loads(match.group(1))
+        except json.JSONDecodeError:
+            continue
+        if (
+            not isinstance(payload, Mapping)
+            or payload.get("schema")
+            != "https://powdrr.io/schemas/ci-repair-artifact-chunk-v1"
+            or payload.get("contract_id") != contract_id
+            or payload.get("bundle_digest") != bundle_digest
+        ):
+            continue
+        count = payload.get("chunk_count")
+        index = payload.get("chunk_index")
+        if (
+            isinstance(count, bool)
+            or not isinstance(count, int)
+            or count < 1
+            or isinstance(index, bool)
+            or not isinstance(index, int)
+            or not 1 <= index <= count
+        ):
+            continue
+        digest = str(payload["bundle_digest"])
+        existing_count, indexes = bundles.setdefault(digest, (count, set()))
+        if existing_count == count:
+            indexes.add(index)
+    return any(
+        indexes == set(range(1, count + 1)) for count, indexes in bundles.values()
+    )
+
+
+def _persist_ci_repair_artifact(
+    *,
+    client: GitHubIssueClient,
+    issue: QueueIssue,
+    contract_id: str,
+    record: Mapping[str, Any],
+) -> None:
+    """Store a bounded, integrity-checked CI repair continuation in issue comments."""
+    if not re.fullmatch(r"[0-9a-f]{64}", contract_id):
+        raise GitHubIssueQueueError("CI repair artifact contract ID is malformed")
+    payload = {"schema": "ci-repair-continuation-v1", **dict(record)}
+    if payload.get("contract_id") != contract_id:
+        raise GitHubIssueQueueError("CI repair artifact contract ID does not match")
+    encoded = json.dumps(
+        payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")
+    ).encode("utf-8")
+    if len(encoded) > _CI_REPAIR_ARTIFACT_MAX_BYTES:
+        raise GitHubIssueQueueError("CI repair continuation exceeds the size limit")
+    compressed = zlib.compress(encoded, level=9)
+    if len(compressed) > _CI_REPAIR_ARTIFACT_MAX_BYTES:
+        raise GitHubIssueQueueError("CI repair continuation exceeds the size limit")
+    digest = hashlib.sha256(compressed).hexdigest()
+    pieces = [
+        compressed[offset : offset + _CI_REPAIR_ARTIFACT_CHUNK_BYTES]
+        for offset in range(0, len(compressed), _CI_REPAIR_ARTIFACT_CHUNK_BYTES)
+    ] or [b""]
+    for index, piece in enumerate(pieces, start=1):
+        chunk_payload = {
+            "schema": "https://powdrr.io/schemas/ci-repair-artifact-chunk-v1",
+            "contract_id": contract_id,
+            "bundle_digest": digest,
+            "bundle_size": len(compressed),
+            "chunk_index": index,
+            "chunk_count": len(pieces),
+            "chunk_sha256": hashlib.sha256(piece).hexdigest(),
+            "content_base64": base64.b64encode(piece).decode("ascii"),
+        }
+        body = (
+            "### Powdrr CI repair continuation\n\n"
+            f"{_CI_REPAIR_ARTIFACT_MARKER}\n"
+            "```json\n"
+            f"{json.dumps(chunk_payload, indent=2, sort_keys=True)}\n"
+            "```"
+        )
+        client.add_comment(issue, body)
+    current_issue = client.get_issue(issue.number)
+    updated_body = _render_ci_repair_artifact_pointer(
+        current_issue.body,
+        contract_id=contract_id,
+        bundle_digest=digest,
+    )
+    if updated_body != current_issue.body:
+        client.update_issue(current_issue, body=updated_body)
+
+
+def _load_ci_repair_artifact(
+    *,
+    client: GitHubIssueClient,
+    issue_number: int,
+    contract_id: str,
+) -> Mapping[str, Any] | None:
+    """Load the newest complete CI repair continuation for one contract."""
+    groups: dict[str, dict[str, Any]] = {}
+    order: list[str] = []
+    issue = client.get_issue(issue_number)
+    pointers = _ci_repair_artifact_pointers(issue.body)
+    digest_pointer = pointers.get(contract_id)
+    if digest_pointer is None:
+        return None
+    list_artifacts = getattr(client, "list_ci_repair_artifact_comments", None)
+    comments = (
+        list_artifacts(
+            issue_number,
+            contract_id=contract_id,
+            bundle_digest=digest_pointer,
+        )
+        if callable(list_artifacts)
+        else client.list_comments(issue_number)
+    )
+    for comment in comments:
+        body = comment.get("body")
+        if not isinstance(body, str) or _CI_REPAIR_ARTIFACT_MARKER not in body:
+            continue
+        match = re.search(r"```json\s*\n(.*?)\n```", body, re.DOTALL)
+        if match is None:
+            continue
+        try:
+            payload = json.loads(match.group(1))
+        except json.JSONDecodeError:
+            continue
+        if (
+            not isinstance(payload, Mapping)
+            or payload.get("schema")
+            != "https://powdrr.io/schemas/ci-repair-artifact-chunk-v1"
+            or payload.get("contract_id") != contract_id
+            or payload.get("bundle_digest") != digest_pointer
+        ):
+            continue
+        digest = str(payload["bundle_digest"])
+        if digest not in groups:
+            groups[digest] = {"chunks": {}, "payload": dict(payload)}
+            order.append(digest)
+        group = groups[digest]
+        index = payload.get("chunk_index")
+        count = payload.get("chunk_count")
+        size = payload.get("bundle_size")
+        content = payload.get("content_base64")
+        chunk_digest = payload.get("chunk_sha256")
+        if (
+            isinstance(index, bool)
+            or not isinstance(index, int)
+            or isinstance(count, bool)
+            or not isinstance(count, int)
+            or not 1 <= index <= count
+            or isinstance(size, bool)
+            or not isinstance(size, int)
+            or not 0 <= size <= _CI_REPAIR_ARTIFACT_MAX_BYTES
+            or not isinstance(content, str)
+            or not isinstance(chunk_digest, str)
+        ):
+            continue
+        try:
+            piece = base64.b64decode(content, validate=True)
+        except ValueError:
+            continue
+        if hashlib.sha256(piece).hexdigest() != chunk_digest:
+            continue
+        group["count"] = count
+        group["size"] = size
+        group["chunks"][index] = piece
+
+    for digest in reversed(order):
+        group = groups[digest]
+        count = group.get("count")
+        chunks = group["chunks"]
+        if not isinstance(count, int) or set(chunks) != set(range(1, count + 1)):
+            continue
+        compressed = b"".join(chunks[index] for index in range(1, count + 1))
+        if (
+            len(compressed) != group.get("size")
+            or hashlib.sha256(compressed).hexdigest() != digest
+        ):
+            continue
+        try:
+            decompressor = zlib.decompressobj()
+            raw_payload = decompressor.decompress(
+                compressed, _CI_REPAIR_ARTIFACT_MAX_BYTES + 1
+            )
+            if (
+                len(raw_payload) > _CI_REPAIR_ARTIFACT_MAX_BYTES
+                or not decompressor.eof
+                or decompressor.unused_data
+            ):
+                continue
+            payload = json.loads(raw_payload)
+        except (zlib.error, json.JSONDecodeError):
+            continue
+        if (
+            isinstance(payload, Mapping)
+            and payload.get("schema") == "ci-repair-continuation-v1"
+            and payload.get("contract_id") == contract_id
+        ):
+            return payload
+    return None
+
+
 def _task_checkpoint_callback(
     *,
     client: GitHubIssueClient,
@@ -2446,6 +2772,23 @@ def _task_checkpoint_callback(
                 plan_loader=plan_loader,
             )
 
+    def persist_ci_repair_artifact(contract_id: str, record: Mapping[str, Any]) -> None:
+        _persist_ci_repair_artifact(
+            client=client,
+            issue=issue,
+            contract_id=contract_id,
+            record=record,
+        )
+
+    def load_ci_repair_artifact(contract_id: str) -> Mapping[str, Any] | None:
+        return _load_ci_repair_artifact(
+            client=client,
+            issue_number=issue.number,
+            contract_id=contract_id,
+        )
+
+    persist.persist_ci_repair_artifact = persist_ci_repair_artifact  # type: ignore[attr-defined]
+    persist.load_ci_repair_artifact = load_ci_repair_artifact  # type: ignore[attr-defined]
     return persist
 
 

@@ -430,9 +430,11 @@ The initial three-PR outline was delivered in smaller, reviewable slices.
 Observation and reproduction, bounded evidence and research, protected repair
 contracts, candidate acceptance, MiniSWE dispatch, limited publication with
 exact-head re-observation, and same-host at-most-once dispatch continuation are
-implemented in the PR history above. Cross-host artifact-backed continuation,
-broader evidence collection, and full publication integration remain. New
-policy remains service-owned; Git publication remains an agent capability.
+implemented in the PR history above. The current changes add cross-host
+continuation through compressed, hash-checked issue-comment artifacts and
+contract-bound candidate restoration. Broader evidence collection and full
+publication integration remain. New policy remains service-owned; Git
+publication remains an agent capability.
 
 1. **Publication integration and continuation.** Call the procedure after
    `finish-implementation-pr` and PR updates, expose structured terminal

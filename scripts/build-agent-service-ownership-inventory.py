@@ -31,7 +31,7 @@ def _owner(path: str) -> tuple[str, str, str]:
             "service",
             "bounded MiniSWE prompt compilation bound to a repair contract, "
             "failure, reproduction, and accepted source claims",
-            "1539",
+            "1540",
         )
     if path.startswith("packages/service/src/powdrr_service/ci_response/"):
         return (

@@ -1,0 +1,238 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1540
+title: Dispatch contract-bound CI repairs to MiniSWE
+intent:
+  problem: CI response could observe, reproduce, compile, and accept repair candidates but had no bounded MiniSWE dispatch path.
+  goal: Dispatch one repair for a matching failure and PR head, run its contracted validations, and return the service acceptance decision.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 3412, end_line: 3412}
+  summary: Record CI contract types in task agent ownership dependencies.
+  rationale: Keep source ownership aligned with the CI response operation.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 3459, end_line: 3460}
+  summary: Record service prompt and acceptance imports used by dispatch.
+  rationale: Show policy and execution boundaries in the architecture inventory.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 3925, end_line: 3925}
+  summary: Export the CI repair prompt compiler through the service package.
+  rationale: Keep the service API inventory accurate.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 3992, end_line: 4002}
+  summary: Add the bounded CI repair prompt compiler to the ownership inventory.
+  rationale: Track prompt assembly as service-owned policy.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 4053, end_line: 4053}
+  summary: Update task agent ownership rationale for CI dispatch and validation.
+  rationale: Clarify that local execution stays at the agent boundary.
+- path: docs/plans/procedrr-ci-response-action.md
+  type: modified
+  span: {start_line: 31, end_line: 37}
+  summary: Record contract-bound dispatch and remaining publication work.
+  rationale: Keep completed milestones and remaining work explicit.
+- path: packages/service/src/powdrr_service/ci_response/__init__.py
+  type: modified
+  span: {start_line: 25, end_line: 25}
+  summary: Import the CI repair prompt compiler into the service package.
+  rationale: Expose prompt policy to procedural composition.
+- path: packages/service/src/powdrr_service/ci_response/__init__.py
+  type: modified
+  span: {start_line: 52, end_line: 52}
+  summary: Export the CI repair prompt compiler.
+  rationale: Make the compiler available through the package API.
+- path: packages/service/src/powdrr_service/ci_response/prompt.py
+  type: added
+  span: {start_line: 1, end_line: 150}
+  summary: Compile a bounded prompt from one contract-bound failure, reproduction, and exact accepted source claims.
+  rationale: Prevent unbound evidence and instructions embedded in logs or excerpts from becoming worker instructions.
+- path: packages/service/src/powdrr_service/procedrr/catalog.py
+  type: modified
+  span: {start_line: 64, end_line: 76}
+  summary: Materialize defaults for omitted optional process inputs.
+  rationale: Preserve observation-only calls while allowing an optional repair contract.
+- path: packages/service/src/powdrr_service/procedrr/catalog.py
+  type: modified
+  span: {start_line: 75, end_line: 75}
+  summary: Validate and complete normalized process inputs after applying defaults.
+  rationale: Preserve the existing input validation behavior for supplied values.
+- path: packages/service/src/powdrr_service/procedrr/parser.py
+  type: modified
+  span: {start_line: 35, end_line: 35}
+  summary: Allow the contract-bound CI repair operation in process definitions.
+  rationale: Permit the response process to invoke its registered agent operation.
+- path: packages/service/src/powdrr_service/procedrr_evaluator/evaluator.py
+  type: modified
+  span: {start_line: 546, end_line: 553}
+  summary: Apply declared defaults when invoking nested processes.
+  rationale: Resolve optional inputs consistently in nested workflows.
+- path: packages/service/src/powdrr_service/resources/processes/respond-to-pr-ci.yaml
+  type: modified
+  span: {start_line: 3, end_line: 3}
+  summary: Describe the optional contract-bound dispatch capability.
+  rationale: State what the response process does when given a repair contract.
+- path: packages/service/src/powdrr_service/resources/processes/respond-to-pr-ci.yaml
+  type: modified
+  span: {start_line: 9, end_line: 10}
+  summary: Add optional repair contract and accepted research inputs with defaults.
+  rationale: Keep existing observation-only invocations valid.
+- path: packages/service/src/powdrr_service/resources/processes/respond-to-pr-ci.yaml
+  type: modified
+  span: {start_line: 15, end_line: 17}
+  summary: Expose the local repair candidate result.
+  rationale: Return dispatch and acceptance status to the caller.
+- path: packages/service/src/powdrr_service/resources/processes/respond-to-pr-ci.yaml
+  type: modified
+  span: {start_line: 37, end_line: 55}
+  summary: Dispatch contract-bound repair after failed observation and route its outcome.
+  rationale: Keep candidate acceptance distinct from publication and GitHub check success.
+- path: scripts/build-agent-service-ownership-inventory.py
+  type: modified
+  span: {start_line: 29, end_line: 35}
+  summary: Classify the prompt compiler as service-owned policy for PR-1540.
+  rationale: Preserve module ownership and introducing PR during inventory rebuilds.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 15, end_line: 15}
+  summary: Import the literal status type for validation receipts.
+  rationale: Keep acceptance receipt statuses statically constrained.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 30, end_line: 35}
+  summary: Import typed CI failure, reproduction, and repair contract records.
+  rationale: Parse and revalidate CI evidence at the procedural operation boundary.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 44, end_line: 48}
+  summary: Import prompt compilation and candidate acceptance policy.
+  rationale: Delegate service decisions to service-owned functions.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 193, end_line: 194}
+  summary: Import current candidate path and fingerprint helpers.
+  rationale: Bind validations and candidate changes to the same worktree state.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 201, end_line: 201}
+  summary: Import validation result status values.
+  rationale: Convert validation outcomes to contract acceptance receipts.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 3843, end_line: 3847}
+  summary: Remove the obsolete hard rejection before the typed dispatch route.
+  rationale: The registered CI repair operation now owns contract-bound dispatch.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 5200, end_line: 5211}
+  summary: Register CI repair dispatch and preserve no-contract behavior.
+  rationale: Route only supplied contracts to the worker.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 5379, end_line: 5639}
+  summary: Bind contract, evidence, worktree, MiniSWE attempt, validations, and acceptance.
+  rationale: Reject mismatched repository or head and return a deterministic candidate decision.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 6279, end_line: 6279}
+  summary: Register the operation in the task operation executor.
+  rationale: Make the process operation callable at runtime.
+- path: tests/test_ci_response_prompt.py
+  type: added
+  span: {start_line: 1, end_line: 122}
+  summary: Test prompt binding, bounded instructions, and exact research references.
+  rationale: Prevent mismatched evidence from entering the worker prompt.
+- path: tests/test_procedrr_chat.py
+  type: modified
+  span: {start_line: 126, end_line: 135}
+  summary: Test optional process input defaults.
+  rationale: Preserve existing calls that do not provide a repair contract.
+- path: tests/test_procedrr_chat.py
+  type: modified
+  span: {start_line: 146, end_line: 150}
+  summary: Test the failed-observation dispatch operation binding.
+  rationale: Keep the contract input connected to the CI response operation.
+- path: tests/test_procedrr_chat.py
+  type: modified
+  span: {start_line: 152, end_line: 155}
+  summary: Test that observation-only flow remains terminal when no contract is supplied.
+  rationale: Keep optional repair dispatch backward compatible.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span: {start_line: 3, end_line: 3}
+  summary: Import hashing for deterministic repair evidence fixtures.
+  rationale: Generate contract IDs from the same canonical record contents.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span: {start_line: 10, end_line: 10}
+  summary: Import timezone-aware expiry helpers.
+  rationale: Build valid, time-bounded repair contracts in tests.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span: {start_line: 17, end_line: 22}
+  summary: Import typed CI contract fixtures.
+  rationale: Exercise the actual dispatch contract boundary.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span: {start_line: 2969, end_line: 3152}
+  summary: Test accepted in-scope repair and rejected out-of-scope tracked edit with a fake worker.
+  rationale: Verify validation and acceptance without external publication.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span: {start_line: 4630, end_line: 4630}
+  summary: Keep the legacy direct CI coding-agent mode unsupported.
+  rationale: Route contract-bound execution through the typed process operation.
+entities:
+- id: compile-ci-repair-prompt
+  type: Function
+  action: added
+- id: ci-repair-dispatch-operation
+  type: Internal API
+  action: added
+- id: ci-repair-response-process
+  type: Workflow
+  action: added
+- id: assess-ci-repair-candidate
+  type: Function
+  action: modified
+- id: ci-repair-prompt-tests
+  type: Unit test
+  action: added
+- id: ci-repair-dispatch-tests
+  type: Integration test
+  action: added
+entity_relationships:
+- id: dispatch-compiles-bound-prompt
+  source: ci-repair-dispatch-operation
+  target: compile-ci-repair-prompt
+  type: invokes
+- id: dispatch-uses-candidate-acceptance
+  source: ci-repair-dispatch-operation
+  target: assess-ci-repair-candidate
+  type: invokes
+- id: process-routes-failed-observation
+  source: ci-repair-response-process
+  target: ci-repair-dispatch-operation
+  type: invokes
+invariants:
+- id: dispatch-matches-live-contract-head
+  description: Repository, PR, observation, failure, and exact head must match the supplied contract and isolated worktree.
+  action: added
+- id: prompt-uses-contract-bound-evidence
+  description: The prompt includes the contract-bound failure and reproduction and exactly the accepted source claims named by the contract, within the configured size bound.
+  action: added
+- id: dispatch-runs-exact-validation-commands
+  description: Every contracted validation command runs against the candidate and its receipt is tied to the candidate fingerprint.
+  action: added
+- id: local-acceptance-does-not-publish
+  description: An accepted local candidate is returned for later publication; the operation neither pushes changes nor claims GitHub checks passed.
+  action: added
+guidance:
+- id: publication-remains-unfinished
+  description: Limited publication, GitHub re-observation, durable continuation, broader evidence collection, and full publication integration remain unfinished.
+  action: added

@@ -1,0 +1,32 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1544
+title: Keep source requirement extraction examples grounded
+intent:
+  problem: The planning requirement extractor supplied an unsupported generic obligation as a valid example, which could cause navigation or context text to be planned as new work.
+  goal: Avoid seeding source extraction with obligations that are not present in the cited source while preserving pagination behavior.
+human-decisions: []
+structured_files: []
+files:
+- path: packages/service/src/powdrr_service/planning/source.py
+  type: modified
+  span: {start_line: 885, end_line: 897}
+  summary: Use an empty requirement list as the extraction example while retaining the source block's pagination cursor.
+  rationale: A positive generic example cannot be valid for navigation and context blocks and can introduce unsupported obligations.
+- path: tests/test_planning_source.py
+  type: modified
+  span: {start_line: 473, end_line: 674}
+  summary: Cover non-invented extraction examples and preserve cursor pagination tests without fabricated requirement text.
+  rationale: Keep source extraction examples valid for non-normative blocks and ensure pagination remains unchanged.
+entities: []
+entity_relationships: []
+invariants:
+- id: extraction-example-does-not-invent-requirements
+  description: A valid extraction example must not introduce an obligation that is absent from the source block.
+  action: added
+- id: extraction-example-keeps-pagination-cursor
+  description: Requirement extraction pagination continues to identify the correct next source anchor without adding example requirements.
+  action: altered
+guidance:
+- id: source-extraction-positive-examples
+  description: Do not use a generic positive obligation example for arbitrary source blocks; navigation and context blocks may impose no requirements.
+  action: added

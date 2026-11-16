@@ -1,5 +1,10 @@
 """Service-owned CI evidence and diagnosis policy."""
 
+from powdrr_service.ci_response.acceptance import (
+    CIRepairAcceptance,
+    CIRepairValidation,
+    assess_ci_repair_candidate,
+)
 from powdrr_service.ci_response.assessment import (
     CIResponseAssessment,
     assess_ci_observation,
@@ -31,10 +36,13 @@ from powdrr_service.ci_response.research import (
 
 __all__ = [
     "CIResponseAssessment",
+    "CIRepairAcceptance",
+    "CIRepairValidation",
     "CIFailureUnit",
     "CIResearchPlan",
     "CIResearchQuery",
     "assess_ci_observation",
+    "assess_ci_repair_candidate",
     "bind_ci_research_assessments",
     "bind_ci_research_source_selections",
     "build_ci_research_plan",

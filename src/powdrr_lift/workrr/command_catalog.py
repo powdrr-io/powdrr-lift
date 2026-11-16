@@ -9,13 +9,18 @@ import re
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Any, cast
+from typing import Any, Literal, cast
 
+from powdrr_contracts.ci import ProtectedArtifact, RepairContract
 from powdrr_service.behavior_contract import (
     BEHAVIOR_DIMENSIONS,
     SUPPORTED_ASSUMPTION_DIMENSIONS,
     compile_behavior_scenarios,
     validate_normative_assumptions,
+)
+from powdrr_service.ci_response.acceptance import (
+    CIRepairValidation,
+    assess_ci_repair_candidate,
 )
 from powdrr_service.ci_response.research import (
     bind_ci_research_assessments,
@@ -259,6 +264,109 @@ def feature_command_catalog(
                 },
             },
             logic=implementations.get("prepare_ci_research_search"),
+        ),
+        "assess_ci_repair_candidate": CommandSpec(
+            name="assess_ci_repair_candidate",
+            input_schema=object_schema(
+                {
+                    "repair_contract": {"type": "object"},
+                    "base_sha": {"type": "string", "pattern": "^[0-9a-f]{40}$"},
+                    "worker_status": {
+                        "type": "string",
+                        "enum": ["completed", "failed", "timed_out", "policy_denied"],
+                    },
+                    "changed_paths": {
+                        "type": "array",
+                        "maxItems": 500,
+                        "items": {"type": "string", "minLength": 1},
+                    },
+                    "protected_artifacts": {
+                        "type": "array",
+                        "maxItems": 100,
+                        "items": {
+                            "type": "object",
+                            "required": ["path", "sha256"],
+                            "properties": {
+                                "path": {"type": "string", "minLength": 1},
+                                "sha256": {
+                                    "type": "string",
+                                    "pattern": "^[0-9a-f]{64}$",
+                                },
+                            },
+                            "additionalProperties": False,
+                        },
+                    },
+                    "diff_fingerprint": {
+                        "type": "string",
+                        "pattern": "^[0-9a-f]{64}$",
+                    },
+                    "validations": {
+                        "type": "array",
+                        "maxItems": 12,
+                        "items": {
+                            "type": "object",
+                            "required": ["command", "status", "diff_fingerprint"],
+                            "properties": {
+                                "command": {
+                                    "type": "array",
+                                    "minItems": 1,
+                                    "maxItems": 32,
+                                    "items": {"type": "string", "minLength": 1},
+                                },
+                                "status": {
+                                    "type": "string",
+                                    "enum": ["passed", "failed", "incomplete"],
+                                },
+                                "diff_fingerprint": {
+                                    "type": ["string", "null"],
+                                    "pattern": "^[0-9a-f]{64}$",
+                                },
+                            },
+                            "additionalProperties": False,
+                        },
+                    },
+                },
+                required=(
+                    "repair_contract",
+                    "base_sha",
+                    "worker_status",
+                    "changed_paths",
+                    "protected_artifacts",
+                    "diff_fingerprint",
+                    "validations",
+                ),
+                additional_properties=False,
+            ),
+            output_schema={
+                "type": "object",
+                "required": [
+                    "schema_version",
+                    "status",
+                    "contract_id",
+                    "reasons",
+                    "changed_paths",
+                    "validated_commands",
+                ],
+                "properties": {
+                    "schema_version": {
+                        "type": "string",
+                        "const": "ci-repair-acceptance-v1",
+                    },
+                    "status": {"type": "string", "enum": ["accepted", "rejected"]},
+                    "contract_id": {"type": "string", "minLength": 1},
+                    "reasons": {"type": "array", "items": {"type": "string"}},
+                    "changed_paths": {"type": "array", "items": {"type": "string"}},
+                    "validated_commands": {
+                        "type": "array",
+                        "items": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                        },
+                    },
+                },
+                "additionalProperties": False,
+            },
+            logic=implementations.get("assess_ci_repair_candidate"),
         ),
         "bind_ci_research_source_selections": CommandSpec(
             name="bind_ci_research_source_selections",
@@ -1315,6 +1423,68 @@ class FeatureCommandRuntime:
                 api_key=os.environ.get("TAVILY_API_KEY"),
                 cache_path=cache_root / "external-contract-search.sqlite3",
             )
+        if name == "assess_ci_repair_candidate":
+            contract_data = parameters.get("repair_contract")
+            changed_paths = parameters.get("changed_paths")
+            protected_data = parameters.get("protected_artifacts")
+            validation_data = parameters.get("validations")
+            base_sha = parameters.get("base_sha")
+            worker_status = parameters.get("worker_status")
+            diff_fingerprint = parameters.get("diff_fingerprint")
+            if (
+                not isinstance(contract_data, Mapping)
+                or not isinstance(base_sha, str)
+                or not isinstance(worker_status, str)
+                or worker_status
+                not in {"completed", "failed", "timed_out", "policy_denied"}
+                or not isinstance(diff_fingerprint, str)
+                or not isinstance(changed_paths, list)
+                or not all(isinstance(path, str) for path in changed_paths)
+                or not isinstance(protected_data, list)
+                or not all(isinstance(item, Mapping) for item in protected_data)
+                or not isinstance(validation_data, list)
+                or not all(isinstance(item, Mapping) for item in validation_data)
+            ):
+                raise PowdrrExecutionError("CI repair candidate evidence is malformed")
+            validations: list[CIRepairValidation] = []
+            for item in validation_data:
+                command_argv = item.get("command")
+                status = item.get("status")
+                fingerprint = item.get("diff_fingerprint")
+                if (
+                    not isinstance(command_argv, list)
+                    or not all(isinstance(part, str) for part in command_argv)
+                    or not isinstance(status, str)
+                    or status not in {"passed", "failed", "incomplete"}
+                    or (fingerprint is not None and not isinstance(fingerprint, str))
+                ):
+                    raise PowdrrExecutionError(
+                        "CI repair validation evidence is malformed"
+                    )
+                validations.append(
+                    CIRepairValidation(
+                        tuple(command_argv),
+                        cast(Literal["passed", "failed", "incomplete"], status),
+                        fingerprint,
+                    )
+                )
+            try:
+                decision = assess_ci_repair_candidate(
+                    RepairContract.from_dict(contract_data),
+                    base_sha=base_sha,
+                    worker_status=worker_status,
+                    changed_paths=changed_paths,
+                    protected_artifacts=tuple(
+                        ProtectedArtifact.from_dict(item) for item in protected_data
+                    ),
+                    diff_fingerprint=diff_fingerprint,
+                    validations=validations,
+                )
+                return decision.to_dict()
+            except (TypeError, ValueError) as error:
+                raise PowdrrExecutionError(
+                    f"CI repair candidate could not be assessed: {error}"
+                ) from error
         if name == "prepare_ci_research_search":
             research_plan = parameters.get("research_plan")
             if not isinstance(research_plan, Mapping):

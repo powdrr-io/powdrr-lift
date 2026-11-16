@@ -1,0 +1,131 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1538
+title: Assess contract-bound CI repair candidates
+intent:
+  problem: Contract-bound worker requests had integrity checks, but no service policy decided whether a resulting candidate and its validation evidence were acceptable.
+  goal: Add a deterministic acceptance decision that binds the worker result and required validation receipts to the live repair contract and candidate diff.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 2612, end_line: 2612}
+  summary: Record the command catalog dependency on CI repair acceptance policy.
+  rationale: Keep the agent service-operation dependency inventory accurate.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 2622, end_line: 2622}
+  summary: Update command catalog ownership rationale.
+  rationale: Identify its CI correction acceptance capability.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 3918, end_line: 3918}
+  summary: Export CI repair acceptance through the service package inventory.
+  rationale: Include the new acceptance policy in the service API dependencies.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 3943, end_line: 3953}
+  summary: Add the service-owned CI repair acceptance module to the inventory.
+  rationale: Track the module's contract, hash, and receipt enforcement responsibility under PR-1538.
+- path: docs/plans/procedrr-ci-response-action.md
+  type: modified
+  span: {start_line: 28, end_line: 32}
+  summary: Record the deterministic correction acceptance milestone and remaining dispatch and publication work.
+  rationale: Distinguish local candidate acceptance from GitHub confirmation and workflow integration.
+- path: packages/service/src/powdrr_service/ci_response/__init__.py
+  type: modified
+  span: {start_line: 3, end_line: 7}
+  summary: Export the CI repair acceptance decision, validation receipt, and assessment function.
+  rationale: Make service-owned correction acceptance available to procedural operations.
+- path: packages/service/src/powdrr_service/ci_response/__init__.py
+  type: modified
+  span: {start_line: 39, end_line: 40}
+  summary: Add acceptance record types to the service package exports.
+  rationale: Keep the public exports aligned with the imported acceptance API.
+- path: packages/service/src/powdrr_service/ci_response/__init__.py
+  type: modified
+  span: {start_line: 45, end_line: 45}
+  summary: Export the contract-bound candidate assessment function.
+  rationale: Allow callers to request deterministic repair acceptance.
+- path: packages/service/src/powdrr_service/ci_response/acceptance.py
+  type: added
+  span: {start_line: 1, end_line: 194}
+  summary: Accept candidates only when contract expiry, base, edit scope, protected hashes, worker status, and exact-diff validation receipts pass.
+  rationale: Reject stale, out-of-scope, integrity-changing, incomplete, or unvalidated repair candidates with deterministic reasons.
+- path: scripts/build-agent-service-ownership-inventory.py
+  type: modified
+  span: {start_line: 23, end_line: 28}
+  summary: Classify the new correction acceptance module as service-owned policy.
+  rationale: Preserve its owner and introducing PR when rebuilding the module inventory.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span: {start_line: 12, end_line: 12}
+  summary: Import the public CI contract records for command parsing.
+  rationale: Deserialize repair contracts and protected artifact evidence at the operation boundary.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span: {start_line: 14, end_line: 14}
+  summary: Import the acceptance policy used by the Procedrr command runtime.
+  rationale: Route candidate decisions to service-owned policy.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span: {start_line: 21, end_line: 24}
+  summary: Import CI validation receipt records and the candidate assessment operation.
+  rationale: Connect the typed procedural command to the deterministic service function.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span: {start_line: 268, end_line: 370}
+  summary: Define strict input and output schemas for CI repair candidate assessment.
+  rationale: Bound repair contract, changed path, protected artifact, diff fingerprint, and validation receipt data crossing the Procedrr operation boundary.
+- path: src/powdrr_lift/workrr/command_catalog.py
+  type: modified
+  span: {start_line: 1426, end_line: 1487}
+  summary: Parse typed candidate evidence and return the service acceptance decision.
+  rationale: Reject malformed operation inputs and expose deterministic acceptance results to procedural workflows.
+- path: tests/test_ci_response_acceptance.py
+  type: added
+  span: {start_line: 1, end_line: 206}
+  summary: Cover accepted candidates and rejection of expired, stale, out-of-scope, protected, and unvalidated candidates, including command catalog dispatch.
+  rationale: Verify acceptance policy reasons and the serialized Procedrr operation boundary.
+entities:
+- id: ci-repair-acceptance
+  type: Class
+  action: added
+- id: ci-repair-validation
+  type: Class
+  action: added
+- id: assess-ci-repair-candidate
+  type: Function
+  action: added
+- id: assess-ci-repair-candidate-procedrr-operation
+  type: Internal API
+  action: added
+- id: ci-repair-acceptance-tests
+  type: Unit test
+  action: added
+entity_relationships:
+- id: acceptance-verifies-repair-validation
+  source: assess-ci-repair-candidate
+  target: ci-repair-validation
+  type: consumes
+- id: acceptance-decision-belongs-to-repair-contract
+  source: assess-ci-repair-candidate
+  target: ci-repair-acceptance
+  type: returns
+invariants:
+- id: accepted-ci-repair-matches-contract-head-and-scope
+  description: A candidate is rejected if its base differs from the contract head or any changed path falls outside the exact editable scope.
+  action: added
+- id: accepted-ci-repair-preserves-protected-artifacts
+  description: The candidate must report every protected artifact with the contract's exact path and SHA-256 value and must not change a protected path.
+  action: added
+- id: accepted-ci-repair-validations-bind-to-candidate
+  description: Every contract verification command must have one passing receipt bound to the candidate diff fingerprint; missing, duplicate, uncontracted, failed, or mismatched receipts are rejected.
+  action: added
+- id: local-repair-acceptance-does-not-confirm-github
+  description: A local accepted candidate does not establish that the published PR's current required GitHub checks passed.
+  action: added
+guidance:
+- id: ci-repair-acceptance-precedes-dispatch-and-publication
+  description: Candidate acceptance is available as a service operation; MiniSWE dispatch, limited publication, durable continuation, broader evidence collection, and full publication integration remain unfinished.
+  action: added

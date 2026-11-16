@@ -298,6 +298,50 @@ def test_list_plan_issues_prints_item_to_issue_mapping(
     assert result["missing_item_ids"] == ["followup"]
 
 
+def test_publish_plan_issues_cli_forwards_source_design_blockers(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    captured: dict[str, object] = {}
+    monkeypatch.setattr("powdrr_lift.cli.resolve_repo_root", lambda _path: tmp_path)
+    monkeypatch.setattr(
+        "powdrr_lift.cli.load_reviewed_plan_at_commit",
+        lambda *_args, **_kwargs: SimpleNamespace(plan_id="plan-v1"),
+    )
+    monkeypatch.setattr(
+        "powdrr_lift.cli.source_design_items_requiring_replan_at_commit",
+        lambda *_args, **_kwargs: frozenset({"item-01"}),
+    )
+    monkeypatch.setattr("powdrr_lift.cli.GitHubIssueClient", lambda _repo: object())
+
+    def publish(**kwargs: object) -> SimpleNamespace:
+        captured.update(kwargs)
+        return SimpleNamespace(
+            plan_id="plan-v1",
+            plan_commit="a" * 40,
+            created_issue_numbers=(42,),
+            existing_issue_numbers=(),
+        )
+
+    monkeypatch.setattr("powdrr_lift.cli.publish_plan_issues", publish)
+    stdout = io.StringIO()
+    with redirect_stdout(stdout):
+        status = main(
+            [
+                "publish-plan-issues",
+                "--repository",
+                "example/project",
+                "--plan",
+                "docs/plans/plan.yaml",
+                "--plan-commit",
+                "a" * 40,
+            ]
+        )
+
+    assert status == 0
+    assert captured["blocked_item_ids"] == frozenset({"item-01"})
+    assert json.loads(stdout.getvalue())["blocked_item_ids"] == ["item-01"]
+
+
 def test_fulfill_plan_issue_without_pr_cli_dispatches() -> None:
     args = build_parser().parse_args(
         [

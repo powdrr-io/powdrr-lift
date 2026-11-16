@@ -70,7 +70,7 @@ alone does not establish completion. Report blocked acceptance honestly.
 | 8 | Complete run telemetry and mechanical-call removal | 1, 7 | Complete ([PR #1533](https://github.com/powdrr-io/powdrr-lift/pull/1533)) |
 | 9 | Recoverable claims and independent item concurrency | 4, 6 | Complete ([PR #1535](https://github.com/powdrr-io/powdrr-lift/pull/1535)) |
 | 10 | Full deterministic planning/execution/recovery scenario | 1–9 | Complete ([PR #1537](https://github.com/powdrr-io/powdrr-lift/pull/1537)) |
-| 11 | Live Gaterr acceptance and measured report | 10 | Blocked; see [acceptance report](../reports/task-11-live-gaterr-acceptance.md) |
+| 11 | Live Gaterr acceptance and measured report | 10 | Blocked; see [readiness-gate PR #1541](https://github.com/powdrr-io/powdrr-lift/pull/1541) and [acceptance report](../reports/task-11-live-gaterr-acceptance.md) |
 
 ## 1. Return a typed result and publish exact failure evidence
 

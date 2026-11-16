@@ -262,6 +262,7 @@ from powdrr_lift.workrr.github_issue_queue import (
     fulfill_issue_without_pr,
     load_reviewed_plan_at_commit,
     publish_plan_issues,
+    source_design_items_requiring_replan_at_commit,
 )
 from powdrr_lift.workrr.human_task import (
     HumanTaskRunnerConfig,
@@ -3008,11 +3009,17 @@ def _run_publish_plan_issues(args: argparse.Namespace) -> int:
         plan = load_reviewed_plan_at_commit(
             normalized_plan_path, args.plan_commit, repo_root=repo_root
         )
+        blocked_item_ids = source_design_items_requiring_replan_at_commit(
+            plan,
+            args.plan_commit,
+            repo_root=repo_root,
+        )
         report = publish_plan_issues(
             plan=plan,
             plan_path=normalized_plan_path,
             plan_commit=args.plan_commit,
             client=GitHubIssueClient(args.repository),
+            blocked_item_ids=blocked_item_ids,
         )
     except GitHubIssueQueueError as error:
         print(str(error), file=sys.stderr)
@@ -3024,6 +3031,7 @@ def _run_publish_plan_issues(args: argparse.Namespace) -> int:
                 "plan_commit": report.plan_commit,
                 "created_issue_numbers": report.created_issue_numbers,
                 "existing_issue_numbers": report.existing_issue_numbers,
+                "blocked_item_ids": sorted(blocked_item_ids),
             },
             indent=2,
         )

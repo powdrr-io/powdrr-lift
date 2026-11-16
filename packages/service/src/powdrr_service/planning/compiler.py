@@ -269,7 +269,9 @@ def compile_plan(
     if len(files) != len(set(files)):
         raise PlanningCompilationError("artifact destinations must be unique")
     _reject_overlapping_destinations(tuple(files), protected={plan.source_document})
-    ready, blocked = _dependency_readiness(compiled_plan)
+    ready, blocked = _dependency_readiness(
+        compiled_plan, _source_design_readiness_blockers(compiled_plan, files)
+    )
     compiled = CompiledPlan(
         compiled_plan,
         files,
@@ -464,7 +466,10 @@ def validate_compiled_plan(
         PlanWorkflowInstanceError,
     ) as error:
         errors.append(str(error))
-    ready, blocked = _dependency_readiness(compiled.plan)
+    ready, blocked = _dependency_readiness(
+        compiled.plan,
+        _source_design_readiness_blockers(compiled.plan, compiled.files),
+    )
     if ready != compiled.ready_item_ids or blocked != compiled.blocked_item_reasons:
         errors.append("compiled ready/blocked summary differs from dependency graph")
     return ValidationReport(not errors, tuple(errors), ready, blocked)
@@ -785,14 +790,60 @@ def _validate_repository_snapshot(
 
 def _dependency_readiness(
     plan: ReviewedExecutionPlan,
+    source_design_blockers: Mapping[str, str] | None = None,
 ) -> tuple[tuple[str, ...], Mapping[str, str]]:
-    ready = tuple(item.item_id for item in plan.items if not item.dependencies)
-    blocked = {
-        item.item_id: f"waiting for {', '.join(item.dependencies)}"
+    blockers = source_design_blockers or {}
+    ready = tuple(
+        item.item_id
         for item in plan.items
-        if item.dependencies
-    }
+        if not item.dependencies and item.item_id not in blockers
+    )
+    blocked: dict[str, str] = {}
+    for item in plan.items:
+        if item.item_id in blockers:
+            blocked[item.item_id] = blockers[item.item_id]
+        elif item.dependencies:
+            blocked[item.item_id] = f"waiting for {', '.join(item.dependencies)}"
     return ready, blocked
+
+
+def _source_design_readiness_blockers(
+    plan: ReviewedExecutionPlan, artifacts: Mapping[str, str]
+) -> Mapping[str, str]:
+    """Exclude source-reference designs that explicitly require replanning."""
+    blockers: dict[str, str] = {}
+    for item in plan.items:
+        path = item.source_reference_design_file
+        if path is None:
+            continue
+        raw = artifacts.get(path)
+        try:
+            design = yaml.safe_load(raw) if raw is not None else None
+        except yaml.YAMLError:
+            design = None
+        if not isinstance(design, Mapping):
+            blockers[item.item_id] = "source design is missing or malformed"
+            continue
+        accepted_design = design.get("design")
+        requirement = design.get("amendment_requirement")
+        if not isinstance(requirement, str) or not requirement.strip():
+            requirement = (
+                accepted_design.get("amendment_requirement")
+                if isinstance(accepted_design, Mapping)
+                else None
+            )
+        if design.get("status") == "requires_replan" or (
+            isinstance(accepted_design, Mapping)
+            and accepted_design.get("compilation_status") == "requires_replan"
+        ):
+            blockers[item.item_id] = (
+                f"source design requires replanning: {requirement}"
+                if isinstance(requirement, str) and requirement.strip()
+                else "source design requires replanning"
+            )
+        elif not isinstance(design.get("preparation"), Mapping):
+            blockers[item.item_id] = "source design has no execution preparation"
+    return blockers
 
 
 def _reject_overlapping_destinations(

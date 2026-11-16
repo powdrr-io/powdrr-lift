@@ -79,6 +79,8 @@ efficiency improvement.
 
 The plan must be repaired or regenerated so that protected execution has an
 accepted source design and valid preparation for each eligible item, and queue
-readiness must agree with that validation. Then publish the corrected plan
-revision and resume with two dependent items. Until those PRs are merged and the
-missing telemetry is captured, task 11 remains blocked and incomplete.
+readiness must agree with that validation. [Powdrr-Lift PR #1541](https://github.com/powdrr-io/powdrr-lift/pull/1541)
+adds that readiness gate; it identifies and blocks invalid designs but does not
+repair the reviewed source designs. Then publish a corrected plan revision and
+resume with two dependent items. Until those PRs are merged and the missing
+telemetry is captured, task 11 remains blocked and incomplete.

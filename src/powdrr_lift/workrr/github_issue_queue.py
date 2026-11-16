@@ -47,7 +47,11 @@ from powdrr_service.planning.plan_document import (
 from powdrr_service.planning.plan_document import (
     serialize_reviewed_plan_yaml as serialize_reviewed_plan_yaml,
 )
-from powdrr_service.planning.plan_models import PlannedWorkItem, ReviewedExecutionPlan
+from powdrr_service.planning.plan_models import (
+    PlannedWorkItem,
+    ReviewedExecutionPlan,
+    source_reference_design_file,
+)
 from powdrr_service.structrr.python_topology import is_validation_evidence_path
 from powdrr_service.structrr.validation_models import ValidationCheck
 
@@ -1007,15 +1011,75 @@ def load_reviewed_plan_at_commit(
     return parse_reviewed_plan_yaml(result.stdout)
 
 
+def source_design_items_requiring_replan_at_commit(
+    plan: ReviewedExecutionPlan,
+    plan_commit: str,
+    *,
+    repo_root: str | Path,
+    run: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
+) -> frozenset[str]:
+    """Find reviewed plan items whose pinned source design cannot execute yet."""
+    if not re.fullmatch(r"[0-9a-f]{40,64}", plan_commit):
+        raise GitHubIssueQueueError("plan commit must be an exact Git object ID")
+    root = Path(repo_root).resolve()
+    blocked: set[str] = set()
+    for item in plan.items:
+        if item.source_reference_design_file is None:
+            continue
+        path = source_reference_design_file(item.source_reference_design_file)
+        result = run(
+            ["git", "-C", str(root), "show", f"{plan_commit}:{path}"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if result.returncode != 0:
+            raise GitHubIssueQueueError(
+                f"could not read source design {path!r} at {plan_commit}: "
+                f"{result.stderr.strip()}"
+            )
+        try:
+            document = yaml.safe_load(result.stdout)
+        except yaml.YAMLError as error:
+            raise GitHubIssueQueueError(
+                f"source design {path!r} is not valid YAML: {error}"
+            ) from error
+        if (
+            not isinstance(document, Mapping)
+            or document.get("schema_version") != "structrr-source-reference-task-v1"
+            or document.get("plan_id") != plan.plan_id
+            or document.get("item_id") != item.item_id
+            or not isinstance(document.get("design"), Mapping)
+        ):
+            raise GitHubIssueQueueError(
+                f"source design {path!r} does not match plan item {item.item_id!r}"
+            )
+        design = document["design"]
+        if (
+            document.get("status") == "requires_replan"
+            or design.get("compilation_status") == "requires_replan"
+            or not isinstance(document.get("preparation"), Mapping)
+        ):
+            blocked.add(item.item_id)
+    return frozenset(blocked)
+
+
 def publish_plan_issues(
     *,
     plan: ReviewedExecutionPlan,
     plan_path: str,
     plan_commit: str,
     client: GitHubIssueClient,
+    blocked_item_ids: frozenset[str] = frozenset(),
 ) -> PublishReport:
     """Create one minimal pointer issue per plan item; reruns reuse issue IDs."""
     _validate_plan_reference(plan_path, plan_commit)
+    unknown_blocked_ids = blocked_item_ids - {item.item_id for item in plan.items}
+    if unknown_blocked_ids:
+        raise GitHubIssueQueueError(
+            "blocked item IDs are not present in the reviewed plan: "
+            + ", ".join(sorted(unknown_blocked_ids))
+        )
     client.ensure_plan_commit_merged(plan_commit)
     client.ensure_queue_labels()
     plan_label = client.ensure_plan_label(plan.plan_id)
@@ -1048,7 +1112,13 @@ def publish_plan_issues(
                 )
             reused.append(issue.number)
             continue
-        status = "ready" if not item.dependencies else "blocked_on_dependency"
+        status = (
+            "blocked"
+            if item.item_id in blocked_item_ids
+            else "ready"
+            if not item.dependencies
+            else "blocked_on_dependency"
+        )
         created_issue = client.create_issue(
             title=f"Powdrr work item: {plan.plan_id}/{item.item_id}",
             body=body,
@@ -1077,7 +1147,13 @@ def publish_plan_issues(
             )
             for dependency in item.dependencies
         )
-        status = "ready" if dependencies_closed else "blocked_on_dependency"
+        status = (
+            "blocked"
+            if item.item_id in blocked_item_ids
+            else "ready"
+            if dependencies_closed
+            else "blocked_on_dependency"
+        )
         labels = _replace_queue_status(issue.labels, status)
         if labels != issue.labels:
             client.update_issue(issue, labels=labels)

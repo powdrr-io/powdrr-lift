@@ -112,6 +112,16 @@ files:
   span: {start_line: 1250, end_line: 1292}
   summary: Verify source designs requiring replanning are excluded from ready summaries.
   rationale: Prevent regressions in compiler readiness reporting.
+- path: tests/test_planning_service.py
+  type: modified
+  span: {start_line: 1525, end_line: 1526}
+  summary: Expect planning artifacts without execution-ready source designs to remain blocked.
+  rationale: Align the end-to-end source-ledger test with validated readiness.
+- path: tests/test_planning_service.py
+  type: modified
+  span: {start_line: 2023, end_line: 2024}
+  summary: Expect scripted planning runs with replan-required source designs to remain blocked.
+  rationale: Keep deterministic planner tests consistent with the source-design gate.
 - path: tests/test_cli.py
   type: modified
   span: {start_line: 301, end_line: 344}

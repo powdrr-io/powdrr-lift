@@ -12,7 +12,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass, field, replace
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
-from typing import Any, TextIO
+from typing import Any, Literal, TextIO
 from uuid import uuid4
 
 import yaml
@@ -27,6 +27,12 @@ from powdrr_agent.execution.story_test_collection import (
     collect_story_tests,
     run_story_tests,
 )
+from powdrr_contracts.ci import (
+    CIFailureUnit,
+    LocalReproduction,
+    ProtectedArtifact,
+    RepairContract,
+)
 from powdrr_contracts.models import OperationRequest
 from powdrr_local import (
     JsonServiceBridge,
@@ -35,6 +41,11 @@ from powdrr_local import (
 )
 from powdrr_service.changelog.parser import parse_change_log
 from powdrr_service.changelog.template import is_structured_document_path
+from powdrr_service.ci_response.acceptance import (
+    CIRepairValidation,
+    assess_ci_repair_candidate,
+)
+from powdrr_service.ci_response.prompt import compile_ci_repair_prompt
 from powdrr_service.planning.multipr_structrr import (
     active_decision_drift_findings,
     inherited_decision_records,
@@ -179,12 +190,15 @@ from powdrr_lift.workrr.coding_agent import (
     ImplementationRequest,
     MiniSWEAgentProvider,
     OpenCodePermissionPolicy,
+    _working_paths,
+    _worktree_fingerprint,
     build_coding_agent_provider,
     run_coding_agent_recovery,
 )
 from powdrr_lift.workrr.coding_agent_validation import (
     ValidationProfile,
     ValidationReportStatus,
+    ValidationResultStatus,
     ValidationRunner,
     parse_validation_profile,
 )
@@ -3840,11 +3854,6 @@ class _TaskWorkflowExecutionStrategy:
         mode: str = "implementation",
         mode_context: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
-        if mode == "ci-repair":
-            raise PowdrrExecutionError(
-                "CI repair code-writing was removed; use CI observation to record "
-                "the failure and prepare a reviewed source-reference plan"
-            )
         if mode == "plan-amendment":
             return self._run_plan_amendment_agent(mode_context or {})
         if mode != "implementation":
@@ -5188,6 +5197,18 @@ class _TaskProcedrrOperations:
                 {"kind": "ci_observation", "result": normalized}
             )
             return normalized
+        if operation == "ci_repair_dispatch":
+            if parameters.get("repair_contract") is None:
+                return {"passed": True, "dispatch_status": "not_requested"}
+            return self._run_ci_repair_agent(
+                {
+                    "repair_contract": parameters.get("repair_contract"),
+                    "observation_result": parameters.get("observation_result"),
+                    "accepted_research_claims": parameters.get(
+                        "accepted_research_claims", []
+                    ),
+                }
+            )
         if operation == "procedrr_fragment_start":
             from powdrr_service.procedrr.fragments import start_fragment
 
@@ -5354,6 +5375,267 @@ class _TaskProcedrrOperations:
             "bindings": result_bindings,
             "terminal_status": result.terminal_status.value,
         }
+
+    def _run_ci_repair_agent(self, mode_context: Mapping[str, Any]) -> dict[str, Any]:
+        """Dispatch one exact-head repair and assess its local candidate."""
+        raw_contract = mode_context.get("repair_contract")
+        observation = mode_context.get("observation_result")
+        if not isinstance(raw_contract, Mapping) or not isinstance(
+            observation, Mapping
+        ):
+            raise PowdrrExecutionError(
+                "CI repair dispatch requires a repair contract and observation result"
+            )
+        try:
+            contract = RepairContract.from_dict(raw_contract)
+        except ValueError as error:
+            raise PowdrrExecutionError(
+                f"invalid CI repair contract: {error}"
+            ) from error
+        if observation.get("response_state") != "failed":
+            raise PowdrrExecutionError(
+                "CI repair dispatch requires a failed CI observation"
+            )
+        if (
+            observation.get("repository") != contract.repository
+            or observation.get("pull_request") != contract.pull_request_number
+            or observation.get("head_sha") != contract.head_sha
+            or observation.get("observation_id") != contract.observation_id
+        ):
+            raise PowdrrExecutionError(
+                "CI repair contract does not match the observed repository, PR, "
+                "head, and observation"
+            )
+        failures = observation.get("failures")
+        if not isinstance(failures, list):
+            raise PowdrrExecutionError("CI observation failures must be a list")
+        matching = [
+            item
+            for item in failures
+            if isinstance(item, Mapping)
+            and item.get("failure_id") == contract.failure_id
+        ]
+        if len(matching) != 1:
+            raise PowdrrExecutionError(
+                "CI repair contract must identify exactly one observed failure"
+            )
+        failure_data = dict(matching[0])
+        reproduction_data = failure_data.get("local_reproduction")
+        if not isinstance(reproduction_data, Mapping):
+            raise PowdrrExecutionError(
+                "contract-bound CI failure has no local reproduction evidence"
+            )
+        try:
+            failure = CIFailureUnit.from_dict(failure_data)
+            reproduction = LocalReproduction.from_dict(reproduction_data)
+        except ValueError as error:
+            raise PowdrrExecutionError(
+                f"invalid CI repair evidence: {error}"
+            ) from error
+        if not failure.command and reproduction.command:
+            failure = CIFailureUnit.from_dict(
+                {**failure.to_dict(), "command": list(reproduction.command)}
+            )
+        claims = mode_context.get("accepted_research_claims", [])
+        if not isinstance(claims, list) or not all(
+            isinstance(item, Mapping) for item in claims
+        ):
+            raise PowdrrExecutionError(
+                "accepted CI research claims must be an object list"
+            )
+        try:
+            prompt = compile_ci_repair_prompt(
+                contract,
+                failure,
+                reproduction,
+                accepted_research_claims=claims,
+            )
+        except ValueError as error:
+            raise PowdrrExecutionError(
+                f"could not compile bound CI repair prompt: {error}"
+            ) from error
+
+        root = (
+            Path(tempfile.gettempdir())
+            / "powdrr-lift-ci-response"
+            / (
+                f"{contract.repository.replace('/', '--')}-pr-"
+                f"{contract.pull_request_number}-{contract.head_sha[:12]}"
+            )
+        )
+        worker_root = root / "worktree"
+        if not worker_root.is_dir():
+            raise PowdrrExecutionError(
+                "the isolated CI observation worktree is unavailable"
+            )
+        actual_head = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=worker_root,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if actual_head.returncode or actual_head.stdout.strip() != contract.head_sha:
+            raise PowdrrExecutionError(
+                "CI repair worktree is not pinned to the contract head"
+            )
+        remote = subprocess.run(
+            ["git", "remote", "get-url", "origin"],
+            cwd=worker_root,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        expected_remote = contract.repository
+        accepted_remotes = {
+            f"https://github.com/{expected_remote}.git",
+            f"https://github.com/{expected_remote}",
+            f"git@github.com:{expected_remote}.git",
+            f"git@github.com:{expected_remote}",
+        }
+        if remote.returncode or remote.stdout.strip() not in accepted_remotes:
+            raise PowdrrExecutionError(
+                "CI repair worktree origin does not match the contract repository"
+            )
+        dirty = subprocess.run(
+            ["git", "status", "--porcelain"],
+            cwd=worker_root,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if dirty.returncode or dirty.stdout.strip():
+            raise PowdrrExecutionError(
+                "CI repair worktree must be clean before MiniSWE dispatch"
+            )
+        if self.strategy.config.code_agent != "minisweagent":
+            raise PowdrrExecutionError(
+                "contract-bound CI repair currently requires MiniSWE"
+            )
+        request_id = contract.contract_id
+        profile_names = tuple(
+            f"ci-repair-{index:02d}"
+            for index, _ in enumerate(contract.verification_commands, start=1)
+        )
+        if len(set(contract.verification_commands)) != len(
+            contract.verification_commands
+        ):
+            raise PowdrrExecutionError(
+                "CI repair contract contains duplicate validation commands"
+            )
+        request = ImplementationRequest.from_repair_contract(
+            contract,
+            request_id=request_id,
+            objective=(
+                f"Correct CI failure {contract.failure_id} on PR "
+                f"#{contract.pull_request_number}"
+            ),
+            prompt=prompt,
+            validation_profiles=profile_names,
+        )
+        store_root = root / "repair-attempts" / contract.contract_id
+        provider = build_coding_agent_provider(
+            "minisweagent",
+            opencode_executable=self.strategy.config.opencode_executable,
+            opencode_model=self.strategy.config.opencode_model,
+            minisweagent_executable=self.strategy.config.minisweagent_executable,
+            minisweagent_model=self.strategy.config.minisweagent_model,
+            timeout_seconds=self.strategy.config.coding_agent_timeout_seconds,
+            diagnostics_root=store_root / "diagnostics",
+            permission_policy=OpenCodePermissionPolicy(()),
+            miniswe_inference_handler=create_miniswe_inference_handler(
+                self.strategy.config.coding_agent_timeout_seconds
+            ),
+        )
+        runner = CodingAgentRunner(
+            provider=provider,
+            store=CodingAgentAttemptStore(store_root),
+        )
+        attempt_id = f"{contract.contract_id}-{uuid4().hex[:12]}"
+        attempt = runner.run(
+            request,
+            worktree_root=worker_root,
+            attempt_id=attempt_id,
+        )
+        profiles = {
+            name: ValidationProfile(
+                name=name,
+                command=command,
+                source="contract-bound CI repair",
+                cwd=".",
+                purpose="required repair verification",
+                local_reproducibility="declared",
+                declaration="repair contract",
+            )
+            for name, command in zip(
+                profile_names, contract.verification_commands, strict=True
+            )
+        }
+        validation = ValidationRunner(
+            profiles,
+            timeout_seconds=self.strategy.config.coding_agent_validation_timeout_seconds,
+        ).run(request, attempt, worktree_root=worker_root)
+        runner.store.save_validation_report(validation)
+
+        changed_paths = tuple(
+            sorted(set(attempt.changed_paths) | _working_paths(worker_root))
+        )
+        diff_fingerprint = _worktree_fingerprint(worker_root, changed_paths)
+        validations_by_command: dict[tuple[str, ...], CIRepairValidation] = {}
+        for validation_result in validation.results:
+            if validation_result.command not in contract.verification_commands:
+                continue
+            status: Literal["passed", "failed", "incomplete"] = (
+                "passed"
+                if validation_result.status is ValidationResultStatus.PASSED
+                else "failed"
+                if validation_result.status
+                in (ValidationResultStatus.FAILED, ValidationResultStatus.TIMED_OUT)
+                else "incomplete"
+            )
+            validations_by_command[validation_result.command] = CIRepairValidation(
+                command=validation_result.command,
+                status=status,
+                diff_fingerprint=diff_fingerprint,
+            )
+        protected_artifacts: list[ProtectedArtifact] = []
+        for artifact in contract.protected_artifacts:
+            path = worker_root / artifact.path
+            if path.is_file() and not path.is_symlink():
+                protected_artifacts.append(
+                    ProtectedArtifact(
+                        path=artifact.path,
+                        sha256=hashlib.sha256(path.read_bytes()).hexdigest(),
+                    )
+                )
+        acceptance = assess_ci_repair_candidate(
+            contract,
+            base_sha=contract.head_sha,
+            worker_status=attempt.status.value,
+            changed_paths=changed_paths,
+            protected_artifacts=protected_artifacts,
+            diff_fingerprint=diff_fingerprint,
+            validations=tuple(validations_by_command.values()),
+        )
+        outcome = {
+            "passed": acceptance.status == "accepted",
+            "dispatch_status": acceptance.status,
+            "attempt_id": attempt.attempt_id,
+            "attempt_status": attempt.status.value,
+            "changed_paths": list(changed_paths),
+            "validation_status": validation.status.value,
+            "validation_results": [
+                {
+                    "command": list(item.command),
+                    "status": item.status.value,
+                    "returncode": item.returncode,
+                }
+                for item in validation.results
+            ],
+            "acceptance": acceptance.to_dict(),
+        }
+        self.strategy.events.append({"kind": "ci_repair_dispatch", "result": outcome})
+        return outcome
 
     def _complete(self, parameters: Mapping[str, Any]) -> dict[str, Any]:
         if "output_state" not in parameters:
@@ -5994,6 +6276,7 @@ def run_workflow_task(
         )
         operation_names = (
             "ci_observe",
+            "ci_repair_dispatch",
             "procedrr_fragment_start",
             "procedrr_fragment_apply_edit",
             "internal",

@@ -61,7 +61,19 @@ class ProcessDefinition:
             if declaration.get("required") is True:
                 required.add(name)
 
-        supplied = set(bindings)
+        validated = dict(bindings)
+        for declaration in declarations:
+            if not isinstance(declaration, Mapping):
+                continue
+            name = declaration.get("name")
+            if (
+                isinstance(name, str)
+                and name not in validated
+                and "default" in declaration
+            ):
+                validated[name] = declaration["default"]
+
+        supplied = set(validated)
         unknown = supplied - schemas.keys()
         missing = required - supplied
         if unknown or missing:
@@ -72,7 +84,6 @@ class ProcessDefinition:
                 details.append(f"missing required inputs: {', '.join(sorted(missing))}")
             raise ProcessCatalogError(f"{self.name}: {'; '.join(details)}")
 
-        validated = dict(bindings)
         for name, value in validated.items():
             errors = sorted(
                 Draft202012Validator(schemas[name]).iter_errors(value),

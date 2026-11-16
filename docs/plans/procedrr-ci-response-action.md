@@ -28,8 +28,13 @@ deny protected writes in supported worker sandboxes. Contract overlap between
 editable and protected paths is rejected. Service policy now accepts a
 correction only when its base, changed paths, protected artifact hashes, and
 passing validation receipts match the live contract and candidate fingerprint.
-MiniSWE dispatch, limited publication, durable continuation, broader evidence
-collection, and full publication integration remain.
+PR #1540 adds a contract-bound MiniSWE dispatch path: the prompt is compiled
+from the exact observed failure, reproduction and accepted source claims; the
+worker runs only in the isolated worktree at the contract head; and every
+contracted command is executed before service acceptance evaluates the
+candidate. The response process still requires an already compiled repair
+contract. Limited publication, GitHub re-observation, durable continuation,
+broader evidence collection, and full publication integration remain.
 
 ## Outcome
 

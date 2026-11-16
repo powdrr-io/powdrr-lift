@@ -543,6 +543,14 @@ class Evaluator:
         child_state = {
             str(name): _resolve_value(value, state) for name, value in inputs.items()
         }
+        for item in process_inputs:
+            if (
+                isinstance(item, Mapping)
+                and isinstance(item.get("name"), str)
+                and item["name"] not in child_state
+                and "default" in item
+            ):
+                child_state[item["name"]] = item["default"]
         child_schemas: dict[str, Mapping[str, Any]] = {
             str(name): dict(self._schemas_for_state(state).get(str(name), {}))
             for name in inputs

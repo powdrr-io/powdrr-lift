@@ -1,17 +1,25 @@
 from __future__ import annotations
 
+import hashlib
 import io
 import json
 import subprocess
 import sys
 from collections.abc import Mapping, Sequence
 from dataclasses import replace
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, cast
 
 import pytest
 import yaml
+from powdrr_contracts.ci import (
+    CIFailureUnit,
+    LocalReproduction,
+    ProtectedArtifact,
+    RepairContract,
+)
 from powdrr_local import LocalPowdrrService
 from powdrr_service.changelog.parser import parse_change_log
 from powdrr_service.planning.multipr_structrr import (
@@ -2958,6 +2966,190 @@ def test_nested_procedrr_operation_returns_action_result_binding() -> None:
     assert output == result
 
 
+@pytest.mark.parametrize(
+    ("changed_path", "expected_status"),
+    (("src/app.py", "accepted"), ("docs/other.md", "rejected")),
+)
+def test_ci_repair_dispatch_runs_contract_validations_and_acceptance(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    changed_path: str,
+    expected_status: str,
+) -> None:
+    repository = tmp_path / "seed-repository"
+    repository.mkdir()
+    (repository / "src").mkdir()
+    (repository / "tests").mkdir()
+    (repository / "docs").mkdir()
+    (repository / "src" / "app.py").write_text("original\n", encoding="utf-8")
+    (repository / "docs" / "other.md").write_text("baseline\n", encoding="utf-8")
+    protected_path = repository / "tests" / "test_app.py"
+    protected_path.write_text("assert True\n", encoding="utf-8")
+
+    def git(*args: str) -> str:
+        result = subprocess.run(
+            ["git", *args], cwd=repository, capture_output=True, text=True, check=True
+        )
+        return result.stdout.strip()
+
+    git("init", "-b", "main")
+    git("config", "user.name", "CI repair test")
+    git("config", "user.email", "ci-repair-test@example.invalid")
+    git("add", ".")
+    git("commit", "-m", "initial")
+    head_sha = git("rev-parse", "HEAD")
+    git("remote", "add", "origin", "https://github.com/example/project.git")
+    worker_root = (
+        tmp_path
+        / "temp"
+        / "powdrr-lift-ci-response"
+        / f"example--project-pr-270-{head_sha[:12]}"
+        / "worktree"
+    )
+    worker_root.parent.mkdir(parents=True)
+    subprocess.run(
+        ["git", "worktree", "add", "--detach", str(worker_root), head_sha],
+        cwd=repository,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+
+    reproduction = LocalReproduction(
+        status="reproduced",
+        reason="the same assertion failed locally",
+        command=(sys.executable, "-c", "raise SystemExit(1)"),
+        exit_code=1,
+        matching_failure=True,
+    )
+    reproduction_id = (
+        "reproduction-"
+        + hashlib.sha256(
+            json.dumps(
+                reproduction.to_dict(),
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=False,
+            ).encode("utf-8")
+        ).hexdigest()[:20]
+    )
+    failure = CIFailureUnit(
+        failure_id="failure-1",
+        observation_id="observation-1",
+        job_id=11,
+        phase="test_failure",
+        signature="FAILED tests/test_app.py::test_example",
+        evidence=("job_log:11:sha256:" + "a" * 64,),
+        locally_executable=True,
+        head_sha=head_sha,
+        run_id=10,
+        run_attempt=1,
+        workflow_path=".github/workflows/ci.yml",
+        command=reproduction.command,
+        test_node_id="tests/test_app.py::test_example",
+    )
+    contract = RepairContract.create(
+        repository="example/project",
+        pull_request_number=270,
+        head_sha=head_sha,
+        observation_id=failure.observation_id,
+        failure_id=failure.failure_id,
+        reproduction_id=reproduction_id,
+        reproduction_status=reproduction.status,
+        allowed_paths=("src",),
+        protected_artifacts=(
+            ProtectedArtifact(
+                "tests/test_app.py",
+                hashlib.sha256(protected_path.read_bytes()).hexdigest(),
+            ),
+        ),
+        required_behavior=("Keep the application behavior correct.",),
+        verification_commands=(
+            (
+                sys.executable,
+                "-c",
+                "from pathlib import Path; "
+                "assert Path('src/app.py').read_text() == 'fixed\\n'",
+            ),
+        ),
+        required_checks=("CI / unit",),
+        research_claim_refs=(),
+        stop_conditions=("Stop if the correction needs another path.",),
+        expires_at=(datetime.now(UTC) + timedelta(hours=1)).isoformat(),
+    )
+    observation_result = {
+        "repository": contract.repository,
+        "pull_request": contract.pull_request_number,
+        "head_sha": head_sha,
+        "observation_id": contract.observation_id,
+        "response_state": "failed",
+        "failures": [
+            {
+                **failure.to_dict(),
+                "local_reproduction": reproduction.to_dict(),
+            }
+        ],
+    }
+
+    class FakeProvider:
+        provider_name = "minisweagent"
+
+        def run(
+            self, _request: Any, *, worktree_root: Path, attempt_id: str
+        ) -> subprocess.CompletedProcess[str]:
+            app = worktree_root / "src" / "app.py"
+            app.write_text("fixed\n", encoding="utf-8")
+            if changed_path != "src/app.py":
+                target = worktree_root / changed_path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text("changed\n", encoding="utf-8")
+            return subprocess.CompletedProcess([], 0, "", "")
+
+    monkeypatch.setattr(
+        task_agent.tempfile, "gettempdir", lambda: str(tmp_path / "temp")
+    )
+    monkeypatch.setattr(
+        task_agent,
+        "build_coding_agent_provider",
+        lambda *_args, **_kwargs: FakeProvider(),
+    )
+    monkeypatch.setattr(
+        task_agent, "create_miniswe_inference_handler", lambda _timeout: object()
+    )
+    strategy: Any = SimpleNamespace(
+        workflow=SimpleNamespace(),
+        task=SimpleNamespace(task_id="task-001", process_checkpoint=None),
+        config=SimpleNamespace(
+            code_agent="minisweagent",
+            opencode_executable="opencode",
+            opencode_model=None,
+            minisweagent_executable="mini",
+            minisweagent_model=None,
+            coding_agent_timeout_seconds=30,
+            coding_agent_validation_timeout_seconds=30,
+        ),
+        events=[],
+    )
+    operations = _TaskProcedrrOperations(
+        strategy,
+        process_id="respond-to-pr-ci",
+        process_catalog=cast(Any, SimpleNamespace()),
+        process_client=cast(Any, SimpleNamespace()),
+    )
+
+    result = operations.execute(
+        "ci_repair_dispatch",
+        {
+            "repair_contract": contract.to_dict(),
+            "observation_result": observation_result,
+        },
+    )
+
+    assert result["dispatch_status"] == expected_status, result
+    assert result["validation_status"] == "passed"
+    assert result["acceptance"]["status"] == expected_status
+
+
 def test_coding_agent_error_result_is_normalized_at_operation_boundary() -> None:
     strategy: Any = SimpleNamespace(
         workflow=SimpleNamespace(),
@@ -4435,7 +4627,7 @@ def test_ci_repair_mode_rejects_legacy_code_writing() -> None:
     )
     with pytest.raises(
         PowdrrExecutionError,
-        match="CI repair code-writing was removed",
+        match="unsupported coding-agent mode",
     ):
         task_agent._TaskWorkflowExecutionStrategy._run_coding_agent(
             strategy, mode="ci-repair"

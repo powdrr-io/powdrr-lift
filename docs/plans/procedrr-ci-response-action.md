@@ -25,9 +25,11 @@ with accepted source-backed guidance; it does not dispatch edits. Agent-side
 execution requests now carry the contract, bind it to the exact base and edit
 scope, verify protected artifact hashes before and after worker execution, and
 deny protected writes in supported worker sandboxes. Contract overlap between
-editable and protected paths is rejected. Correction acceptance and dispatch,
-durable continuation, broader evidence collection, and full publication
-integration remain.
+editable and protected paths is rejected. Service policy now accepts a
+correction only when its base, changed paths, protected artifact hashes, and
+passing validation receipts match the live contract and candidate fingerprint.
+MiniSWE dispatch, limited publication, durable continuation, broader evidence
+collection, and full publication integration remain.
 
 ## Outcome
 

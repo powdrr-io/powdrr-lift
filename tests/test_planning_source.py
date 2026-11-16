@@ -470,6 +470,23 @@ def test_source_question_builders_bind_context_examples_and_digests() -> None:
         request.validate()
 
 
+def test_requirement_extraction_example_does_not_invent_an_obligation() -> None:
+    segmented = segment_markdown_source(
+        _document(
+            "# Plan\n\nNavigation:\n\n- [Trust assumptions](#trust-assumptions)\n"
+        )
+    )
+    block = next(item for item in segmented.blocks if "Navigation:" in item.text)
+    anchors = {item.id: item for item in segmented.anchors}
+
+    request = build_extract_requirements_request(block, anchors=anchors)
+
+    assert request.valid_example["records"] == []
+    assert request.valid_example["has_more"] is False
+    assert request.valid_example["next_anchor"] is None
+    request.parse_answer(request.valid_example)
+
+
 def test_block_without_extracted_requirements_can_be_classified_as_context() -> None:
     block = next(
         block
@@ -566,9 +583,7 @@ def test_requirement_question_is_scoped_to_current_block_and_cursor() -> None:
         anchors=anchor_by_id,
         after_anchor=obligation_anchors[0],
     )
-    assert next_request.valid_example["records"][0]["source_refs"] == [
-        obligation_anchors[1]
-    ]
+    assert next_request.valid_example["records"] == []
     assert obligation_anchors[0] not in next_request.question.context_ref_ids
     assert obligation_anchors[1] in next_request.question.context_ref_ids
     assert (
@@ -652,9 +667,7 @@ def test_requirement_question_is_scoped_to_current_block_and_cursor() -> None:
         anchors=anchor_by_id,
         after_anchor=obligation_anchors[1],
     )
-    assert final_request.valid_example["records"][0]["source_refs"] == [
-        obligation_anchors[2]
-    ]
+    assert final_request.valid_example["records"] == []
     assert final_request.valid_example["has_more"] is False
     assert final_request.valid_example["next_anchor"] is None
     final_request.parse_answer(final_request.valid_example)

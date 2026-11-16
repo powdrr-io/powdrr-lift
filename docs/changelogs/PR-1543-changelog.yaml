@@ -1,0 +1,132 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1543
+title: Make CI repair dispatch safe to resume
+intent:
+  problem: Re-entering the CI response process after an interruption could start another MiniSWE repair for the same contract.
+  goal: Persist dispatch intent before launch, reuse the same saved attempt on retry, and block duplicate launch when the prior invocation has no saved result.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/plans/procedrr-ci-response-action.md
+  type: modified
+  span: {start_line: 41, end_line: 46}
+  summary: Record same-host at-most-once dispatch continuation and retain cross-host continuation as unfinished work.
+  rationale: Distinguish local retry safety from the plan's still-open durable artifact continuation.
+- path: docs/plans/procedrr-ci-response-action.md
+  type: modified
+  span: {start_line: 431, end_line: 434}
+  summary: Update implementation status with dispatch continuation and remaining integration milestones.
+  rationale: Keep the plan's next work aligned with the delivered retry behavior.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 5121, end_line: 5133}
+  summary: Atomically write CI repair dispatch and candidate JSON records.
+  rationale: Avoid partially written same-host recovery evidence.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 5530, end_line: 5577}
+  summary: Load deterministic attempt state or return an interrupted outcome when invocation intent exists without a saved attempt.
+  rationale: Prevent a resumed process from invoking MiniSWE a second time after an uncertain interruption.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 5585, end_line: 5591}
+  summary: Accept only the contract head or the saved worker commit as the current worktree head.
+  rationale: Bind retry validation to the exact candidate produced by the prior attempt.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 5593, end_line: 5593}
+  summary: Return a specific error when the current worktree head matches neither the contract nor saved worker result.
+  rationale: Make stale or replaced worker worktrees fail closed.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 5595, end_line: 5613}
+  summary: Verify the saved attempt remains based on the contract head and its candidate fingerprint is unchanged.
+  rationale: Reject worktree changes made after the persisted worker result.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 5632, end_line: 5641}
+  summary: Require a clean worktree before a new MiniSWE invocation while permitting validation-only retry for a saved attempt.
+  rationale: Reuse accepted saved work without allowing a second worker invocation.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 5643, end_line: 5643}
+  summary: Apply the MiniSWE provider requirement only when creating a new attempt.
+  rationale: Let saved MiniSWE attempts continue through validation without depending on current provider setup.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 5647, end_line: 5647}
+  summary: Write a versioned invocation receipt before starting the coding worker.
+  rationale: Record the side-effect boundary before MiniSWE runs.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 5672, end_line: 5703}
+  summary: Reuse the deterministic saved attempt or invoke MiniSWE once with an atomically persisted intent receipt.
+  rationale: Resume validation after interruption without duplicating the repair attempt.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 5722, end_line: 5722}
+  summary: Persist validation results through the shared attempt store on initial and resumed executions.
+  rationale: Keep recovery artifacts under the same contract-scoped store.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 5782, end_line: 5782}
+  summary: Atomically persist the versioned candidate manifest.
+  rationale: Make acceptance evidence recoverable as one complete record.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 5800, end_line: 5810}
+  summary: Persist the completed dispatch state and acceptance result metadata.
+  rationale: Record completion after candidate validation for safe retry.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span: {start_line: 3098, end_line: 3099}
+  summary: Track MiniSWE invocation count in the CI repair dispatch fixture.
+  rationale: Assert that resumed execution does not launch a duplicate worker.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span: {start_line: 3106, end_line: 3107}
+  summary: Count calls to the fake MiniSWE provider.
+  rationale: Provide direct evidence for at-most-once dispatch tests.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span: {start_line: 3159, end_line: 3168}
+  summary: Re-enter dispatch and assert it reuses the persisted attempt and acceptance.
+  rationale: Cover process continuation after the worker attempt was saved.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span: {start_line: 3312, end_line: 3329}
+  summary: Remove the saved result while retaining invocation intent and assert resumed dispatch is blocked.
+  rationale: Ensure an interrupted worker is not silently started again.
+entities:
+- id: write-ci-repair-json
+  type: Function
+  action: added
+- id: ci-repair-dispatch-resume
+  type: Method
+  action: added
+- id: ci-repair-dispatch-continuation-tests
+  type: Unit test
+  action: added
+entity_relationships:
+- id: dispatch-resume-persists-intent
+  source: ci-repair-dispatch-resume
+  target: write-ci-repair-json
+  type: uses
+- id: dispatch-continuation-tests-cover-retry
+  source: ci-repair-dispatch-continuation-tests
+  target: ci-repair-dispatch-resume
+  type: verifies
+invariants:
+- id: ci-repair-dispatch-at-most-once-per-contract
+  description: A contract-bound deterministic attempt ID and invocation receipt prevent a resumed process from launching another MiniSWE attempt for the same repair contract.
+  action: added
+- id: ci-repair-resumed-attempt-must-match-saved-diff
+  description: Reuse a saved attempt only when the worktree head remains at the recorded worker commit and the candidate fingerprint still matches.
+  action: added
+- id: ci-repair-dispatch-receipt-is-same-host-only
+  description: Dispatch receipts live in the existing local temporary attempt store and do not provide cross-host artifact retrieval or full durable continuation.
+  action: added
+guidance:
+- id: cross-host-ci-response-continuation-remains
+  description: Same-host at-most-once dispatch continuation is implemented; cross-host artifact-backed continuation, broader evidence collection, and full publication integration remain open.
+  action: altered

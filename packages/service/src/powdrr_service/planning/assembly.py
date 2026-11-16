@@ -865,7 +865,6 @@ def _derive_planned_write_runtime(
         derived = None
     elif (
         derived is None
-        and fact is None
         and not suffix
         and "fixtures" in parsed_path.parts
         and role == "test"

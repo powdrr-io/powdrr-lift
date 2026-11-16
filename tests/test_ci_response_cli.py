@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from argparse import Namespace
 from hashlib import sha256
+from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
@@ -11,6 +12,49 @@ from powdrr_contracts.ci import CIFailureUnit, CIJobLogEvidence, CIJobObservatio
 from powdrr_service.ci_response import build_failure_units
 
 from powdrr_lift import cli
+
+
+def test_ci_source_evidence_hashes_bounded_referenced_files(tmp_path: Path) -> None:
+    workflow = tmp_path / ".github" / "workflows" / "ci.yml"
+    workflow.parent.mkdir(parents=True)
+    workflow.write_text(
+        "jobs:\n  check:\n    steps:\n      - run: bash ./scripts/check.sh\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "scripts").mkdir()
+    script = tmp_path / "scripts" / "check.sh"
+    script.write_text("echo checked\n", encoding="utf-8")
+    (tmp_path / "tests").mkdir()
+    test_file = tmp_path / "tests" / "test_ci.py"
+    test_file.write_text("def test_ci(): pass\n", encoding="utf-8")
+    (tmp_path / "src").mkdir()
+    source = tmp_path / "src" / "app.py"
+    source.write_text("VALUE = 1\n", encoding="utf-8")
+    (tmp_path / "uv.lock").write_text("version = 1\n", encoding="utf-8")
+
+    evidence = cli._collect_ci_source_evidence(
+        tmp_path,
+        jobs=[SimpleNamespace(job_id=11, workflow_path=".github/workflows/ci.yml")],
+        failures=[SimpleNamespace(job_id=11, test_node_id="tests/test_ci.py::test_ci")],
+        changed_paths=("src/app.py", "../outside.py"),
+    )
+
+    by_path = {item["path"]: item for item in evidence}
+    assert set(by_path) == {
+        ".github/workflows/ci.yml",
+        "scripts/check.sh",
+        "tests/test_ci.py",
+        "uv.lock",
+        "src/app.py",
+    }
+    assert by_path["scripts/check.sh"]["kind"] == "workflow_script"
+    assert by_path["tests/test_ci.py"]["kind"] == "test"
+    assert by_path["src/app.py"]["sha256"] == sha256(source.read_bytes()).hexdigest()
+    assert all("content" not in item for item in evidence)
+
+    (tmp_path / "scripts" / "linked.sh").symlink_to(script)
+    linked = cli._ci_source_file(tmp_path, "scripts/linked.sh")
+    assert linked is None
 
 
 def test_response_command_writes_idempotent_runner_failure_checkpoint(

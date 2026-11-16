@@ -1610,12 +1610,33 @@ def run_worker_once(
                         pull_request_url=pull_request_url,
                         observation=observation,
                         ci_response_result=ci_response_result,
+                        human_prerequisite=(
+                            _ci_human_prerequisite_from_response(ci_response_result)
+                        ),
                     )
-                    status = _queue_status_for_ci_outcome(ci_outcome)
+                    has_human_prerequisite = (
+                        ci_response_result is not None
+                        and ci_response_result.get("response_state") == "awaiting_human"
+                    )
+                    if (
+                        has_human_prerequisite
+                        and ci_response_result is not None
+                        and ci_outcome != "awaiting_review"
+                    ):
+                        ci_outcome = "awaiting_human"
+                        status = "awaiting_human"
+                        note = _ci_response_human_note(
+                            client.repository,
+                            issue.number,
+                            pull_request_url,
+                            ci_response_result,
+                        )
+                    else:
+                        status = _queue_status_for_ci_outcome(ci_outcome)
+                        note = _ci_outcome_note(
+                            client.repository, issue.number, observation
+                        )
                     outcome = ci_outcome
-                    note = _ci_outcome_note(
-                        client.repository, issue.number, observation
-                    )
             else:
                 status = "blocked"
                 outcome = "blocked"
@@ -1894,18 +1915,31 @@ def continue_awaiting_ci_issue(
 ) -> WorkerReport:
     """Refresh the required-check outcome for a published implementation PR."""
     issue = client.get_issue(issue_number)
-    if issue.state != "open" or QUEUE_LABELS["awaiting_ci"] not in issue.labels:
-        raise GitHubIssueQueueError(
-            f"issue #{issue_number} is not open and awaiting CI"
-        )
+    if issue.state != "open":
+        raise GitHubIssueQueueError(f"issue #{issue_number} is not open")
     comments = client.list_comments(issue_number)
     pull_request_url = _latest_checkpoint_pull_request_url(comments)
     if pull_request_url is None:
         raise GitHubIssueQueueError(
             f"issue #{issue_number} has no published PR checkpoint to observe"
         )
-    inventory = _read_repository_validation_inventory(repo_root)
     previous_observation = _latest_ci_outcome_observation(comments, pull_request_url)
+    human_prerequisite = (
+        previous_observation.get("human_prerequisite")
+        if previous_observation is not None
+        and isinstance(previous_observation.get("human_prerequisite"), Mapping)
+        else None
+    )
+    awaiting_ci = QUEUE_LABELS["awaiting_ci"] in issue.labels
+    awaiting_human = (
+        QUEUE_LABELS["awaiting_human"] in issue.labels
+        and human_prerequisite is not None
+    )
+    if not (awaiting_ci or awaiting_human):
+        raise GitHubIssueQueueError(
+            f"issue #{issue_number} is not awaiting CI or a CI human prerequisite"
+        )
+    inventory = _read_repository_validation_inventory(repo_root)
     observation = _observe_required_ci_outcome(
         client,
         pull_request_url,
@@ -1916,25 +1950,60 @@ def continue_awaiting_ci_issue(
         ),
         previous_observation=previous_observation,
     )
+    ci_response_result = (
+        previous_observation.get("ci_response_result")
+        if previous_observation is not None
+        and isinstance(previous_observation.get("ci_response_result"), Mapping)
+        else None
+    )
     _append_ci_outcome_checkpoint(
         client=client,
         issue=issue,
         pull_request_url=pull_request_url,
         observation=observation,
-        ci_response_result=(
-            previous_observation.get("ci_response_result")
-            if previous_observation is not None
-            and isinstance(previous_observation.get("ci_response_result"), Mapping)
+        ci_response_result=ci_response_result,
+        human_prerequisite=(
+            human_prerequisite
+            if awaiting_human and observation.get("outcome") == "blocked"
             else None
         ),
     )
     outcome = str(observation["outcome"])
+    if awaiting_human and outcome == "blocked":
+        outcome = "awaiting_human"
+        reasons = _normalize_ci_response_reasons(
+            human_prerequisite.get("reasons")
+            if human_prerequisite is not None
+            else None
+        )
+        response_result = {
+            "response_state": "awaiting_human",
+            "repair_reasons": reasons,
+            "response_reason": observation.get("reason", ""),
+        }
+        note = _ci_response_human_note(
+            client.repository, issue_number, pull_request_url, response_result
+        )
+    else:
+        note = _ci_outcome_note(client.repository, issue_number, observation)
     status = _queue_status_for_ci_outcome(outcome)
     issue = client.get_issue(issue_number)
     client.update_issue(issue, labels=_replace_queue_status(issue.labels, status))
-    note = _ci_outcome_note(client.repository, issue_number, observation)
     client.add_comment(client.get_issue(issue_number), note)
     return WorkerReport(outcome, issue_number, detail=note, ci_outcome=outcome)
+
+
+def has_ci_human_checkpoint(*, client: GitHubIssueClient, issue_number: int) -> bool:
+    """Return whether the latest published-PR checkpoint asks for CI human action."""
+    comments = client.list_comments(issue_number)
+    pull_request_url = _latest_checkpoint_pull_request_url(comments)
+    if pull_request_url is None:
+        return False
+    observation = _latest_ci_outcome_observation(comments, pull_request_url)
+    return bool(
+        observation is not None
+        and isinstance(observation.get("human_prerequisite"), Mapping)
+    )
 
 
 def _continue_manual_prerequisite_issue_locked(
@@ -3546,7 +3615,14 @@ def _ci_response_result_from_task_record(
     if (
         result.get("observation_schema_version") != 1
         or not isinstance(response_state, str)
-        or response_state not in {"awaiting_ci", "awaiting_review", "failed", "blocked"}
+        or response_state
+        not in {
+            "awaiting_ci",
+            "awaiting_human",
+            "awaiting_review",
+            "failed",
+            "blocked",
+        }
         or not isinstance(head_sha, str)
         or re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", head_sha) is None
         or not isinstance(observation_id, str)
@@ -3576,6 +3652,7 @@ def _ci_response_result_from_task_record(
     if isinstance(dispatch_status, str) and dispatch_status in {
         "accepted",
         "blocked",
+        "human_required",
         "interrupted",
         "not_requested",
         "rejected",
@@ -4148,6 +4225,8 @@ def _queue_status_for_ci_outcome(outcome: str) -> str:
         return "awaiting_review"
     if outcome == "awaiting_ci":
         return "awaiting_ci"
+    if outcome == "awaiting_human":
+        return "awaiting_human"
     return "blocked"
 
 
@@ -4156,6 +4235,7 @@ def _render_ci_outcome_checkpoint(
     pull_request_url: str | None,
     observation: Mapping[str, Any],
     ci_response_result: Mapping[str, Any] | None = None,
+    human_prerequisite: Mapping[str, Any] | None = None,
 ) -> str:
     checkpoint_url = pull_request_url or observation.get("pull_request_url")
     payload = {
@@ -4174,6 +4254,12 @@ def _render_ci_outcome_checkpoint(
         ),
         "last_remote_observed_at": observation.get("last_remote_observed_at"),
     }
+    if human_prerequisite is not None:
+        reasons = _normalize_ci_response_reasons(human_prerequisite.get("reasons"))
+        payload["human_prerequisite"] = {
+            "schema_version": 1,
+            "reasons": reasons,
+        }
     response_result = _normalize_ci_response_for_checkpoint(
         ci_response_result, expected_head_sha=observation.get("head_sha")
     )
@@ -4254,6 +4340,17 @@ def _latest_ci_outcome_observation(
             )
             if normalized_response is not None:
                 result["ci_response_result"] = normalized_response
+        human_prerequisite = payload.get("human_prerequisite")
+        if (
+            isinstance(human_prerequisite, Mapping)
+            and human_prerequisite.get("schema_version") == 1
+        ):
+            result["human_prerequisite"] = {
+                "schema_version": 1,
+                "reasons": _normalize_ci_response_reasons(
+                    human_prerequisite.get("reasons")
+                ),
+            }
         return result
     return None
 
@@ -4265,11 +4362,13 @@ def _append_ci_outcome_checkpoint(
     pull_request_url: str | None,
     observation: Mapping[str, Any],
     ci_response_result: Mapping[str, Any] | None = None,
+    human_prerequisite: Mapping[str, Any] | None = None,
 ) -> None:
     comment = _render_ci_outcome_checkpoint(
         pull_request_url=pull_request_url,
         observation=observation,
         ci_response_result=ci_response_result,
+        human_prerequisite=human_prerequisite,
     )
     fingerprint = re.search(r"Observation `([0-9a-f]{16})`", comment)
     if fingerprint is not None and any(
@@ -4295,7 +4394,14 @@ def _normalize_ci_response_for_checkpoint(
         or not isinstance(observation_id, str)
         or re.fullmatch(r"[0-9a-f]{64}", observation_id) is None
         or not isinstance(response_state, str)
-        or response_state not in {"awaiting_ci", "awaiting_review", "failed", "blocked"}
+        or response_state
+        not in {
+            "awaiting_ci",
+            "awaiting_human",
+            "awaiting_review",
+            "failed",
+            "blocked",
+        }
     ):
         return None
     checks_status = result.get("required_checks_status")
@@ -4319,6 +4425,7 @@ def _normalize_ci_response_for_checkpoint(
     if isinstance(dispatch_status, str) and dispatch_status in {
         "accepted",
         "blocked",
+        "human_required",
         "interrupted",
         "not_requested",
         "rejected",
@@ -4352,6 +4459,20 @@ def _normalize_ci_response_reasons(value: object) -> list[str]:
     ]
 
 
+def _ci_human_prerequisite_from_response(
+    result: Mapping[str, Any] | None,
+) -> dict[str, Any] | None:
+    if result is None or result.get("response_state") != "awaiting_human":
+        return None
+    reasons = _normalize_ci_response_reasons(result.get("repair_reasons"))
+    if not reasons:
+        reason = result.get("response_reason")
+        reasons = _normalize_ci_response_reasons(
+            [reason] if isinstance(reason, str) else []
+        )
+    return {"schema_version": 1, "reasons": reasons}
+
+
 def _ci_outcome_note(
     repository: str, issue_number: int, observation: Mapping[str, Any]
 ) -> str:
@@ -4367,6 +4488,26 @@ def _ci_outcome_note(
     return (
         f"Powdrr cannot mark this item ready for review: {reason}. "
         "Inspect the CI outcome checkpoint and resolve the reported state."
+    )
+
+
+def _ci_response_human_note(
+    repository: str,
+    issue_number: int,
+    pull_request_url: str | None,
+    response_result: Mapping[str, Any],
+) -> str:
+    reasons = _normalize_ci_response_reasons(response_result.get("repair_reasons"))
+    reason = "; ".join(reasons) or str(
+        response_result.get("response_reason")
+        or "The CI failure needs human review before a repair can be authorized."
+    )
+    pull_request = pull_request_url or "the published PR"
+    return (
+        f"Powdrr paused CI repair for {pull_request}: {reason}. After the "
+        "external prerequisite or review is complete, run `powdrr-lift "
+        "github-issue-worker-continue --repository "
+        f"{repository} --issue-number {issue_number}` to recheck the current PR head."
     )
 
 

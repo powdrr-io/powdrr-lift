@@ -533,6 +533,10 @@ inputs:
   - {name: issue_number, type: integer, required: true}
   - {name: pull_request_url, type: string, required: true}
   - {name: verification_command, type: string, required: true}
+  - name: task_context
+    schema: {type: [object, "null"]}
+    required: false
+    default: null
 outputs:
   ci_response_result: {type: object}
 steps:

@@ -260,6 +260,7 @@ from powdrr_lift.workrr.github_issue_queue import (
     continue_manual_prerequisite_issue,
     find_plan_issues,
     fulfill_issue_without_pr,
+    has_ci_human_checkpoint,
     load_reviewed_plan_at_commit,
     publish_plan_issues,
     source_design_items_requiring_replan_at_commit,
@@ -3216,6 +3217,12 @@ def _run_respond_to_pr_ci(args: argparse.Namespace) -> int:
             head_sha=head_sha,
             verification_command=getattr(args, "verification_command", None),
         )
+        source_evidence = _collect_ci_source_evidence(
+            worker_root,
+            jobs=jobs,
+            failures=failures,
+            changed_paths=snapshot.changed_paths,
+        )
         jobs_by_id = {item.job_id: item for item in jobs}
         runs_by_id = {
             item.get("id"): item
@@ -3362,6 +3369,8 @@ def _run_respond_to_pr_ci(args: argparse.Namespace) -> int:
                 "draft": draft_status,
             },
             "observation_id": observation_id,
+            "observation": observation.to_dict(),
+            "source_evidence": source_evidence,
             "checkpoint_written": checkpoint_written,
             "waited_seconds": (
                 min(
@@ -3603,6 +3612,141 @@ def _reproduce_ci_failures(
     return results
 
 
+def _collect_ci_source_evidence(
+    repository_root: Path,
+    *,
+    jobs: Sequence[Any],
+    failures: Sequence[Any],
+    changed_paths: Sequence[str],
+) -> list[dict[str, Any]]:
+    """Hash bounded source files referenced by the failed workflow surface."""
+    selected: dict[str, str] = {}
+    jobs_by_id = {job.job_id: job for job in jobs}
+    workflow_paths = {
+        jobs_by_id[failure.job_id].workflow_path
+        for failure in failures
+        if failure.job_id in jobs_by_id
+        and isinstance(jobs_by_id[failure.job_id].workflow_path, str)
+    }
+    for workflow_path in workflow_paths:
+        if not isinstance(workflow_path, str) or not _safe_ci_repository_path(
+            workflow_path
+        ):
+            continue
+        selected[workflow_path] = "workflow"
+        workflow_file = _ci_source_file(repository_root, workflow_path)
+        if workflow_file is None:
+            continue
+        try:
+            raw_workflow = workflow_file.read_bytes()
+            if len(raw_workflow) > 1_000_000:
+                continue
+            workflow_data = yaml.safe_load(raw_workflow)
+        except (OSError, UnicodeError, yaml.YAMLError):
+            continue
+        if not isinstance(workflow_data, Mapping):
+            continue
+        jobs_data = workflow_data.get("jobs")
+        if not isinstance(jobs_data, Mapping):
+            continue
+        for job_data in jobs_data.values():
+            if not isinstance(job_data, Mapping):
+                continue
+            steps = job_data.get("steps")
+            if not isinstance(steps, list):
+                continue
+            for step in steps:
+                if not isinstance(step, Mapping) or not isinstance(
+                    step.get("run"), str
+                ):
+                    continue
+                for match in re.finditer(
+                    r"(?:^|\s)(?:python(?:3(?:\.\d+)?)?|bash|sh)\s+"
+                    r"(?P<path>[A-Za-z0-9_./-]+\.(?:py|sh|bash))(?:\s|$)",
+                    step["run"],
+                    re.MULTILINE,
+                ):
+                    path = match.group("path").removeprefix("./")
+                    if _safe_ci_repository_path(path):
+                        selected[path] = "workflow_script"
+
+    for failure in failures:
+        test_node_id = getattr(failure, "test_node_id", None)
+        if isinstance(test_node_id, str):
+            test_path = test_node_id.split("::", 1)[0]
+            if _safe_ci_repository_path(test_path):
+                selected[test_path] = "test"
+
+    lockfiles = (
+        "uv.lock",
+        "poetry.lock",
+        "pdm.lock",
+        "requirements.txt",
+        "requirements-dev.txt",
+        "package-lock.json",
+        "pnpm-lock.yaml",
+        "yarn.lock",
+        "go.mod",
+        "Cargo.lock",
+    )
+    for path in lockfiles:
+        if _ci_source_file(repository_root, path) is not None:
+            selected.setdefault(path, "dependency_lock")
+
+    for path in changed_paths:
+        if path.endswith((".sh", ".bash", ".py")) and _safe_ci_repository_path(path):
+            selected.setdefault(path, "changed_script_or_source")
+
+    evidence: list[dict[str, Any]] = []
+    for relative, kind in sorted(selected.items())[:24]:
+        source = _ci_source_file(repository_root, relative)
+        if source is None:
+            continue
+        try:
+            if source.stat().st_size > 2_000_000:
+                continue
+            content = source.read_bytes()
+        except OSError:
+            continue
+        evidence.append(
+            {
+                "path": relative,
+                "kind": kind,
+                "size_bytes": len(content),
+                "sha256": hashlib.sha256(content).hexdigest(),
+            }
+        )
+    return evidence
+
+
+def _ci_source_file(repository_root: Path, relative: str) -> Path | None:
+    parts = relative.split("/")
+    if any(part in {"", ".", ".."} for part in parts):
+        return None
+    source = repository_root
+    for part in parts:
+        source = source / part
+        if source.is_symlink():
+            return None
+    try:
+        resolved = source.resolve(strict=True)
+        resolved.relative_to(repository_root.resolve())
+    except (OSError, ValueError):
+        return None
+    return resolved if resolved.is_file() else None
+
+
+def _safe_ci_repository_path(value: str) -> bool:
+    normalized = value.replace("\\", "/")
+    return bool(
+        normalized
+        and not normalized.startswith("/")
+        and "\\" not in value
+        and ".." not in normalized.split("/")
+        and all(ord(character) >= 32 for character in normalized)
+    )
+
+
 def _target_pytest_command(
     command: tuple[str, ...], failures: Sequence[Any]
 ) -> tuple[str, ...]:
@@ -3799,7 +3943,10 @@ def _run_github_issue_worker_continue(args: argparse.Namespace) -> int:
     repo_root = resolve_repo_root(args.repo_root)
     client = GitHubIssueClient(args.repository)
     issue = client.get_issue(args.issue_number)
-    if QUEUE_LABELS["awaiting_ci"] in issue.labels:
+    if QUEUE_LABELS["awaiting_ci"] in issue.labels or (
+        QUEUE_LABELS["awaiting_human"] in issue.labels
+        and has_ci_human_checkpoint(client=client, issue_number=args.issue_number)
+    ):
         try:
             report = continue_awaiting_ci_issue(
                 client=client, issue_number=args.issue_number, repo_root=repo_root
@@ -3818,7 +3965,11 @@ def _run_github_issue_worker_continue(args: argparse.Namespace) -> int:
                 indent=2,
             )
         )
-        return 0 if report.outcome in {"awaiting_review", "awaiting_ci"} else 1
+        return (
+            0
+            if report.outcome in {"awaiting_review", "awaiting_ci", "awaiting_human"}
+            else 1
+        )
 
     def resume_workflow(
         checkpoint: Mapping[str, Any], checkpoint_callback: TaskCheckpointCallback

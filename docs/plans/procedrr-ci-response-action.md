@@ -37,26 +37,30 @@ publication revalidates the persisted attempt, manifest, diff fingerprint,
 protected artifacts, and validation receipts; permits only a same-repository
 PR branch that still points at the contract head; uses a normal fast-forward
 push; and re-observes checks after publication. Fork branches and moved branch
-heads stop as blocked. The response process still requires an already compiled
-repair contract. This follow-up makes MiniSWE dispatch safe to resume on the
+heads stop as blocked. Earlier slices required a precompiled repair contract.
+This follow-up makes MiniSWE dispatch safe to resume on the
 same host: it records invocation intent before launch, reuses the deterministic
 attempt ID and saved attempt on retry, and blocks a second launch when an
 invocation receipt exists without a saved result. PR #1546 adds cross-host
 artifact-backed continuation using hash-checked issue-comment artifacts.
-Broader evidence collection and durable human-prerequisite continuation remain;
-publication is currently limited to accepted candidates on the existing
-same-repository PR branch.
+Publication is currently limited to accepted candidates on the existing
+same-repository PR branch. This follow-up hashes bounded workflow, test,
+lockfile, and changed-source evidence; prepares a repair contract in the normal
+PR workflow only for one locally reproduced failure with an exact reviewed
+source path; and routes ambiguous or externally dependent failures to a durable
+human checkpoint. The existing continue command re-observes that checkpoint
+and keeps it awaiting human while required checks remain blocked.
 
-This slice makes terminal repair and publication outcomes part of the
-versioned response result returned to the issue queue. Every terminal path in
-`respond-to-pr-ci` now finalizes the latest observation together with dispatch
-and publication status and bounded reasons. The workflow adapter returns that
-combined result, and the queue checkpoint preserves those fields for operators.
-Blocked repair or publication is recorded as a completed, structured response
-so the queue can persist the reason and independently check current required CI
-state. This does not complete the response plan: durable human-prerequisite
-continuation and broader evidence collection remain, and publication is still
-limited to the existing same-repository PR branch.
+The response process prepares a narrow repair contract from the reviewed PR
+scope, exact changed-file list, captured failed-job log, reproduced pytest
+failure, and protected test hash. It dispatches automatically only when those
+inputs identify one source path and required-check policy is complete. Other
+failures receive an actionable human checkpoint. The issue queue persists this
+route, exposes the existing continue command for it, and re-observes the latest
+PR head before changing queue state. Source evidence is represented by bounded
+file hashes rather than copying repository contents into the issue checkpoint.
+Publication remains limited to accepted candidates on the existing
+same-repository PR branch.
 
 ## Outcome
 
@@ -439,23 +443,19 @@ return values. No live provider or private GitHub access is required in CI.
 
 ## Remaining implementation sequence
 
-The initial three-PR outline was delivered in smaller, reviewable slices.
-Observation and reproduction, bounded evidence and research, protected repair
-contracts, candidate acceptance, MiniSWE dispatch, limited publication with
-exact-head re-observation, and same-host at-most-once dispatch continuation are
-implemented in the PR history above. The current changes add cross-host
-continuation through compressed, hash-checked issue-comment artifacts and
-contract-bound candidate restoration. Broader evidence collection and full
-publication integration remain. New policy remains service-owned; Git
+The initial implementation outline is delivered: the normal implementation PR
+workflow calls the response process; exact-head observations, bounded evidence,
+research, scoped contracts, acceptance, dispatch, limited publication,
+same-host and cross-host continuation, terminal queue outcomes, and durable
+human continuation are implemented. New policy remains service-owned; Git
 publication remains an agent capability.
 
-1. **Publication integration and continuation.** Call the procedure after
-   `finish-implementation-pr` and PR updates, expose structured terminal
-   outcomes to the queue, and extend the existing human continuation path.
-   Preserve `pull_request_url` while adding the explicit CI outcome; the queue
-   must not infer awaiting-review from an exit code alone. Add resume/race and
-   existing-PR scenarios, operator guidance and complete required repository
-   checks. Exercise Gaterr only through the product workflow after merge.
+1. **Post-merge product verification.** Run the Gaterr scenario only through
+   the product workflow after this implementation is merged. Confirm a real
+   required-check failure reaches either a constrained repair or a durable
+   human checkpoint, and that `github-issue-worker-continue` re-observes the
+   current head. Do not close this plan based only on local tests or a green
+   feature-branch PR.
 
 Completion requires an actual PR whose current required GitHub checks pass,
 or an evidenced human prerequisite with a working continuation path; a locally

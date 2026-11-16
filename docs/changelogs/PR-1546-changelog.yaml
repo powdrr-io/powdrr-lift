@@ -1,5 +1,5 @@
 schema: https://powdrr.io/schema/changelog-v2
-change_id: PR-1545
+change_id: PR-1546
 title: Persist CI repair continuation artifacts across workers
 intent:
   problem: CI repair dispatch receipts and candidate worktrees are stored only on the worker host, so a later worker cannot safely continue after a host change.

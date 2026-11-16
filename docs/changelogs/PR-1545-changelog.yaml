@@ -1,0 +1,72 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1545
+title: Keep duplicate source references valid during planning
+intent:
+  problem: Exact duplicate source blocks could be classified using requirements from an earlier block, but the planner rejected those references because it only allowed IDs cited within the duplicate block.
+  goal: Preserve known requirement IDs across exact duplicate blocks so planning can account for repeated source text and continue coverage analysis.
+human-decisions: []
+structured_files: []
+files:
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span: {start_line: 787, end_line: 793}
+  summary: Add matching earlier-block requirements to the IDs accepted by duplicate disposition questions.
+  rationale: Let exact duplicate classifications reference obligations already covered by the original block.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span: {start_line: 791, end_line: 791}
+  summary: Move fingerprint calculation before construction of the allowed reference set.
+  rationale: Use the matching-block key to collect valid prior requirement IDs.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span: {start_line: 802, end_line: 802}
+  summary: Reuse the prior-block requirement IDs when deriving deterministic duplicate dispositions.
+  rationale: Keep duplicate question validation aligned with deterministic classification.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span: {start_line: 2994, end_line: 2994}
+  summary: Initialize prior-block requirement tracking during ledger replay.
+  rationale: Resolve duplicate references consistently while rebuilding accepted dispositions.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span: {start_line: 2996, end_line: 3009}
+  summary: Reconstruct prior-block requirement IDs while replaying source dispositions into the ledger.
+  rationale: Ensure accepted-ledger parsing validates duplicate IDs against the same set as question preparation.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span: {start_line: 3019, end_line: 3026}
+  summary: Retain each block's direct requirement IDs for later exact-duplicate accounting.
+  rationale: Make prior requirements available when the accepted ledger encounters repeated source text.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span: {start_line: 3184, end_line: 3201}
+  summary: Add a shared helper that builds the valid requirement IDs for a source block disposition.
+  rationale: Keep question validation and accepted-ledger replay aligned on prior duplicate references.
+- path: tests/test_planning_service.py
+  type: modified
+  span: {start_line: 40, end_line: 40}
+  summary: Import the duplicate disposition requirement-ID helper for regression coverage.
+  rationale: Exercise the same ID set construction used by planning.
+- path: tests/test_planning_service.py
+  type: modified
+  span: {start_line: 59, end_line: 59}
+  summary: Import the source disposition request builder for regression coverage.
+  rationale: Verify the prior ID passes typed disposition validation.
+- path: tests/test_planning_service.py
+  type: modified
+  span: {start_line: 1596, end_line: 1628}
+  summary: Verify an exact duplicate disposition accepts the earlier block's requirement ID.
+  rationale: Prevent the unknown requirement error that stopped replanning after extraction.
+entities: []
+entity_relationships: []
+invariants:
+- id: duplicate-blocks-preserve-covering-requirements
+  description: An exact duplicate source block may cite requirements that cover an earlier matching block.
+  action: added
+- id: source-disposition-validation-and-replay-agree
+  description: Requirement IDs accepted while preparing a disposition question remain valid when reconstructing the source ledger.
+  action: added
+guidance:
+- id: include-prior-requirements-for-exact-duplicates
+  description: When classifying an exact duplicate source block, include requirements from prior matching blocks in the allowed reference set.
+  action: added

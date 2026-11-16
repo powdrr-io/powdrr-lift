@@ -1,5 +1,5 @@
 schema: https://powdrr.io/schema/changelog-v2
-change_id: PR-1548
+change_id: PR-1549
 title: Treat extensionless test fixtures as runtime neutral
 intent:
   problem: Work-unit planning required repository runtime evidence for new extensionless files in test fixture directories, even though these files hold data and do not select a programming language.

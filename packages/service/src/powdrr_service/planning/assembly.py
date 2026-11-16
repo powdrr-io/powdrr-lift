@@ -863,6 +863,14 @@ def _derive_planned_write_runtime(
         and role in {"configuration", "documentation"}
     ):
         derived = None
+    elif (
+        derived is None
+        and fact is None
+        and not suffix
+        and "fixtures" in parsed_path.parts
+        and role == "test"
+    ):
+        derived = None
     elif derived is None:
         derived = (
             fact.runtime if fact is not None else None

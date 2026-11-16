@@ -333,6 +333,18 @@ def test_new_extensionless_data_file_can_be_explicitly_runtime_neutral() -> None
     assert proposal.planned_writes[0].runtime is None
 
 
+def test_extensionless_test_fixture_is_runtime_neutral() -> None:
+    path = "attestation/tests/fixtures/snapshot_digests"
+    context, anchor = _context(path=path, runtime="neutral")
+    context = replace(context, repository_paths={})
+    answer = _proposal(context, anchor, path=path, runtime="neutral")
+
+    proposal = parse_work_unit_proposal(answer, context=context)
+
+    assert proposal.implementation_runtime == "neutral"
+    assert proposal.planned_writes[0].runtime is None
+
+
 @pytest.mark.parametrize(
     "path",
     [

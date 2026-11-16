@@ -1,0 +1,32 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1549
+title: Treat extensionless test fixtures as runtime neutral
+intent:
+  problem: Work-unit planning required repository runtime evidence for new extensionless files in test fixture directories, even though these files hold data and do not select a programming language.
+  goal: Allow extensionless test fixtures to be planned without inventing runtime evidence while retaining runtime checks for extension-bearing source files.
+human-decisions: []
+structured_files: []
+files:
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span: {start_line: 866, end_line: 873}
+  summary: Classify extensionless planned test fixture paths as runtime neutral when no repository runtime fact exists.
+  rationale: Fixture data does not need a programming-language runtime, and the path remains constrained to a fixture directory.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span: {start_line: 334, end_line: 345}
+  summary: Verify an extensionless fixture path is accepted as a runtime-neutral test write.
+  rationale: Cover the snapshot digest fixture that blocked the saved planning proposal.
+entities: []
+entity_relationships: []
+invariants:
+- id: extensionless-test-fixtures-are-runtime-neutral
+  description: New extensionless files under fixtures directories with test role do not require repository runtime evidence.
+  action: added
+- id: test-source-files-retain-runtime-classification
+  description: Extension-bearing source files continue to use path-derived runtime classification.
+  action: added
+guidance:
+- id: infer-no-runtime-for-extensionless-fixture-data
+  description: Treat extensionless files under a fixtures directory as runtime neutral when the planned write has test role.
+  action: added

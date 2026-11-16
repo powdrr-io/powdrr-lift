@@ -1,0 +1,143 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1546
+title: Persist CI repair continuation artifacts across workers
+intent:
+  problem: CI repair dispatch receipts and candidate worktrees are stored only on the worker host, so a later worker cannot safely continue after a host change.
+  goal: Persist invocation state and accepted candidate files in bounded, integrity-checked issue-comment artifacts, then restore and revalidate them on a fresh worker.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/plans/procedrr-ci-response-action.md
+  type: modified
+  span: {start_line: 433, end_line: 437}
+  summary: Record cross-host continuation as the current implementation slice and retain broader evidence and publication integration as remaining work.
+  rationale: Keep the implementation sequence aligned with the durable artifact behavior being added.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 9, end_line: 9}
+  summary: Import base64 support for encoding issue-comment artifact chunks.
+  rationale: Store binary candidate data in the existing text-based GitHub comment checkpoint channel.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 18, end_line: 18}
+  summary: Import zlib support for compact continuation bundles.
+  rationale: Bound the number of durable issue comments needed to carry candidate files.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 74, end_line: 80}
+  summary: Define the artifact comment markers, pointer markers, chunk size, and payload limits.
+  rationale: Keep continuation records identifiable, discoverable without scanning unrelated comments, and bounded.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 839, end_line: 897}
+  summary: Read comment pages backward only until the issue-pointed repair bundle is complete.
+  rationale: Retrieve durable artifacts without scanning unrelated issue history.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 2449, end_line: 2707}
+  summary: Maintain compact issue-body pointers, store compressed continuation chunks, and load only complete bundles whose chunk and bundle digests verify.
+  rationale: Provide a repository-owned durable artifact path that is retrievable by a worker on another host.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 2776, end_line: 2792}
+  summary: Attach contract-scoped persist and load operations to the queue checkpoint callback.
+  rationale: Let task execution save and recover CI repair artifacts through its existing checkpoint boundary.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 4, end_line: 4}
+  summary: Import base64 support for portable candidate-file snapshots.
+  rationale: Encode candidate bytes in durable continuation records.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 5135, end_line: 5305}
+  summary: Capture portable candidate files, persist dispatch intent before MiniSWE, and restore a matching cross-host candidate before rerunning validations.
+  rationale: Preserve at-most-once dispatch behavior while allowing a fresh worker to continue from a completed attempt.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 5707, end_line: 5722}
+  summary: Read durable continuation operations from the task checkpoint callback.
+  rationale: Recover artifact-backed dispatch state through the issue checkpoint.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 5738, end_line: 5767}
+  summary: Restore a completed artifact on a fresh worker or block when only an invocation receipt exists.
+  rationale: Continue safely across hosts without launching MiniSWE twice.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 5915, end_line: 5924}
+  summary: Persist the remote invocation receipt before starting MiniSWE.
+  rationale: Preserve the at-most-once boundary if the worker stops during dispatch.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 6011, end_line: 6028}
+  summary: Persist the completed attempt, candidate manifest, and hashed file snapshots for cross-host recovery.
+  rationale: Make validated candidate state retrievable before the workflow advances to publication.
+- path: tests/test_github_issue_queue.py
+  type: modified
+  span: {start_line: 3, end_line: 3}
+  summary: Import hashing for deterministic multi-chunk artifact test content.
+  rationale: Build a stable incompressible payload that exercises multi-comment storage.
+- path: tests/test_github_issue_queue.py
+  type: modified
+  span: {start_line: 2615, end_line: 2663}
+  summary: Verify CI repair continuation artifacts round-trip through issue comments.
+  rationale: Cover durable storage serialization and integrity verification at the GitHub comment boundary.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span: {start_line: 6, end_line: 6}
+  summary: Import temporary artifact cleanup for the fresh-worker scenario.
+  rationale: Remove host-local attempt files to prove the test uses only durable continuation data.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span: {start_line: 3128, end_line: 3140}
+  summary: Provide an in-memory durable checkpoint boundary to the CI repair operation test.
+  rationale: Exercise the same persist and load hooks that issue comments provide in production.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span: {start_line: 3152, end_line: 3152}
+  summary: Inject the durable checkpoint boundary into the task strategy.
+  rationale: Enable dispatch continuation persistence during the integration scenario.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span: {start_line: 3174, end_line: 3190}
+  summary: Simulate a fresh worker restoring an accepted candidate after local attempt files are removed, while asserting MiniSWE runs only once.
+  rationale: Exercise cross-host continuation and revalidation through the workflow operation boundary.
+entities:
+- id: persist-ci-repair-artifact
+  type: Function
+  action: added
+- id: load-ci-repair-artifact
+  type: Function
+  action: added
+- id: restore-ci-repair-portable-artifact
+  type: Function
+  action: added
+- id: cross-host-ci-repair-continuation-test
+  type: Unit test
+  action: added
+entity_relationships:
+- id: durable-artifact-round-trip
+  source: persist-ci-repair-artifact
+  target: load-ci-repair-artifact
+  type: supports
+- id: cross-host-continuation-restores-candidate
+  source: cross-host-ci-repair-continuation-test
+  target: restore-ci-repair-portable-artifact
+  type: verifies
+invariants:
+- id: ci-repair-artifacts-are-integrity-checked
+  description: Continuation bundles are accepted only when every chunk hash, complete chunk set, compressed bundle digest, contract identity, and restored file hash match.
+  action: added
+- id: ci-repair-restoration-is-contract-bound
+  description: A restored candidate must use the contract head, stay within allowed paths, preserve protected artifacts, and pass the contract validations again before publication.
+  action: added
+- id: ci-repair-interrupted-dispatch-remains-at-most-once
+  description: A durable invocation receipt without a completed artifact blocks automatic redispatch on another worker.
+  action: altered
+guidance:
+- id: ci-repair-checkpoint-storage-limit
+  description: Compressed continuation payloads are limited to 10 MiB and stored as individually hashed issue-comment chunks; incomplete or corrupt bundles are ignored.
+  action: added
+- id: broader-ci-response-work-remains
+  description: Broader evidence collection and full publication integration remain open in the Procedrr CI response action plan.
+  action: added

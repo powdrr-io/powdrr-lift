@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import subprocess
@@ -2609,6 +2610,55 @@ def test_task_checkpoint_comment_is_readable_and_structured() -> None:
     assert body.startswith("### Powdrr task checkpoint\n")
     assert "<!-- powdrr-task-checkpoint:v1 -->" in body
     assert '"task_id": "plan-pr-02-task-03"' in body
+
+
+def test_ci_repair_artifact_round_trips_through_issue_comments() -> None:
+    issue = QueueIssue(
+        123,
+        "CI repair",
+        "",
+        "open",
+        (),
+        "https://github.com/example/project/issues/123",
+    )
+    client = FakeIssueClient((issue,))
+    contract_id = "repair-" + "a" * 20
+    record = {
+        "contract_id": contract_id,
+        "observation_id": "b" * 64,
+        "attempt_id": f"{contract_id}-dispatch",
+        "phase": "completed",
+        "candidate_bytes": "".join(
+            hashlib.sha256(str(index).encode()).hexdigest() for index in range(3000)
+        ),
+    }
+
+    github_issue_queue._persist_ci_repair_artifact(
+        client=client,  # type: ignore[arg-type]
+        issue=issue,
+        contract_id=contract_id,
+        record=record,
+    )
+
+    assert len(client.comments) > 1
+    assert github_issue_queue._load_ci_repair_artifact(
+        client=client,  # type: ignore[arg-type]
+        issue_number=issue.number,
+        contract_id=contract_id,
+    ) == {"schema": "ci-repair-continuation-v1", **record}
+    comment_number, body = client.comments[0]
+    client.comments[0] = (
+        comment_number,
+        body.replace('"content_base64": "', '"content_base64": "A', 1),
+    )
+    assert (
+        github_issue_queue._load_ci_repair_artifact(
+            client=client,  # type: ignore[arg-type]
+            issue_number=issue.number,
+            contract_id=contract_id,
+        )
+        is None
+    )
 
 
 def test_worker_keeps_pending_required_checks_out_of_review_queue(

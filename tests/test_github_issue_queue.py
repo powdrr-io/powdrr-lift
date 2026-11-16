@@ -6,10 +6,12 @@ import subprocess
 import threading
 from collections.abc import Mapping
 from concurrent.futures import ThreadPoolExecutor
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
 import pytest
+import yaml
 from powdrr_local.file_lock import Timeout
 from powdrr_service.planning.checkpoints import (
     PlanningCheckpoint,
@@ -43,6 +45,7 @@ from powdrr_lift.workrr.github_issue_queue import (
     render_plan_repair_metadata,
     render_task_checkpoint_comment,
     run_worker_once,
+    source_design_items_requiring_replan_at_commit,
 )
 
 PLAN_COMMIT = "a" * 40
@@ -1237,6 +1240,50 @@ def test_publisher_creates_minimal_pointer_issues_and_is_idempotent() -> None:
     }
     assert "Add the shared base" not in client.issues[0].body
     assert "https://github.com/example/project/blob/" in client.issues[0].body
+
+
+def test_publisher_blocks_items_with_replan_required_source_designs(
+    tmp_path: Path,
+) -> None:
+    reviewed = plan()
+    source_path = "docs/plans/feature-v1-source-design/base.yaml"
+    reviewed = replace(
+        reviewed,
+        items=(replace(reviewed.items[0], source_reference_design_file=source_path),)
+        + reviewed.items[1:],
+    )
+    source_design = {
+        "schema_version": "structrr-source-reference-task-v1",
+        "plan_id": reviewed.plan_id,
+        "item_id": "base",
+        "design": {"compilation_status": "requires_replan"},
+        "status": "requires_replan",
+        "amendment_requirement": "An accepted behavior scenario is missing.",
+    }
+
+    def run(arguments: list[str], **_kwargs: Any) -> subprocess.CompletedProcess[str]:
+        assert arguments[-1] == f"{PLAN_COMMIT}:{source_path}"
+        return subprocess.CompletedProcess(
+            arguments, 0, yaml.safe_dump(source_design), ""
+        )
+
+    blocked = source_design_items_requiring_replan_at_commit(
+        reviewed, PLAN_COMMIT, repo_root=tmp_path, run=run
+    )
+    client = FakeIssueClient()
+    publish_plan_issues(
+        plan=reviewed,
+        plan_path="docs/plans/feature.yaml",
+        plan_commit=PLAN_COMMIT,
+        client=client,  # type: ignore[arg-type]
+        blocked_item_ids=blocked,
+    )
+
+    assert blocked == frozenset({"base"})
+    assert QUEUE_LABELS["blocked"] in client.issues[0].labels
+    assert QUEUE_LABELS["ready"] not in client.issues[0].labels
+    assert QUEUE_LABELS["blocked_on_dependency"] in client.issues[1].labels
+    assert QUEUE_LABELS["ready"] not in client.issues[1].labels
 
 
 def test_worker_skips_unmet_dependency_then_executes_ready_item(

@@ -1,0 +1,175 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1541
+title: Gate plan readiness on executable source designs
+intent:
+  problem: Plan readiness and issue publication considered dependencies but ignored source designs explicitly marked requires_replan, allowing unexecutable items to be labeled ready.
+  goal: Exclude source designs requiring replanning from ready summaries and publish their issues as blocked, using the immutable reviewed plan commit as the source of truth.
+human-decisions: []
+structured_files: []
+files:
+- path: packages/service/src/powdrr_service/planning/compiler.py
+  type: modified
+  span: {start_line: 272, end_line: 274}
+  summary: Pass generated source-design status into the plan readiness calculation.
+  rationale: Keep plans from advertising a replan-required first item as ready.
+- path: packages/service/src/powdrr_service/planning/compiler.py
+  type: modified
+  span: {start_line: 469, end_line: 472}
+  summary: Recompute validation readiness using source-design blockers.
+  rationale: Ensure compiled readiness summaries can be independently validated.
+- path: packages/service/src/powdrr_service/planning/compiler.py
+  type: modified
+  span: {start_line: 793, end_line: 793}
+  summary: Accept source-design blockers as part of dependency readiness.
+  rationale: Make source-design execution validity part of readiness decisions.
+- path: packages/service/src/powdrr_service/planning/compiler.py
+  type: modified
+  span: {start_line: 795, end_line: 797}
+  summary: Exclude blocked source designs from ready item IDs.
+  rationale: Keep a replan-required item out of the ready summary.
+- path: packages/service/src/powdrr_service/planning/compiler.py
+  type: modified
+  span: {start_line: 799, end_line: 806}
+  summary: Preserve source-design blockers and dependency wait reasons.
+  rationale: Report why affected plan items are not ready.
+- path: packages/service/src/powdrr_service/planning/compiler.py
+  type: modified
+  span: {start_line: 810, end_line: 848}
+  summary: Add explicit source-design readiness blocker reasons.
+  rationale: Preserve amendment requirements and reject missing execution preparation.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 50, end_line: 54}
+  summary: Import normalized source-design path validation.
+  rationale: Validate the reviewed plan's source-design pointer before reading its blob.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 1014, end_line: 1066}
+  summary: Read source-design state at the pinned plan commit and mark items requiring replanning as blocked during issue publication.
+  rationale: Prevent invalid reviewed source designs from entering the worker queue as executable work.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 1073, end_line: 1073}
+  summary: Accept the blocked item set when publishing plan issues.
+  rationale: Carry readiness results into queue state.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 1077, end_line: 1082}
+  summary: Reject blocker IDs that do not belong to the reviewed plan.
+  rationale: Keep queue labels bound to valid plan items.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 1115, end_line: 1121}
+  summary: Create issues for unexecutable source designs with the blocked label.
+  rationale: Prevent first-step implementation workers from claiming invalid items.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 1150, end_line: 1156}
+  summary: Preserve blocked source-design state when reconciling existing issues.
+  rationale: Avoid re-labeling unexecutable work as ready.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 265, end_line: 265}
+  summary: Import the pinned source-design readiness check.
+  rationale: Keep plan publication on the same validation path as the queue.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 3012, end_line: 3016}
+  summary: Compute source-design blockers from the exact reviewed plan commit.
+  rationale: Avoid trusting the mutable local checkout when publishing issues.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 3022, end_line: 3022}
+  summary: Pass blocked item IDs into queue publication.
+  rationale: Keep published issue state aligned with source-design readiness.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 3034, end_line: 3034}
+  summary: Include blocked item IDs in the publication result.
+  rationale: Make readiness decisions visible to the command caller.
+- path: tests/test_github_issue_queue.py
+  type: modified
+  span: {start_line: 9, end_line: 9}
+  summary: Import the dataclass replacement helper for plan fixtures.
+  rationale: Build a reviewed plan with a source-design pointer in the regression test.
+- path: tests/test_github_issue_queue.py
+  type: modified
+  span: {start_line: 14, end_line: 14}
+  summary: Import YAML serialization for pinned design fixtures.
+  rationale: Exercise the reviewed source-design document format.
+- path: tests/test_github_issue_queue.py
+  type: modified
+  span: {start_line: 48, end_line: 48}
+  summary: Import the readiness check used by plan issue publication.
+  rationale: Verify that source designs are evaluated at the pinned commit.
+- path: tests/test_github_issue_queue.py
+  type: modified
+  span: {start_line: 1245, end_line: 1288}
+  summary: Verify replan-required source designs receive blocked queue labels and keep dependent items blocked.
+  rationale: Protect queue publication from unexecutable plan items.
+- path: tests/test_planning_compiler.py
+  type: modified
+  span: {start_line: 1250, end_line: 1292}
+  summary: Verify source designs requiring replanning are excluded from ready summaries.
+  rationale: Prevent regressions in compiler readiness reporting.
+- path: tests/test_planning_service.py
+  type: modified
+  span: {start_line: 1525, end_line: 1526}
+  summary: Expect planning artifacts without execution-ready source designs to remain blocked.
+  rationale: Align the end-to-end source-ledger test with validated readiness.
+- path: tests/test_planning_service.py
+  type: modified
+  span: {start_line: 2023, end_line: 2024}
+  summary: Expect scripted planning runs with replan-required source designs to remain blocked.
+  rationale: Keep deterministic planner tests consistent with the source-design gate.
+- path: tests/test_cli.py
+  type: modified
+  span: {start_line: 301, end_line: 344}
+  summary: Verify the plan issue command forwards and reports source-design blockers.
+  rationale: Keep CLI publication connected to the readiness gate.
+- path: docs/plans/reliable-plan-execution.md
+  type: modified
+  span: {start_line: 73, end_line: 73}
+  summary: Link task 11's blocked state to the readiness-gate follow-up PR and acceptance report.
+  rationale: Keep the execution plan status tied to observed live acceptance evidence.
+- path: docs/reports/task-11-live-gaterr-acceptance.md
+  type: modified
+  span: {start_line: 82, end_line: 86}
+  summary: Record the readiness-gate follow-up and clarify that valid source designs and two merged implementations remain necessary.
+  rationale: Preserve the live acceptance blocker and remaining completion criteria.
+entities:
+- id: compiled-plan-source-design-readiness
+  type: Function
+  action: added
+- id: reviewed-source-design-queue-gate
+  type: Function
+  action: added
+- id: publish-plan-issues-subcommand
+  type: Subcommand
+  action: added
+- id: source-design-readiness-regression-tests
+  type: Unit test
+  action: added
+entity_relationships:
+- id: source-design-state-gates-plan-readiness
+  source: compiled-plan-source-design-readiness
+  target: reviewed-source-design-queue-gate
+  type: informs
+- id: queue-gate-blocks-unexecutable-items
+  source: reviewed-source-design-queue-gate
+  target: publish-plan-issues-subcommand
+  type: controls
+invariants:
+- id: replan-required-design-is-not-ready
+  description: A source design marked requires_replan is excluded from the plan's ready item IDs and retains its amendment reason in the blocked summary.
+  action: added
+- id: replan-required-design-is-not-queued-as-ready
+  description: Plan issue publication reads source-design status from the immutable plan commit and labels items requiring replanning as blocked.
+  action: added
+- id: dependency-readiness-respects-blocked-source-design
+  description: A dependent item remains blocked on its dependency when that dependency's source design requires replanning.
+  action: added
+guidance:
+- id: replan-before-running-blocked-plan-items
+  description: Amend or regenerate the reviewed plan to produce accepted source designs and execution preparation, then publish a corrected plan revision before running those items.
+  action: added

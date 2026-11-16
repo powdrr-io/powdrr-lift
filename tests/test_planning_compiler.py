@@ -1247,6 +1247,49 @@ def test_source_design_pointer_survives_compilation_and_detects_workflow_drift()
     assert not validate_compiled_plan(altered_design, snapshot).valid
 
 
+def test_replan_required_source_design_is_not_reported_ready(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    plan, manifest, proposal = _fixture()
+    item = replace(
+        plan.items[0], source_reference_design_file="docs/design/accepted.yaml"
+    )
+    plan = replace(plan, items=(item,))
+    original = compile_source_reference_design
+
+    def requires_replan(**kwargs: Any) -> dict[str, Any]:
+        design = original(**kwargs)
+        design["status"] = "requires_replan"
+        design["amendment_requirement"] = "An accepted behavior scenario is missing."
+        design["design"]["compilation_status"] = "requires_replan"
+        design["design"]["amendment_requirement"] = design["amendment_requirement"]
+        design.pop("preparation")
+        return design
+
+    monkeypatch.setattr(
+        "powdrr_service.planning.compiler.compile_source_reference_design",
+        requires_replan,
+    )
+    snapshot = {"source": manifest.data["source"], "base": manifest.data["base"]}
+    compiled = compile_plan(
+        plan=plan,
+        planning_manifest=manifest,
+        repository_snapshot=snapshot,
+        structrr_proposal=proposal,
+        verification_command="pytest -q",
+        plan_path="docs/plans/bounded-plan.yaml",
+    )
+
+    assert compiled.ready_item_ids == ()
+    assert compiled.blocked_item_reasons == {
+        "item-01": (
+            "source design requires replanning: "
+            "An accepted behavior scenario is missing."
+        )
+    }
+    assert validate_compiled_plan(compiled, snapshot).valid
+
+
 @pytest.mark.parametrize(
     "path", ["", "../intent.yaml", "/intent.yaml", "./intent.yaml"]
 )

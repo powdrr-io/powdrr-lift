@@ -1522,7 +1522,8 @@ def test_source_question_machine_accounts_for_normative_and_context_blocks() -> 
         proposal_path="docs/plans/bounded-plan-structrr-proposal.json",
     )
     assert set(compiled.destinations) == set(compiled.files)
-    assert compiled.ready_item_ids == ("item-0001",)
+    assert compiled.ready_item_ids == ()
+    assert "source design" in compiled.blocked_item_reasons["item-0001"]
     assert compiled.plan.items[0].source_reference_design_file == (
         "docs/plans/bounded-plan-source-design/item-0001.yaml"
     )
@@ -2019,7 +2020,8 @@ def test_procedrr_runs_real_planning_machine_through_compiled_artifacts(
         plan_path="docs/plans/bounded-plan.yaml",
         proposal_path="docs/plans/bounded-plan-structrr-proposal.json",
     )
-    assert compiled.ready_item_ids == ("item-0001",)
+    assert compiled.ready_item_ids == ()
+    assert "source design" in compiled.blocked_item_reasons["item-0001"]
     assert len(compiled.files) == 4
     assert compiled.plan.items[0].source_reference_design_file in compiled.files
     proposal = machine.accepted_structrr_proposal(accepted)

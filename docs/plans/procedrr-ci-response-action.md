@@ -32,9 +32,14 @@ PR #1540 adds a contract-bound MiniSWE dispatch path: the prompt is compiled
 from the exact observed failure, reproduction and accepted source claims; the
 worker runs only in the isolated worktree at the contract head; and every
 contracted command is executed before service acceptance evaluates the
-candidate. The response process still requires an already compiled repair
-contract. Limited publication, GitHub re-observation, durable continuation,
-broader evidence collection, and full publication integration remain.
+candidate. This follow-up adds limited publication for accepted candidates:
+publication revalidates the persisted attempt, manifest, diff fingerprint,
+protected artifacts, and validation receipts; permits only a same-repository
+PR branch that still points at the contract head; uses a normal fast-forward
+push; and re-observes checks after publication. Fork branches and moved branch
+heads stop as blocked. The response process still requires an already compiled
+repair contract. Durable continuation, broader evidence collection, and full
+publication integration remain.
 
 ## Outcome
 
@@ -415,24 +420,15 @@ mocked GitHub transport, and scripted MiniSWE patch attempts. Test observable
 state transitions and rejected patches, not just prompt substrings or helper
 return values. No live provider or private GitHub access is required in CI.
 
-## Implementation sequence
+## Remaining implementation sequence
 
-Deliver this in three substantial PRs; each includes its scenarios and updated
-ownership inventory. New policy stays in service modules from its first commit.
+The initial three-PR outline was delivered in smaller, reviewable slices.
+Observation and reproduction, bounded evidence and research, protected repair
+contracts, candidate acceptance, MiniSWE dispatch, and limited publication
+with exact-head re-observation are implemented in the PR history above. New
+policy remains service-owned; Git publication remains an agent capability.
 
-1. **Observation, reproduction and durable procedure.** Add public CI records,
-   agent transport/execution capabilities, service normalization/comparison,
-   Procedrr observation/wait/reproduce branches and durable checkpoints. Add
-   an explicit `respond-to-pr-ci --repository --pr --issue` entry point following
-   existing CLI conventions. It can diagnose and pause without editing. Prove
-   the motivating fixture and all reproduction states through the boundary.
-2. **Research and protected corrections.** Add scoped service research,
-   claim applicability decisions, contract/prompt compiler, generic agent
-   enforcement, correction acceptance, MiniSWE dispatch and limited publication.
-   Cover repository fixes and human prerequisites, plus adversarial weakening
-   attempts. Prove a correction can reach green mocked GitHub checks without
-   changing protected tests.
-3. **Publication integration and continuation.** Call the procedure after
+1. **Publication integration and continuation.** Call the procedure after
    `finish-implementation-pr` and PR updates, expose structured terminal
    outcomes to the queue, and extend the existing human continuation path.
    Preserve `pull_request_url` while adding the explicit CI outcome; the queue

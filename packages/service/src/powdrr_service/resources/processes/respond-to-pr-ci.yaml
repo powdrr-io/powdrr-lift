@@ -1,6 +1,6 @@
 version: 1
 name: respond-to-pr-ci
-description: Observe and reproduce CI at the current PR head, checkpoint evidence before waiting for required checks, and optionally dispatch one repair bound to an existing contract.
+description: Observe and reproduce CI at the current PR head, checkpoint evidence before waiting for required checks, and optionally dispatch, publish, and re-observe one repair bound to an existing contract.
 inputs:
   - {name: repository, type: string, required: true}
   - {name: issue_number, type: integer, required: true}
@@ -13,6 +13,9 @@ outputs:
     type: object
     additionalProperties: true
   ci_repair_result:
+    type: object
+    additionalProperties: true
+  ci_publication_result:
     type: object
     additionalProperties: true
 limits: {llm_activations: 1, tool_calls: 32, context_chars: 12000, context_value_chars: 5000}
@@ -46,7 +49,44 @@ steps:
               subject: ci_repair_result.dispatch_status
               cases:
                 accepted:
-                  - terminal: succeeded
+                  - operation:
+                      tool: ci_repair_publish
+                      parameters:
+                        repair_contract: {type: reference, value: repair_contract}
+                        observation_result: {type: reference, value: ci_observation_result}
+                        candidate_result: {type: reference, value: ci_repair_result}
+                      returns: {type: object, additionalProperties: true}
+                      bind: ci_publication_result
+                  - branch:
+                      subject: ci_publication_result.publication_status
+                      cases:
+                        published:
+                          - operation:
+                              tool: ci_observe
+                              parameters:
+                                repository: {type: reference, value: repository}
+                                issue_number: {type: reference, value: issue_number}
+                                pull_request_url: {type: reference, value: pull_request_url}
+                                verification_command: {type: reference, value: verification_command}
+                              returns: {type: object, additionalProperties: true}
+                              bind: ci_observation_result
+                          - branch:
+                              subject: ci_observation_result.response_state
+                              cases:
+                                awaiting_review:
+                                  - terminal: succeeded
+                                awaiting_ci:
+                                  - terminal: succeeded
+                                failed:
+                                  - terminal: blocked
+                                blocked:
+                                  - terminal: blocked
+                              default:
+                                - terminal: blocked
+                        blocked:
+                          - terminal: blocked
+                      default:
+                        - terminal: blocked
                 not_requested:
                   - terminal: succeeded
                 rejected:

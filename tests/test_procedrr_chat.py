@@ -149,7 +149,24 @@ def test_ci_response_procedure_runs_declared_verification_at_pinned_head() -> No
         "type": "reference",
         "value": "repair_contract",
     }
-    assert failed_steps[1]["branch"]["subject"] == ("ci_repair_result.dispatch_status")
+    dispatch_branch = failed_steps[1]["branch"]
+    assert dispatch_branch["subject"] == "ci_repair_result.dispatch_status"
+    accepted = dispatch_branch["cases"]["accepted"]
+    assert accepted[0]["operation"]["tool"] == "ci_repair_publish"
+    assert accepted[0]["operation"]["parameters"]["candidate_result"] == {
+        "type": "reference",
+        "value": "ci_repair_result",
+    }
+    publication_branch = accepted[1]["branch"]
+    assert publication_branch["subject"] == "ci_publication_result.publication_status"
+    reobserve = publication_branch["cases"]["published"][0]["operation"]
+    assert reobserve["tool"] == "ci_observe"
+    assert publication_branch["cases"]["published"][1]["branch"]["subject"] == (
+        "ci_observation_result.response_state"
+    )
+    assert publication_branch["cases"]["blocked"] == [{"terminal": "blocked"}]
+    assert dispatch_branch["cases"]["not_requested"] == [{"terminal": "succeeded"}]
+    assert dispatch_branch["cases"]["rejected"] == [{"terminal": "blocked"}]
     assert branch["cases"]["awaiting_review"] == [{"terminal": "succeeded"}]
     assert branch["cases"]["awaiting_ci"] == [{"terminal": "succeeded"}]
     assert branch["cases"]["blocked"] == [{"terminal": "succeeded"}]

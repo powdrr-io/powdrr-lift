@@ -30,7 +30,11 @@ def test_response_command_writes_idempotent_runner_failure_checkpoint(
                     "html_url": "https://github.com/example/project/pull/270",
                     "body": "Closes #107",
                     "draft": True,
-                    "head": {"sha": head_sha},
+                    "head": {
+                        "sha": head_sha,
+                        "ref": "feature/example",
+                        "repo": {"full_name": "example/project"},
+                    },
                 },
                 runs=(
                     {
@@ -98,6 +102,7 @@ def test_response_command_writes_idempotent_runner_failure_checkpoint(
     first = json.loads(capsys.readouterr().out)
     assert first["checkpoint_written"] is True
     assert first["pull_request_metadata"]["draft"] is True
+    assert first["pull_request_metadata"]["head_repository"] == "example/project"
     assert first["observation_schema_version"] == 1
     assert first["tested_sha"] == head_sha
     assert first["required_checks_status"] == "unavailable"

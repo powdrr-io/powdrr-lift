@@ -3196,6 +3196,12 @@ def _run_respond_to_pr_ci(args: argparse.Namespace) -> int:
         if not isinstance(head_sha, str):
             raise GitHubActionsError("GitHub did not return the current PR head SHA")
         head_ref = head.get("ref") if isinstance(head, Mapping) else None
+        head_repository = head.get("repo") if isinstance(head, Mapping) else None
+        head_repository_name = (
+            head_repository.get("full_name")
+            if isinstance(head_repository, Mapping)
+            else None
+        )
         clone_root, worker_root = _prepare_ci_observation_worktree(
             args.repository, pr_number, head_sha, head_ref=head_ref
         )
@@ -3345,6 +3351,11 @@ def _run_respond_to_pr_ci(args: argparse.Namespace) -> int:
             "required_checks_reason": snapshot.required_checks_reason,
             "pull_request_metadata": {
                 "head_ref": head_ref if isinstance(head_ref, str) else None,
+                "head_repository": (
+                    head_repository_name
+                    if isinstance(head_repository_name, str)
+                    else None
+                ),
                 "base_ref": base_ref if isinstance(base_ref, str) else None,
                 "title": title if isinstance(title, str) else "",
                 "body": body if isinstance(body, str) else "",

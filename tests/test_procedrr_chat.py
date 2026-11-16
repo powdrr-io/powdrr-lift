@@ -133,6 +133,7 @@ def test_ci_response_procedure_runs_declared_verification_at_pinned_head() -> No
     )
     assert defaulted["repair_contract"] is None
     assert defaulted["accepted_research_claims"] == []
+    assert defaulted["task_context"] is None
     assert process.document["limits"]["tool_calls"] >= 32
     operation = process.document["steps"][0]["operation"]
     assert operation["tool"] == "ci_observe"
@@ -215,6 +216,11 @@ def test_ci_response_procedure_runs_declared_verification_at_pinned_head() -> No
         "issue_number",
         "pull_request_url",
         "verification_command",
+        "task_context",
+    }
+    assert ci_inputs["task_context"] == {
+        "type": "reference",
+        "value": "task_context",
     }
     serialized_execute = yaml.safe_dump(execute.document)
     assert serialized_execute.count("task_context.input_state.github_repository") == 2

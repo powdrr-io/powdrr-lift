@@ -65,6 +65,20 @@ def test_ci_response_result_preserves_interrupted_dispatch_reason() -> None:
     assert result["repair_reasons"] == ["A saved invocation has no result."]
 
 
+def test_ci_response_result_routes_unsafe_repair_to_human_checkpoint() -> None:
+    result = build_ci_response_result(
+        observation_result=_observation("failed"),
+        repair_result={
+            "dispatch_status": "human_required",
+            "reasons": ["The failure evidence does not identify one safe source path."],
+        },
+    )
+
+    assert result["response_state"] == "awaiting_human"
+    assert result["repair_dispatch_status"] == "human_required"
+    assert "human action" in result["response_reason"]
+
+
 def test_ci_response_without_repair_keeps_observed_failure_state() -> None:
     result = build_ci_response_result(observation_result=_observation("failed"))
 

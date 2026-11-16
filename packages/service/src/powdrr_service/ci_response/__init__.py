@@ -22,6 +22,7 @@ from powdrr_service.ci_response.observation import (
     normalize_ci_observation,
     normalize_github_snapshot,
 )
+from powdrr_service.ci_response.prepare_repair import prepare_ci_repair_contract
 from powdrr_service.ci_response.prompt import compile_ci_repair_prompt
 from powdrr_service.ci_response.repair_contract import compile_repair_contract
 from powdrr_service.ci_response.reproduction import compare_local_reproduction
@@ -57,6 +58,7 @@ __all__ = [
     "normalize_failure_signature",
     "normalize_ci_observation",
     "normalize_github_snapshot",
+    "prepare_ci_repair_contract",
     "prepare_ci_research_search",
     "render_ci_observation_checkpoint",
     "render_stale_ci_observation_checkpoint",

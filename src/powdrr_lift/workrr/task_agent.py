@@ -30,6 +30,7 @@ from powdrr_agent.execution.story_test_collection import (
 )
 from powdrr_contracts.ci import (
     CIFailureUnit,
+    CIObservation,
     LocalReproduction,
     ProtectedArtifact,
     RepairContract,
@@ -46,6 +47,7 @@ from powdrr_service.ci_response.acceptance import (
     CIRepairValidation,
     assess_ci_repair_candidate,
 )
+from powdrr_service.ci_response.prepare_repair import prepare_ci_repair_contract
 from powdrr_service.ci_response.prompt import compile_ci_repair_prompt
 from powdrr_service.ci_response.result import build_ci_response_result
 from powdrr_service.planning.multipr_structrr import (
@@ -5331,6 +5333,136 @@ class _TaskProcedrrOperations:
             if isinstance(context, Mapping) and isinstance(context.get("task_id"), str):
                 self.original_task_id = context["task_id"]
 
+    def _prepare_ci_repair_contract(
+        self,
+        observation_result: object,
+        task_context: object,
+    ) -> tuple[dict[str, Any] | None, str]:
+        """Prepare one reproduced CI repair or return a human-review reason."""
+        if not isinstance(observation_result, Mapping):
+            return None, "CI observation is unavailable for repair preparation."
+        context = (
+            task_context
+            if isinstance(task_context, Mapping)
+            else {"input_state": self.task.input_state}
+        )
+        input_state = context.get("input_state")
+        proposed = (
+            input_state.get("proposed_pr_context")
+            if isinstance(input_state, Mapping)
+            else None
+        )
+        if not isinstance(proposed, Mapping):
+            return None, "The task has no reviewed implementation scope for CI repair."
+        try:
+            observation_data = observation_result.get("observation")
+            if not isinstance(observation_data, Mapping):
+                raise ValueError("the full typed CI observation is unavailable")
+            observation = CIObservation.from_dict(observation_data)
+            raw_failures = observation_result.get("failures")
+            if not isinstance(raw_failures, list) or len(raw_failures) != 1:
+                raise ValueError("automatic repair requires exactly one failure unit")
+            failure_data = raw_failures[0]
+            if not isinstance(failure_data, Mapping):
+                raise ValueError("the CI failure record is malformed")
+            failure = CIFailureUnit.from_dict(failure_data)
+            reproduction_data = failure_data.get("local_reproduction")
+            if not isinstance(reproduction_data, Mapping):
+                raise ValueError("local reproduction evidence is unavailable")
+            reproduction = LocalReproduction.from_dict(reproduction_data)
+            root = (
+                Path(tempfile.gettempdir())
+                / "powdrr-lift-ci-response"
+                / (
+                    f"{observation.repository.replace('/', '--')}-pr-"
+                    f"{observation.pull_request_number}-{observation.head_sha[:12]}"
+                )
+            )
+            worker_root = root / "worktree"
+            actual_head = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=worker_root,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            if (
+                actual_head.returncode
+                or actual_head.stdout.strip() != observation.head_sha
+            ):
+                raise ValueError("the isolated CI worktree is not at the observed head")
+
+            test_path = (
+                failure.test_node_id.split("::", 1)[0]
+                if failure.test_node_id is not None
+                else None
+            )
+            if test_path is None:
+                raise ValueError("the failed check does not identify one pytest file")
+            changed_paths = observation_result.get("changed_paths")
+            if not isinstance(changed_paths, list) or not all(
+                isinstance(path, str) for path in changed_paths
+            ):
+                raise ValueError("the exact PR changed-file list is unavailable")
+            protected_paths = {test_path}
+            protected_paths.update(
+                path
+                for path in changed_paths
+                if isinstance(path, str)
+                and ("/tests/" in f"/{path}/" or Path(path).name.startswith("test_"))
+            )
+            if len(protected_paths) > 100:
+                raise ValueError("too many test artifacts to protect for one repair")
+            protected_artifacts: list[ProtectedArtifact] = []
+            for relative in sorted(protected_paths):
+                path = PurePosixPath(relative)
+                if (
+                    path.is_absolute()
+                    or ".." in path.parts
+                    or "\\" in relative
+                    or not relative
+                ):
+                    raise ValueError("the failing test path is unsafe")
+                target = worker_root.joinpath(*path.parts)
+                parent = worker_root
+                for part in path.parts[:-1]:
+                    parent = parent / part
+                    if parent.is_symlink():
+                        raise ValueError("the failing test path crosses a symlink")
+                if not target.is_file() or target.is_symlink():
+                    raise ValueError("a test artifact to protect is unavailable")
+                protected_artifacts.append(
+                    ProtectedArtifact(
+                        relative,
+                        hashlib.sha256(target.read_bytes()).hexdigest(),
+                    )
+                )
+
+            log_data = observation_result.get("job_log_evidence")
+            job_log = (
+                log_data.get(str(failure.job_id))
+                if isinstance(log_data, Mapping)
+                else None
+            )
+            excerpt = (
+                job_log.get("excerpt", "")
+                if isinstance(job_log, Mapping)
+                and isinstance(job_log.get("excerpt", ""), str)
+                else ""
+            )
+            contract = prepare_ci_repair_contract(
+                observation=observation,
+                failure=failure,
+                reproduction=reproduction,
+                changed_paths=changed_paths,
+                failure_log_excerpt=excerpt,
+                reviewed_context=proposed,
+                protected_artifacts=protected_artifacts,
+            )
+        except (OSError, ValueError) as error:
+            return None, str(error)
+        return contract.to_dict(), ""
+
     def execute(self, operation: str, parameters: Mapping[str, Any]) -> Any:
         if operation == "ci_observe":
             values = {
@@ -5387,11 +5519,25 @@ class _TaskProcedrrOperations:
             )
             return normalized
         if operation == "ci_repair_dispatch":
-            if parameters.get("repair_contract") is None:
-                return {"passed": True, "dispatch_status": "not_requested"}
+            repair_contract = parameters.get("repair_contract")
+            if repair_contract is None:
+                repair_contract, reason = self._prepare_ci_repair_contract(
+                    parameters.get("observation_result"),
+                    parameters.get("task_context"),
+                )
+                if repair_contract is None:
+                    result = {
+                        "passed": False,
+                        "dispatch_status": "human_required",
+                        "reasons": [reason[:240]],
+                    }
+                    self.strategy.events.append(
+                        {"kind": "ci_repair_preparation", "result": result}
+                    )
+                    return result
             return self._run_ci_repair_agent(
                 {
-                    "repair_contract": parameters.get("repair_contract"),
+                    "repair_contract": repair_contract,
                     "observation_result": parameters.get("observation_result"),
                     "accepted_research_claims": parameters.get(
                         "accepted_research_claims", []

@@ -6,8 +6,21 @@ import re
 from collections.abc import Mapping
 from typing import Any
 
-_RESPONSE_STATES = {"awaiting_ci", "awaiting_review", "failed", "blocked"}
-_DISPATCH_STATES = {"accepted", "blocked", "interrupted", "not_requested", "rejected"}
+_RESPONSE_STATES = {
+    "awaiting_ci",
+    "awaiting_human",
+    "awaiting_review",
+    "failed",
+    "blocked",
+}
+_DISPATCH_STATES = {
+    "accepted",
+    "blocked",
+    "human_required",
+    "interrupted",
+    "not_requested",
+    "rejected",
+}
 _PUBLICATION_STATES = {"blocked", "not_attempted", "published"}
 _SHA_RE = re.compile(r"[0-9a-f]{40}|[0-9a-f]{64}")
 _DIGEST_RE = re.compile(r"[0-9a-f]{64}")
@@ -61,7 +74,8 @@ def build_ci_response_result(
     publication_reasons = _bounded_reasons(publication_result)
     response_state = str(observed_state)
     if (
-        dispatch_status in {"blocked", "interrupted", "rejected"}
+        dispatch_status == "human_required"
+        or dispatch_status in {"blocked", "interrupted", "rejected"}
         or publication_status == "blocked"
         or (dispatch_status == "accepted" and publication_status != "published")
         or (
@@ -69,7 +83,9 @@ def build_ci_response_result(
             and observed_state in {"failed", "blocked"}
         )
     ):
-        response_state = "blocked"
+        response_state = (
+            "awaiting_human" if dispatch_status == "human_required" else "blocked"
+        )
 
     reason = str(
         observation_result.get("response_reason")
@@ -78,6 +94,8 @@ def build_ci_response_result(
     )[:500]
     if publication_status == "blocked" and publication_reasons:
         reason = "CI repair publication blocked: " + "; ".join(publication_reasons)
+    elif dispatch_status == "human_required" and repair_reasons:
+        reason = "CI repair requires human action: " + "; ".join(repair_reasons)
     elif dispatch_status in {"blocked", "interrupted", "rejected"} and repair_reasons:
         reason = "CI repair dispatch blocked: " + "; ".join(repair_reasons)
     elif response_state == "blocked" and not reason:

@@ -9,7 +9,7 @@ from collections.abc import Mapping
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pytest
 import yaml
@@ -2838,6 +2838,101 @@ def test_continue_awaiting_ci_rechecks_current_head_and_records_result(
     assert latest is not None
     assert latest["ci_response_result"]["response_state"] == "awaiting_ci"
     assert latest["ci_response_result"]["matches_queue_head"] is True
+
+
+def test_continue_ci_human_checkpoint_preserves_human_route_until_checks_clear(
+    tmp_path: Path,
+) -> None:
+    client = FakeIssueClient()
+    client.required_checks = [{"name": "test", "state": "fail", "workflow": "ci"}]
+    client.issues.append(
+        QueueIssue(
+            100,
+            "Implement base",
+            "",
+            "open",
+            (QUEUE_LABELS["awaiting_human"],),
+            "https://github.com/example/project/issues/100",
+        )
+    )
+    client.comments.append(
+        (
+            100,
+            _legacy_checkpoint_comment(
+                TaskCheckpoint(
+                    plan_id="feature-v1",
+                    item_id="base",
+                    workflow_id="base",
+                    task_id="finished",
+                    output_state_type="execute-proposed-pr-workflow-result-state",
+                    output_state={
+                        "pull_request_url": "https://github.com/example/project/pull/123"
+                    },
+                    commit_sha="b" * 40,
+                )
+            ),
+        )
+    )
+    client.comments.append(
+        (
+            100,
+            github_issue_queue._render_ci_outcome_checkpoint(
+                pull_request_url="https://github.com/example/project/pull/123",
+                observation={
+                    "outcome": "blocked",
+                    "head_sha": client.pr_head,
+                    "observed_at": "2026-11-15T00:00:00+00:00",
+                    "checks": [],
+                    "reason": "required check failed",
+                },
+                ci_response_result={
+                    "schema_version": 1,
+                    "head_sha": client.pr_head,
+                    "observation_id": "f" * 64,
+                    "response_state": "awaiting_human",
+                    "response_reason": "automatic repair scope was ambiguous",
+                    "required_checks_status": "available",
+                    "repair_dispatch_status": "human_required",
+                    "repair_reasons": ["Review the failed workflow setup."],
+                },
+                human_prerequisite={
+                    "schema_version": 1,
+                    "reasons": ["Review the failed workflow setup."],
+                },
+            ),
+        )
+    )
+
+    assert github_issue_queue.has_ci_human_checkpoint(
+        client=cast(GitHubIssueClient, client), issue_number=100
+    )
+    report = continue_awaiting_ci_issue(
+        client=client,  # type: ignore[arg-type]
+        issue_number=100,
+        repo_root=tmp_path,
+    )
+
+    assert report.outcome == "awaiting_human"
+    assert QUEUE_LABELS["awaiting_human"] in client.get_issue(100).labels
+    assert report.detail is not None
+    assert "github-issue-worker-continue" in report.detail
+    latest = github_issue_queue._latest_ci_outcome_observation(
+        client.list_comments(100), "https://github.com/example/project/pull/123"
+    )
+    assert latest is not None
+    assert latest["human_prerequisite"]["reasons"] == [
+        "Review the failed workflow setup."
+    ]
+
+    client.required_checks = [{"name": "test", "state": "pass", "workflow": "ci"}]
+    recovered = continue_awaiting_ci_issue(
+        client=client,  # type: ignore[arg-type]
+        issue_number=100,
+        repo_root=tmp_path,
+    )
+    assert recovered.outcome == "awaiting_review"
+    assert QUEUE_LABELS["awaiting_review"] in client.get_issue(100).labels
+    assert QUEUE_LABELS["awaiting_human"] not in client.get_issue(100).labels
 
 
 def test_required_ci_observation_rejects_head_change_during_check_read(

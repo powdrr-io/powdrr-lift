@@ -40,6 +40,7 @@ steps:
                 pull_request_url: {type: reference, value: pull_request_url}
                 verification_command:
                   {type: reference, value: task_context.input_state.proposed_pr_context.verification_command}
+                task_context: {type: reference, value: task_context}
               outputs:
                 ci_response_result: ci_response_result
       default:
@@ -94,6 +95,7 @@ steps:
                       pull_request_url: {type: reference, value: pull_request_url}
                       verification_command:
                         {type: reference, value: task_context.input_state.proposed_pr_context.verification_command}
+                      task_context: {type: reference, value: task_context}
                     outputs:
                       ci_response_result: ci_response_result
               implementation_defect:

@@ -8,6 +8,7 @@ inputs:
   - {name: verification_command, type: string, required: true}
   - {name: repair_contract, schema: {type: [object, "null"]}, required: false, default: null}
   - {name: accepted_research_claims, type: array, required: false, default: []}
+  - {name: task_context, schema: {type: [object, "null"]}, required: false, default: null}
 outputs:
   ci_response_result:
     type: object
@@ -49,6 +50,7 @@ steps:
                 repair_contract: {type: reference, value: repair_contract}
                 observation_result: {type: reference, value: ci_observation_result}
                 accepted_research_claims: {type: reference, value: accepted_research_claims}
+                task_context: {type: reference, value: task_context}
               returns: {type: object, additionalProperties: true}
               bind: ci_repair_result
           - branch:

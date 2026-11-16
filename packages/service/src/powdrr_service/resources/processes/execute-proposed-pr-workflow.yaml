@@ -41,7 +41,7 @@ steps:
                 verification_command:
                   {type: reference, value: task_context.input_state.proposed_pr_context.verification_command}
               outputs:
-                ci_response_result: ci_observation_result
+                ci_response_result: ci_response_result
       default:
         - judge:
             kind: construct_one
@@ -95,7 +95,7 @@ steps:
                       verification_command:
                         {type: reference, value: task_context.input_state.proposed_pr_context.verification_command}
                     outputs:
-                      ci_response_result: ci_observation_result
+                      ci_response_result: ci_response_result
               implementation_defect:
                 - terminal: failed
               unclear:

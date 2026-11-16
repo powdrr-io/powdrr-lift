@@ -161,15 +161,22 @@ def test_ci_response_procedure_runs_declared_verification_at_pinned_head() -> No
     assert publication_branch["subject"] == "ci_publication_result.publication_status"
     reobserve = publication_branch["cases"]["published"][0]["operation"]
     assert reobserve["tool"] == "ci_observe"
-    assert publication_branch["cases"]["published"][1]["branch"]["subject"] == (
-        "ci_observation_result.response_state"
+    assert publication_branch["cases"]["published"][1]["operation"]["tool"] == (
+        "ci_response_finalize"
     )
-    assert publication_branch["cases"]["blocked"] == [{"terminal": "blocked"}]
-    assert dispatch_branch["cases"]["not_requested"] == [{"terminal": "succeeded"}]
-    assert dispatch_branch["cases"]["rejected"] == [{"terminal": "blocked"}]
-    assert branch["cases"]["awaiting_review"] == [{"terminal": "succeeded"}]
-    assert branch["cases"]["awaiting_ci"] == [{"terminal": "succeeded"}]
-    assert branch["cases"]["blocked"] == [{"terminal": "succeeded"}]
+    assert publication_branch["cases"]["blocked"][0]["operation"]["tool"] == (
+        "ci_response_finalize"
+    )
+    assert dispatch_branch["cases"]["not_requested"][0]["operation"]["tool"] == (
+        "ci_response_finalize"
+    )
+    assert dispatch_branch["cases"]["rejected"][0]["operation"]["tool"] == (
+        "ci_response_finalize"
+    )
+    for state in ("awaiting_review", "awaiting_ci", "blocked"):
+        assert branch["cases"][state][0]["operation"]["tool"] == (
+            "ci_response_finalize"
+        )
     assert all(
         item["name"] != "implementation_context" for item in process.document["inputs"]
     )
@@ -188,7 +195,7 @@ def test_ci_response_procedure_runs_declared_verification_at_pinned_head() -> No
     }
     assert execute.document["steps"][1]["branch"]["cases"][True][1]["call"][
         "outputs"
-    ] == {"ci_response_result": "ci_observation_result"}
+    ] == {"ci_response_result": "ci_response_result"}
     assert ci_inputs["repository"] == {
         "type": "reference",
         "value": "task_context.input_state.github_repository",

@@ -41,9 +41,22 @@ heads stop as blocked. The response process still requires an already compiled
 repair contract. This follow-up makes MiniSWE dispatch safe to resume on the
 same host: it records invocation intent before launch, reuses the deterministic
 attempt ID and saved attempt on retry, and blocks a second launch when an
-invocation receipt exists without a saved result. Cross-host artifact-backed
-continuation, broader evidence collection, and full publication integration
-remain.
+invocation receipt exists without a saved result. PR #1546 adds cross-host
+artifact-backed continuation using hash-checked issue-comment artifacts.
+Broader evidence collection and durable human-prerequisite continuation remain;
+publication is currently limited to accepted candidates on the existing
+same-repository PR branch.
+
+This slice makes terminal repair and publication outcomes part of the
+versioned response result returned to the issue queue. Every terminal path in
+`respond-to-pr-ci` now finalizes the latest observation together with dispatch
+and publication status and bounded reasons. The workflow adapter returns that
+combined result, and the queue checkpoint preserves those fields for operators.
+Blocked repair or publication is recorded as a completed, structured response
+so the queue can persist the reason and independently check current required CI
+state. This does not complete the response plan: durable human-prerequisite
+continuation and broader evidence collection remain, and publication is still
+limited to the existing same-repository PR branch.
 
 ## Outcome
 

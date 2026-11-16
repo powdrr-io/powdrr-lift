@@ -47,6 +47,7 @@ from powdrr_service.ci_response.acceptance import (
     assess_ci_repair_candidate,
 )
 from powdrr_service.ci_response.prompt import compile_ci_repair_prompt
+from powdrr_service.ci_response.result import build_ci_response_result
 from powdrr_service.planning.multipr_structrr import (
     active_decision_drift_findings,
     inherited_decision_records,
@@ -5440,6 +5441,34 @@ class _TaskProcedrrOperations:
                 {"kind": "ci_repair_publication", "result": result}
             )
             return result
+        if operation == "ci_response_finalize":
+            observation = parameters.get("observation_result")
+            repair = parameters.get("repair_result")
+            publication = parameters.get("publication_result")
+            if not isinstance(observation, Mapping):
+                raise PowdrrExecutionError(
+                    "CI response finalization requires an observation result"
+                )
+            if repair is not None and not isinstance(repair, Mapping):
+                raise PowdrrExecutionError(
+                    "CI response repair result must be an object or null"
+                )
+            if publication is not None and not isinstance(publication, Mapping):
+                raise PowdrrExecutionError(
+                    "CI response publication result must be an object or null"
+                )
+            try:
+                result = build_ci_response_result(
+                    observation_result=observation,
+                    repair_result=repair,
+                    publication_result=publication,
+                )
+            except ValueError as error:
+                raise PowdrrExecutionError(str(error)) from error
+            self.strategy.events.append(
+                {"kind": "ci_response_result", "result": result}
+            )
+            return result
         if operation == "procedrr_fragment_start":
             from powdrr_service.procedrr.fragments import start_fragment
 
@@ -6698,6 +6727,7 @@ def run_workflow_task(
             "ci_observe",
             "ci_repair_dispatch",
             "ci_repair_publish",
+            "ci_response_finalize",
             "procedrr_fragment_start",
             "procedrr_fragment_apply_edit",
             "internal",

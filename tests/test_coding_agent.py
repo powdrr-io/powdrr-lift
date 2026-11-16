@@ -1,13 +1,16 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import subprocess
 import sys
 from dataclasses import replace
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pytest
 from powdrr_agent.execution.minisweagent_monitor import MiniSWEAgentSnapshot
+from powdrr_contracts.ci import ProtectedArtifact, RepairContract
 from powdrr_contracts.models import ChatCompletionRequest, ChatCompletionResponse
 from powdrr_service.behavior_contract import BEHAVIOR_DIMENSIONS
 from powdrr_service.structrr.reference_catalog import compile_reference_catalog
@@ -26,7 +29,9 @@ from powdrr_lift.workrr.coding_agent import (
     MiniSWEAgentProvider,
     OpenCodePermissionPolicy,
     OpenCodeProvider,
+    _repair_contract_protected_paths,
     _seatbelt_write_deny_profile,
+    _write_denied_command,
     classify_coding_agent_attempt,
     run_coding_agent,
 )
@@ -183,6 +188,42 @@ def _request(base_commit: str = "base") -> ImplementationRequest:
         acceptance_criteria=("the test passes",),
         validation_profiles=("python",),
         allowed_commands=("python3 *",),
+    )
+
+
+def _repair_request(
+    worktree: Path,
+    protected_relative_path: str,
+    *,
+    expires_at: str = "2026-11-17T00:00:00Z",
+) -> ImplementationRequest:
+    protected_path = worktree / protected_relative_path
+    protected_digest = hashlib.sha256(protected_path.read_bytes()).hexdigest()
+    head = _head(worktree)
+    contract = RepairContract.create(
+        repository="example/project",
+        pull_request_number=270,
+        head_sha=head,
+        observation_id="observation-1",
+        failure_id="failure-1",
+        reproduction_id="reproduction-1",
+        reproduction_status="reproduced",
+        allowed_paths=("src",),
+        protected_artifacts=(
+            ProtectedArtifact(protected_relative_path, protected_digest),
+        ),
+        required_behavior=("Preserve all existing test behavior.",),
+        verification_commands=(("pytest", protected_relative_path),),
+        required_checks=("CI / unit",),
+        research_claim_refs=(),
+        stop_conditions=("Stop if protected artifacts change.",),
+        expires_at=expires_at,
+    )
+    return ImplementationRequest.from_repair_contract(
+        contract,
+        request_id="ci-repair-1",
+        objective="Repair the identified CI failure.",
+        prompt="Implement only the contract-bound correction.",
     )
 
 
@@ -1042,6 +1083,215 @@ def test_worker_change_to_protected_path_is_policy_denied(tmp_path: Path) -> Non
     assert attempt.status is CodingAgentStatus.POLICY_DENIED
     assert attempt.error == "worker changed protected paths"
     assert attempt.changed_paths == ("tests/test_protected.py",)
+
+
+def test_repair_contract_round_trips_and_binds_worker_scope(tmp_path: Path) -> None:
+    worktree = _git_repo(tmp_path)
+    protected = worktree / "tests" / "test_contract.py"
+    protected.parent.mkdir()
+    protected.write_text("def test_behavior():\n    assert 1 == 1\n")
+    subprocess.run(["git", "add", "tests/test_contract.py"], cwd=worktree, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.com",
+            "commit",
+            "-m",
+            "add protected test",
+        ],
+        cwd=worktree,
+        check=True,
+        capture_output=True,
+    )
+    request = _repair_request(worktree, "tests/test_contract.py")
+
+    assert ImplementationRequest.from_data(request.to_data()) == request
+    assert request.worker_prompt.endswith(
+        "Do not edit protected artifacts or change behavior outside this contract."
+    )
+    assert _repair_contract_protected_paths(request, worktree) == (protected,)
+    with pytest.raises(ValueError, match="differs from its CI repair contract"):
+        replace(request, allowed_paths=("tests",))
+
+
+def test_repair_contract_hash_mismatch_blocks_worker_before_execution(
+    tmp_path: Path,
+) -> None:
+    worktree = _git_repo(tmp_path)
+    protected = worktree / "tests" / "test_contract.py"
+    protected.parent.mkdir()
+    protected.write_text("def test_behavior():\n    assert 1 == 1\n")
+    subprocess.run(["git", "add", "tests/test_contract.py"], cwd=worktree, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.com",
+            "commit",
+            "-m",
+            "add protected test",
+        ],
+        cwd=worktree,
+        check=True,
+        capture_output=True,
+    )
+    request = _repair_request(worktree, "tests/test_contract.py")
+    protected.write_text("def test_behavior():\n    assert True\n")
+
+    class NeverRunProvider:
+        provider_name = "fake"
+        ran = False
+
+        def run(
+            self,
+            request: ImplementationRequest,
+            *,
+            worktree_root: Path,
+            attempt_id: str,
+        ) -> subprocess.CompletedProcess[str]:
+            del request, worktree_root, attempt_id
+            self.ran = True
+            return subprocess.CompletedProcess(["fake"], 0, "", "")
+
+    provider = NeverRunProvider()
+    attempt = run_coding_agent(
+        provider, request, worktree_root=worktree, attempt_id="contract-baseline"
+    )
+
+    assert attempt.status is CodingAgentStatus.POLICY_DENIED
+    assert attempt.error == "protected artifact hash changed: tests/test_contract.py"
+    assert not provider.ran
+
+
+def test_expired_repair_contract_blocks_worker_before_execution(tmp_path: Path) -> None:
+    worktree = _git_repo(tmp_path)
+    protected = worktree / "tests" / "test_contract.py"
+    protected.parent.mkdir()
+    protected.write_text("def test_behavior():\n    assert 1 == 1\n")
+    subprocess.run(["git", "add", "tests/test_contract.py"], cwd=worktree, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.com",
+            "commit",
+            "-m",
+            "add protected test",
+        ],
+        cwd=worktree,
+        check=True,
+        capture_output=True,
+    )
+    expired_at = (datetime.now(UTC) - timedelta(seconds=1)).isoformat()
+    request = _repair_request(worktree, "tests/test_contract.py", expires_at=expired_at)
+
+    class NeverRunProvider:
+        provider_name = "fake"
+        ran = False
+
+        def run(
+            self,
+            request: ImplementationRequest,
+            *,
+            worktree_root: Path,
+            attempt_id: str,
+        ) -> subprocess.CompletedProcess[str]:
+            del request, worktree_root, attempt_id
+            self.ran = True
+            return subprocess.CompletedProcess(["fake"], 0, "", "")
+
+    provider = NeverRunProvider()
+    attempt = run_coding_agent(
+        provider, request, worktree_root=worktree, attempt_id="expired-contract"
+    )
+
+    assert attempt.status is CodingAgentStatus.POLICY_DENIED
+    assert attempt.error == "CI repair contract has expired"
+    assert not provider.ran
+
+
+def test_repair_contract_worker_change_is_denied_and_os_write_is_blocked(
+    tmp_path: Path,
+) -> None:
+    worktree = _git_repo(tmp_path)
+    protected = worktree / "tests" / "test_contract.py"
+    protected.parent.mkdir()
+    protected.write_text("def test_behavior():\n    assert 1 == 1\n")
+    subprocess.run(["git", "add", "tests/test_contract.py"], cwd=worktree, check=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=Test",
+            "-c",
+            "user.email=test@example.com",
+            "commit",
+            "-m",
+            "add protected test",
+        ],
+        cwd=worktree,
+        check=True,
+        capture_output=True,
+    )
+    request = _repair_request(worktree, "tests/test_contract.py")
+
+    class ProtectedFileProvider:
+        provider_name = "fake"
+
+        def run(
+            self,
+            request: ImplementationRequest,
+            *,
+            worktree_root: Path,
+            attempt_id: str,
+        ) -> subprocess.CompletedProcess[str]:
+            del request, attempt_id
+            (worktree_root / "tests/test_contract.py").write_text(
+                "def test_behavior():\n    assert True\n"
+            )
+            return subprocess.CompletedProcess(["fake"], 0, "", "")
+
+    attempt = run_coding_agent(
+        ProtectedFileProvider(),
+        request,
+        worktree_root=worktree,
+        attempt_id="contract-protected-edit",
+    )
+    profile = _seatbelt_write_deny_profile(
+        _repair_contract_protected_paths(request, worktree)
+    )
+
+    assert attempt.status is CodingAgentStatus.POLICY_DENIED
+    assert attempt.error == "worker changed protected paths"
+    assert "(deny file-write* (subpath " in profile
+    assert str(protected) in profile
+
+
+def test_opencode_contract_command_uses_write_denial_profile(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import powdrr_lift.workrr.coding_agent as coding_agent_module
+
+    protected = tmp_path / "tests" / "test_contract.py"
+    monkeypatch.setattr(coding_agent_module.sys, "platform", "darwin")
+    monkeypatch.setattr(
+        Path,
+        "is_file",
+        lambda path: str(path) == "/usr/bin/sandbox-exec",
+    )
+    command, profile = _write_denied_command(("opencode", "run"), (protected,))
+
+    assert command[:2] == ["/usr/bin/sandbox-exec", "-f"]
+    assert profile is not None
+    assert str(protected) in profile.read_text()
+    profile.unlink()
 
 
 def test_implementation_request_round_trips_protected_paths() -> None:

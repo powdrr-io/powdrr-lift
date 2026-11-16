@@ -126,12 +126,14 @@ def test_repair_contract_rejects_inconclusive_reproduction_and_head_mismatch() -
 
 def test_repair_contract_rejects_protected_paths_and_unknown_checks() -> None:
     observation, failure = _case()
-    with pytest.raises(ContractError, match="cannot allow edits to protected"):
+    with pytest.raises(ContractError, match="overlap protected artifacts"):
         _compile(
             observation,
             failure,
             allowed_paths=("tests/test_app.py",),
         )
+    with pytest.raises(ContractError, match="overlap protected artifacts"):
+        _compile(observation, failure, allowed_paths=("tests",))
 
 
 def test_repair_contract_cannot_drop_an_observed_required_check() -> None:

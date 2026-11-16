@@ -1,0 +1,270 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1536
+title: Enforce CI repair contracts in coding workers
+intent:
+  problem: CI repair contracts defined a safe correction boundary, but the generic coding worker did not yet carry or enforce that boundary.
+  goal: Bind repair requests to the exact contract, enforce expiry and protected artifact integrity, and deny protected writes in supported worker sandboxes.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 2578, end_line: 2578}
+  summary: Record the coding worker dependency on CI repair contracts.
+  rationale: Keep the agent module ownership inventory aligned with its contract enforcement responsibility.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 2584, end_line: 2584}
+  summary: Update the coding worker ownership rationale.
+  rationale: Identify its contract-bound CI repair and protected artifact enforcement responsibility.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 4010, end_line: 4012}
+  summary: Record the generic coding worker import of CI repair contracts.
+  rationale: Keep the internal dependency inventory accurate.
+- path: docs/architecture/agent-service-module-ownership.json
+  type: modified
+  span: {start_line: 4016, end_line: 4016}
+  summary: Update the generic coding worker ownership rationale.
+  rationale: Identify its contract-bound CI repair and protected artifact enforcement responsibility.
+- path: docs/plans/procedrr-ci-response-action.md
+  type: modified
+  span: {start_line: 25, end_line: 30}
+  summary: Record completed worker-side contract enforcement and remaining response work.
+  rationale: Keep the plan accurate about protected correction support and outstanding dispatch and publication integration.
+- path: packages/contracts/src/powdrr_contracts/ci.py
+  type: modified
+  span: {start_line: 802, end_line: 806}
+  summary: Reject editable paths that overlap protected artifact paths.
+  rationale: Prevent directory allowlists from indirectly including protected files.
+- path: packages/contracts/src/powdrr_contracts/ci.py
+  type: modified
+  span: {start_line: 808, end_line: 808}
+  summary: Clarify the error for overlapping editable and protected paths.
+  rationale: Make the fail-closed contract rejection explicit.
+- path: packages/contracts/src/powdrr_contracts/ci.py
+  type: modified
+  span: {start_line: 1041, end_line: 1050}
+  summary: Compare repository paths for equality and parent-child overlap.
+  rationale: Detect protected artifacts included by broader editable directories.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span: {start_line: 21, end_line: 21}
+  summary: Import time support for repair contract expiry checks.
+  rationale: Compare contract expiration with the current UTC time.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span: {start_line: 36, end_line: 36}
+  summary: Import the public CI repair contract type.
+  rationale: Bind serialized repair contracts into generic worker requests.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span: {start_line: 53, end_line: 53}
+  summary: Define the v4 repair request schema version.
+  rationale: Add a versioned transport for contract-bound coding requests.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span: {start_line: 136, end_line: 136}
+  summary: Add an optional repair contract to implementation requests.
+  rationale: Preserve existing request versions while allowing v4 requests to carry the boundary.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span: {start_line: 144, end_line: 144}
+  summary: Accept implementation request v4.
+  rationale: Enable explicit parsing and validation of repair-bound worker requests.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span: {start_line: 156, end_line: 175}
+  summary: Bind v4 request base, edit scope, protected paths, and behavior to its repair contract.
+  rationale: Reject mismatched or combined boundaries before worker execution.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span: {start_line: 180, end_line: 183}
+  summary: Allow source reference validation for supported v3 and v4 requests.
+  rationale: Preserve existing prompt validation while introducing the new request version.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span: {start_line: 230, end_line: 256}
+  summary: Construct implementation requests from validated repair contracts.
+  rationale: Bind exact base, allowed paths, behavior, verification commands, and protected artifacts.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span: {start_line: 320, end_line: 324}
+  summary: Serialize source reference fields for v4 requests.
+  rationale: Keep versioned request serialization explicit.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span: {start_line: 348, end_line: 356}
+  summary: Serialize repair contract data only for v4 requests.
+  rationale: Preserve legacy request payloads and carry the boundary in v4.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span: {start_line: 378, end_line: 391}
+  summary: Render correction context and contract constraints in the worker prompt.
+  rationale: Give the worker the required behavior and protected artifact boundaries.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span: {start_line: 393, end_line: 406}
+  summary: Include contract identity, editable paths, protected artifacts, and stop conditions in prompts.
+  rationale: Make contract obligations explicit to the worker.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span: {start_line: 458, end_line: 467}
+  summary: Recognize v4 request fields while rejecting them in legacy schemas.
+  rationale: Keep repair contracts confined to the intended transport version.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span: {start_line: 470, end_line: 473}
+  summary: Require explicit source reference fields for v4 requests.
+  rationale: Preserve the established request parsing guarantees.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span: {start_line: 476, end_line: 485}
+  summary: Require and parse serialized repair contracts in v4 requests.
+  rationale: Reject payloads whose schema and carried boundary disagree.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span: {start_line: 517, end_line: 521}
+  summary: Parse the repair contract into the typed implementation request.
+  rationale: Revalidate contract contents during deserialization.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span: {start_line: 1087, end_line: 1089}
+  summary: Add a protected-write profile to OpenCode execution.
+  rationale: Deny writes to protected artifacts in the macOS worker sandbox.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span: {start_line: 1091, end_line: 1107}
+  summary: Run OpenCode with the generated write-denial profile and remove the temporary profile afterward.
+  rationale: Keep protected artifact enforcement active for the worker process lifetime.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span: {start_line: 1313, end_line: 1318}
+  summary: Add contract protected artifacts to the MiniSWE Seatbelt profile.
+  rationale: Deny protected writes in the supported macOS worker sandbox.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span: {start_line: 1338, end_line: 1338}
+  summary: Build the MiniSWE profile from configured and contract protected paths.
+  rationale: Apply the combined write-denial boundary.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span: {start_line: 1434, end_line: 1471}
+  summary: Resolve protected contract paths and create fail-closed macOS write-denial commands.
+  rationale: Refuse repair execution when the required operating system boundary is unavailable.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span: {start_line: 1803, end_line: 1812}
+  summary: Check contract expiry and protected artifact integrity before invoking a worker.
+  rationale: Block stale contracts and mismatched protected files before execution.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span: {start_line: 1829, end_line: 1838}
+  summary: Recheck protected artifact integrity after worker setup.
+  rationale: Prevent work from starting if setup changed a protected artifact.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span: {start_line: 1847, end_line: 1857}
+  summary: Convert unavailable repair worker boundaries into policy denial.
+  rationale: Fail closed when a contract-bound execution sandbox cannot be provided.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span: {start_line: 1886, end_line: 1886}
+  summary: Check protected artifacts after worker execution.
+  rationale: Detect any contract artifact changes before accepting the attempt.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span: {start_line: 1897, end_line: 1902}
+  summary: Deny attempts that alter protected artifacts.
+  rationale: Keep protected baseline hashes intact across the full worker attempt.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span: {start_line: 1908, end_line: 1908}
+  summary: Report protected artifact changes as policy denial.
+  rationale: Distinguish integrity failures from ordinary worker outcomes.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span: {start_line: 2022, end_line: 2045}
+  summary: Verify contract expiry, artifact availability, symlink status, and SHA-256 baselines.
+  rationale: Keep protected files immutable throughout the worker attempt.
+- path: src/powdrr_lift/workrr/coding_agent.py
+  type: modified
+  span: {start_line: 2209, end_line: 2209}
+  summary: Export the v4 repair request schema constant.
+  rationale: Make the versioned request format available to callers.
+- path: tests/test_ci_response_repair_contract.py
+  type: modified
+  span: {start_line: 129, end_line: 129}
+  summary: Verify protected artifacts cannot be included through an allowed parent directory.
+  rationale: Cover path overlap rejection in repair contract compilation.
+- path: tests/test_ci_response_repair_contract.py
+  type: modified
+  span: {start_line: 135, end_line: 136}
+  summary: Verify parent directories of protected artifacts are rejected as editable paths.
+  rationale: Prevent a directory allowlist from including protected files.
+- path: tests/test_coding_agent.py
+  type: modified
+  span: {start_line: 3, end_line: 3}
+  summary: Import hashing support for protected artifact test baselines.
+  rationale: Compare protected file content against contract digests.
+- path: tests/test_coding_agent.py
+  type: modified
+  span: {start_line: 8, end_line: 8}
+  summary: Import timezone-aware timestamps for expiry cases.
+  rationale: Construct expired contract fixtures.
+- path: tests/test_coding_agent.py
+  type: modified
+  span: {start_line: 13, end_line: 13}
+  summary: Import CI repair contract records for worker tests.
+  rationale: Exercise contract-bound request creation and parsing.
+- path: tests/test_coding_agent.py
+  type: modified
+  span: {start_line: 32, end_line: 32}
+  summary: Import protected path resolution for worker boundary assertions.
+  rationale: Verify contract artifacts are passed to the sandbox profile.
+- path: tests/test_coding_agent.py
+  type: modified
+  span: {start_line: 34, end_line: 34}
+  summary: Import the write-denial command builder for sandbox tests.
+  rationale: Verify OpenCode receives the required macOS policy wrapper.
+- path: tests/test_coding_agent.py
+  type: modified
+  span: {start_line: 194, end_line: 229}
+  summary: Build reusable worker requests from validated repair contracts.
+  rationale: Exercise contract binding with repository-backed protected artifacts.
+- path: tests/test_coding_agent.py
+  type: modified
+  span: {start_line: 1088, end_line: 1296}
+  summary: Cover v4 request round trips, scope binding, contract expiry, protected hashes, and worker sandbox write denial.
+  rationale: Verify repair contract enforcement blocks unsafe worker execution and detects protected artifact changes.
+entities:
+- id: repair-contract-integrity-check
+  type: Function
+  action: added
+- id: repair-contract-write-denial-command
+  type: Function
+  action: added
+- id: repository-path-overlap-check
+  type: Function
+  action: added
+- id: ci-repair-enforcement-tests
+  type: Unit test
+  action: added
+entity_relationships: []
+invariants:
+- id: ci-repair-request-is-bound-to-contract
+  description: A v4 implementation request must use the contract head, exact editable paths, required behavior, and protected artifacts.
+  action: added
+- id: ci-repair-contract-must-be-current
+  description: Expired repair contracts are denied before worker execution.
+  action: added
+- id: ci-repair-protected-artifacts-remain-intact
+  description: Protected artifacts must match their contract hashes before and after worker execution, and supported worker sandboxes deny writes to them.
+  action: added
+- id: ci-repair-edit-scope-cannot-overlap-protected-paths
+  description: Contract editable paths cannot equal, contain, or be contained by a protected artifact path.
+  action: added
+guidance:
+- id: ci-repair-contract-enforcement-is-not-dispatch
+  description: The coding worker now enforces contract-bound repairs; correction acceptance and dispatch, durable continuation, broader evidence collection, and publication integration remain unfinished.
+  action: added

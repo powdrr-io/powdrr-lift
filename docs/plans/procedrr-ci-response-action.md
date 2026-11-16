@@ -22,8 +22,12 @@ protected artifact hashes, required behaviors and commands, complete required
 checks, accepted research references, and explicit stop conditions. Its service
 compiler issues a contract only for reproduced failures or non-local failures
 with accepted source-backed guidance; it does not dispatch edits. Agent-side
-enforcement, correction acceptance and dispatch, durable continuation, broader
-evidence collection, and full publication integration remain.
+execution requests now carry the contract, bind it to the exact base and edit
+scope, verify protected artifact hashes before and after worker execution, and
+deny protected writes in supported worker sandboxes. Contract overlap between
+editable and protected paths is rejected. Correction acceptance and dispatch,
+durable continuation, broader evidence collection, and full publication
+integration remain.
 
 ## Outcome
 

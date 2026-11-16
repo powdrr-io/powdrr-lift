@@ -1,13 +1,18 @@
 version: 1
 name: respond-to-pr-ci
-description: Observe and reproduce CI at the current PR head, checkpoint evidence before waiting for required checks, and return a bounded response state without starting a repair worker.
+description: Observe and reproduce CI at the current PR head, checkpoint evidence before waiting for required checks, and optionally dispatch one repair bound to an existing contract.
 inputs:
   - {name: repository, type: string, required: true}
   - {name: issue_number, type: integer, required: true}
   - {name: pull_request_url, type: string, required: true}
   - {name: verification_command, type: string, required: true}
+  - {name: repair_contract, schema: {type: [object, "null"]}, required: false, default: null}
+  - {name: accepted_research_claims, type: array, required: false, default: []}
 outputs:
   ci_observation_result:
+    type: object
+    additionalProperties: true
+  ci_repair_result:
     type: object
     additionalProperties: true
 limits: {llm_activations: 1, tool_calls: 32, context_chars: 12000, context_value_chars: 5000}
@@ -29,7 +34,25 @@ steps:
         awaiting_ci:
           - terminal: succeeded
         failed:
-          - terminal: succeeded
+          - operation:
+              tool: ci_repair_dispatch
+              parameters:
+                repair_contract: {type: reference, value: repair_contract}
+                observation_result: {type: reference, value: ci_observation_result}
+                accepted_research_claims: {type: reference, value: accepted_research_claims}
+              returns: {type: object, additionalProperties: true}
+              bind: ci_repair_result
+          - branch:
+              subject: ci_repair_result.dispatch_status
+              cases:
+                accepted:
+                  - terminal: succeeded
+                not_requested:
+                  - terminal: succeeded
+                rejected:
+                  - terminal: blocked
+              default:
+                - terminal: blocked
         blocked:
           - terminal: succeeded
       default:

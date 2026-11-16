@@ -123,6 +123,16 @@ def test_all_supported_workflow_names_have_procedrr_processes() -> None:
 
 def test_ci_response_procedure_runs_declared_verification_at_pinned_head() -> None:
     process = ProcessCatalog.load(bundled_process_directory()).get("respond-to-pr-ci")
+    defaulted = process.validate_inputs(
+        {
+            "repository": "example/project",
+            "issue_number": 270,
+            "pull_request_url": "https://github.com/example/project/pull/270",
+            "verification_command": "pytest",
+        }
+    )
+    assert defaulted["repair_contract"] is None
+    assert defaulted["accepted_research_claims"] == []
     assert process.document["limits"]["tool_calls"] >= 32
     operation = process.document["steps"][0]["operation"]
     assert operation["tool"] == "ci_observe"
@@ -133,12 +143,16 @@ def test_ci_response_procedure_runs_declared_verification_at_pinned_head() -> No
     assert len(process.document["steps"]) == 2
     branch = process.document["steps"][-1]["branch"]
     assert branch["subject"] == "ci_observation_result.response_state"
-    assert branch["cases"] == {
-        "awaiting_review": [{"terminal": "succeeded"}],
-        "awaiting_ci": [{"terminal": "succeeded"}],
-        "failed": [{"terminal": "succeeded"}],
-        "blocked": [{"terminal": "succeeded"}],
+    failed_steps = branch["cases"]["failed"]
+    assert failed_steps[0]["operation"]["tool"] == "ci_repair_dispatch"
+    assert failed_steps[0]["operation"]["parameters"]["repair_contract"] == {
+        "type": "reference",
+        "value": "repair_contract",
     }
+    assert failed_steps[1]["branch"]["subject"] == ("ci_repair_result.dispatch_status")
+    assert branch["cases"]["awaiting_review"] == [{"terminal": "succeeded"}]
+    assert branch["cases"]["awaiting_ci"] == [{"terminal": "succeeded"}]
+    assert branch["cases"]["blocked"] == [{"terminal": "succeeded"}]
     assert all(
         item["name"] != "implementation_context" for item in process.document["inputs"]
     )

@@ -3409,6 +3409,7 @@
         "powdrr_lift.core.execution_plan",
         "powdrr_lift.core.implementation_packet",
         "powdrr_lift.core.spec_context",
+        "powdrr_contracts.ci",
         "powdrr_lift.execution.builtin_tools",
         "powdrr_lift.execution.runtime",
         "powdrr_lift.file_management",
@@ -3455,6 +3456,8 @@
         "powdrr_service.verification.execute_pr_test_validation",
         "powdrr_service.verification.execute_pr_acceptance",
         "powdrr_service.planning.reviewed_plan",
+        "powdrr_service.ci_response.acceptance",
+        "powdrr_service.ci_response.prompt",
         "powdrr_service.verification.test_obligations"
       ],
       "kind": "python_module",
@@ -3919,6 +3922,7 @@
         "powdrr_service.ci_response.checkpoint",
         "powdrr_service.ci_response.evidence",
         "powdrr_service.ci_response.observation",
+        "powdrr_service.ci_response.prompt",
         "powdrr_service.ci_response.repair_contract",
         "powdrr_service.ci_response.reproduction",
         "powdrr_service.ci_response.research"
@@ -3986,6 +3990,17 @@
       "reviewed": false
     },
     {
+      "extraction_pr": "1539",
+      "internal_imports": [
+        "powdrr_contracts.ci"
+      ],
+      "kind": "python_module",
+      "owner": "service",
+      "path": "packages/service/src/powdrr_service/ci_response/prompt.py",
+      "rationale": "bounded MiniSWE prompt compilation bound to a repair contract, failure, reproduction, and accepted source claims",
+      "reviewed": false
+    },
+    {
       "extraction_pr": "1380",
       "internal_imports": [
         "powdrr_contracts.ci",
@@ -4035,7 +4050,7 @@
       "kind": "python_module",
       "owner": "agent",
       "path": "src/powdrr_lift/workrr/task_agent.py",
-      "rationale": "workflow task dispatch and protected source-reference execution",
+      "rationale": "workflow operation dispatch, including contract-bound CI repair execution and validation",
       "reviewed": false
     },
     {

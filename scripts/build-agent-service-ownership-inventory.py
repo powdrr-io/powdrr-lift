@@ -24,7 +24,7 @@ def _owner(path: str) -> tuple[str, str, str]:
         return (
             "service",
             "deterministic acceptance policy for contract-bound CI corrections",
-            "1537",
+            "1538",
         )
     if path.startswith("packages/service/src/powdrr_service/ci_response/"):
         return (

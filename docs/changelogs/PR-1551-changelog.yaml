@@ -1,0 +1,343 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1551
+title: Complete scoped CI repair preparation and human continuation
+intent:
+  problem: The normal implementation PR workflow did not supply a repair contract, so failed checks could not dispatch an eligible repair, and ambiguous cases had no durable CI-specific human continuation.
+  goal: Prepare narrowly scoped contracts from reviewed context and observed evidence, preserve human-required outcomes through the issue queue, and recheck the current PR head through the existing continue command.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/plans/procedrr-ci-response-action.md
+  type: modified
+  span: {start_line: 40, end_line: 41}
+  summary: Clarify that only the later scoped repair implementation can prepare a contract.
+  rationale: Keep the plan history consistent with the new normal-workflow contract preparation.
+- path: docs/plans/procedrr-ci-response-action.md
+  type: modified
+  span: {start_line: 46, end_line: 62}
+  summary: Record bounded source hashes, scoped automatic repair, and durable human continuation.
+  rationale: Describe the completed implementation slice without claiming live product verification.
+- path: docs/plans/procedrr-ci-response-action.md
+  type: modified
+  span: {start_line: 50, end_line: 60}
+  summary: Replace the earlier slice description with the current scoped contract and human continuation behavior.
+  rationale: Keep the plan status and implementation summary accurate.
+- path: docs/plans/procedrr-ci-response-action.md
+  type: modified
+  span: {start_line: 446, end_line: 450}
+  summary: Summarize the delivered implementation sequence.
+  rationale: Keep the remaining plan focused on post-merge product verification.
+- path: docs/plans/procedrr-ci-response-action.md
+  type: modified
+  span: {start_line: 453, end_line: 458}
+  summary: Replace the remaining implementation milestone with post-merge Gaterr verification.
+  rationale: Prevent local tests or feature-branch checks from being mistaken for plan completion.
+- path: packages/service/src/powdrr_service/ci_response/__init__.py
+  type: modified
+  span: {start_line: 25, end_line: 25}
+  summary: Import the service-owned repair preparation policy.
+  rationale: Expose the scoped compiler through the existing service package.
+- path: packages/service/src/powdrr_service/ci_response/__init__.py
+  type: modified
+  span: {start_line: 61, end_line: 61}
+  summary: Export the repair preparation function.
+  rationale: Make the policy available to the task operation adapter.
+- path: packages/service/src/powdrr_service/ci_response/prepare_repair.py
+  type: added
+  span: {start_line: 1, end_line: 144}
+  summary: Compile a repair contract only for one locally reproduced test failure and one reviewed changed source path.
+  rationale: Keep repair scope tied to complete required checks, protected test hashes, reviewed acceptance criteria, and verification commands.
+- path: packages/service/src/powdrr_service/ci_response/result.py
+  type: modified
+  span: {start_line: 9, end_line: 23}
+  summary: Recognize human-required dispatch and awaiting-human response states.
+  rationale: Preserve human action as a distinct terminal route.
+- path: packages/service/src/powdrr_service/ci_response/result.py
+  type: modified
+  span: {start_line: 77, end_line: 78}
+  summary: Map human-required repair dispatch to an awaiting-human outcome.
+  rationale: Keep ambiguous or ineligible repair candidates out of automatic dispatch.
+- path: packages/service/src/powdrr_service/ci_response/result.py
+  type: modified
+  span: {start_line: 86, end_line: 88}
+  summary: Select awaiting-human instead of blocked for human-required dispatch.
+  rationale: Expose the actionable queue state.
+- path: packages/service/src/powdrr_service/ci_response/result.py
+  type: modified
+  span: {start_line: 97, end_line: 98}
+  summary: Include the bounded repair reason in the human-action result.
+  rationale: Give the issue checkpoint an operator-readable reason.
+- path: packages/service/src/powdrr_service/resources/processes/execute-proposed-pr-workflow.yaml
+  type: modified
+  span: {start_line: 43, end_line: 43}
+  summary: Pass task context into the response process after implementation publication.
+  rationale: Supply reviewed PR scope to contract preparation.
+- path: packages/service/src/powdrr_service/resources/processes/execute-proposed-pr-workflow.yaml
+  type: modified
+  span: {start_line: 98, end_line: 98}
+  summary: Pass task context into the response process after plan amendment publication.
+  rationale: Keep both normal publication routes eligible for the same bounded response handling.
+- path: packages/service/src/powdrr_service/resources/processes/respond-to-pr-ci.yaml
+  type: modified
+  span: {start_line: 11, end_line: 11}
+  summary: Add an optional task context input for repair preparation.
+  rationale: Preserve compatibility while enabling reviewed-scope lookup.
+- path: packages/service/src/powdrr_service/resources/processes/respond-to-pr-ci.yaml
+  type: modified
+  span: {start_line: 53, end_line: 53}
+  summary: Forward task context to CI repair dispatch.
+  rationale: Connect the process input to the scoped contract preparation operation.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 263, end_line: 263}
+  summary: Import CI human-checkpoint detection for continuation routing.
+  rationale: Select the existing CI observer for CI-specific human checkpoints.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 3220, end_line: 3225}
+  summary: Collect bounded source-file hashes during CI observation.
+  rationale: Capture source identity for the failed workflow surface.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 3372, end_line: 3373}
+  summary: Return the typed observation and bounded source evidence.
+  rationale: Provide the task adapter with exact failure and source identity.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 3615, end_line: 3749}
+  summary: Hash safe workflow, test, lockfile, and changed source files without returning file contents.
+  rationale: Keep source evidence bounded and reject traversal or symlinked paths.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 3946, end_line: 3949}
+  summary: Route awaiting-human issues with CI checkpoints through required-check re-observation.
+  rationale: Avoid sending CI response checkpoints through the staged-PR continuation route.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span: {start_line: 3968, end_line: 3972}
+  summary: Treat a still-awaiting-human CI checkpoint as a successful continuation result.
+  rationale: Keep the operator workflow resumable.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 1613, end_line: 1615}
+  summary: Persist the CI human-prerequisite marker with the current queue observation.
+  rationale: Keep the response reason durable across worker processes.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 1617, end_line: 1619}
+  summary: Choose awaiting-human when the current checks remain unresolved after repair preparation.
+  rationale: Prevent the queue from inferring review readiness from task exit status.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 1621, end_line: 1639}
+  summary: Write an actionable human checkpoint or the normal required-check outcome note.
+  rationale: Give operators the existing recheck command and preserve passing-check recovery.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 1918, end_line: 1919}
+  summary: Allow the required-check continuation helper to inspect either CI queue state.
+  rationale: Support the CI human route without changing manual staged-PR continuation.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 1907, end_line: 1907}
+  summary: Remove the old await-CI-only issue guard.
+  rationale: Read the checkpoint first so the same helper can recognize the CI human route.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 1927, end_line: 1942}
+  summary: Load the latest human checkpoint and validate the issue queue state.
+  rationale: Resume only an issue with a durable CI response checkpoint.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 1935, end_line: 1935}
+  summary: Validate the issue is awaiting CI or has a durable CI human prerequisite.
+  rationale: Keep the CI continuation path separate from other awaiting-human workflows.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 1953, end_line: 1958}
+  summary: Carry forward the CI response result and human marker when still blocked.
+  rationale: Retain only current continuation evidence.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 1964, end_line: 1967}
+  summary: Keep unresolved human prerequisites in awaiting-human state.
+  rationale: Do not convert an unresolved CI repair into a generic blocked state.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 1972, end_line: 1988}
+  summary: Render a human continuation note when required checks remain blocked.
+  rationale: Explain the reason and existing operator recheck path.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 1996, end_line: 2008}
+  summary: Detect whether the latest published-PR checkpoint is a CI human checkpoint.
+  rationale: Route only CI-specific awaiting-human issues through the CI observer.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 3618, end_line: 3625}
+  summary: Accept awaiting-human as a normalized CI response state.
+  rationale: Preserve the state in task output checkpoints.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 3655, end_line: 3655}
+  summary: Accept the human-required dispatch status.
+  rationale: Retain the structured terminal dispatch outcome.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 4228, end_line: 4229}
+  summary: Map awaiting-human to its queue label.
+  rationale: Keep the result state aligned with queue status.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 4238, end_line: 4238}
+  summary: Allow a human-prerequisite payload on a CI outcome checkpoint.
+  rationale: Persist the continuation reason beside the current PR observation.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 4257, end_line: 4262}
+  summary: Serialize bounded human-prerequisite reasons in the checkpoint payload.
+  rationale: Keep the continuation data compact and tamper-evident through the existing fingerprint.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 4343, end_line: 4353}
+  summary: Restore a validated human-prerequisite marker when reading a checkpoint.
+  rationale: Resume from durable issue comments.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 4365, end_line: 4365}
+  summary: Forward the human marker when appending the CI outcome checkpoint.
+  rationale: Keep the rendered and persisted checkpoint data consistent.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 4371, end_line: 4371}
+  summary: Forward the human marker into the checkpoint renderer.
+  rationale: Keep continuation state in the existing checkpoint path.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 4397, end_line: 4404}
+  summary: Accept awaiting-human and human-required values during bounded checkpoint normalization.
+  rationale: Preserve only known terminal states.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 4428, end_line: 4428}
+  summary: Normalize bounded repair reasons from human-required outcomes.
+  rationale: Keep operator-facing reasons safe for checkpoint storage.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 4462, end_line: 4475}
+  summary: Build the durable human-prerequisite checkpoint from the terminal response.
+  rationale: Keep continuation data versioned and reason-limited.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span: {start_line: 4494, end_line: 4513}
+  summary: Render the CI human-action reason and existing recheck command.
+  rationale: Provide a direct operator path without creating another task queue.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 33, end_line: 33}
+  summary: Import the typed CI observation record.
+  rationale: Parse the full observation before preparing a contract.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 50, end_line: 50}
+  summary: Import service-owned repair preparation.
+  rationale: Keep repair authorization policy in the service layer.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 5336, end_line: 5465}
+  summary: Prepare a repair contract from the exact observed head, one failure, reviewed scope, log excerpt, and protected test hashes.
+  rationale: Return a human-required reason whenever required evidence is incomplete or ambiguous.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 5522, end_line: 5537}
+  summary: Prepare a contract when none was explicitly supplied and checkpoint human-required cases.
+  rationale: Connect the normal response workflow to the safe preparation policy.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span: {start_line: 5540, end_line: 5540}
+  summary: Pass the prepared contract into the existing repair agent path.
+  rationale: Reuse the established constrained execution and validation machinery.
+- path: tests/test_ci_response_cli.py
+  type: modified
+  span: {start_line: 6, end_line: 6}
+  summary: Import Path for source-evidence fixtures.
+  rationale: Build an isolated repository fixture.
+- path: tests/test_ci_response_cli.py
+  type: modified
+  span: {start_line: 17, end_line: 59}
+  summary: Verify bounded source hashes, workflow-script discovery, and symlink rejection.
+  rationale: Cover evidence provenance without exposing repository file contents.
+- path: tests/test_ci_response_prepare_repair.py
+  type: added
+  span: {start_line: 1, end_line: 120}
+  summary: Verify narrow contract preparation and ambiguous evidence rejection.
+  rationale: Cover the service-owned repair authorization boundary.
+- path: tests/test_ci_response_result.py
+  type: modified
+  span: {start_line: 68, end_line: 81}
+  summary: Verify human-required dispatch maps to awaiting-human with a bounded reason.
+  rationale: Protect terminal result semantics.
+- path: tests/test_github_issue_queue.py
+  type: modified
+  span: {start_line: 12, end_line: 12}
+  summary: Import cast for the CI checkpoint helper fixture.
+  rationale: Keep the fake-client test explicitly typed.
+- path: tests/test_github_issue_queue.py
+  type: modified
+  span: {start_line: 2843, end_line: 2937}
+  summary: Verify the human checkpoint remains resumable until the current required checks pass.
+  rationale: Cover durable state, operator command, and recovery to awaiting review.
+- path: tests/test_procedrr_chat.py
+  type: modified
+  span: {start_line: 136, end_line: 136}
+  summary: Assert the optional task-context input defaults to null.
+  rationale: Protect the process input contract.
+- path: tests/test_procedrr_chat.py
+  type: modified
+  span: {start_line: 219, end_line: 223}
+  summary: Assert task context is forwarded through the normal workflow.
+  rationale: Verify the repair preparation has access to reviewed scope.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span: {start_line: 536, end_line: 539}
+  summary: Add optional task context to the evaluator subprocess fixture.
+  rationale: Keep the workflow integration fixture aligned with production.
+entities:
+- id: normal-ci-repair-dispatch
+  type: Tool
+  action: added
+- id: prepare-ci-repair-contract
+  type: Function
+  action: added
+- id: collect-ci-source-evidence
+  type: Function
+  action: added
+- id: ci-human-continuation
+  type: Function
+  action: added
+- id: ci-human-continuation-tests
+  type: Unit test
+  action: added
+entity_relationships:
+- id: dispatch-prepares-scoped-contract
+  source: normal-ci-repair-dispatch
+  target: prepare-ci-repair-contract
+  type: invokes
+- id: queue-preserves-human-continuation
+  source: ci-human-continuation
+  target: ci-human-continuation-tests
+  type: verifies
+invariants:
+- id: ci-automatic-repair-requires-exact-reviewed-evidence
+  description: Automatic CI repair requires one locally reproduced failure, complete required-check policy, one log-identified changed source path inside the reviewed allowlist, and a protected failing test artifact.
+  action: added
+- id: ci-human-required-remains-durable-until-recheck
+  description: Human-required CI outcomes retain a durable checkpoint and continue through a current-head required-check observation; passing checks move the issue to awaiting review.
+  action: added
+- id: ci-source-evidence-stores-hashes-only
+  description: Source evidence is bounded to repository-relative file identity, size, and SHA-256 and excludes file contents and symlink targets.
+  action: added
+guidance:
+- id: ci-response-post-merge-product-verification
+  description: Keep the plan open until the Gaterr scenario is exercised through the product workflow after merge and its required-check or human-continuation route is observed.
+  action: added

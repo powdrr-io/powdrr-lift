@@ -784,17 +784,22 @@ class SourceLedgerQuestionMachine:
                     for requirement_id in req_by_related_source.get(anchor_id, [])
                 )
             )
-            known_ids = tuple(dict.fromkeys((*direct_ids, *related_ids_for_block)))
+            fingerprint = _normalized_block_fingerprint(block.text)
+            prior_direct_ids = prior_direct_by_fingerprint.get(fingerprint, ())
+            known_ids = _source_block_disposition_requirement_ids(
+                direct_ids=direct_ids,
+                related_ids=related_ids_for_block,
+                prior_direct_ids=prior_direct_ids,
+            )
             disposition_request = build_block_disposition_request(
                 block, requirement_ids=known_ids
             )
-            fingerprint = _normalized_block_fingerprint(block.text)
             if disposition_request.question.question_id not in accepted_answers:
                 automatic = _deterministic_block_disposition(
                     block_id=block.id,
                     direct_ids=direct_ids,
                     related_ids=related_ids_for_block,
-                    prior_direct_ids=prior_direct_by_fingerprint.get(fingerprint, ()),
+                    prior_direct_ids=prior_direct_ids,
                     has_exact_duplicate=fingerprint in prior_direct_by_fingerprint,
                 )
                 if automatic is None:
@@ -2986,24 +2991,22 @@ class SourceLedgerQuestionMachine:
         )
 
         dispositions: list[BlockDisposition] = []
+        prior_direct_by_fingerprint: dict[str, list[tuple[str, ...]]] = {}
         for block in self.source.blocks:
-            known_ids = tuple(
-                dict.fromkeys(
-                    (
-                        *(
-                            requirement_id
-                            for anchor_id in block.anchor_ids
-                            for requirement_id in ids_by_anchor.get(anchor_id, [])
-                        ),
-                        *(
-                            requirement_id
-                            for anchor_id in block.anchor_ids
-                            for requirement_id in ids_by_related_anchor.get(
-                                anchor_id, []
-                            )
-                        ),
-                    )
-                )
+            fingerprint = _normalized_block_fingerprint(block.text)
+            prior_direct_ids = prior_direct_by_fingerprint.get(fingerprint, ())
+            known_ids = _source_block_disposition_requirement_ids(
+                direct_ids=(
+                    requirement_id
+                    for anchor_id in block.anchor_ids
+                    for requirement_id in ids_by_anchor.get(anchor_id, [])
+                ),
+                related_ids=(
+                    requirement_id
+                    for anchor_id in block.anchor_ids
+                    for requirement_id in ids_by_related_anchor.get(anchor_id, [])
+                ),
+                prior_direct_ids=prior_direct_ids,
             )
             disposition_request = build_block_disposition_request(
                 block, requirement_ids=known_ids
@@ -3013,6 +3016,14 @@ class SourceLedgerQuestionMachine:
                     accepted_answers[disposition_request.question.question_id]
                 )
             )
+            direct_ids = tuple(
+                dict.fromkeys(
+                    requirement_id
+                    for anchor_id in block.anchor_ids
+                    for requirement_id in ids_by_anchor.get(anchor_id, [])
+                )
+            )
+            prior_direct_by_fingerprint.setdefault(fingerprint, []).append(direct_ids)
 
         revised: list[Requirement] = []
         for requirement in requirements:
@@ -3167,6 +3178,24 @@ def _deterministic_block_disposition(
         "source-block-disposition-v1/unreferenced-context",
         "Extraction found no direct or related requirement and no exact duplicate "
         "candidate.",
+    )
+
+
+def _source_block_disposition_requirement_ids(
+    *,
+    direct_ids: Sequence[str],
+    related_ids: Sequence[str],
+    prior_direct_ids: Sequence[Sequence[str]],
+) -> tuple[str, ...]:
+    """Allow exact duplicate blocks to refer to requirements from earlier blocks."""
+    return tuple(
+        dict.fromkeys(
+            (
+                *direct_ids,
+                *related_ids,
+                *(requirement_id for ids in prior_direct_ids for requirement_id in ids),
+            )
+        )
     )
 
 

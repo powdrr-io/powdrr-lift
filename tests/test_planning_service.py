@@ -37,6 +37,7 @@ from powdrr_service.planning.driver import (
     _is_completed_zero_hit_search,
     _planned_existing_structural_subjects,
     _planned_reference_path_pairs,
+    _source_block_disposition_requirement_ids,
 )
 from powdrr_service.planning.questions import (
     ContextRecord,
@@ -55,6 +56,7 @@ from powdrr_service.planning.service import (
 from powdrr_service.planning.source import (
     PinnedSourceDocument,
     Requirement,
+    build_block_disposition_request,
     segment_markdown_source,
 )
 from powdrr_service.procedrr.catalog import ProcessCatalog
@@ -1589,6 +1591,39 @@ def test_source_dispositions_are_derived_only_for_unambiguous_cases() -> None:
     )
     assert related_only is None
     assert ambiguous_duplicate is None
+
+
+def test_exact_duplicate_disposition_accepts_prior_block_requirement_ids() -> None:
+    text = "# Existing behavior\n\nThe service retries."
+    source = segment_markdown_source(
+        PinnedSourceDocument(
+            repository="owner/repo",
+            commit_sha="a" * 40,
+            path="docs/plan.md",
+            blob_sha="b" * 40,
+            content_sha256=hashlib.sha256(text.encode()).hexdigest(),
+            text=text,
+        )
+    )
+    block = source.blocks[0]
+    known_ids = _source_block_disposition_requirement_ids(
+        direct_ids=(),
+        related_ids=(),
+        prior_direct_ids=(("req-0438",),),
+    )
+    request = build_block_disposition_request(block, requirement_ids=known_ids)
+
+    disposition = request.parse_answer(
+        {
+            "disposition": "duplicate",
+            "requirement_ids": ["req-0438"],
+            "reason": (
+                "This repeats an earlier block already covered by the requirement."
+            ),
+        }
+    )
+
+    assert disposition.requirement_ids == ("req-0438",)
 
 
 def test_zero_hit_coverage_requires_complete_pinned_search_metadata() -> None:

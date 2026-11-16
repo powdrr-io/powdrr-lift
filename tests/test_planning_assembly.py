@@ -175,6 +175,10 @@ def test_work_unit_response_schema_derives_source_refs_from_requirement_ids() ->
         == MAX_WORK_UNIT_REQUIREMENTS_PER_PROPOSAL
     )
     assert "Powdrr derives each write's anchors" in request.exact_question
+    assert "one concrete normalized repository-relative file path" in (
+        request.exact_question
+    )
+    assert "Expand source brace notation" in request.exact_question
 
 
 def test_python_test_that_tests_swift_is_a_python_write() -> None:

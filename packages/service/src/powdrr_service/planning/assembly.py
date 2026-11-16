@@ -1239,6 +1239,10 @@ def build_work_unit_proposal_request(
             )
             + "Use pinned repository facts for paths whose runtime cannot be "
             "derived from their extension. Do not mix implementation runtimes. "
+            "Every planned_writes.path must be one concrete normalized "
+            "repository-relative file path. Expand source brace notation such as "
+            "{a,b} into separate concrete paths; do not use braces, globs, path "
+            "lists, absolute paths, dot segments, or backslashes. "
             "Use the valid example for field shape only; do not copy its "
             "placeholder path or example wording. "
             f"Keep descriptions concise. Return at most {maximum_proposals} records "

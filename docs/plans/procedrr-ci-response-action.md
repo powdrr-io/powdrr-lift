@@ -38,8 +38,12 @@ protected artifacts, and validation receipts; permits only a same-repository
 PR branch that still points at the contract head; uses a normal fast-forward
 push; and re-observes checks after publication. Fork branches and moved branch
 heads stop as blocked. The response process still requires an already compiled
-repair contract. Durable continuation, broader evidence collection, and full
-publication integration remain.
+repair contract. This follow-up makes MiniSWE dispatch safe to resume on the
+same host: it records invocation intent before launch, reuses the deterministic
+attempt ID and saved attempt on retry, and blocks a second launch when an
+invocation receipt exists without a saved result. Cross-host artifact-backed
+continuation, broader evidence collection, and full publication integration
+remain.
 
 ## Outcome
 
@@ -424,8 +428,10 @@ return values. No live provider or private GitHub access is required in CI.
 
 The initial three-PR outline was delivered in smaller, reviewable slices.
 Observation and reproduction, bounded evidence and research, protected repair
-contracts, candidate acceptance, MiniSWE dispatch, and limited publication
-with exact-head re-observation are implemented in the PR history above. New
+contracts, candidate acceptance, MiniSWE dispatch, limited publication with
+exact-head re-observation, and same-host at-most-once dispatch continuation are
+implemented in the PR history above. Cross-host artifact-backed continuation,
+broader evidence collection, and full publication integration remain. New
 policy remains service-owned; Git publication remains an agent capability.
 
 1. **Publication integration and continuation.** Call the procedure after

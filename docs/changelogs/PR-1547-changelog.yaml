@@ -1,0 +1,32 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1547
+title: Treat Make include files as runtime neutral in planning
+intent:
+  problem: Planning a new .mk fixture required repository runtime evidence even though Make include files are configuration and Gaterr's source plan calls for policy fixtures in this format.
+  goal: Classify .mk paths as runtime neutral so work-unit proposals can plan new Make policy fixtures without unsupported runtime inference.
+human-decisions: []
+structured_files: []
+files:
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span: {start_line: 60, end_line: 60}
+  summary: Add .mk to the runtime-neutral file suffixes used when deriving planned-write runtimes.
+  rationale: Make include files are build configuration and do not need a language runtime assignment.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span: {start_line: 345, end_line: 345}
+  summary: Cover the planned Gaterr Make policy fixture path in runtime-neutral extension tests.
+  rationale: Ensure planning can accept the new fixture path without requiring repository evidence.
+entities: []
+entity_relationships: []
+invariants:
+- id: make-includes-are-runtime-neutral
+  description: A planned .mk file has no language runtime requirement, like other configuration files.
+  action: added
+- id: new-make-fixture-needs-no-repository-runtime-evidence
+  description: A new Make include fixture can be planned without an existing repository path from which to infer a runtime.
+  action: added
+guidance:
+- id: use-neutral-runtime-for-make-includes
+  description: Classify .mk Make include files as runtime neutral during work-unit planning.
+  action: added

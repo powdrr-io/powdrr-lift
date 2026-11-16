@@ -342,6 +342,7 @@ def test_new_extensionless_data_file_can_be_explicitly_runtime_neutral() -> None
         "installer/launchd.plist",
         "config/install-paths.conf",
         "test-results/section13-macos-github.log",
+        "attestation/tests/fixtures/policy_samples/make_policy.mk",
         "attestation/fixtures/golden_dsse.bin",
         ".github/CODEOWNERS.template",
     ],

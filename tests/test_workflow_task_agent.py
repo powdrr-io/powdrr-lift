@@ -3095,12 +3095,16 @@ def test_ci_repair_dispatch_runs_contract_validations_and_acceptance(
         ],
     }
 
+    provider_calls = 0
+
     class FakeProvider:
         provider_name = "minisweagent"
 
         def run(
             self, _request: Any, *, worktree_root: Path, attempt_id: str
         ) -> subprocess.CompletedProcess[str]:
+            nonlocal provider_calls
+            provider_calls += 1
             app = worktree_root / "src" / "app.py"
             app.write_text("fixed\n", encoding="utf-8")
             if changed_path != "src/app.py":
@@ -3152,6 +3156,16 @@ def test_ci_repair_dispatch_runs_contract_validations_and_acceptance(
     assert result["dispatch_status"] == expected_status, result
     assert result["validation_status"] == "passed"
     assert result["acceptance"]["status"] == expected_status
+    resumed = operations.execute(
+        "ci_repair_dispatch",
+        {
+            "repair_contract": contract.to_dict(),
+            "observation_result": observation_result,
+        },
+    )
+    assert resumed["attempt_id"] == result["attempt_id"]
+    assert resumed["dispatch_status"] == expected_status
+    assert provider_calls == 1
     if expected_status == "accepted":
         bare_remote = tmp_path / "remote.git"
         subprocess.run(
@@ -3294,6 +3308,24 @@ def test_ci_repair_dispatch_runs_contract_validations_and_acceptance(
         )
         assert moved_publication["publication_status"] == "blocked"
         assert "branch moved" in moved_publication["reasons"][0]
+
+    saved_attempt = (
+        worker_root.parent
+        / "repair-attempts"
+        / contract.contract_id
+        / "attempts"
+        / f"{result['attempt_id']}.json"
+    )
+    saved_attempt.unlink()
+    interrupted = operations.execute(
+        "ci_repair_dispatch",
+        {
+            "repair_contract": contract.to_dict(),
+            "observation_result": observation_result,
+        },
+    )
+    assert interrupted["dispatch_status"] == "interrupted"
+    assert provider_calls == 1
 
 
 def test_coding_agent_error_result_is_normalized_at_operation_boundary() -> None:

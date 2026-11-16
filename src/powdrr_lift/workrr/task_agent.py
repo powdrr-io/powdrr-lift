@@ -5118,6 +5118,19 @@ def _record_task_pull_request(
     )
 
 
+def _write_ci_repair_json(path: Path, value: Mapping[str, Any]) -> None:
+    """Atomically checkpoint CI repair dispatch evidence on the current host."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f".{path.name}.{uuid4().hex}.tmp")
+    try:
+        temporary.write_text(
+            json.dumps(value, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+        os.replace(temporary, path)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
 class _TaskProcedrrOperations:
     """Expose only this claimed task's authorized Workrr operations."""
 
@@ -5514,6 +5527,54 @@ class _TaskProcedrrOperations:
             raise PowdrrExecutionError(
                 "the isolated CI observation worktree is unavailable"
             )
+        store_root = root / "repair-attempts" / contract.contract_id
+        attempt_store = CodingAgentAttemptStore(store_root)
+        attempt_id = f"{contract.contract_id}-dispatch"
+        attempt_path = attempt_store.attempts_root / f"{attempt_id}.json"
+        dispatch_path = store_root / "dispatch.json"
+        prior_attempt = None
+        if attempt_path.is_file():
+            try:
+                prior_attempt = attempt_store.load_attempt(attempt_id)
+            except (OSError, KeyError, ValueError) as error:
+                raise PowdrrExecutionError(
+                    f"saved CI repair attempt is invalid: {error}"
+                ) from error
+            if (
+                prior_attempt.request_id != contract.contract_id
+                or prior_attempt.provider != "minisweagent"
+            ):
+                raise PowdrrExecutionError(
+                    "saved CI repair attempt does not match the contract request"
+                )
+        elif dispatch_path.is_file():
+            try:
+                dispatch_record = json.loads(dispatch_path.read_text(encoding="utf-8"))
+            except (OSError, ValueError) as error:
+                raise PowdrrExecutionError(
+                    f"saved CI repair dispatch checkpoint is invalid: {error}"
+                ) from error
+            if (
+                not isinstance(dispatch_record, Mapping)
+                or dispatch_record.get("schema_version") != "ci-repair-dispatch-v1"
+                or dispatch_record.get("contract_id") != contract.contract_id
+                or dispatch_record.get("observation_id") != contract.observation_id
+                or dispatch_record.get("attempt_id") != attempt_id
+            ):
+                raise PowdrrExecutionError(
+                    "saved CI repair dispatch checkpoint does not match the contract"
+                )
+            return {
+                "passed": False,
+                "dispatch_status": "interrupted",
+                "attempt_id": attempt_id,
+                "attempt_status": "interrupted",
+                "reasons": [
+                    "a prior MiniSWE invocation started but has no saved attempt "
+                    "result; "
+                    "automatic redispatch is blocked to avoid repeating the repair"
+                ],
+            }
         actual_head = subprocess.run(
             ["git", "rev-parse", "HEAD"],
             cwd=worker_root,
@@ -5521,10 +5582,35 @@ class _TaskProcedrrOperations:
             text=True,
             check=False,
         )
-        if actual_head.returncode or actual_head.stdout.strip() != contract.head_sha:
+        current_head = actual_head.stdout.strip()
+        expected_head = (
+            prior_attempt.worker_commit_sha
+            if prior_attempt is not None and prior_attempt.worker_commit_sha
+            else contract.head_sha
+        )
+        if actual_head.returncode or current_head != expected_head:
             raise PowdrrExecutionError(
-                "CI repair worktree is not pinned to the contract head"
+                "CI repair worktree does not match the contract or saved attempt head"
             )
+        if prior_attempt is not None:
+            based_on_contract_head = subprocess.run(
+                ["git", "merge-base", "--is-ancestor", contract.head_sha, "HEAD"],
+                cwd=worker_root,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            prior_paths = tuple(
+                sorted(set(prior_attempt.changed_paths) | _working_paths(worker_root))
+            )
+            if (
+                based_on_contract_head.returncode != 0
+                or prior_attempt.diff_fingerprint
+                != _worktree_fingerprint(worker_root, prior_paths)
+            ):
+                raise PowdrrExecutionError(
+                    "CI repair worktree changed after the saved worker attempt"
+                )
         remote = subprocess.run(
             ["git", "remote", "get-url", "origin"],
             cwd=worker_root,
@@ -5543,18 +5629,22 @@ class _TaskProcedrrOperations:
             raise PowdrrExecutionError(
                 "CI repair worktree origin does not match the contract repository"
             )
-        dirty = subprocess.run(
-            ["git", "status", "--porcelain"],
-            cwd=worker_root,
-            capture_output=True,
-            text=True,
-            check=False,
+        dirty = (
+            subprocess.run(
+                ["git", "status", "--porcelain"],
+                cwd=worker_root,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            if prior_attempt is None
+            else None
         )
-        if dirty.returncode or dirty.stdout.strip():
+        if dirty is not None and (dirty.returncode or dirty.stdout.strip()):
             raise PowdrrExecutionError(
                 "CI repair worktree must be clean before MiniSWE dispatch"
             )
-        if self.strategy.config.code_agent != "minisweagent":
+        if prior_attempt is None and self.strategy.config.code_agent != "minisweagent":
             raise PowdrrExecutionError(
                 "contract-bound CI repair currently requires MiniSWE"
             )
@@ -5579,30 +5669,38 @@ class _TaskProcedrrOperations:
             prompt=prompt,
             validation_profiles=profile_names,
         )
-        store_root = root / "repair-attempts" / contract.contract_id
-        provider = build_coding_agent_provider(
-            "minisweagent",
-            opencode_executable=self.strategy.config.opencode_executable,
-            opencode_model=self.strategy.config.opencode_model,
-            minisweagent_executable=self.strategy.config.minisweagent_executable,
-            minisweagent_model=self.strategy.config.minisweagent_model,
-            timeout_seconds=self.strategy.config.coding_agent_timeout_seconds,
-            diagnostics_root=store_root / "diagnostics",
-            permission_policy=OpenCodePermissionPolicy(()),
-            miniswe_inference_handler=create_miniswe_inference_handler(
-                self.strategy.config.coding_agent_timeout_seconds
-            ),
-        )
-        runner = CodingAgentRunner(
-            provider=provider,
-            store=CodingAgentAttemptStore(store_root),
-        )
-        attempt_id = f"{contract.contract_id}-{uuid4().hex[:12]}"
-        attempt = runner.run(
-            request,
-            worktree_root=worker_root,
-            attempt_id=attempt_id,
-        )
+        if prior_attempt is None:
+            provider = build_coding_agent_provider(
+                "minisweagent",
+                opencode_executable=self.strategy.config.opencode_executable,
+                opencode_model=self.strategy.config.opencode_model,
+                minisweagent_executable=self.strategy.config.minisweagent_executable,
+                minisweagent_model=self.strategy.config.minisweagent_model,
+                timeout_seconds=self.strategy.config.coding_agent_timeout_seconds,
+                diagnostics_root=store_root / "diagnostics",
+                permission_policy=OpenCodePermissionPolicy(()),
+                miniswe_inference_handler=create_miniswe_inference_handler(
+                    self.strategy.config.coding_agent_timeout_seconds
+                ),
+            )
+            runner = CodingAgentRunner(provider=provider, store=attempt_store)
+            _write_ci_repair_json(
+                dispatch_path,
+                {
+                    "schema_version": "ci-repair-dispatch-v1",
+                    "contract_id": contract.contract_id,
+                    "observation_id": contract.observation_id,
+                    "attempt_id": attempt_id,
+                    "phase": "invoking",
+                },
+            )
+            attempt = runner.run(
+                request,
+                worktree_root=worker_root,
+                attempt_id=attempt_id,
+            )
+        else:
+            attempt = prior_attempt
         profiles = {
             name: ValidationProfile(
                 name=name,
@@ -5621,7 +5719,7 @@ class _TaskProcedrrOperations:
             profiles,
             timeout_seconds=self.strategy.config.coding_agent_validation_timeout_seconds,
         ).run(request, attempt, worktree_root=worker_root)
-        runner.store.save_validation_report(validation)
+        attempt_store.save_validation_report(validation)
 
         changed_paths = tuple(
             sorted(set(attempt.changed_paths) | _working_paths(worker_root))
@@ -5681,10 +5779,7 @@ class _TaskProcedrrOperations:
                 for item in validations_by_command.values()
             ],
         }
-        (store_root / "candidate.json").write_text(
-            json.dumps(manifest, indent=2, sort_keys=True) + "\n",
-            encoding="utf-8",
-        )
+        _write_ci_repair_json(store_root / "candidate.json", manifest)
         outcome = {
             "passed": acceptance.status == "accepted",
             "dispatch_status": acceptance.status,
@@ -5702,6 +5797,17 @@ class _TaskProcedrrOperations:
             ],
             "acceptance": acceptance.to_dict(),
         }
+        _write_ci_repair_json(
+            dispatch_path,
+            {
+                "schema_version": "ci-repair-dispatch-v1",
+                "contract_id": contract.contract_id,
+                "observation_id": contract.observation_id,
+                "attempt_id": attempt_id,
+                "phase": "completed",
+                "dispatch_status": acceptance.status,
+            },
+        )
         self.strategy.events.append({"kind": "ci_repair_dispatch", "result": outcome})
         return outcome
 

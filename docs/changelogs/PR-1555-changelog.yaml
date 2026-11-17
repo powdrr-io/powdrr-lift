@@ -1,0 +1,85 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1555
+title: Harden planned test coverage responses
+intent:
+  problem: Multi-criterion coverage answers can exceed the shared response-size limit, and model-generated assumptions can misclassify source-backed or irrelevant behavior.
+  goal: Bound answer size per criterion and normalize assumptions against pinned evidence and typed not-applicable dimensions.
+human-decisions: []
+structured_files: []
+files:
+  - path: packages/service/src/powdrr_service/planning/test_coverage.py
+    type: modified
+    span: {start_line: 18, end_line: 18}
+    summary: Import the shared per-answer character limit.
+    rationale: Use the existing limit as the budget for each criterion's structured case.
+  - path: packages/service/src/powdrr_service/planning/test_coverage.py
+    type: modified
+    span: {start_line: 335, end_line: 369}
+    summary: Remove redundant not-applicable assumptions and source-backed behavior mislabeled as assumptions.
+    rationale: Keep typed behavior contracts aligned with dimensions and pinned evidence.
+  - path: packages/service/src/powdrr_service/planning/test_coverage.py
+    type: modified
+    span: {start_line: 401, end_line: 401}
+    summary: Advance the coverage digest contract to version 4.
+    rationale: Prevent reuse of cached answers produced under earlier normalization rules.
+  - path: packages/service/src/powdrr_service/planning/test_coverage.py
+    type: modified
+    span: {start_line: 410, end_line: 410}
+    summary: Advance the question contract version to 4.
+    rationale: Invalidate prior answers after changing assumption normalization.
+  - path: packages/service/src/powdrr_service/planning/test_coverage.py
+    type: modified
+    span: {start_line: 417, end_line: 417}
+    summary: Name the revised answer schema version 4.
+    rationale: Keep cached response validation aligned with the new contract.
+  - path: packages/service/src/powdrr_service/planning/test_coverage.py
+    type: modified
+    span: {start_line: 433, end_line: 439}
+    summary: Clarify assumption instructions for not-applicable and source-defined behavior.
+    rationale: Guide the model toward repository-convention assumptions only.
+  - path: packages/service/src/powdrr_service/planning/test_coverage.py
+    type: modified
+    span: {start_line: 455, end_line: 458}
+    summary: Scale the response limit with the number of required criteria.
+    rationale: Allow each criterion its normal answer budget without an overly restrictive aggregate cap.
+  - path: packages/service/src/powdrr_service/planning/test_coverage.py
+    type: modified
+    span: {start_line: 473, end_line: 481}
+    summary: Recognize the supported not-applicable value forms.
+    rationale: Normalize generated assumption handling consistently with behavior contracts.
+  - path: tests/test_test_coverage_planning.py
+    type: modified
+    span: {start_line: 71, end_line: 73}
+    summary: Assert the revised contract and per-criterion answer budget.
+    rationale: Prevent regressions in the multi-criterion response allowance.
+  - path: tests/test_test_coverage_planning.py
+    type: modified
+    span: {start_line: 109, end_line: 109}
+    summary: Verify the single-criterion request retains the standard answer budget.
+    rationale: Keep the scaled budget bounded for the smallest request.
+  - path: tests/test_test_coverage_planning.py
+    type: modified
+    span: {start_line: 126, end_line: 171}
+    summary: Cover normalization of source-backed and not-applicable assumptions.
+    rationale: Ensure unsupported source basis labels grounded in evidence are omitted as assumptions while ungrounded assumptions still fail closed.
+entities:
+  - id: build-test-coverage-request
+    type: Function
+    action: modified
+  - id: plan-test-coverage-v4
+    type: Schema
+    action: added
+entity_relationships: []
+invariants:
+  - id: per-criterion-answer-budget
+    description: Each required criterion receives one shared-limit answer budget.
+    action: added
+    rationale: Multi-criterion plans fit the bounded response contract without changing the single-criterion limit.
+  - id: evidence-backed-assumption-normalization
+    description: Source-defined behavior and not-applicable dimensions are not persisted as repository-convention assumptions.
+    action: added
+    rationale: Preserve the distinction between source evidence and defaults inferred from repository conventions.
+guidance:
+  - id: assumption-basis
+    description: Assumptions resolve unspecified dimensions from repository conventions; source-defined behavior belongs in typed dimensions and cited evidence.
+    action: added

@@ -15,6 +15,7 @@ from powdrr_service.behavior_contract import (
 )
 from powdrr_service.planning.contracts import PlanningContractError, Question
 from powdrr_service.planning.questions import (
+    MAX_QUESTION_ANSWER_CHARS,
     ContextRecord,
     QuestionRequest,
     SourceExcerpt,
@@ -331,6 +332,41 @@ def build_test_coverage_request(
                 "routing": "include",
                 "capability_matrix": raw_behavior.get("capability_matrix"),
             }
+            assumptions = behavior.get("assumptions")
+            if isinstance(assumptions, Sequence) and not isinstance(
+                assumptions, (str, bytes)
+            ):
+                normalized_assumptions: list[Any] = []
+                for assumption_index, assumption in enumerate(assumptions):
+                    if isinstance(assumption, Mapping):
+                        assumption_dimension = assumption.get("dimension")
+                        dimensions = raw_behavior.get("dimensions")
+                        dimension_value = (
+                            dimensions.get(assumption_dimension)
+                            if isinstance(dimensions, Mapping)
+                            and isinstance(assumption_dimension, str)
+                            else None
+                        )
+                        if _is_not_applicable_value(
+                            dimension_value
+                        ) and _is_not_applicable_value(assumption.get("resolution")):
+                            # An irrelevant dimension has no default to record.
+                            continue
+                    if (
+                        isinstance(assumption, Mapping)
+                        and assumption.get("basis") not in ASSUMPTION_BASES
+                    ):
+                        if assumption.get("basis_reference") not in evidence:
+                            raise PlanningContractError(
+                                f"{path}/behavior_scenario/assumptions/{assumption_index}",
+                                "unsupported assumption bases must be grounded in a "
+                                "pinned excerpt cited by scenario evidence",
+                            )
+                        # A source-backed behavior is evidence, not a default
+                        # assumption. The dimension and scenario retain it.
+                        continue
+                    normalized_assumptions.append(assumption)
+                behavior["assumptions"] = normalized_assumptions
             try:
                 compiled_behavior = compile_behavior_scenarios([behavior])[0]
             except (TypeError, ValueError) as error:
@@ -362,7 +398,7 @@ def build_test_coverage_request(
             }
             for excerpt in source_excerpts
         ],
-        "contract_version": 1,
+        "contract_version": 4,
     }
     digest = hashlib.sha256(
         json.dumps(digest_data, sort_keys=True, separators=(",", ":")).encode()
@@ -371,14 +407,14 @@ def build_test_coverage_request(
         question=Question(
             question_id=question_id,
             kind="plan_test_coverage",
-            contract_version=1,
+            contract_version=4,
             subject_ids=(item_id,),
             input_digest=f"sha256:{digest}",
             context_ref_ids=(
                 *(excerpt.ref_id for excerpt in source_excerpts),
                 *(fact.ref_id for fact in facts),
             ),
-            expected_answer_schema="plan-test-coverage-v1",
+            expected_answer_schema="plan-test-coverage-v4",
             attempt=1,
         ),
         exact_question=(
@@ -394,10 +430,13 @@ def build_test_coverage_request(
             "behavior dimensions explicitly resolved. Use not_applicable only "
             "when the pinned source evidence makes a dimension irrelevant; use "
             "an explicit assumption when repository conventions must resolve an "
-            "unspecified dimension. Ground the scenario in the supplied source "
-            "excerpts and cite only relevant excerpt IDs in evidence. The planner "
-            "will bind the behavior scenario's when/then to the test scenario and "
-            "expected outcome. "
+            "unspecified dimension. Do not add assumptions for dimensions marked "
+            "not_applicable. Ground the scenario in the supplied source "
+            "excerpts and cite only relevant excerpt IDs in evidence. Do not list "
+            "source-defined behavior as an assumption; include an assumption only "
+            "when a repository convention resolves an unspecified dimension. The "
+            "planner will bind the behavior scenario's when/then to the test "
+            "scenario and expected outcome. "
             "Return cases in exactly the supplied acceptance-criterion order."
         ),
         answer_field_definitions={
@@ -413,6 +452,10 @@ def build_test_coverage_request(
         empty_example=example,
         answer_schema=schema,
         parse_answer=parse,
+        # Each required criterion contributes one structured case with seven
+        # dimensions and optional evidence detail. Give every case the normal
+        # bounded-answer budget instead of applying one budget to the whole set.
+        max_answer_chars=MAX_QUESTION_ANSWER_CHARS * len(normalized_criteria),
     )
 
 
@@ -425,6 +468,15 @@ def _required_text(value: Any, path: str) -> str:
     if normalized.startswith(("TODO", "TBD", "<")):
         raise PlanningContractError(path, "must contain a concrete test design")
     return normalized
+
+
+def _is_not_applicable_value(value: Any) -> bool:
+    if not isinstance(value, str):
+        return False
+    normalized = value.strip().casefold()
+    return normalized == "not_applicable" or normalized.startswith(
+        ("not_applicable ", "not_applicable-", "not_applicable—", "not_applicable:")
+    )
 
 
 __all__ = ["TEST_TYPES", "build_test_coverage_request"]

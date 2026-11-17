@@ -1,0 +1,74 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1562
+title: Evaluate shared dependency nodes once per queue pass
+intent:
+  problem: A plan item with several downstream dependents can have its fulfillment evidence parsed repeatedly for each outgoing dependency edge.
+  goal: Evaluate each prerequisite node once per queue pass and reuse its verified result across dependent items.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 152, end_line: 154}
+    summary: Add per-plan-node fulfillment results to the pass-scoped evidence cache.
+    rationale: Share each prerequisite result across all downstream edges in the plan.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 4646, end_line: 4661}
+    summary: Return a previously verified prerequisite result before reprocessing evidence.
+    rationale: Avoid repeating digest, checkpoint, and pull request validation for shared dependencies.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 4663, end_line: 4663}
+    summary: Cache missing issue evidence as an unsatisfied dependency result.
+    rationale: Keep missing plan nodes out of the ready frontier without repeated analysis.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 4666, end_line: 4666}
+    summary: Cache open prerequisite issues as unsatisfied.
+    rationale: Reuse the same state result for every item that depends on that issue.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 4674, end_line: 4674}
+    summary: Cache verified no-op fulfillment as satisfied.
+    rationale: Avoid re-parsing the same fulfillment receipt for downstream items.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 4679, end_line: 4679}
+    summary: Cache missing plan-item evidence as unsatisfied.
+    rationale: Avoid repeating static plan lookups for the same dependency node.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 4683, end_line: 4683}
+    summary: Cache invalid issue pointers as unsatisfied dependencies.
+    rationale: Preserve fail-closed behavior while sharing node results.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 4733, end_line: 4734}
+    summary: Store the final verified merged-PR result for the prerequisite node.
+    rationale: Reuse checkpoint and merge validation across every outgoing edge.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 589, end_line: 623}
+    summary: Verify repeated checks of a shared plan node evaluate its receipt once.
+    rationale: Guard the DAG fan-out optimization against repeated dependency verification.
+  - path: docs/plans/github-issue-plan-worker.md
+    type: modified
+    span: {start_line: 198, end_line: 200}
+    summary: Document reusing verified dependency results across a plan's outgoing edges.
+    rationale: Describe the plan-node evaluation behavior and preserve fresh issue-label checks.
+entities:
+  - id: queue-dependency-evidence-cache
+    type: Cache
+    action: modified
+entity_relationships: []
+invariants:
+  - id: dependency-node-verified-once-per-pass
+    description: A prerequisite's verified fulfillment result is computed once per plan node in a queue evaluation pass and reused across its dependents.
+    action: added
+    rationale: Avoid repeating dependency evidence analysis along shared DAG edges.
+guidance:
+  - id: keep-dependency-results-pass-scoped
+    description: Reuse dependency results only within the current queue pass and refresh them on the next worker invocation.
+    action: added
+    rationale: Keep dependency analysis responsive to later issue and pull request changes.

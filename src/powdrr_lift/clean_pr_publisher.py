@@ -417,7 +417,14 @@ def _persist_publication_intent(
     intent_id = hashlib.sha256(
         f"{branch}\0{authorization['authorization_digest']}".encode()
     ).hexdigest()
-    path = source_root / ".powdrr" / "publication-intents" / f"{intent_id}.json"
+    git_path = Path(
+        _run(
+            ["git", "rev-parse", "--git-path", "powdrr/publication-intents"],
+            cwd=source_root,
+        ).strip()
+    )
+    intent_root = git_path if git_path.is_absolute() else source_root / git_path
+    path = intent_root / f"{intent_id}.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     intent = {
         "schema_version": "powdrr-publication-intent-v1",

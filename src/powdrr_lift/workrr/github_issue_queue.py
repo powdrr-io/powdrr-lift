@@ -1345,14 +1345,15 @@ def run_worker_once(
         )
         _mark_abandoned_claims_for_reconciliation(client, root)
         dependency_evidence = _DependencyEvidenceCache()
+        plan_issue_indexes: dict[str, dict[tuple[str, str], QueueIssue]] = {}
         _promote_unblocked_issues(
             client=client,
             repo_root=root,
             plan_loader=plan_loader,
             evidence_cache=dependency_evidence,
+            issue_indexes=plan_issue_indexes,
         )
         issues = client.list_issues(labels=(QUEUE_LABELS["ready"],), state="open")
-        plan_issue_indexes: dict[str, dict[tuple[str, str], QueueIssue]] = {}
         loaded_plans: dict[tuple[str, str, str], ReviewedExecutionPlan] = {}
         for issue in sorted(issues, key=lambda value: value.number):
             if QUEUE_LABELS["ready"] not in issue.labels or issue.state != "open":
@@ -2939,13 +2940,13 @@ def _promote_unblocked_issues(
     repo_root: Path,
     plan_loader: Callable[..., ReviewedExecutionPlan],
     evidence_cache: _DependencyEvidenceCache,
+    issue_indexes: dict[str, dict[tuple[str, str], QueueIssue]],
 ) -> None:
     """Make dependency-blocked work ready after all prerequisite issues close."""
     blocked = client.list_issues(
         labels=(QUEUE_LABELS["blocked_on_dependency"],), state="open"
     )
     loaded_plans: dict[tuple[str, str, str], ReviewedExecutionPlan] = {}
-    issue_indexes: dict[str, dict[tuple[str, str], QueueIssue]] = {}
     status_changed = False
     for issue in sorted(blocked, key=lambda value: value.number):
         if (

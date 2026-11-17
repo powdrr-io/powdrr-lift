@@ -552,6 +552,7 @@ class SourceReferenceRun:
         reader_limits: ReaderLimits | None = None,
         readonly_support_files: Mapping[str, str] | None = None,
         accepted_preparation: Mapping[str, Any] | None = None,
+        reviewed_objective: str | None = None,
         seed_candidate_files: Mapping[str, str | None] | None = None,
         correction_context: Mapping[str, Any] | None = None,
         post_worker_reconciler: (
@@ -719,6 +720,8 @@ class SourceReferenceRun:
             runtime_contract.pop("base_commit", None)
             runtime_contract.pop("catalog_digest", None)
             runtime_contract.pop("workspace_root", None)
+            if reviewed_objective is not None:
+                runtime_contract["objective"] = reviewed_objective
             if runtime_contract != accepted_preparation.get("accepted_contract"):
                 raise ValueError(
                     "runtime preparation differs from the reviewed plan; a plan "

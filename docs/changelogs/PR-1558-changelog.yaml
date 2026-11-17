@@ -1,0 +1,56 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1558
+title: Compare runtime objectives to reviewed preparation
+intent:
+  problem: Source-reference runs append reviewed scope and story instructions to their runtime objective, while the accepted preparation contains the plain plan objective, so the worker rejects valid runs before coding.
+  goal: Preserve runtime instructions in the worker handoff while comparing the accepted plan objective against its reviewed preparation.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/source_reference_dispatch.py
+    type: modified
+    span: {start_line: 533, end_line: 538}
+    summary: Pass the reviewed plan objective alongside the augmented runtime objective.
+    rationale: Bind stable preparation comparison to the objective used to compile the accepted plan.
+  - path: src/powdrr_lift/workrr/source_reference_run.py
+    type: modified
+    span: {start_line: 555, end_line: 555}
+    summary: Accept the reviewed objective separately from runtime prompt instructions.
+    rationale: Allow runtime context to remain in the worker handoff without changing reviewed scope.
+  - path: src/powdrr_lift/workrr/source_reference_run.py
+    type: modified
+    span: {start_line: 723, end_line: 724}
+    summary: Compare the reviewed objective while retaining the full runtime objective in the handoff.
+    rationale: Prevent scope and story guidance appended at runtime from invalidating accepted preparation.
+  - path: tests/test_source_reference_run.py
+    type: modified
+    span: {start_line: 81, end_line: 82}
+    summary: Allow the preparation fixture to model reviewed and augmented objectives.
+    rationale: Reproduce runtime-added instructions without changing accepted preparation.
+  - path: tests/test_source_reference_run.py
+    type: modified
+    span: {start_line: 212, end_line: 212}
+    summary: Append runtime-only objective context when preparing the run.
+    rationale: Exercise the same distinction used by issue-worker dispatch.
+  - path: tests/test_source_reference_run.py
+    type: modified
+    span: {start_line: 225, end_line: 225}
+    summary: Pass the reviewed objective into source-reference preparation.
+    rationale: Keep the comparison bound to accepted plan data.
+  - path: tests/test_source_reference_run.py
+    type: modified
+    span: {start_line: 250, end_line: 267}
+    summary: Verify augmented runtime objectives preserve accepted preparation and remain in the worker handoff.
+    rationale: Prevent scope guidance from blocking implementation before coding.
+entities: []
+entity_relationships: []
+invariants:
+  - id: runtime-objective-preserves-reviewed-objective
+    description: Runtime-added instructions remain in the worker objective while preparation comparison uses the reviewed plan objective.
+    action: added
+    rationale: Runtime context may extend the objective without changing the reviewed plan.
+guidance:
+  - id: compare-objective-to-reviewed-plan
+    description: Use the immutable proposed plan objective for accepted preparation comparison.
+    action: added
+    rationale: Scope and story context can be appended to the runtime objective after planning.

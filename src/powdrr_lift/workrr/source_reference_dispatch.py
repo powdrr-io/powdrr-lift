@@ -530,6 +530,12 @@ def dispatch_source_reference_task(
                     == "source-reference-preparation-v1"
                     else None
                 ),
+                reviewed_objective=(
+                    str(proposed.get("objective", objective))
+                    if proposed.get("execution_preparation_schema")
+                    == "source-reference-preparation-v1"
+                    else None
+                ),
                 seed_candidate_files=seed_candidate_files,
                 correction_context=correction_context,
                 review_client=_ReferenceReviewer(review_client),

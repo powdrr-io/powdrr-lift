@@ -104,8 +104,6 @@ def build_test_coverage_request(
                             "required": [
                                 "subject",
                                 "given",
-                                "when",
-                                "then",
                                 "dimensions",
                                 "evidence",
                                 "validator",
@@ -115,8 +113,6 @@ def build_test_coverage_request(
                             "properties": {
                                 "subject": {"type": "string", "minLength": 1},
                                 "given": {"type": "string", "minLength": 1},
-                                "when": {"type": "string", "minLength": 1},
-                                "then": {"type": "string", "minLength": 1},
                                 "dimensions": {
                                     "type": "object",
                                     "additionalProperties": False,
@@ -237,8 +233,6 @@ def build_test_coverage_request(
                 "behavior_scenario": {
                     "subject": "The behavior covered by this criterion.",
                     "given": "The source-defined preconditions hold.",
-                    "when": "Exercise the observable behavior for this criterion.",
-                    "then": "The externally visible result satisfies the criterion.",
                     "dimensions": {
                         name: "not_applicable" for name in BEHAVIOR_DIMENSIONS
                     },
@@ -297,8 +291,6 @@ def build_test_coverage_request(
             expected_behavior_fields = {
                 "subject",
                 "given",
-                "when",
-                "then",
                 "dimensions",
                 "evidence",
                 "validator",
@@ -329,6 +321,11 @@ def build_test_coverage_request(
                 **dict(raw_behavior),
                 "schema_version": "behavior-scenario-v1",
                 "scenario_id": f"{item_id}-{index:02d}",
+                # These fields duplicate the test design. Bind them from the
+                # accepted scenario/outcome so independently phrased model
+                # text cannot make an otherwise valid plan unpublishable.
+                "when": scenario,
+                "then": expected,
                 "evidence": list(dict.fromkeys(evidence)),
                 "faithfulness_ref": {"fingerprint": f"sha256:{digest}"},
                 "routing": "include",
@@ -340,11 +337,6 @@ def build_test_coverage_request(
                 raise PlanningContractError(
                     f"{path}/behavior_scenario", str(error)
                 ) from error
-            if compiled_behavior.when != scenario or compiled_behavior.then != expected:
-                raise PlanningContractError(
-                    f"{path}/behavior_scenario",
-                    "when and then must match the test scenario and expected outcome",
-                )
             cases.append(
                 {
                     "id": f"AC-{index:02d}",
@@ -403,8 +395,9 @@ def build_test_coverage_request(
             "when the pinned source evidence makes a dimension irrelevant; use "
             "an explicit assumption when repository conventions must resolve an "
             "unspecified dimension. Ground the scenario in the supplied source "
-            "excerpts, cite only relevant excerpt IDs in evidence, and make its "
-            "when/then match the test scenario and outcome. "
+            "excerpts and cite only relevant excerpt IDs in evidence. The planner "
+            "will bind the behavior scenario's when/then to the test scenario and "
+            "expected outcome. "
             "Return cases in exactly the supplied acceptance-criterion order."
         ),
         answer_field_definitions={

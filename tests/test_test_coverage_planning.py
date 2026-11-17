@@ -68,6 +68,9 @@ def test_planner_assigns_stable_ids_to_llm_test_designs() -> None:
     planned = request.parse_answer(answer)
 
     assert request.question.kind == "plan_test_coverage"
+    assert request.question.contract_version == 4
+    assert request.question.expected_answer_schema == "plan-test-coverage-v4"
+    assert request.max_answer_chars == 8_000
     assert [case["id"] for case in planned["required_test_cases"]] == [
         "AC-01",
         "AC-02",
@@ -103,6 +106,7 @@ def test_planner_rejects_missing_or_unsupported_test_designs() -> None:
         },
         source_excerpts=(SourceExcerpt("anchor-behavior", "The behavior works."),),
     )
+    assert request.max_answer_chars == 4_000
 
     with pytest.raises(ValueError, match="exactly one test design"):
         request.parse_answer({"cases": []})
@@ -119,3 +123,49 @@ def test_planner_rejects_missing_or_unsupported_test_designs() -> None:
                 ]
             }
         )
+
+
+def test_planner_does_not_store_source_backed_behavior_as_an_assumption() -> None:
+    request = build_test_coverage_request(
+        {
+            "id": "item-0001",
+            "acceptance_criteria": ["Denial paths are covered."],
+        },
+        source_excerpts=(SourceExcerpt("anchor-ci", "Denial paths are covered."),),
+    )
+    behavior = _behavior()
+    behavior["assumptions"] = [
+        {
+            "dimension": "negative_boundaries",
+            "resolution": "Denial paths are tested as negative scenarios.",
+            "rationale": "The pinned source requires denial path coverage.",
+            "basis": "source_defined",
+            "basis_reference": "anchor-ci",
+            "confidence": "high",
+        },
+        {
+            "dimension": "cancellation_cleanup",
+            "resolution": "not_applicable",
+            "rationale": "No cancellation behavior is described.",
+            "basis": "repository_convention",
+            "basis_reference": "existing-test-paths",
+            "confidence": "medium",
+        },
+    ]
+
+    planned = request.parse_answer(
+        {
+            "cases": [
+                {
+                    "test_type": "unit",
+                    "scenario": "Exercise a denial path.",
+                    "expected_outcome": "The denial behavior is covered.",
+                    "behavior_scenario": behavior,
+                }
+            ]
+        }
+    )
+
+    compiled = planned["required_test_cases"][0]["behavior_scenario"]
+    assert compiled.get("assumptions", []) == []
+    assert compiled["evidence"] == ["anchor-ci"]

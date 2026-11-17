@@ -5,8 +5,14 @@ from __future__ import annotations
 import hashlib
 import json
 from collections.abc import Mapping, Sequence
-from typing import Any
+from typing import Any, cast
 
+from powdrr_service.behavior_contract import (
+    ASSUMPTION_BASES,
+    BEHAVIOR_DIMENSIONS,
+    SUPPORTED_ASSUMPTION_DIMENSIONS,
+    compile_behavior_scenarios,
+)
 from powdrr_service.planning.contracts import PlanningContractError, Question
 from powdrr_service.planning.questions import (
     ContextRecord,
@@ -38,7 +44,14 @@ def build_test_coverage_request(
         raise PlanningContractError(
             "/acceptance_criteria", "must contain non-empty criteria"
         )
-    normalized_criteria = tuple(value.strip() for value in criteria)
+    normalized_criteria = tuple(
+        value.strip() for value in cast(Sequence[str], criteria)
+    )
+    if not source_excerpts:
+        raise PlanningContractError(
+            "/source_excerpts",
+            "typed behavior scenarios require pinned source evidence",
+        )
     test_paths = tuple(sorted(set(existing_test_paths))[:40])
     facts = (
         ContextRecord(
@@ -67,7 +80,12 @@ def build_test_coverage_request(
                 "items": {
                     "type": "object",
                     "additionalProperties": False,
-                    "required": ["test_type", "scenario", "expected_outcome"],
+                    "required": [
+                        "test_type",
+                        "scenario",
+                        "expected_outcome",
+                        "behavior_scenario",
+                    ],
                     "properties": {
                         "test_type": {"type": "string", "enum": list(TEST_TYPES)},
                         "scenario": {
@@ -79,6 +97,129 @@ def build_test_coverage_request(
                             "type": "string",
                             "minLength": 1,
                             "maxLength": _MAX_TEXT_LENGTH,
+                        },
+                        "behavior_scenario": {
+                            "type": "object",
+                            "additionalProperties": False,
+                            "required": [
+                                "subject",
+                                "given",
+                                "when",
+                                "then",
+                                "dimensions",
+                                "evidence",
+                                "validator",
+                                "capability_matrix",
+                                "assumptions",
+                            ],
+                            "properties": {
+                                "subject": {"type": "string", "minLength": 1},
+                                "given": {"type": "string", "minLength": 1},
+                                "when": {"type": "string", "minLength": 1},
+                                "then": {"type": "string", "minLength": 1},
+                                "dimensions": {
+                                    "type": "object",
+                                    "additionalProperties": False,
+                                    "required": list(BEHAVIOR_DIMENSIONS),
+                                    "properties": {
+                                        name: {"type": "string", "minLength": 1}
+                                        for name in BEHAVIOR_DIMENSIONS
+                                    },
+                                },
+                                "evidence": {
+                                    "type": "array",
+                                    "minItems": 1,
+                                    "items": {
+                                        "type": "string",
+                                        "enum": [
+                                            excerpt.ref_id
+                                            for excerpt in source_excerpts
+                                        ],
+                                    },
+                                },
+                                "validator": {"type": "string", "minLength": 1},
+                                "capability_matrix": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "additionalProperties": False,
+                                        "required": [
+                                            "capability",
+                                            "behavior",
+                                            "evidence",
+                                            "error",
+                                        ],
+                                        "properties": {
+                                            "capability": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                            },
+                                            "behavior": {
+                                                "type": "string",
+                                                "enum": [
+                                                    "support",
+                                                    "reject",
+                                                    "fallback",
+                                                ],
+                                            },
+                                            "evidence": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "string",
+                                                    "enum": [
+                                                        excerpt.ref_id
+                                                        for excerpt in source_excerpts
+                                                    ],
+                                                },
+                                            },
+                                            "error": {"type": ["string", "null"]},
+                                        },
+                                    },
+                                },
+                                "assumptions": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "additionalProperties": False,
+                                        "required": [
+                                            "dimension",
+                                            "resolution",
+                                            "rationale",
+                                            "basis",
+                                            "basis_reference",
+                                            "confidence",
+                                        ],
+                                        "properties": {
+                                            "dimension": {
+                                                "type": "string",
+                                                "enum": sorted(
+                                                    SUPPORTED_ASSUMPTION_DIMENSIONS
+                                                ),
+                                            },
+                                            "resolution": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                            },
+                                            "rationale": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                            },
+                                            "basis": {
+                                                "type": "string",
+                                                "enum": sorted(ASSUMPTION_BASES),
+                                            },
+                                            "basis_reference": {
+                                                "type": "string",
+                                                "minLength": 1,
+                                            },
+                                            "confidence": {
+                                                "type": "string",
+                                                "enum": ["high", "medium", "low"],
+                                            },
+                                        },
+                                    },
+                                },
+                            },
                         },
                     },
                 },
@@ -93,6 +234,19 @@ def build_test_coverage_request(
                 "expected_outcome": (
                     "The externally visible result satisfies the criterion."
                 ),
+                "behavior_scenario": {
+                    "subject": "The behavior covered by this criterion.",
+                    "given": "The source-defined preconditions hold.",
+                    "when": "Exercise the observable behavior for this criterion.",
+                    "then": "The externally visible result satisfies the criterion.",
+                    "dimensions": {
+                        name: "not_applicable" for name in BEHAVIOR_DIMENSIONS
+                    },
+                    "evidence": [excerpt.ref_id for excerpt in source_excerpts],
+                    "validator": "Run the focused test for this criterion.",
+                    "capability_matrix": [],
+                    "assumptions": [],
+                },
             }
             for _criterion in normalized_criteria
         ]
@@ -110,7 +264,7 @@ def build_test_coverage_request(
             raise PlanningContractError(
                 "/cases", "must have exactly one test design per acceptance criterion"
             )
-        cases: list[dict[str, str]] = []
+        cases: list[dict[str, Any]] = []
         for index, (raw_case, description) in enumerate(
             zip(raw_cases, normalized_criteria, strict=True), start=1
         ):
@@ -119,9 +273,12 @@ def build_test_coverage_request(
                 "test_type",
                 "scenario",
                 "expected_outcome",
+                "behavior_scenario",
             }:
                 raise PlanningContractError(
-                    path, "must contain test_type, scenario, and expected_outcome"
+                    path,
+                    "must contain test_type, scenario, expected_outcome, "
+                    "and behavior_scenario",
                 )
             test_type = raw_case.get("test_type")
             if test_type not in TEST_TYPES:
@@ -132,6 +289,62 @@ def build_test_coverage_request(
             expected = _required_text(
                 raw_case.get("expected_outcome"), f"{path}/expected_outcome"
             )
+            raw_behavior = raw_case.get("behavior_scenario")
+            if not isinstance(raw_behavior, Mapping):
+                raise PlanningContractError(
+                    f"{path}/behavior_scenario", "must be an object"
+                )
+            expected_behavior_fields = {
+                "subject",
+                "given",
+                "when",
+                "then",
+                "dimensions",
+                "evidence",
+                "validator",
+                "capability_matrix",
+                "assumptions",
+            }
+            if set(raw_behavior) != expected_behavior_fields:
+                raise PlanningContractError(
+                    f"{path}/behavior_scenario",
+                    "must contain exactly the typed behavior scenario fields",
+                )
+            evidence = raw_behavior.get("evidence")
+            if (
+                not isinstance(evidence, Sequence)
+                or isinstance(evidence, (str, bytes))
+                or not evidence
+                or not all(
+                    isinstance(ref, str)
+                    and ref in {excerpt.ref_id for excerpt in source_excerpts}
+                    for ref in evidence
+                )
+            ):
+                raise PlanningContractError(
+                    f"{path}/behavior_scenario/evidence",
+                    "must cite at least one pinned source excerpt",
+                )
+            behavior: dict[str, Any] = {
+                **dict(raw_behavior),
+                "schema_version": "behavior-scenario-v1",
+                "scenario_id": f"{item_id}-{index:02d}",
+                "evidence": list(dict.fromkeys(evidence)),
+                "faithfulness_ref": {"fingerprint": f"sha256:{digest}"},
+                "routing": "include",
+                "capability_matrix": raw_behavior.get("capability_matrix"),
+            }
+            try:
+                compiled_behavior = compile_behavior_scenarios([behavior])[0]
+            except (TypeError, ValueError) as error:
+                raise PlanningContractError(
+                    f"{path}/behavior_scenario", str(error)
+                ) from error
+            if compiled_behavior.when != scenario or compiled_behavior.then != expected:
+                raise PlanningContractError(
+                    f"{path}/behavior_scenario",
+                    "when and then must match the test scenario and expected outcome",
+                )
             cases.append(
                 {
                     "id": f"AC-{index:02d}",
@@ -140,6 +353,7 @@ def build_test_coverage_request(
                     "test_type": str(test_type),
                     "scenario": scenario,
                     "expected_outcome": expected,
+                    "behavior_scenario": compiled_behavior.to_data(),
                 }
             )
         return {"required_test_cases": cases, "validation_runs": []}
@@ -184,10 +398,20 @@ def build_test_coverage_request(
             "Prefer an existing public boundary and realistic behavior assertions. "
             "Do not repeat or rewrite the acceptance criterion, propose test IDs, "
             "invent behavior, or choose a broader test type without a reason. "
+            "For each case, also provide a typed behavior_scenario with all seven "
+            "behavior dimensions explicitly resolved. Use not_applicable only "
+            "when the pinned source evidence makes a dimension irrelevant; use "
+            "an explicit assumption when repository conventions must resolve an "
+            "unspecified dimension. Ground the scenario in the supplied source "
+            "excerpts, cite only relevant excerpt IDs in evidence, and make its "
+            "when/then match the test scenario and outcome. "
             "Return cases in exactly the supplied acceptance-criterion order."
         ),
         answer_field_definitions={
-            "cases": "One test type, scenario, and expected outcome per criterion.",
+            "cases": (
+                "One test type, test scenario, expected outcome, and typed "
+                "source-grounded behavior scenario per criterion."
+            ),
         },
         source_excerpts=tuple(source_excerpts),
         repository_evidence=(facts[1],),

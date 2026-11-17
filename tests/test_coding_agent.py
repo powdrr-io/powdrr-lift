@@ -195,7 +195,7 @@ def _repair_request(
     worktree: Path,
     protected_relative_path: str,
     *,
-    expires_at: str = "2026-11-17T00:00:00Z",
+    expires_at: str = "2099-11-17T00:00:00Z",
 ) -> ImplementationRequest:
     protected_path = worktree / protected_relative_path
     protected_digest = hashlib.sha256(protected_path.read_bytes()).hexdigest()

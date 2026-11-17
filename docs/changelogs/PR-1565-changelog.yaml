@@ -1,0 +1,69 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1565
+title: Reuse plan issue indexes during worker readiness checks
+intent:
+  problem: The worker can paginate a plan's issues while promoting blocked work and then fetch the same plan index again while checking ready candidates.
+  goal: Reuse the pass-scoped plan issue index across dependency promotion and candidate selection.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 1348, end_line: 1348}
+    summary: Create a per-pass plan issue index before dependency promotion.
+    rationale: Let candidate selection reuse plan issues already fetched while promoting blocked items.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 1354, end_line: 1354}
+    summary: Pass the shared plan issue index into dependency promotion.
+    rationale: Reuse the same per-pass index when checking ready candidates.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 1355, end_line: 1355}
+    summary: Remove the later duplicate plan issue index initialization.
+    rationale: Preserve the index populated during promotion for candidate analysis.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 2943, end_line: 2943}
+    summary: Accept the worker's shared plan issue index in the promotion step.
+    rationale: Keep plan issue reads scoped to one worker pass and reuse the same index across phases.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 2948, end_line: 2948}
+    summary: Remove the promotion-local empty index.
+    rationale: Use the per-pass index provided by the worker.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 429, end_line: 429}
+    summary: Track issue-list read counts in the fake GitHub client.
+    rationale: Assert the queue reuses a plan index across worker phases.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 460, end_line: 461}
+    summary: Increment per-filter issue-list read counts in the fake client.
+    rationale: Measure plan-index query reuse without changing fake GitHub behavior.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 1522, end_line: 1522}
+    summary: Reset issue-list counters after publishing the fixture plan.
+    rationale: Keep the assertion focused on one worker pass.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 1554, end_line: 1556}
+    summary: Verify candidate analysis does not fetch the plan index a third time.
+    rationale: Preserve the shared-index optimization while keeping the later no-work readiness read.
+entities:
+  - id: worker-plan-issue-index-cache
+    type: Cache
+    action: added
+entity_relationships: []
+invariants:
+  - id: plan-issue-index-shared-per-worker-pass
+    description: Dependency promotion and candidate selection reuse one plan issue index during a worker pass.
+    action: added
+    rationale: Avoid duplicate paginated issue reads while keeping cached issue state scoped to one pass.
+guidance:
+  - id: reuse-plan-index-during-worker-pass
+    description: Share the plan issue index between dependency promotion and ready candidate checks in the current pass.
+    action: added
+    rationale: Reduce GitHub API reads without carrying issue state into later worker invocations.

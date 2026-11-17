@@ -426,6 +426,7 @@ class FakeIssueClient:
     def __init__(self, issues: tuple[QueueIssue, ...] = ()) -> None:
         self.repository = "example/project"
         self.issues = list(issues)
+        self.issue_list_reads: dict[tuple[tuple[str, ...], str], int] = {}
         self.comments: list[tuple[int, str]] = []
         self.comment_reads: dict[int, int] = {}
         self.pull_requests: dict[int, dict[str, object]] = {}
@@ -456,6 +457,8 @@ class FakeIssueClient:
     def list_issues(
         self, *, labels: tuple[str, ...] = (), state: str = "all"
     ) -> tuple[QueueIssue, ...]:
+        key = (labels, state)
+        self.issue_list_reads[key] = self.issue_list_reads.get(key, 0) + 1
         return tuple(
             issue
             for issue in self.issues
@@ -1516,6 +1519,7 @@ def test_worker_skips_issue_relabelled_before_fresh_claim_check(
         plan_commit=PLAN_COMMIT,
         client=client,  # type: ignore[arg-type]
     )
+    client.issue_list_reads.clear()
     executed: list[str] = []
 
     def load_plan(
@@ -1547,6 +1551,9 @@ def test_worker_skips_issue_relabelled_before_fresh_claim_check(
     assert report.outcome == "no_eligible_work"
     assert QUEUE_LABELS["claimed"] in client.issues[0].labels
     assert executed == []
+    # Promotion and no-work readiness each need an index; candidate analysis
+    # reuses the promotion index instead of fetching the plan a third time.
+    assert client.issue_list_reads[((_plan_label("feature-v1"),), "all")] == 2
 
 
 def test_worker_passes_explicit_no_pr_dependency_to_workflow(

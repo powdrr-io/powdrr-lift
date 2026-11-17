@@ -718,6 +718,7 @@ class SourceReferenceRun:
             runtime_contract = dict(self.handoff.to_data()["worker_prompt"]["contract"])
             runtime_contract.pop("base_commit", None)
             runtime_contract.pop("catalog_digest", None)
+            runtime_contract.pop("workspace_root", None)
             if runtime_contract != accepted_preparation.get("accepted_contract"):
                 raise ValueError(
                     "runtime preparation differs from the reviewed plan; a plan "

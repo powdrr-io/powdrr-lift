@@ -1,0 +1,21 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1564
+title: Plan GitHub feature visibility and agent-independent coordination
+intent:
+  problem: The existing agent UI presents local jobs but lacks a shared repository feature inventory and a protocol for discovering work performed by other agents.
+  goal: Specify a GitHub-owned protocol and an integrated Features view with ordered implementation milestones and concrete acceptance criteria.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/plans/github-feature-visibility.md
+  type: added
+  span: {start_line: 1, end_line: 629}
+  summary: Define shared feature identities, GitHub records, execution reports, remote coordination, repository discovery, and the existing UI Features view.
+  rationale: Give implementing agents a detailed current-code-aligned plan with protocol examples, file guidance, ordered milestones, and explicit acceptance checks.
+entities:
+- id: github-feature-visibility-plan
+  type: Technical specification
+  action: added
+entity_relationships: []
+invariants: []
+guidance: []

@@ -1,0 +1,181 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1557
+title: Include remaining coverage in planning proposals
+intent:
+  problem: Requirement-level coverage can identify a broad requirement as unresolved even when an individual proposed subtask is already implemented, because work-unit proposals do not receive the coverage assessment's remaining-gap explanation.
+  goal: Pass each unresolved requirement's coverage assessment into proposal generation and require proposed work to address the documented remaining gap.
+human-decisions: []
+structured_files: []
+files:
+  - path: packages/service/src/powdrr_service/planning/assembly.py
+    type: modified
+    span: {start_line: 317, end_line: 317}
+    summary: Add coverage assessments to work-unit context.
+    rationale: Keep requirement-level completion detail available to proposal generation.
+  - path: packages/service/src/powdrr_service/planning/assembly.py
+    type: modified
+    span: {start_line: 1050, end_line: 1058}
+    summary: Build bounded context records from requirement coverage facts.
+    rationale: Make accepted completion evidence available to each proposal request.
+  - path: packages/service/src/powdrr_service/planning/assembly.py
+    type: modified
+    span: {start_line: 1107, end_line: 1107}
+    summary: Include coverage facts in accepted proposal context.
+    rationale: Bind coverage evidence to the generated work-unit request.
+  - path: packages/service/src/powdrr_service/planning/assembly.py
+    type: modified
+    span: {start_line: 1126, end_line: 1134}
+    summary: Add coverage assessments to proposal input facts.
+    rationale: Include exact remaining gaps in proposal context and cache identity.
+  - path: packages/service/src/powdrr_service/planning/assembly.py
+    type: modified
+    span: {start_line: 1169, end_line: 1169}
+    summary: Version coverage-aware proposal questions as version 7.
+    rationale: Prevent reuse of answers requested without coverage context.
+  - path: packages/service/src/powdrr_service/planning/assembly.py
+    type: modified
+    span: {start_line: 1171, end_line: 1171}
+    summary: Increment the proposal contract version.
+    rationale: Distinguish the expanded proposal input contract.
+  - path: packages/service/src/powdrr_service/planning/assembly.py
+    type: modified
+    span: {start_line: 1173, end_line: 1173}
+    summary: Version proposal input digests with the revised contract.
+    rationale: Keep cache identity aligned with supplied proposal facts.
+  - path: packages/service/src/powdrr_service/planning/assembly.py
+    type: modified
+    span: {start_line: 1175, end_line: 1175}
+    summary: Set the version 7 answer schema identifier.
+    rationale: Reject stale proposal response schemas.
+  - path: packages/service/src/powdrr_service/planning/assembly.py
+    type: modified
+    span: {start_line: 1222, end_line: 1229}
+    summary: Require proposals to reconcile deliverables and criteria against the documented gap and pinned evidence.
+    rationale: Avoid scheduling work already satisfying a proposed criterion.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 36, end_line: 36}
+    summary: Import the partial coverage variant for preserving remaining statements.
+    rationale: Pass the accepted assessment through proposal context.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 1068, end_line: 1068}
+    summary: Pass accepted coverage into work-unit context.
+    rationale: Supply the assessed gap to proposal generation.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 1188, end_line: 1191}
+    summary: Extend work-unit context construction to accept coverage.
+    rationale: Bind coverage to the requirement set being proposed.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 1222, end_line: 1235}
+    summary: Serialize coverage status, reason, evidence, and any partial remainder.
+    rationale: Give proposal generation the precise explanation for remaining work.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 1302, end_line: 1302}
+    summary: Select accepted answers using the version 7 proposal question prefix.
+    rationale: Recognize answers under the expanded proposal contract.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 1345, end_line: 1346}
+    summary: Pass coverage into final proposal context construction.
+    rationale: Keep proposal allocation bound to its assessment inputs.
+  - path: tests/test_benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 218, end_line: 218}
+    summary: Update benchmark proposal question identity.
+    rationale: Align scale-planning fixtures with proposal contract version 7.
+  - path: tests/test_benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 220, end_line: 220}
+    summary: Update the first benchmark proposal contract version.
+    rationale: Align scale-planning fixtures with proposal contract version 7.
+  - path: tests/test_benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 224, end_line: 224}
+    summary: Update the first benchmark proposal schema identifier.
+    rationale: Align scale-planning fixtures with proposal contract version 7.
+  - path: tests/test_benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 243, end_line: 243}
+    summary: Update serialized benchmark proposal question identity.
+    rationale: Align scale-planning fixtures with proposal contract version 7.
+  - path: tests/test_benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 259, end_line: 259}
+    summary: Update the resolved benchmark question identity.
+    rationale: Align scale-planning fixtures with proposal contract version 7.
+  - path: tests/test_benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 261, end_line: 261}
+    summary: Update the second benchmark proposal contract version.
+    rationale: Align scale-planning fixtures with proposal contract version 7.
+  - path: tests/test_benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 265, end_line: 265}
+    summary: Update the second benchmark proposal schema identifier.
+    rationale: Align scale-planning fixtures with proposal contract version 7.
+  - path: tests/test_planning_assembly.py
+    type: modified
+    span: {start_line: 648, end_line: 660}
+    summary: Add a partial coverage assessment to the proposal context fixture.
+    rationale: Exercise proposal generation with a requirement that has a specific remaining gap.
+  - path: tests/test_planning_assembly.py
+    type: modified
+    span: {start_line: 667, end_line: 673}
+    summary: Assert proposal contract versioning and remaining-gap guidance.
+    rationale: Guard against losing coverage-aware proposal instructions.
+  - path: tests/test_planning_assembly.py
+    type: modified
+    span: {start_line: 1259, end_line: 1259}
+    summary: Update the continuation test context stub for the coverage argument.
+    rationale: Align request tests with the revised context signature.
+  - path: tests/test_planning_assembly.py
+    type: modified
+    span: {start_line: 1352, end_line: 1352}
+    summary: Update the supplemental question test stub for the coverage argument.
+    rationale: Align request tests with the revised context signature.
+  - path: tests/test_planning_service.py
+    type: modified
+    span: {start_line: 1048, end_line: 1048}
+    summary: Update oversized-answer fixture question identity.
+    rationale: Align service fixtures with proposal contract version 7.
+  - path: tests/test_planning_service.py
+    type: modified
+    span: {start_line: 1050, end_line: 1050}
+    summary: Update the first proposal fixture contract version.
+    rationale: Align service fixtures with proposal contract version 7.
+  - path: tests/test_planning_service.py
+    type: modified
+    span: {start_line: 1054, end_line: 1054}
+    summary: Update the first proposal fixture schema identifier.
+    rationale: Align service fixtures with proposal contract version 7.
+  - path: tests/test_planning_service.py
+    type: modified
+    span: {start_line: 1071, end_line: 1071}
+    summary: Update the single-question fixture identity.
+    rationale: Align service fixtures with proposal contract version 7.
+  - path: tests/test_planning_service.py
+    type: modified
+    span: {start_line: 1073, end_line: 1073}
+    summary: Update the second proposal fixture contract version.
+    rationale: Align service fixtures with proposal contract version 7.
+  - path: tests/test_planning_service.py
+    type: modified
+    span: {start_line: 1077, end_line: 1077}
+    summary: Update the second proposal fixture schema identifier.
+    rationale: Align service fixtures with proposal contract version 7.
+entities: []
+entity_relationships: []
+invariants:
+  - id: proposed-work-targets-remaining-coverage
+    description: Every work-unit proposal is generated with the coverage assessment for each unresolved requirement and targets its documented remaining gap.
+    action: added
+    rationale: A broad requirement may remain incomplete after one narrower subtask is already satisfied.
+guidance:
+  - id: reconcile-proposed-criteria-with-pinned-evidence
+    description: Proposal generation compares each deliverable and acceptance criterion with the pinned implementation and test evidence.
+    action: added
+    rationale: Avoid scheduling work that already satisfies a proposed criterion.

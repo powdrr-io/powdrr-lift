@@ -33,7 +33,7 @@ from powdrr_service.planning.compiler import (
     compile_plan,
     validate_compiled_plan,
 )
-from powdrr_service.planning.contracts import PlanningContractError
+from powdrr_service.planning.contracts import PartialCoverage, PlanningContractError
 from powdrr_service.planning.coverage import (
     RequirementCoverage,
     RequirementEvidenceSearch,
@@ -1065,7 +1065,7 @@ class SourceLedgerQuestionMachine:
         )
         if not unresolved:
             return ()
-        context = self._work_unit_context(ledger, unresolved)
+        context = self._work_unit_context(ledger, unresolved, coverage)
         requests: list[QuestionRequest[Any] | None] = []
         for requirement_ids in self._work_unit_requirement_groups(unresolved):
             cursor: str | None = None
@@ -1185,7 +1185,10 @@ class SourceLedgerQuestionMachine:
         return tuple(groups)
 
     def _work_unit_context(
-        self, ledger: SourceLedger, unresolved: tuple[str, ...]
+        self,
+        ledger: SourceLedger,
+        unresolved: tuple[str, ...],
+        coverage: tuple[RequirementCoverage, ...],
     ) -> WorkUnitContext:
         requirements = {item.id: item for item in ledger.requirements}
         evidence_by_requirement = {
@@ -1216,6 +1219,20 @@ class SourceLedgerQuestionMachine:
             ambiguous_runtime_resolutions={},
             preferred_runtimes=self.preferred_runtimes,
             evidence_by_requirement=evidence_by_requirement,
+            coverage_by_requirement={
+                item.requirement_id: {
+                    "status": item.answer.status,
+                    "reason": item.answer.reason,
+                    "evidence_ids": list(item.answer.evidence_ids),
+                    **(
+                        {"remaining_statement": item.answer.remaining_statement}
+                        if isinstance(item.answer, PartialCoverage)
+                        else {}
+                    ),
+                }
+                for item in coverage
+                if item.requirement_id in unresolved
+            },
             implementation_phases=self._implementation_phases,
             story_context=story_planning_context(
                 self.structrr_baseline or {}, self.story_refs
@@ -1282,7 +1299,7 @@ class SourceLedgerQuestionMachine:
         proposal_answers = {
             question_id: answer
             for question_id, answer in accepted_answers.items()
-            if question_id.startswith("propose-units-v6-")
+            if question_id.startswith("propose-units-v7-")
         }
         cache_key = hashlib.sha256(
             json.dumps(
@@ -1325,8 +1342,8 @@ class SourceLedgerQuestionMachine:
             item.requirement_id for item in coverage if item.answer.status != "complete"
         )
         if not unresolved:
-            return self._work_unit_context(ledger, ()), ()
-        context = self._work_unit_context(ledger, unresolved)
+            return self._work_unit_context(ledger, (), coverage), ()
+        context = self._work_unit_context(ledger, unresolved, coverage)
         proposals: list[WorkUnitProposal] = []
         for requirement_ids in self._work_unit_requirement_groups(unresolved):
             remaining_requirement_ids = requirement_ids

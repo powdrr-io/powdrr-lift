@@ -1,0 +1,36 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1560
+title: Fall back to reviewed PR metadata for empty tool values
+intent:
+  problem: Clean PR publication can reject an empty base branch even when the reviewed workflow context provides the base branch, because explicit null or blank metadata suppresses context fallback.
+  goal: Treat null and blank publication metadata as missing and use the corresponding reviewed workflow-context values.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/clean_pr_publisher.py
+    type: modified
+    span: {start_line: 212, end_line: 213}
+    summary: Fall back to reviewed workflow-context metadata when a direct value is null or blank.
+    rationale: Preserve the reviewed base, publication branch, title, and commit message when tool arguments contain empty placeholders.
+  - path: tests/test_clean_pr_publisher.py
+    type: modified
+    span: {start_line: 12, end_line: 12}
+    summary: Import the publication parameter normalizer for a regression test.
+    rationale: Exercise fallback behavior independently of the GitHub publication side effect.
+  - path: tests/test_clean_pr_publisher.py
+    type: modified
+    span: {start_line: 39, end_line: 60}
+    summary: Verify null and blank publication metadata resolves from reviewed context.
+    rationale: Reproduce the empty-base failure while checking every publication identity field.
+entities: []
+entity_relationships: []
+invariants:
+  - id: reviewed-publication-metadata-is-preserved
+    description: Null or blank direct publication metadata falls back to the corresponding reviewed workflow-context value.
+    action: added
+    rationale: Ensure clean publication uses the reviewed base branch and publication identity.
+guidance:
+  - id: normalize-empty-publication-metadata
+    description: Treat missing, null, or whitespace-only direct publication metadata as absent before resolving workflow-context aliases.
+    action: added
+    rationale: Do not discard valid reviewed context because an adapter supplied empty placeholders.

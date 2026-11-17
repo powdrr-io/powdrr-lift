@@ -9,6 +9,7 @@ import pytest
 
 from powdrr_lift.clean_pr_publisher import (
     build_publication_authorization,
+    normalize_clean_pr_publication_parameters,
     publish_clean_pull_request,
     render_standard_pr_description,
     validate_standard_pr_description,
@@ -33,6 +34,28 @@ def _authorization(source: Path, files: list[str]) -> dict[str, object]:
         lineage={"record_id": "source-run:test", "audit_passed": True},
         worktree_root=source,
     )
+
+
+def test_workflow_context_fills_missing_explicit_publication_metadata() -> None:
+    parameters = normalize_clean_pr_publication_parameters(
+        {
+            "base": None,
+            "publication_branch": "",
+            "title": None,
+            "commit_message": " ",
+            "workflow_context": {
+                "base-branch": "main",
+                "publication-branch": "powdrr/feature-implementation",
+                "feature-name": "Reviewed feature",
+                "commit-message": "Implement reviewed feature",
+            },
+        }
+    )
+
+    assert parameters["base"] == "main"
+    assert parameters["publication_branch"] == "powdrr/feature-implementation"
+    assert parameters["title"] == "Reviewed feature"
+    assert parameters["commit_message"] == "Implement reviewed feature"
 
 
 def test_standard_pr_description_requires_ordered_nonempty_sections() -> None:

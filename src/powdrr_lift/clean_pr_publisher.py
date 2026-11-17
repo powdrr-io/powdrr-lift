@@ -209,7 +209,8 @@ def normalize_clean_pr_publication_parameters(
         ),
     }
     for target, keys in aliases.items():
-        if target not in normalized:
+        current = normalized.get(target)
+        if current is None or (isinstance(current, str) and not current.strip()):
             normalized[target] = next(
                 (context[key] for key in keys if key in context), None
             )

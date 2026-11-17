@@ -645,15 +645,32 @@ def test_work_unit_question_has_a_parser_valid_example_and_exact_context() -> No
         "next_anchor": None,
     }
 
+    context = replace(
+        context,
+        coverage_by_requirement={
+            "req-0001": {
+                "status": "partial",
+                "reason": (
+                    "The acceptance test exists, but runtime behavior is missing."
+                ),
+                "remaining_statement": "Implement runtime validation.",
+                "evidence_ids": ["evidence-0001"],
+            }
+        },
+    )
     request = build_work_unit_proposal_request(
         context, ["req-0001"], valid_example=example
     )
 
     request.validate()
     assert request.question.kind == "propose_work_units"
-    assert request.question.contract_version == 6
-    assert request.question.expected_answer_schema == "work-unit-proposals-v6"
-    assert request.question.question_id.startswith("propose-units-v6-")
+    assert request.question.contract_version == 7
+    assert request.question.expected_answer_schema == "work-unit-proposals-v7"
+    assert request.question.question_id.startswith("propose-units-v7-")
+    assert "requirement_coverage" in request.exact_question
+    assert (
+        "Do not schedule work or tests that already satisfy" in request.exact_question
+    )
     assert "several strongly related requirements together" in request.exact_question
     assert "Do not create one unit per requirement" in request.exact_question
     assert "Powdrr derives each write's anchors" in request.exact_question
@@ -1239,7 +1256,7 @@ def test_work_unit_continuation_only_includes_uncovered_requirements(
     monkeypatch.setattr(machine, "accepted_ledger", lambda _answers: ledger)
     monkeypatch.setattr(machine, "accepted_coverage", lambda _answers: coverage)
     monkeypatch.setattr(
-        machine, "_work_unit_context", lambda _ledger, _unresolved: context
+        machine, "_work_unit_context", lambda _ledger, _unresolved, _coverage: context
     )
 
     initial_request = machine._work_unit_requests({})[0]
@@ -1332,7 +1349,7 @@ def test_missing_grouped_requirement_gets_a_supplemental_question(
     monkeypatch.setattr(machine, "accepted_ledger", lambda _answers: ledger)
     monkeypatch.setattr(machine, "accepted_coverage", lambda _answers: coverage)
     monkeypatch.setattr(
-        machine, "_work_unit_context", lambda _ledger, _unresolved: context
+        machine, "_work_unit_context", lambda _ledger, _unresolved, _coverage: context
     )
 
     grouped_request = machine._work_unit_requests({})[0]

@@ -1,9 +1,9 @@
 schema: https://powdrr.io/schema/changelog-v2
 change_id: PR-1556
-title: Ignore runtime workspace path in preparation comparison
+title: Fix planning execution and completed-work detection
 intent:
-  problem: Runtime source-reference handoffs include a candidate checkout path that cannot appear in the stable reviewed preparation, causing every implementation attempt to fail before coding.
-  goal: Compare stable contract fields while retaining the actual runtime workspace path in the worker handoff.
+  problem: Runtime source-reference handoffs include a candidate checkout path that cannot appear in the stable reviewed preparation, and work-unit proposals lack the coverage assessment that identifies an already-satisfied subtask within an unresolved requirement.
+  goal: Compare stable contract fields while retaining the runtime workspace path, and include the exact remaining coverage gap when proposing implementation work.
 human-decisions: []
 structured_files: []
 files:
@@ -47,6 +47,31 @@ files:
     span: {start_line: 237, end_line: 246}
     summary: Verify a temporary workspace path does not invalidate accepted preparation.
     rationale: Preserve the actual path in the worker contract while comparing only stable reviewed fields.
+  - path: packages/service/src/powdrr_service/planning/assembly.py
+    type: modified
+    span: {start_line: 314, end_line: 1235}
+    summary: Include per-requirement coverage facts in proposal context and direct proposals to documented remaining gaps.
+    rationale: Prevent proposals from repeating deliverables already satisfying part of an unresolved requirement.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 38, end_line: 1346}
+    summary: Pass accepted coverage assessments into work-unit context and recognize the revised proposal contract.
+    rationale: Preserve coverage reasons, evidence, and partial remainders through proposal generation.
+  - path: tests/test_planning_assembly.py
+    type: modified
+    span: {start_line: 640, end_line: 1360}
+    summary: Verify coverage-gap guidance and update proposal-context fixtures.
+    rationale: Prevent proposing already-satisfied subtasks without considering coverage.
+  - path: tests/test_planning_service.py
+    type: modified
+    span: {start_line: 1048, end_line: 1077}
+    summary: Update accepted proposal fixtures to contract version 7.
+    rationale: Keep service tests aligned with the coverage-aware proposal contract.
+  - path: tests/test_benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 218, end_line: 265}
+    summary: Update benchmark fixtures to contract version 7.
+    rationale: Keep scale planning fixtures aligned with the coverage-aware proposal contract.
 entities: []
 entity_relationships: []
 invariants:
@@ -58,3 +83,7 @@ guidance:
   - id: preserve-runtime-workspace-in-handoff
     description: Exclude workspace_root only from the stable preparation comparison; retain its actual value in the runtime worker handoff.
     action: added
+  - id: work-unit-proposals-address-remaining-coverage
+    description: Work-unit proposals receive each unresolved requirement's coverage assessment and must target the documented remaining gap.
+    action: added
+    rationale: Broad source requirements can remain unresolved after a narrower subtask is already complete, so proposal generation must account for that completion evidence.

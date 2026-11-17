@@ -314,6 +314,7 @@ class WorkUnitContext:
     ambiguous_runtime_resolutions: Mapping[str, str]
     preferred_runtimes: tuple[str, ...] = ()
     evidence_by_requirement: Mapping[str, tuple[Evidence, ...]] | None = None
+    coverage_by_requirement: Mapping[str, Mapping[str, Any]] | None = None
     implementation_phases: tuple[ImplementationPhase, ...] = ()
     story_context: Mapping[str, Any] | None = None
 
@@ -1046,6 +1047,15 @@ def build_work_unit_proposal_request(
         )
         for requirement_id in requirement_ids
     )
+    coverage_facts = tuple(
+        ContextRecord(
+            f"coverage:{requirement_id}",
+            context.coverage_by_requirement[requirement_id],
+        )
+        for requirement_id in requirement_ids
+        if context.coverage_by_requirement is not None
+        and requirement_id in context.coverage_by_requirement
+    )
     components = (
         ContextRecord("components", {"component_ids": sorted(context.component_ids)}),
     )
@@ -1094,6 +1104,7 @@ def build_work_unit_proposal_request(
     )
     accepted = (
         *requirement_facts,
+        *coverage_facts,
         *story_facts,
         *validations,
         *components,
@@ -1111,6 +1122,15 @@ def build_work_unit_proposal_request(
     input_facts: dict[str, Any] = {
         "requirements": [
             context.requirements[item].statement for item in requirement_ids
+        ],
+        "requirement_coverage": [
+            {
+                "requirement_id": requirement_id,
+                **context.coverage_by_requirement[requirement_id],
+            }
+            for requirement_id in requirement_ids
+            if context.coverage_by_requirement is not None
+            and requirement_id in context.coverage_by_requirement
         ],
         "source": [
             {
@@ -1146,13 +1166,13 @@ def build_work_unit_proposal_request(
         question_identity["maximum_proposals"] = maximum_proposals
     question_key = _digest(question_identity)[-12:]
     question = Question(
-        question_id=f"propose-units-v6-{requirement_ids[0]}-{question_key}",
+        question_id=f"propose-units-v7-{requirement_ids[0]}-{question_key}",
         kind="propose_work_units",
-        contract_version=6,
+        contract_version=7,
         subject_ids=tuple(requirement_ids),
-        input_digest=_digest({"schema_version": 6, **input_facts}),
+        input_digest=_digest({"schema_version": 7, **input_facts}),
         context_ref_ids=all_refs,
-        expected_answer_schema="work-unit-proposals-v6",
+        expected_answer_schema="work-unit-proposals-v7",
         attempt=1,
     )
     request_context = replace(
@@ -1199,7 +1219,14 @@ def build_work_unit_proposal_request(
         question=question,
         exact_question=(
             "Enumerate concrete implementation work units for only the supplied "
-            "unresolved requirements. Prefer a cohesive unit that addresses "
+            "unresolved requirements. Use the supplied requirement_coverage "
+            "assessment as the exact remaining gap. A requirement may remain "
+            "unresolved even when one proposed subtask is already implemented; "
+            "compare every deliverable, planned write, and acceptance criterion "
+            "with the pinned implementation and test evidence. Do not schedule "
+            "work or tests that already satisfy a proposed criterion. For an "
+            "existing file, describe the specific missing behavior the write "
+            "must add or change. Prefer a cohesive unit that addresses "
             "several strongly related requirements together, up to four per unit, when "
             "they share a deliverable, code area, or validation boundary. Do not "
             "create one unit per requirement merely because the source lists them "

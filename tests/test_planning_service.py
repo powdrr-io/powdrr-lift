@@ -260,6 +260,28 @@ class _PlanningScriptClient:
                         "test_type": "integration",
                         "scenario": "Exercise the public behavior for this criterion.",
                         "expected_outcome": criterion,
+                        "behavior_scenario": {
+                            "subject": criterion,
+                            "given": "The source-defined preconditions hold.",
+                            "when": "Exercise the public behavior for this criterion.",
+                            "then": criterion,
+                            "evidence": [packet["source_excerpts"][0]["ref_id"]],
+                            "capability_matrix": [],
+                            "assumptions": [],
+                            "dimensions": {
+                                name: "not_applicable"
+                                for name in (
+                                    "normal_result",
+                                    "error_behavior",
+                                    "continuation",
+                                    "unsupported_behavior",
+                                    "cancellation_cleanup",
+                                    "compatibility",
+                                    "negative_boundaries",
+                                )
+                            },
+                            "validator": "Run the focused integration test.",
+                        },
                     }
                     for criterion in plan["acceptance_criteria"]
                 ]
@@ -1524,8 +1546,8 @@ def test_source_question_machine_accounts_for_normative_and_context_blocks() -> 
         proposal_path="docs/plans/bounded-plan-structrr-proposal.json",
     )
     assert set(compiled.destinations) == set(compiled.files)
-    assert compiled.ready_item_ids == ()
-    assert "source design" in compiled.blocked_item_reasons["item-0001"]
+    assert compiled.ready_item_ids == ("item-0001",)
+    assert "item-0001" not in compiled.blocked_item_reasons
     assert compiled.plan.items[0].source_reference_design_file == (
         "docs/plans/bounded-plan-source-design/item-0001.yaml"
     )
@@ -2055,8 +2077,8 @@ def test_procedrr_runs_real_planning_machine_through_compiled_artifacts(
         plan_path="docs/plans/bounded-plan.yaml",
         proposal_path="docs/plans/bounded-plan-structrr-proposal.json",
     )
-    assert compiled.ready_item_ids == ()
-    assert "source design" in compiled.blocked_item_reasons["item-0001"]
+    assert compiled.ready_item_ids == ("item-0001",)
+    assert "item-0001" not in compiled.blocked_item_reasons
     assert len(compiled.files) == 4
     assert compiled.plan.items[0].source_reference_design_file in compiled.files
     proposal = machine.accepted_structrr_proposal(accepted)

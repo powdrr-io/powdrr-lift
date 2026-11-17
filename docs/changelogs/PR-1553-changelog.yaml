@@ -1,0 +1,152 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1553
+title: Compile source-bound behavior scenarios during plan test design
+intent:
+  problem: Planned test cases contained prose only, so source-reference designs were blocked from execution for lacking typed behavior scenarios and provenance.
+  goal: Require every planned case to include a validated typed behavior scenario tied to pinned source excerpts, allowing accepted plans to pass the protected execution readiness check.
+human-decisions: []
+structured_files: []
+files:
+- path: packages/service/src/powdrr_service/planning/test_coverage.py
+  type: modified
+  span: {start_line: 8, end_line: 8}
+  summary: Import typed behavior scenario validation for plan test design.
+  rationale: Reuse the shared contract compiler so planning artifacts meet protected handoff requirements.
+- path: packages/service/src/powdrr_service/planning/test_coverage.py
+  type: modified
+  span: {start_line: 10, end_line: 15}
+  summary: Import behavior dimensions and scenario compilation helpers.
+  rationale: Build planning answers with the canonical behavior contract.
+- path: packages/service/src/powdrr_service/planning/test_coverage.py
+  type: modified
+  span: {start_line: 47, end_line: 54}
+  summary: Require source excerpts when creating test design questions.
+  rationale: A typed plan scenario must be grounded in pinned source evidence.
+- path: packages/service/src/powdrr_service/planning/test_coverage.py
+  type: modified
+  span: {start_line: 83, end_line: 88}
+  summary: Require a typed behavior scenario in every planned test case.
+  rationale: Prose-only cases cannot pass the protected source-reference readiness check.
+- path: packages/service/src/powdrr_service/planning/test_coverage.py
+  type: modified
+  span: {start_line: 101, end_line: 223}
+  summary: Define a strict provider-compatible schema for dimensions, source citations, capabilities, and explicit assumptions.
+  rationale: Keep model output constrained to the typed contract and valid pinned evidence references.
+- path: packages/service/src/powdrr_service/planning/test_coverage.py
+  type: modified
+  span: {start_line: 237, end_line: 249}
+  summary: Provide a complete valid example of the typed scenario response.
+  rationale: Ensure bounded planning can validate its answer contract before asking the model.
+- path: packages/service/src/powdrr_service/planning/test_coverage.py
+  type: modified
+  span: {start_line: 267, end_line: 267}
+  summary: Require behavior scenario fields to match the strict response contract.
+  rationale: Reject incomplete typed answers before plan compilation.
+- path: packages/service/src/powdrr_service/planning/test_coverage.py
+  type: modified
+  span: {start_line: 276, end_line: 276}
+  summary: Require exact scenario fields in provider answers.
+  rationale: Prevent unvalidated fields from entering accepted plan artifacts.
+- path: packages/service/src/powdrr_service/planning/test_coverage.py
+  type: modified
+  span: {start_line: 279, end_line: 281}
+  summary: Validate that each scenario cites pinned excerpts and contains exact typed fields.
+  rationale: Preserve source-faithfulness and fail closed on unsupported references.
+- path: packages/service/src/powdrr_service/planning/test_coverage.py
+  type: modified
+  span: {start_line: 292, end_line: 347}
+  summary: Compile typed scenarios, bind their fingerprint to planning inputs, and keep prose checks aligned with observable behavior.
+  rationale: Make generated plan artifacts usable by the protected worker without synthesizing source claims.
+- path: packages/service/src/powdrr_service/planning/test_coverage.py
+  type: modified
+  span: {start_line: 356, end_line: 356}
+  summary: Add guidance to cite only relevant pinned source excerpt IDs.
+  rationale: Keep scenario evidence tied to source context supplied to the planning question.
+- path: packages/service/src/powdrr_service/planning/test_coverage.py
+  type: modified
+  span: {start_line: 401, end_line: 407}
+  summary: Ask planning models for explicit behavior dimensions, assumptions, and source citations.
+  rationale: Generate execution-ready behavior contracts instead of prose-only test plans.
+- path: packages/service/src/powdrr_service/planning/test_coverage.py
+  type: modified
+  span: {start_line: 411, end_line: 414}
+  summary: Describe the expanded typed test design answer contract.
+  rationale: Keep the bounded question instructions aligned with its required output.
+- path: tests/test_test_coverage_planning.py
+  type: modified
+  span: {start_line: 4, end_line: 4}
+  summary: Import pinned source excerpt records for planning tests.
+  rationale: Exercise source-bound scenario creation.
+- path: tests/test_test_coverage_planning.py
+  type: modified
+  span: {start_line: 8, end_line: 34}
+  summary: Add a typed behavior scenario fixture with explicit dimensions and evidence.
+  rationale: Keep planner unit answers valid under the canonical behavior contract.
+- path: tests/test_test_coverage_planning.py
+  type: modified
+  span: {start_line: 50, end_line: 50}
+  summary: Supply pinned source context to the planner question.
+  rationale: Validate that planning uses a source-bound test design.
+- path: tests/test_test_coverage_planning.py
+  type: modified
+  span: {start_line: 58, end_line: 61}
+  summary: Add typed scenario responses for each test case.
+  rationale: Match the expanded answer schema in planner fixtures.
+- path: tests/test_test_coverage_planning.py
+  type: modified
+  span: {start_line: 69, end_line: 72}
+  summary: Add typed scenario responses for the second criterion.
+  rationale: Keep all criteria covered by the source-grounded design contract.
+- path: tests/test_test_coverage_planning.py
+  type: modified
+  span: {start_line: 93, end_line: 98}
+  summary: Verify stable scenario IDs, pinned evidence, and input fingerprint binding.
+  rationale: Ensure scenario provenance survives planner compilation.
+- path: tests/test_test_coverage_planning.py
+  type: modified
+  span: {start_line: 102, end_line: 108}
+  summary: Reject test design requests without pinned source excerpts.
+  rationale: Prevent unsupported behavior scenarios from entering plans.
+- path: tests/test_test_coverage_planning.py
+  type: modified
+  span: {start_line: 113, end_line: 114}
+  summary: Provide source evidence for invalid-answer rejection tests.
+  rationale: Isolate test-type validation from the source-evidence requirement.
+- path: tests/test_test_coverage_planning.py
+  type: modified
+  span: {start_line: 127, end_line: 131}
+  summary: Assert malformed test type answers remain rejected with typed scenarios.
+  rationale: Preserve existing bounded answer validation.
+- path: tests/test_planning_service.py
+  type: modified
+  span: {start_line: 263, end_line: 284}
+  summary: Return typed source-cited scenarios from the planning fixture provider.
+  rationale: Exercise the compiled planning flow with the expanded bounded answer contract.
+- path: tests/test_planning_service.py
+  type: modified
+  span: {start_line: 1549, end_line: 1550}
+  summary: Assert accepted typed test designs produce a ready plan item.
+  rationale: Prevent plans with accepted source evidence from being blocked for missing scenario structure.
+- path: tests/test_planning_service.py
+  type: modified
+  span: {start_line: 2080, end_line: 2081}
+  summary: Assert end-to-end planned artifacts pass the source-design readiness gate.
+  rationale: Cover readiness through the durable planning workflow.
+- path: tests/test_coding_agent.py
+  type: modified
+  span: {start_line: 198, end_line: 198}
+  summary: Keep the repair-contract fixture expiry safely beyond long verification runs.
+  rationale: Avoid time-of-day dependent failures when the full suite reaches the repair tests.
+entities: []
+entity_relationships: []
+invariants:
+- id: planned-test-cases-carry-typed-source-bound-scenarios
+  description: Each planned acceptance-criterion test includes a valid behavior scenario that cites pinned source evidence and carries a fingerprint of its planning input.
+  action: added
+- id: prose-only-plan-items-remain-blocked
+  description: Plans without accepted typed behavior scenarios continue to fail the protected source-reference readiness check.
+  action: added
+guidance:
+- id: cite-only-pinned-planning-excerpts
+  description: Test-design answers must cite relevant excerpt IDs from their pinned planning context and may not invent source evidence.
+  action: added

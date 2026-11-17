@@ -7,6 +7,7 @@ description: >-
 inputs:
   - {name: files_to_publish, type: array, required: true}
   - {name: language_labels, type: array, required: false}
+  - {name: verification_command, type: string, required: false, default: ""}
 outputs:
   validation_results:
     type: array
@@ -29,23 +30,56 @@ steps:
         types: [tools]
         filters: {labels: [pr-prep]}
       bind: validation_tools
-  - gate:
+  - branch:
       subject: validation_tools.validation_inventory_status
-      equals: ready
-      on_failure: {retry: {max_attempts: 1, on_exhausted: failed}}
-  - for_each:
-      snapshot: {name: validation_tools.matches, max_items: 32}
-      item_binding: validation_tool
-      collect: {binding: validation_results, mode: list, key: id, value: validation_result}
-      body:
-        - operation:
-            tool: invoke_tool
-            parameters:
-              tool: "${validation_tool.item.validation_action.tool}"
-              parameters: "${validation_tool.item.validation_action.parameters}"
-            bind: validation_result
-        - gate:
-            subject: validation_result.returncode
-            equals: 0
-            on_failure: {retry: {max_attempts: 1, on_exhausted: failed}}
+      cases:
+        ready:
+          - for_each:
+              snapshot: {name: validation_tools.matches, max_items: 32}
+              item_binding: validation_tool
+              collect: {binding: validation_results, mode: list, key: id, value: validation_result}
+              body:
+                - operation:
+                    tool: invoke_tool
+                    parameters:
+                      tool: "${validation_tool.item.validation_action.tool}"
+                      parameters: "${validation_tool.item.validation_action.parameters}"
+                    bind: validation_result
+                - gate:
+                    subject: validation_result.returncode
+                    equals: 0
+                    on_failure: {retry: {max_attempts: 1, on_exhausted: failed}}
+        missing:
+          - branch:
+              subject: verification_command
+              cases:
+                "":
+                  - gate:
+                      subject: validation_tools.validation_inventory_status
+                      equals: ready
+                      on_failure: {retry: {max_attempts: 1, on_exhausted: failed}}
+              default:
+                - for_each:
+                    snapshot:
+                      max_items: 1
+                      values:
+                        - id: reviewed-verification-command
+                          validation_action:
+                            tool: shell
+                            parameters: {command: "${verification_command}"}
+                    item_binding: validation_tool
+                    collect: {binding: validation_results, mode: list, key: id, value: validation_result}
+                    body:
+                      - operation:
+                          tool: invoke_tool
+                          parameters:
+                            tool: "${validation_tool.validation_action.tool}"
+                            parameters: "${validation_tool.validation_action.parameters}"
+                          bind: validation_result
+                      - gate:
+                          subject: validation_result.returncode
+                          equals: 0
+                          on_failure: {retry: {max_attempts: 1, on_exhausted: failed}}
+      default:
+        - terminal: failed
   - terminal: succeeded

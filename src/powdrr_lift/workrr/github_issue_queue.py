@@ -19,6 +19,7 @@ import zlib
 from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass, replace
+from dataclasses import field as dataclass_field
 from datetime import UTC, datetime
 from pathlib import Path
 from time import sleep, time
@@ -136,6 +137,30 @@ class WorkerReport:
     ci_outcome: str | None = None
     failure_record: str | None = None
     readiness: Mapping[str, Any] | None = None
+
+
+@dataclass(slots=True)
+class _DependencyEvidenceCache:
+    """Memoize immutable GitHub evidence for one queue evaluation pass."""
+
+    comments_by_issue: dict[int, tuple[Mapping[str, Any], ...]] = dataclass_field(
+        default_factory=dict
+    )
+    pull_requests_by_number: dict[int, Mapping[str, Any]] = dataclass_field(
+        default_factory=dict
+    )
+
+    def comments(
+        self, client: GitHubIssueClient, issue_number: int
+    ) -> tuple[Mapping[str, Any], ...]:
+        if issue_number not in self.comments_by_issue:
+            self.comments_by_issue[issue_number] = client.list_comments(issue_number)
+        return self.comments_by_issue[issue_number]
+
+    def pull_request(self, client: GitHubIssueClient, number: int) -> Mapping[str, Any]:
+        if number not in self.pull_requests_by_number:
+            self.pull_requests_by_number[number] = client.pull_request(number)
+        return self.pull_requests_by_number[number]
 
 
 @dataclass(frozen=True, slots=True)
@@ -1154,6 +1179,7 @@ def publish_plan_issues(
     existing = _plan_issue_index(client.list_issues(labels=(plan_label,)))
     created: list[int] = []
     reused: list[int] = []
+    dependency_evidence = _DependencyEvidenceCache()
     for item in plan.items:
         key = (plan.plan_id, item.item_id)
         issue = existing.get(key)
@@ -1212,6 +1238,7 @@ def publish_plan_issues(
                 client=client,
                 plan=plan,
                 dependency_id=dependency,
+                evidence_cache=dependency_evidence,
             )
             for dependency in item.dependencies
         )
@@ -1314,22 +1341,33 @@ def run_worker_once(
             plan_loader=plan_loader,
         )
         _mark_abandoned_claims_for_reconciliation(client, root)
+        dependency_evidence = _DependencyEvidenceCache()
         _promote_unblocked_issues(
             client=client,
             repo_root=root,
             plan_loader=plan_loader,
+            evidence_cache=dependency_evidence,
         )
         issues = client.list_issues(labels=(QUEUE_LABELS["ready"],), state="open")
         plan_issue_indexes: dict[str, dict[tuple[str, str], QueueIssue]] = {}
+        loaded_plans: dict[tuple[str, str, str], ReviewedExecutionPlan] = {}
         for issue in sorted(issues, key=lambda value: value.number):
             if QUEUE_LABELS["ready"] not in issue.labels or issue.state != "open":
                 continue
             pointer = parse_issue_pointer(issue.body)
             if pointer is None:
                 continue
-            plan = plan_loader(
-                pointer["plan_path"], pointer["plan_commit"], repo_root=root
+            plan_key = (
+                pointer["plan_id"],
+                pointer["plan_path"],
+                pointer["plan_commit"],
             )
+            plan = loaded_plans.get(plan_key)
+            if plan is None:
+                plan = plan_loader(
+                    pointer["plan_path"], pointer["plan_commit"], repo_root=root
+                )
+                loaded_plans[plan_key] = plan
             item = next(
                 (
                     candidate
@@ -1365,6 +1403,7 @@ def run_worker_once(
                     client=client,
                     plan=plan,
                     dependency_id=dependency,
+                    evidence_cache=dependency_evidence,
                 )
             ]
             if unmet:
@@ -1502,6 +1541,7 @@ def run_worker_once(
                             client=client,
                             plan=plan,
                             dependency_id=dependency,
+                            evidence_cache=dependency_evidence,
                         )
                     )
                 )
@@ -1685,7 +1725,10 @@ def run_worker_once(
                 failure_record=(str(failure_path) if return_code != 0 else None),
             )
     readiness = _no_eligible_work_readiness(
-        client, repo_root=root, plan_loader=plan_loader
+        client,
+        repo_root=root,
+        plan_loader=plan_loader,
+        evidence_cache=dependency_evidence,
     )
     waiting = readiness["blocking_reasons"]
     detail = (
@@ -2899,6 +2942,7 @@ def _promote_unblocked_issues(
     client: GitHubIssueClient,
     repo_root: Path,
     plan_loader: Callable[..., ReviewedExecutionPlan],
+    evidence_cache: _DependencyEvidenceCache,
 ) -> None:
     """Make dependency-blocked work ready after all prerequisite issues close."""
     blocked = client.list_issues(
@@ -2953,6 +2997,7 @@ def _promote_unblocked_issues(
                 client=client,
                 plan=plan,
                 dependency_id=dependency,
+                evidence_cache=evidence_cache,
             )
             for dependency in item.dependencies
         ):
@@ -4593,6 +4638,7 @@ def _dependency_is_fulfilled(
     client: GitHubIssueClient,
     plan: ReviewedExecutionPlan,
     dependency_id: str,
+    evidence_cache: _DependencyEvidenceCache | None = None,
 ) -> bool:
     if issue is None:
         return False
@@ -4600,7 +4646,11 @@ def _dependency_is_fulfilled(
     if current.state != "closed":
         return False
     if _dependency_has_verified_noop_receipt(
-        current, client=client, plan=plan, dependency_id=dependency_id
+        current,
+        client=client,
+        plan=plan,
+        dependency_id=dependency_id,
+        evidence_cache=evidence_cache,
     ):
         return True
     from powdrr_service.planning.repair import item_input_contract_digest
@@ -4612,7 +4662,12 @@ def _dependency_is_fulfilled(
     pointer = parse_issue_pointer(current.body)
     if pointer is None or pointer["plan_id"] != plan.plan_id:
         return False
-    for checkpoint in _task_checkpoint_payloads(client.list_comments(current.number)):
+    comments = (
+        evidence_cache.comments(client, current.number)
+        if evidence_cache is not None
+        else client.list_comments(current.number)
+    )
+    for checkpoint in _task_checkpoint_payloads(comments):
         if (
             checkpoint.get("schema")
             != "https://powdrr.io/schemas/github-issue-task-checkpoint-v1"
@@ -4633,7 +4688,11 @@ def _dependency_is_fulfilled(
         )
         if number is None:
             continue
-        pull_request = client.pull_request(number)
+        pull_request = (
+            evidence_cache.pull_request(client, number)
+            if evidence_cache is not None
+            else client.pull_request(number)
+        )
         merge_commit = pull_request.get("merge_commit_sha")
         body = pull_request.get("body")
         closes_dependency = (
@@ -4662,6 +4721,7 @@ def _dependency_has_verified_noop_receipt(
     client: GitHubIssueClient,
     plan: ReviewedExecutionPlan,
     dependency_id: str,
+    evidence_cache: _DependencyEvidenceCache | None = None,
 ) -> bool:
     if issue.state != "closed" or FULFILLED_WITHOUT_PR_LABEL not in issue.labels:
         return False
@@ -4676,7 +4736,12 @@ def _dependency_has_verified_noop_receipt(
     if planned_item is None:
         return False
     expected_digest = item_input_contract_digest(planned_item, plan.planning)
-    for comment in client.list_comments(issue.number):
+    comments = (
+        evidence_cache.comments(client, issue.number)
+        if evidence_cache is not None
+        else client.list_comments(issue.number)
+    )
+    for comment in comments:
         body = comment.get("body")
         if not isinstance(body, str) or _FULFILLMENT_MARKER not in body:
             continue
@@ -4706,9 +4771,12 @@ def _no_eligible_work_readiness(
     *,
     repo_root: Path,
     plan_loader: Callable[..., ReviewedExecutionPlan],
+    evidence_cache: _DependencyEvidenceCache,
 ) -> dict[str, Any]:
     blocking: list[dict[str, Any]] = []
     counts = {"open": 0, "ready": 0, "waiting_dependencies": 0, "other": 0}
+    loaded_plans: dict[tuple[str, str, str], ReviewedExecutionPlan] = {}
+    issue_indexes: dict[str, dict[tuple[str, str], QueueIssue]] = {}
     for issue in client.list_issues(state="open"):
         pointer = parse_issue_pointer(issue.body)
         if pointer is None:
@@ -4720,9 +4788,17 @@ def _no_eligible_work_readiness(
         ):
             counts["other"] += 1
             continue
-        plan = plan_loader(
-            pointer["plan_path"], pointer["plan_commit"], repo_root=repo_root
+        plan_key = (
+            pointer["plan_id"],
+            pointer["plan_path"],
+            pointer["plan_commit"],
         )
+        plan = loaded_plans.get(plan_key)
+        if plan is None:
+            plan = plan_loader(
+                pointer["plan_path"], pointer["plan_commit"], repo_root=repo_root
+            )
+            loaded_plans[plan_key] = plan
         item = next(
             (
                 candidate
@@ -4741,9 +4817,12 @@ def _no_eligible_work_readiness(
                 }
             )
             continue
-        index = _plan_issue_index(
-            client.list_issues(labels=(_plan_label(plan.plan_id),))
-        )
+        index = issue_indexes.get(plan.plan_id)
+        if index is None:
+            index = _plan_issue_index(
+                client.list_issues(labels=(_plan_label(plan.plan_id),))
+            )
+            issue_indexes[plan.plan_id] = index
         by_number = {value.number: value for value in index.values()}
         unmet = [
             dependency
@@ -4754,6 +4833,7 @@ def _no_eligible_work_readiness(
                 client=client,
                 plan=plan,
                 dependency_id=dependency,
+                evidence_cache=evidence_cache,
             )
         ]
         if unmet:

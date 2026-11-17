@@ -427,7 +427,9 @@ class FakeIssueClient:
         self.repository = "example/project"
         self.issues = list(issues)
         self.comments: list[tuple[int, str]] = []
+        self.comment_reads: dict[int, int] = {}
         self.pull_requests: dict[int, dict[str, object]] = {}
+        self.pull_request_reads: dict[int, int] = {}
         self.labels_ensured = False
         self.fulfillment_label_ensured = False
         self.merged_commit: str | None = None
@@ -504,6 +506,7 @@ class FakeIssueClient:
         self.comments.append((issue.number, body))
 
     def list_comments(self, issue_number: int) -> tuple[dict[str, str], ...]:
+        self.comment_reads[issue_number] = self.comment_reads.get(issue_number, 0) + 1
         return tuple(
             {
                 "body": body,
@@ -516,6 +519,7 @@ class FakeIssueClient:
         )
 
     def pull_request(self, number: int) -> dict[str, object]:
+        self.pull_request_reads[number] = self.pull_request_reads.get(number, 0) + 1
         return self.pull_requests.get(number, {})
 
     def _invoke(
@@ -565,6 +569,21 @@ def plan() -> ReviewedExecutionPlan:
             ),
         ),
     )
+
+
+def test_dependency_evidence_cache_reuses_comment_and_pull_request_reads() -> None:
+    client = FakeIssueClient()
+    cache = github_issue_queue._DependencyEvidenceCache()
+
+    first_comments = cache.comments(client, 12)  # type: ignore[arg-type]
+    second_comments = cache.comments(client, 12)  # type: ignore[arg-type]
+    first_pull_request = cache.pull_request(client, 34)  # type: ignore[arg-type]
+    second_pull_request = cache.pull_request(client, 34)  # type: ignore[arg-type]
+
+    assert first_comments == second_comments == ()
+    assert first_pull_request == second_pull_request == {}
+    assert client.comment_reads == {12: 1}
+    assert client.pull_request_reads == {34: 1}
 
 
 def test_plan_validation_rejects_unknown_dependency_and_cycle() -> None:

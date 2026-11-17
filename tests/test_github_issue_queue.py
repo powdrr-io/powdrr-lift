@@ -586,6 +586,41 @@ def test_dependency_evidence_cache_reuses_comment_and_pull_request_reads() -> No
     assert client.pull_request_reads == {34: 1}
 
 
+def test_dependency_result_is_checked_once_per_plan_node(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = FakeIssueClient()
+    dependency = QueueIssue(
+        101,
+        "Base work",
+        "",
+        "closed",
+        (),
+        "https://github.com/example/project/issues/101",
+    )
+    evidence_cache = github_issue_queue._DependencyEvidenceCache()
+    checks: list[int] = []
+
+    def verified_noop(*_args: Any, **_kwargs: Any) -> bool:
+        checks.append(1)
+        return True
+
+    monkeypatch.setattr(
+        github_issue_queue, "_dependency_has_verified_noop_receipt", verified_noop
+    )
+    for _ in range(2):
+        assert github_issue_queue._dependency_is_fulfilled(
+            dependency,
+            {dependency.number: dependency},
+            client=client,  # type: ignore[arg-type]
+            plan=plan(),
+            dependency_id="base",
+            evidence_cache=evidence_cache,
+        )
+
+    assert len(checks) == 1
+
+
 def test_plan_validation_rejects_unknown_dependency_and_cycle() -> None:
     text = """
 schema: https://powdrr.io/schemas/github-issue-execution-plan-v1

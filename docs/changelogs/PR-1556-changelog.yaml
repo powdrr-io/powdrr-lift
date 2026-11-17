@@ -129,7 +129,7 @@ files:
     rationale: Prevent proposing already-satisfied subtasks without considering coverage.
   - path: tests/test_planning_assembly.py
     type: modified
-    span: {start_line: 667, end_line: 674}
+    span: {start_line: 667, end_line: 673}
     summary: Assert proposal contract versioning and remaining-gap guidance.
     rationale: Guard the planner against losing coverage-aware proposal instructions.
   - path: tests/test_planning_assembly.py

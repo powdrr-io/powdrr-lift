@@ -11,6 +11,9 @@ from typing import Any
 
 import pytest
 from powdrr_contracts.models import ChatCompletionRequest, ChatCompletionResponse
+from powdrr_service.structrr.execution_preparation import (
+    compile_execution_preparation,
+)
 from powdrr_service.structrr.reference_definitions import ReferenceDefinition
 
 from powdrr_lift.workrr import source_reference_run as source_reference_run_module
@@ -74,6 +77,7 @@ def prepare(
     readonly_support_files: dict[str, str] | None = None,
     seed_candidate_files: dict[str, str | None] | None = None,
     correction_context: dict[str, Any] | None = None,
+    with_accepted_preparation: bool = False,
 ) -> SourceReferenceRun:
     root = tmp_path / "repo"
     if not root.exists():
@@ -176,36 +180,46 @@ def prepare(
     if not native:
         monkeypatch.setattr(SourceReferenceRun, "_probe_protection", lambda self: None)
     monkeypatch.setenv("MSWEA_COST_TRACKING", "ignore_errors")
+    objective = "Extract the retry helper without changing results."
+    profile = ValidationProfile(
+        "behavior",
+        (
+            sys.executable,
+            "-c",
+            profile_code
+            or "import retry; assert [retry.retry(x) for x in (-1,0,4)] == [0,1,5]",
+        ),
+    )
+    base_commit = git(root, "rev-parse", "HEAD")
+    accepted_preparation = (
+        compile_execution_preparation(
+            document,
+            planning_base_commit=base_commit,
+            objective=objective,
+            allowed_paths=("retry.py",),
+            verification_commands=(profile.command,),
+        )
+        if with_accepted_preparation
+        else None
+    )
     try:
         return SourceReferenceRun.prepare(
             workspace_root=root,
             accepted_design=document,
-            base_commit=git(root, "rev-parse", "HEAD"),
-            objective="Extract the retry helper without changing results.",
+            base_commit=base_commit,
+            objective=objective,
             allowed_paths=("retry.py",),
             artifact_root=tmp_path / "artifacts",
             run_id=run_id,
             model="test",
-            profiles={
-                "behavior": ValidationProfile(
-                    "behavior",
-                    (
-                        sys.executable,
-                        "-c",
-                        profile_code
-                        or (
-                            "import retry; "
-                            "assert [retry.retry(x) for x in (-1,0,4)] == [0,1,5]"
-                        ),
-                    ),
-                )
-            },
+            profiles={"behavior": profile},
             private_validation_data={"oracle": "PRIVATE-ORACLE"},
             review_client=Reviewer(),
             readonly_support_files=readonly_support_files,
             seed_candidate_files=seed_candidate_files,
             correction_context=correction_context,
             post_worker_reconciler=post_worker_reconciler,
+            accepted_preparation=accepted_preparation,
             worker_timeout_seconds=30,
             validation_timeout_seconds=30,
         )
@@ -218,6 +232,16 @@ def prepare(
                 "Native source protection is unavailable in the outer test environment"
             )
         raise
+
+
+def test_runtime_workspace_path_does_not_invalidate_accepted_preparation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    run = prepare(tmp_path, monkeypatch, with_accepted_preparation=True)
+
+    assert run.handoff.to_data()["worker_prompt"]["contract"]["workspace_root"] == str(
+        run.workspace_root
+    )
 
 
 def unused_inference(request: ChatCompletionRequest) -> ChatCompletionResponse:

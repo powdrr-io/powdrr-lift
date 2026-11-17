@@ -78,6 +78,8 @@ def prepare(
     seed_candidate_files: dict[str, str | None] | None = None,
     correction_context: dict[str, Any] | None = None,
     with_accepted_preparation: bool = False,
+    reviewed_objective: str | None = None,
+    runtime_objective_suffix: str = "",
 ) -> SourceReferenceRun:
     root = tmp_path / "repo"
     if not root.exists():
@@ -207,7 +209,7 @@ def prepare(
             workspace_root=root,
             accepted_design=document,
             base_commit=base_commit,
-            objective=objective,
+            objective=objective + runtime_objective_suffix,
             allowed_paths=("retry.py",),
             artifact_root=tmp_path / "artifacts",
             run_id=run_id,
@@ -220,6 +222,7 @@ def prepare(
             correction_context=correction_context,
             post_worker_reconciler=post_worker_reconciler,
             accepted_preparation=accepted_preparation,
+            reviewed_objective=reviewed_objective,
             worker_timeout_seconds=30,
             validation_timeout_seconds=30,
         )
@@ -241,6 +244,24 @@ def test_runtime_workspace_path_does_not_invalidate_accepted_preparation(
 
     assert run.handoff.to_data()["worker_prompt"]["contract"]["workspace_root"] == str(
         run.workspace_root
+    )
+
+
+def test_runtime_objective_additions_preserve_reviewed_preparation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    run = prepare(
+        tmp_path,
+        monkeypatch,
+        with_accepted_preparation=True,
+        reviewed_objective="Extract the retry helper without changing results.",
+        runtime_objective_suffix=(
+            "\n\nReviewed implementation scope:\n- Keep this change focused."
+        ),
+    )
+
+    assert run.handoff.to_data()["worker_prompt"]["contract"]["objective"].endswith(
+        "- Keep this change focused."
     )
 
 

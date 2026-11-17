@@ -21,6 +21,8 @@ steps:
       process: finish-pr-prep
       inputs:
         files_to_publish: {type: reference, value: implementation_result.changed_paths}
+        verification_command:
+          {type: reference, value: task_context.input_state.proposed_pr_context.verification_command}
       outputs:
         validation_results: validation_results
   - judge:

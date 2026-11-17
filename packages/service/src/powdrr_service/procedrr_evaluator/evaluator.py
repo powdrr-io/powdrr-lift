@@ -1177,11 +1177,11 @@ class Evaluator:
         path: str,
     ) -> None:
         snapshot = declaration["snapshot"]
-        name = snapshot["name"] if isinstance(snapshot, Mapping) else snapshot
+        name = snapshot.get("name") if isinstance(snapshot, Mapping) else snapshot
         items = (
-            snapshot["values"]
+            _resolve_value(snapshot["values"], state)
             if isinstance(snapshot, Mapping) and "values" in snapshot
-            else _resolve_binding(state, name)
+            else _resolve_binding(state, str(name))
         )
         if not isinstance(items, Sequence) or isinstance(items, (str, bytes)):
             raise EvaluationError(f"{path}.{kind}.snapshot must resolve to a sequence")

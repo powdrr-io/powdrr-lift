@@ -369,6 +369,10 @@ def test_execute_proposed_pr_is_a_procedrr_workflow_process() -> None:
         "type": "reference",
         "value": "implementation_result.changed_paths",
     }
+    assert implementation_steps[2]["call"]["inputs"]["verification_command"] == {
+        "type": "reference",
+        "value": "task_context.input_state.proposed_pr_context.verification_command",
+    }
     assert implementation_steps[2]["call"]["outputs"] == {
         "validation_results": "validation_results"
     }

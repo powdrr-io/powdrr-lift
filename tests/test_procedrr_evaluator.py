@@ -479,6 +479,7 @@ version: 1
 name: finish-pr-prep
 inputs:
   - {name: files_to_publish, type: array, required: true}
+  - {name: verification_command, type: string, required: false, default: ""}
 outputs: {validation_results: {type: array, items: {type: object}}}
 steps:
   - operation:
@@ -962,16 +963,18 @@ steps:
                     evaluator.evaluate(
                         workflow,
                         {
-                            "task_context": {
-                                "objective": "Implement a feature",
-                                "github_repository": "example/repo",
-                                "github_issue_number": 42,
-                                "proposed_pr_context": {
+                            "task_context": wrapped_task_context(
+                                {
+                                    "objective": "Implement a feature",
                                     "github_repository": "example/repo",
                                     "github_issue_number": 42,
-                                    "verification_command": "pytest -q",
-                                },
-                            }
+                                    "proposed_pr_context": {
+                                        "github_repository": "example/repo",
+                                        "github_issue_number": 42,
+                                        "verification_command": "pytest -q",
+                                    },
+                                }
+                            )
                         },
                     )
                 assert calls == ["implement", "amend", "finish", "publish"]
@@ -1043,16 +1046,18 @@ steps:
             evaluator.evaluate(
                 workflow,
                 {
-                    "task_context": {
-                        "objective": "Implement a feature",
-                        "github_repository": "example/repo",
-                        "github_issue_number": 42,
-                        "proposed_pr_context": {
+                    "task_context": wrapped_task_context(
+                        {
+                            "objective": "Implement a feature",
                             "github_repository": "example/repo",
                             "github_issue_number": 42,
-                            "verification_command": "pytest -q",
-                        },
-                    }
+                            "proposed_pr_context": {
+                                "github_repository": "example/repo",
+                                "github_issue_number": 42,
+                                "verification_command": "pytest -q",
+                            },
+                        }
+                    )
                 },
             )
         assert calls == ["implement", "finish", "publish"]

@@ -223,6 +223,48 @@ def test_finish_pr_prep_accepts_files_already_committed_on_feature_branch() -> N
     )
 
 
+def test_finish_pr_prep_uses_reviewed_command_when_inventory_is_missing() -> None:
+    catalog = ProcessCatalog.load(bundled_process_directory())
+    calls: list[tuple[str, dict[str, Any]]] = []
+
+    def invoke_tool(parameters: Any) -> dict[str, Any]:
+        tool = parameters["tool"]
+        tool_parameters = dict(parameters["parameters"])
+        calls.append((tool, tool_parameters))
+        if tool == "git" and tool_parameters.get("operation") == "verify_pr_scope":
+            return {
+                "confirmed": True,
+                "findings": [],
+                "paths": tool_parameters["paths"],
+            }
+        return {"returncode": 0, "stdout": "verified", "stderr": ""}
+
+    def execute(tool: str, parameters: Any) -> Any:
+        if tool == "gather_context":
+            return {"validation_inventory_status": "missing", "matches": []}
+        return invoke_tool(parameters)
+
+    result = ProcedrrExecutionService(
+        catalog,
+        SequenceLLM([]),
+        execute,
+    ).execute(
+        "finish-pr-prep",
+        {
+            "files_to_publish": ["attestation/verifier/src/powdrr_attestation.py"],
+            "verification_command": "bash attestation/scripts/verify-all.sh",
+        },
+    )
+
+    assert result.terminal_status.value == "succeeded"
+    assert ("shell", {"command": "bash attestation/scripts/verify-all.sh"}) in calls
+    assert result.bindings["validation_results"][0]["result"] == {
+        "returncode": 0,
+        "stdout": "verified",
+        "stderr": "",
+    }
+
+
 def test_finish_pr_prep_reviews_large_scope_without_runtime_paths() -> None:
     Path(__file__).resolve().parents[1]
     catalog = ProcessCatalog.load(bundled_process_directory())

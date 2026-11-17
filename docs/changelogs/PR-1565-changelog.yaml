@@ -1,5 +1,5 @@
 schema: https://powdrr.io/schema/changelog-v2
-change_id: 1564
+change_id: 1565
 title: Reuse plan issue indexes during worker readiness checks
 intent:
   problem: The worker can paginate a plan's issues while promoting blocked work and then fetch the same plan index again while checking ready candidates.

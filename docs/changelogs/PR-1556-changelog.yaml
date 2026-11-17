@@ -1,0 +1,60 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1556
+title: Ignore runtime workspace path in preparation comparison
+intent:
+  problem: Runtime source-reference handoffs include a candidate checkout path that cannot appear in the stable reviewed preparation, causing every implementation attempt to fail before coding.
+  goal: Compare stable contract fields while retaining the actual runtime workspace path in the worker handoff.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/source_reference_run.py
+    type: modified
+    span: {start_line: 721, end_line: 721}
+    summary: Exclude the temporary workspace root from stable preparation equality.
+    rationale: Candidate checkout paths vary by execution and are not part of the reviewed semantic contract.
+  - path: tests/test_source_reference_run.py
+    type: modified
+    span: {start_line: 14, end_line: 16}
+    summary: Import the deterministic preparation compiler for runtime comparison coverage.
+    rationale: Construct the same accepted preparation contract used by reviewed plans.
+  - path: tests/test_source_reference_run.py
+    type: modified
+    span: {start_line: 80, end_line: 80}
+    summary: Add optional accepted preparation to the shared run fixture.
+    rationale: Exercise runtime preparation validation without changing existing cases.
+  - path: tests/test_source_reference_run.py
+    type: modified
+    span: {start_line: 183, end_line: 204}
+    summary: Build the accepted preparation from the fixture's stable inputs.
+    rationale: Reproduce a reviewed contract before the runtime run adds its temporary workspace path.
+  - path: tests/test_source_reference_run.py
+    type: modified
+    span: {start_line: 209, end_line: 210}
+    summary: Reuse the fixture's objective and pinned base commit.
+    rationale: Keep preparation and runtime inputs identical for the regression case.
+  - path: tests/test_source_reference_run.py
+    type: modified
+    span: {start_line: 215, end_line: 215}
+    summary: Reuse the exact validation profile when compiling and running.
+    rationale: Ensure any remaining contract comparison difference comes from runtime-only data.
+  - path: tests/test_source_reference_run.py
+    type: modified
+    span: {start_line: 222, end_line: 222}
+    summary: Pass the accepted preparation into source-reference run setup.
+    rationale: Cover the production path that previously rejected every worker attempt.
+  - path: tests/test_source_reference_run.py
+    type: modified
+    span: {start_line: 237, end_line: 246}
+    summary: Verify a temporary workspace path does not invalidate accepted preparation.
+    rationale: Preserve the actual path in the worker contract while comparing only stable reviewed fields.
+entities: []
+entity_relationships: []
+invariants:
+  - id: runtime-workspace-is-not-review-contract
+    description: A runtime candidate workspace path does not affect equality with the reviewed execution preparation.
+    action: added
+    rationale: Temporary checkout locations vary between attempts and cannot be predeclared in a reviewed plan.
+guidance:
+  - id: preserve-runtime-workspace-in-handoff
+    description: Exclude workspace_root only from the stable preparation comparison; retain its actual value in the runtime worker handoff.
+    action: added

@@ -149,6 +149,9 @@ class _DependencyEvidenceCache:
     pull_requests_by_number: dict[int, Mapping[str, Any]] = dataclass_field(
         default_factory=dict
     )
+    dependency_results: dict[tuple[str, str, int | None], bool] = dataclass_field(
+        default_factory=dict
+    )
 
     def comments(
         self, client: GitHubIssueClient, issue_number: int
@@ -4640,11 +4643,27 @@ def _dependency_is_fulfilled(
     dependency_id: str,
     evidence_cache: _DependencyEvidenceCache | None = None,
 ) -> bool:
+    dependency_key = (
+        plan.plan_id,
+        dependency_id,
+        issue.number if issue is not None else None,
+    )
+    if (
+        evidence_cache is not None
+        and dependency_key in evidence_cache.dependency_results
+    ):
+        return evidence_cache.dependency_results[dependency_key]
+
+    def remember(result: bool) -> bool:
+        if evidence_cache is not None:
+            evidence_cache.dependency_results[dependency_key] = result
+        return result
+
     if issue is None:
-        return False
+        return remember(False)
     current = by_number.get(issue.number, issue)
     if current.state != "closed":
-        return False
+        return remember(False)
     if _dependency_has_verified_noop_receipt(
         current,
         client=client,
@@ -4652,16 +4671,16 @@ def _dependency_is_fulfilled(
         dependency_id=dependency_id,
         evidence_cache=evidence_cache,
     ):
-        return True
+        return remember(True)
     from powdrr_service.planning.repair import item_input_contract_digest
 
     item = next((value for value in plan.items if value.item_id == dependency_id), None)
     if item is None:
-        return False
+        return remember(False)
     expected_digest = item_input_contract_digest(item, plan.planning)
     pointer = parse_issue_pointer(current.body)
     if pointer is None or pointer["plan_id"] != plan.plan_id:
-        return False
+        return remember(False)
     comments = (
         evidence_cache.comments(client, current.number)
         if evidence_cache is not None
@@ -4711,8 +4730,8 @@ def _dependency_is_fulfilled(
             and isinstance(merge_commit, str)
             and re.fullmatch(r"[0-9a-fA-F]{40}|[0-9a-fA-F]{64}", merge_commit)
         ):
-            return True
-    return False
+            return remember(True)
+    return remember(False)
 
 
 def _dependency_has_verified_noop_receipt(

@@ -1,0 +1,196 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1561
+title: Reuse dependency evidence during issue queue checks
+intent:
+  problem: Queue discovery repeats GitHub reads for prerequisite comments and pull requests and reloads the same pinned plan and issue index for multiple items.
+  goal: Reuse immutable dependency evidence and per-plan inputs within each queue evaluation pass while keeping the selected issue's queue state fresh before claim.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 22, end_line: 22}
+    summary: Import a dataclass field factory for the evidence cache.
+    rationale: Give per-pass cache maps independent empty defaults.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 142, end_line: 165}
+    summary: Add a pass-scoped cache for prerequisite comments and pull request details.
+    rationale: Avoid duplicate GitHub requests when queued items share prerequisites.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 1182, end_line: 1182}
+    summary: Create one evidence cache while publishing a plan's issues.
+    rationale: Reuse completed prerequisite evidence across dependent items.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 1241, end_line: 1241}
+    summary: Pass the shared evidence cache through plan publication checks.
+    rationale: Avoid re-fetching a prerequisite referenced by multiple items.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 1344, end_line: 1344}
+    summary: Create a worker-pass evidence cache after queue reconciliation.
+    rationale: Keep memoized evidence scoped to one eligibility pass.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 1349, end_line: 1349}
+    summary: Share cached evidence with dependency promotion.
+    rationale: Reuse prerequisite reads when promoted issues are considered for execution.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 1353, end_line: 1353}
+    summary: Add a per-pass cache for pinned plan documents.
+    rationale: Avoid loading the same reviewed plan for every ready item.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 1360, end_line: 1363}
+    summary: Key the plan cache by plan ID, path, and pinned commit.
+    rationale: Keep cached plan identity bound to the issue's reviewed revision.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 1365, end_line: 1370}
+    summary: Load each pinned plan only once during candidate selection.
+    rationale: Reduce repeated repository reads while scanning eligible issues.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 1406, end_line: 1406}
+    summary: Use the pass cache for candidate dependency checks.
+    rationale: Reuse prerequisite evidence between promotion and selection.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 1544, end_line: 1544}
+    summary: Reuse cached no-PR fulfillment evidence when preparing the workflow.
+    rationale: Avoid a second comment read for the same prerequisite.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 1728, end_line: 1731}
+    summary: Pass the worker-pass evidence cache into no-work diagnostics.
+    rationale: Reuse prerequisite evidence when explaining why no item was claimed.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 2945, end_line: 2945}
+    summary: Require the pass-scoped evidence cache in dependency promotion.
+    rationale: Keep the promotion path on the same read-reuse policy.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 3000, end_line: 3000}
+    summary: Use cached prerequisite evidence while promoting blocked issues.
+    rationale: Avoid duplicate comments and pull request reads in one pass.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 4641, end_line: 4641}
+    summary: Allow dependency verification to receive a pass-scoped evidence cache.
+    rationale: Share immutable API responses across repeated checks.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 4649, end_line: 4653}
+    summary: Pass cached evidence through the verified no-op check.
+    rationale: Avoid duplicate comment requests for fulfilled dependencies.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 4665, end_line: 4670}
+    summary: Reuse the prerequisite comment list when checking its task checkpoint.
+    rationale: Reduce GitHub round trips without relaxing checkpoint validation.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 4691, end_line: 4695}
+    summary: Reuse pull request details when validating merged dependency evidence.
+    rationale: Avoid fetching the same PR repeatedly during queue evaluation.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 4724, end_line: 4724}
+    summary: Allow no-op receipt checks to use the evidence cache.
+    rationale: Keep no-PR fulfillment reads within the same queue-pass cache.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 4739, end_line: 4744}
+    summary: Read no-op fulfillment comments through the shared cache.
+    rationale: Prevent repeated comment requests for a closed prerequisite.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 4774, end_line: 4774}
+    summary: Pass cached dependency evidence into no-work diagnostics.
+    rationale: Keep diagnostic checks from repeating prior GitHub reads.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 4778, end_line: 4779}
+    summary: Cache plan documents and plan issue indexes for readiness reporting.
+    rationale: Avoid repeated plan loads and labeled issue queries per candidate.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 4791, end_line: 4794}
+    summary: Key diagnostic plan loads by the pinned plan identity.
+    rationale: Prevent unrelated plan revisions from sharing cached data.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 4796, end_line: 4801}
+    summary: Load each pinned plan once while constructing readiness details.
+    rationale: Reduce repeated repository reads in no-work reports.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 4820, end_line: 4825}
+    summary: Fetch each plan-scoped issue index once in no-work diagnostics.
+    rationale: Avoid one labeled GitHub issue query per candidate item.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 4836, end_line: 4836}
+    summary: Reuse dependency evidence while listing blocked prerequisites.
+    rationale: Keep no-work explanations from repeating comment and PR API calls.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 430, end_line: 430}
+    summary: Count fake-client comment reads.
+    rationale: Verify dependency evidence cache behavior by API request count.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 432, end_line: 432}
+    summary: Count fake-client pull request reads.
+    rationale: Verify repeated dependency checks reuse PR details.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 509, end_line: 509}
+    summary: Increment comment-read count in the fake GitHub client.
+    rationale: Make duplicate comment requests visible to the regression test.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 522, end_line: 522}
+    summary: Increment pull-request-read count in the fake GitHub client.
+    rationale: Make duplicate PR requests visible to the regression test.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 574, end_line: 588}
+    summary: Verify repeated evidence access performs one read per issue and pull request.
+    rationale: Prevent duplicate prerequisite API reads from returning to queue checks.
+  - path: docs/plans/github-issue-plan-worker.md
+    type: modified
+    span: {start_line: 196, end_line: 198}
+    summary: Document pass-scoped evidence reuse and the fresh queue-state check before claiming.
+    rationale: Explain the performance behavior without changing queue eligibility rules.
+entities:
+  - id: queue-dependency-evidence-cache
+    type: Cache
+    action: added
+  - id: queue-eligibility-evidence
+    type: Function
+    action: added
+  - id: queue-dependency-cache-regression-tests
+    type: Regression test
+    action: added
+entity_relationships:
+  - id: queue-cache-tests-verify-dependency-evidence-reuse
+    type: verifies
+    source: queue-dependency-cache-regression-tests
+    target: queue-dependency-evidence-cache
+    action: added
+    description: Regression coverage verifies comments and pull request details are fetched only once per item in a queue evaluation pass.
+invariants:
+  - id: dependency-evidence-reused-within-worker-pass
+    description: A worker pass reuses prerequisite comments and pull request details and loads each pinned plan and plan-scoped issue index once per plan.
+    action: added
+    rationale: Reduce repeated GitHub and repository reads during eligibility checks.
+guidance:
+  - id: scope-dependency-cache-to-one-pass
+    description: Cache dependency evidence only for the current queue evaluation pass; do not retain it across worker invocations.
+    action: added
+    rationale: Avoid stale comments, pull request state, or fulfillment evidence in later runs.

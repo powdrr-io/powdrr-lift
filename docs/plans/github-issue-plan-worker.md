@@ -193,6 +193,9 @@ truth and is checked after GitHub returns the indexed candidates.
 when all prerequisite issues are closed, then selects the lowest-numbered
 eligible item, marks it `claimed`, and invokes the existing
 `process-workflow-task` runtime for the workflow named by the pinned plan.
+Within one worker pass, it reuses each pinned plan, plan-scoped issue index,
+prerequisite comment list, and prerequisite pull request response. It still
+re-reads the selected issue before claiming it so queue labels remain current.
 
 When a workflow task finishes, the worker commits and pushes its workflow state
 and atomically writes a local checkpoint containing the plan, item, workflow,

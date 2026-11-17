@@ -1,0 +1,36 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1563
+title: Remove redundant ready queue refresh before claim
+intent:
+  problem: Candidate selection lists the entire ready queue again and then fetches the selected issue directly before claim.
+  goal: Use the direct issue response for the final open-and-ready check, reducing one repository-wide query while preserving a fresh claim decision.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 1418, end_line: 1426}
+    summary: Replace the second ready-queue listing with a direct open-and-ready issue check.
+    rationale: Remove the redundant ready-issue list request and make the final freshness check use the selected issue's current metadata.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 1419, end_line: 1420}
+    summary: Skip claim preparation when the direct issue response is closed or no longer ready.
+    rationale: Respect queue changes that occur after candidate listing.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 1484, end_line: 1551}
+    summary: Verify an issue relabeled before the final claim check is skipped.
+    rationale: Preserve safe behavior when queue state changes during candidate selection.
+entities: []
+entity_relationships: []
+invariants:
+  - id: claim-requires-fresh-ready-issue
+    description: Claim preparation proceeds only when a direct issue read reports the selected item open and ready.
+    action: altered
+    rationale: Preserve the final eligibility check while avoiding a full ready-queue refresh.
+guidance:
+  - id: use-direct-issue-state-before-claim
+    description: Recheck open state and the ready label on the selected issue response during final claim preparation.
+    action: added
+    rationale: Avoid broad queue reads and prevent claiming an item whose state changed after listing.

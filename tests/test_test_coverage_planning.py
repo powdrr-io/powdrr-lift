@@ -5,14 +5,10 @@ from powdrr_service.planning.questions import SourceExcerpt
 from powdrr_service.planning.test_coverage import build_test_coverage_request
 
 
-def _behavior(
-    scenario: str, outcome: str, evidence_ref: str = "anchor-ci"
-) -> dict[str, object]:
+def _behavior(evidence_ref: str = "anchor-ci") -> dict[str, object]:
     return {
         "subject": "The acceptance criterion behavior.",
         "given": "The source-defined preconditions hold.",
-        "when": scenario,
-        "then": outcome,
         "evidence": [evidence_ref],
         "dimensions": {
             name: "not_applicable"
@@ -55,10 +51,7 @@ def test_planner_assigns_stable_ids_to_llm_test_designs() -> None:
                 "test_type": "integration",
                 "scenario": "Parse the workflow and inspect its pull_request triggers.",
                 "expected_outcome": "Pull requests trigger the verification workflow.",
-                "behavior_scenario": _behavior(
-                    "Parse the workflow and inspect its pull_request triggers.",
-                    "Pull requests trigger the verification workflow.",
-                ),
+                "behavior_scenario": _behavior(),
             },
             {
                 "test_type": "contract",
@@ -66,10 +59,7 @@ def test_planner_assigns_stable_ids_to_llm_test_designs() -> None:
                 "expected_outcome": (
                     "The configured step invokes the repository test command."
                 ),
-                "behavior_scenario": _behavior(
-                    "Inspect the verification step in the CI job.",
-                    "The configured step invokes the repository test command.",
-                ),
+                "behavior_scenario": _behavior(),
             },
         ]
     }
@@ -124,11 +114,7 @@ def test_planner_rejects_missing_or_unsupported_test_designs() -> None:
                         "test_type": "manual",
                         "scenario": "Check the behavior.",
                         "expected_outcome": "The behavior works.",
-                        "behavior_scenario": _behavior(
-                            "Check the behavior.",
-                            "The behavior works.",
-                            "anchor-behavior",
-                        ),
+                        "behavior_scenario": _behavior("anchor-behavior"),
                     }
                 ]
             }

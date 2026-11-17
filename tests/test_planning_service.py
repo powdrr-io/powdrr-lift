@@ -263,8 +263,6 @@ class _PlanningScriptClient:
                         "behavior_scenario": {
                             "subject": criterion,
                             "given": "The source-defined preconditions hold.",
-                            "when": "Exercise the public behavior for this criterion.",
-                            "then": criterion,
                             "evidence": [packet["source_excerpts"][0]["ref_id"]],
                             "capability_matrix": [],
                             "assumptions": [],

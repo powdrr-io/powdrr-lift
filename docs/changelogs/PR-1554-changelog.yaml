@@ -1,0 +1,88 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1554
+title: Bind planned behavior scenarios to test outcomes
+intent:
+  problem: Planning models must duplicate test scenarios and expected outcomes in behavior fields, and paraphrases can block an otherwise valid plan.
+  goal: Derive behavior scenario when and then values from each accepted test design while retaining typed dimension and source evidence validation.
+human-decisions: []
+structured_files: []
+files:
+- path: packages/service/src/powdrr_service/planning/test_coverage.py
+  type: modified
+  span: {start_line: 107, end_line: 108}
+  summary: Remove duplicated behavior fields from the model response schema.
+  rationale: The planner derives these values from the accepted test design.
+- path: packages/service/src/powdrr_service/planning/test_coverage.py
+  type: modified
+  span: {start_line: 118, end_line: 119}
+  summary: Stop asking the model schema to supply behavior when and then values.
+  rationale: Avoid requiring duplicated model-generated text.
+- path: packages/service/src/powdrr_service/planning/test_coverage.py
+  type: modified
+  span: {start_line: 240, end_line: 241}
+  summary: Remove redundant behavior text from the example response.
+  rationale: Keep the example aligned with the bounded response schema.
+- path: packages/service/src/powdrr_service/planning/test_coverage.py
+  type: modified
+  span: {start_line: 300, end_line: 301}
+  summary: Validate only model-owned typed behavior fields.
+  rationale: Let the planner bind duplicated behavior values deterministically.
+- path: packages/service/src/powdrr_service/planning/test_coverage.py
+  type: modified
+  span: {start_line: 324, end_line: 328}
+  summary: Populate behavior when and then from each accepted test design.
+  rationale: Keep typed scenarios synchronized with scenario and expected outcome.
+- path: packages/service/src/powdrr_service/planning/test_coverage.py
+  type: modified
+  span: {start_line: 343, end_line: 347}
+  summary: Remove the redundant equality rejection after canonical values are bound.
+  rationale: Preserve typed contract compilation without rejecting paraphrases.
+- path: packages/service/src/powdrr_service/planning/test_coverage.py
+  type: modified
+  span: {start_line: 398, end_line: 400}
+  summary: Clarify that the planner supplies behavior when and then values.
+  rationale: Keep the model instructions consistent with the response schema.
+- path: tests/test_test_coverage_planning.py
+  type: modified
+  span: {start_line: 8, end_line: 8}
+  summary: Simplify the typed behavior test fixture.
+  rationale: Model answers no longer contain duplicated when and then fields.
+- path: tests/test_test_coverage_planning.py
+  type: modified
+  span: {start_line: 14, end_line: 15}
+  summary: Remove fixture values now derived from the test design.
+  rationale: Verify that the planner fills canonical behavior values.
+- path: tests/test_test_coverage_planning.py
+  type: modified
+  span: {start_line: 54, end_line: 54}
+  summary: Update the first criterion response to omit duplicated behavior text.
+  rationale: Exercise deterministic scenario binding.
+- path: tests/test_test_coverage_planning.py
+  type: modified
+  span: {start_line: 62, end_line: 62}
+  summary: Update the second criterion response to omit duplicated behavior text.
+  rationale: Exercise deterministic outcome binding.
+- path: tests/test_test_coverage_planning.py
+  type: modified
+  span: {start_line: 117, end_line: 117}
+  summary: Keep the invalid test-type fixture within the updated answer schema.
+  rationale: Isolate test-type rejection from removed behavior fields.
+- path: tests/test_planning_service.py
+  type: modified
+  span: {start_line: 266, end_line: 267}
+  summary: Update the planning service fixture to omit behavior when and then fields.
+  rationale: Keep end-to-end planning aligned with the bounded response schema.
+entities:
+- id: build-test-coverage-request
+  type: Function
+  action: added
+entity_relationships: []
+invariants:
+- id: planned-behavior-matches-test-design
+  description: Each compiled behavior scenario uses the accepted test scenario as when and its expected outcome as then.
+  action: added
+  rationale: Keep the executable typed scenario synchronized with the plan's test design without relying on duplicated model text.
+guidance:
+- id: model-owns-behavior-dimensions
+  description: Planning responses provide source-grounded typed dimensions and evidence; the planner derives behavior when and then from the corresponding test scenario and expected outcome.
+  action: added

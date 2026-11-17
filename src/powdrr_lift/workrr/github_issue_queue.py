@@ -1415,16 +1415,9 @@ def run_worker_once(
                     labels=_replace_queue_status(issue.labels, "blocked_on_dependency"),
                 )
                 continue
-            issue = next(
-                value
-                for value in client.list_issues(
-                    labels=(QUEUE_LABELS["ready"],), state="open"
-                )
-                if value.number == issue.number
-            )
-            if QUEUE_LABELS["ready"] not in issue.labels:
-                continue
             issue = client.get_issue(issue.number)
+            if issue.state != "open" or QUEUE_LABELS["ready"] not in issue.labels:
+                continue
             detail: str | None = None
             planned_item = item
             try:

@@ -1481,6 +1481,74 @@ def test_worker_skips_unmet_dependency_then_executes_ready_item(
     assert waits == [1.0]
 
 
+def test_worker_skips_issue_relabelled_before_fresh_claim_check(
+    tmp_path: Path,
+) -> None:
+    class RelabelOnReadyListClient(FakeIssueClient):
+        relabeled = False
+
+        def list_issues(
+            self, *, labels: tuple[str, ...] = (), state: str = "all"
+        ) -> tuple[QueueIssue, ...]:
+            result = super().list_issues(labels=labels, state=state)
+            if (
+                labels == (QUEUE_LABELS["ready"],)
+                and state == "open"
+                and not self.relabeled
+            ):
+                self.relabeled = True
+                candidate = next(issue for issue in result if issue.number == 100)
+                self.update_issue(
+                    candidate,
+                    labels=github_issue_queue._replace_queue_status(
+                        candidate.labels, "claimed"
+                    ),
+                )
+            return result
+
+    root = tmp_path
+    (root / "docs/workflows/base").mkdir(parents=True)
+    (root / "docs/workflows/followup").mkdir(parents=True)
+    client = RelabelOnReadyListClient()
+    publish_plan_issues(
+        plan=plan(),
+        plan_path="docs/plans/feature.yaml",
+        plan_commit=PLAN_COMMIT,
+        client=client,  # type: ignore[arg-type]
+    )
+    executed: list[str] = []
+
+    def load_plan(
+        _path: str, _commit: str, *, repo_root: str | Path
+    ) -> ReviewedExecutionPlan:
+        assert Path(repo_root) == root
+        return plan()
+
+    def run_task(
+        _directory: Path,
+        workflow_id: str,
+        _worker_id: str,
+        _item: PlannedWorkItem,
+        _plan: ReviewedExecutionPlan,
+        _fulfilled_without_pr_dependencies: tuple[str, ...],
+        _checkpoint: TaskCheckpointCallback,
+    ) -> int:
+        executed.append(workflow_id)
+        return 0
+
+    report = run_worker_once(
+        client=client,  # type: ignore[arg-type]
+        repo_root=root,
+        worker_id="worker-a",
+        run_task=run_task,
+        plan_loader=load_plan,
+    )
+
+    assert report.outcome == "no_eligible_work"
+    assert QUEUE_LABELS["claimed"] in client.issues[0].labels
+    assert executed == []
+
+
 def test_worker_passes_explicit_no_pr_dependency_to_workflow(
     tmp_path: Path,
 ) -> None:

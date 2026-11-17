@@ -193,10 +193,7 @@ def test_clean_publication_branch_excludes_checkpoint_commits(
     _git("config", "user.name", "Powdrr Test", cwd=source)
     _git("config", "user.email", "powdrr-test@example.invalid", cwd=source)
     (source / "README.md").write_text("base\n", encoding="utf-8")
-    (source / ".gitignore").write_text(
-        ".powdrr/publication-intents/\n", encoding="utf-8"
-    )
-    _git("add", "README.md", ".gitignore", cwd=source)
+    _git("add", "README.md", cwd=source)
     _git("commit", "-m", "initial", cwd=source)
     _git("remote", "add", "origin", str(remote), cwd=source)
     _git("push", "-u", "origin", "main", cwd=source)
@@ -308,7 +305,14 @@ def test_clean_publication_branch_excludes_checkpoint_commits(
     )
     assert remote_changed_paths == set(product_paths)
     assert not (set(runtime_paths) & remote_paths)
-    intent_files = list((source / ".powdrr/publication-intents").glob("*.json"))
+    intent_root = Path(
+        _git(
+            "rev-parse", "--git-path", "powdrr/publication-intents", cwd=source
+        ).strip()
+    )
+    if not intent_root.is_absolute():
+        intent_root = source / intent_root
+    intent_files = list(intent_root.glob("*.json"))
     assert len(intent_files) == 1
     intent = json.loads(intent_files[0].read_text(encoding="utf-8"))
     assert intent["pull_request_url"] == result

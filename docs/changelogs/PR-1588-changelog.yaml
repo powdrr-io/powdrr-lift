@@ -1,5 +1,5 @@
 schema: https://powdrr.io/schema/changelog-v2
-change_id: 1587
+change_id: 1588
 title: Render worker publication requests deterministically
 intent:
   problem: Successful implementation and plan-amendment PR descriptions still depended on model judges even though their source facts were already recorded in typed plan, repair, and validation evidence.

@@ -1128,6 +1128,11 @@ class MiniSWEAgentProvider:
     prompt_suffix: str = ""
     progress_callback: Callable[[str], None] | None = None
     write_denied_paths: tuple[Path, ...] = ()
+    trace_caller: str = "minisweagent"
+    trace_gate_consumer: str | None = None
+    trace_evidence_fingerprint: str | None = None
+    trace_evidence_ids: tuple[str, ...] = ()
+    trace_check_id: str | None = None
     session_trajectory: Path | None = field(default=None, init=False)
     source_reference_mode: str = "off"
     source_reference_catalog: ReferenceCatalog | None = field(default=None, repr=False)
@@ -1391,6 +1396,15 @@ class MiniSWEAgentProvider:
                             ),
                             task_id=request.request_id,
                             attempt_id=attempt_id,
+                            caller=self.trace_caller,
+                            gate_consumer=self.trace_gate_consumer,
+                            evidence_fingerprint=self.trace_evidence_fingerprint,
+                            evidence_ids=self.trace_evidence_ids,
+                            check_id=self.trace_check_id,
+                            candidate_id=request.base_commit,
+                            request_response_artifact_ref=(
+                                output_path.name if output_path is not None else None
+                            ),
                         )
                         if self.diagnostics_root is not None
                         else self.inference_handler

@@ -95,6 +95,13 @@ def test_miniswe_trace_records_redacted_success_metadata(tmp_path: Path) -> None
         trace_path=trace_path,
         task_id="task-456",
         attempt_id="attempt-2",
+        caller="story_test_author",
+        gate_consumer="story_test_baseline_gate",
+        evidence_fingerprint="evidence-hash",
+        evidence_ids=("story:checkout", "case:retry"),
+        check_id="tests/test_resume.py::test_retry",
+        candidate_id="base-commit-sha",
+        request_response_artifact_ref="attempt-2.traj.json",
     )
 
     assert traced(request) == response
@@ -103,6 +110,13 @@ def test_miniswe_trace_records_redacted_success_metadata(tmp_path: Path) -> None
     assert record["interaction_id"] == "request-123"
     assert record["task_id"] == "task-456"
     assert record["attempt_id"] == "attempt-2"
+    assert record["caller"] == "story_test_author"
+    assert record["gate_consumer"] == "story_test_baseline_gate"
+    assert record["evidence_fingerprint"] == "evidence-hash"
+    assert record["evidence_ids"] == ["story:checkout", "case:retry"]
+    assert record["check_id"] == "tests/test_resume.py::test_retry"
+    assert record["candidate_id"] == "base-commit-sha"
+    assert record["request_response_artifact_ref"] == "attempt-2.traj.json"
     assert record["provider"] == "deepinfra"
     assert record["model"] == "deepinfra/test-model"
     assert record["prompt_fingerprint"]

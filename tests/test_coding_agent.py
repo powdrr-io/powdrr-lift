@@ -563,6 +563,8 @@ def test_minisweagent_provider_uses_targeted_prompt_and_diagnostics(
     assert trace["task_id"] == request.request_id
     assert trace["attempt_id"] == "attempt-1"
     assert trace["interaction_id"] == "ipc-request-1"
+    assert trace["candidate_id"] == request.base_commit
+    assert trace["request_response_artifact_ref"] == "attempt-1.traj.json"
     assert "private prompt" not in trace_path.read_text(encoding="utf-8")
     assert progress_messages == [
         "MiniSWE started.",

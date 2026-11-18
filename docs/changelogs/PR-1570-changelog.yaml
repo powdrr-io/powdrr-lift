@@ -2,56 +2,410 @@ schema: https://powdrr.io/schema/changelog-v2
 change_id: 1570
 title: Trace durable issue worker model attempts
 intent:
-  problem: The durable issue worker did not persist per-attempt model telemetry or connect successful judge events to provider retries.
-  goal: Record privacy-conscious task-scoped Procedrr attempt telemetry and summarize request counts, retries, usage, and trace linkage while marking unobserved routes explicitly.
+  problem: The durable issue worker did not persist per-attempt model telemetry or
+    connect successful judge events to provider retries.
+  goal: Record privacy-conscious task-scoped Procedrr attempt telemetry and summarize
+    request counts, retries, usage, and trace linkage while marking unobserved routes
+    explicitly.
 human-decisions: []
 structured_files: []
 files:
-  - path: packages/service/src/powdrr_service/procedrr_evaluator/evaluator.py
-    type: modified
-    span: {start_line: 997, end_line: 1174}
-    summary: Attach caller metadata to single and batched judge telemetry and include trace fingerprints in successful judge events.
-    rationale: Correlate each provider attempt with the gate path and existing request/response event without storing prompt content in the attempt log.
-  - path: packages/service/src/powdrr_service/procedrr_evaluator/model_client.py
-    type: modified
-    span: {start_line: 27, end_line: 550}
-    summary: Add interaction IDs, attempt fingerprints, caller context, batch member trace IDs, and typed retry causes to Procedrr provider telemetry.
-    rationale: Distinguish logical requests from transport attempts and identify retry causes with bounded fields.
-  - path: src/powdrr_lift/workrr/model_interaction_telemetry.py
-    type: added
-    span: {start_line: 1, end_line: 259}
-    summary: Persist task-scoped provider attempt metadata and summarize retries, usage, caller paths, and linkage to judge events.
-    rationale: Provide a compact run baseline while excluding raw prompt, response, and free-form provider error text.
-  - path: src/powdrr_lift/workrr/task_agent.py
-    type: modified
-    span: {start_line: 6862, end_line: 7108}
-    summary: Wire durable-task Procedrr attempts to a task manifest and a separate JSONL telemetry artifact.
-    rationale: Make GitHub issue worker model calls inspectable across resumes and explicitly report routes that remain unobserved.
-  - path: tests/test_procedrr_evaluator.py
-    type: modified
-    span: {start_line: 183, end_line: 193}
-    summary: Verify batched judge telemetry identifies member paths and correlatable trace IDs.
-    rationale: Protect batch attribution and prompt-builder metadata.
-  - path: tests/fixtures/structrr/golden-python-symbols.yaml
-    type: modified
-    span: {start_line: 37, end_line: 50}
-    summary: Update source spans for ProcedrrModelClient and its complete_json method.
-    rationale: Keep the source-symbol golden fixture aligned with the added telemetry implementation.
-  - path: tests/test_workflow_task_agent.py
-    type: modified
-    span: {start_line: 2257, end_line: 2398}
-    summary: Verify durable-task telemetry, explicit missing-route reporting, and correct batched question counts per caller.
-    rationale: Ensure the worker artifact reports useful counts without overcounting batch members or claiming complete coverage.
-  - path: tests/test_workrr_procedrr.py
-    type: modified
-    span: {start_line: 148, end_line: 190}
-    summary: Verify retry attempts share a logical interaction ID while repeated identical prompts remain distinct interactions.
-    rationale: Keep transport retries separate from repeated logical requests.
-  - path: docs/audits/github-issue-worker-llm-audit.md
-    type: modified
-    span: {start_line: 1, end_line: 620}
-    summary: Track WP0 as partially implemented and document the remaining unobserved worker routes and scenarios.
-    rationale: Keep the proposed sequence aligned with the implemented telemetry boundary.
+- path: docs/audits/github-issue-worker-llm-audit.md
+  type: modified
+  span:
+    start_line: 3
+    end_line: 3
+  summary: Track WP0 as partially implemented and document the remaining unobserved
+    worker routes and scenarios.
+  rationale: Keep the proposed sequence aligned with the implemented telemetry boundary.
+- path: docs/audits/github-issue-worker-llm-audit.md
+  type: modified
+  span:
+    start_line: 588
+    end_line: 590
+  summary: Track WP0 as partially implemented and document the remaining unobserved
+    worker routes and scenarios.
+  rationale: Keep the proposed sequence aligned with the implemented telemetry boundary.
+- path: docs/audits/github-issue-worker-llm-audit.md
+  type: modified
+  span:
+    start_line: 607
+    end_line: 618
+  summary: Track WP0 as partially implemented and document the remaining unobserved
+    worker routes and scenarios.
+  rationale: Keep the proposed sequence aligned with the implemented telemetry boundary.
+- path: packages/service/src/powdrr_service/procedrr_evaluator/evaluator.py
+  type: modified
+  span:
+    start_line: 17
+    end_line: 17
+  summary: Attach caller metadata to single and batched judge telemetry and include
+    trace fingerprints in successful judge events.
+  rationale: Correlate each provider attempt with the gate path and existing request/response
+    event without storing prompt content in the attempt log.
+- path: packages/service/src/powdrr_service/procedrr_evaluator/evaluator.py
+  type: modified
+  span:
+    start_line: 1001
+    end_line: 1009
+  summary: Attach caller metadata to single and batched judge telemetry and include
+    trace fingerprints in successful judge events.
+  rationale: Correlate each provider attempt with the gate path and existing request/response
+    event without storing prompt content in the attempt log.
+- path: packages/service/src/powdrr_service/procedrr_evaluator/evaluator.py
+  type: modified
+  span:
+    start_line: 1011
+    end_line: 1020
+  summary: Attach caller metadata to single and batched judge telemetry and include
+    trace fingerprints in successful judge events.
+  rationale: Correlate each provider attempt with the gate path and existing request/response
+    event without storing prompt content in the attempt log.
+- path: packages/service/src/powdrr_service/procedrr_evaluator/evaluator.py
+  type: modified
+  span:
+    start_line: 1052
+    end_line: 1052
+  summary: Attach caller metadata to single and batched judge telemetry and include
+    trace fingerprints in successful judge events.
+  rationale: Correlate each provider attempt with the gate path and existing request/response
+    event without storing prompt content in the attempt log.
+- path: packages/service/src/powdrr_service/procedrr_evaluator/evaluator.py
+  type: modified
+  span:
+    start_line: 1153
+    end_line: 1163
+  summary: Attach caller metadata to single and batched judge telemetry and include
+    trace fingerprints in successful judge events.
+  rationale: Correlate each provider attempt with the gate path and existing request/response
+    event without storing prompt content in the attempt log.
+- path: packages/service/src/powdrr_service/procedrr_evaluator/evaluator.py
+  type: modified
+  span:
+    start_line: 1165
+    end_line: 1168
+  summary: Attach caller metadata to single and batched judge telemetry and include
+    trace fingerprints in successful judge events.
+  rationale: Correlate each provider attempt with the gate path and existing request/response
+    event without storing prompt content in the attempt log.
+- path: packages/service/src/powdrr_service/procedrr_evaluator/evaluator.py
+  type: modified
+  span:
+    start_line: 1194
+    end_line: 1198
+  summary: Attach caller metadata to single and batched judge telemetry and include
+    trace fingerprints in successful judge events.
+  rationale: Correlate each provider attempt with the gate path and existing request/response
+    event without storing prompt content in the attempt log.
+- path: packages/service/src/powdrr_service/procedrr_evaluator/model_client.py
+  type: modified
+  span:
+    start_line: 11
+    end_line: 13
+  summary: Add interaction IDs, attempt fingerprints, caller context, batch member
+    trace IDs, and typed retry causes to Procedrr provider telemetry.
+  rationale: Distinguish logical requests from transport attempts and identify retry
+    causes with bounded fields.
+- path: packages/service/src/powdrr_service/procedrr_evaluator/model_client.py
+  type: modified
+  span:
+    start_line: 30
+    end_line: 32
+  summary: Add interaction IDs, attempt fingerprints, caller context, batch member
+    trace IDs, and typed retry causes to Procedrr provider telemetry.
+  rationale: Distinguish logical requests from transport attempts and identify retry
+    causes with bounded fields.
+- path: packages/service/src/powdrr_service/procedrr_evaluator/model_client.py
+  type: modified
+  span:
+    start_line: 114
+    end_line: 122
+  summary: Add interaction IDs, attempt fingerprints, caller context, batch member
+    trace IDs, and typed retry causes to Procedrr provider telemetry.
+  rationale: Distinguish logical requests from transport attempts and identify retry
+    causes with bounded fields.
+- path: packages/service/src/powdrr_service/procedrr_evaluator/model_client.py
+  type: modified
+  span:
+    start_line: 134
+    end_line: 135
+  summary: Add interaction IDs, attempt fingerprints, caller context, batch member
+    trace IDs, and typed retry causes to Procedrr provider telemetry.
+  rationale: Distinguish logical requests from transport attempts and identify retry
+    causes with bounded fields.
+- path: packages/service/src/powdrr_service/procedrr_evaluator/model_client.py
+  type: modified
+  span:
+    start_line: 160
+    end_line: 161
+  summary: Add interaction IDs, attempt fingerprints, caller context, batch member
+    trace IDs, and typed retry causes to Procedrr provider telemetry.
+  rationale: Distinguish logical requests from transport attempts and identify retry
+    causes with bounded fields.
+- path: packages/service/src/powdrr_service/procedrr_evaluator/model_client.py
+  type: modified
+  span:
+    start_line: 173
+    end_line: 174
+  summary: Add interaction IDs, attempt fingerprints, caller context, batch member
+    trace IDs, and typed retry causes to Procedrr provider telemetry.
+  rationale: Distinguish logical requests from transport attempts and identify retry
+    causes with bounded fields.
+- path: packages/service/src/powdrr_service/procedrr_evaluator/model_client.py
+  type: modified
+  span:
+    start_line: 179
+    end_line: 179
+  summary: Add interaction IDs, attempt fingerprints, caller context, batch member
+    trace IDs, and typed retry causes to Procedrr provider telemetry.
+  rationale: Distinguish logical requests from transport attempts and identify retry
+    causes with bounded fields.
+- path: packages/service/src/powdrr_service/procedrr_evaluator/model_client.py
+  type: modified
+  span:
+    start_line: 200
+    end_line: 202
+  summary: Add interaction IDs, attempt fingerprints, caller context, batch member
+    trace IDs, and typed retry causes to Procedrr provider telemetry.
+  rationale: Distinguish logical requests from transport attempts and identify retry
+    causes with bounded fields.
+- path: packages/service/src/powdrr_service/procedrr_evaluator/model_client.py
+  type: modified
+  span:
+    start_line: 207
+    end_line: 207
+  summary: Add interaction IDs, attempt fingerprints, caller context, batch member
+    trace IDs, and typed retry causes to Procedrr provider telemetry.
+  rationale: Distinguish logical requests from transport attempts and identify retry
+    causes with bounded fields.
+- path: packages/service/src/powdrr_service/procedrr_evaluator/model_client.py
+  type: modified
+  span:
+    start_line: 221
+    end_line: 221
+  summary: Add interaction IDs, attempt fingerprints, caller context, batch member
+    trace IDs, and typed retry causes to Procedrr provider telemetry.
+  rationale: Distinguish logical requests from transport attempts and identify retry
+    causes with bounded fields.
+- path: packages/service/src/powdrr_service/procedrr_evaluator/model_client.py
+  type: modified
+  span:
+    start_line: 225
+    end_line: 225
+  summary: Add interaction IDs, attempt fingerprints, caller context, batch member
+    trace IDs, and typed retry causes to Procedrr provider telemetry.
+  rationale: Distinguish logical requests from transport attempts and identify retry
+    causes with bounded fields.
+- path: packages/service/src/powdrr_service/procedrr_evaluator/model_client.py
+  type: modified
+  span:
+    start_line: 227
+    end_line: 229
+  summary: Add interaction IDs, attempt fingerprints, caller context, batch member
+    trace IDs, and typed retry causes to Procedrr provider telemetry.
+  rationale: Distinguish logical requests from transport attempts and identify retry
+    causes with bounded fields.
+- path: packages/service/src/powdrr_service/procedrr_evaluator/model_client.py
+  type: modified
+  span:
+    start_line: 250
+    end_line: 250
+  summary: Add interaction IDs, attempt fingerprints, caller context, batch member
+    trace IDs, and typed retry causes to Procedrr provider telemetry.
+  rationale: Distinguish logical requests from transport attempts and identify retry
+    causes with bounded fields.
+- path: packages/service/src/powdrr_service/procedrr_evaluator/model_client.py
+  type: modified
+  span:
+    start_line: 355
+    end_line: 359
+  summary: Add interaction IDs, attempt fingerprints, caller context, batch member
+    trace IDs, and typed retry causes to Procedrr provider telemetry.
+  rationale: Distinguish logical requests from transport attempts and identify retry
+    causes with bounded fields.
+- path: packages/service/src/powdrr_service/procedrr_evaluator/model_client.py
+  type: modified
+  span:
+    start_line: 366
+    end_line: 368
+  summary: Add interaction IDs, attempt fingerprints, caller context, batch member
+    trace IDs, and typed retry causes to Procedrr provider telemetry.
+  rationale: Distinguish logical requests from transport attempts and identify retry
+    causes with bounded fields.
+- path: packages/service/src/powdrr_service/procedrr_evaluator/model_client.py
+  type: modified
+  span:
+    start_line: 396
+    end_line: 396
+  summary: Add interaction IDs, attempt fingerprints, caller context, batch member
+    trace IDs, and typed retry causes to Procedrr provider telemetry.
+  rationale: Distinguish logical requests from transport attempts and identify retry
+    causes with bounded fields.
+- path: packages/service/src/powdrr_service/procedrr_evaluator/model_client.py
+  type: modified
+  span:
+    start_line: 411
+    end_line: 414
+  summary: Add interaction IDs, attempt fingerprints, caller context, batch member
+    trace IDs, and typed retry causes to Procedrr provider telemetry.
+  rationale: Distinguish logical requests from transport attempts and identify retry
+    causes with bounded fields.
+- path: packages/service/src/powdrr_service/procedrr_evaluator/model_client.py
+  type: modified
+  span:
+    start_line: 463
+    end_line: 474
+  summary: Add interaction IDs, attempt fingerprints, caller context, batch member
+    trace IDs, and typed retry causes to Procedrr provider telemetry.
+  rationale: Distinguish logical requests from transport attempts and identify retry
+    causes with bounded fields.
+- path: src/powdrr_lift/workrr/model_interaction_telemetry.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 259
+  summary: Persist task-scoped provider attempt metadata and summarize retries, usage,
+    caller paths, and linkage to judge events.
+  rationale: Provide a compact run baseline while excluding raw prompt, response,
+    and free-form provider error text.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 263
+    end_line: 265
+  summary: Wire durable-task Procedrr attempts to a task manifest and a separate JSONL
+    telemetry artifact.
+  rationale: Make GitHub issue worker model calls inspectable across resumes and explicitly
+    report routes that remain unobserved.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 6862
+    end_line: 6908
+  summary: Wire durable-task Procedrr attempts to a task manifest and a separate JSONL
+    telemetry artifact.
+  rationale: Make GitHub issue worker model calls inspectable across resumes and explicitly
+    report routes that remain unobserved.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 6915
+    end_line: 6916
+  summary: Wire durable-task Procedrr attempts to a task manifest and a separate JSONL
+    telemetry artifact.
+  rationale: Make GitHub issue worker model calls inspectable across resumes and explicitly
+    report routes that remain unobserved.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 6906
+    end_line: 6928
+  summary: Wire durable-task Procedrr attempts to a task manifest and a separate JSONL
+    telemetry artifact.
+  rationale: Make GitHub issue worker model calls inspectable across resumes and explicitly
+    report routes that remain unobserved.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 7013
+    end_line: 7013
+  summary: Wire durable-task Procedrr attempts to a task manifest and a separate JSONL
+    telemetry artifact.
+  rationale: Make GitHub issue worker model calls inspectable across resumes and explicitly
+    report routes that remain unobserved.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 7061
+    end_line: 7061
+  summary: Wire durable-task Procedrr attempts to a task manifest and a separate JSONL
+    telemetry artifact.
+  rationale: Make GitHub issue worker model calls inspectable across resumes and explicitly
+    report routes that remain unobserved.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 7105
+    end_line: 7105
+  summary: Wire durable-task Procedrr attempts to a task manifest and a separate JSONL
+    telemetry artifact.
+  rationale: Make GitHub issue worker model calls inspectable across resumes and explicitly
+    report routes that remain unobserved.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 7109
+    end_line: 7109
+  summary: Wire durable-task Procedrr attempts to a task manifest and a separate JSONL
+    telemetry artifact.
+  rationale: Make GitHub issue worker model calls inspectable across resumes and explicitly
+    report routes that remain unobserved.
+- path: tests/fixtures/structrr/golden-python-symbols.yaml
+  type: modified
+  span:
+    start_line: 42
+    end_line: 43
+  summary: Update source spans for ProcedrrModelClient and its complete_json method.
+  rationale: Keep the source-symbol golden fixture aligned with the added telemetry
+    implementation.
+- path: tests/fixtures/structrr/golden-python-symbols.yaml
+  type: modified
+  span:
+    start_line: 49
+    end_line: 50
+  summary: Update source spans for ProcedrrModelClient and its complete_json method.
+  rationale: Keep the source-symbol golden fixture aligned with the added telemetry
+    implementation.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span:
+    start_line: 186
+    end_line: 191
+  summary: Verify batched judge telemetry identifies member paths and correlatable
+    trace IDs.
+  rationale: Protect batch attribution and prompt-builder metadata.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 70
+    end_line: 72
+  summary: Verify durable-task telemetry, explicit missing-route reporting, and correct
+    batched question counts per caller.
+  rationale: Ensure the worker artifact reports useful counts without overcounting
+    batch members or claiming complete coverage.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 2305
+    end_line: 2398
+  summary: Verify durable-task telemetry, explicit missing-route reporting, and correct
+    batched question counts per caller.
+  rationale: Ensure the worker artifact reports useful counts without overcounting
+    batch members or claiming complete coverage.
+- path: tests/test_workrr_procedrr.py
+  type: modified
+  span:
+    start_line: 154
+    end_line: 173
+  summary: Verify retry attempts share a logical interaction ID while repeated identical
+    prompts remain distinct interactions.
+  rationale: Keep transport retries separate from repeated logical requests.
+- path: tests/test_workrr_procedrr.py
+  type: modified
+  span:
+    start_line: 175
+    end_line: 175
+  summary: Verify retry attempts share a logical interaction ID while repeated identical
+    prompts remain distinct interactions.
+  rationale: Keep transport retries separate from repeated logical requests.
+- path: tests/test_workrr_procedrr.py
+  type: modified
+  span:
+    start_line: 177
+    end_line: 182
+  summary: Verify retry attempts share a logical interaction ID while repeated identical
+    prompts remain distinct interactions.
+  rationale: Keep transport retries separate from repeated logical requests.
 entities: []
 entity_relationships: []
 invariants: []

@@ -1,6 +1,6 @@
 # GitHub issue worker: LLM interaction and determinism audit
 
-Status: audited recommendations; no runtime changes implemented.
+Status: source-backed audit and proposed implementation work breakdown; no runtime changes implemented.
 
 Audited revision: `a3f4a6cb6173cec50daa39deef978496adb6905d`, fetched from
 `origin/main` on 2026-11-17. Source locations and prompt snapshots below refer to
@@ -582,43 +582,123 @@ independent semantic review.
 | CI observation, reproduction, contract preparation, candidate acceptance | CLI and CI service modules; a failed check alone does not trigger source research. |
 | Final status, checkpoints, issue comments and labels | Queue/runtime reconciliation; no model recall should be introduced. |
 
-## 11. Recommended removal sequence and verification criteria
+## 11. Proposed implementation sequence and verification gates
 
-1. **Publication without models (A16-A18).** Implement one typed renderer shared
-   by implementation and amendment publication. Test exact field preservation,
-   title shortening, all required sections, empty quality notes, command result
-   rendering and rejection of missing evidence. The entire publish path must run
-   with a client that raises on any unexpected inference call. Typed transport
-   errors must not trigger description generation.
-2. **Runtime-owned metadata (A01/A06/A08-A09/A13).** Resolve exact owners and emit
-   annotation/comment/coverage metadata algorithmically. Move fixed commands,
-   file inventory and submission serialization into the runtime. Separate exact
-   accepted membership from optional semantic adequacy. Preserve independent
-   verifier/sandbox and review requirements; reject ambiguity rather than infer.
-3. **Test review reduction (A03-A05).** Add typed boundary/observation adapters,
-   AST/provenance checks and negative controls. Eliminate mandatory second opinion
-   and standalone code suggestion; forward structured residual findings directly
-   to the independent author. Preserve explicit story adequacy coverage and unknown
-   outcomes. Measure requests by target/check/attempt, not just aggregate tokens.
-4. **Typed failure routing and plan deltas (A14-A15).** Carry failure reason and
-   discovery IDs from the producing gate. Deterministic cases compile to repair
-   operations; unknown semantic cases retain a bounded proposal/human decision.
-   Code copies unchanged plan fields and binds IDs/CAS/evidence.
-5. **Known corrections before synthesis (A02/A07/A20).** Register safe codemods,
-   formatters and generated-artifact repairs with exact applicability/scope and
-   postconditions. Do not bypass accepted test authoring to save calls.
-6. **Bound residual model work (A10-A12/B).** Prefer exact reviewed selectors and
-   executable invariants; cache complete evidence-bound semantic receipts. Keep
-   new semantics and insufficient evidence explicit. Stop generated orchestration
-   where a static process already describes the operation.
+This sequence turns the audit recommendations into independently reviewable
+work packages. It is still a proposal: no runtime changes are implemented or
+authorized by this document. Complete WP0 first so later decisions can be
+compared with observed request and retry counts rather than static estimates.
 
-These are recommendations, not implemented milestones. A later implementation
-plan should assign one independently reviewable change set per numbered item.
-Do not modify unrelated prompts under the guise of this documentation audit.
+0. **Establish a model-interaction baseline (all active IDs).** Add or verify a
+   trace record for each logical model interaction and wire attempt. Record the
+   fields listed in section 12, including caller/interaction ID, prompt-builder
+   version, task and attempt identity, evidence fingerprint, provider/model,
+   retry cause, cache/replay status, gate consumer, duration, and token/cost
+   values when the provider supplies them. Keep prompts, responses, and private
+   verifier evidence in their existing access-controlled stores; traces must not
+   expose credentials or copy private verifier content into general logs. Capture
+   representative non-story success, story-test, plan-defect/amendment, PR
+   publication-recovery, and CI-repair paths. Report logical requests separately
+   from transport retries and identify paths without usable traces. **Exit:** a
+   reviewer can reconstruct per-path request counts and retry causes from trace
+   IDs, and the baseline report marks missing or unobserved paths instead of
+   extrapolating them.
+
+1. **Render publication requests in code (A16-A18).** Use one typed renderer for
+   implementation and amendment publication. Test immutable field preservation,
+   title shortening, every required section, empty quality notes, command/result
+   rendering, and fail-closed behavior when evidence is missing. Exercise both
+   successful publication and recoverable publication-input failures with a
+   model client that fails on any unexpected call. Typed GitHub, network, and
+   authorization failures must not trigger description generation. **Exit:** the
+   publication path needs no judge to assemble or repair a description, and
+   publication identity and factual validation results are preserved.
+
+2. **Make accepted source-reference membership deterministic (A08-A09/A13).**
+   Compare accepted and observed edge sets in code; add or remove only exact
+   authorized annotations. Keep semantic owner adequacy (A10-A12) separate and
+   make contradictions or unknown ownership block or request review. Test exact
+   edge differences, source AST preservation, stale evidence, and fail-closed
+   ambiguity. **Exit:** exact membership decisions make no model calls, and no
+   accepted placement or semantic review gate is weakened.
+
+3. **Move coding-agent bookkeeping into the runtime (A06).** Move fixed command
+   selection, known file inventory, and completion-envelope serialization out of
+   the coding prompt. Keep exact accepted-edge comparison and annotation repair
+   in WP2 to avoid duplicating that scope. Preserve the independent verifier,
+   sandbox, candidate scope, and semantic implementation task. Compare emitted
+   metadata and command/evidence receipts with current behavior on representative
+   source-reference and no-reference tasks. **Exit:** known facts are supplied
+   from typed runtime state, and the coding agent cannot redefine paths, IDs,
+   commands, or acceptance evidence.
+
+4. **Define typed test-authoring requests and metadata (A01-A02).** Introduce
+   typed case requests carrying the reviewed public boundary, inputs, expected
+   observations, permitted substitutions, baseline policy, and assigned test
+   path. Derive test IDs, coverage links, manifests, and collection facts from
+   source/AST and actual test collection. Keep semantic test-body authoring for
+   unsupported forms, and route repair only for concrete semantic defects.
+   **Exit:** the author cannot choose its path, invent coverage IDs, classify its
+   own baseline, weaken accepted intent, or certify its own tests; existing
+   baseline policies remain valid.
+
+5. **Reduce per-test review calls (A03-A05).** Build on WP4's typed boundaries
+   and observations. Implement sound checks for registered AST/provenance forms
+   and negative controls; remove the mandatory duplicate opinion and separate
+   suggestion calls; send structured residual findings directly to the
+   independent author. Preserve story acceptance, explicit observation coverage,
+   and unknown/error outcomes. Test known positive/negative cases, unresolved
+   dynamic cases, unavailable review, and evidence changes. Use WP0 traces to
+   compare calls per target/check/attempt. **Exit:** only unresolved semantic
+   judgments reach a model or human, with no broader acceptance of story tests.
+
+6. **Route typed failures and compile plan deltas (A14-A15).** Carry reason codes,
+   discovery IDs, and evidence references from the producing gate. Compile known
+   deterministic defects into typed repair operations; retain bounded proposals
+   or human decisions for new semantic requirements. Have code select IDs, bind
+   compare-and-swap/evidence values, and copy unchanged plan fields. Test every
+   deterministic route, ambiguous/environment failures, invalid IDs, and
+   preservation of unrelated item fields. **Exit:** no failure is guessed into
+   a plan defect, and a proposal cannot overwrite unimplicated reviewed fields.
+
+7. **Apply registered corrections before synthesis (A07/A20).** Add formatters,
+   codemods, and generated-artifact repairs only when exact applicability,
+   scope, and postconditions are defined. Test no-op, stale evidence, protected
+   artifact, out-of-scope, and ambiguous execution cases. Retain model synthesis
+   for unsupported product-code defects; preserve immutable attempts, CI contract
+   checks, and remote re-observation. **Exit:** every automated correction is
+   selected and accepted by code-owned predicates, and unsupported cases stop
+   without widening scope.
+
+8. **Bound residual semantic review (A10-A12).** Prefer exact reviewed selectors
+   and executable invariants; cache only complete evidence-bound receipts, and
+   invalidate them when source, callers, catalog, or policy changes. Keep
+   insufficient evidence explicit and route it to review. Test receipt binding,
+   invalidation, and unknown outcomes. **Exit:** remaining model use is limited
+   to the semantic residual documented for each review purpose; it is never
+   represented as proof of behavioral equivalence.
+
+### Separate conditional track: optional and custom processes (B01-B05)
+
+Do not include these interactions in the default worker-removal sequence. B01
+and B03-B05 belong to generated/custom execution and explicitly selected CI
+research routes, not the normal bundled worker path. Use WP0 traces to confirm a
+route is active and its interaction family before proposing a change. Then make
+each active route its own work package with a named owner, exact supported
+process, deterministic boundary, and route-specific tests. In particular, do
+not replace a static process with generated orchestration, and do not let
+research output authorize edits. If a route is not used, document that decision
+instead of creating speculative implementation work.
+
+Each numbered WP should be one independently reviewable change set. Do not
+combine unrelated prompts or optional/custom paths merely to reduce PR count.
+Do not change prompts outside the listed interaction families under the guise
+of this audit.
 
 ## 12. Measurement and unresolved evidence
 
-Record role, exact prompt-builder version, task/item/attempt/candidate identity,
+WP0 establishes the trace and baseline deliverable. Record role, exact
+prompt-builder version, task/item/attempt/candidate identity,
 question/check ID, evidence IDs, model/provider, request/response artifact,
 logical activation versus wire attempts, retry reason, cache/replay hit and gate
 consumer. Redact credentials and keep private verifier data private. Count the

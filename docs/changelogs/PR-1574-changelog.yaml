@@ -1,0 +1,45 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1574
+title: Preserve PR prep validation error evidence
+intent:
+  problem: PR prep tool errors reached the validation gate but the resulting exception hid the original evidence; binary files could also break changelog context indexing.
+  goal: Show the structured validation error in the failure message and allow changelog indexing to handle tracked binary assets.
+human-decisions: []
+structured_files: []
+files:
+  - path: packages/service/src/powdrr_service/procedrr_evaluator/evaluator.py
+    type: modified
+    span: {start_line: 43, end_line: 43}
+    summary: Include validation gate evidence in the exception message.
+    rationale: Make the original PR prep tool error visible to the workflow operator.
+  - path: src/powdrr_lift/core/index.py
+    type: modified
+    span: {start_line: 1271, end_line: 1271}
+    summary: Compare byte output against an empty byte string when counting committed lines.
+    rationale: Correct empty-content handling for binary Git output.
+  - path: src/powdrr_lift/core/index.py
+    type: modified
+    span: {start_line: 1282, end_line: 1286}
+    summary: Count worktree lines from bytes so tracked binary files do not require UTF-8 decoding.
+    rationale: Keep binary assets from aborting provenance and changelog indexing.
+  - path: src/powdrr_lift/core/index.py
+    type: modified
+    span: {start_line: 1350, end_line: 1350}
+    summary: Replace undecodable bytes in textual Git output.
+    rationale: Prevent binary blame output from raising a Unicode decoding error.
+  - path: tests/test_change_log_template.py
+    type: modified
+    span: {start_line: 187, end_line: 215}
+    summary: Add a tracked binary file to a changelog template regression case.
+    rationale: Verify binary assets no longer prevent template generation.
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 107, end_line: 107}
+    summary: Assert that the gate exception message includes the original BrokenPipeError.
+    rationale: Ensure PR prep diagnostics remain visible after the gate raises.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []
+features: []
+proposed_prs: []

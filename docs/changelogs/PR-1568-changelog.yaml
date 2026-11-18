@@ -1,0 +1,18 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1568
+title: Audit planning model interactions and deterministic alternatives
+intent:
+  problem: Planning contains bounded semantic questions and retained older helpers without a consolidated source-backed inventory distinguishing necessary semantic proposals from algorithmic work and tracked state.
+  goal: Catalog active and dormant planning model requests with exact prompt and schema evidence, gate effects, retry and batch behavior, and concrete deterministic replacement recommendations.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/audits/planning-llm-audit.md
+  type: added
+  span: {start_line: 1, end_line: 6503}
+  summary: Audit planning question families, response fields, evidence, gating, retry behavior and deterministic alternatives, with exact source snapshots.
+  rationale: Extend the issue-worker audit format to planning while distinguishing active calls, dormant builders, older direct helpers and already deterministic mechanisms.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []

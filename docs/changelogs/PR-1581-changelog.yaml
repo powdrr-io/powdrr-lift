@@ -24,6 +24,11 @@ files:
     rationale: Report missing data explicitly and avoid extrapolating static call estimates.
   - path: packages/service/src/powdrr_service/local_service.py
     type: modified
+    span: {start_line: 354, end_line: 355}
+    summary: Omit task and attempt identity when the service request does not supply it.
+    rationale: Avoid presenting empty identity values as meaningful trace metadata.
+  - path: packages/service/src/powdrr_service/local_service.py
+    type: modified
     span: {start_line: 355, end_line: 359}
     summary: Pass task and attempt identity into quality-review tracing when available.
     rationale: Connect each per-test review interaction to its worker task and authoring attempt.

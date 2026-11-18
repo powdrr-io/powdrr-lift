@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+import yaml
 from powdrr_agent.execution.execute_pr_tests import run_generated_pytest
 from test_github_issue_plan_generation import (
     FakePlanningClient,
@@ -528,12 +529,26 @@ def test_reliable_plan_execution_scenario(
         authorization["candidate_content"][product_path]
         == hashlib.sha256(correction_candidate.encode()).hexdigest()
     )
-    assert _git(
+    published_paths = _git(
         verification_root,
         "diff",
         "--name-only",
         "main..refs/remotes/origin/powdrr/reliable-execution-scenario",
-    ).splitlines() == sorted(files_to_publish)
+    )
+    changelog_path = "docs/changelogs/PR-900-changelog.yaml"
+    assert published_paths.splitlines() == sorted([*files_to_publish, changelog_path])
+    changelog = yaml.safe_load(
+        _git(
+            verification_root,
+            "show",
+            f"refs/remotes/origin/powdrr/reliable-execution-scenario:{changelog_path}",
+        )
+    )
+    assert changelog["change_id"] == "PR-900"
+    assert {record["path"] for record in changelog["files"]} == {
+        product_path,
+        "docs/changelog/2026-11-15-scenario.yaml",
+    }
 
     scenario_report = {
         "outcomes": item_outcomes,

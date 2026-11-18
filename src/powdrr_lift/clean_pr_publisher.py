@@ -4,12 +4,17 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import shutil
 import subprocess
 import tempfile
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
+
+import yaml
+from powdrr_service.changelog import parse_change_log
+from powdrr_service.changelog.template import is_structured_document_path
 
 from powdrr_lift.errors import PowdrrExecutionError
 
@@ -387,6 +392,18 @@ def publish_clean_pull_request(
                 title=title,
                 body=body,
             )
+            _ensure_pull_request_changelog(
+                publication_root,
+                pull_request_url=url,
+                base=base,
+                title=title,
+                description_sections=(
+                    description_sections
+                    if isinstance(description_sections, Mapping)
+                    else None
+                ),
+                branch=branch,
+            )
             if intent_path is not None:
                 _complete_publication_intent(
                     intent_path,
@@ -404,6 +421,235 @@ def publish_clean_pull_request(
                 text=True,
                 check=False,
             )
+
+
+def _ensure_pull_request_changelog(
+    publication_root: Path,
+    *,
+    pull_request_url: str,
+    base: str,
+    title: str,
+    description_sections: Mapping[str, Any] | None,
+    branch: str,
+) -> None:
+    match = re.search(r"/pull/(\d+)(?:$|[?#])", pull_request_url)
+    if match is None:
+        raise PowdrrExecutionError(
+            "Cannot generate a changelog for invalid pull request URL: "
+            f"{pull_request_url!r}."
+        )
+    pr_number = match.group(1)
+    changelog_relative_path = f"docs/changelogs/PR-{pr_number}-changelog.yaml"
+    changelog_path = publication_root / changelog_relative_path
+    base_ref = _resolve_base_ref(publication_root, base)
+    changed_paths = [
+        path
+        for path in _run(
+            ["git", "diff", "--name-only", f"{base_ref}...HEAD"],
+            cwd=publication_root,
+        ).splitlines()
+        if path and not _is_pr_changelog_path(path)
+    ]
+
+    previous: Mapping[str, Any] = {}
+    if changelog_path.is_file():
+        try:
+            loaded = yaml.safe_load(changelog_path.read_text(encoding="utf-8"))
+        except (OSError, yaml.YAMLError) as error:
+            raise PowdrrExecutionError(
+                f"Existing PR changelog is unreadable: {changelog_path}: {error}"
+            ) from error
+        if not isinstance(loaded, Mapping):
+            raise PowdrrExecutionError(
+                f"Existing PR changelog must contain a mapping: {changelog_path}"
+            )
+        previous = loaded
+
+    previous_file_records = (
+        {
+            (
+                str(record.get("path")),
+                str(record.get("type")),
+                _span_pair(record.get("span")),
+            ): record
+            for record in previous.get("files", [])
+            if isinstance(record, Mapping)
+        }
+        if isinstance(previous.get("files", []), list)
+        else {}
+    )
+    files: list[dict[str, Any]] = []
+    structured_files: list[str] = []
+    objective_value = (
+        description_sections.get("objective")
+        if description_sections is not None
+        else None
+    )
+    objective = (
+        objective_value.strip()
+        if isinstance(objective_value, str) and objective_value.strip()
+        else title
+    )
+    for path in sorted(changed_paths):
+        if is_structured_document_path(path):
+            structured_files.append(path)
+            continue
+        existed = (
+            subprocess.run(
+                ["git", "cat-file", "-e", f"{base_ref}:{path}"],
+                cwd=publication_root,
+                capture_output=True,
+                check=False,
+            ).returncode
+            == 0
+        )
+        diff = subprocess.run(
+            [
+                "git",
+                "diff",
+                "--unified=0",
+                "--no-color",
+                f"{base_ref}...HEAD",
+                "--",
+                path,
+            ],
+            cwd=publication_root,
+            capture_output=True,
+            text=True,
+            errors="replace",
+            check=False,
+        )
+        if diff.returncode != 0:
+            detail = diff.stderr.strip() or diff.stdout.strip()
+            raise PowdrrExecutionError(
+                f"Could not inspect PR diff for changelog path {path!r}: {detail}"
+            )
+        spans = [
+            (int(hunk.group(1)), int(hunk.group(2) or "1"))
+            for line in diff.stdout.splitlines()
+            if (hunk := re.match(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@", line))
+        ]
+        # Binary files have no text hunk and are intentionally omitted from
+        # changelog file spans by the shared validator as well.
+        for start_line, line_count in spans:
+            if line_count == 0:
+                continue
+            file_type = "modified" if existed else "added"
+            span = {
+                "start_line": start_line,
+                "end_line": start_line + line_count - 1,
+            }
+            previous_record = previous_file_records.get(
+                (path, file_type, (start_line, start_line + line_count - 1))
+            )
+            files.append(
+                {
+                    "path": path,
+                    "type": file_type,
+                    "span": span,
+                    "summary": (
+                        previous_record.get("summary")
+                        if isinstance(previous_record, Mapping)
+                        and isinstance(previous_record.get("summary"), str)
+                        else f"Changed as part of {title}."
+                    ),
+                    "rationale": (
+                        previous_record.get("rationale")
+                        if isinstance(previous_record, Mapping)
+                        and isinstance(previous_record.get("rationale"), str)
+                        else objective
+                    ),
+                }
+            )
+
+    prior_intent = previous.get("intent")
+    intent = (
+        dict(prior_intent)
+        if isinstance(prior_intent, Mapping)
+        else {
+            "problem": f"The change described by {title!r} is not yet available.",
+            "goal": objective,
+        }
+    )
+    descriptor: dict[str, Any] = {
+        "schema": "https://powdrr.io/schema/changelog-v2",
+        "change_id": f"PR-{pr_number}",
+        "title": title,
+        "intent": intent,
+        "human-decisions": previous.get("human-decisions", []),
+        "structured_files": sorted(structured_files),
+        "files": files,
+    }
+    for section in (
+        "entities",
+        "entity_relationships",
+        "invariants",
+        "guidance",
+        "features",
+        "acceptance_criteria",
+        "proposed_prs",
+        "verification",
+    ):
+        descriptor[section] = previous.get(
+            section, [] if section != "verification" else {}
+        )
+
+    text = yaml.safe_dump(
+        descriptor,
+        allow_unicode=True,
+        default_flow_style=False,
+        sort_keys=False,
+    )
+    try:
+        parse_change_log(text)
+    except (TypeError, ValueError) as error:
+        raise PowdrrExecutionError(
+            f"Generated PR changelog is invalid: {error}"
+        ) from error
+    from powdrr_lift.change_log_validation import build_validation_report
+
+    validation = build_validation_report(
+        text,
+        branch_name="HEAD",
+        repo_root=publication_root,
+        default_branch=base_ref,
+    )
+    if not validation.validation_successful:
+        findings = "; ".join(issue.message for issue in validation.issues)
+        raise PowdrrExecutionError(
+            f"Generated PR changelog failed diff validation: {findings}"
+        )
+
+    changelog_path.parent.mkdir(parents=True, exist_ok=True)
+    changelog_path.write_text(text, encoding="utf-8")
+    _run(["git", "add", "--", changelog_relative_path], cwd=publication_root)
+    staged = _run(
+        ["git", "diff", "--cached", "--name-only"], cwd=publication_root
+    ).splitlines()
+    if staged and staged != [changelog_relative_path]:
+        raise PowdrrExecutionError(
+            f"PR changelog generation staged unexpected paths: {sorted(staged)!r}."
+        )
+    if staged:
+        _run(
+            ["git", "commit", "-m", f"Add PR-{pr_number} changelog descriptor"],
+            cwd=publication_root,
+        )
+        _run(["git", "push", "origin", branch], cwd=publication_root)
+
+
+def _span_pair(value: object) -> tuple[int, int] | None:
+    if not isinstance(value, Mapping):
+        return None
+    start_line = value.get("start_line")
+    end_line = value.get("end_line")
+    if isinstance(start_line, int) and isinstance(end_line, int):
+        return start_line, end_line
+    return None
+
+
+def _is_pr_changelog_path(path: str) -> bool:
+    return re.fullmatch(r"docs/changelogs/PR-\d+-changelog\.yaml", path) is not None
 
 
 def _persist_publication_intent(

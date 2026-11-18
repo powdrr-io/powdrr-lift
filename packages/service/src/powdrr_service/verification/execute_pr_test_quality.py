@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import hashlib
 import json
 import re
 import time
@@ -436,10 +437,12 @@ def review_execute_pr_test_quality(
     max_timeout_retries: int = 8,
     timeout_backoff_seconds: float = 10.0,
     suggest_tests: bool = True,
+    trace_context: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
     """Run advisory, per-test quality review with service-owned prompts and policy."""
     assessments: list[dict[str, Any]] = []
     suggestions: list[dict[str, str]] = []
+    interaction_trace: list[dict[str, Any]] = []
 
     for target in execute_pr_test_review_targets(suite_evidence):
         review_context = execute_pr_test_review_context(suite_evidence, target)
@@ -468,6 +471,11 @@ def review_execute_pr_test_quality(
             continue
         for check_id, question in checks:
             question_text = build_quality_question(question, review_context)
+            evidence_fingerprint = hashlib.sha256(
+                json.dumps(
+                    review_context, sort_keys=True, separators=(",", ":")
+                ).encode("utf-8")
+            ).hexdigest()
             messages = [
                 {"role": "system", "content": ""},
                 {"role": "user", "content": question_text},
@@ -484,9 +492,22 @@ def review_execute_pr_test_quality(
                 "repair_suggestion_requested": suggest_tests,
             }
             try:
-                decision = decision_client.complete_json(
-                    messages, response_schema=DECISION_SCHEMA
-                )
+                if trace_context:
+                    decision = _complete_json_traced(
+                        decision_client,
+                        messages,
+                        response_schema=DECISION_SCHEMA,
+                        trace=interaction_trace,
+                        trace_context=trace_context,
+                        role="decision",
+                        target=target,
+                        check_id=check_id,
+                        evidence_fingerprint=evidence_fingerprint,
+                    )
+                else:
+                    decision = decision_client.complete_json(
+                        messages, response_schema=DECISION_SCHEMA
+                    )
                 verdict = decision.get("shortcoming_present")
                 if not isinstance(verdict, bool):
                     raise ValueError(
@@ -510,6 +531,12 @@ def review_execute_pr_test_quality(
                         response_schema=OPINION_SCHEMA,
                         max_retries=max_timeout_retries,
                         backoff_seconds=timeout_backoff_seconds,
+                        trace=interaction_trace,
+                        trace_context=trace_context,
+                        role="opinion",
+                        target=target,
+                        check_id=check_id,
+                        evidence_fingerprint=evidence_fingerprint,
                     )
                     agrees = opinion.get("shortcoming_present")
                     if not isinstance(agrees, bool):
@@ -545,6 +572,12 @@ def review_execute_pr_test_quality(
                             response_schema=SUGGESTION_SCHEMA,
                             max_retries=max_timeout_retries,
                             backoff_seconds=timeout_backoff_seconds,
+                            trace=interaction_trace,
+                            trace_context=trace_context,
+                            role="suggestion",
+                            target=target,
+                            check_id=check_id,
+                            evidence_fingerprint=evidence_fingerprint,
                         )
                         normalized = {
                             key: str(suggestion.get(key, "")).strip()
@@ -575,6 +608,7 @@ def review_execute_pr_test_quality(
         "assessments": assessments,
         "suggestions": suggestions,
         "notes": execute_pr_test_quality_notes(assessments),
+        **({"interaction_trace": interaction_trace} if trace_context else {}),
         **(
             {"story_review_fingerprint": story_review_fingerprint(suite_evidence)}
             if suite_evidence.get("story_test_links")
@@ -590,16 +624,122 @@ def _complete_json_with_retry(
     response_schema: Mapping[str, Any],
     max_retries: int,
     backoff_seconds: float,
+    trace: list[dict[str, Any]] | None = None,
+    trace_context: Mapping[str, str] | None = None,
+    role: str | None = None,
+    target: Mapping[str, Any] | None = None,
+    check_id: str | None = None,
+    evidence_fingerprint: str | None = None,
 ) -> dict[str, Any]:
     retries = 0
     while True:
         try:
-            return client.complete_json(messages, response_schema=response_schema)
+            if trace is None or trace_context is None or role is None or target is None:
+                return client.complete_json(messages, response_schema=response_schema)
+            return _complete_json_traced(
+                client,
+                messages,
+                response_schema=response_schema,
+                trace=trace,
+                trace_context=trace_context,
+                role=role,
+                target=target,
+                check_id=check_id or "unknown",
+                evidence_fingerprint=evidence_fingerprint or "",
+            )
         except Exception as error:
             if not _retryable_quality_error(error) or retries >= max(0, max_retries):
                 raise
             retries += 1
             time.sleep(max(0.0, backoff_seconds) * (2 ** (retries - 1)))
+
+
+def _complete_json_traced(
+    client: JsonCompletionClient,
+    messages: list[dict[str, str]],
+    *,
+    response_schema: Mapping[str, Any],
+    trace: list[dict[str, Any]],
+    trace_context: Mapping[str, str],
+    role: str,
+    target: Mapping[str, Any],
+    check_id: str,
+    evidence_fingerprint: str,
+) -> dict[str, Any]:
+    interaction_id = ":".join(
+        (
+            trace_context.get("request_id", "quality-review"),
+            str(target.get("test_id", "unknown-test")),
+            check_id,
+            role,
+        )
+    )
+    previous_attempts = [
+        record for record in trace if record.get("interaction_id") == interaction_id
+    ]
+    attempt = len(previous_attempts) + 1
+    previous_error = next(
+        (
+            record.get("error_type")
+            for record in reversed(previous_attempts)
+            if record.get("outcome") == "error"
+        ),
+        None,
+    )
+    started = time.monotonic()
+    record: dict[str, Any] = {
+        "record_type": "powdrr_service.test_quality.provider_attempt",
+        "interaction_id": interaction_id,
+        "request_id": trace_context.get("request_id"),
+        "task_id": trace_context.get("task_id"),
+        "attempt_id": trace_context.get("attempt_id"),
+        "caller": "execute_pr_test_quality",
+        "role": role,
+        "gate_consumer": "story_test_quality_gate"
+        if trace_context.get("story_review") == "true"
+        else "advisory_test_quality_review",
+        "prompt_builder_version": "execute-pr-test-quality-v1",
+        "test_id": target.get("test_id"),
+        "criterion_ids": list(target.get("criterion_ids", [])),
+        "check_id": check_id,
+        "evidence_fingerprint": evidence_fingerprint,
+        "prompt_fingerprint": hashlib.sha256(
+            json.dumps(messages, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        ).hexdigest(),
+        "provider": getattr(client, "provider_name", None),
+        "model": getattr(client, "model", None),
+        "provider_call_attempt": attempt,
+        "retry_cause": (
+            f"retry after {previous_error}"
+            if previous_error
+            else "retry after prior provider call failure"
+            if attempt > 1
+            else None
+        ),
+        "replay_status": "unknown",
+        "usage": {},
+        "request_response_artifact_ref": None,
+    }
+    try:
+        response = client.complete_json(messages, response_schema=response_schema)
+    except Exception as error:
+        record.update(
+            {
+                "duration_ms": round((time.monotonic() - started) * 1000),
+                "outcome": "error",
+                "error_type": type(error).__name__,
+            }
+        )
+        trace.append(record)
+        raise
+    record.update(
+        {
+            "duration_ms": round((time.monotonic() - started) * 1000),
+            "outcome": "success",
+        }
+    )
+    trace.append(record)
+    return response
 
 
 def _retryable_quality_error(error: Exception) -> bool:

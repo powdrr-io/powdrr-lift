@@ -1,0 +1,123 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1572
+title: Trace MiniSWE inference interactions
+intent:
+  problem: MiniSWE model calls run inside a child worker and were absent from issue-worker model interaction telemetry.
+  goal: Persist redacted per-request MiniSWE records with task and attempt identity and include them in run telemetry summaries.
+human-decisions: []
+structured_files: []
+files:
+  - path: packages/local/src/powdrr_local/miniswe_inference.py
+    type: modified
+    span: {start_line: 5, end_line: 11}
+    summary: Import fingerprinting, timing, and trace persistence support.
+    rationale: Record inference metadata without storing prompt or response content.
+  - path: packages/local/src/powdrr_local/miniswe_inference.py
+    type: modified
+    span: {start_line: 23, end_line: 24}
+    summary: Version the MiniSWE session prompt builder.
+    rationale: Identify the prompt-construction route in each interaction record.
+  - path: packages/local/src/powdrr_local/miniswe_inference.py
+    type: modified
+    span: {start_line: 43, end_line: 164}
+    summary: Trace MiniSWE inference outcomes, model metadata, fingerprints, timings, and usage.
+    rationale: Make logical model requests and transport attempts attributable to their worker run while keeping content private.
+  - path: src/powdrr_lift/workrr/coding_agent.py
+    type: modified
+    span: {start_line: 38, end_line: 38}
+    summary: Import the MiniSWE inference trace wrapper.
+    rationale: Attach trace persistence at the parent-owned worker boundary.
+  - path: src/powdrr_lift/workrr/coding_agent.py
+    type: modified
+    span: {start_line: 1385, end_line: 1397}
+    summary: Bind each MiniSWE request trace to its implementation task and worker attempt.
+    rationale: Preserve task attribution across child-process inference IPC.
+  - path: src/powdrr_lift/workrr/run_artifacts.py
+    type: modified
+    span: {start_line: 289, end_line: 293}
+    summary: Load per-attempt MiniSWE inference records into run telemetry.
+    rationale: Include child-worker model requests in the generated aggregate report.
+  - path: src/powdrr_lift/workrr/run_artifacts.py
+    type: modified
+    span: {start_line: 297, end_line: 301}
+    summary: Aggregate MiniSWE and Procedrr provider attempts together.
+    rationale: Report logical calls and transport attempts across both model routes.
+  - path: src/powdrr_lift/workrr/run_artifacts.py
+    type: modified
+    span: {start_line: 306, end_line: 306}
+    summary: Group MiniSWE attempts by their interaction identity.
+    rationale: Count logical requests independently of transport attempts.
+  - path: src/powdrr_lift/workrr/run_artifacts.py
+    type: modified
+    span: {start_line: 309, end_line: 309}
+    summary: Group MiniSWE calls under their caller identity.
+    rationale: Keep per-model summaries attributable to the worker route.
+  - path: src/powdrr_lift/workrr/run_artifacts.py
+    type: modified
+    span: {start_line: 330, end_line: 330}
+    summary: Count logical MiniSWE interactions in per-model summaries.
+    rationale: Include worker inference in run-level provider call counts.
+  - path: tests/test_coding_agent.py
+    type: modified
+    span: {start_line: 472, end_line: 472}
+    summary: Provide a successful model response for the trace wiring test.
+    rationale: Exercise the wrapped handler without launching a real model request.
+  - path: tests/test_coding_agent.py
+    type: modified
+    span: {start_line: 552, end_line: 566}
+    summary: Verify MiniSWE worker inference writes task and attempt identifiers without prompt text.
+    rationale: Guard trace wiring and content redaction at the parent boundary.
+  - path: tests/test_local_miniswe_inference.py
+    type: modified
+    span: {start_line: 3, end_line: 3}
+    summary: Import JSON parsing for trace assertions.
+    rationale: Validate emitted trace records through the local service package.
+  - path: tests/test_local_miniswe_inference.py
+    type: modified
+    span: {start_line: 5, end_line: 5}
+    summary: Import path types for trace test fixtures.
+    rationale: Keep new tests compatible with strict type checking.
+  - path: tests/test_local_miniswe_inference.py
+    type: modified
+    span: {start_line: 9, end_line: 12}
+    summary: Import the trace wrapper for focused MiniSWE interaction tests.
+    rationale: Validate emitted trace records through the local service package.
+  - path: tests/test_local_miniswe_inference.py
+    type: modified
+    span: {start_line: 80, end_line: 143}
+    summary: Verify success and failure traces preserve metadata while excluding prompt and response content.
+    rationale: Keep the telemetry privacy boundary and provider outcome records covered.
+  - path: tests/test_minisweagent_environment.py
+    type: modified
+    span: {start_line: 4, end_line: 4}
+    summary: Import path joining for the subprocess environment fixture.
+    rationale: Expose current worktree package sources to the shared interpreter subprocess.
+  - path: tests/test_minisweagent_environment.py
+    type: modified
+    span: {start_line: 180, end_line: 180}
+    summary: Pass current Python import paths to the isolated MiniSWE environment test.
+    rationale: Run the source reader from the active worktree in the shared environment.
+  - path: tests/test_run_artifacts.py
+    type: modified
+    span: {start_line: 261, end_line: 297}
+    summary: Verify run telemetry counts MiniSWE interactions and token usage.
+    rationale: Keep the generated summary aligned with the newly persisted worker records.
+entities:
+  - id: miniswe-inference-interaction-tracing
+    type: Feature
+    action: added
+entity_relationships: []
+invariants:
+  - id: miniswe-telemetry-content-boundary
+    description: MiniSWE inference telemetry records interaction identity and fingerprints without prompt, response, or provider error message content.
+    action: added
+    rationale: Preserve auditability without copying private model inputs or outputs into generic telemetry.
+  - id: miniswe-run-summary-coverage
+    description: Run telemetry counts each MiniSWE interaction separately from its transport attempts.
+    action: added
+    rationale: Keep issue-worker model-call totals representative of both Procedrr and MiniSWE routes.
+guidance:
+  - id: persist-miniswe-inference-traces
+    description: Keep MiniSWE model inference behind the parent-side trace wrapper whenever diagnostics are enabled.
+    action: added
+    rationale: Maintain task attribution and redaction for future child-worker inference routes.

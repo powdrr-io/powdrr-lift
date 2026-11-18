@@ -1283,7 +1283,7 @@ def _read_worktree_line_count(repo_root: Path, path: str) -> int:
     # may also contain tracked binary assets. Count byte lines here so one
     # binary file cannot prevent index refresh or changelog generation.
     content = file_path.read_bytes()
-    if content == "":
+    if content == b"":
         return 0
 
     return len(content.splitlines())

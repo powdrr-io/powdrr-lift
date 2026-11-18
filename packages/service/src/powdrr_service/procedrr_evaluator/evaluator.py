@@ -40,7 +40,7 @@ class ValidationGateError(EvaluationError):
 
     def __init__(self, evidence: Any) -> None:
         self.evidence = evidence
-        super().__init__("validation gate failed")
+        super().__init__(f"validation gate failed: {_json_text(evidence)}")
 
 
 class SuspendEvaluation(Exception):

@@ -1,0 +1,409 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1590
+title: Bind planner batch answers by position
+intent:
+  problem: Combined planner requests ask the model to repeat known question IDs as answer-map keys even
+    though request order and identity are already tracked by code.
+  goal: Have the model return one schema-ordered answer per request and bind each position to its known
+    question ID in the scheduler.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/audits/planning-llm-audit.md
+  type: modified
+  span:
+    start_line: 4
+    end_line: 7
+  summary: Record deterministic batch answer ID binding as implemented.
+  rationale: Keep the planner LLM audit current with the schema-ordered response format and remaining
+    LLM work.
+- path: docs/audits/planning-llm-audit.md
+  type: modified
+  span:
+    start_line: 40
+    end_line: 46
+  summary: Record deterministic batch answer ID binding as implemented.
+  rationale: Keep the planner LLM audit current with the schema-ordered response format and remaining
+    LLM work.
+- path: docs/audits/planning-llm-audit.md
+  type: modified
+  span:
+    start_line: 461
+    end_line: 461
+  summary: Record deterministic batch answer ID binding as implemented.
+  rationale: Keep the planner LLM audit current with the schema-ordered response format and remaining
+    LLM work.
+- path: docs/audits/planning-llm-audit.md
+  type: modified
+  span:
+    start_line: 489
+    end_line: 490
+  summary: Record deterministic batch answer ID binding as implemented.
+  rationale: Keep the planner LLM audit current with the schema-ordered response format and remaining
+    LLM work.
+- path: packages/service/src/powdrr_service/planning/questions.py
+  type: modified
+  span:
+    start_line: 294
+    end_line: 294
+  summary: Use schema-ordered answer arrays and bind each member result to its request ID in code.
+  rationale: Remove a model-generated identity mapping while retaining member-specific schema checks and
+    deterministic batch splitting.
+- path: packages/service/src/powdrr_service/planning/questions.py
+  type: modified
+  span:
+    start_line: 315
+    end_line: 315
+  summary: Use schema-ordered answer arrays and bind each member result to its request ID in code.
+  rationale: Remove a model-generated identity mapping while retaining member-specific schema checks and
+    deterministic batch splitting.
+- path: packages/service/src/powdrr_service/planning/questions.py
+  type: modified
+  span:
+    start_line: 322
+    end_line: 325
+  summary: Use schema-ordered answer arrays and bind each member result to its request ID in code.
+  rationale: Remove a model-generated identity mapping while retaining member-specific schema checks and
+    deterministic batch splitting.
+- path: packages/service/src/powdrr_service/planning/questions.py
+  type: modified
+  span:
+    start_line: 331
+    end_line: 332
+  summary: Use schema-ordered answer arrays and bind each member result to its request ID in code.
+  rationale: Remove a model-generated identity mapping while retaining member-specific schema checks and
+    deterministic batch splitting.
+- path: packages/service/src/powdrr_service/planning/questions.py
+  type: modified
+  span:
+    start_line: 334
+    end_line: 334
+  summary: Use schema-ordered answer arrays and bind each member result to its request ID in code.
+  rationale: Remove a model-generated identity mapping while retaining member-specific schema checks and
+    deterministic batch splitting.
+- path: packages/service/src/powdrr_service/planning/questions.py
+  type: modified
+  span:
+    start_line: 336
+    end_line: 336
+  summary: Use schema-ordered answer arrays and bind each member result to its request ID in code.
+  rationale: Remove a model-generated identity mapping while retaining member-specific schema checks and
+    deterministic batch splitting.
+- path: packages/service/src/powdrr_service/planning/questions.py
+  type: modified
+  span:
+    start_line: 339
+    end_line: 340
+  summary: Use schema-ordered answer arrays and bind each member result to its request ID in code.
+  rationale: Remove a model-generated identity mapping while retaining member-specific schema checks and
+    deterministic batch splitting.
+- path: packages/service/src/powdrr_service/planning/questions.py
+  type: modified
+  span:
+    start_line: 343
+    end_line: 343
+  summary: Use schema-ordered answer arrays and bind each member result to its request ID in code.
+  rationale: Remove a model-generated identity mapping while retaining member-specific schema checks and
+    deterministic batch splitting.
+- path: packages/service/src/powdrr_service/planning/questions.py
+  type: modified
+  span:
+    start_line: 350
+    end_line: 350
+  summary: Use schema-ordered answer arrays and bind each member result to its request ID in code.
+  rationale: Remove a model-generated identity mapping while retaining member-specific schema checks and
+    deterministic batch splitting.
+- path: packages/service/src/powdrr_service/planning/questions.py
+  type: modified
+  span:
+    start_line: 357
+    end_line: 362
+  summary: Use schema-ordered answer arrays and bind each member result to its request ID in code.
+  rationale: Remove a model-generated identity mapping while retaining member-specific schema checks and
+    deterministic batch splitting.
+- path: packages/service/src/powdrr_service/planning/questions.py
+  type: modified
+  span:
+    start_line: 366
+    end_line: 366
+  summary: Use schema-ordered answer arrays and bind each member result to its request ID in code.
+  rationale: Remove a model-generated identity mapping while retaining member-specific schema checks and
+    deterministic batch splitting.
+- path: packages/service/src/powdrr_service/planning/questions.py
+  type: modified
+  span:
+    start_line: 369
+    end_line: 369
+  summary: Use schema-ordered answer arrays and bind each member result to its request ID in code.
+  rationale: Remove a model-generated identity mapping while retaining member-specific schema checks and
+    deterministic batch splitting.
+- path: packages/service/src/powdrr_service/planning/questions.py
+  type: modified
+  span:
+    start_line: 371
+    end_line: 371
+  summary: Use schema-ordered answer arrays and bind each member result to its request ID in code.
+  rationale: Remove a model-generated identity mapping while retaining member-specific schema checks and
+    deterministic batch splitting.
+- path: packages/service/src/powdrr_service/planning/questions.py
+  type: modified
+  span:
+    start_line: 381
+    end_line: 381
+  summary: Use schema-ordered answer arrays and bind each member result to its request ID in code.
+  rationale: Remove a model-generated identity mapping while retaining member-specific schema checks and
+    deterministic batch splitting.
+- path: packages/service/src/powdrr_service/planning/questions.py
+  type: modified
+  span:
+    start_line: 386
+    end_line: 389
+  summary: Use schema-ordered answer arrays and bind each member result to its request ID in code.
+  rationale: Remove a model-generated identity mapping while retaining member-specific schema checks and
+    deterministic batch splitting.
+- path: packages/service/src/powdrr_service/planning/questions.py
+  type: modified
+  span:
+    start_line: 397
+    end_line: 400
+  summary: Use schema-ordered answer arrays and bind each member result to its request ID in code.
+  rationale: Remove a model-generated identity mapping while retaining member-specific schema checks and
+    deterministic batch splitting.
+- path: packages/service/src/powdrr_service/planning/questions.py
+  type: modified
+  span:
+    start_line: 772
+    end_line: 776
+  summary: Use schema-ordered answer arrays and bind each member result to its request ID in code.
+  rationale: Remove a model-generated identity mapping while retaining member-specific schema checks and
+    deterministic batch splitting.
+- path: packages/service/src/powdrr_service/planning/questions.py
+  type: modified
+  span:
+    start_line: 780
+    end_line: 780
+  summary: Use schema-ordered answer arrays and bind each member result to its request ID in code.
+  rationale: Remove a model-generated identity mapping while retaining member-specific schema checks and
+    deterministic batch splitting.
+- path: packages/service/src/powdrr_service/planning/questions.py
+  type: modified
+  span:
+    start_line: 782
+    end_line: 784
+  summary: Use schema-ordered answer arrays and bind each member result to its request ID in code.
+  rationale: Remove a model-generated identity mapping while retaining member-specific schema checks and
+    deterministic batch splitting.
+- path: packages/service/src/powdrr_service/planning/questions.py
+  type: modified
+  span:
+    start_line: 789
+    end_line: 789
+  summary: Use schema-ordered answer arrays and bind each member result to its request ID in code.
+  rationale: Remove a model-generated identity mapping while retaining member-specific schema checks and
+    deterministic batch splitting.
+- path: packages/service/src/powdrr_service/planning/questions.py
+  type: modified
+  span:
+    start_line: 793
+    end_line: 803
+  summary: Use schema-ordered answer arrays and bind each member result to its request ID in code.
+  rationale: Remove a model-generated identity mapping while retaining member-specific schema checks and
+    deterministic batch splitting.
+- path: packages/service/src/powdrr_service/planning/questions.py
+  type: modified
+  span:
+    start_line: 805
+    end_line: 809
+  summary: Use schema-ordered answer arrays and bind each member result to its request ID in code.
+  rationale: Remove a model-generated identity mapping while retaining member-specific schema checks and
+    deterministic batch splitting.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 692
+    end_line: 694
+  summary: Checkpoint ordered batch answers under their original question IDs and route metrics by array
+    position.
+  rationale: Keep question identity and replay state owned by the service.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 696
+    end_line: 698
+  summary: Checkpoint ordered batch answers under their original question IDs and route metrics by array
+    position.
+  rationale: Keep question identity and replay state owned by the service.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 701
+    end_line: 703
+  summary: Checkpoint ordered batch answers under their original question IDs and route metrics by array
+    position.
+  rationale: Keep question identity and replay state owned by the service.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 707
+    end_line: 708
+  summary: Checkpoint ordered batch answers under their original question IDs and route metrics by array
+    position.
+  rationale: Keep question identity and replay state owned by the service.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 741
+    end_line: 753
+  summary: Checkpoint ordered batch answers under their original question IDs and route metrics by array
+    position.
+  rationale: Keep question identity and replay state owned by the service.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 755
+    end_line: 758
+  summary: Checkpoint ordered batch answers under their original question IDs and route metrics by array
+    position.
+  rationale: Keep question identity and replay state owned by the service.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 970
+    end_line: 970
+  summary: Checkpoint ordered batch answers under their original question IDs and route metrics by array
+    position.
+  rationale: Keep question identity and replay state owned by the service.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 974
+    end_line: 974
+  summary: Checkpoint ordered batch answers under their original question IDs and route metrics by array
+    position.
+  rationale: Keep question identity and replay state owned by the service.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 976
+    end_line: 977
+  summary: Checkpoint ordered batch answers under their original question IDs and route metrics by array
+    position.
+  rationale: Keep question identity and replay state owned by the service.
+- path: scripts/benchmark_planning_scale.py
+  type: modified
+  span:
+    start_line: 601
+    end_line: 601
+  summary: Emit batch fixture answers in request order.
+  rationale: Keep benchmark clients aligned with the planner batch contract.
+- path: scripts/benchmark_planning_scale.py
+  type: modified
+  span:
+    start_line: 610
+    end_line: 610
+  summary: Emit batch fixture answers in request order.
+  rationale: Keep benchmark clients aligned with the planner batch contract.
+- path: scripts/benchmark_planning_scale.py
+  type: modified
+  span:
+    start_line: 613
+    end_line: 613
+  summary: Emit batch fixture answers in request order.
+  rationale: Keep benchmark clients aligned with the planner batch contract.
+- path: tests/test_planning_questions.py
+  type: modified
+  span:
+    start_line: 356
+    end_line: 356
+  summary: Verify v2 ordered-array schemas, deterministic identity binding, and overflow subdivision.
+  rationale: Protect wrapper framing and member validation behavior.
+- path: tests/test_planning_questions.py
+  type: modified
+  span:
+    start_line: 360
+    end_line: 362
+  summary: Verify v2 ordered-array schemas, deterministic identity binding, and overflow subdivision.
+  rationale: Protect wrapper framing and member validation behavior.
+- path: tests/test_planning_questions.py
+  type: modified
+  span:
+    start_line: 377
+    end_line: 387
+  summary: Verify v2 ordered-array schemas, deterministic identity binding, and overflow subdivision.
+  rationale: Protect wrapper framing and member validation behavior.
+- path: tests/test_planning_questions.py
+  type: modified
+  span:
+    start_line: 389
+    end_line: 389
+  summary: Verify v2 ordered-array schemas, deterministic identity binding, and overflow subdivision.
+  rationale: Protect wrapper framing and member validation behavior.
+- path: tests/test_planning_questions.py
+  type: modified
+  span:
+    start_line: 409
+    end_line: 409
+  summary: Verify v2 ordered-array schemas, deterministic identity binding, and overflow subdivision.
+  rationale: Protect wrapper framing and member validation behavior.
+- path: tests/test_planning_questions.py
+  type: modified
+  span:
+    start_line: 440
+    end_line: 442
+  summary: Verify v2 ordered-array schemas, deterministic identity binding, and overflow subdivision.
+  rationale: Protect wrapper framing and member validation behavior.
+- path: tests/test_planning_questions.py
+  type: modified
+  span:
+    start_line: 462
+    end_line: 463
+  summary: Verify v2 ordered-array schemas, deterministic identity binding, and overflow subdivision.
+  rationale: Protect wrapper framing and member validation behavior.
+- path: tests/test_planning_questions.py
+  type: modified
+  span:
+    start_line: 468
+    end_line: 468
+  summary: Verify v2 ordered-array schemas, deterministic identity binding, and overflow subdivision.
+  rationale: Protect wrapper framing and member validation behavior.
+- path: tests/test_planning_questions.py
+  type: modified
+  span:
+    start_line: 470
+    end_line: 471
+  summary: Verify v2 ordered-array schemas, deterministic identity binding, and overflow subdivision.
+  rationale: Protect wrapper framing and member validation behavior.
+- path: tests/test_planning_questions.py
+  type: modified
+  span:
+    start_line: 493
+    end_line: 494
+  summary: Verify v2 ordered-array schemas, deterministic identity binding, and overflow subdivision.
+  rationale: Protect wrapper framing and member validation behavior.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 172
+    end_line: 173
+  summary: Verify ordered batch responses are checkpointed under each original question.
+  rationale: Protect service-level checkpoint identity and replay semantics.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 177
+    end_line: 177
+  summary: Verify ordered batch responses are checkpointed under each original question.
+  rationale: Protect service-level checkpoint identity and replay semantics.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 793
+    end_line: 793
+  summary: Verify ordered batch responses are checkpointed under each original question.
+  rationale: Protect service-level checkpoint identity and replay semantics.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []
+features: []
+proposed_prs: []

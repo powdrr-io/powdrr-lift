@@ -890,7 +890,7 @@ def test_native_fake_model_end_to_end_protects_private_inputs_and_validates_owne
     edit = (
         "from pathlib import Path; Path('retry.py').write_text(" + repr(candidate) + ")"
     )
-    completion = {"design_gaps": []}
+    completion: dict[str, Any] = {"design_gaps": []}
     commands = [
         "pwd; git rev-parse --show-toplevel",
         f"{shlex.quote(sys.executable)} -c {shlex.quote(probe)}",

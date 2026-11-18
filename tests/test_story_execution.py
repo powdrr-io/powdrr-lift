@@ -762,7 +762,7 @@ def test_protected_source_dispatch_proves_story_before_patch_transfer(
 
     def infer(request: ChatCompletionRequest) -> ChatCompletionResponse:
         calls.append(request)
-        completion = {"design_gaps": []}
+        completion: dict[str, Any] = {"design_gaps": []}
         edit = (
             "from pathlib import Path; Path('app.py').write_text("
             + repr(candidate_source)

@@ -1,0 +1,57 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1594
+title: Carry exact human setup requirements deterministically
+intent:
+  problem: The planner asks an LLM to restate human setup instructions that are already explicit in a single cited source anchor.
+  goal: Carry exact actionable setup text directly into the plan and use the configured validation command as its completion check.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/audits/planning-llm-audit.md
+  type: modified
+  span:
+    start_line: 54
+    end_line: 60
+  summary: Record the exact-source human setup optimization and its remaining semantic fallback cases.
+  rationale: Keep the planner LLM audit aligned with the behavior implemented for P05.
+- path: docs/audits/planning-llm-audit.md
+  type: modified
+  span:
+    start_line: 205
+    end_line: 205
+  summary: Update the P05 recommendation with the implemented deterministic setup case.
+  rationale: Distinguish exact imperative setup from wording that still needs semantic interpretation.
+- path: docs/audits/planning-llm-audit.md
+  type: modified
+  span:
+    start_line: 617
+    end_line: 622
+  summary: Update the planner implementation status for exact-source human setup.
+  rationale: Document which setup requests now bypass LLM restatement.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 980
+    end_line: 999
+  summary: Generate a deterministic answer for exact actionable human setup requirements.
+  rationale: Avoid asking the LLM to repeat known instructions and retain the model path when answer validation fails.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 2900
+    end_line: 2957
+  summary: Recognize narrowly scoped exact-source setup instructions and bind existing validation.
+  rationale: Preserve source wording and avoid inferring setup semantics beyond an explicit single-anchor imperative.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span:
+    start_line: 1071
+    end_line: 1145
+  summary: Verify exact actionable setup bypasses the description question and binds validation.
+  rationale: Protect deterministic answer recording, source traceability, and the generated completion check.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []
+features: []
+proposed_prs: []

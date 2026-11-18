@@ -1,0 +1,50 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1578
+title: Generate a changelog for direct PR creation
+intent:
+  problem: Pull requests created through the intrinsic GitHub tool could bypass the clean publisher and omit their required changelog.
+  goal: Ensure direct pull request creation also generates and validates the PR-numbered changelog before reporting success.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/intrinsic_git_gh.py
+    type: modified
+    span: {start_line: 110, end_line: 114}
+    summary: Generate a changelog when direct PR creation reuses an existing pull request.
+    rationale: Keep idempotent PR creation compliant with the changelog requirement.
+  - path: src/powdrr_lift/intrinsic_git_gh.py
+    type: modified
+    span: {start_line: 147, end_line: 163}
+    summary: Generate a changelog after direct PR creation and report a clear error when GitHub returns no URL.
+    rationale: Ensure newly created PRs receive a changelog using their URL as the PR identity.
+  - path: src/powdrr_lift/intrinsic_git_gh.py
+    type: modified
+    span: {start_line: 232, end_line: 249}
+    summary: Reuse the clean publisher's changelog generator for intrinsic PR creation.
+    rationale: Apply the same changelog validation and commit behavior across PR creation paths.
+  - path: tests/test_intrinsic_git_gh.py
+    type: modified
+    span: {start_line: 6, end_line: 6}
+    summary: Import typing support for recorded changelog call assertions.
+    rationale: Type the test data captured from the generator.
+  - path: tests/test_intrinsic_git_gh.py
+    type: modified
+    span: {start_line: 298, end_line: 305}
+    summary: Record the changelog generator call for existing PR creation.
+    rationale: Verify the idempotent path supplies the correct PR identity and branch.
+  - path: tests/test_intrinsic_git_gh.py
+    type: modified
+    span: {start_line: 319, end_line: 322}
+    summary: Stub the changelog generator in the existing PR creation test.
+    rationale: Isolate the intrinsic tool behavior while checking generator arguments.
+  - path: tests/test_intrinsic_git_gh.py
+    type: modified
+    span: {start_line: 332, end_line: 409}
+    summary: Cover generated changelogs for new and existing PRs and missing URL output.
+    rationale: Protect direct PR creation from silently omitting its changelog.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []
+features: []
+proposed_prs: []

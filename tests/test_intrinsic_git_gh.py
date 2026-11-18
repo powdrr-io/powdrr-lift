@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import subprocess
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -294,6 +295,14 @@ def test_empty_git_commit_is_an_idempotent_success(tmp_path: Path) -> None:
 def test_existing_pull_request_makes_create_idempotent(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    changelog_calls: list[dict[str, Any]] = []
+
+    def record_changelog(
+        _worktree_root: Path,
+        **arguments: Any,
+    ) -> None:
+        changelog_calls.append(arguments)
+
     def fake_run(args: list[str], **_: object) -> subprocess.CompletedProcess[str]:
         if args[:3] == ["git", "branch", "--show-current"]:
             return subprocess.CompletedProcess(args, 0, "workflow/demo\n", "")
@@ -307,6 +316,10 @@ def test_existing_pull_request_makes_create_idempotent(
         raise AssertionError(args)
 
     monkeypatch.setattr("powdrr_lift.intrinsic_git_gh.subprocess.run", fake_run)
+    monkeypatch.setattr(
+        "powdrr_lift.clean_pr_publisher._ensure_pull_request_changelog",
+        record_changelog,
+    )
     result = execute_intrinsic_git_gh_tool(
         "gh",
         {"operation": "pr_create", "title": "Title", "body": "Body"},
@@ -316,6 +329,84 @@ def test_existing_pull_request_makes_create_idempotent(
     assert result["returncode"] == 0
     assert result["no_op"] is True
     assert result["stdout"] == "https://github.com/example/repo/pull/7\n"
+    assert changelog_calls == [
+        {
+            "pull_request_url": "https://github.com/example/repo/pull/7",
+            "base": "main",
+            "title": "Title",
+            "description_sections": None,
+            "branch": "workflow/demo",
+        }
+    ]
+
+
+def test_new_intrinsic_pr_creation_generates_a_changelog(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    changelog_calls: list[dict[str, Any]] = []
+
+    def record_changelog(
+        _worktree_root: Path,
+        **arguments: Any,
+    ) -> None:
+        changelog_calls.append(arguments)
+
+    def fake_run(args: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+        if args[:3] == ["git", "branch", "--show-current"]:
+            return subprocess.CompletedProcess(args, 0, "workflow/new-pr\n", "")
+        if args[:3] == ["gh", "pr", "view"]:
+            return subprocess.CompletedProcess(args, 1, "", "not found")
+        if args[:3] == ["gh", "pr", "create"]:
+            return subprocess.CompletedProcess(
+                args, 0, "https://github.com/example/repo/pull/8\n", ""
+            )
+        raise AssertionError(args)
+
+    monkeypatch.setattr("powdrr_lift.intrinsic_git_gh.subprocess.run", fake_run)
+    monkeypatch.setattr(
+        "powdrr_lift.clean_pr_publisher._ensure_pull_request_changelog",
+        record_changelog,
+    )
+
+    result = execute_intrinsic_git_gh_tool(
+        "gh",
+        {"operation": "pr_create", "title": "New PR", "body": "Summary"},
+        worktree_root=tmp_path,
+    )
+
+    assert result["returncode"] == 0
+    assert result["stdout"] == "https://github.com/example/repo/pull/8\n"
+    assert changelog_calls == [
+        {
+            "pull_request_url": "https://github.com/example/repo/pull/8",
+            "base": "main",
+            "title": "New PR",
+            "description_sections": None,
+            "branch": "workflow/new-pr",
+        }
+    ]
+
+
+def test_new_intrinsic_pr_creation_requires_returned_url(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def fake_run(args: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+        if args[:3] == ["git", "branch", "--show-current"]:
+            return subprocess.CompletedProcess(args, 0, "workflow/new-pr\n", "")
+        if args[:3] == ["gh", "pr", "view"]:
+            return subprocess.CompletedProcess(args, 1, "", "not found")
+        if args[:3] == ["gh", "pr", "create"]:
+            return subprocess.CompletedProcess(args, 0, "", "")
+        raise AssertionError(args)
+
+    monkeypatch.setattr("powdrr_lift.intrinsic_git_gh.subprocess.run", fake_run)
+
+    with pytest.raises(PowdrrExecutionError, match="did not return its URL"):
+        execute_intrinsic_git_gh_tool(
+            "gh",
+            {"operation": "pr_create", "title": "New PR", "body": "Summary"},
+            worktree_root=tmp_path,
+        )
 
 
 def test_review_thread_query_collects_every_page(

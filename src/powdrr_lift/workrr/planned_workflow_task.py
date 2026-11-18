@@ -46,7 +46,7 @@ class PlannedWorkflowTaskOptions:
     opencode_executable: str = "opencode"
     opencode_model: str | None = None
     minisweagent_executable: str = "mini"
-    minisweagent_model: str = "deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731"
+    minisweagent_model: str = "deepinfra/deepseek-ai/DeepSeek-V4.1-Flash-1017"
     coding_agent_timeout_seconds: float = 1800.0
     coding_agent_validation_timeout_seconds: float = 1800.0
     coding_agent_recovery_attempts: int = 3

@@ -1914,7 +1914,9 @@ def test_workrr_feature_cli_builds_endpoint_config(
     assert config.allowed_paths == ("src/app.py", "tests/test_app.py")
     assert config.validation_command == ("python", "-m", "pytest")
     assert config.code_agent == "minisweagent"
-    assert config.minisweagent_model == ("deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731")
+    assert config.minisweagent_model == (
+        "deepinfra/deepseek-ai/DeepSeek-V4.1-Flash-1017"
+    )
     assert config.open_pr is False
 
 
@@ -1964,7 +1966,9 @@ def test_harbor_feature_cli_uses_in_place_endpoint(
     assert config.allowed_paths == (".",)
     assert config.validation_command == ("python", "-m", "pytest")
     assert config.code_agent == "minisweagent"
-    assert config.minisweagent_model == ("deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731")
+    assert config.minisweagent_model == (
+        "deepinfra/deepseek-ai/DeepSeek-V4.1-Flash-1017"
+    )
     assert config.open_pr is False
     assert config.push_changes is False
     assert config.benchmark_mode is False

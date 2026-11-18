@@ -34,7 +34,7 @@ POWDRR_VERSION = "0.1.0"
 OPENCODE_VERSION = "1.18.31"
 MINISWEAGENT_VERSION = "2.4.6"
 MINISWEAGENT_REQUESTS_VERSION = "2.34.2"
-MINISWEAGENT_MODEL = "deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731"
+MINISWEAGENT_MODEL = "deepinfra/deepseek-ai/DeepSeek-V4.1-Flash-1017"
 
 
 class PowdrrAgent(BaseInstalledAgent):
@@ -232,7 +232,7 @@ class PowdrrAgent(BaseInstalledAgent):
             command.extend(
                 (
                     "--opencode-model",
-                    "deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731",
+                    "deepinfra/deepseek-ai/DeepSeek-V4.1-Flash-1017",
                 )
             )
         minisweagent_executable = self._get_env("POWDRR_MINISWEAGENT_EXECUTABLE")

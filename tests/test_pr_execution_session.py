@@ -75,7 +75,7 @@ def test_worker_adapter_passes_typed_configuration_to_existing_queue(
             context_compaction_threshold=9000,
             verbose=True,
             code_agent="minisweagent",
-            minisweagent_model="deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731",
+            minisweagent_model="deepinfra/deepseek-ai/DeepSeek-V4.1-Flash-1017",
             coding_agent_timeout_seconds=120,
             coding_agent_validation_timeout_seconds=240,
         ),
@@ -106,7 +106,9 @@ def test_worker_adapter_passes_typed_configuration_to_existing_queue(
     assert options.max_roundtrips == 12
     assert options.context_compaction_threshold == 9000
     assert options.verbose is True
-    assert options.minisweagent_model == "deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731"
+    assert (
+        options.minisweagent_model == "deepinfra/deepseek-ai/DeepSeek-V4.1-Flash-1017"
+    )
     assert options.coding_agent_timeout_seconds == 120
     assert options.coding_agent_validation_timeout_seconds == 240
     assert task["stdout"] is stdout

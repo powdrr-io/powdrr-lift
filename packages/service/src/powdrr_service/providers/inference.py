@@ -5,18 +5,25 @@ from __future__ import annotations
 import json
 import os
 from collections.abc import Mapping
+from dataclasses import replace
 from typing import Protocol
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from powdrr_contracts.models import ChatCompletionRequest, ChatCompletionResponse
 
-from powdrr_service.providers.config import ISOQUANT_MODEL, provider_definition
+from powdrr_service.providers.config import (
+    DEEPINFRA_CHEAP_BACKUP_MODEL,
+    DEEPINFRA_CHEAP_MODEL,
+    ISOQUANT_MODEL,
+    provider_definition,
+)
 from powdrr_service.providers.errors import (
     ProviderClientError,
     ProviderHTTPError,
     ProviderResponseError,
 )
+from powdrr_service.providers.model_failover import ModelBusyFailover
 
 DEFAULT_DEEPINFRA_CHAT_COMPLETIONS_URL = (
     "https://api.deepinfra.com/v1/openai/chat/completions"
@@ -129,6 +136,22 @@ class OpenAIInferenceClient:
 
 class DeepInfraInferenceClient(OpenAIInferenceClient):
     """Forward chat completions to DeepInfra with service-held credentials."""
+
+    def __init__(self, **kwargs: object) -> None:
+        super().__init__(**kwargs)
+        self._model_failover = ModelBusyFailover()
+
+    def complete(self, request: ChatCompletionRequest) -> ChatCompletionResponse:
+        model = request.model.removeprefix("deepinfra/")
+        if model.casefold() != DEEPINFRA_CHEAP_MODEL.casefold():
+            return super().complete(request)
+        return self._model_failover.run(
+            lambda selected: super(DeepInfraInferenceClient, self).complete(
+                replace(request, model=f"deepinfra/{selected}")
+            ),
+            primary_model=DEEPINFRA_CHEAP_MODEL,
+            backup_model=DEEPINFRA_CHEAP_BACKUP_MODEL,
+        )
 
 
 class IsoquantInferenceClient(OpenAIInferenceClient):

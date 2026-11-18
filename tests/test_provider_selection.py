@@ -51,7 +51,7 @@ def test_explicit_mapping_provider_wins_over_provider_override() -> None:
 
 def test_forced_provider_model_wins_over_configured_default() -> None:
     assert initial_model_for_provider("deepinfra-cheap", DEFAULT_MODEL) == (
-        "deepseek-ai/DeepSeek-V4-Flash-0731"
+        "deepseek-ai/DeepSeek-V4.1-Flash-1017"
     )
 
 

@@ -296,10 +296,10 @@ class FeatureEndpointConfig:
     validation_command: tuple[str, ...] = ()
     base_branch: str = "main"
     opencode_executable: str = "opencode"
-    opencode_model: str = "deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731"
+    opencode_model: str = "deepinfra/deepseek-ai/DeepSeek-V4.1-Flash-1017"
     code_agent: str = "minisweagent"
     minisweagent_executable: str = "mini"
-    minisweagent_model: str | None = "deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731"
+    minisweagent_model: str | None = "deepinfra/deepseek-ai/DeepSeek-V4.1-Flash-1017"
     code_agent_prompt_prefix: str = ""
     code_agent_prompt_suffix: str = ""
     output_root: Path | None = None

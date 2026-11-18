@@ -57,8 +57,8 @@ MAX_COMPLETION_TOKENS = 32768
 DEFAULT_MODEL = "glm-5.2"
 DEFAULT_LLM_TYPE = "high_reasoning"
 QWEN_2_5_CODER_MODEL = "Qwen/Qwen2.5-Coder-14B-Instruct"
-DEEPINFRA_CHEAP_MODEL = "deepseek-ai/DeepSeek-V4-Flash-0731"
-DEEPINFRA_CHEAP_BACKUP_MODEL = "deepseek-ai/DeepSeek-V4-Flash"
+DEEPINFRA_CHEAP_MODEL = "deepseek-ai/DeepSeek-V4.1-Flash-1017"
+DEEPINFRA_CHEAP_BACKUP_MODEL = "deepseek-ai/DeepSeek-V4-Flash-0731"
 OPENROUTER_MODEL = "stealth/ox-alpha"
 ISOQUANT_MODEL = "deepseek-v4.1-flash-1017-fast"
 
@@ -85,6 +85,9 @@ ZAI_MODEL_LIMITS: Mapping[str, LLMModelLimits] = {
 }
 
 DEEPINFRA_MODEL_LIMITS: Mapping[str, LLMModelLimits] = {
+    "deepseek-ai/deepseek-v4.1-flash-1017": LLMModelLimits(
+        context_window=1_000_000, max_output_tokens=16_384
+    ),
     "deepseek-ai/deepseek-v4-pro": LLMModelLimits(
         context_window=1_000_000, max_output_tokens=16_384
     ),

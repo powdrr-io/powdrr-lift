@@ -75,6 +75,33 @@ from powdrr_lift.workrr.source_reference_validation import (
 
 POLICY = "structrr-source-reference-run-v1"
 CHECK_COMMAND = ("python", "-m", "powdrr_agent.execution.source_reader", "check")
+COMPLETION_SCHEMA = "structrr-reference-completion-v1"
+
+
+def _accepted_owner_inventory(contract: Mapping[str, Any]) -> list[dict[str, str]]:
+    """Render owner metadata from exact accepted selectors, not worker claims."""
+    records = [
+        *contract["obligations"],
+        *(
+            item
+            for item in contract["preservation"]
+            if item["disposition"] == "preserve"
+        ),
+    ]
+    identities = {
+        (
+            str(record["ref"]),
+            str(record["owner"]["path"]),
+            str(record["owner"]["kind"]),
+            str(record["owner"]["qualified_name"]),
+        )
+        for record in records
+        if record["owner"].get("binding") == "exact"
+    }
+    return [
+        {"ref": ref, "path": path, "kind": kind, "qualified_name": qualified_name}
+        for ref, path, kind, qualified_name in sorted(identities)
+    ]
 
 
 def _write_once(path: Path, value: Mapping[str, Any]) -> None:
@@ -1191,31 +1218,18 @@ class SourceReferenceRun:
                 "Source worker did not produce a submitted trajectory",
             )
         try:
-            completion = json.loads(messages[-1]["content"])
+            worker_report = json.loads(messages[-1]["content"])
         except (ValueError, TypeError) as error:
             raise SourceRunFailure(
                 "invalid_submission",
-                "Source completion must use the compiled JSON protocol",
+                "Source submission must contain a JSON design-gap report",
             ) from error
-        if (
-            not isinstance(completion, dict)
-            or set(completion) != {"schema_version", "reference_owners", "design_gaps"}
-            or completion["schema_version"] != "structrr-reference-completion-v1"
-        ):
+        if not isinstance(worker_report, dict) or set(worker_report) != {"design_gaps"}:
             raise SourceRunFailure(
                 "invalid_submission",
-                "Source completion schema does not match the immutable prompt",
+                "Source design-gap report does not match the worker protocol",
             )
-        claims, gaps = completion["reference_owners"], completion["design_gaps"]
-        if not isinstance(claims, list) or any(
-            not isinstance(c, dict)
-            or set(c) != {"ref", "path", "kind", "qualified_name"}
-            or any(not isinstance(v, str) or not v.strip() for v in c.values())
-            for c in claims
-        ):
-            raise SourceRunFailure(
-                "invalid_submission", "Source owner claims are malformed"
-            )
+        gaps = worker_report["design_gaps"]
         if not isinstance(gaps, list) or any(
             not isinstance(g, dict)
             or set(g) != {"location", "consequence"}
@@ -1225,6 +1239,13 @@ class SourceReferenceRun:
             raise SourceRunFailure(
                 "invalid_submission", "Source design gaps are malformed"
             )
+        contract = self.handoff.worker_prompt.to_data()["contract"]
+        claims = _accepted_owner_inventory(contract)
+        completion = {
+            "schema_version": COMPLETION_SCHEMA,
+            "reference_owners": claims,
+            "design_gaps": gaps,
+        }
         self.completion, self.claims = completion, tuple(claims)
         if gaps:
             raise SourceRunFailure(

@@ -762,18 +762,7 @@ def test_protected_source_dispatch_proves_story_before_patch_transfer(
 
     def infer(request: ChatCompletionRequest) -> ChatCompletionResponse:
         calls.append(request)
-        completion = {
-            "schema_version": "structrr-reference-completion-v1",
-            "reference_owners": [
-                {
-                    "ref": "feature:resume",
-                    "path": "app.py",
-                    "kind": "function",
-                    "qualified_name": "resume",
-                }
-            ],
-            "design_gaps": [],
-        }
+        completion = {"design_gaps": []}
         edit = (
             "from pathlib import Path; Path('app.py').write_text("
             + repr(candidate_source)

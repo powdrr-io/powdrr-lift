@@ -858,18 +858,7 @@ def test_native_dispatch_validates_before_applying_candidate(
             (repo / "twice.py").write_text("concurrent parent edit\n")
         if scenario == "preexisting_parent_no_progress":
             assert (candidate / "twice.py").read_text() == BASELINE
-        completion = {
-            "schema_version": "structrr-reference-completion-v1",
-            "reference_owners": [
-                {
-                    "ref": "feature:twice",
-                    "path": "twice.py",
-                    "kind": "function",
-                    "qualified_name": "twice",
-                }
-            ],
-            "design_gaps": [],
-        }
+        completion = {"design_gaps": []}
         edit = (
             "from pathlib import Path; Path('twice.py').write_text("
             + repr(CANDIDATE)

@@ -35,8 +35,8 @@ from powdrr_service.structrr.reference_definitions import (
     validate_reference_id,
 )
 
-COMPILER_REVISION = "structrr-source-reference-handoff-v1"
-PROMPT_SCHEMA = "minisweagent-source-reference-prompt-v1"
+COMPILER_REVISION = "structrr-source-reference-handoff-v2"
+PROMPT_SCHEMA = "minisweagent-source-reference-prompt-v2"
 MANIFEST_SCHEMA = "source-reference-validation-manifest-v1"
 SECTIONS = (
     "Objective",
@@ -49,16 +49,11 @@ SECTIONS = (
     "Completion protocol",
 )
 WORKER_INSTRUCTION = (
-    "Add the supplied Structrr IDs to the smallest declarations or blocks that own\n"
-    "their requirements, using the supplied annotation convention. Preserve and\n"
-    "relocate existing applicable references when moving code. Read referenced\n"
-    "context before changing the owner. Do not invent IDs, alter canonical intent,\n"
-    "or satisfy coverage by listing IDs in unrelated code. If an essential decision\n"
-    "or assumption is missing, report the gap with its location and consequence.\n"
-    "Run the local reference check before submitting. Report each implemented ID\n"
-    "and its owning path and qualified symbol. Run `git diff --check` and fix any\n"
-    "reported whitespace errors before submitting. "
-    "These claims are independently checked."
+    "Implement the accepted behavior requirements within the allowed paths. Read\n"
+    "relevant source context before changing code. Do not edit Structrr annotation\n"
+    "metadata; the runtime reconciles accepted references and runs their checks.\n"
+    "If an essential design decision or assumption is missing, report the gap with\n"
+    "its location and consequence. Do not commit or push."
 )
 _RELATIONSHIPS = {
     "implements": "feature",
@@ -534,55 +529,29 @@ def _render(contract: Mapping[str, Any]) -> str:
     workspace = contract.get("workspace_root")
     has_reference_intent = bool(contract["obligations"] or contract["preservation"])
     reference_guidance = (
-        WORKER_INSTRUCTION + "\n\nAnnotation grammar: # structrr: ID; "
-        "# structrr[module]: ID; # structrr[block]: ID. Place declaration markers "
-        "immediately above the owning declaration, before decorators. Module markers "
-        "belong in the module header. Block markers precede their owning statement.\n"
-        + _json({"baseline_reference_rules": contract["preservation"]})
+        WORKER_INSTRUCTION
+        + " Owner adequacy is assessed independently by the runtime; worker reports "
+        "never establish a passing binding."
         if has_reference_intent
         else (
-            "Implement the accepted behavior scenarios and verification commands "
-            "within the allowed paths. This design contains no source-reference "
-            "placement or preservation obligations; do not invent Structrr IDs or "
-            "add markers to unrelated code. Preserve existing repository behavior "
-            "outside the accepted scenarios. Run `git diff --check` and fix any "
-            "reported whitespace errors before submitting."
+            "Implement the accepted behavior requirements within the allowed paths. "
+            "This design has no source-reference placements. Do not edit Structrr "
+            "annotation metadata; the runtime handles it. Preserve existing "
+            "repository behavior outside the accepted scenarios. Do not commit or "
+            "push."
         )
     )
     completion_guidance = (
-        "Return control using the existing completion protocol. In the existing "
-        "submission report each reference ID, owning path, kind and qualified symbol; "
-        "include unresolved design gaps, their locations and consequences. Do not "
-        "write an additional repository artifact. Semantic owner selectors require "
-        "independent review; worker claims never establish a passing binding. "
-        "A design gap leaves the attempt incomplete and requires the normal design "
-        "workflow; the worker cannot approve its own amendment."
-        if has_reference_intent
-        else (
-            "Return control using the existing completion protocol. Report an empty "
-            "reference_owners list and include any unresolved design gaps, their "
-            "locations and consequences. Do not write an additional repository "
-            "artifact. The worker cannot approve its own amendment. The final Bash "
-            "command must submit completion JSON with no prose afterward: "
-            "printf '%s\\n' COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT "
-            '\'{"schema_version":"structrr-reference-completion-v1",'
-            '"reference_owners":[],"design_gaps":[]}\''
-        )
+        "Report only unresolved design gaps as JSON with one field, design_gaps, "
+        "whose value is a list of objects containing location and consequence. "
+        "Use an empty list when no gap remains. The runtime adds fixed completion "
+        "metadata and checks the result; a nonempty list blocks acceptance. Submit "
+        "with the existing completion sentinel followed by that JSON, and include "
+        "no prose afterward. For an empty list, run: printf '%s\\n' "
+        "COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT '{\"design_gaps\":[]}'"
     )
     if workspace:
-        completion_guidance += (
-            "\nSubmit a JSON object with "
-            "schema_version=structrr-reference-completion-v1, "
-            "reference_owners (a list of ref/path/kind/qualified_name objects), and "
-            "design_gaps (a list of location/consequence objects). The final Bash "
-            "command must execute printf '%s\\n' "
-            "COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT followed by that valid JSON, with "
-            "no prose or markdown afterward. For empty lists, use: printf '%s\\n' "
-            "COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT "
-            '\'{"schema_version":"structrr-reference-completion-v1",'
-            '"reference_owners":[],"design_gaps":[]}\'. Report every '
-            "unresolved gap; a nonempty list blocks acceptance. Do not commit or push."
-        )
+        completion_guidance += " Do not write an additional repository artifact."
     sections = (
         _json(contract["objective"]),
         _json(
@@ -604,31 +573,24 @@ def _render(contract: Mapping[str, Any]) -> str:
         ),
         _json(
             {
-                "placements": contract["obligations"],
-                "reference_metadata": [
-                    {
-                        key: value
-                        for key, value in definition.items()
-                        if key != "statement"
-                    }
-                    for definition in contract["definitions"]
+                "requirements": [
+                    item["requirement"] for item in contract["obligations"]
+                ]
+                + [
+                    next(
+                        definition["statement"]
+                        for definition in contract["definitions"]
+                        if definition["id"] == item["ref"]
+                    )
+                    for item in contract["preservation"]
+                    if item["disposition"] != "remove"
                 ],
                 "behavior_scenarios": contract["behavior_scenarios"],
-                "behavior_case_ids": contract["behavior_case_ids"],
             }
         ),
-        _json(
-            {
-                "verification_refs": sorted(
-                    {
-                        ref
-                        for o in contract["obligations"]
-                        for ref in o["verification_refs"]
-                    }
-                ),
-                "commands": contract["verification_commands"],
-            }
-        ),
+        "The runtime runs the accepted verification commands and records their "
+        "receipts after implementation. Do not claim a command passed unless its "
+        "result is present in the runtime-provided evidence.",
         reference_guidance,
         _json(contract["allowed_paths"]),
         _json(
@@ -652,15 +614,9 @@ def _render(contract: Mapping[str, Any]) -> str:
                     "LITERAL",
                     "PATH",
                 ],
-                "local_reference_check": contract["reference_check_command"],
             }
         )
-        + (
-            "\nLocal reference check is unavailable in this build. Report it as an "
-            "unresolved gap; do not claim reference validation passed."
-            if contract["reference_check_command"] is None
-            else ""
-        ),
+        + "\nThe runtime supplies source context and performs reference checks.",
         completion_guidance,
     )
     return (

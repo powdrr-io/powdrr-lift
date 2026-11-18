@@ -1068,6 +1068,81 @@ def test_explicit_human_setup_requirement_becomes_an_item_prerequisite() -> None
     assert setup.unblocks_validation_ids == (validation.id,)
 
 
+def test_exact_actionable_setup_anchor_skips_description_question() -> None:
+    text = "# Plan\n\nInstall the signed provider.\n"
+    source = segment_markdown_source(
+        PinnedSourceDocument(
+            repository="owner/repo",
+            commit_sha="a" * 40,
+            path="docs/plan.md",
+            blob_sha="b" * 40,
+            content_sha256=hashlib.sha256(text.encode()).hexdigest(),
+            text=text,
+        )
+    )
+    source_ref = next(
+        anchor.id
+        for anchor in source.anchors
+        if text[anchor.start_offset : anchor.end_offset]
+        == "Install the signed provider."
+    )
+    requirement = Requirement(
+        "req-0001",
+        "Install the signed provider.",
+        "human_setup",
+        (source_ref,),
+        (),
+        (),
+    )
+    ledger = SourceLedger((requirement,), ())
+    machine: Any = SourceLedgerQuestionMachine(source, plan_id="plan-01")
+
+    requests = machine._explicit_human_setup_requests(ledger, {})
+
+    assert requests == ()
+    deterministic = machine._pending_deterministic_answers[
+        "describe-human-setup-req-0001"
+    ]
+    assert deterministic["rule_id"] == "exact-source-human-setup-v1"
+    answer = deterministic["answer"]
+    assert answer["instructions"] == ["Install the signed provider."]
+    assert answer["source_refs"] == [source_ref]
+    machine._next_source_questions = lambda _answers: ()
+    machine.accepted_ledger = lambda _answers: ledger
+    derived_answers = machine.deterministic_answers({})
+    assert any(
+        result["question"].question_id == "describe-human-setup-req-0001"
+        and result["rule_id"] == "exact-source-human-setup-v1"
+        for result in derived_answers
+    )
+    validation = Validation(
+        "validation-0001",
+        "Run the verification command.",
+        "local_command",
+        "make test",
+        (requirement.id,),
+        (source_ref,),
+        (),
+    )
+    assembly = SimpleNamespace(
+        plan=SimpleNamespace(items=(SimpleNamespace(item_id="item-0001"),)),
+        item_unit_ids={"item-0001": ("unit-0001",)},
+        units=(SimpleNamespace(id="unit-0001", requirement_ids=(requirement.id,)),),
+    )
+
+    setups = machine._accepted_human_setups(
+        ledger,
+        {"describe-human-setup-req-0001": answer},
+        assembly,
+        validation,
+    )
+
+    setup, owner_item_id = setups[0]
+    assert owner_item_id == "item-0001"
+    assert setup.instructions == ("Install the signed provider.",)
+    assert setup.verification == "Run `make test` and confirm it passes."
+
+
 def test_file_structural_change_omits_unrelated_entity_identity_index() -> None:
     target_path = "attestation/scripts/verify-all.sh"
     subject = BoundStructuralSubject(

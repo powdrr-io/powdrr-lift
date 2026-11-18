@@ -796,7 +796,6 @@ def advance_planning_session(
     # run concurrently, but checkpoint heads never race.
     for result in accepted_results:
         uses_decision_client = result.question.kind in {
-            "review_structural_candidate",
             "review_dependency_candidate",
         }
         append_checkpoint(
@@ -882,7 +881,6 @@ def _run_question_batch(
 ) -> tuple[tuple[QuestionRequest[Any], Any, Exception | None], ...]:
     """Execute ready questions concurrently while keeping progress output ordered."""
     decision_question_kinds = {
-        "review_structural_candidate",
         "review_dependency_candidate",
     }
     decision_client = options.decision_client
@@ -909,7 +907,6 @@ def _run_question_batch(
         output = StringIO()
         started = time.monotonic()
         uses_decision_client = request.question.kind in {
-            "review_structural_candidate",
             "review_dependency_candidate",
         }
         request_client = (
@@ -1238,7 +1235,6 @@ def _question_phase(kind: str) -> str:
         return "dependency-and-pr-slicing"
     if kind in {
         "enumerate_structural_subjects",
-        "review_structural_candidate",
         "describe_structural_change",
         "check_validation_coverage",
     }:

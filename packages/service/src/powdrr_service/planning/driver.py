@@ -90,7 +90,6 @@ from powdrr_service.planning.structrr import (
     StructuralSubjectPage,
     _merge_code_evidence,
     bind_structural_operation,
-    build_structural_candidate_review_request,
     build_structural_change_request,
     build_subject_enumeration_request,
     coalesce_structural_subjects,
@@ -596,8 +595,7 @@ class SourceLedgerQuestionMachine:
         if self._max_question_frontier is not None:
             requests = requests[: self._max_question_frontier]
         if requests and all(
-            request.question.kind
-            in {"review_structural_candidate", "review_dependency_candidate"}
+            request.question.kind == "review_dependency_candidate"
             for request in requests
         ):
             return tuple(requests)
@@ -1946,7 +1944,6 @@ class SourceLedgerQuestionMachine:
                     tuple[tuple[str, str], ...],
                 ],
             ] = {}
-            pending_candidate_reviews: list[QuestionRequest[Any]] = []
             for item_id in ready_item_ids:
                 record = record_by_id[item_id]
                 units = tuple(record["units"])
@@ -1990,52 +1987,10 @@ class SourceLedgerQuestionMachine:
                     fallback_source_refs=source_refs,
                     basedpyright_symbols_by_path=item_symbols_by_path,
                 )
-                relevant_candidates: list[BoundStructuralSubject] = []
-                excluded_candidates: list[tuple[str, str]] = []
-                for candidate in deterministic_subjects:
-                    review = build_structural_candidate_review_request(
-                        candidate,
-                        source=self.source,
-                        units=units,
-                        projected_baseline=projected,
-                        baseline_index=baseline_index,
-                    )
-                    answer = accepted_answers.get(review.question.question_id)
-                    if (
-                        answer is not None
-                        and self._accepted_question_input_digests is not None
-                        and self._accepted_question_input_digests.get(
-                            review.question.question_id
-                        )
-                        != review.question.input_digest
-                    ):
-                        self._invalid_accepted_question_ids.add(
-                            review.question.question_id
-                        )
-                        answer = None
-                    if answer is None:
-                        pending_candidate_reviews.append(review)
-                        continue
-                    try:
-                        relevant = review.parse_answer(answer)
-                    except PlanningContractError:
-                        self._invalid_accepted_question_ids.add(
-                            review.question.question_id
-                        )
-                        pending_candidate_reviews.append(review)
-                        continue
-                    if relevant:
-                        relevant_candidates.append(candidate)
-                    else:
-                        excluded_candidates.append(
-                            (candidate.section, candidate.subject_id)
-                        )
                 candidate_subjects_by_item[item_id] = (
-                    tuple((*planned_file_subjects, *relevant_candidates)),
-                    tuple(excluded_candidates),
+                    tuple((*planned_file_subjects, *deterministic_subjects)),
+                    (),
                 )
-            if pending_candidate_reviews:
-                return self._batch_requests(pending_candidate_reviews)
 
             subjects_by_item: dict[str, tuple[BoundStructuralSubject, ...]] = {}
             pending_enumerations: list[QuestionRequest[Any]] = []

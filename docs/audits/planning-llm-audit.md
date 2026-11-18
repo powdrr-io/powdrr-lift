@@ -3,8 +3,9 @@
 Status: audited recommendations; the first removal milestone (P07/P09),
 deterministic source-extraction paging, deterministic work-unit proposal
 progression, deterministic runtime/component/validation and zero-or-one phase
-bindings, and deterministic batch answer-ID binding are implemented in the active
-planning path. Remaining work in milestones 2–6 is still proposed.
+bindings, deterministic batch answer-ID binding, and P11/P13 existing-subject
+review consolidation are implemented in the active planning path. Remaining work
+in milestones 2–6 is still proposed.
 
 Audited revision: `cfc0b514c43c1d14269147a03e5d7ec5ec5cc739`, fetched from
 `origin/main` on 2026-11-17. This is a static source audit, not a measured live
@@ -43,6 +44,12 @@ the corresponding supplied question ID and validates it with that member's
 schema. The model no longer repeats IDs as object keys. Batch contract v2 also
 versions the wrapper contract. Accepted member answers remain checkpointed under
 their original question identities.
+
+Structural-change update: deterministic existing entity and relationship
+candidates now go directly to one desired-delta request. The answer says unchanged
+or supplies desired content; code retains the candidate identity, action, item
+ownership, provenance, and operation binding. This removes the separate P11
+relevance call and avoids asking P13 only after a prior boolean answer.
 
 Structural subject update: answers now contain subject records only. The planner
 automatically requests another page when a response fills the eight-record
@@ -375,9 +382,9 @@ do not simply union unrelated IDs and pretend it proves relevance.
 | ID | Interaction / activation | Continue as LLM? | Why any residual semantic assistance is justified | Deterministic replacement / retained state |
 | --- | --- | --- | --- | --- |
 | P10 | Per-item test and seven-dimension behavior scenario design | Split / conditional | Creating a novel observable oracle from prose can require judgment; existing confirmed cases and behavior dimensions must be carried, not reinvented. | Compile supported typed cases/boundaries/fixtures into test plans; copy pinned cases and explicit dimensions; ask only for missing scenario/adapter semantics. Keep unknown dimensions unresolved rather than blanket not_applicable. |
-| P11 | Decision-provider relevance of existing entity/relationship candidate | Split | Path/symbol proximity alone does not decide semantic feature/relationship change. | Use exact typed planned semantic deltas and stable entity bindings; a true mechanical impact is direct, nearby-only cases are not. Retain semantic relevance review only for incomplete desired intent. |
+| P11 | Decision-provider relevance of existing entity/relationship candidate | Split | Path/symbol proximity alone does not decide semantic feature/relationship change. | Implemented together with P13: one desired-delta request returns unchanged or desired content for each deterministic candidate; code retains stable identity and ownership. |
 | P12 | Enumerate additional entity/relationship subjects beyond known deterministic candidates | Split / conditional | Novel conceptual entities and relationships may not be discoverable from syntax alone. | Diff explicit accepted entity intent and known schema/AST transformations first; code owns file subjects, existing IDs, source refs and page cursor. Model proposes only unrepresented semantic identities. |
-| P13 | Describe one bound subject's desired section content or unchanged | Split | New conceptual type/relationship meaning may require design. Existing types, endpoints and accepted target states should not be re-decided. | Canonical projection/patch generation for known fields; equality/diff/change classification in code; model proposes only missing desired semantic fields, never action/ID/item ownership. |
+| P13 | Describe one bound subject's desired section content or unchanged | Split | New conceptual type/relationship meaning may require design. Existing types, endpoints and accepted target states should not be re-decided. | Implemented with P11 for existing deterministic candidates: one request returns unchanged or the semantic desired delta. Code derives action, IDs, operation, projection, and ownership. New subjects still need semantic content proposals. |
 
 ### P10: every requested case and behavior field
 
@@ -605,8 +612,9 @@ check public API/test consumers explicitly; this audit changes none of them.
    source relations and scenario dimensions. Unknown meaning stops or goes to
    review rather than silently becoming context/not_applicable.
 4. **Compile formal dependency/structural cases.** Typed resource use and exact
-   planned deltas derive edges/operations. Combine genuinely residual relevance
-   and desired-content proposals only when doing so preserves authority/review.
+   planned deltas derive edges/operations. Existing deterministic candidate
+   relevance and desired-content proposals now share one validated request; new
+   subjects still need semantic content proposals.
    Test false path/name correlations, dynamic/partial symbol coverage, graph cycles,
    superseded source and contradictory projected states.
 5. **Improve coverage/oracle evidence before removing semantic reviews.** Use

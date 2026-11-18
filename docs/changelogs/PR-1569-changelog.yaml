@@ -1,0 +1,28 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1569
+title: Make issue worker audit plan actionable
+intent:
+  problem: The audit's removal sequence mixed unrelated responsibilities, omitted measurement as scheduled work, and grouped optional/custom interactions with the default worker path.
+  goal: Turn the recommendations into independently reviewable work packages with a measurement baseline, explicit verification gates, and a separate conditional track for optional routes.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/audits/github-issue-worker-llm-audit.md
+    type: modified
+    span: {start_line: 3, end_line: 3}
+    summary: Clarify that the document contains a proposed implementation work breakdown and no runtime changes.
+    rationale: Distinguish the audit and proposed sequence from active or completed implementation work.
+  - path: docs/audits/github-issue-worker-llm-audit.md
+    type: modified
+    span: {start_line: 585, end_line: 696}
+    summary: Define per-work-package scope, dependencies, verification cases, and exit criteria; move optional/custom interactions to a conditional track.
+    rationale: Make the recommendations independently reviewable while keeping non-default routes out of the worker implementation sequence.
+  - path: docs/audits/github-issue-worker-llm-audit.md
+    type: modified
+    span: {start_line: 700, end_line: 701}
+    summary: Tie the measurement evidence fields to the baseline work package.
+    rationale: Keep the exact trace fields and privacy limits available to the scheduled measurement work.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []

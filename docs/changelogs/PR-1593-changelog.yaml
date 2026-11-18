@@ -1,0 +1,217 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1593
+title: Combine structural candidate and delta review
+intent:
+  problem: Existing structural candidates required a boolean relevance request followed by a desired-content
+    request when relevant, repeating the same semantic judgment.
+  goal: Ask one validated desired-delta question per deterministic existing candidate and let its unchanged/change
+    result cover both relevance and content.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/audits/planning-llm-audit.md
+  type: modified
+  span:
+    start_line: 6
+    end_line: 8
+  summary: Record the consolidation of existing-subject relevance and desired-delta review.
+  rationale: Keep the planner LLM audit aligned with the single active semantic request and remaining
+    new-subject proposal work.
+- path: docs/audits/planning-llm-audit.md
+  type: modified
+  span:
+    start_line: 48
+    end_line: 53
+  summary: Record the consolidation of existing-subject relevance and desired-delta review.
+  rationale: Keep the planner LLM audit aligned with the single active semantic request and remaining
+    new-subject proposal work.
+- path: docs/audits/planning-llm-audit.md
+  type: modified
+  span:
+    start_line: 385
+    end_line: 385
+  summary: Record the consolidation of existing-subject relevance and desired-delta review.
+  rationale: Keep the planner LLM audit aligned with the single active semantic request and remaining
+    new-subject proposal work.
+- path: docs/audits/planning-llm-audit.md
+  type: modified
+  span:
+    start_line: 387
+    end_line: 387
+  summary: Record the consolidation of existing-subject relevance and desired-delta review.
+  rationale: Keep the planner LLM audit aligned with the single active semantic request and remaining
+    new-subject proposal work.
+- path: docs/audits/planning-llm-audit.md
+  type: modified
+  span:
+    start_line: 615
+    end_line: 617
+  summary: Record the consolidation of existing-subject relevance and desired-delta review.
+  rationale: Keep the planner LLM audit aligned with the single active semantic request and remaining
+    new-subject proposal work.
+- path: packages/service/src/powdrr_service/planning/contracts.py
+  type: modified
+  span:
+    start_line: 32
+    end_line: 32
+  summary: Remove the obsolete structural-candidate boolean question kind.
+  rationale: Prevent the retired P11-only interaction from remaining a supported planner contract.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 93
+    end_line: 93
+  summary: Carry deterministic existing candidates directly into the desired-change review.
+  rationale: Let the semantic response resolve unchanged versus changed once, while code retains candidate
+    identity and ownership.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 598
+    end_line: 598
+  summary: Carry deterministic existing candidates directly into the desired-change review.
+  rationale: Let the semantic response resolve unchanged versus changed once, while code retains candidate
+    identity and ownership.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 1949
+    end_line: 1949
+  summary: Carry deterministic existing candidates directly into the desired-change review.
+  rationale: Let the semantic response resolve unchanged versus changed once, while code retains candidate
+    identity and ownership.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 1993
+    end_line: 2032
+  summary: Carry deterministic existing candidates directly into the desired-change review.
+  rationale: Let the semantic response resolve unchanged versus changed once, while code retains candidate
+    identity and ownership.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 1991
+    end_line: 1992
+  summary: Carry deterministic existing candidates directly into the desired-change review.
+  rationale: Let the semantic response resolve unchanged versus changed once, while code retains candidate
+    identity and ownership.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 2037
+    end_line: 2038
+  summary: Carry deterministic existing candidates directly into the desired-change review.
+  rationale: Let the semantic response resolve unchanged versus changed once, while code retains candidate
+    identity and ownership.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 799
+    end_line: 799
+  summary: Remove structural-candidate boolean routing through the decision provider.
+  rationale: Route structural desired-delta decisions through the active structural-change contract only.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 885
+    end_line: 885
+  summary: Remove structural-candidate boolean routing through the decision provider.
+  rationale: Route structural desired-delta decisions through the active structural-change contract only.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 912
+    end_line: 912
+  summary: Remove structural-candidate boolean routing through the decision provider.
+  rationale: Route structural desired-delta decisions through the active structural-change contract only.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 1241
+    end_line: 1241
+  summary: Remove structural-candidate boolean routing through the decision provider.
+  rationale: Route structural desired-delta decisions through the active structural-change contract only.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 912
+    end_line: 1014
+  summary: Delete the redundant structural-candidate review request builder.
+  rationale: Keep one request builder for existing candidate relevance and desired content.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 472
+    end_line: 472
+  summary: Retain decision-provider checkpoint coverage for dependency candidates.
+  rationale: Protect the remaining P08 decision-provider route after removing the structural P11 route.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 474
+    end_line: 474
+  summary: Retain decision-provider checkpoint coverage for dependency candidates.
+  rationale: Protect the remaining P08 decision-provider route after removing the structural P11 route.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span:
+    start_line: 10
+    end_line: 10
+  summary: Verify existing candidates flow to one desired-delta request.
+  rationale: Protect combined unchanged/change semantics and ensure the boolean review interaction is
+    absent.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span:
+    start_line: 32
+    end_line: 32
+  summary: Verify existing candidates flow to one desired-delta request.
+  rationale: Protect combined unchanged/change semantics and ensure the boolean review interaction is
+    absent.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span:
+    start_line: 719
+    end_line: 719
+  summary: Verify existing candidates flow to one desired-delta request.
+  rationale: Protect combined unchanged/change semantics and ensure the boolean review interaction is
+    absent.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span:
+    start_line: 776
+    end_line: 776
+  summary: Verify existing candidates flow to one desired-delta request.
+  rationale: Protect combined unchanged/change semantics and ensure the boolean review interaction is
+    absent.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span:
+    start_line: 778
+    end_line: 779
+  summary: Verify existing candidates flow to one desired-delta request.
+  rationale: Protect combined unchanged/change semantics and ensure the boolean review interaction is
+    absent.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span:
+    start_line: 781
+    end_line: 784
+  summary: Verify existing candidates flow to one desired-delta request.
+  rationale: Protect combined unchanged/change semantics and ensure the boolean review interaction is
+    absent.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span:
+    start_line: 931
+    end_line: 987
+  summary: Verify existing candidates flow to one desired-delta request.
+  rationale: Protect combined unchanged/change semantics and ensure the boolean review interaction is
+    absent.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []
+features: []
+proposed_prs: []

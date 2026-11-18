@@ -2,8 +2,9 @@
 
 Status: audited recommendations; the first removal milestone (P07/P09),
 deterministic source-extraction paging, and deterministic work-unit proposal
-progression are implemented in the active planning path. Remaining work in
-milestones 2–6 is still proposed.
+progression, and deterministic bindings for known runtime, component, validation,
+and zero-or-one implementation phases are implemented in the active planning
+path. Remaining work in milestones 2–6 is still proposed.
 
 Audited revision: `cfc0b514c43c1d14269147a03e5d7ec5ec5cc739`, fetched from
 `origin/main` on 2026-11-17. This is a static source audit, not a measured live
@@ -29,16 +30,19 @@ Work-unit proposal update: the scheduler now creates one fixed request for each
 ordered group of at most four unresolved requirements. The model returns only
 semantic proposal records; the scheduler detects uncovered requirements and
 creates deterministic singleton follow-up requests. Proposal answers no longer
-contain `has_more` or `next_anchor`. The question contract is version 8, so old
-version 7 answers are not replayed.
+contain `has_more` or `next_anchor`. The question contract is version 9, so old
+version 8 answers are not replayed. Runtime, component, and validation IDs are
+bound from planned paths and supplied catalogs. The planner also derives an
+empty phase assignment when the source has no phase sequence, and the sole phase
+when exactly one is declared. Only sources with multiple phases ask the model to
+assign a proposal to one phase.
 
 Structural subject update: answers now contain subject records only. The planner
 automatically requests another page when a response fills the eight-record
 capacity, and stops after the first shorter response. The question contract is
-version 2. The model no longer chooses whether or where to continue. Copied
-runtime, component, and validation bindings, and other recommendations in
-milestone 2 remain unimplemented. The detailed request catalog below preserves
-the audited source snapshot and its historical schemas.
+version 2. The model no longer chooses whether or where to continue. The
+detailed request catalog below preserves the audited source snapshot and its
+historical schemas.
 
 ## 1. Answer to the central question
 
@@ -583,9 +587,11 @@ check public API/test consumers explicitly; this audit changes none of them.
    progression now uses fixed groups plus deterministic singleton supplements;
    proposal answers contain no cursor. Structural-subject enumeration now
    continues automatically after a full eight-record response and ends after a
-   shorter one. Remaining work: derive phase/runtime/component/validation
-   bindings. Verify no duplicate or skipped obligations, source-edit
-   invalidation, and oversized answers without lossy truncation across these paths.
+   shorter one. Runtime, component, and validation bindings are derived from
+   known path and catalog facts. Phase answers omit the field when it is absent
+   or has one possible value; choosing among multiple source phases remains a
+   semantic model decision. Verify no duplicate or skipped obligations,
+   source-edit invalidation, and oversized answers without lossy truncation.
 3. **Carry accepted semantics directly.** Typed source requirements, human setup,
    phases, cases and observations bypass rediscovery. Preserve conditional/Boolean
    source relations and scenario dimensions. Unknown meaning stops or goes to
@@ -607,9 +613,9 @@ check public API/test consumers explicitly; this audit changes none of them.
    Do not add a second planner to bypass deterministic compilation failures.
 
 The request catalog describes the audited revision, while milestones 1 and the
-source/work-unit/subject-pagination portions of milestone 2 are implemented in
-the current planner. Remaining milestone 2 work and milestones 3–6 remain
-recommendations.
+source/work-unit/subject-pagination and deterministic binding portions of
+milestone 2 are implemented in the current planner. Multi-phase assignment and
+milestones 3–6 remain recommendations.
 Later changes should be separately reviewable and retain pinned intent, private
 verification, full scenario closure and explicit human decision boundaries.
 

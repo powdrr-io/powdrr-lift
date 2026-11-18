@@ -91,7 +91,6 @@ WORK_UNIT_PROPOSAL_JSON_SCHEMA: dict[str, Any] = {
                 "additionalProperties": False,
                 "required": [
                     "requirement_ids",
-                    "implementation_phase_id",
                     "deliverable",
                     "planned_writes",
                     "implementation_step",
@@ -99,7 +98,6 @@ WORK_UNIT_PROPOSAL_JSON_SCHEMA: dict[str, Any] = {
                     "required_outputs",
                 ],
                 "properties": {
-                    "implementation_phase_id": {"type": ["string", "null"]},
                     "requirement_ids": {
                         "type": "array",
                         "minItems": 1,
@@ -379,13 +377,14 @@ def parse_work_unit_proposal(
     """Parse one proposal and bind all model references to supplied catalogs."""
     expected = {
         "requirement_ids",
-        "implementation_phase_id",
         "deliverable",
         "planned_writes",
         "implementation_step",
         "acceptance_criteria",
         "required_outputs",
     }
+    if len(context.implementation_phases) > 1:
+        expected.add("implementation_phase_id")
     _exact_fields(value, expected, "/")
     requirement_ids = _reference_list(
         value["requirement_ids"],
@@ -394,22 +393,19 @@ def parse_work_unit_proposal(
         minimum=1,
         maximum=MAX_WORK_UNIT_REQUIREMENTS_PER_PROPOSAL,
     )
-    raw_phase_id = value["implementation_phase_id"]
     phase_ids = {phase.id for phase in context.implementation_phases}
-    if context.implementation_phases:
+    if len(context.implementation_phases) > 1:
+        raw_phase_id = value["implementation_phase_id"]
         if not isinstance(raw_phase_id, str) or raw_phase_id not in phase_ids:
             raise PlanningContractError(
                 "/implementation_phase_id",
                 "must select one source-declared implementation phase",
             )
         implementation_phase_id: str | None = raw_phase_id
-    elif raw_phase_id is None:
-        implementation_phase_id = None
+    elif context.implementation_phases:
+        implementation_phase_id = context.implementation_phases[0].id
     else:
-        raise PlanningContractError(
-            "/implementation_phase_id",
-            "must be null when the source has no implementation PR sequence",
-        )
+        implementation_phase_id = None
     if len(context.component_ids) != 1:
         raise PlanningContractError(
             "/component", "component cannot be derived from the supplied catalog"
@@ -1094,13 +1090,13 @@ def build_work_unit_proposal_request(
         question_identity["maximum_proposals"] = maximum_proposals
     question_key = _digest(question_identity)[-12:]
     question = Question(
-        question_id=f"propose-units-v8-{requirement_ids[0]}-{question_key}",
+        question_id=f"propose-units-v9-{requirement_ids[0]}-{question_key}",
         kind="propose_work_units",
-        contract_version=8,
+        contract_version=9,
         subject_ids=tuple(requirement_ids),
-        input_digest=_digest({"schema_version": 8, **input_facts}),
+        input_digest=_digest({"schema_version": 9, **input_facts}),
         context_ref_ids=all_refs,
-        expected_answer_schema="work-unit-proposals-v8",
+        expected_answer_schema="work-unit-proposals-v9",
         attempt=1,
     )
     request_context = replace(
@@ -1121,10 +1117,13 @@ def build_work_unit_proposal_request(
     answer_schema["properties"]["records"]["maxItems"] = maximum_proposals
     record_properties = answer_schema["properties"]["records"]["items"]["properties"]
     record_properties["requirement_ids"]["items"]["enum"] = list(requirement_ids)
-    record_properties["implementation_phase_id"]["enum"] = [
-        *[phase.id for phase in context.implementation_phases],
-        *([None] if not context.implementation_phases else []),
-    ]
+    if len(context.implementation_phases) > 1:
+        record_schema = answer_schema["properties"]["records"]["items"]
+        record_schema["required"].append("implementation_phase_id")
+        record_properties["implementation_phase_id"] = {
+            "type": "string",
+            "enum": [phase.id for phase in context.implementation_phases],
+        }
     write_properties = record_properties["planned_writes"]["items"]["properties"]
     write_properties["requirement_ids"]["items"]["enum"] = list(requirement_ids)
     write_properties["requirement_ids"]["maxItems"] = (
@@ -1177,9 +1176,14 @@ def build_work_unit_proposal_request(
                 "implementation_phase_id to one supplied phase ID for every "
                 "proposal, follow the dependency table, and do not combine work "
                 "from different phases. "
-                if context.implementation_phases
-                else "Set implementation_phase_id to null because the source has "
-                "no explicit implementation PR sequence. "
+                if len(context.implementation_phases) > 1
+                else (
+                    "The planner assigns the only source-declared implementation "
+                    "phase to every proposal. "
+                    if context.implementation_phases
+                    else "The planner leaves phase assignment empty because the "
+                    "source has no explicit implementation PR sequence. "
+                )
             )
             + "Use pinned repository facts for paths whose runtime cannot be "
             "derived from their extension. Do not mix implementation runtimes. "
@@ -1411,6 +1415,15 @@ def build_unit_cohesion_request(
         "decision": "accept",
         "reason": "One runtime and one cohesive deliverable.",
     }
+    replacement_record_schema = deepcopy(
+        WORK_UNIT_PROPOSAL_JSON_SCHEMA["properties"]["records"]["items"]
+    )
+    if len(context.implementation_phases) > 1:
+        replacement_record_schema["required"].append("implementation_phase_id")
+        replacement_record_schema["properties"]["implementation_phase_id"] = {
+            "type": "string",
+            "enum": [phase.id for phase in context.implementation_phases],
+        }
     return QuestionRequest(
         question=question,
         exact_question=(
@@ -1455,9 +1468,7 @@ def build_unit_cohesion_request(
                             "type": "array",
                             "minItems": 2,
                             "maxItems": 4,
-                            "items": WORK_UNIT_PROPOSAL_JSON_SCHEMA["properties"][
-                                "records"
-                            ]["items"],
+                            "items": replacement_record_schema,
                         },
                         "reason": {
                             "type": "string",

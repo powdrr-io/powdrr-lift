@@ -29,6 +29,7 @@ from powdrr_service.providers.errors import (
     ProviderHTTPError,
     ProviderResponseError,
 )
+from powdrr_service.providers.model_failover import ModelBusyFailover
 from powdrr_service.providers.selection import provider_model_limits
 
 _DEFAULT_LOCAL_MODEL_CONTEXT = 24576
@@ -52,6 +53,38 @@ class ProviderClient(Protocol):
         *,
         response_schema: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]: ...
+
+
+class _FailoverProviderClient:
+    def __init__(
+        self,
+        primary: ProviderClient,
+        backup: ProviderClient,
+        primary_model: str,
+        backup_model: str,
+    ) -> None:
+        self._primary = primary
+        self._backup = backup
+        self._primary_model = primary_model
+        self._backup_model = backup_model
+        self._failover = ModelBusyFailover()
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._primary, name)
+
+    def complete_json(
+        self,
+        messages: list[dict[str, str]],
+        *,
+        response_schema: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        def complete(model: str) -> dict[str, Any]:
+            client = self._primary if model == self._primary_model else self._backup
+            return client.complete_json(messages, response_schema=response_schema)
+
+        return self._failover.run(
+            complete, primary_model=self._primary_model, backup_model=self._backup_model
+        )
 
 
 class OpenAIChatClient:
@@ -817,8 +850,7 @@ def build_provider_client(
             limits=limits,
             timeout=timeout,
         )
-    return OpenAIChatClient(
-        model=model,
+    client_options = dict(
         api_key=api_key,
         base_url=base_url,
         limits=limits,
@@ -836,6 +868,21 @@ def build_provider_client(
             else frozenset()
         ),
         timeout=timeout,
+    )
+    primary = OpenAIChatClient(model=model, **client_options)
+    if provider != "deepinfra-cheap":
+        return primary
+    from powdrr_service.providers.config import DEEPINFRA_CHEAP_BACKUP_MODEL
+
+    backup = OpenAIChatClient(
+        model=DEEPINFRA_CHEAP_BACKUP_MODEL,
+        **client_options,
+    )
+    return _FailoverProviderClient(
+        primary,
+        backup,
+        model,
+        DEEPINFRA_CHEAP_BACKUP_MODEL,
     )
 
 

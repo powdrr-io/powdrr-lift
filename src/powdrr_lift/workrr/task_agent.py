@@ -389,7 +389,7 @@ class WorkflowTaskAgentConfig:
     opencode_executable: str = "opencode"
     opencode_model: str | None = None
     minisweagent_executable: str = "mini"
-    minisweagent_model: str | None = "deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731"
+    minisweagent_model: str | None = "deepinfra/deepseek-ai/DeepSeek-V4.1-Flash-1017"
     coding_agent_timeout_seconds: float = DEFAULT_CODING_AGENT_TIMEOUT_SECONDS
     coding_agent_validation_timeout_seconds: float = (
         DEFAULT_CODING_AGENT_VALIDATION_TIMEOUT_SECONDS

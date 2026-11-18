@@ -527,7 +527,7 @@ def build_parser() -> argparse.ArgumentParser:
     github_issue_worker_parser.add_argument("--minisweagent-executable", default="mini")
     github_issue_worker_parser.add_argument(
         "--minisweagent-model",
-        default="deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731",
+        default="deepinfra/deepseek-ai/DeepSeek-V4.1-Flash-1017",
     )
     github_issue_worker_parser.add_argument(
         "--coding-agent-timeout-seconds",
@@ -591,7 +591,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     continue_issue_worker_parser.add_argument(
         "--minisweagent-model",
-        default="deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731",
+        default="deepinfra/deepseek-ai/DeepSeek-V4.1-Flash-1017",
     )
     continue_issue_worker_parser.add_argument(
         "--coding-agent-timeout-seconds",
@@ -871,7 +871,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     implement_parser.add_argument("--opencode-executable", default="opencode")
     implement_parser.add_argument(
-        "--opencode-model", default="deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731"
+        "--opencode-model", default="deepinfra/deepseek-ai/DeepSeek-V4.1-Flash-1017"
     )
     implement_parser.add_argument("--minisweagent-executable", default="mini")
     implement_parser.add_argument("--minisweagent-model")
@@ -1908,12 +1908,12 @@ def build_parser() -> argparse.ArgumentParser:
     workrr_feature_parser.add_argument("--opencode-executable", default="opencode")
     workrr_feature_parser.add_argument(
         "--opencode-model",
-        default="deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731",
+        default="deepinfra/deepseek-ai/DeepSeek-V4.1-Flash-1017",
     )
     workrr_feature_parser.add_argument("--minisweagent-executable", default="mini")
     workrr_feature_parser.add_argument(
         "--minisweagent-model",
-        default="deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731",
+        default="deepinfra/deepseek-ai/DeepSeek-V4.1-Flash-1017",
     )
     workrr_feature_parser.add_argument("--code-agent-prompt-prefix", default="")
     workrr_feature_parser.add_argument("--code-agent-prompt-suffix", default="")
@@ -1961,7 +1961,7 @@ def build_parser() -> argparse.ArgumentParser:
     harbor_feature_parser.add_argument("--opencode-executable", default="opencode")
     harbor_feature_parser.add_argument(
         "--opencode-model",
-        default="deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731",
+        default="deepinfra/deepseek-ai/DeepSeek-V4.1-Flash-1017",
     )
     harbor_feature_parser.add_argument(
         "--code-agent", choices=("opencode", "minisweagent"), default="minisweagent"
@@ -1969,7 +1969,7 @@ def build_parser() -> argparse.ArgumentParser:
     harbor_feature_parser.add_argument("--minisweagent-executable", default="mini")
     harbor_feature_parser.add_argument(
         "--minisweagent-model",
-        default="deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731",
+        default="deepinfra/deepseek-ai/DeepSeek-V4.1-Flash-1017",
     )
     harbor_feature_parser.add_argument("--code-agent-prompt-prefix", default="")
     harbor_feature_parser.add_argument("--code-agent-prompt-suffix", default="")
@@ -3899,7 +3899,7 @@ def _run_github_issue_worker(args: argparse.Namespace) -> int:
         minisweagent_model=getattr(
             args,
             "minisweagent_model",
-            "deepinfra/deepseek-ai/DeepSeek-V4-Flash-0731",
+            "deepinfra/deepseek-ai/DeepSeek-V4.1-Flash-1017",
         ),
         coding_agent_timeout_seconds=getattr(
             args, "coding_agent_timeout_seconds", 1800.0

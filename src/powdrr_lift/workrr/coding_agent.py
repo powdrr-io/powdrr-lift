@@ -35,6 +35,7 @@ from powdrr_agent.execution.minisweagent_monitor import (
 from powdrr_agent.execution.opencode_monitor import run_opencode
 from powdrr_contracts.ci import RepairContract
 from powdrr_contracts.models import ChatCompletionRequest, ChatCompletionResponse
+from powdrr_local.miniswe_inference import trace_miniswe_inference_handler
 from powdrr_local.structrr_context import StructrrContextBridge
 from powdrr_service.behavior_contract import BehaviorScenario
 from powdrr_service.intent_packet import IntentPacket
@@ -1381,7 +1382,19 @@ class MiniSWEAgentProvider:
                     timeout_seconds=self.timeout_seconds,
                     inference_parent=inference_parent,
                     inference_child=inference_child,
-                    inference_handler=self.inference_handler,
+                    inference_handler=(
+                        trace_miniswe_inference_handler(
+                            self.inference_handler,
+                            trace_path=(
+                                self.diagnostics_root
+                                / f"{attempt_id}.inference-attempts.jsonl"
+                            ),
+                            task_id=request.request_id,
+                            attempt_id=attempt_id,
+                        )
+                        if self.diagnostics_root is not None
+                        else self.inference_handler
+                    ),
                     on_snapshot=(
                         report_progress if self.progress_callback is not None else None
                     ),

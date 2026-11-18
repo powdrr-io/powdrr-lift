@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Any
@@ -176,6 +177,7 @@ def test_proxy_command_and_actual_formatter_keep_long_context(tmp_path: Path) ->
     ) as bridge:
         environment = StructrrLocalEnvironment(
             cwd=str(tmp_path),
+            env={"PYTHONPATH": os.pathsep.join(sys.path)},
             source_reference_mode="observe",
             source_context_endpoint=bridge.endpoint,
         )

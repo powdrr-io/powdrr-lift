@@ -469,7 +469,7 @@ def test_minisweagent_provider_uses_targeted_prompt_and_diagnostics(
     diagnostics = tmp_path / "diagnostics"
     progress_messages: list[str] = []
     provider = MiniSWEAgentProvider(
-        inference_handler=_unused_inference_handler,
+        inference_handler=lambda _: ChatCompletionResponse(content="ok"),
         executable="mini",
         model="openai/gpt-5",
         diagnostics_root=diagnostics,
@@ -549,6 +549,21 @@ def test_minisweagent_provider_uses_targeted_prompt_and_diagnostics(
     assert "DEEPINFRA_API_TOKEN" not in environment
     assert environment["POWDRR_MINISWE_INFERENCE_FD"]
     assert callable(kwargs["inference_handler"])
+    traced_handler = kwargs["inference_handler"]
+    assert callable(traced_handler)
+    traced_handler(
+        ChatCompletionRequest(
+            model="deepinfra/test-model",
+            messages=({"role": "user", "content": "private prompt"},),
+            request_id="ipc-request-1",
+        )
+    )
+    trace_path = diagnostics / "attempt-1.inference-attempts.jsonl"
+    trace = json.loads(trace_path.read_text(encoding="utf-8"))
+    assert trace["task_id"] == request.request_id
+    assert trace["attempt_id"] == "attempt-1"
+    assert trace["interaction_id"] == "ipc-request-1"
+    assert "private prompt" not in trace_path.read_text(encoding="utf-8")
     assert progress_messages == [
         "MiniSWE started.",
         "MiniSWE active (0m 10s elapsed; 2 model calls, 1 tool call).",

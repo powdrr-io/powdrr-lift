@@ -1,0 +1,36 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1595
+title: Handle collected PR prep validation results
+intent:
+  problem: PR preparation collected validation results as nested id and result objects, but publication rendering did not read that result shape and rejected the validation command.
+  goal: Render validation evidence from Procedrr's collected result so implementation PR preparation can continue after successful verification.
+human-decisions: []
+structured_files: []
+files:
+- path: src/powdrr_lift/clean_pr_publisher.py
+  type: modified
+  span:
+    start_line: 406
+    end_line: 406
+  summary: Read validation output from the collected result field.
+  rationale: Match the result shape emitted by Procedrr collection.
+- path: src/powdrr_lift/clean_pr_publisher.py
+  type: modified
+  span:
+    start_line: 411
+    end_line: 415
+  summary: Resolve validation commands from nested collected input IDs when absent from output.
+  rationale: Preserve validation evidence produced by the PR-preparation workflow.
+- path: tests/test_clean_pr_publisher.py
+  type: modified
+  span:
+    start_line: 258
+    end_line: 302
+  summary: Cover the exact Procedrr validation collection shape.
+  rationale: Prevent regressions that would block publication after successful verification.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []
+features: []
+proposed_prs: []

@@ -403,12 +403,16 @@ def _render_validation_results(value: object) -> str:
             raise PowdrrExecutionError(
                 f"Validation result {index + 1} must be an object."
             )
-        result = entry.get("validation_result", entry)
+        result = entry.get("validation_result", entry.get("result", entry))
         if not isinstance(result, Mapping):
             raise PowdrrExecutionError(
                 f"Validation result {index + 1} has no structured result."
             )
-        command = result.get("command", entry.get("id"))
+        command = result.get("command")
+        if command is None:
+            command = entry.get("id")
+            if isinstance(command, Mapping):
+                command = command.get("id")
         if isinstance(command, Sequence) and not isinstance(command, str):
             command = " ".join(str(token) for token in command)
         command = _required_text(command, f"validation_results[{index}].command")

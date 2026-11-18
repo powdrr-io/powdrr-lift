@@ -771,49 +771,10 @@ steps:
                         ),
                     },
                     "subjects": [{"subject_kind": "item", "reason": "Item defect."}],
-                    "operations": [],
+                    "operations": [{"operation": "update_item", "item_id": "PR-01"}],
                     "replacement_items": {},
                     "replacement_units": [],
                     "replacement_requirements": {},
-                }
-            if "What populated pull-request request" in question:
-                return {
-                    "user_request": "Publish the implemented feature.",
-                    "workflow_context": {
-                        "feature-name": "Feature",
-                        "commit-message": "Implement feature",
-                        "populated-pr-description": (
-                            "## Objective\n\nImplement the feature.\n\n"
-                            "## Scope\n\n- Add the feature.\n\n"
-                            "## Implementation Details\n\n- Update code.\n\n"
-                            "## Acceptance Criteria\n\n- Feature works.\n\n"
-                            "## Validation\n\n- `pytest`: passed.\n\n"
-                            "## Advisory Test-Quality Notes\n\nNone."
-                        ),
-                        # Simulate an incomplete model response. The publisher
-                        # must receive the implementation result's full list.
-                        "files-to-publish": ["attestation/component-00.py"],
-                        "base-branch": "main",
-                        "publication-branch": "powdrr/pr-01-implementation",
-                    },
-                }
-            if "What review request describes this plan amendment" in question:
-                return {
-                    "user_request": "Correct the reviewed plan item.",
-                    "workflow_context": {
-                        "feature-name": "Correct plan: verifier scope",
-                        "commit-message": "Correct reviewed plan scope",
-                        "populated-pr-description": (
-                            "## Objective\n\nCorrect the plan.\n\n"
-                            "## Scope\n\n- Update the plan.\n\n"
-                            "## Implementation Details\n\n- Narrow the criteria.\n\n"
-                            "## Acceptance Criteria\n\n- Scope is corrected.\n\n"
-                            "## Validation\n\n- `pytest`: passed.\n\n"
-                            "## Advisory Test-Quality Notes\n\nNone."
-                        ),
-                        "base-branch": "main",
-                        "publication-branch": "powdrr/pr-01-plan-amendment",
-                    },
                 }
             raise AssertionError(f"Unexpected judge question: {question}")
 
@@ -850,6 +811,17 @@ steps:
                 "integration_tests": {"passed": True},
             }
         if _tool == "invoke_tool":
+            if parameters.get("tool") == "gh":
+                from powdrr_lift.clean_pr_publisher import (
+                    render_issue_worker_publication_request,
+                )
+
+                nested_parameters = parameters["parameters"]
+                if nested_parameters.get("operation") == "pr_render_request":
+                    kind = nested_parameters["publication_kind"]
+                    calls.append(f"render-{kind}")
+                    call_parameters.append(nested_parameters)
+                    return render_issue_worker_publication_request(nested_parameters)
             parameters = parameters["parameters"]
         command = parameters["command"][0]
         calls.append(command)
@@ -931,7 +903,17 @@ steps:
     evaluator = Evaluator(WorkflowLLM(), execute, process_directory=tmp_path)
 
     def wrapped_task_context(input_state: Mapping[str, Any]) -> dict[str, Any]:
-        return {"task_id": "feature-task-001", "input_state": dict(input_state)}
+        state = dict(input_state)
+        proposed = dict(state.get("proposed_pr_context", {}))
+        proposed.setdefault("title", "Implement the reviewed feature")
+        proposed.setdefault("objective", state.get("objective", "Implement a feature."))
+        proposed.setdefault("scope", ["Implement the reviewed feature."])
+        proposed.setdefault("acceptance_criteria", ["The reviewed behavior passes."])
+        proposed.setdefault("plan_id", "feature-v1")
+        proposed.setdefault("item_id", "item-0003")
+        state["proposed_pr_context"] = proposed
+        state.setdefault("proposed_pr_id", "pr-01")
+        return {"task_id": "feature-task-001", "input_state": state}
 
     if policy_denied_required_paths:
         result = evaluator.evaluate(
@@ -992,6 +974,7 @@ steps:
             "implement",
             "amend",
             "finish",
+            "render-plan-amendment",
             "publish",
             "observe",
         ]
@@ -999,6 +982,7 @@ steps:
             result.bindings["pull_request_url"]
             == "https://github.com/example/repo/pull/123"
         )
+        assert result.llm_activations == 2
         return
     if unshaped_execution_error:
         failed = evaluator.evaluate(
@@ -1041,7 +1025,13 @@ steps:
                             )
                         },
                     )
-                assert calls == ["implement", "amend", "finish", "publish"]
+                assert calls == [
+                    "implement",
+                    "amend",
+                    "finish",
+                    "render-plan-amendment",
+                    "publish",
+                ]
                 return
             result = evaluator.evaluate(
                 workflow,
@@ -1074,12 +1064,14 @@ steps:
                 "implement",
                 "amend",
                 "finish",
+                "render-plan-amendment",
                 "publish",
                 "observe",
             ]
             assert result.bindings["pull_request_url"] == (
                 "https://github.com/example/repo/pull/123"
             )
+            assert result.llm_activations == 2
             assert call_parameters[-2]["files_to_publish"] == [
                 "docs/plans/feature-v1-execution-plan.yaml",
                 "docs/plans/feature-v1-structrr-proposal.json",
@@ -1124,7 +1116,7 @@ steps:
                     )
                 },
             )
-        assert calls == ["implement", "finish", "publish"]
+        assert calls == ["implement", "finish", "render-implementation", "publish"]
         return
 
     result = evaluator.evaluate(
@@ -1133,10 +1125,17 @@ steps:
             "task_context": {
                 "task_id": "feature-task-001",
                 "input_state": {
+                    "proposed_pr_id": "pr-01",
                     "objective": "Implement a feature",
                     "github_repository": "example/repo",
                     "github_issue_number": 42,
                     "proposed_pr_context": {
+                        "title": "Implement the reviewed feature",
+                        "objective": "Implement a feature.",
+                        "scope": ["Implement the reviewed feature."],
+                        "acceptance_criteria": ["The reviewed behavior passes."],
+                        "plan_id": "feature-v1",
+                        "item_id": "item-0003",
                         "verification_command": "pytest -q",
                     },
                 },
@@ -1153,10 +1152,17 @@ steps:
         "finish-implementation-pr",
         "respond-to-pr-ci",
     ]
-    assert calls == ["implement", "finish", "publish", "observe"]
+    assert calls == [
+        "implement",
+        "finish",
+        "render-implementation",
+        "publish",
+        "observe",
+    ]
     assert result.bindings["pull_request_url"] == (
         "https://github.com/example/repo/pull/123"
     )
+    assert result.llm_activations == 0
     assert call_parameters[1]["files_to_publish"] == implementation_paths
     assert call_parameters[-2]["files_to_publish"] == implementation_paths
 

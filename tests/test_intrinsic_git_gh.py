@@ -565,3 +565,34 @@ def test_review_thread_query_collects_all_replies_in_a_thread(
     assert [comment["id"] for comment in comments] == ["COMMENT_1", "COMMENT_2"]
     assert "threadId=THREAD_1" in commands[1]
     assert "after=comment-cursor-1" in commands[1]
+
+
+def test_pr_render_request_executes_locally_without_github(tmp_path: Path) -> None:
+    result = execute_intrinsic_git_gh_tool(
+        "gh",
+        {
+            "operation": "pr_render_request",
+            "publication_kind": "implementation",
+            "task_context": {
+                "proposed_pr_id": "feature-pr-03",
+                "proposed_pr_context": {
+                    "title": "Add deterministic publication rendering",
+                    "objective": "Publish validated implementation evidence.",
+                    "scope": ["Render the publication request."],
+                    "acceptance_criteria": ["The description is complete."],
+                },
+            },
+            "implementation_result": {
+                "passed": True,
+                "structrr": {"passed": True},
+                "integration_tests": {"passed": True},
+                "changed_paths": ["src/feature.py"],
+            },
+            "validation_results": [{"command": "pytest -q", "returncode": 0}],
+        },
+        worktree_root=tmp_path,
+    )
+
+    assert result["workflow_context"]["publication-branch"] == (
+        "powdrr/feature-pr-03-implementation"
+    )

@@ -1,0 +1,174 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1588
+title: Render worker publication requests deterministically
+intent:
+  problem: Successful implementation and plan-amendment PR descriptions still depended on model judges even though their source facts were already recorded in typed plan, repair, and validation evidence.
+  goal: Render both publication requests from typed evidence in code, validate all required sections and identity fields, and fail closed when required evidence is absent.
+human-decisions: []
+structured_files: []
+files:
+  - path: packages/service/src/powdrr_service/resources/processes/amend-plan-and-open-pr.yaml
+    type: modified
+    span: {start_line: 104, end_line: 119}
+    summary: Replace the amendment publication judge with the typed publication request renderer.
+    rationale: Keep plan repair descriptions grounded in repair operations and validation evidence without an additional model call.
+  - path: packages/service/src/powdrr_service/resources/processes/finish-implementation-pr.yaml
+    type: modified
+    span: {start_line: 28, end_line: 41}
+    summary: Replace the implementation publication judge with the typed publication request renderer.
+    rationale: Build title, sections, validation results, quality notes, and branch identity from reviewed inputs and execution receipts.
+  - path: src/powdrr_lift/builtin_tool_help.py
+    type: modified
+    span: {start_line: 78, end_line: 81}
+    summary: Describe deterministic local pull-request request rendering in GitHub tool help.
+    rationale: Make the local rendering operation discoverable as part of the structured pull-request tool.
+  - path: src/powdrr_lift/builtin_tool_help.py
+    type: modified
+    span: {start_line: 83, end_line: 85}
+    summary: Clarify when to use the structured pull-request operation.
+    rationale: Include request rendering alongside inspection and publication operations.
+  - path: src/powdrr_lift/builtin_tool_help.py
+    type: modified
+    span: {start_line: 90, end_line: 90}
+    summary: Add pr_render_request to the supported pull-request operations.
+    rationale: Advertise the deterministic request renderer to tool callers.
+  - path: src/powdrr_lift/clean_pr_publisher.py
+    type: modified
+    span: {start_line: 193, end_line: 503}
+    summary: Render implementation and amendment publication requests from typed evidence, shortening titles and validating factual sections.
+    rationale: Preserve publication identity and validation results while removing prose-generation judges.
+  - path: src/powdrr_lift/execution/builtin_tools.py
+    type: modified
+    span: {start_line: 86, end_line: 86}
+    summary: Register pr_render_request as a supported read-only repository operation.
+    rationale: Allow workflows to invoke the renderer through the capability broker without granting a GitHub write.
+  - path: src/powdrr_lift/intrinsic_git_gh.py
+    type: modified
+    span: {start_line: 93, end_line: 98}
+    summary: Dispatch pr_render_request to the local deterministic renderer.
+    rationale: Return a structured request without invoking GitHub or a model.
+  - path: tests/test_builtin_capability_tools.py
+    type: modified
+    span: {start_line: 77, end_line: 121}
+    summary: Verify the request renderer runs through the read-only repository capability.
+    rationale: Prevent publication rendering from being classified as an external write.
+  - path: tests/test_clean_pr_publisher.py
+    type: modified
+    span: {start_line: 15, end_line: 15}
+    summary: Import the deterministic publication request renderer for focused behavior tests.
+    rationale: Exercise the public renderer API.
+  - path: tests/test_clean_pr_publisher.py
+    type: modified
+    span: {start_line: 138, end_line: 284}
+    summary: Test implementation and amendment rendering, title shortening, required sections, note deduplication, command summaries, identity preservation, and fail-closed validation.
+    rationale: Cover publication content directly from typed evidence, including empty advisory notes and missing validation evidence.
+  - path: tests/test_intrinsic_git_gh.py
+    type: modified
+    span: {start_line: 568, end_line: 598}
+    summary: Verify intrinsic request rendering completes locally without a GitHub call.
+    rationale: Ensure the renderer is a deterministic local capability.
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 774, end_line: 774}
+    summary: Replace the expected implementation publication judge response.
+    rationale: Ensure publication content is no longer supplied by a model judge.
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 779, end_line: 817}
+    summary: Replace both publication-description judges with deterministic renderer calls.
+    rationale: Keep evaluator fixtures aligned with deterministic publication rendering.
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 814, end_line: 824}
+    summary: Invoke the real typed renderer in workflow evaluation fixtures.
+    rationale: Exercise end-to-end binding of implementation and amendment evidence to publication requests.
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 906, end_line: 916}
+    summary: Supply reviewed proposal metadata needed by deterministic rendering.
+    rationale: Verify the renderer requires and uses accepted title, scope, and criteria.
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 977, end_line: 977}
+    summary: Assert semantic plan review remains the only model work before amendment rendering.
+    rationale: Ensure publication prose adds no model activation.
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 985, end_line: 985}
+    summary: Supply the reviewed item identity to the amendment renderer.
+    rationale: Preserve plan item identity in amendment publication.
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 1028, end_line: 1034}
+    summary: Update amendment publication call expectations for the local renderer.
+    rationale: Confirm publication uses the code-rendered request.
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 1067, end_line: 1067}
+    summary: Assert no description judge runs during amendment publication.
+    rationale: Keep the removed model activation from returning.
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 1074, end_line: 1074}
+    summary: Preserve item metadata in the amendment workflow fixture.
+    rationale: Provide the renderer only reviewed identity data.
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 1119, end_line: 1119}
+    summary: Update failure-path call expectations for deterministic rendering.
+    rationale: Verify the renderer executes before publication attempts.
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 1128, end_line: 1128}
+    summary: Add proposal metadata to the success workflow fixture.
+    rationale: Exercise publication rendering with a complete reviewed context.
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 1133, end_line: 1138}
+    summary: Preserve accepted proposal fields in the implementation success fixture.
+    rationale: Validate deterministic title and description content against immutable inputs.
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 1155, end_line: 1161}
+    summary: Expect the local implementation renderer and zero model activations.
+    rationale: Prove successful publication request construction needs no judge.
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 1165, end_line: 1165}
+    summary: Confirm the successful implementation path does not activate an LLM.
+    rationale: Guard the A16 deterministic publication route.
+  - path: tests/test_workflow_template_specification.py
+    type: modified
+    span: {start_line: 379, end_line: 385}
+    summary: Assert the implementation workflow invokes the typed publication renderer.
+    rationale: Prevent a model judge from being reintroduced for successful implementation publication.
+  - path: tests/test_workflow_template_specification.py
+    type: modified
+    span: {start_line: 387, end_line: 388}
+    summary: Assert publication evidence bindings for implementation rendering.
+    rationale: Ensure the renderer receives accepted task, implementation, and validation data.
+  - path: tests/test_workflow_template_specification.py
+    type: modified
+    span: {start_line: 390, end_line: 390}
+    summary: Assert the implementation publication step contains no judge.
+    rationale: Keep publication prose code-owned.
+  - path: tests/test_workflow_template_specification.py
+    type: modified
+    span: {start_line: 402, end_line: 411}
+    summary: Assert the amendment workflow invokes the renderer with typed repair evidence.
+    rationale: Keep amendment publication grounded in failure review, repair operations, and validation receipts.
+entities:
+  - id: deterministic-worker-publication-rendering
+    type: Feature
+    action: added
+entity_relationships: []
+invariants:
+  - id: worker-publication-uses-typed-evidence
+    description: Implementation and plan-amendment publication requests are rendered from typed reviewed inputs and validation results without description-generation judges.
+    action: added
+    rationale: Preserve publication identity and keep claims tied to recorded evidence.
+guidance:
+  - id: fail-closed-publication-rendering
+    description: Require successful gates, typed repair details, changed paths, and passing validation results before rendering a publication request.
+    action: added
+    rationale: Do not invent missing publication evidence or validation outcomes.

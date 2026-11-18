@@ -74,6 +74,51 @@ def test_builtin_repository_inspection_resolves_through_broker(tmp_path: Path) -
     assert result.output["command"] == ["git", "status", "--short"]
 
 
+def test_pr_publication_request_renderer_is_a_read_only_repository_capability(
+    tmp_path: Path,
+) -> None:
+    broker = CapabilityBroker(builtin_tool_registry())
+    context = ToolContext(
+        tmp_path,
+        tmp_path,
+        frozenset({"inspect_pull_request"}),
+        frozenset({ToolEffect.WORKSPACE_READ}),
+    )
+    result = broker.invoke(
+        context,
+        CapabilityRequest(
+            "repository",
+            "inspect_pull_request",
+            {
+                "operation": "pr_render_request",
+                "publication_kind": "implementation",
+                "task_context": {
+                    "proposed_pr_id": "feature-pr-03",
+                    "proposed_pr_context": {
+                        "title": "Add deterministic publication rendering",
+                        "objective": "Publish validated implementation evidence.",
+                        "scope": ["Render the publication request."],
+                        "acceptance_criteria": ["The description is complete."],
+                    },
+                },
+                "implementation_result": {
+                    "passed": True,
+                    "structrr": {"passed": True},
+                    "integration_tests": {"passed": True},
+                    "changed_paths": ["src/feature.py"],
+                },
+                "validation_results": [{"command": "pytest -q", "returncode": 0}],
+            },
+        ),
+    )
+
+    assert isinstance(result, ToolResult)
+    assert result.output["workflow_context"]["publication-branch"] == (
+        "powdrr/feature-pr-03-implementation"
+    )
+    assert result.observed_effects == frozenset({ToolEffect.WORKSPACE_READ})
+
+
 def test_builtin_mutation_requires_the_declared_effect(tmp_path: Path) -> None:
     broker = CapabilityBroker(builtin_tool_registry())
     context = ToolContext(

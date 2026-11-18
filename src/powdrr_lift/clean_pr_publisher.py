@@ -190,6 +190,317 @@ def validate_standard_pr_description(body: str) -> None:
         )
 
 
+def render_issue_worker_publication_request(
+    parameters: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Render an implementation or plan-amendment PR request from typed evidence."""
+    kind = _required_text(parameters.get("publication_kind"), "publication_kind")
+    task_context = _required_mapping(parameters.get("task_context"), "task_context")
+    input_state = task_context.get("input_state")
+    if not isinstance(input_state, Mapping):
+        input_state = task_context
+    proposed = input_state.get("proposed_pr_context")
+    if not isinstance(proposed, Mapping):
+        proposed = task_context.get("proposed_pr_context")
+    proposed = _required_mapping(proposed, "proposed_pr_context")
+    proposed_pr_id = _required_text(
+        task_context.get("proposed_pr_id", input_state.get("proposed_pr_id")),
+        "proposed_pr_id",
+    )
+    item_title = _required_text(proposed.get("title"), "proposed_pr_context.title")
+    if kind == "implementation":
+        return _render_implementation_publication_request(
+            proposed=proposed,
+            proposed_pr_id=proposed_pr_id,
+            implementation_result=_required_mapping(
+                parameters.get("implementation_result"), "implementation_result"
+            ),
+            validation_results=parameters.get("validation_results"),
+        )
+    if kind == "plan-amendment":
+        return _render_plan_amendment_publication_request(
+            proposed=proposed,
+            proposed_pr_id=proposed_pr_id,
+            item_title=item_title,
+            failure_review=_required_mapping(
+                parameters.get("failure_review"), "failure_review"
+            ),
+            repair_request=_required_mapping(
+                parameters.get("repair_request"), "repair_request"
+            ),
+            amendment_result=_required_mapping(
+                parameters.get("amendment_result"), "amendment_result"
+            ),
+            validation_results=parameters.get("validation_results"),
+        )
+    raise PowdrrExecutionError(
+        "publication_kind must be 'implementation' or 'plan-amendment'."
+    )
+
+
+def _render_implementation_publication_request(
+    *,
+    proposed: Mapping[str, Any],
+    proposed_pr_id: str,
+    implementation_result: Mapping[str, Any],
+    validation_results: object,
+) -> dict[str, Any]:
+    structrr = _required_mapping(
+        implementation_result.get("structrr"), "implementation_result.structrr"
+    )
+    if structrr.get("passed") is not True:
+        raise PowdrrExecutionError("Implementation Structrr validation did not pass.")
+    integration_tests = implementation_result.get("integration_tests")
+    if (
+        not isinstance(integration_tests, Mapping)
+        or integration_tests.get("passed") is not True
+    ):
+        raise PowdrrExecutionError("Implementation integration tests did not pass.")
+    if implementation_result.get("passed") is not True:
+        raise PowdrrExecutionError("Implementation did not pass its acceptance gates.")
+
+    title_source = _required_text(proposed.get("title"), "proposed_pr_context.title")
+    title = _shorten_title(title_source, 100)
+    objective = _required_text(
+        proposed.get("objective"), "proposed_pr_context.objective"
+    )
+    scope = _required_text_list(proposed.get("scope"), "proposed_pr_context.scope")
+    criteria = _required_text_list(
+        proposed.get("acceptance_criteria"),
+        "proposed_pr_context.acceptance_criteria",
+    )
+    changed_paths = _required_text_list(
+        implementation_result.get("changed_paths"),
+        "implementation_result.changed_paths",
+    )
+    validations = _render_validation_results(validation_results)
+    notes_value = integration_tests.get("quality_notes", [])
+    notes = _deduplicated_notes(notes_value)
+    sections = {
+        "objective": objective,
+        "scope": "\n".join(f"- {item}" for item in scope),
+        "implementation_details": "Changed files:\n"
+        + "\n".join(f"- `{path}`" for path in changed_paths),
+        "acceptance_criteria": "\n".join(f"- {item}" for item in criteria),
+        "validation": validations,
+        "advisory_test_quality_notes": (
+            "\n".join(f"- {note}" for note in notes) if notes else "None."
+        ),
+    }
+    return _publication_request(
+        title=title,
+        commit_message=f"Implement {title}",
+        publication_branch=f"powdrr/{proposed_pr_id}-implementation",
+        user_request=f"Implement the reviewed plan item: {title_source}.",
+        sections=sections,
+    )
+
+
+def _render_plan_amendment_publication_request(
+    *,
+    proposed: Mapping[str, Any],
+    proposed_pr_id: str,
+    item_title: str,
+    failure_review: Mapping[str, Any],
+    repair_request: Mapping[str, Any],
+    amendment_result: Mapping[str, Any],
+    validation_results: object,
+) -> dict[str, Any]:
+    if amendment_result.get("passed") is not True:
+        raise PowdrrExecutionError("Plan amendment did not pass validation.")
+    evidence = _required_text_list(
+        failure_review.get("evidence"), "failure_review.evidence"
+    )
+    changed_paths = _required_text_list(
+        amendment_result.get("changed_paths"), "amendment_result.changed_paths"
+    )
+    discovery = _required_mapping(
+        repair_request.get("discovery"), "repair_request.discovery"
+    )
+    summary = _required_text(
+        discovery.get("summary"), "repair_request.discovery.summary"
+    )
+    requested_outcome = _required_text(
+        discovery.get("requested_outcome"), "repair_request.discovery.requested_outcome"
+    )
+    operations = repair_request.get("operations")
+    if not isinstance(operations, list) or not operations:
+        raise PowdrrExecutionError("Plan amendment requires typed repair operations.")
+    rendered_operations = [
+        _render_repair_operation(operation) for operation in operations
+    ]
+    plan_id = _required_text(proposed.get("plan_id"), "proposed_pr_context.plan_id")
+    item_id = _required_text(proposed.get("item_id"), "proposed_pr_context.item_id")
+    issue_number = proposed.get("github_issue_number")
+    issue_reference = (
+        f" and proposed PR issue #{issue_number}"
+        if isinstance(issue_number, int)
+        and not isinstance(issue_number, bool)
+        and issue_number > 0
+        else ""
+    )
+    title = _shorten_title(f"Correct plan: {item_title}", 100)
+    validation = _render_validation_results(validation_results)
+    explanation = _required_text(
+        failure_review.get("explanation"), "failure_review.explanation"
+    )
+    sections = {
+        "objective": (
+            f"{explanation}\n\nDiscovery: {summary}\n\nThis amendment is linked "
+            f"to original plan `{plan_id}`{issue_reference}."
+        ),
+        "scope": (
+            f"Plan `{plan_id}`, item `{item_id}`.\n\nChanged files:\n"
+            + "\n".join(f"- `{path}`" for path in changed_paths)
+        ),
+        "implementation_details": "Typed plan repair operations:\n"
+        + "\n".join(f"- {operation}" for operation in rendered_operations),
+        "acceptance_criteria": (
+            f"Requested outcome: {requested_outcome}\n\nAffected item: `{item_id}`.\n\n"
+            "Evidence:\n" + "\n".join(f"- {item}" for item in evidence)
+        ),
+        "validation": validation,
+        "advisory_test_quality_notes": "None.",
+    }
+    return _publication_request(
+        title=title,
+        commit_message=f"Correct plan: {_shorten_title(item_title, 75)}",
+        publication_branch=f"powdrr/{proposed_pr_id}-plan-amendment",
+        user_request=(
+            f"Correct the reviewed plan defect for {plan_id}/{item_id}: {summary}"
+        ),
+        sections=sections,
+    )
+
+
+def _publication_request(
+    *,
+    title: str,
+    commit_message: str,
+    publication_branch: str,
+    user_request: str,
+    sections: Mapping[str, str],
+) -> dict[str, Any]:
+    render_standard_pr_description(sections)
+    return {
+        "user_request": user_request,
+        "workflow_context": {
+            "feature-name": title,
+            "commit-message": commit_message,
+            "base-branch": "main",
+            "publication-branch": publication_branch,
+            "pr-description-sections": dict(sections),
+        },
+    }
+
+
+def _render_validation_results(value: object) -> str:
+    if not isinstance(value, list) or not value:
+        raise PowdrrExecutionError("Publication requires validation command results.")
+    rendered: list[str] = []
+    for index, entry in enumerate(value):
+        if not isinstance(entry, Mapping):
+            raise PowdrrExecutionError(
+                f"Validation result {index + 1} must be an object."
+            )
+        result = entry.get("validation_result", entry)
+        if not isinstance(result, Mapping):
+            raise PowdrrExecutionError(
+                f"Validation result {index + 1} has no structured result."
+            )
+        command = result.get("command", entry.get("id"))
+        if isinstance(command, Sequence) and not isinstance(command, str):
+            command = " ".join(str(token) for token in command)
+        command = _required_text(command, f"validation_results[{index}].command")
+        signals: list[bool] = []
+        if "passed" in result:
+            signals.append(result.get("passed") is True)
+        if "status" in result:
+            signals.append(
+                result.get("status") in {"pass", "passed", "success", "succeeded"}
+            )
+        if "returncode" in result:
+            returncode = result.get("returncode")
+            signals.append(
+                isinstance(returncode, int)
+                and not isinstance(returncode, bool)
+                and returncode == 0
+            )
+        if not signals or not all(signals):
+            raise PowdrrExecutionError(f"Validation command did not pass: {command}.")
+        summary = _validation_summary(result)
+        rendered.append(f"- `{command}` — passed{summary}")
+    return "\n".join(rendered)
+
+
+def _validation_summary(result: Mapping[str, Any]) -> str:
+    for key in ("summary", "result_summary"):
+        value = result.get(key)
+        if isinstance(value, str) and value.strip():
+            return f" ({value.strip()})"
+    output = result.get("stdout")
+    if isinstance(output, str):
+        match = re.search(r"\b(\d+)\s+passed\b", output)
+        if match:
+            return f" ({match.group(1)} tests passed)"
+    return ""
+
+
+def _render_repair_operation(operation: object) -> str:
+    if not isinstance(operation, Mapping):
+        raise PowdrrExecutionError("Each plan repair operation must be an object.")
+    name = _required_text(operation.get("operation"), "repair operation")
+    identifiers = [
+        f"{key}={operation[key]}"
+        for key in ("item_id", "requirement_id", "dependency_id", "path")
+        if isinstance(operation.get(key), str) and operation[key].strip()
+    ]
+    return f"{name}" + (f" ({', '.join(identifiers)})" if identifiers else "")
+
+
+def _deduplicated_notes(value: object) -> list[str]:
+    if not isinstance(value, list):
+        raise PowdrrExecutionError("Test-quality notes must be a list of strings.")
+    notes: list[str] = []
+    seen: set[str] = set()
+    for note in value:
+        if not isinstance(note, str) or not note.strip():
+            raise PowdrrExecutionError("Test-quality notes must be non-empty strings.")
+        normalized = " ".join(note.split())
+        identity = normalized.casefold()
+        if identity not in seen:
+            seen.add(identity)
+            notes.append(normalized)
+    return notes
+
+
+def _required_mapping(value: object, field: str) -> Mapping[str, Any]:
+    if not isinstance(value, Mapping):
+        raise PowdrrExecutionError(f"{field} must be an object.")
+    return value
+
+
+def _required_text_list(value: object, field: str) -> list[str]:
+    if (
+        not isinstance(value, Sequence)
+        or isinstance(value, (str, bytes, bytearray))
+        or not value
+        or any(not isinstance(item, str) or not item.strip() for item in value)
+    ):
+        raise PowdrrExecutionError(f"{field} must be a non-empty list of strings.")
+    return [item.strip() for item in value]
+
+
+def _shorten_title(value: str, maximum: int) -> str:
+    title = _required_text(value, "PR title")
+    if len(title) <= maximum:
+        return title
+    prefix = title[: maximum - 3].rstrip()
+    if " " in prefix:
+        prefix = prefix.rsplit(" ", 1)[0]
+    return f"{prefix}..."
+
+
 def normalize_clean_pr_publication_parameters(
     parameters: Mapping[str, Any],
 ) -> dict[str, Any]:

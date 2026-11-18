@@ -75,16 +75,19 @@ _HELP: dict[str, dict[str, Any]] = {
         ],
     },
     "gh": {
-        "summary": "Perform an allow-listed GitHub pull-request operation.",
+        "summary": (
+            "Perform an allow-listed pull-request operation or render its request "
+            "locally."
+        ),
         "when_to_use": (
-            "Use for pull-request inspection, creation, editing, checks, comments, "
-            "and review-thread replies/resolution. Use the GitHub intrinsic "
-            "rather than "
-            "shelling out to arbitrary network commands."
+            "Use for pull-request request rendering, inspection, creation, editing, "
+            "checks, comments, and review-thread replies/resolution. Use the GitHub "
+            "intrinsic rather than shelling out to arbitrary network commands."
         ),
         "parameters": {
             "operation": (
                 "One of pr_view, pr_diff, pr_checks, pr_create, pr_publish_clean, "
+                "pr_render_request, "
                 "pr_edit, pr_comments, pr_review_comment, pr_review_threads, "
                 "pr_review_reply, or pr_review_resolve."
             ),

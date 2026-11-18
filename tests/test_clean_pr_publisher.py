@@ -12,6 +12,7 @@ from powdrr_lift.clean_pr_publisher import (
     build_publication_authorization,
     normalize_clean_pr_publication_parameters,
     publish_clean_pull_request,
+    render_issue_worker_publication_request,
     render_standard_pr_description,
     validate_standard_pr_description,
     verify_publication_scope,
@@ -132,6 +133,153 @@ def test_standard_pr_template_rejects_missing_or_empty_sections() -> None:
         )
     with pytest.raises(PowdrrExecutionError, match="non-empty text"):
         render_standard_pr_description({**sections, "scope": "  "})
+
+
+def test_implementation_publication_request_renders_typed_evidence() -> None:
+    result = render_issue_worker_publication_request(
+        {
+            "publication_kind": "implementation",
+            "task_context": {
+                "proposed_pr_id": "feature-17-pr-04",
+                "input_state": {
+                    "proposed_pr_context": {
+                        "title": (
+                            "Implement a reviewed change with a deliberately "
+                            "long title "
+                            "that must be shortened to GitHub's title limit"
+                        ),
+                        "objective": "Deliver the reviewed behavior.",
+                        "scope": ["Update the implementation.", "Add focused tests."],
+                        "acceptance_criteria": ["The behavior matches the plan."],
+                    }
+                },
+            },
+            "implementation_result": {
+                "passed": True,
+                "structrr": {"passed": True},
+                "integration_tests": {
+                    "passed": True,
+                    "quality_notes": [
+                        "Boundary case needs another test.",
+                        "  boundary CASE needs another test.  ",
+                    ],
+                },
+                "changed_paths": ["src/feature.py", "tests/test_feature.py"],
+            },
+            "validation_results": [
+                {
+                    "id": "repository-tests",
+                    "validation_result": {
+                        "command": ["pytest", "-q"],
+                        "returncode": 0,
+                        "stdout": "18 passed",
+                    },
+                }
+            ],
+        }
+    )
+
+    context = result["workflow_context"]
+    sections = context["pr-description-sections"]
+    assert len(context["feature-name"]) <= 100
+    assert context["feature-name"].startswith("Implement a reviewed change")
+    assert context["base-branch"] == "main"
+    assert context["publication-branch"] == "powdrr/feature-17-pr-04-implementation"
+    assert sections == {
+        "objective": "Deliver the reviewed behavior.",
+        "scope": "- Update the implementation.\n- Add focused tests.",
+        "implementation_details": (
+            "Changed files:\n- `src/feature.py`\n- `tests/test_feature.py`"
+        ),
+        "acceptance_criteria": "- The behavior matches the plan.",
+        "validation": "- `pytest -q` — passed (18 tests passed)",
+        "advisory_test_quality_notes": "- Boundary case needs another test.",
+    }
+    assert result["user_request"] == (
+        "Implement the reviewed plan item: Implement a reviewed change with a "
+        "deliberately long title that must be shortened to GitHub's title limit."
+    )
+
+
+def test_amendment_publication_request_uses_repair_and_validation_evidence() -> None:
+    result = render_issue_worker_publication_request(
+        {
+            "publication_kind": "plan-amendment",
+            "task_context": {
+                "proposed_pr_id": "feature-17-pr-04",
+                "proposed_pr_context": {
+                    "plan_id": "feature-v1",
+                    "item_id": "PR-04",
+                    "title": "Implement the reviewed verifier behavior",
+                    "github_issue_number": 42,
+                },
+            },
+            "failure_review": {
+                "explanation": "The accepted item omits a required fixture path.",
+                "evidence": [
+                    "attempt-2: missing fixture",
+                    "scope-check: required path",
+                ],
+            },
+            "repair_request": {
+                "discovery": {
+                    "summary": "Add the required fixture path to the item scope.",
+                    "requested_outcome": "The plan permits the required fixture.",
+                },
+                "operations": [{"operation": "update_item", "item_id": "PR-04"}],
+            },
+            "amendment_result": {
+                "passed": True,
+                "changed_paths": ["docs/plans/feature-v1.yaml"],
+            },
+            "validation_results": [
+                {"command": "powdrr-lift validate-plan", "status": "passed"}
+            ],
+        }
+    )
+
+    context = result["workflow_context"]
+    sections = context["pr-description-sections"]
+    assert (
+        context["feature-name"]
+        == "Correct plan: Implement the reviewed verifier behavior"
+    )
+    assert context["publication-branch"] == "powdrr/feature-17-pr-04-plan-amendment"
+    assert context["base-branch"] == "main"
+    assert "plan `feature-v1`" in sections["objective"]
+    assert "issue #42" in sections["objective"]
+    assert "item `PR-04`" in sections["scope"]
+    assert "update_item (item_id=PR-04)" in sections["implementation_details"]
+    assert "attempt-2: missing fixture" in sections["acceptance_criteria"]
+    assert sections["validation"] == "- `powdrr-lift validate-plan` — passed"
+    assert sections["advisory_test_quality_notes"] == "None."
+
+
+def test_publication_request_renderer_fails_closed_without_validation_evidence() -> (
+    None
+):
+    with pytest.raises(PowdrrExecutionError, match="validation command results"):
+        render_issue_worker_publication_request(
+            {
+                "publication_kind": "implementation",
+                "task_context": {
+                    "proposed_pr_id": "feature-17-pr-04",
+                    "proposed_pr_context": {
+                        "title": "Implement behavior",
+                        "objective": "Deliver behavior.",
+                        "scope": ["Update code."],
+                        "acceptance_criteria": ["Behavior passes."],
+                    },
+                },
+                "implementation_result": {
+                    "passed": True,
+                    "structrr": {"passed": True},
+                    "integration_tests": {"passed": True},
+                    "changed_paths": ["src/feature.py"],
+                },
+                "validation_results": [],
+            }
+        )
 
 
 def test_clean_publisher_validates_standard_description_before_git_operations(

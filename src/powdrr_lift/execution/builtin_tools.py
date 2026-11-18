@@ -83,6 +83,7 @@ class IntrinsicRepositoryAdapter:
             "pr_comments",
             "pr_create",
             "pr_publish_clean",
+            "pr_render_request",
             "pr_edit",
             "pr_review_comment",
             "pr_review_threads",

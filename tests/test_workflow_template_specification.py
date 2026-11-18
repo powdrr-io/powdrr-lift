@@ -376,36 +376,18 @@ def test_execute_proposed_pr_is_a_procedrr_workflow_process() -> None:
     assert implementation_steps[2]["call"]["outputs"] == {
         "validation_results": "validation_results"
     }
-    assert implementation_steps[3]["judge"]["output"]["name"] == "pull_request_request"
-    title_judge = implementation_steps[3]["judge"]
-    assert any(
-        "task_context.proposed_pr_context.title" in instruction
-        and "Prefer the reviewed item title verbatim" in instruction
-        for instruction in title_judge["instructions"]
+    publication_renderer = implementation_steps[3]["operation"]["parameters"]
+    assert publication_renderer["tool"] == "gh"
+    assert publication_renderer["parameters"]["operation"] == "pr_render_request"
+    assert publication_renderer["parameters"]["publication_kind"] == "implementation"
+    assert publication_renderer["parameters"]["task_context"]["value"] == "task_context"
+    assert publication_renderer["parameters"]["implementation_result"]["value"] == (
+        "implementation_result"
     )
-    assert any(
-        "Never use the plan ID" in instruction
-        for instruction in title_judge["instructions"]
+    assert publication_renderer["parameters"]["validation_results"]["value"] == (
+        "validation_results"
     )
-    assert any(
-        "Never copy raw stdout, stderr, terminal logs" in instruction
-        for instruction in title_judge["instructions"]
-    )
-    assert any(
-        "one concise Markdown bullet per command" in instruction
-        for instruction in title_judge["instructions"]
-    )
-    assert (
-        title_judge["output"]["schema"]["properties"]["workflow_context"]["properties"][
-            "feature-name"
-        ]["maxLength"]
-        == 100
-    )
-    description_schema = title_judge["output"]["schema"]["properties"][
-        "workflow_context"
-    ]["properties"]["pr-description-sections"]
-    assert description_schema["type"] == "object"
-    assert "objective" not in description_schema.get("required", [])
+    assert "judge" not in implementation_steps[3]
     publish_call = implementation_steps[4]["call"]
     assert publish_call["inputs"]["files_to_publish"] == {
         "type": "reference",
@@ -417,11 +399,16 @@ def test_execute_proposed_pr_is_a_procedrr_workflow_process() -> None:
     amendment_call = amendment_process["steps"][1]["operation"]["parameters"]
     assert amendment_call["parameters"]["mode"] == "plan-amendment"
     assert amendment_process["steps"][2]["gate"]["subject"] == "amendment_result.passed"
-    amendment_description_schema = amendment_process["steps"][4]["judge"]["output"][
-        "schema"
-    ]["properties"]["workflow_context"]["properties"]["pr-description-sections"]
-    assert amendment_description_schema["type"] == "object"
-    assert "objective" not in amendment_description_schema.get("required", [])
+    amendment_renderer = amendment_process["steps"][4]["operation"]["parameters"][
+        "parameters"
+    ]
+    assert amendment_renderer["operation"] == "pr_render_request"
+    assert amendment_renderer["publication_kind"] == "plan-amendment"
+    assert amendment_renderer["failure_review"]["value"] == "failure_review"
+    assert amendment_renderer["repair_request"]["value"] == "repair_request"
+    assert amendment_renderer["amendment_result"]["value"] == "amendment_result"
+    assert amendment_renderer["validation_results"]["value"] == "validation_results"
+    assert "judge" not in amendment_process["steps"][4]
 
 
 def test_create_pull_request_preserves_runtime_state_and_accepts_committed_files() -> (

@@ -90,6 +90,12 @@ def execute_intrinsic_git_gh_tool(
     elif tool == GH_TOOL:
         effective_parameters = dict(parameters)
         operation = effective_parameters.get("operation")
+        if operation == "pr_render_request":
+            from powdrr_lift.clean_pr_publisher import (
+                render_issue_worker_publication_request,
+            )
+
+            return render_issue_worker_publication_request(effective_parameters)
         if operation == "pr_create":
             _reject_pr_identity_overrides(effective_parameters, ("base", "head"))
         elif operation == "pr_edit":

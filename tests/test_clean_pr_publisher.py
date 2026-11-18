@@ -255,6 +255,51 @@ def test_amendment_publication_request_uses_repair_and_validation_evidence() -> 
     assert sections["advisory_test_quality_notes"] == "None."
 
 
+def test_implementation_publication_accepts_pr_prep_collect_results() -> None:
+    result = render_issue_worker_publication_request(
+        {
+            "publication_kind": "implementation",
+            "task_context": {
+                "proposed_pr_id": "feature-17-pr-04",
+                "proposed_pr_context": {
+                    "title": "Implement typed policy parsing",
+                    "objective": "Deliver the reviewed behavior.",
+                    "scope": ["Update the implementation."],
+                    "acceptance_criteria": ["The behavior matches the plan."],
+                },
+            },
+            "implementation_result": {
+                "passed": True,
+                "structrr": {"passed": True},
+                "integration_tests": {"passed": True},
+                "changed_paths": ["src/feature.py"],
+            },
+            "validation_results": [
+                {
+                    "id": {
+                        "id": "reviewed-verification-command",
+                        "validation_action": {
+                            "tool": "shell",
+                            "parameters": {
+                                "command": "bash attestation/scripts/verify-all.sh"
+                            },
+                        },
+                    },
+                    "result": {
+                        "command": "rtk bash attestation/scripts/verify-all.sh",
+                        "returncode": 0,
+                        "stdout": "211 passed",
+                    },
+                }
+            ],
+        }
+    )
+
+    assert result["workflow_context"]["pr-description-sections"]["validation"] == (
+        "- `rtk bash attestation/scripts/verify-all.sh` — passed (211 tests passed)"
+    )
+
+
 def test_publication_request_renderer_fails_closed_without_validation_evidence() -> (
     None
 ):

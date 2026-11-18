@@ -353,13 +353,13 @@ def test_batch_question_request_preserves_each_question_schema_and_identity() ->
 
     (batch,) = batch_question_requests((first, second))
     packet = json.loads(build_question_messages(batch)[1]["content"])
-    answers = {
-        first.question.question_id: _VALID_PAGE,
-        second.question.question_id: _VALID_PAGE,
-    }
+    answers = [_VALID_PAGE, _VALID_PAGE]
 
     batch.validate()
     assert len(batch.batch_members) == 2
+    assert batch.question.contract_version == 2
+    assert batch.question.expected_answer_schema == "planning-question-batch-v2"
+    assert batch.question.question_id.startswith("batch-v2-")
     child_packets = [
         fact["value"]
         for fact in packet["accepted_facts"]
@@ -374,12 +374,19 @@ def test_batch_question_request_preserves_each_question_schema_and_identity() ->
         if fact["ref_id"] == "shared-member-question-contract"
     )
     assert shared_contract["prompt"] in packet["exact_question"]["prompt"]
-    assert packet["answer_fields"]["json_schema"]["properties"]["answers"][
-        "required"
-    ] == ["q-000001", "q-000002"]
-    assert batch.parse_answer({"answers": answers}) == answers
+    answer_schema = packet["answer_fields"]["json_schema"]["properties"]["answers"]
+    assert answer_schema["type"] == "array"
+    assert answer_schema["minItems"] == answer_schema["maxItems"] == 2
+    assert all(
+        "question_id" not in json.dumps(member_schema)
+        for member_schema in answer_schema["items"]["anyOf"]
+    )
+    assert batch.parse_answer({"answers": answers}) == {
+        first.question.question_id: _VALID_PAGE,
+        second.question.question_id: _VALID_PAGE,
+    }
     with pytest.raises(PlanningContractError, match="every supplied question"):
-        batch.parse_answer({"answers": {"q-000001": _VALID_PAGE}})
+        batch.parse_answer({"answers": [_VALID_PAGE]})
 
 
 def test_batch_question_requests_keep_non_extraction_default_at_four() -> None:
@@ -399,11 +406,7 @@ def test_batch_question_requests_keep_non_extraction_default_at_four() -> None:
     assert [len(batch.batch_members) for batch in batches] == [4, 4]
     for batch, members in zip(batches, (requests[:4], requests[4:]), strict=True):
         assert batch.parse_answer(
-            {
-                "answers": {
-                    request.question.question_id: _VALID_PAGE for request in members
-                }
-            }
+            {"answers": [_VALID_PAGE for _request in members]}
         ) == {request.question.question_id: _VALID_PAGE for request in members}
 
 
@@ -434,9 +437,9 @@ def test_extraction_batch_uses_six_when_input_bound_allows() -> None:
     (batch,) = batch_question_requests(requests)
 
     assert len(batch.batch_members) == 6
-    assert batch.parse_answer(
-        {"answers": {request.question.question_id: _VALID_PAGE for request in requests}}
-    ) == {request.question.question_id: _VALID_PAGE for request in requests}
+    assert batch.parse_answer({"answers": [_VALID_PAGE for _request in requests]}) == {
+        request.question.question_id: _VALID_PAGE for request in requests
+    }
 
 
 def test_oversized_batch_correction_subdivides_and_revalidates_each_member() -> None:
@@ -456,24 +459,16 @@ def test_oversized_batch_correction_subdivides_and_revalidates_each_member() -> 
     )
     (batch,) = batch_question_requests(requests)
     first_invalid_batch_answer = {
-        "answers": {
-            request.question.question_id: {
+        "answers": [
+            {
                 **_VALID_PAGE,
                 "unexpected": "x" * 3600,
             }
             for request in requests
-        }
+        ]
     }
-    valid_first_half = {
-        "answers": {
-            request.question.question_id: _VALID_PAGE for request in requests[:2]
-        }
-    }
-    valid_second_half = {
-        "answers": {
-            request.question.question_id: _VALID_PAGE for request in requests[2:]
-        }
-    }
+    valid_first_half = {"answers": [_VALID_PAGE for _request in requests[:2]]}
+    valid_second_half = {"answers": [_VALID_PAGE for _request in requests[2:]]}
     client = _ScriptedClient(
         {
             ("planning_question_batch", "block-01"): [
@@ -495,9 +490,8 @@ def test_oversized_batch_correction_subdivides_and_revalidates_each_member() -> 
 
     assert not isinstance(result, NeedsQuestionAnswer)
     assert result.question.question_id == batch.question.question_id
-    assert set(result.raw_answer["answers"]) == {
-        request.question.question_id for request in requests
-    }
+    assert len(result.raw_answer["answers"]) == len(requests)
+    assert result.raw_answer["answers"] == [_VALID_PAGE for _request in requests]
     assert result.answer == {
         request.question.question_id: _VALID_PAGE for request in requests
     }

@@ -1,10 +1,10 @@
 # Planning: LLM interaction and determinism audit
 
 Status: audited recommendations; the first removal milestone (P07/P09),
-deterministic source-extraction paging, and deterministic work-unit proposal
-progression, and deterministic bindings for known runtime, component, validation,
-and zero-or-one implementation phases are implemented in the active planning
-path. Remaining work in milestones 2–6 is still proposed.
+deterministic source-extraction paging, deterministic work-unit proposal
+progression, deterministic runtime/component/validation and zero-or-one phase
+bindings, and deterministic batch answer-ID binding are implemented in the active
+planning path. Remaining work in milestones 2–6 is still proposed.
 
 Audited revision: `cfc0b514c43c1d14269147a03e5d7ec5ec5cc739`, fetched from
 `origin/main` on 2026-11-17. This is a static source audit, not a measured live
@@ -36,6 +36,13 @@ bound from planned paths and supplied catalogs. The planner also derives an
 empty phase assignment when the source has no phase sequence, and the sole phase
 when exactly one is declared. Only sources with multiple phases ask the model to
 assign a proposal to one phase.
+
+Batch-answer update: compatible requests still share one semantic model call, but
+answers now use a schema-ordered array. The scheduler binds each array position to
+the corresponding supplied question ID and validates it with that member's
+schema. The model no longer repeats IDs as object keys. Batch contract v2 also
+versions the wrapper contract. Accepted member answers remain checkpointed under
+their original question identities.
 
 Structural subject update: answers now contain subject records only. The planner
 automatically requests another page when a response fills the eight-record
@@ -451,7 +458,7 @@ operation identity and per-item assignment stay deterministic.
 | ID | Interaction | Continue as LLM? | Why any semantic retry remains justified | Deterministic replacement / boundary |
 | --- | --- | --- | --- | --- |
 | P14 | Bounded answer correction after invalid JSON/schema/parser/size result | No for lossless structure; conditional for missing semantics | A new semantic value may need a new proposal; renaming a known key or carrying a supplied ID does not. | Constrained output, canonical adapters and local validation; preserve original semantic payload. Never invent missing criterion/behavior to make a schema pass. |
-| P15 | Combined QuestionRequest batch requiring model to return an answer map keyed by known question IDs | No for framing; conditional member questions | Batch members may remain semantic; request IDs/routing/reassembly are known state. | Provider-native batch with code-owned request/result correlation; validate each member independently, split overflow in scheduler and retry only invalid members. |
+| P15 | Combined QuestionRequest batch requiring model to return an answer map keyed by known question IDs | No for framing; conditional member questions | Batch members may remain semantic; request IDs/routing/reassembly are known state. | Implemented: model returns one schema-ordered answer array; code binds positions to question IDs and validates each member independently. Overflow still splits in the scheduler. |
 | P16 | Provider retries and decision-provider request transformation/fallback | No semantic role for retry scheduling | Transient failures may warrant another transmission, not reinterpretation or state reconstruction. | Typed retry policy, bounded backoff and observable wire attempts; fail closed for unavailable required decisions, reuse accepted answers with matching inputs. |
 
 ### Exact common request envelope
@@ -479,7 +486,8 @@ are parsed/checkpointed under exact member identity. A malformed/oversized answe
 can stop earlier rather than consume all attempts.
 
 `batch_question_requests` combines compatible general questions into one prompt
-with known answer-map keys. Decision-provider kinds P08/P11 instead use the
+with an ordered answer array; code correlates array positions to known question
+IDs. Decision-provider kinds P08/P11 instead use the
 service's provider-native decision batch when all requests in that frontier have
 those kinds and the client supports it. `_SeededBatchAnswerClient` returns an
 already-obtained result to the local runner for validation; that seeded return is

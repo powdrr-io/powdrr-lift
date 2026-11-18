@@ -169,12 +169,12 @@ class _PlanningScriptClient:
         self.calls.append(question["kind"])
         if question["kind"] == "planning_question_batch":
             return {
-                "answers": {
-                    child["exact_question"]["question_id"]: self._answer(child)
+                "answers": [
+                    self._answer(child)
                     for item in packet["accepted_facts"]
                     for child in (item["value"],)
                     if item["ref_id"].startswith("question:")
-                }
+                ]
             }
         return self._answer(packet)
 
@@ -790,12 +790,7 @@ def test_batched_question_answer_is_checkpointed_as_each_original_question() -> 
         ) -> dict[str, Any]:
             del messages, response_schema
             self.calls += 1
-            return {
-                "answers": {
-                    member.question.question_id: dict(member.valid_example)
-                    for member in members
-                }
-            }
+            return {"answers": [dict(member.valid_example) for member in members]}
 
     client = BatchClient()
     transition = advance_planning_session(

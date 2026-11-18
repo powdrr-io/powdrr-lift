@@ -291,7 +291,7 @@ def _build_question_batch(
         batch_context.append(
             ContextRecord(f"question:{request.question.question_id}", packet)
         )
-    properties = {}
+    member_schemas = []
     for request in requests:
         member_schema = deepcopy(dict(request.answer_schema))
         if request.question.kind == "propose_work_units":
@@ -312,63 +312,63 @@ def _build_question_batch(
                 "properties"
             ]
             output_properties["requirement_ids"]["items"].pop("enum", None)
-        properties[request.question.question_id] = member_schema
+        member_schemas.append(member_schema)
     schema = {
         "type": "object",
         "additionalProperties": False,
         "required": ["answers"],
         "properties": {
             "answers": {
-                "type": "object",
-                "additionalProperties": False,
-                "required": identifiers,
-                "properties": properties,
+                "type": "array",
+                "minItems": len(requests),
+                "maxItems": len(requests),
+                "items": {"anyOf": member_schemas},
             }
         },
     }
 
     def parse(value: Mapping[str, Any]) -> Mapping[str, Mapping[str, Any]]:
-        if set(value) != {"answers"} or not isinstance(value.get("answers"), Mapping):
-            raise PlanningContractError("/", "must contain one answers object")
+        if set(value) != {"answers"} or not isinstance(value.get("answers"), list):
+            raise PlanningContractError("/", "must contain one answers array")
         answers = value["answers"]
-        if set(answers) != set(identifiers):
+        if len(answers) != len(requests):
             raise PlanningContractError(
-                "/answers", "must answer every supplied question exactly once"
+                "/answers", "must answer every supplied question in order"
             )
         parsed: dict[str, Mapping[str, Any]] = {}
-        for question_id in identifiers:
-            answer = answers[question_id]
+        for question_id, answer in zip(identifiers, answers, strict=True):
+            answer_index = len(parsed)
             if not isinstance(answer, Mapping):
                 raise PlanningContractError(
-                    f"/answers/{question_id}", "must be an object"
+                    f"/answers/{answer_index}", "must be an object"
                 )
             member = members[question_id]
             try:
                 member.parse_answer(answer)
             except PlanningContractError as error:
                 raise PlanningContractError(
-                    f"/answers/{question_id}{error.json_pointer}", error.message
+                    f"/answers/{answer_index}{error.json_pointer}", error.message
                 ) from error
             parsed[question_id] = dict(answer)
         return parsed
 
     digest = hashlib.sha256(
         json.dumps(
-            [request.question.input_digest for request in requests],
+            {
+                "schema_version": 2,
+                "member_input_digests": [
+                    request.question.input_digest for request in requests
+                ],
+            },
             separators=(",", ":"),
         ).encode("utf-8")
     ).hexdigest()
-    example = {
-        "answers": {
-            request.question.question_id: dict(request.valid_example)
-            for request in requests
-        }
-    }
+    example = {"answers": [dict(request.valid_example) for request in requests]}
     batch = QuestionRequest(
         question=Question(
-            question_id=f"batch-{digest[:24]}",
+            question_id=f"batch-v2-{digest[:24]}",
             kind="planning_question_batch",
-            contract_version=1,
+            contract_version=2,
             subject_ids=tuple(
                 dict.fromkeys(
                     subject
@@ -378,14 +378,15 @@ def _build_question_batch(
             ),
             input_digest=f"sha256:{digest}",
             context_ref_ids=tuple(record.ref_id for record in batch_context),
-            expected_answer_schema="planning-question-batch-v1",
+            expected_answer_schema="planning-question-batch-v2",
             attempt=1,
         ),
         exact_question=(
             "Answer every planning request in the accepted facts. Treat each "
-            "request as independent, follow its question and schema, and put "
-            "exactly one answer under its supplied question ID. Do not omit or "
-            "combine answers."
+            "request as independent, follow its question and schema, and return "
+            "one answer object per request in the same order as the supplied "
+            "question records. Do not omit or combine answers, and do not repeat "
+            "question IDs in the answer."
             + (
                 f" The shared member question is: {requests[0].exact_question}"
                 if shared_contract
@@ -393,7 +394,10 @@ def _build_question_batch(
             )
         ),
         answer_field_definitions={
-            "answers": "An answer object for every supplied question ID."
+            "answers": (
+                "An ordered array with one answer object per supplied question, "
+                "in question record order."
+            )
         },
         source_excerpts=(),
         repository_evidence=(),
@@ -765,29 +769,44 @@ def _retry_split_batch_after_oversized_correction(
                 error=child_result.error,
                 previous_answer=child_result.previous_answer,
             )
+        child_members = (
+            child_request.batch_members
+            if child_request.batch_members
+            else (child_request,)
+        )
         child_answers = (
             child_result.raw_answer.get("answers")
             if child_request.batch_members
-            else {child_request.question.question_id: child_result.raw_answer}
+            else [child_result.raw_answer]
         )
-        if not isinstance(child_answers, Mapping):
+        if not isinstance(child_answers, list) or len(child_answers) != len(
+            child_members
+        ):
             return NeedsQuestionAnswer(
                 question=replace(request.question, attempt=attempts),
                 attempts=attempts,
                 error=PlanningContractError(
-                    "/answers", "subdivided batch returned no answer map"
+                    "/answers", "subdivided batch returned an invalid answer list"
                 ),
                 previous_answer=dict(child_result.raw_answer),
             )
-        answer_map.update(
-            {
-                question_id: dict(answer)
-                for question_id, answer in child_answers.items()
-                if isinstance(question_id, str) and isinstance(answer, Mapping)
-            }
-        )
+        for member, answer in zip(child_members, child_answers, strict=True):
+            if not isinstance(answer, Mapping):
+                return NeedsQuestionAnswer(
+                    question=replace(request.question, attempt=attempts),
+                    attempts=attempts,
+                    error=PlanningContractError(
+                        "/answers", "subdivided batch answer must be an object"
+                    ),
+                    previous_answer=dict(child_result.raw_answer),
+                )
+            answer_map[member.question.question_id] = dict(answer)
 
-    raw_answer = {"answers": answer_map}
+    raw_answer = {
+        "answers": [
+            answer_map[member.question.question_id] for member in request.batch_members
+        ]
+    }
     try:
         parsed_answer = request.parse_answer(raw_answer)
     except PlanningContractError as error:

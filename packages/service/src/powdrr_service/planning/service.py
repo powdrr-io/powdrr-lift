@@ -689,17 +689,23 @@ def advance_planning_session(
         elif isinstance(result, AcceptedQuestionAnswer):
             if request.batch_members:
                 raw_answers = result.raw_answer.get("answers")
-                if not isinstance(raw_answers, Mapping):
+                if not isinstance(raw_answers, list) or len(raw_answers) != len(
+                    request.batch_members
+                ):
                     errors.append(
-                        PlanningServiceError("question batch returned no answer map")
+                        PlanningServiceError(
+                            "question batch returned an invalid ordered answer list"
+                        )
                     )
                     continue
-                for member in request.batch_members:
-                    raw_answer = raw_answers.get(member.question.question_id)
+                for member_index, (member, raw_answer) in enumerate(
+                    zip(request.batch_members, raw_answers, strict=True)
+                ):
                     if not isinstance(raw_answer, Mapping):
                         errors.append(
                             PlanningServiceError(
-                                f"question batch omitted {member.question.question_id}"
+                                "question batch answer at index "
+                                f"{member_index} is not an object"
                             )
                         )
                         continue
@@ -732,12 +738,24 @@ def advance_planning_session(
                 needs_answers.append(result)
                 continue
             raw_answers = result.previous_answer.get("answers")
-            for member in request.batch_members:
-                raw_answer = (
-                    raw_answers.get(member.question.question_id)
-                    if isinstance(raw_answers, Mapping)
-                    else None
+            if not isinstance(raw_answers, list) or len(raw_answers) != len(
+                request.batch_members
+            ):
+                needs_answers.extend(
+                    NeedsQuestionAnswer(
+                        replace(member.question, attempt=result.attempts),
+                        result.attempts,
+                        PlanningContractError(
+                            "/answers", "batch response has an invalid answer list"
+                        ),
+                        {},
+                    )
+                    for member in request.batch_members
                 )
+                continue
+            for member, raw_answer in zip(
+                request.batch_members, raw_answers, strict=True
+            ):
                 if not isinstance(raw_answer, Mapping):
                     needs_answers.append(
                         NeedsQuestionAnswer(
@@ -949,14 +967,14 @@ def _run_question_batch(
         raw_answers = (
             raw_answer.get("answers")
             if isinstance(raw_answer, Mapping)
-            and isinstance(raw_answer.get("answers"), Mapping)
+            and isinstance(raw_answer.get("answers"), list)
             else None
         )
         pagination = []
-        for member in members:
+        for index, member in enumerate(members):
             member_answer = (
-                raw_answers.get(member.question.question_id)
-                if raw_answers is not None
+                raw_answers[index]
+                if raw_answers is not None and index < len(raw_answers)
                 else raw_answer
             )
             pagination_metric = _pagination_metric(member, member_answer, prior_events)

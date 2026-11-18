@@ -243,11 +243,6 @@ class _PlanningScriptClient:
                 "has_more": False,
                 "next_anchor": None,
             }
-        if kind == "describe_item":
-            return {
-                "title": f"Implement behavior in {question['subject_ids'][0]}",
-                "objective": "Implement the behavior described by the plan.",
-            }
         if kind == "plan_test_coverage":
             plan = next(
                 item["value"]
@@ -286,11 +281,6 @@ class _PlanningScriptClient:
             }
         if kind == "review_dependency_candidate":
             return {"required": True}
-        if kind == "describe_confirmed_dependency":
-            return {
-                "requirement_ids": ["req-0001"],
-                "reason": "The consumer uses the producer output.",
-            }
         if kind == "enumerate_structural_subjects":
             return {"records": [], "has_more": False, "next_anchor": None}
         if kind == "describe_structural_change":
@@ -630,7 +620,7 @@ def test_candidate_reviews_use_jev_and_checkpoint_provider(
     }
 
 
-def test_dependency_candidates_gate_generative_details_on_jev() -> None:
+def test_dependency_candidate_review_derives_edge_details_deterministically() -> None:
     text = "# Plan\n\nImplement the producer and consumer.\n"
     source = segment_markdown_source(
         PinnedSourceDocument(
@@ -685,29 +675,13 @@ def test_dependency_candidates_gate_generative_details_on_jev() -> None:
     assert machine.accepted_dependency_edges(rejected_answers) == ()
 
     accepted_review_answers = {review.question.question_id: {"required": True}}
-    details = machine._dependency_requests(accepted_review_answers)[0]
-    assert details.question.kind == "describe_confirmed_dependency"
-    machine.set_accepted_question_input_digests(
-        {
-            review.question.question_id: review.question.input_digest,
-            details.question.question_id: details.question.input_digest,
-        }
-    )
-    answers = {
-        **accepted_review_answers,
-        details.question.question_id: {
-            "requirement_ids": ["req-0001"],
-            "reason": "The consumer uses the producer's schema.",
-        },
-    }
-
-    assert machine._dependency_requests(answers) == ()
-    assert machine.accepted_dependency_edges(answers) == (
+    assert machine._dependency_requests(accepted_review_answers) == ()
+    assert machine.accepted_dependency_edges(accepted_review_answers) == (
         UnitDependencyEdge(
             producer.id,
             consumer.id,
             output.description,
-            "The consumer uses the producer's schema.",
+            "Consumer unit-consumer requires producer unit-producer's planned output.",
             ("req-0001",),
         ),
     )
@@ -1397,6 +1371,7 @@ def test_source_question_machine_accounts_for_normative_and_context_blocks() -> 
             block.anchor_ids[0],
         )
 
+    requested_kinds: list[str] = []
     while True:
         for deterministic in machine.deterministic_answers(answers):
             answers[deterministic["question"].question_id] = dict(
@@ -1406,6 +1381,7 @@ def test_source_question_machine_accounts_for_normative_and_context_blocks() -> 
         if request is None:
             break
         question = request.question
+        requested_kinds.append(question.kind)
         if question.kind == "extract_requirements":
             block = block_by_id[question.subject_ids[0]]
             records = (
@@ -1467,9 +1443,6 @@ def test_source_question_machine_accounts_for_normative_and_context_blocks() -> 
                 "has_more": False,
                 "next_anchor": None,
             }
-        elif question.kind == "describe_item":
-            answer = dict(request.valid_example)
-            answer["title"] = f"Implement behavior in {question.subject_ids[0]}"
         elif question.kind == "plan_test_coverage":
             answer = dict(request.valid_example)
         elif question.kind == "assess_requirement_coverage":
@@ -1481,11 +1454,6 @@ def test_source_question_machine_accounts_for_normative_and_context_blocks() -> 
             }
         elif question.kind == "review_dependency_candidate":
             answer = {"required": True}
-        elif question.kind == "describe_confirmed_dependency":
-            answer = {
-                "requirement_ids": ["req-0001"],
-                "reason": "The focused test consumes the implementation contract.",
-            }
         elif question.kind == "confirm_dependency":
             answer = {
                 "result": "required",
@@ -1522,10 +1490,17 @@ def test_source_question_machine_accounts_for_normative_and_context_blocks() -> 
         "unit-0002",
     ]
     assert len(machine.accepted_item_descriptions(answers)) == 1
+    assert "describe_item" not in requested_kinds
+    assert "describe_confirmed_dependency" not in requested_kinds
     dependency_edges = machine.accepted_dependency_edges(answers)
     assert len(dependency_edges) == 1
     assert dependency_edges[0].before_unit_id == "unit-0001"
     assert dependency_edges[0].after_unit_id == "unit-0002"
+    assert dependency_edges[0].output == "The behavior contract."
+    assert dependency_edges[0].requirement_ids == ("req-0001",)
+    assert dependency_edges[0].reason == (
+        "Consumer unit-0002 requires producer unit-0001's planned output."
+    )
     assembled = machine.accepted_assembly(answers, plan_id="bounded-plan")
     assert assembled.dependency_graph.unit_edges == dependency_edges
     assert len(assembled.plan.items) == 1
@@ -2011,7 +1986,6 @@ def test_procedrr_runs_real_planning_machine_through_compiled_artifacts(
     expected_provider_calls = [
         "planning_question_batch",
         "propose_work_units",
-        "describe_item",
         "plan_test_coverage",
         "enumerate_structural_subjects",
     ]

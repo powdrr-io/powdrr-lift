@@ -16,14 +16,13 @@ from powdrr_service.planning.assembly import (
     AllocationGroup,
     ItemDescription,
     PathFact,
-    PendingUnitOutput,
     PlannedWrite,
     WorkUnit,
     WorkUnitContext,
     WorkUnitProposal,
     allocate_work_unit_groups,
     allocate_work_units,
-    build_item_description_request,
+    build_deterministic_item_description,
     build_work_unit_proposal_request,
 )
 from powdrr_service.planning.compiler import (
@@ -49,7 +48,6 @@ from powdrr_service.planning.dependencies import (
     UnitDependencyEdge,
     Validation,
     bind_manual_setup,
-    build_confirmed_dependency_details_request,
     build_dependency_candidate_review_request,
     build_human_setup_description_request,
     combine_manual_prerequisite_data,
@@ -923,10 +921,6 @@ class SourceLedgerQuestionMachine:
             return self._batch_requests(work_unit_requests)
 
         downstream_requests: list[QuestionRequest[Any]] = []
-        for request in self._item_description_requests(accepted_answers):
-            if request.question.question_id not in accepted_answers:
-                downstream_requests.append(request)
-
         for request in self._dependency_requests(accepted_answers):
             if self._request_is_pending(request, accepted_answers):
                 downstream_requests.append(request)
@@ -1398,91 +1392,20 @@ class SourceLedgerQuestionMachine:
             return ()
         return allocate_work_unit_groups(units).groups
 
-    def _item_description_requests(
-        self, accepted_answers: Mapping[str, Mapping[str, Any]]
-    ) -> tuple[QuestionRequest[Any], ...]:
-        units = self.accepted_work_units(accepted_answers)
-        if not units:
-            return ()
-        by_id = {unit.id: unit for unit in units}
-        phase_by_id = {phase.id: phase for phase in self._implementation_phases}
-
-        def phase_for_group(group: AllocationGroup) -> Any:
-            phase_ids = {
-                by_id[unit_id].implementation_phase_id
-                for unit_id in group.unit_ids
-                if by_id[unit_id].implementation_phase_id is not None
-            }
-            if len(phase_ids) > 1:
-                raise PlanningCompilationError(
-                    "one allocated item crosses source implementation phases"
-                )
-            phase_id = next(iter(phase_ids), None)
-            return None if phase_id is None else phase_by_id.get(phase_id)
-
-        requests: list[QuestionRequest[Any]] = []
-        accepted_titles: list[tuple[str, str]] = []
-        for group in allocate_work_unit_groups(units).groups:
-            request = build_item_description_request(
-                group,
-                by_id,
-                already_used_titles=accepted_titles,
-                implementation_phase=phase_for_group(group),
-            )
-            answer = accepted_answers.get(request.question.question_id)
-            if answer is None:
-                requests.append(request)
-                continue
-            if (
-                self._accepted_question_input_digests is not None
-                and self._accepted_question_input_digests.get(
-                    request.question.question_id
-                )
-                != request.question.input_digest
-            ):
-                issue = "the work-unit details or prior item titles changed"
-                self._invalid_accepted_question_ids.add(request.question.question_id)
-                requests.append(
-                    build_item_description_request(
-                        group,
-                        by_id,
-                        already_used_titles=accepted_titles,
-                        title_issue=issue,
-                        implementation_phase=phase_for_group(group),
-                    )
-                )
-                continue
-            try:
-                description = request.parse_answer(answer)
-            except PlanningContractError as error:
-                self._invalid_accepted_question_ids.add(request.question.question_id)
-                requests.append(
-                    build_item_description_request(
-                        group,
-                        by_id,
-                        already_used_titles=accepted_titles,
-                        title_issue=str(error),
-                        implementation_phase=phase_for_group(group),
-                    )
-                )
-                continue
-            accepted_titles.append((group.id, description.title))
-            requests.append(request)
-        return tuple(requests)
-
     def accepted_item_descriptions(
         self, accepted_answers: Mapping[str, Mapping[str, Any]]
     ) -> tuple[tuple[AllocationGroup, ItemDescription], ...]:
+        units = self.accepted_work_units(accepted_answers)
+        by_id = {unit.id: unit for unit in units}
         groups = self._item_groups(accepted_answers)
-        requests = self._item_description_requests(accepted_answers)
         result = []
-        for group, request in zip(groups, requests, strict=True):
-            answer = accepted_answers.get(request.question.question_id)
-            if answer is None:
-                raise ValueError(
-                    f"item description is incomplete at {request.question.question_id}"
-                )
-            result.append((group, request.parse_answer(answer)))
+        accepted_titles: list[tuple[str, str]] = []
+        for group in groups:
+            description = build_deterministic_item_description(
+                group, by_id, already_used_titles=accepted_titles
+            )
+            accepted_titles.append((group.id, description.title))
+            result.append((group, description))
         return tuple(result)
 
     def _dependency_requests(
@@ -1490,16 +1413,6 @@ class SourceLedgerQuestionMachine:
     ) -> tuple[QuestionRequest[Any], ...]:
         allocation, discovery = self._dependency_discovery(accepted_answers)
         units = {unit.id: unit for unit in allocation.units}
-        pairs: list[
-            tuple[
-                PendingUnitOutput,
-                WorkUnit,
-                WorkUnit,
-                QuestionRequest[bool],
-                set[str],
-                tuple[str, ...],
-            ]
-        ] = []
         pending_reviews: list[QuestionRequest[Any]] = []
         for pending_output, consumer in discovery.confirmation_pairs:
             producer = units[pending_output.unit_id]
@@ -1515,16 +1428,6 @@ class SourceLedgerQuestionMachine:
                 pending_output.description,
                 allowed_requirement_ids=allowed_requirement_ids,
                 code_reference_paths=code_reference_paths,
-            )
-            pairs.append(
-                (
-                    pending_output,
-                    consumer,
-                    producer,
-                    review,
-                    allowed_requirement_ids,
-                    code_reference_paths,
-                )
             )
             answer = accepted_answers.get(review.question.question_id)
             if answer is not None and (
@@ -1546,47 +1449,7 @@ class SourceLedgerQuestionMachine:
                 pending_reviews.append(review)
         if pending_reviews:
             return self._batch_requests(pending_reviews)
-
-        requests: list[QuestionRequest[Any]] = []
-        for (
-            pending_output,
-            consumer,
-            producer,
-            review,
-            allowed_ids,
-            reference_paths,
-        ) in pairs:
-            if not review.parse_answer(accepted_answers[review.question.question_id]):
-                continue
-            details = build_confirmed_dependency_details_request(
-                producer,
-                consumer,
-                pending_output.description,
-                allowed_requirement_ids=allowed_ids,
-                candidate_review=review,
-                code_reference_paths=reference_paths,
-            )
-            answer = accepted_answers.get(details.question.question_id)
-            if answer is not None and (
-                self._accepted_question_input_digests is not None
-                and self._accepted_question_input_digests.get(
-                    details.question.question_id
-                )
-                != details.question.input_digest
-            ):
-                self._invalid_accepted_question_ids.add(details.question.question_id)
-                answer = None
-            if answer is not None:
-                try:
-                    details.parse_answer(answer)
-                except PlanningContractError:
-                    self._invalid_accepted_question_ids.add(
-                        details.question.question_id
-                    )
-                    answer = None
-            if answer is None:
-                requests.append(details)
-        return tuple(requests)
+        return ()
 
     def accepted_dependency_edges(
         self, accepted_answers: Mapping[str, Mapping[str, Any]]
@@ -1616,24 +1479,16 @@ class SourceLedgerQuestionMachine:
             )
             if not review.parse_answer(accepted_answers[review.question.question_id]):
                 continue
-            request = build_confirmed_dependency_details_request(
-                producer,
-                consumer,
-                pending_output.description,
-                allowed_requirement_ids=allowed_requirement_ids,
-                candidate_review=review,
-                code_reference_paths=code_reference_paths,
-            )
-            answer = request.parse_answer(
-                accepted_answers[request.question.question_id]
-            )
             edges.append(
                 UnitDependencyEdge(
                     producer.id,
                     consumer.id,
-                    answer.output or pending_output.description,
-                    answer.reason,
-                    answer.requirement_ids,
+                    pending_output.description,
+                    (
+                        f"Consumer {consumer.id} requires producer {producer.id}'s "
+                        "planned output."
+                    ),
+                    pending_output.requirement_ids,
                 )
             )
         return tuple(edges)

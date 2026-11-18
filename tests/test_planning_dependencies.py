@@ -23,7 +23,6 @@ from powdrr_service.planning.dependencies import (
     bind_manual_setup,
     bind_unit_prerequisites,
     bind_validation,
-    build_confirmed_dependency_details_request,
     build_dependency_candidate_review_request,
     build_dependency_confirmation_request,
     build_dependency_graph_review_requests,
@@ -541,23 +540,6 @@ def test_dependency_candidate_uses_jev_boolean_then_bounded_details() -> None:
         if fact.ref_id == "dependency-candidate-classifier"
     )
     assert "reference alone does not prove" in classifier["instructions"][0]
-
-    details = build_confirmed_dependency_details_request(
-        producer,
-        consumer,
-        output,
-        allowed_requirement_ids=allowed,
-        candidate_review=review,
-        code_reference_paths=references,
-    )
-    details.validate()
-    confirmation = details.parse_answer(
-        {"requirement_ids": ["req-0001"], "reason": "The client consumes the schema."}
-    )
-    assert confirmation.required
-    assert confirmation.output == output
-    assert confirmation.requirement_ids == ("req-0001",)
-    assert details.question.kind == "describe_confirmed_dependency"
 
 
 def test_candidate_recall_fixture_keeps_chain_and_reviews_false_positive() -> None:

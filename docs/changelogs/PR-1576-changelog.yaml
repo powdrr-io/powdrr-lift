@@ -1,0 +1,511 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1576
+title: Remove redundant planner LLM metadata calls
+intent:
+  problem: The planner used model calls to render titles/objectives for frozen work
+    groups and to restate provenance after confirming a dependency.
+  goal: Derive item metadata and confirmed dependency edge details from accepted planning
+    facts, retaining the semantic candidate decision.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/audits/planning-llm-audit.md
+  type: modified
+  span:
+    start_line: 3
+    end_line: 4
+  summary: Record P07/P09 as implemented and retain audit snapshots as historical
+    context.
+  rationale: Keep planner removal milestones synchronized with the current active
+    path.
+- path: docs/audits/planning-llm-audit.md
+  type: modified
+  span:
+    start_line: 12
+    end_line: 18
+  summary: Record P07/P09 as implemented and retain audit snapshots as historical
+    context.
+  rationale: Keep planner removal milestones synchronized with the current active
+    path.
+- path: docs/audits/planning-llm-audit.md
+  type: modified
+  span:
+    start_line: 549
+    end_line: 555
+  summary: Record P07/P09 as implemented and retain audit snapshots as historical
+    context.
+  rationale: Keep planner removal milestones synchronized with the current active
+    path.
+- path: docs/audits/planning-llm-audit.md
+  type: modified
+  span:
+    start_line: 581
+    end_line: 584
+  summary: Record P07/P09 as implemented and retain audit snapshots as historical
+    context.
+  rationale: Keep planner removal milestones synchronized with the current active
+    path.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 1570
+    end_line: 1581
+  summary: Derive item title, objective, and scope from accepted allocated work units.
+  rationale: Remove inference for metadata already present in frozen planning facts.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 1603
+    end_line: 1827
+  summary: Derive item title, objective, and scope from accepted allocated work units.
+  rationale: Remove inference for metadata already present in frozen planning facts.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 1635
+    end_line: 1655
+  summary: Derive item title, objective, and scope from accepted allocated work units.
+  rationale: Remove inference for metadata already present in frozen planning facts.
+- path: packages/service/src/powdrr_service/planning/contracts.py
+  type: modified
+  span:
+    start_line: 22
+    end_line: 22
+  summary: Remove obsolete item-description and confirmed-dependency question kinds.
+  rationale: Prevent removed planner interactions from remaining valid question contracts.
+- path: packages/service/src/powdrr_service/planning/contracts.py
+  type: modified
+  span:
+    start_line: 27
+    end_line: 27
+  summary: Remove obsolete item-description and confirmed-dependency question kinds.
+  rationale: Prevent removed planner interactions from remaining valid question contracts.
+- path: packages/service/src/powdrr_service/planning/dependencies.py
+  type: modified
+  span:
+    start_line: 1675
+    end_line: 1778
+  summary: Delete the follow-up dependency-details request builder.
+  rationale: Keep the confirmed edge anchored to declared output provenance and the
+    original semantic decision.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 19
+    end_line: 19
+  summary: Remove item-description and confirmed-dependency-detail questions from
+    the active planning driver.
+  rationale: Preserve the semantic candidate decision while deterministically carrying
+    declared output provenance into dependency edges.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 25
+    end_line: 25
+  summary: Remove item-description and confirmed-dependency-detail questions from
+    the active planning driver.
+  rationale: Preserve the semantic candidate decision while deterministically carrying
+    declared output provenance into dependency edges.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 52
+    end_line: 52
+  summary: Remove item-description and confirmed-dependency-detail questions from
+    the active planning driver.
+  rationale: Preserve the semantic candidate decision while deterministically carrying
+    declared output provenance into dependency edges.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 926
+    end_line: 929
+  summary: Remove item-description and confirmed-dependency-detail questions from
+    the active planning driver.
+  rationale: Preserve the semantic candidate decision while deterministically carrying
+    declared output provenance into dependency edges.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 1395
+    end_line: 1395
+  summary: Remove item-description and confirmed-dependency-detail questions from
+    the active planning driver.
+  rationale: Preserve the semantic candidate decision while deterministically carrying
+    declared output provenance into dependency edges.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 1397
+    end_line: 1397
+  summary: Remove item-description and confirmed-dependency-detail questions from
+    the active planning driver.
+  rationale: Preserve the semantic candidate decision while deterministically carrying
+    declared output provenance into dependency edges.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 1405
+    end_line: 1406
+  summary: Remove item-description and confirmed-dependency-detail questions from
+    the active planning driver.
+  rationale: Preserve the semantic candidate decision while deterministically carrying
+    declared output provenance into dependency edges.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 1400
+    end_line: 1401
+  summary: Remove item-description and confirmed-dependency-detail questions from
+    the active planning driver.
+  rationale: Preserve the semantic candidate decision while deterministically carrying
+    declared output provenance into dependency edges.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 1403
+    end_line: 1405
+  summary: Remove item-description and confirmed-dependency-detail questions from
+    the active planning driver.
+  rationale: Preserve the semantic candidate decision while deterministically carrying
+    declared output provenance into dependency edges.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 1432
+    end_line: 1468
+  summary: Remove item-description and confirmed-dependency-detail questions from
+    the active planning driver.
+  rationale: Preserve the semantic candidate decision while deterministically carrying
+    declared output provenance into dependency edges.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 1408
+    end_line: 1408
+  summary: Remove item-description and confirmed-dependency-detail questions from
+    the active planning driver.
+  rationale: Preserve the semantic candidate decision while deterministically carrying
+    declared output provenance into dependency edges.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 1493
+    end_line: 1502
+  summary: Remove item-description and confirmed-dependency-detail questions from
+    the active planning driver.
+  rationale: Preserve the semantic candidate decision while deterministically carrying
+    declared output provenance into dependency edges.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 1519
+    end_line: 1528
+  summary: Remove item-description and confirmed-dependency-detail questions from
+    the active planning driver.
+  rationale: Preserve the semantic candidate decision while deterministically carrying
+    declared output provenance into dependency edges.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 1452
+    end_line: 1452
+  summary: Remove item-description and confirmed-dependency-detail questions from
+    the active planning driver.
+  rationale: Preserve the semantic candidate decision while deterministically carrying
+    declared output provenance into dependency edges.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 1619
+    end_line: 1629
+  summary: Remove item-description and confirmed-dependency-detail questions from
+    the active planning driver.
+  rationale: Preserve the semantic candidate decision while deterministically carrying
+    declared output provenance into dependency edges.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 1486
+    end_line: 1491
+  summary: Remove item-description and confirmed-dependency-detail questions from
+    the active planning driver.
+  rationale: Preserve the semantic candidate decision while deterministically carrying
+    declared output provenance into dependency edges.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 1215
+    end_line: 1215
+  summary: Remove phase routing for the deleted planner question kinds.
+  rationale: Keep telemetry routing aligned with valid active question families.
+- path: packages/service/src/powdrr_service/planning/service.py
+  type: modified
+  span:
+    start_line: 1219
+    end_line: 1219
+  summary: Remove phase routing for the deleted planner question kinds.
+  rationale: Keep telemetry routing aligned with valid active question families.
+- path: tests/test_benchmark_planning_scale.py
+  type: modified
+  span:
+    start_line: 318
+    end_line: 318
+  summary: Remove synthetic counts and answer handling for deleted dependency-detail
+    calls.
+  rationale: Keep benchmark reporting aligned with the active planner route.
+- path: tests/test_benchmark_planning_scale.py
+  type: modified
+  span:
+    start_line: 472
+    end_line: 476
+  summary: Remove synthetic counts and answer handling for deleted dependency-detail
+    calls.
+  rationale: Keep benchmark reporting aligned with the active planner route.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 22
+    end_line: 22
+  summary: Test deterministic item title, objective, and derived scope behavior.
+  rationale: Replace question parser tests with checks of the new no-inference renderer.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 25
+    end_line: 25
+  summary: Test deterministic item title, objective, and derived scope behavior.
+  rationale: Replace question parser tests with checks of the new no-inference renderer.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 541
+    end_line: 543
+  summary: Test deterministic item title, objective, and derived scope behavior.
+  rationale: Replace question parser tests with checks of the new no-inference renderer.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 546
+    end_line: 546
+  summary: Test deterministic item title, objective, and derived scope behavior.
+  rationale: Replace question parser tests with checks of the new no-inference renderer.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 548
+    end_line: 549
+  summary: Test deterministic item title, objective, and derived scope behavior.
+  rationale: Replace question parser tests with checks of the new no-inference renderer.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 565
+    end_line: 568
+  summary: Test deterministic item title, objective, and derived scope behavior.
+  rationale: Replace question parser tests with checks of the new no-inference renderer.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 572
+    end_line: 572
+  summary: Test deterministic item title, objective, and derived scope behavior.
+  rationale: Replace question parser tests with checks of the new no-inference renderer.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 574
+    end_line: 574
+  summary: Test deterministic item title, objective, and derived scope behavior.
+  rationale: Replace question parser tests with checks of the new no-inference renderer.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 576
+    end_line: 576
+  summary: Test deterministic item title, objective, and derived scope behavior.
+  rationale: Replace question parser tests with checks of the new no-inference renderer.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 579
+    end_line: 580
+  summary: Test deterministic item title, objective, and derived scope behavior.
+  rationale: Replace question parser tests with checks of the new no-inference renderer.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 583
+    end_line: 583
+  summary: Test deterministic item title, objective, and derived scope behavior.
+  rationale: Replace question parser tests with checks of the new no-inference renderer.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 592
+    end_line: 594
+  summary: Test deterministic item title, objective, and derived scope behavior.
+  rationale: Replace question parser tests with checks of the new no-inference renderer.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 598
+    end_line: 598
+  summary: Test deterministic item title, objective, and derived scope behavior.
+  rationale: Replace question parser tests with checks of the new no-inference renderer.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 601
+    end_line: 601
+  summary: Test deterministic item title, objective, and derived scope behavior.
+  rationale: Replace question parser tests with checks of the new no-inference renderer.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 603
+    end_line: 603
+  summary: Test deterministic item title, objective, and derived scope behavior.
+  rationale: Replace question parser tests with checks of the new no-inference renderer.
+- path: tests/test_planning_dependencies.py
+  type: modified
+  span:
+    start_line: 26
+    end_line: 26
+  summary: Remove tests for the deleted confirmed-dependency-details question builder.
+  rationale: Test the retained candidate review and edge construction at the driver
+    boundary.
+- path: tests/test_planning_dependencies.py
+  type: modified
+  span:
+    start_line: 545
+    end_line: 561
+  summary: Remove tests for the deleted confirmed-dependency-details question builder.
+  rationale: Test the retained candidate review and edge construction at the driver
+    boundary.
+- path: tests/test_planning_questions.py
+  type: modified
+  span:
+    start_line: 388
+    end_line: 392
+  summary: Use active question kinds in generic batching tests.
+  rationale: Keep contract fixtures within the planner supported question vocabulary.
+- path: tests/test_planning_questions.py
+  type: modified
+  span:
+    start_line: 449
+    end_line: 449
+  summary: Use active question kinds in generic batching tests.
+  rationale: Keep contract fixtures within the planner supported question vocabulary.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 246
+    end_line: 250
+  summary: Remove fake responses for deleted planner requests and verify no follow-up
+    request is emitted.
+  rationale: Protect deterministic item and dependency output while retaining semantic
+    candidate review.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 289
+    end_line: 293
+  summary: Remove fake responses for deleted planner requests and verify no follow-up
+    request is emitted.
+  rationale: Protect deterministic item and dependency output while retaining semantic
+    candidate review.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 623
+    end_line: 623
+  summary: Remove fake responses for deleted planner requests and verify no follow-up
+    request is emitted.
+  rationale: Protect deterministic item and dependency output while retaining semantic
+    candidate review.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 678
+    end_line: 679
+  summary: Remove fake responses for deleted planner requests and verify no follow-up
+    request is emitted.
+  rationale: Protect deterministic item and dependency output while retaining semantic
+    candidate review.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 684
+    end_line: 684
+  summary: Remove fake responses for deleted planner requests and verify no follow-up
+    request is emitted.
+  rationale: Protect deterministic item and dependency output while retaining semantic
+    candidate review.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1374
+    end_line: 1374
+  summary: Remove fake responses for deleted planner requests and verify no follow-up
+    request is emitted.
+  rationale: Protect deterministic item and dependency output while retaining semantic
+    candidate review.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1384
+    end_line: 1384
+  summary: Remove fake responses for deleted planner requests and verify no follow-up
+    request is emitted.
+  rationale: Protect deterministic item and dependency output while retaining semantic
+    candidate review.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1470
+    end_line: 1472
+  summary: Remove fake responses for deleted planner requests and verify no follow-up
+    request is emitted.
+  rationale: Protect deterministic item and dependency output while retaining semantic
+    candidate review.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1484
+    end_line: 1488
+  summary: Remove fake responses for deleted planner requests and verify no follow-up
+    request is emitted.
+  rationale: Protect deterministic item and dependency output while retaining semantic
+    candidate review.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1493
+    end_line: 1494
+  summary: Remove fake responses for deleted planner requests and verify no follow-up
+    request is emitted.
+  rationale: Protect deterministic item and dependency output while retaining semantic
+    candidate review.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1499
+    end_line: 1503
+  summary: Remove fake responses for deleted planner requests and verify no follow-up
+    request is emitted.
+  rationale: Protect deterministic item and dependency output while retaining semantic
+    candidate review.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 2014
+    end_line: 2014
+  summary: Remove fake responses for deleted planner requests and verify no follow-up
+    request is emitted.
+  rationale: Protect deterministic item and dependency output while retaining semantic
+    candidate review.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []

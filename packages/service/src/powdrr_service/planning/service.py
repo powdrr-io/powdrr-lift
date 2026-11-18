@@ -1212,11 +1212,9 @@ def _question_phase(kind: str) -> str:
     }:
         return "work-unit-design"
     if kind in {
-        "describe_item",
         "resolve_prerequisite_output",
         "confirm_dependency",
         "review_dependency_candidate",
-        "describe_confirmed_dependency",
         "review_dependency_graph",
     }:
         return "dependency-and-pr-slicing"

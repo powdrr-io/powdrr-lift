@@ -9,6 +9,7 @@ import re
 import time
 import uuid
 from collections.abc import Callable, Mapping
+from contextvars import ContextVar
 from pathlib import Path
 from typing import Any, cast
 
@@ -24,6 +25,9 @@ _PROVIDER_CREDENTIAL_RE = re.compile(
 _PROVIDER_TOKEN_RE = re.compile(
     r"(?:ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|"
     r"AKIA[0-9A-Z]{16}|Bearer\s+[A-Za-z0-9._-]{20,}|sk-[A-Za-z0-9_-]{20,})"
+)
+_INTERACTION_CONTEXT: ContextVar[Mapping[str, Any] | None] = ContextVar(
+    "procedrr_interaction_context", default=None
 )
 
 
@@ -96,6 +100,7 @@ class ProcedrrModelClient:
         replay_responses: Mapping[str, Mapping[str, Any]] | None = None,
         telemetry_sink: Callable[[Mapping[str, Any]], None] | None = None,
         telemetry_role: str = "unknown",
+        telemetry_context: Mapping[str, Any] | None = None,
     ) -> None:
         self._client = client
         self._process_directory = process_directory
@@ -105,6 +110,7 @@ class ProcedrrModelClient:
         self._replay_responses = dict(replay_responses or {})
         self._telemetry_sink = telemetry_sink
         self._telemetry_role = telemetry_role
+        self._telemetry_context = dict(telemetry_context or {})
 
     @staticmethod
     def replay_key(messages: list[dict[str, str]]) -> str:
@@ -112,11 +118,25 @@ class ProcedrrModelClient:
         canonical = json.dumps(messages, ensure_ascii=False, sort_keys=True)
         return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
+    def set_telemetry_sink(
+        self, sink: Callable[[Mapping[str, Any]], None] | None
+    ) -> None:
+        """Set the run-owned sink after its durable artifact is initialized."""
+        self._telemetry_sink = sink
+
+    def is_replay_hit(self, messages: list[dict[str, str]]) -> bool:
+        """Return whether this request is satisfied by the configured replay map."""
+        return self.replay_key(messages) in self._replay_responses
+
     def _complete_from_provider(
         self,
         messages: list[dict[str, str]],
         response_schema: Mapping[str, Any],
         trace_id: str,
+        *,
+        interaction_id: str,
+        prompt_fingerprint: str,
+        retry_cause: str | None,
     ) -> dict[str, Any]:
         for attempt in range(self._provider_retry_attempts + 1):
             started = time.monotonic()
@@ -142,6 +162,9 @@ class ProcedrrModelClient:
                     attempt,
                     started,
                     outcome="succeeded",
+                    prompt_fingerprint=prompt_fingerprint,
+                    interaction_id=interaction_id,
+                    retry_cause=retry_cause,
                     **_usage_fields(self._client),
                 )
                 return result
@@ -153,6 +176,9 @@ class ProcedrrModelClient:
                     attempt,
                     started,
                     outcome="retrying" if will_retry else "failed",
+                    prompt_fingerprint=prompt_fingerprint,
+                    interaction_id=interaction_id,
+                    retry_cause=("provider_transport" if retryable else retry_cause),
                     error_type=type(exc).__name__,
                     error_module=type(exc).__module__,
                     error_message=_safe_provider_error(exc),
@@ -188,15 +214,46 @@ class ProcedrrModelClient:
         completion_tokens: int | None = None,
         cost_amount: int | float | None = None,
         cost_currency: str | None = None,
+        prompt_fingerprint: str | None = None,
+        interaction_id: str | None = None,
+        retry_cause: str | None = None,
+        interaction_ids: list[str] | None = None,
+        interaction_contexts: list[Mapping[str, Any]] | None = None,
     ) -> None:
         if self._telemetry_sink is None:
             return
         client = self._client
         delegate = getattr(client, "_fallback", None)
+        interaction_context = {
+            **self._telemetry_context,
+            **dict(_INTERACTION_CONTEXT.get() or {}),
+        }
         self._telemetry_sink(
             {
                 "record_type": "powdrr_service.procedrr.provider_attempt",
                 "trace_id": trace_id,
+                "interaction_id": interaction_id
+                or interaction_context.get("interaction_id"),
+                "interaction_ids": interaction_ids,
+                "interactions": (
+                    [dict(context) for context in interaction_contexts]
+                    if interaction_contexts is not None
+                    else None
+                ),
+                "caller": interaction_context.get("caller"),
+                "gate_consumer": interaction_context.get("gate_consumer"),
+                "judge_path": interaction_context.get("judge_path"),
+                "replay_status": interaction_context.get("replay_status", "miss"),
+                "evidence_fingerprint": interaction_context.get("evidence_fingerprint"),
+                "prompt_builder_version": interaction_context.get(
+                    "prompt_builder_version"
+                ),
+                "task_id": interaction_context.get("task_id"),
+                "attempt_id": interaction_context.get("attempt_id"),
+                "process_id": interaction_context.get("process_id"),
+                "process_fingerprint": interaction_context.get("process_fingerprint"),
+                "prompt_fingerprint": prompt_fingerprint,
+                "retry_cause": retry_cause,
                 "attempt": attempt + 1,
                 "provider_client": type(client).__name__,
                 "role": self._telemetry_role,
@@ -262,6 +319,7 @@ class ProcedrrModelClient:
         """Complete a declared group of judge requests while preserving replay."""
         if not requests:
             return []
+        contexts = (_INTERACTION_CONTEXT.get() or {}).get("batch_interactions", [])
         replay_keys = [self.replay_key(messages) for messages, _ in requests]
         outputs: list[dict[str, Any] | None] = [None] * len(requests)
         pending: list[tuple[int, list[dict[str, str]], Mapping[str, Any], str]] = []
@@ -285,8 +343,8 @@ class ProcedrrModelClient:
             batch_method = getattr(self._client, "complete_json_batch", None)
             if not callable(batch_method):
                 for index, _, schema, _ in pending:
-                    outputs[index] = self.complete_json(
-                        requests[index][0], response_schema=schema
+                    outputs[index] = self._complete_batch_member(
+                        requests[index][0], schema, index
                     )
             else:
                 started = time.monotonic()
@@ -309,8 +367,8 @@ class ProcedrrModelClient:
                     # The batch boundary is an optimization. Preserve the
                     # established individual structured-repair path on error.
                     for index, _, schema, _ in pending:
-                        outputs[index] = self.complete_json(
-                            requests[index][0], response_schema=schema
+                        outputs[index] = self._complete_batch_member(
+                            requests[index][0], schema, index
                         )
                 finally:
                     self._record_provider_attempt(
@@ -324,12 +382,68 @@ class ProcedrrModelClient:
                         error_module=(
                             type(batch_error).__module__ if batch_error else None
                         ),
-                        error_message=(str(batch_error) if batch_error else None),
+                        error_message=(
+                            _safe_provider_error(batch_error) if batch_error else None
+                        ),
                         transport_kind="batch",
                         batch_member_count=len(pending),
+                        interaction_ids=[
+                            str(contexts[index].get("interaction_id"))
+                            for index, *_ in pending
+                            if index < len(contexts)
+                            and contexts[index].get("interaction_id")
+                        ],
+                        interaction_contexts=[
+                            contexts[index]
+                            for index, *_ in pending
+                            if index < len(contexts)
+                        ],
                         **(_usage_fields(self._client) if batch_error is None else {}),
                     )
         return [output for output in outputs if output is not None]
+
+    def _complete_batch_member(
+        self,
+        messages: list[dict[str, str]],
+        schema: Mapping[str, Any],
+        index: int,
+    ) -> dict[str, Any]:
+        contexts = (_INTERACTION_CONTEXT.get() or {}).get("batch_interactions", [])
+        context = contexts[index] if index < len(contexts) else {}
+        token = _INTERACTION_CONTEXT.set({**dict(context), "batch_interactions": []})
+        try:
+            return self.complete_json(messages, response_schema=schema)
+        finally:
+            _INTERACTION_CONTEXT.reset(token)
+
+    def complete_json_traced(
+        self,
+        messages: list[dict[str, str]],
+        *,
+        response_schema: Mapping[str, Any],
+        telemetry_context: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        """Complete one judge request with caller identity for its attempt trace."""
+        token = _INTERACTION_CONTEXT.set(dict(telemetry_context))
+        try:
+            return self.complete_json(messages, response_schema=response_schema)
+        finally:
+            _INTERACTION_CONTEXT.reset(token)
+
+    def complete_json_batch_traced(
+        self,
+        requests: list[tuple[list[dict[str, str]], Mapping[str, Any]]],
+        *,
+        telemetry_contexts: list[Mapping[str, Any]],
+    ) -> list[dict[str, Any]]:
+        """Complete a batch while preserving each member's logical identity."""
+        token = _INTERACTION_CONTEXT.set(
+            {"batch_interactions": [dict(item) for item in telemetry_contexts]}
+        )
+        try:
+            return self.complete_json_batch(requests)
+        finally:
+            _INTERACTION_CONTEXT.reset(token)
 
     def complete_json(
         self,
@@ -352,6 +466,14 @@ class ProcedrrModelClient:
         if replay is not None:
             return parse(dict(replay))
 
+        interaction_context = {
+            **self._telemetry_context,
+            **dict(_INTERACTION_CONTEXT.get() or {}),
+        }
+        interaction_id = str(
+            interaction_context.get("interaction_id") or uuid.uuid4().hex
+        )
+
         last_error = ""
         for attempt in range(self._max_retries + 1):
             if attempt:
@@ -367,8 +489,15 @@ class ProcedrrModelClient:
                     },
                 ]
             try:
+                logical_request_id = uuid.uuid4().hex
+                prompt_fingerprint = self.replay_key(messages)
                 payload = self._complete_from_provider(
-                    messages, response_schema, replay_key
+                    messages,
+                    response_schema,
+                    logical_request_id,
+                    interaction_id=interaction_id,
+                    prompt_fingerprint=prompt_fingerprint,
+                    retry_cause=("invalid_response_correction" if attempt else None),
                 )
                 return parse(payload)
             except JsonSchemaError as exc:

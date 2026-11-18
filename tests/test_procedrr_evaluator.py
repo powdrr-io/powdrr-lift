@@ -184,6 +184,11 @@ steps:
     assert telemetry[0]["transport_kind"] == "batch"
     assert telemetry[0]["batch_member_count"] == 2
     assert telemetry[0]["outcome"] == "succeeded"
+    judge_events = [event for event in result.events if event.kind == "judge"]
+    assert len({event.data["interaction_id"] for event in judge_events}) == 2
+    assert set(telemetry[0]["interaction_ids"]) == {
+        event.data["interaction_id"] for event in judge_events
+    }
     assert result.bindings["decisions"] == [
         {"item": "yes, include this", "result": {"positive": True}},
         {"item": "no, exclude this", "result": {"positive": False}},
@@ -239,7 +244,7 @@ def test_parallel_judge_failures_preserve_each_failed_item_event() -> None:
         "steps[0].for_each[0][0][0]",
         "steps[0].for_each[0][1][0]",
     ]
-    assert len({event.data["trace_id"] for event in failed}) == 2
+    assert len({event.data["interaction_id"] for event in failed}) == 2
 
 
 def test_evaluator_enforces_declared_operation_return_schema() -> None:
@@ -357,7 +362,7 @@ def test_evaluator_records_failed_judge_path_and_request_trace() -> None:
     assert failure.path == "steps[2]"
     assert failure.data["provider"] == "planning"
     assert failure.data["output"] == "classification"
-    assert len(failure.data["trace_id"]) == 64
+    assert len(failure.data["interaction_id"]) == 32
 
 
 def test_evaluator_calls_a_named_procedrr_process(tmp_path: Path) -> None:

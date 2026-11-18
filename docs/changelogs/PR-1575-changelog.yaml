@@ -1,0 +1,113 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1575
+title: Trace story-test authoring interactions
+intent:
+  problem: MiniSWE story-test authoring lacked explicit gate, case, and evidence attribution in interaction traces, and its suite artifact did not report trace coverage.
+  goal: Bind story-test model calls to their plan evidence and baseline gate, then mark whether usable traces were captured.
+human-decisions: []
+structured_files: []
+files:
+  - path: packages/local/src/powdrr_local/miniswe_inference.py
+    type: modified
+    span: {start_line: 49, end_line: 55}
+    summary: Accept caller, gate, evidence, check, candidate, and conversation-artifact metadata for MiniSWE traces.
+    rationale: Preserve story-test request attribution without copying prompts or responses.
+  - path: packages/local/src/powdrr_local/miniswe_inference.py
+    type: modified
+    span: {start_line: 72, end_line: 83}
+    summary: Attach trace context to failed MiniSWE interactions.
+    rationale: Keep failed model requests linked to the evidence and baseline gate that invoked them.
+  - path: packages/local/src/powdrr_local/miniswe_inference.py
+    type: modified
+    span: {start_line: 107, end_line: 118}
+    summary: Attach trace context to successful MiniSWE interactions.
+    rationale: Keep successful authoring requests equally attributable.
+  - path: packages/local/src/powdrr_local/miniswe_inference.py
+    type: modified
+    span: {start_line: 141, end_line: 151}
+    summary: Extend the trace identity record with story-test context and artifact references.
+    rationale: Make the candidate, check, evidence, and conversation artifact discoverable from one attempt record.
+  - path: packages/local/src/powdrr_local/miniswe_inference.py
+    type: modified
+    span: {start_line: 157, end_line: 163}
+    summary: Serialize the new story-test identity fields.
+    rationale: Keep context in trace metadata without adding request content.
+  - path: src/powdrr_lift/workrr/coding_agent.py
+    type: modified
+    span: {start_line: 1131, end_line: 1135}
+    summary: Configure caller-specific MiniSWE trace metadata.
+    rationale: Let authoring routes label their gate and supporting evidence.
+  - path: src/powdrr_lift/workrr/coding_agent.py
+    type: modified
+    span: {start_line: 1399, end_line: 1407}
+    summary: Link each inference request to its base candidate and trajectory artifact.
+    rationale: Preserve the existing access-controlled request and response record as a trace reference.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span: {start_line: 2039, end_line: 2060}
+    summary: Fingerprint test-author evidence and collect obligation identifiers.
+    rationale: Identify the exact reviewed plan and test cases without copying private evidence into telemetry.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span: {start_line: 2093, end_line: 2103}
+    summary: Label MiniSWE authoring calls with the story-test or integration-test baseline gate.
+    rationale: Distinguish story validation from general pre-coding test authoring.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span: {start_line: 2377, end_line: 2379}
+    summary: Add interaction-trace coverage to the test-suite artifact.
+    rationale: Report observed or missing MiniSWE traces with the authoring result.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span: {start_line: 2410, end_line: 2444}
+    summary: Count logical MiniSWE requests and transport attempts from redacted trace files.
+    rationale: Make story-test trace coverage explicit without exposing model content.
+  - path: tests/test_coding_agent.py
+    type: modified
+    span: {start_line: 566, end_line: 567}
+    summary: Assert trace records link to the candidate commit and trajectory artifact.
+    rationale: Keep the per-attempt artifact reference stable and resolvable.
+  - path: tests/test_local_miniswe_inference.py
+    type: modified
+    span: {start_line: 98, end_line: 104}
+    summary: Supply story-test trace metadata in the redaction test.
+    rationale: Exercise evidence and gate attribution on the local inference wrapper.
+  - path: tests/test_local_miniswe_inference.py
+    type: modified
+    span: {start_line: 113, end_line: 119}
+    summary: Assert caller, gate, evidence, check, candidate, and artifact trace fields.
+    rationale: Guard the story-test trace contract against metadata loss.
+  - path: tests/test_story_test_authoring.py
+    type: modified
+    span: {start_line: 420, end_line: 420}
+    summary: Capture provider configuration in the story-test author route test.
+    rationale: Verify the live authoring route passes its specific trace context.
+  - path: tests/test_story_test_authoring.py
+    type: modified
+    span: {start_line: 426, end_line: 426}
+    summary: Save story-test trace configuration from the fake provider.
+    rationale: Assert route-level metadata without making a provider call.
+  - path: tests/test_story_test_authoring.py
+    type: modified
+    span: {start_line: 479, end_line: 490}
+    summary: Verify story gate, evidence identifiers, fingerprint, check ID, and unobserved trace status.
+    rationale: Ensure the artifact reports missing traces instead of implying coverage.
+entities:
+  - id: story-test-interaction-tracing
+    type: Feature
+    action: added
+entity_relationships: []
+invariants:
+  - id: story-test-interaction-attribution
+    description: Story-test MiniSWE calls identify the baseline gate, candidate commit, test check, obligation evidence, and trajectory artifact.
+    action: added
+    rationale: Allow reviewers to reconstruct which accepted cases and candidate a test-author request served.
+  - id: story-test-trace-coverage-state
+    description: The authoring suite reports unobserved when no usable MiniSWE trace records exist.
+    action: added
+    rationale: Keep missing measurement explicit in WP0 coverage reporting.
+guidance:
+  - id: preserve-story-test-trace-metadata
+    description: Keep story-test author requests connected to their plan fingerprint, obligation IDs, baseline gate, and candidate.
+    action: added
+    rationale: Preserve the audit chain from approved story cases to independent baseline results.

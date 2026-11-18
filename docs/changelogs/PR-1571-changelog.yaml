@@ -1,0 +1,40 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1571
+title: Preserve PR prep validation errors
+intent:
+  problem: PR prep validation failures caused by tool error objects could be replaced by unrelated missing binding errors, and failed shell validation could be retried.
+  goal: Retain the original tool error evidence when a validation gate fails and stop retrying terminal validation failures.
+human-decisions: []
+structured_files: []
+files:
+  - path: packages/service/src/powdrr_service/procedrr_evaluator/evaluator.py
+    type: modified
+    span: {start_line: 1389, end_line: 1389}
+    summary: Resolve gate subjects with gate-specific nested binding behavior.
+    rationale: Let validation gates fail with the original root error evidence instead of an unrelated missing binding error.
+  - path: packages/service/src/powdrr_service/procedrr_evaluator/evaluator.py
+    type: modified
+    span: {start_line: 1437, end_line: 1457}
+    summary: Treat a missing nested gate field as absent while keeping top-level names strict.
+    rationale: Preserve the root tool error object when a gate checks a field omitted by that error.
+  - path: packages/service/src/powdrr_service/resources/processes/finish-pr-prep.yaml
+    type: modified
+    span: {start_line: 51, end_line: 51}
+    summary: Stop retrying a failed file validation gate.
+    rationale: Avoid rerunning validation after a tool error and preserve its diagnostic evidence.
+  - path: packages/service/src/powdrr_service/resources/processes/finish-pr-prep.yaml
+    type: modified
+    span: {start_line: 82, end_line: 82}
+    summary: Stop retrying a failed project validation gate.
+    rationale: Avoid rerunning validation after a tool error and preserve its diagnostic evidence.
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 51, end_line: 108}
+    summary: Cover missing nested gate fields and PR prep tool errors.
+    rationale: Verify that a BrokenPipeError reaches the gate failure and validation runs once.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []
+features: []
+proposed_prs: []

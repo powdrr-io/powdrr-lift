@@ -104,6 +104,7 @@ def test_finish_pr_prep_preserves_tool_error_in_gate_failure() -> None:
 
     assert shell_attempts == 1
     assert raised.value.evidence == tool_error
+    assert "BrokenPipeError" in str(raised.value)
 
 
 class FakeLLM:

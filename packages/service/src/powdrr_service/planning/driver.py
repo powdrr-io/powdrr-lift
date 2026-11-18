@@ -2155,7 +2155,7 @@ class SourceLedgerQuestionMachine:
                             break
                         scope_pages.append(page)
                         scope_subjects.extend(page.records)
-                        if not page.has_more:
+                        if not page.is_full:
                             completed_item_subjects.extend(
                                 complete_subject_enumeration(scope_pages)
                             )
@@ -2325,7 +2325,7 @@ class SourceLedgerQuestionMachine:
                 prior_subjects = list(
                     coalesce_structural_subjects((*prior_subjects, *page.records))
                 )
-                if not page.has_more:
+                if not page.is_full:
                     subjects.extend(complete_subject_enumeration(pages))
                     break
                 page_ordinal += 1

@@ -39,7 +39,6 @@ steps:
         - In validation, report one concise Markdown bullet per command with a short result summary. Never copy raw stdout, stderr, terminal logs, progress output, dependency-install output, or full test traces. Summarize test counts when available.
         - Keep every section concise and focused on this PR. Do not paste structured JSON or unprocessed tool output into any section.
         - "In advisory_test_quality_notes, include each distinct implementation_result.integration_tests.quality_notes concern once. Group multiple labels for the same test into one concise bullet, summarize the concern and evidence in at most two sentences, and never copy full model reasoning or raw prompts. Write `None.` when there are no concerns. These notes are advisory and never block publication."
-        - Set base-branch to main.
         - "Set publication-branch to powdrr/<proposed-pr-id>-implementation, using task_context.proposed_pr_id exactly. When workflow metadata includes a publication ID, Workrr appends it to create a unique branch for this PR; do not invent the ID."
         - Provide a clear commit message and a complete populated PR description. Do not claim any unrun check passed.
       context: [task_context, implementation_result, validation_results]
@@ -53,7 +52,7 @@ steps:
             user_request: {type: string, minLength: 1}
             workflow_context:
               type: object
-              required: [feature-name, commit-message, base-branch, publication-branch]
+              required: [feature-name, commit-message, publication-branch]
               additionalProperties: true
               properties:
                 feature-name: {type: string, minLength: 1, maxLength: 100}
@@ -62,7 +61,6 @@ steps:
                   type: object
                   additionalProperties: true
                 populated-pr-description: {type: string, minLength: 1}
-                base-branch: {type: string, const: main}
                 publication-branch: {type: string, minLength: 1}
       validation: {kind: json_schema}
   - call:

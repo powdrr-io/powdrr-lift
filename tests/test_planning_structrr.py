@@ -74,10 +74,8 @@ def _record(
     }
 
 
-def _candidate_page(
-    records: list[dict[str, Any]], *, has_more: bool, next_anchor: str | None
-) -> dict[str, Any]:
-    return {"records": records, "has_more": has_more, "next_anchor": next_anchor}
+def _candidate_page(records: list[dict[str, Any]]) -> dict[str, Any]:
+    return {"records": records}
 
 
 def _parse_page(
@@ -209,8 +207,6 @@ def test_structural_questions_send_only_relevant_baseline_subjects(
                         "source_refs": ["basedpyright-reference-paths:item-0001"],
                     }
                 ],
-                "has_more": False,
-                "next_anchor": None,
             }
         )
     assert any(
@@ -713,7 +709,7 @@ def test_structural_subject_answer_is_reasked_when_projected_context_changes() -
     first_request = machine._structrr_requests({})[0]
     question_id = first_request.question.question_id
     machine.set_accepted_question_input_digests({question_id: "sha256:" + "0" * 64})
-    stale_answer = {"records": [], "has_more": False, "next_anchor": None}
+    stale_answer: dict[str, Any] = {"records": []}
 
     requests = machine._structrr_requests({question_id: stale_answer})
 
@@ -790,6 +786,13 @@ def test_structural_candidates_are_reviewed_before_enumeration(
     )[0]
 
     assert enumeration.question.kind == "enumerate_structural_subjects"
+    assert enumeration.question.contract_version == 2
+    assert enumeration.question.expected_answer_schema == "structural-subject-page-v2"
+    assert enumeration.question.question_id.startswith("structural-subjects-v2-")
+    assert enumeration.answer_schema["required"] == ["records"]
+    assert "has_more" not in enumeration.answer_schema["properties"]
+    assert "next_anchor" not in enumeration.answer_schema["properties"]
+    assert "automatically requests another page" in enumeration.exact_question
     baseline_fact = next(
         fact.value
         for fact in enumeration.accepted_facts
@@ -800,6 +803,33 @@ def test_structural_candidates_are_reviewed_before_enumeration(
         fact.ref_id.startswith("prior-subject-summary:")
         for fact in enumeration.accepted_facts
     )
+    first_page_records = [
+        {
+            "section": "entities",
+            "subject_ref": None,
+            "new_identity_description": f"Additional planned entity {index}",
+            "action": "added",
+            "requirement_ids": ["req-01"],
+            "unit_ids": [unit.id],
+            "source_refs": [source_ref],
+        }
+        for index in range(8)
+    ]
+    machine.set_accepted_question_input_digests(
+        {
+            review.question.question_id: review.question.input_digest,
+            enumeration.question.question_id: enumeration.question.input_digest,
+        }
+    )
+    next_page = machine._structrr_requests(
+        {
+            review.question.question_id: {"relevant": False},
+            enumeration.question.question_id: {"records": first_page_records},
+        }
+    )[0]
+    assert next_page.question.kind == "enumerate_structural_subjects"
+    assert next_page.question.question_id.endswith("-0002")
+    assert next_page.question.subject_ids == enumeration.question.subject_ids
 
 
 def test_planned_file_subjects_do_not_need_structural_llm_calls() -> None:
@@ -849,7 +879,7 @@ def test_planned_file_subjects_do_not_need_structural_llm_calls() -> None:
 
     first_request = machine._structrr_requests({})[0]
     question_id = first_request.question.question_id
-    answer = {"records": [], "has_more": False, "next_anchor": None}
+    answer: dict[str, Any] = {"records": []}
     machine.set_accepted_question_input_digests(
         {question_id: first_request.question.input_digest}
     )
@@ -993,8 +1023,6 @@ def test_rejected_candidates_are_hidden_and_cannot_be_enumerated_again() -> None
         request.parse_answer(
             {
                 "records": [_record("entity-01")],
-                "has_more": False,
-                "next_anchor": None,
             }
         )
 
@@ -1016,8 +1044,6 @@ def test_planned_file_mislabeled_as_entity_is_recovered_deterministically() -> N
                     "source_refs": ["anchor-01"],
                 }
             ],
-            "has_more": False,
-            "next_anchor": None,
         },
         plan_id="plan-01",
         item_id="item-0001",
@@ -1072,7 +1098,7 @@ def test_accepted_assembly_cache_survives_structural_answers(
 
     first = machine.accepted_assembly(answers, plan_id="plan-01")
     after_structural_answer = machine.accepted_assembly(
-        {**answers, "structural-subjects-item-0001-0001": {"records": []}},
+        {**answers, "structural-subjects-v2-item-0001-0001": {"records": []}},
         plan_id="plan-01",
     )
     after_upstream_answer_change = machine.accepted_assembly(
@@ -1546,16 +1572,12 @@ def test_structural_subject_pages_cover_all_subjects_and_require_final_page() ->
     first = _parse_page(
         _candidate_page(
             [_record(f"entity-{index:02d}") for index in range(8)],
-            has_more=True,
-            next_anchor="structural-page-0002",
         ),
         baseline=baseline,
     )
     second = _parse_page(
         _candidate_page(
             [_record(f"entity-{index:02d}") for index in range(8, 12)],
-            has_more=False,
-            next_anchor=None,
         ),
         page_ordinal=2,
         baseline=baseline,
@@ -1567,13 +1589,9 @@ def test_structural_subject_pages_cover_all_subjects_and_require_final_page() ->
         complete_subject_enumeration((first,))
 
 
-def test_nonfinal_structural_page_must_add_a_subject() -> None:
-    with pytest.raises(
-        PlanningContractError, match="must add at least one new subject"
-    ):
-        _parse_page(
-            _candidate_page([], has_more=True, next_anchor="structural-page-0002")
-        )
+def test_subject_page_rejects_model_controlled_pagination_fields() -> None:
+    with pytest.raises(PlanningContractError, match="unknown fields"):
+        _parse_page({"records": [], "has_more": False, "next_anchor": None})
 
 
 def test_structural_page_example_does_not_repeat_prior_subjects() -> None:
@@ -1650,9 +1668,7 @@ def test_structural_page_uses_parser_valid_example_if_candidate_is_stale(
     monkeypatch.setattr(
         structrr_module,
         "_example_subject_page",
-        lambda **_kwargs: _candidate_page(
-            [_record("removed-entity")], has_more=False, next_anchor=None
-        ),
+        lambda **_kwargs: _candidate_page([_record("removed-entity")]),
     )
 
     request = build_subject_enumeration_request(
@@ -1666,8 +1682,6 @@ def test_structural_page_uses_parser_valid_example_if_candidate_is_stale(
 
     assert request.valid_example == {
         "records": [],
-        "has_more": False,
-        "next_anchor": None,
     }
     request.parse_answer(request.valid_example)
 
@@ -1682,7 +1696,7 @@ def test_structural_page_coalesces_repeated_entity_within_one_item() -> None:
     records[1]["source_refs"] = ["anchor-02"]
 
     page = _parse_page(
-        _candidate_page(records, has_more=False, next_anchor=None),
+        _candidate_page(records),
         units=units,
         requirements={"req-01", "req-02"},
         baseline={"entities": [{"id": "entity-01"}]},
@@ -1810,8 +1824,6 @@ def test_structural_page_correction_fits_with_many_prior_subjects() -> None:
             }
             for index in range(8)
         ],
-        "has_more": True,
-        "next_anchor": "structural-page-0005",
     }
 
     messages = build_question_messages(
@@ -1835,7 +1847,7 @@ def test_file_subject_can_reference_projected_file_entity_id() -> None:
     record["section"] = "files"
 
     page = _parse_page(
-        _candidate_page([record], has_more=False, next_anchor=None),
+        _candidate_page([record]),
         baseline=baseline,
     )
 
@@ -1856,7 +1868,7 @@ def test_new_relationship_subject_retains_identity_description() -> None:
     }
 
     page = _parse_page(
-        _candidate_page([record], has_more=False, next_anchor=None),
+        _candidate_page([record]),
     )
 
     assert len(page.records) == 1
@@ -1876,7 +1888,7 @@ def test_file_reference_in_entity_section_is_resolved_as_file(
     }
 
     page = _parse_page(
-        _candidate_page([candidate], has_more=False, next_anchor=None),
+        _candidate_page([candidate]),
         baseline=baseline,
     )
 
@@ -1991,8 +2003,6 @@ def test_planned_file_subject_cannot_be_repeated_on_a_later_page() -> None:
     }
     page_one = {
         "records": [record],
-        "has_more": True,
-        "next_anchor": "structural-page-0002",
     }
 
     first = _parse_page(page_one, units=(unit,))
@@ -2008,8 +2018,6 @@ def test_planned_file_subject_cannot_be_repeated_on_a_later_page() -> None:
                         "new_identity_description": None,
                     }
                 ],
-                "has_more": False,
-                "next_anchor": None,
             },
             page_ordinal=2,
             units=(unit,),
@@ -2023,7 +2031,7 @@ def test_subject_page_accepts_all_known_source_references() -> None:
     row["source_refs"] = sorted(source_ids)
 
     page = _parse_page(
-        _candidate_page([row], has_more=False, next_anchor=None),
+        _candidate_page([row]),
         baseline={"entities": [{"id": "entity-01"}]},
         source_ids=source_ids,
     )
@@ -2031,17 +2039,11 @@ def test_subject_page_accepts_all_known_source_references() -> None:
     assert page.records[0].source_refs == tuple(sorted(source_ids))
 
 
-def test_subject_page_rejects_wrong_cursor_and_duplicate_subject() -> None:
-    with pytest.raises(PlanningContractError, match="runtime-owned cursor"):
-        _parse_page(
-            _candidate_page([_record("entity-01")], has_more=True, next_anchor="next"),
-            baseline={"entities": [{"id": "entity-01"}]},
-        )
-
+def test_subject_page_rejects_duplicate_subject() -> None:
     baseline = {"entities": [{"id": "entity-01"}]}
     with pytest.raises(PlanningContractError, match="already enumerated"):
         _parse_page(
-            _candidate_page([_record("entity-01")], has_more=False, next_anchor=None),
+            _candidate_page([_record("entity-01")]),
             baseline=baseline,
             prior={("entities", "entity-01")},
         )
@@ -2078,7 +2080,7 @@ def test_subject_page_coalesces_shared_planned_file_across_units() -> None:
     ]
 
     page = _parse_page(
-        _candidate_page(records, has_more=False, next_anchor=None),
+        _candidate_page(records),
         units=units,
         requirements={"req-01", "req-02"},
         source_ids={"anchor-01", "anchor-02"},
@@ -2123,8 +2125,6 @@ def test_subject_pages_reject_shared_planned_file_repeated_across_pages() -> Non
     first = _parse_page(
         _candidate_page(
             [record("req-01", "unit-01", "anchor-01")],
-            has_more=True,
-            next_anchor="structural-page-0002",
         ),
         units=units,
         requirements={"req-01", "req-02"},
@@ -2136,8 +2136,6 @@ def test_subject_pages_reject_shared_planned_file_repeated_across_pages() -> Non
         _parse_page(
             _candidate_page(
                 [record("req-02", "unit-02", "anchor-02")],
-                has_more=False,
-                next_anchor=None,
             ),
             page_ordinal=2,
             units=units,
@@ -2153,9 +2151,7 @@ def test_subject_page_parser_rejects_unknown_existing_reference() -> None:
         PlanningContractError, match="absent from the projected baseline"
     ):
         _parse_page(
-            _candidate_page(
-                [_record("invented-entity")], has_more=False, next_anchor=None
-            ),
+            _candidate_page([_record("invented-entity")]),
             baseline={"entities": []},
         )
 
@@ -2166,7 +2162,7 @@ def test_subject_requirements_must_be_covered_by_its_units() -> None:
     row["unit_ids"] = ["unit-01"]
     with pytest.raises(PlanningContractError, match="cited requirements"):
         _parse_page(
-            _candidate_page([row], has_more=False, next_anchor=None),
+            _candidate_page([row]),
             units=units,
             requirements={"req-01", "req-02"},
             baseline={"entities": [{"id": "entity-01"}]},
@@ -2185,9 +2181,7 @@ def test_new_file_subject_is_bound_to_a_planned_path() -> None:
         "unit_ids": [unit.id],
         "source_refs": ["anchor-01"],
     }
-    page = _parse_page(
-        _candidate_page([candidate], has_more=False, next_anchor=None), units=(unit,)
-    )
+    page = _parse_page(_candidate_page([candidate]), units=(unit,))
     subject = page.records[0]
     change = parse_structural_change(
         {
@@ -2224,7 +2218,7 @@ def test_new_file_subject_extracts_one_planned_path_from_description() -> None:
     }
 
     page = _parse_page(
-        _candidate_page([candidate], has_more=False, next_anchor=None),
+        _candidate_page([candidate]),
         units=(unit,),
         baseline={"files": [], "source_subjects": []},
     )
@@ -2255,7 +2249,7 @@ def test_new_file_subject_rejects_multiple_planned_paths_in_description() -> Non
 
     with pytest.raises(PlanningContractError, match="multiple planned write paths"):
         _parse_page(
-            _candidate_page([candidate], has_more=False, next_anchor=None),
+            _candidate_page([candidate]),
             units=(unit,),
             baseline={"files": [], "source_subjects": []},
         )
@@ -2280,7 +2274,7 @@ def test_prefixed_new_file_description_resolves_to_planned_path(
     }
 
     page = _parse_page(
-        _candidate_page([candidate], has_more=False, next_anchor=None),
+        _candidate_page([candidate]),
         units=(unit,),
         baseline={"files": [], "source_subjects": []},
     )
@@ -2304,7 +2298,7 @@ def test_prefixed_new_file_description_must_still_match_a_planned_path() -> None
 
     with pytest.raises(PlanningContractError, match="planned write path"):
         _parse_page(
-            _candidate_page([candidate], has_more=False, next_anchor=None),
+            _candidate_page([candidate]),
             baseline={"files": [], "source_subjects": []},
         )
 
@@ -2323,7 +2317,7 @@ def test_existing_projected_file_path_is_a_valid_structural_subject() -> None:
     }
 
     page = _parse_page(
-        _candidate_page([candidate], has_more=False, next_anchor=None),
+        _candidate_page([candidate]),
         baseline=baseline,
     )
 
@@ -2350,7 +2344,7 @@ def test_existing_subject_marked_added_is_normalized_to_changed(
     candidate["action"] = "added"
 
     page = _parse_page(
-        _candidate_page([candidate], has_more=False, next_anchor=None),
+        _candidate_page([candidate]),
         baseline=baseline,
     )
 
@@ -2378,7 +2372,7 @@ def test_absent_planned_file_reference_is_bound_as_a_new_subject(
     }
 
     page = _parse_page(
-        _candidate_page([candidate], has_more=False, next_anchor=None),
+        _candidate_page([candidate]),
         units=(unit,),
         baseline={"files": [], "source_subjects": []},
     )
@@ -2406,7 +2400,7 @@ def test_duplicated_planned_file_reference_is_bound_as_a_new_subject() -> None:
     }
 
     page = _parse_page(
-        _candidate_page([candidate], has_more=False, next_anchor=None),
+        _candidate_page([candidate]),
         units=(unit,),
         baseline={"files": [], "source_subjects": []},
     )
@@ -2434,7 +2428,7 @@ def test_absent_unplanned_file_reference_is_still_rejected() -> None:
         PlanningContractError, match="absent from the projected baseline"
     ):
         _parse_page(
-            _candidate_page([candidate], has_more=False, next_anchor=None),
+            _candidate_page([candidate]),
             baseline={"files": [], "source_subjects": []},
         )
 

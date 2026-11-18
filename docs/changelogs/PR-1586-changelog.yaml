@@ -1,0 +1,502 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1586
+title: Make structural subject paging deterministic
+intent:
+  problem: Structural subject enumeration answers let the model choose whether pagination
+    continued.
+  goal: Have the planner request another deterministic page whenever an answer reaches
+    the fixed record limit and accept subject records only.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/audits/planning-llm-audit.md
+  type: modified
+  span:
+    start_line: 33
+    end_line: 41
+  summary: Record deterministic structural subject paging progress.
+  rationale: Keep the planner audit aligned with the current implementation and remaining
+    work.
+- path: docs/audits/planning-llm-audit.md
+  type: modified
+  span:
+    start_line: 584
+    end_line: 588
+  summary: Record deterministic structural subject paging progress.
+  rationale: Keep the planner audit aligned with the current implementation and remaining
+    work.
+- path: docs/audits/planning-llm-audit.md
+  type: modified
+  span:
+    start_line: 610
+    end_line: 611
+  summary: Record deterministic structural subject paging progress.
+  rationale: Keep the planner audit aligned with the current implementation and remaining
+    work.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 2158
+    end_line: 2158
+  summary: Advance subject enumeration when a response fills its record capacity.
+  rationale: Make page progression a deterministic scheduler decision.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 2328
+    end_line: 2328
+  summary: Advance subject enumeration when a response fills its record capacity.
+  rationale: Make page progression a deterministic scheduler decision.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 117
+    end_line: 117
+  summary: Use records-only subject answers and derive continuation from page capacity.
+  rationale: Remove model-controlled cursors and invalidate answers from the previous
+    contract.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 277
+    end_line: 277
+  summary: Use records-only subject answers and derive continuation from page capacity.
+  rationale: Remove model-controlled cursors and invalidate answers from the previous
+    contract.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 493
+    end_line: 495
+  summary: Use records-only subject answers and derive continuation from page capacity.
+  rationale: Remove model-controlled cursors and invalidate answers from the previous
+    contract.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 501
+    end_line: 501
+  summary: Use records-only subject answers and derive continuation from page capacity.
+  rationale: Remove model-controlled cursors and invalidate answers from the previous
+    contract.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 506
+    end_line: 508
+  summary: Use records-only subject answers and derive continuation from page capacity.
+  rationale: Remove model-controlled cursors and invalidate answers from the previous
+    contract.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 783
+    end_line: 789
+  summary: Use records-only subject answers and derive continuation from page capacity.
+  rationale: Remove model-controlled cursors and invalidate answers from the previous
+    contract.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 797
+    end_line: 797
+  summary: Use records-only subject answers and derive continuation from page capacity.
+  rationale: Remove model-controlled cursors and invalidate answers from the previous
+    contract.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 809
+    end_line: 809
+  summary: Use records-only subject answers and derive continuation from page capacity.
+  rationale: Remove model-controlled cursors and invalidate answers from the previous
+    contract.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 815
+    end_line: 815
+  summary: Use records-only subject answers and derive continuation from page capacity.
+  rationale: Remove model-controlled cursors and invalidate answers from the previous
+    contract.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 817
+    end_line: 817
+  summary: Use records-only subject answers and derive continuation from page capacity.
+  rationale: Remove model-controlled cursors and invalidate answers from the previous
+    contract.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 820
+    end_line: 820
+  summary: Use records-only subject answers and derive continuation from page capacity.
+  rationale: Remove model-controlled cursors and invalidate answers from the previous
+    contract.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 835
+    end_line: 835
+  summary: Use records-only subject answers and derive continuation from page capacity.
+  rationale: Remove model-controlled cursors and invalidate answers from the previous
+    contract.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 840
+    end_line: 841
+  summary: Use records-only subject answers and derive continuation from page capacity.
+  rationale: Remove model-controlled cursors and invalidate answers from the previous
+    contract.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 873
+    end_line: 877
+  summary: Use records-only subject answers and derive continuation from page capacity.
+  rationale: Remove model-controlled cursors and invalidate answers from the previous
+    contract.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 925
+    end_line: 929
+  summary: Use records-only subject answers and derive continuation from page capacity.
+  rationale: Remove model-controlled cursors and invalidate answers from the previous
+    contract.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 903
+    end_line: 903
+  summary: Use records-only subject answers and derive continuation from page capacity.
+  rationale: Remove model-controlled cursors and invalidate answers from the previous
+    contract.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 1488
+    end_line: 1489
+  summary: Use records-only subject answers and derive continuation from page capacity.
+  rationale: Remove model-controlled cursors and invalidate answers from the previous
+    contract.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 2323
+    end_line: 2323
+  summary: Use records-only subject answers and derive continuation from page capacity.
+  rationale: Remove model-controlled cursors and invalidate answers from the previous
+    contract.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 2362
+    end_line: 2363
+  summary: Use records-only subject answers and derive continuation from page capacity.
+  rationale: Remove model-controlled cursors and invalidate answers from the previous
+    contract.
+- path: packages/service/src/powdrr_service/planning/structrr.py
+  type: modified
+  span:
+    start_line: 2365
+    end_line: 2371
+  summary: Use records-only subject answers and derive continuation from page capacity.
+  rationale: Remove model-controlled cursors and invalidate answers from the previous
+    contract.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 283
+    end_line: 283
+  summary: Update structural enumeration fixtures to records-only answers.
+  rationale: Keep planner service tests aligned with the version 2 answer contract.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1490
+    end_line: 1490
+  summary: Update structural enumeration fixtures to records-only answers.
+  rationale: Keep planner service tests aligned with the version 2 answer contract.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span:
+    start_line: 77
+    end_line: 78
+  summary: Cover records-only schemas, full-page continuation, and cursor rejection.
+  rationale: Protect deterministic structural subject paging and its checkpoint behavior.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span:
+    start_line: 212
+    end_line: 213
+  summary: Cover records-only schemas, full-page continuation, and cursor rejection.
+  rationale: Protect deterministic structural subject paging and its checkpoint behavior.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span:
+    start_line: 712
+    end_line: 712
+  summary: Cover records-only schemas, full-page continuation, and cursor rejection.
+  rationale: Protect deterministic structural subject paging and its checkpoint behavior.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span:
+    start_line: 789
+    end_line: 795
+  summary: Cover records-only schemas, full-page continuation, and cursor rejection.
+  rationale: Protect deterministic structural subject paging and its checkpoint behavior.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span:
+    start_line: 806
+    end_line: 832
+  summary: Cover records-only schemas, full-page continuation, and cursor rejection.
+  rationale: Protect deterministic structural subject paging and its checkpoint behavior.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span:
+    start_line: 882
+    end_line: 882
+  summary: Cover records-only schemas, full-page continuation, and cursor rejection.
+  rationale: Protect deterministic structural subject paging and its checkpoint behavior.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span:
+    start_line: 996
+    end_line: 997
+  summary: Cover records-only schemas, full-page continuation, and cursor rejection.
+  rationale: Protect deterministic structural subject paging and its checkpoint behavior.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span:
+    start_line: 1019
+    end_line: 1020
+  summary: Cover records-only schemas, full-page continuation, and cursor rejection.
+  rationale: Protect deterministic structural subject paging and its checkpoint behavior.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span:
+    start_line: 1101
+    end_line: 1101
+  summary: Cover records-only schemas, full-page continuation, and cursor rejection.
+  rationale: Protect deterministic structural subject paging and its checkpoint behavior.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span:
+    start_line: 1549
+    end_line: 1550
+  summary: Cover records-only schemas, full-page continuation, and cursor rejection.
+  rationale: Protect deterministic structural subject paging and its checkpoint behavior.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span:
+    start_line: 1557
+    end_line: 1558
+  summary: Cover records-only schemas, full-page continuation, and cursor rejection.
+  rationale: Protect deterministic structural subject paging and its checkpoint behavior.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span:
+    start_line: 1592
+    end_line: 1594
+  summary: Cover records-only schemas, full-page continuation, and cursor rejection.
+  rationale: Protect deterministic structural subject paging and its checkpoint behavior.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span:
+    start_line: 1671
+    end_line: 1671
+  summary: Cover records-only schemas, full-page continuation, and cursor rejection.
+  rationale: Protect deterministic structural subject paging and its checkpoint behavior.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span:
+    start_line: 1669
+    end_line: 1670
+  summary: Cover records-only schemas, full-page continuation, and cursor rejection.
+  rationale: Protect deterministic structural subject paging and its checkpoint behavior.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span:
+    start_line: 1699
+    end_line: 1699
+  summary: Cover records-only schemas, full-page continuation, and cursor rejection.
+  rationale: Protect deterministic structural subject paging and its checkpoint behavior.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span:
+    start_line: 1813
+    end_line: 1814
+  summary: Cover records-only schemas, full-page continuation, and cursor rejection.
+  rationale: Protect deterministic structural subject paging and its checkpoint behavior.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span:
+    start_line: 1850
+    end_line: 1850
+  summary: Cover records-only schemas, full-page continuation, and cursor rejection.
+  rationale: Protect deterministic structural subject paging and its checkpoint behavior.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span:
+    start_line: 1871
+    end_line: 1871
+  summary: Cover records-only schemas, full-page continuation, and cursor rejection.
+  rationale: Protect deterministic structural subject paging and its checkpoint behavior.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span:
+    start_line: 1891
+    end_line: 1891
+  summary: Cover records-only schemas, full-page continuation, and cursor rejection.
+  rationale: Protect deterministic structural subject paging and its checkpoint behavior.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span:
+    start_line: 1994
+    end_line: 1995
+  summary: Cover records-only schemas, full-page continuation, and cursor rejection.
+  rationale: Protect deterministic structural subject paging and its checkpoint behavior.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span:
+    start_line: 2011
+    end_line: 2012
+  summary: Cover records-only schemas, full-page continuation, and cursor rejection.
+  rationale: Protect deterministic structural subject paging and its checkpoint behavior.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span:
+    start_line: 2034
+    end_line: 2034
+  summary: Cover records-only schemas, full-page continuation, and cursor rejection.
+  rationale: Protect deterministic structural subject paging and its checkpoint behavior.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span:
+    start_line: 2042
+    end_line: 2042
+  summary: Cover records-only schemas, full-page continuation, and cursor rejection.
+  rationale: Protect deterministic structural subject paging and its checkpoint behavior.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span:
+    start_line: 2046
+    end_line: 2046
+  summary: Cover records-only schemas, full-page continuation, and cursor rejection.
+  rationale: Protect deterministic structural subject paging and its checkpoint behavior.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span:
+    start_line: 2083
+    end_line: 2083
+  summary: Cover records-only schemas, full-page continuation, and cursor rejection.
+  rationale: Protect deterministic structural subject paging and its checkpoint behavior.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span:
+    start_line: 2126
+    end_line: 2127
+  summary: Cover records-only schemas, full-page continuation, and cursor rejection.
+  rationale: Protect deterministic structural subject paging and its checkpoint behavior.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span:
+    start_line: 2139
+    end_line: 2140
+  summary: Cover records-only schemas, full-page continuation, and cursor rejection.
+  rationale: Protect deterministic structural subject paging and its checkpoint behavior.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span:
+    start_line: 2154
+    end_line: 2154
+  summary: Cover records-only schemas, full-page continuation, and cursor rejection.
+  rationale: Protect deterministic structural subject paging and its checkpoint behavior.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span:
+    start_line: 2165
+    end_line: 2165
+  summary: Cover records-only schemas, full-page continuation, and cursor rejection.
+  rationale: Protect deterministic structural subject paging and its checkpoint behavior.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span:
+    start_line: 2184
+    end_line: 2184
+  summary: Cover records-only schemas, full-page continuation, and cursor rejection.
+  rationale: Protect deterministic structural subject paging and its checkpoint behavior.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span:
+    start_line: 2221
+    end_line: 2221
+  summary: Cover records-only schemas, full-page continuation, and cursor rejection.
+  rationale: Protect deterministic structural subject paging and its checkpoint behavior.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span:
+    start_line: 2252
+    end_line: 2252
+  summary: Cover records-only schemas, full-page continuation, and cursor rejection.
+  rationale: Protect deterministic structural subject paging and its checkpoint behavior.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span:
+    start_line: 2277
+    end_line: 2277
+  summary: Cover records-only schemas, full-page continuation, and cursor rejection.
+  rationale: Protect deterministic structural subject paging and its checkpoint behavior.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span:
+    start_line: 2301
+    end_line: 2301
+  summary: Cover records-only schemas, full-page continuation, and cursor rejection.
+  rationale: Protect deterministic structural subject paging and its checkpoint behavior.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span:
+    start_line: 2320
+    end_line: 2320
+  summary: Cover records-only schemas, full-page continuation, and cursor rejection.
+  rationale: Protect deterministic structural subject paging and its checkpoint behavior.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span:
+    start_line: 2347
+    end_line: 2347
+  summary: Cover records-only schemas, full-page continuation, and cursor rejection.
+  rationale: Protect deterministic structural subject paging and its checkpoint behavior.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span:
+    start_line: 2375
+    end_line: 2375
+  summary: Cover records-only schemas, full-page continuation, and cursor rejection.
+  rationale: Protect deterministic structural subject paging and its checkpoint behavior.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span:
+    start_line: 2403
+    end_line: 2403
+  summary: Cover records-only schemas, full-page continuation, and cursor rejection.
+  rationale: Protect deterministic structural subject paging and its checkpoint behavior.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span:
+    start_line: 2431
+    end_line: 2431
+  summary: Cover records-only schemas, full-page continuation, and cursor rejection.
+  rationale: Protect deterministic structural subject paging and its checkpoint behavior.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []
+features: []
+proposed_prs: []

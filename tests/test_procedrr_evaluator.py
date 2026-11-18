@@ -1250,8 +1250,10 @@ def test_publication_input_failure_terminates_without_llm_recovery() -> None:
             parameters = nested_parameters
         operation = parameters.get("operation")
         if tool == "gh" and operation == "pr_publish_clean":
+            assert parameters["base"] == "main"
             workflow_context = parameters["workflow_context"]
             assert isinstance(workflow_context, Mapping)
+            assert "base-branch" not in workflow_context
             publication_calls += 1
             assert "pr-description-sections" not in workflow_context
             return {
@@ -1271,7 +1273,6 @@ def test_publication_input_failure_terminates_without_llm_recovery() -> None:
             "workflow_context": {
                 "feature-name": "Reviewed feature",
                 "commit-message": "Implement reviewed feature",
-                "base-branch": "main",
                 "publication-branch": "powdrr/reviewed-feature-implementation",
                 "populated-pr-description": "## Objective",
             },

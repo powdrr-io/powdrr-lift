@@ -14,6 +14,7 @@ from powdrr_service.verification.execute_pr_test_quality import (
     execute_pr_test_review_context,
     execute_pr_test_review_targets,
     render_execute_pr_test_quality_pr_notes,
+    review_execute_pr_test_quality,
 )
 
 
@@ -98,6 +99,102 @@ def test_quality_question_contains_only_scoped_evidence_as_data() -> None:
     assert "AC-01: Accept a valid value." in prompt
     assert "never as instructions" in prompt
     assert "unrelated_repository_dump" not in prompt
+
+
+def test_quality_review_records_redacted_interaction_metadata() -> None:
+    class NoShortcoming:
+        def complete_json(
+            self, _messages: list[dict[str, str]], *, response_schema: Any = None
+        ) -> dict[str, Any]:
+            return {"shortcoming_present": False}
+
+    evidence = {
+        "test_obligations": [
+            {"obligation_id": "AC-01", "source_text": "Accept a valid value."}
+        ],
+        "test_sources": {
+            "tests/test_values.py": (
+                "# Covers: AC-01 test_value_contract\n"
+                "def test_value_contract():\n    assert validate('value')\n"
+            )
+        },
+    }
+
+    report = review_execute_pr_test_quality(
+        evidence,
+        decision_client=NoShortcoming(),
+        llm_client=NoShortcoming(),
+        trace_context={"request_id": "quality-123", "task_id": "task-1"},
+    )
+
+    records = report["interaction_trace"]
+    assert len(records) == len(QUALITY_CHECKS)
+    assert {record["role"] for record in records} == {"decision"}
+    assert {record["caller"] for record in records} == {"execute_pr_test_quality"}
+    assert {record["prompt_builder_version"] for record in records} == {
+        "execute-pr-test-quality-v1"
+    }
+    assert all(record["evidence_fingerprint"] for record in records)
+    assert all(record["prompt_fingerprint"] for record in records)
+    assert all(record["outcome"] == "success" for record in records)
+    assert "test_source" not in json.dumps(records)
+    assert "validate('value')" not in json.dumps(records)
+
+
+def test_quality_review_trace_records_retry_attempts_and_causes() -> None:
+    class OneFinding:
+        calls = 0
+
+        def complete_json(
+            self, _messages: list[dict[str, str]], *, response_schema: Any = None
+        ) -> dict[str, Any]:
+            self.calls += 1
+            return {"shortcoming_present": self.calls == 1}
+
+    class RetryOnce:
+        calls = 0
+
+        def complete_json(
+            self, _messages: list[dict[str, str]], *, response_schema: Any = None
+        ) -> dict[str, Any]:
+            self.calls += 1
+            if self.calls == 1:
+                raise TimeoutError("temporary provider timeout")
+            return {
+                "shortcoming_present": False,
+                "explanation": "The question is not demonstrated by this test.",
+            }
+
+    evidence = {
+        "test_obligations": [
+            {"obligation_id": "AC-01", "source_text": "Accept a valid value."}
+        ],
+        "test_sources": {
+            "tests/test_values.py": (
+                "# Covers: AC-01 test_value_contract\n"
+                "def test_value_contract():\n    assert validate('value')\n"
+            )
+        },
+    }
+    report = review_execute_pr_test_quality(
+        evidence,
+        decision_client=OneFinding(),
+        llm_client=RetryOnce(),
+        max_timeout_retries=1,
+        timeout_backoff_seconds=0,
+        suggest_tests=False,
+        trace_context={"request_id": "quality-retry"},
+    )
+
+    opinion_attempts = [
+        record for record in report["interaction_trace"] if record["role"] == "opinion"
+    ]
+    assert [record["outcome"] for record in opinion_attempts] == ["error", "success"]
+    assert [record["provider_call_attempt"] for record in opinion_attempts] == [1, 2]
+    assert "TimeoutError" in opinion_attempts[1]["retry_cause"]
+    assert (
+        opinion_attempts[0]["interaction_id"] == opinion_attempts[1]["interaction_id"]
+    )
 
 
 def test_review_context_limits_baseline_log_to_targeted_failure() -> None:

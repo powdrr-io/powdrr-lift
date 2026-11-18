@@ -349,6 +349,12 @@ class LocalPowdrrService:
                 max_timeout_retries=retries,
                 timeout_backoff_seconds=float(backoff),
                 suggest_tests=suggest_tests,
+                trace_context={
+                    "request_id": request.request_id,
+                    "task_id": str(request.inputs.get("task_id", "")),
+                    "attempt_id": str(request.inputs.get("attempt_id", "")),
+                    "story_review": str(bool(evidence.get("story_test_links"))).lower(),
+                },
             )
         except Exception as exc:  # Quality review is advisory, including outages.
             report = {

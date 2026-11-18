@@ -1,0 +1,98 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1579
+title: Trace per-test quality review interactions
+intent:
+  problem: The specialized per-test quality reviewer made decision, opinion, and suggestion calls without durable request attribution or retry records.
+  goal: Record redacted interaction metadata in the quality-review artifact so ordinary and story-test review calls can be counted and connected to their gate and evidence.
+human-decisions: []
+structured_files: []
+files:
+  - path: packages/service/src/powdrr_service/local_service.py
+    type: modified
+    span: {start_line: 352, end_line: 357}
+    summary: Pass the review request and gate context into the quality-review tracing layer.
+    rationale: Associate each interaction with its service request and distinguish advisory from story-gate review.
+  - path: packages/service/src/powdrr_service/verification/execute_pr_test_quality.py
+    type: modified
+    span: {start_line: 6, end_line: 6}
+    summary: Add hashing for redacted prompt and evidence fingerprints.
+    rationale: Identify review evidence without copying private source into trace metadata.
+  - path: packages/service/src/powdrr_service/verification/execute_pr_test_quality.py
+    type: modified
+    span: {start_line: 440, end_line: 440}
+    summary: Add optional trace context to the quality-review function.
+    rationale: Allow the service route to bind interactions to their operation and gate.
+  - path: packages/service/src/powdrr_service/verification/execute_pr_test_quality.py
+    type: modified
+    span: {start_line: 445, end_line: 445}
+    summary: Collect per-review interaction records.
+    rationale: Keep decision and follow-up calls in the review result.
+  - path: packages/service/src/powdrr_service/verification/execute_pr_test_quality.py
+    type: modified
+    span: {start_line: 474, end_line: 478}
+    summary: Fingerprint the scoped evidence for each test check.
+    rationale: Identify the reviewed evidence without recording its contents.
+  - path: packages/service/src/powdrr_service/verification/execute_pr_test_quality.py
+    type: modified
+    span: {start_line: 495, end_line: 510}
+    summary: Trace the primary decision-provider call for each test check.
+    rationale: Count primary evaluations and bind them to the check and evidence.
+  - path: packages/service/src/powdrr_service/verification/execute_pr_test_quality.py
+    type: modified
+    span: {start_line: 534, end_line: 539}
+    summary: Trace conditional independent opinion calls.
+    rationale: Attribute follow-up judgments to the original finding.
+  - path: packages/service/src/powdrr_service/verification/execute_pr_test_quality.py
+    type: modified
+    span: {start_line: 575, end_line: 580}
+    summary: Trace conditional test-suggestion calls.
+    rationale: Attribute repair suggestions to the original quality check.
+  - path: packages/service/src/powdrr_service/verification/execute_pr_test_quality.py
+    type: modified
+    span: {start_line: 611, end_line: 611}
+    summary: Return trace records with the quality-review report.
+    rationale: Preserve interaction metadata in the existing review artifact.
+  - path: packages/service/src/powdrr_service/verification/execute_pr_test_quality.py
+    type: modified
+    span: {start_line: 627, end_line: 632}
+    summary: Add trace context to retryable opinion and suggestion calls.
+    rationale: Retain attempt identity across retries.
+  - path: packages/service/src/powdrr_service/verification/execute_pr_test_quality.py
+    type: modified
+    span: {start_line: 637, end_line: 649}
+    summary: Use trace-aware provider calls for retried interactions.
+    rationale: Count each provider call and preserve retry outcomes.
+  - path: packages/service/src/powdrr_service/verification/execute_pr_test_quality.py
+    type: modified
+    span: {start_line: 657, end_line: 744}
+    summary: Record provider-call attempts, duration, outcome, retry metadata, provider identity, and prompt and evidence fingerprints.
+    rationale: Make specialized review retries and outcomes measurable while keeping prompts and verifier evidence out of telemetry.
+  - path: tests/test_execute_pr_test_quality_service.py
+    type: modified
+    span: {start_line: 17, end_line: 17}
+    summary: Import the quality-review entry point for interaction-trace coverage.
+    rationale: Exercise tracing through the service-owned reviewer.
+  - path: tests/test_execute_pr_test_quality_service.py
+    type: modified
+    span: {start_line: 104, end_line: 199}
+    summary: Assert review calls produce redacted metadata and preserve retry attempts and causes.
+    rationale: Prevent private test source from leaking into trace records and verify review-call retry accounting.
+entities:
+  - id: per-test-quality-review-interaction-tracing
+    type: Feature
+    action: added
+entity_relationships: []
+invariants:
+  - id: quality-review-trace-redaction
+    description: Quality-review trace records contain identifiers and fingerprints but do not contain the prompt or source evidence.
+    action: added
+    rationale: Keep private verification content in its existing access-controlled artifact while enabling count and attribution.
+  - id: quality-review-call-attribution
+    description: Decision, opinion, and suggestion calls identify the review request, test, criterion, check, prompt builder, evidence fingerprint, and consuming gate.
+    action: added
+    rationale: Make conditional review calls attributable to the exact test-quality assessment.
+guidance:
+  - id: preserve-quality-review-trace-fields
+    description: Keep quality-review interaction metadata in the review artifact and retain one record for each provider call, including retry outcomes.
+    action: added
+    rationale: Support request-count and retry analysis without logging prompts or verifier evidence.

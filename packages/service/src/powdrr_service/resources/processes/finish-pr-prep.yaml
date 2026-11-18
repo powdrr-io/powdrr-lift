@@ -48,7 +48,7 @@ steps:
                 - gate:
                     subject: validation_result.returncode
                     equals: 0
-                    on_failure: {retry: {max_attempts: 1, on_exhausted: failed}}
+                    on_failure: {terminal: failed}
         missing:
           - branch:
               subject: verification_command
@@ -79,7 +79,7 @@ steps:
                       - gate:
                           subject: validation_result.returncode
                           equals: 0
-                          on_failure: {retry: {max_attempts: 1, on_exhausted: failed}}
+                          on_failure: {terminal: failed}
       default:
         - terminal: failed
   - terminal: succeeded

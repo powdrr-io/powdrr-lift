@@ -1,5 +1,5 @@
 schema: https://powdrr.io/schema/changelog-v2
-change_id: 1584
+change_id: 1585
 title: Stop publication failures from invoking description repair
 intent:
   problem: PR publication recovery sent every failed publish attempt to a model judge, including failures unrelated to the description such as GitHub, network, or authorization errors.

@@ -1268,7 +1268,7 @@ def _span_sort_key(change: ProvenanceRecord) -> tuple[int, int]:
 
 def _read_commit_line_count(repo_root: Path, commit_sha: str, path: str) -> int:
     content = _git_output(repo_root, "show", f"{commit_sha}:{path}")
-    if content == "":
+    if content == b"":
         return 0
 
     return len(content.splitlines())
@@ -1279,7 +1279,10 @@ def _read_worktree_line_count(repo_root: Path, path: str) -> int:
     if not file_path.exists():
         return 0
 
-    content = file_path.read_text(encoding="utf-8")
+    # The provenance index tracks line spans for text files, but the worktree
+    # may also contain tracked binary assets. Count byte lines here so one
+    # binary file cannot prevent index refresh or changelog generation.
+    content = file_path.read_bytes()
     if content == "":
         return 0
 
@@ -1344,6 +1347,7 @@ def _git_output(repo_root: Path, *args: str) -> str:
         check=True,
         capture_output=True,
         text=True,
+        errors="replace",
     )
     return process.stdout
 

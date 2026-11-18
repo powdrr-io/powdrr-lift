@@ -184,6 +184,35 @@ def test_create_change_log_template_uses_branch_diff(tmp_path: Path) -> None:
     assert change_log.decisions == [Decision()]
 
 
+def test_create_change_log_template_handles_tracked_binary_files(
+    tmp_path: Path,
+) -> None:
+    repo_root = tmp_path / "repo"
+    repo_root.mkdir()
+
+    _git(repo_root, "init", "-b", "main")
+    _git(repo_root, "config", "user.name", "Test User")
+    _git(repo_root, "config", "user.email", "test@example.com")
+    (repo_root / "README.md").write_text("initial\n", encoding="utf-8")
+    _git(repo_root, "add", "README.md")
+    _git(repo_root, "commit", "-m", "Initial commit")
+
+    _git(repo_root, "checkout", "-b", "feature/binary-asset")
+    binary_path = repo_root / "assets" / "logo.bin"
+    binary_path.parent.mkdir()
+    binary_path.write_bytes(b"\xf8\x00\x80\n")
+    _git(repo_root, "add", "assets/logo.bin")
+    _git(repo_root, "commit", "-m", "Add binary asset")
+
+    output_path = create_change_log_template(
+        branch_name="feature/binary-asset",
+        output_path=tmp_path / "change-log.template.yaml",
+        repo_root=repo_root,
+    )
+
+    assert output_path.is_file()
+
+
 def test_create_change_log_template_prefers_local_master_without_remote(
     tmp_path: Path,
 ) -> None:

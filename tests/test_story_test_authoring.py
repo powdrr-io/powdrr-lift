@@ -417,12 +417,13 @@ def test_existing_miniswe_author_path_produces_pinned_collected_manifest(
     obligations = prepare_story_test_obligations(proposed)
     source = linked_source(obligations)
     prompts = []
+    provider_configs: list[dict[str, Any]] = []
 
     class ScriptedMiniSWE:
         provider_name = "scripted-miniswe"
 
         def __init__(self, **kwargs: Any) -> None:
-            pass
+            provider_configs.append(kwargs)
 
         def run(
             self,
@@ -475,6 +476,18 @@ def test_existing_miniswe_author_path_produces_pinned_collected_manifest(
         ),
     )
     assert artifact["baseline_result"]["passed"] is False
+    assert provider_configs
+    assert all(
+        provider_config["trace_caller"] == "story_test_author"
+        and provider_config["trace_gate_consumer"] == "story_test_baseline_gate"
+        and len(provider_config["trace_evidence_fingerprint"]) == 64
+        and {obligation["obligation_id"] for obligation in obligations}.issubset(
+            provider_config["trace_evidence_ids"]
+        )
+        and provider_config["trace_check_id"].startswith("tests/test_")
+        for provider_config in provider_configs
+    )
+    assert artifact["model_interaction_trace"]["status"] == "unobserved"
     assert len(artifact["story_test_links"]["links"]) == len(obligations)
     assert set(obligation["obligation_id"] for obligation in obligations) <= set(
         artifact["coverage_references"]

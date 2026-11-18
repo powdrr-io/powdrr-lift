@@ -46,6 +46,13 @@ def trace_miniswe_inference_handler(
     trace_path: Path,
     task_id: str,
     attempt_id: str,
+    caller: str = "minisweagent",
+    gate_consumer: str | None = None,
+    evidence_fingerprint: str | None = None,
+    evidence_ids: tuple[str, ...] = (),
+    check_id: str | None = None,
+    candidate_id: str | None = None,
+    request_response_artifact_ref: str | None = None,
 ) -> Callable[[ChatCompletionRequest], ChatCompletionResponse]:
     """Record redacted interaction metadata around each MiniSWE inference call."""
     write_lock = Lock()
@@ -62,7 +69,18 @@ def trace_miniswe_inference_handler(
                 trace_path,
                 write_lock,
                 {
-                    **_trace_identity(request, task_id, attempt_id),
+                    **_trace_identity(
+                        request,
+                        task_id,
+                        attempt_id,
+                        caller=caller,
+                        gate_consumer=gate_consumer,
+                        evidence_fingerprint=evidence_fingerprint,
+                        evidence_ids=evidence_ids,
+                        check_id=check_id,
+                        candidate_id=candidate_id,
+                        request_response_artifact_ref=request_response_artifact_ref,
+                    ),
                     "prompt_builder_version": _MINISWE_PROMPT_BUILDER_VERSION,
                     "prompt_fingerprint": prompt_fingerprint,
                     "provider": _provider_for_model(request.model),
@@ -86,7 +104,18 @@ def trace_miniswe_inference_handler(
             trace_path,
             write_lock,
             {
-                **_trace_identity(request, task_id, attempt_id),
+                **_trace_identity(
+                    request,
+                    task_id,
+                    attempt_id,
+                    caller=caller,
+                    gate_consumer=gate_consumer,
+                    evidence_fingerprint=evidence_fingerprint,
+                    evidence_ids=evidence_ids,
+                    check_id=check_id,
+                    candidate_id=candidate_id,
+                    request_response_artifact_ref=request_response_artifact_ref,
+                ),
                 "prompt_builder_version": _MINISWE_PROMPT_BUILDER_VERSION,
                 "prompt_fingerprint": prompt_fingerprint,
                 "provider": _provider_for_model(request.model),
@@ -109,14 +138,29 @@ def trace_miniswe_inference_handler(
 
 
 def _trace_identity(
-    request: ChatCompletionRequest, task_id: str, attempt_id: str
+    request: ChatCompletionRequest,
+    task_id: str,
+    attempt_id: str,
+    *,
+    caller: str,
+    gate_consumer: str | None,
+    evidence_fingerprint: str | None,
+    evidence_ids: tuple[str, ...],
+    check_id: str | None,
+    candidate_id: str | None,
+    request_response_artifact_ref: str | None,
 ) -> dict[str, Any]:
     return {
         "record_type": "powdrr_service.miniswe.provider_attempt",
         "interaction_id": request.request_id,
         "request_id": request.request_id,
-        "caller": "minisweagent",
-        "gate_consumer": None,
+        "caller": caller,
+        "gate_consumer": gate_consumer,
+        "evidence_fingerprint": evidence_fingerprint,
+        "evidence_ids": list(evidence_ids),
+        "check_id": check_id,
+        "candidate_id": candidate_id,
+        "request_response_artifact_ref": request_response_artifact_ref,
         "task_id": task_id,
         "attempt_id": attempt_id,
     }

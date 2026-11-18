@@ -2036,6 +2036,28 @@ def _author_execute_pr_tests(
             plan_context=plan_context,
             obligations=obligations,
         )
+        trace_evidence = {
+            "plan_fingerprint": request.plan_fingerprint,
+            "plan_context": plan_context,
+            "test_obligations": obligations,
+        }
+        trace_evidence_fingerprint = hashlib.sha256(
+            json.dumps(trace_evidence, sort_keys=True, separators=(",", ":")).encode(
+                "utf-8"
+            )
+        ).hexdigest()
+        trace_evidence_ids = tuple(
+            dict.fromkeys(
+                (
+                    *request.context_refs,
+                    *(
+                        str(item["obligation_id"])
+                        for item in obligations
+                        if isinstance(item.get("obligation_id"), str)
+                    ),
+                )
+            )
+        )
         author_request = ImplementationRequest(
             request_id=f"{workflow_id}-integration-test-author",
             objective="Author independent PR integration tests before implementation",
@@ -2068,6 +2090,17 @@ def _author_execute_pr_tests(
             model=config.minisweagent_model,
             timeout_seconds=min(config.coding_agent_timeout_seconds, 600.0),
             diagnostics_root=test_root / "diagnostics",
+            trace_caller=(
+                "story_test_author" if story_obligations else "integration_test_author"
+            ),
+            trace_gate_consumer=(
+                "story_test_baseline_gate"
+                if story_obligations
+                else "integration_test_baseline_gate"
+            ),
+            trace_evidence_fingerprint=trace_evidence_fingerprint,
+            trace_evidence_ids=trace_evidence_ids,
+            trace_check_id=test_path,
             write_denied_paths=_execute_pr_test_author_write_denied_paths(repo_root),
         )
         test_runner = CodingAgentRunner(
@@ -2341,6 +2374,9 @@ def _author_execute_pr_tests(
             "baseline_result": baseline_report,
             "baseline_execution_evidence": pytest_execution_evidence(baseline_report),
             "authoring_attempts": attempts,
+            "model_interaction_trace": _miniswe_interaction_trace_summary(
+                test_root / "diagnostics"
+            ),
             **({"story_test_links": story_links} if story_links else {}),
             **(
                 {
@@ -2369,6 +2405,41 @@ def _author_execute_pr_tests(
         return test_sources, artifact
     finally:
         shutil.rmtree(authoring_worktree, ignore_errors=True)
+
+
+def _miniswe_interaction_trace_summary(trace_root: Path) -> dict[str, Any]:
+    """Summarize available MiniSWE trace files without copying request content."""
+    trace_files = sorted(trace_root.glob("*.inference-attempts.jsonl"))
+    records: list[dict[str, Any]] = []
+    for trace_file in trace_files:
+        try:
+            lines = trace_file.read_text(encoding="utf-8").splitlines()
+        except OSError:
+            continue
+        for line in lines:
+            try:
+                record = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if (
+                isinstance(record, dict)
+                and record.get("record_type")
+                == "powdrr_service.miniswe.provider_attempt"
+            ):
+                records.append(record)
+    interactions = {
+        record.get("interaction_id")
+        for record in records
+        if isinstance(record.get("interaction_id"), str)
+        and record.get("interaction_id")
+    }
+    return {
+        "status": "observed" if records else "unobserved",
+        "files": [path.name for path in trace_files],
+        "logical_requests": len(interactions),
+        "transport_attempts": len(records),
+        "unobserved_reason": None if records else "no MiniSWE trace records found",
+    }
 
 
 def _select_workflow_instance(

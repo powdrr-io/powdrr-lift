@@ -6,6 +6,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+import yaml
 
 from powdrr_lift.clean_pr_publisher import (
     build_publication_authorization,
@@ -303,7 +304,19 @@ def test_clean_publication_branch_excludes_checkpoint_commits(
             cwd=tmp_path,
         ).splitlines()
     )
-    assert remote_changed_paths == set(product_paths)
+    changelog_path = "docs/changelogs/PR-902-changelog.yaml"
+    assert remote_changed_paths == {*product_paths, changelog_path}
+    changelog_text = _git(
+        "--git-dir",
+        str(remote),
+        "show",
+        f"refs/heads/powdrr/attestation-pr-01-implementation:{changelog_path}",
+        cwd=tmp_path,
+    )
+    changelog = yaml.safe_load(changelog_text)
+    assert changelog["change_id"] == "PR-902"
+    assert len(changelog["files"]) == len(product_paths)
+    assert changelog["files"][0]["path"] == product_paths[0]
     assert not (set(runtime_paths) & remote_paths)
     intent_root = Path(
         _git(
@@ -417,4 +430,8 @@ def test_clean_publisher_updates_existing_pr_branch_with_only_repair_commit_path
             cwd=tmp_path,
         ).splitlines()
     )
-    assert remote_changes == {"src/existing.py", ".github/workflows/ci.yml"}
+    assert remote_changes == {
+        "src/existing.py",
+        ".github/workflows/ci.yml",
+        "docs/changelogs/PR-7-changelog.yaml",
+    }

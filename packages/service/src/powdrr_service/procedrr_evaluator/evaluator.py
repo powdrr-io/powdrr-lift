@@ -12,6 +12,7 @@ import hashlib
 import json
 import re
 import time
+import uuid
 from collections.abc import Callable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
@@ -993,16 +994,38 @@ class Evaluator:
         self._limit(usage, limits, "llm_activations", "LLM activations")
         schema = judge["output"]["schema"]
         client = self.judge_clients.get(str(judge.get("provider", "")), self.llm)
-        trace_id = hashlib.sha256(
+        evidence_fingerprint = hashlib.sha256(
             json.dumps(messages, ensure_ascii=False, sort_keys=True).encode("utf-8")
         ).hexdigest()
+        interaction_id = uuid.uuid4().hex
+        replay_check = getattr(client, "is_replay_hit", None)
+        replay_status = (
+            "hit" if callable(replay_check) and replay_check(messages) else "miss"
+        )
+        interaction_context = {
+            "interaction_id": interaction_id,
+            "caller": "procedrr_judge",
+            "gate_consumer": str(judge["output"]["name"]),
+            "judge_path": path,
+            "prompt_builder_version": "procedrr-evaluator-judge-v1",
+            "evidence_fingerprint": evidence_fingerprint,
+            "replay_status": replay_status,
+        }
         try:
-            try:
-                output = client.complete_json(  # type: ignore[call-arg]
-                    messages, response_schema=schema
+            traced_complete = getattr(client, "complete_json_traced", None)
+            if callable(traced_complete):
+                output = traced_complete(
+                    messages,
+                    response_schema=schema,
+                    telemetry_context=interaction_context,
                 )
-            except TypeError:
-                output = client.complete_json(messages)
+            else:
+                try:
+                    output = client.complete_json(  # type: ignore[call-arg]
+                        messages, response_schema=schema
+                    )
+                except TypeError:
+                    output = client.complete_json(messages)
         except Exception as exc:
             events.append(
                 EvaluationEvent(
@@ -1011,14 +1034,17 @@ class Evaluator:
                     {
                         "provider": str(judge.get("provider", "default")),
                         "output": str(judge["output"]["name"]),
-                        "trace_id": trace_id,
+                        "interaction_id": interaction_id,
+                        "evidence_fingerprint": evidence_fingerprint,
+                        "replay_status": replay_status,
                         "error_type": type(exc).__name__,
                     },
                 )
             )
             raise EvaluationError(
                 f"{path}.judge provider={judge.get('provider', 'default')} "
-                f"output={judge['output']['name']} trace_id={trace_id} "
+                f"output={judge['output']['name']} "
+                f"interaction_id={interaction_id} "
                 f"failed with {type(exc).__name__}: {exc}"
             ) from exc
         validate_json(output, judge["output"]["schema"])
@@ -1034,6 +1060,9 @@ class Evaluator:
                     "replay_value": output,
                     "messages": messages,
                     "context_metrics": context_metrics,
+                    "interaction_id": interaction_id,
+                    "evidence_fingerprint": evidence_fingerprint,
+                    "replay_status": replay_status,
                 },
             )
         )
@@ -1134,8 +1163,36 @@ class Evaluator:
         usage["llm"] += len(pending)
         self._limit(usage, limits, "llm_activations", "LLM activations")
         try:
-            outputs = batch_complete(
-                [(messages, schema) for _, _, messages, _ in pending]
+            interaction_contexts = [
+                {
+                    "interaction_id": uuid.uuid4().hex,
+                    "caller": "procedrr_judge",
+                    "gate_consumer": str(judge["output"]["name"]),
+                    "judge_path": path,
+                    "prompt_builder_version": "procedrr-evaluator-judge-v1",
+                    "evidence_fingerprint": hashlib.sha256(
+                        json.dumps(messages, ensure_ascii=False, sort_keys=True).encode(
+                            "utf-8"
+                        )
+                    ).hexdigest(),
+                    "replay_status": (
+                        "hit"
+                        if callable(getattr(client, "is_replay_hit", None))
+                        and client.is_replay_hit(messages)
+                        else "miss"
+                    ),
+                }
+                for _, path, messages, _ in pending
+            ]
+            traced_batch = getattr(client, "complete_json_batch_traced", None)
+            batch_requests = [(messages, schema) for _, _, messages, _ in pending]
+            outputs = (
+                traced_batch(
+                    batch_requests,
+                    telemetry_contexts=interaction_contexts,
+                )
+                if callable(traced_batch)
+                else batch_complete(batch_requests)
             )
             if len(outputs) != len(pending):
                 raise EvaluationError("batch judge returned an unexpected result count")
@@ -1145,8 +1202,8 @@ class Evaluator:
                 f"{first_path}.judge provider={provider or 'default'} batch "
                 f"failed with {type(exc).__name__}: {exc}"
             ) from exc
-        for (state, path, messages, metrics), output in zip(
-            pending, outputs, strict=True
+        for (state, path, messages, metrics), output, interaction_context in zip(
+            pending, outputs, interaction_contexts, strict=True
         ):
             validate_json(output, schema)
             output_name = str(judge["output"]["name"])
@@ -1162,6 +1219,13 @@ class Evaluator:
                         "replay_value": output,
                         "messages": messages,
                         "context_metrics": metrics,
+                        "interaction_id": interaction_context["interaction_id"],
+                        "evidence_fingerprint": hashlib.sha256(
+                            json.dumps(
+                                messages, ensure_ascii=False, sort_keys=True
+                            ).encode("utf-8")
+                        ).hexdigest(),
+                        "replay_status": interaction_context["replay_status"],
                     },
                 )
             )

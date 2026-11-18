@@ -151,17 +151,58 @@ def test_procedrr_records_provider_retry_attempts_without_prompt_content(
         telemetry_sink=lambda record: events.append(dict(record)),
     )
 
-    client.complete_json(
+    client.complete_json_traced(
         [{"role": "user", "content": "secret prompt text"}],
         response_schema=SCHEMA,
+        telemetry_context={
+            "interaction_id": "interaction-1",
+            "caller": "procedrr_judge",
+            "gate_consumer": "classification",
+            "judge_path": "steps[0].judge",
+            "prompt_builder_version": "procedrr-evaluator-judge-v1",
+            "evidence_fingerprint": "evidence-digest",
+            "task_id": "task-1",
+        },
     )
 
     assert [event["outcome"] for event in events] == ["retrying", "succeeded"]
     assert [event["attempt"] for event in events] == [1, 2]
     assert events[0]["retryable"] is True
     assert events[0]["trace_id"] == events[1]["trace_id"]
+    assert {event["interaction_id"] for event in events} == {"interaction-1"}
+    assert events[0]["judge_path"] == "steps[0].judge"
+    assert events[0]["gate_consumer"] == "classification"
+    assert events[0]["evidence_fingerprint"] == "evidence-digest"
+    assert events[0]["retry_cause"] == "provider_transport"
+    assert len(events[0]["prompt_fingerprint"]) == 64
     assert events[0]["provider_delegate"] == "RetryOnce"
     assert "secret prompt text" not in str(events)
+
+
+def test_procedrr_distinguishes_identical_prompts_across_activations(
+    tmp_path: Path,
+) -> None:
+    events: list[dict[str, Any]] = []
+    client = ProcedrrModelClient(
+        RepairingClient([{"complete": True}]),
+        process_directory=tmp_path,
+        telemetry_sink=lambda record: events.append(dict(record)),
+    )
+    messages = [{"role": "user", "content": "same prompt"}]
+
+    for interaction_id in ("activation-1", "activation-2"):
+        client.complete_json_traced(
+            messages,
+            response_schema=SCHEMA,
+            telemetry_context={"interaction_id": interaction_id},
+        )
+
+    assert [event["interaction_id"] for event in events] == [
+        "activation-1",
+        "activation-2",
+    ]
+    assert events[0]["trace_id"] != events[1]["trace_id"]
+    assert events[0]["prompt_fingerprint"] == events[1]["prompt_fingerprint"]
 
 
 def test_procedrr_uses_workrr_schema_repair_transport(tmp_path: Path) -> None:

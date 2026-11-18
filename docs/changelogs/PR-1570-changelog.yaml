@@ -1,0 +1,263 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1570
+title: Trace issue-worker Procedrr judge interactions
+intent:
+  problem: Procedrr provider attempts in the GitHub issue worker were not persisted with the process run, and content-derived trace IDs could conflate identical prompts from separate activations.
+  goal: Link each judge activation to its provider requests and transport retries with run, gate, prompt fingerprint, and replay metadata.
+human-decisions: []
+structured_files: []
+files:
+  - path: packages/service/src/powdrr_service/procedrr_evaluator/evaluator.py
+    type: modified
+    span: {start_line: 15, end_line: 15}
+    summary: Import unique identifier generation for judge activations.
+    rationale: Give each logical judge activation its own trace identity.
+  - path: packages/service/src/powdrr_service/procedrr_evaluator/evaluator.py
+    type: modified
+    span: {start_line: 997, end_line: 997}
+    summary: Rename the content hash as an evidence fingerprint.
+    rationale: Keep content identity separate from the unique interaction ID.
+  - path: packages/service/src/powdrr_service/procedrr_evaluator/evaluator.py
+    type: modified
+    span: {start_line: 1000, end_line: 1013}
+    summary: Build judge interaction metadata with caller, gate, path, builder version, and replay status.
+    rationale: Make one judge activation identifiable without exposing its evidence content.
+  - path: packages/service/src/powdrr_service/procedrr_evaluator/evaluator.py
+    type: modified
+    span: {start_line: 1015, end_line: 1020}
+    summary: Pass interaction metadata through the traced client interface.
+    rationale: Link provider attempts to the judge activation.
+  - path: packages/service/src/powdrr_service/procedrr_evaluator/evaluator.py
+    type: modified
+    span: {start_line: 1022, end_line: 1028}
+    summary: Preserve the existing structured completion fallback for clients without tracing support.
+    rationale: Keep existing evaluator clients compatible.
+  - path: packages/service/src/powdrr_service/procedrr_evaluator/evaluator.py
+    type: modified
+    span: {start_line: 1037, end_line: 1039}
+    summary: Attach interaction and evidence identities to failed judge events.
+    rationale: Keep failures attributable to the same logical gate as successful calls.
+  - path: packages/service/src/powdrr_service/procedrr_evaluator/evaluator.py
+    type: modified
+    span: {start_line: 1046, end_line: 1047}
+    summary: Include the interaction ID in judge failure diagnostics.
+    rationale: Make the failed activation searchable from the execution error.
+  - path: packages/service/src/powdrr_service/procedrr_evaluator/evaluator.py
+    type: modified
+    span: {start_line: 1063, end_line: 1065}
+    summary: Attach interaction and replay metadata to successful judge events.
+    rationale: Join the judge result to its provider attempts.
+  - path: packages/service/src/powdrr_service/procedrr_evaluator/evaluator.py
+    type: modified
+    span: {start_line: 1166, end_line: 1195}
+    summary: Assign each batched judge member separate trace metadata and use the traced batch interface.
+    rationale: Preserve per-judge attribution when one provider transport serves multiple logical requests.
+  - path: packages/service/src/powdrr_service/procedrr_evaluator/evaluator.py
+    type: modified
+    span: {start_line: 1205, end_line: 1206}
+    summary: Pair batched outputs with their interaction metadata.
+    rationale: Keep result events aligned with the correct request identity.
+  - path: packages/service/src/powdrr_service/procedrr_evaluator/evaluator.py
+    type: modified
+    span: {start_line: 1222, end_line: 1228}
+    summary: Persist each batched judge member's interaction and evidence identity.
+    rationale: Make per-member results reconstructable from batch telemetry.
+  - path: packages/service/src/powdrr_service/procedrr_evaluator/model_client.py
+    type: modified
+    span: {start_line: 12, end_line: 12}
+    summary: Import context-local interaction metadata support.
+    rationale: Keep concurrent judge traces isolated from one another.
+  - path: packages/service/src/powdrr_service/procedrr_evaluator/model_client.py
+    type: modified
+    span: {start_line: 29, end_line: 31}
+    summary: Define the context-local carrier for one interaction's trace metadata.
+    rationale: Propagate caller identity through provider retries safely.
+  - path: packages/service/src/powdrr_service/procedrr_evaluator/model_client.py
+    type: modified
+    span: {start_line: 103, end_line: 103}
+    summary: Accept run-level telemetry context in the model client.
+    rationale: Bind provider attempts to the issue-worker task and process.
+  - path: packages/service/src/powdrr_service/procedrr_evaluator/model_client.py
+    type: modified
+    span: {start_line: 113, end_line: 113}
+    summary: Store run-level telemetry context.
+    rationale: Include task and process identity on each attempt record.
+  - path: packages/service/src/powdrr_service/procedrr_evaluator/model_client.py
+    type: modified
+    span: {start_line: 121, end_line: 130}
+    summary: Add run sink configuration and replay-hit inspection methods.
+    rationale: Connect telemetry after artifact initialization and report cache state.
+  - path: packages/service/src/powdrr_service/procedrr_evaluator/model_client.py
+    type: modified
+    span: {start_line: 136, end_line: 139}
+    summary: Require interaction, prompt fingerprint, and retry cause when dispatching a provider request.
+    rationale: Separate logical request identity from prompt content.
+  - path: packages/service/src/powdrr_service/procedrr_evaluator/model_client.py
+    type: modified
+    span: {start_line: 165, end_line: 167}
+    summary: Include trace identity and retry metadata on successful provider attempts.
+    rationale: Preserve request-level attribution on success.
+  - path: packages/service/src/powdrr_service/procedrr_evaluator/model_client.py
+    type: modified
+    span: {start_line: 179, end_line: 181}
+    summary: Include prompt identity and transport retry cause on failed attempts.
+    rationale: Explain transport retries while retaining the same logical request link.
+  - path: packages/service/src/powdrr_service/procedrr_evaluator/model_client.py
+    type: modified
+    span: {start_line: 217, end_line: 221}
+    summary: Accept interaction metadata and batch-member identity in the attempt recorder.
+    rationale: Record individual and batched provider calls consistently.
+  - path: packages/service/src/powdrr_service/procedrr_evaluator/model_client.py
+    type: modified
+    span: {start_line: 227, end_line: 230}
+    summary: Merge run-level and per-interaction context for provider telemetry.
+    rationale: Keep common task identity together with judge-specific metadata.
+  - path: packages/service/src/powdrr_service/procedrr_evaluator/model_client.py
+    type: modified
+    span: {start_line: 235, end_line: 256}
+    summary: Write linked interaction IDs, path, gate, fingerprints, retry cause, and run identity to provider attempts.
+    rationale: Reconstruct logical request and transport behavior without copying prompt or response text.
+  - path: packages/service/src/powdrr_service/procedrr_evaluator/model_client.py
+    type: modified
+    span: {start_line: 322, end_line: 322}
+    summary: Read batch interaction contexts for member-level correlation.
+    rationale: Retain the per-judge IDs while recording a shared transport.
+  - path: packages/service/src/powdrr_service/procedrr_evaluator/model_client.py
+    type: modified
+    span: {start_line: 346, end_line: 347}
+    summary: Route individual batch fallbacks through member trace context.
+    rationale: Preserve interaction identity when native batch handling is unavailable.
+  - path: packages/service/src/powdrr_service/procedrr_evaluator/model_client.py
+    type: modified
+    span: {start_line: 370, end_line: 371}
+    summary: Route failed-batch fallbacks through member trace context.
+    rationale: Preserve identity while falling back to separate requests.
+  - path: packages/service/src/powdrr_service/procedrr_evaluator/model_client.py
+    type: modified
+    span: {start_line: 385, end_line: 387}
+    summary: Redact batch error details.
+    rationale: Prevent credential-like values from leaking through provider telemetry.
+  - path: packages/service/src/powdrr_service/procedrr_evaluator/model_client.py
+    type: modified
+    span: {start_line: 390, end_line: 400}
+    summary: Link batch transport records to their member interactions.
+    rationale: Preserve per-judge attribution when one provider transport serves multiple logical requests.
+  - path: packages/service/src/powdrr_service/procedrr_evaluator/model_client.py
+    type: modified
+    span: {start_line: 405, end_line: 447}
+    summary: Add traced single and batch completion entry points with context-safe fallback handling.
+    rationale: Carry interaction identities across sync and batched provider calls.
+  - path: packages/service/src/powdrr_service/procedrr_evaluator/model_client.py
+    type: modified
+    span: {start_line: 469, end_line: 476}
+    summary: Assign an interaction ID to each structured request activation.
+    rationale: Prevent identical prompts from collapsing into one activation.
+  - path: packages/service/src/powdrr_service/procedrr_evaluator/model_client.py
+    type: modified
+    span: {start_line: 492, end_line: 493}
+    summary: Generate a unique logical request trace ID and prompt fingerprint.
+    rationale: Prevent repeated prompts from different activations from sharing a request trace.
+  - path: packages/service/src/powdrr_service/procedrr_evaluator/model_client.py
+    type: modified
+    span: {start_line: 495, end_line: 500}
+    summary: Give each structured request a unique trace ID and prompt fingerprint while distinguishing response correction retries.
+    rationale: Keep separate logical prompts distinct from transport retries.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span: {start_line: 16, end_line: 16}
+    summary: Import a lock for concurrent run-artifact writes.
+    rationale: Serialize process-event and provider-attempt records from parallel judges.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span: {start_line: 6866, end_line: 6875}
+    summary: Configure the issue-worker Procedrr model client with task and process identity.
+    rationale: Attribute provider attempts to the correct workflow activation.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span: {start_line: 6920, end_line: 6920}
+    summary: Create a dedicated telemetry artifact and lock for the task run.
+    rationale: Store provider attempts separately from sequenced process events.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span: {start_line: 6922, end_line: 6922}
+    summary: Add a lock for concurrent event and telemetry writes.
+    rationale: Prevent concurrent judges from interleaving JSONL records.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span: {start_line: 6930, end_line: 6930}
+    summary: Reset telemetry records when starting a fresh task execution.
+    rationale: Prevent stale attempts from a prior execution from contaminating the run trace.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span: {start_line: 6949, end_line: 6960}
+    summary: Serialize process-event writes and define the provider-attempt sink.
+    rationale: Avoid interleaved JSONL writes when judges run concurrently.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span: {start_line: 6962, end_line: 6969}
+    summary: Persist provider-attempt records to the dedicated task telemetry file.
+    rationale: Keep provider attempts durable and separate from sequenced process events.
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 187, end_line: 191}
+    summary: Verify each batched judge has a distinct ID linked from the batch transport record.
+    rationale: Guard per-member attribution when one transport serves multiple judges.
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 247, end_line: 247}
+    summary: Assert parallel failed judges keep distinct interaction identities.
+    rationale: Verify failed activations remain independently traceable.
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 365, end_line: 365}
+    summary: Assert failed judge diagnostics include an interaction ID.
+    rationale: Verify the evaluator reports the unique activation identity.
+  - path: tests/test_workrr_procedrr.py
+    type: modified
+    span: {start_line: 154, end_line: 154}
+    summary: Exercise the traced completion entry point in the retry telemetry test.
+    rationale: Verify caller metadata reaches provider attempts.
+  - path: tests/test_workrr_procedrr.py
+    type: modified
+    span: {start_line: 157, end_line: 165}
+    summary: Provide the interaction, gate, path, and evidence context for retry telemetry.
+    rationale: Assert provider attempts preserve the caller's trace context.
+  - path: tests/test_workrr_procedrr.py
+    type: modified
+    span: {start_line: 172, end_line: 177}
+    summary: Assert attempts share the interaction and request identity and expose only fingerprints.
+    rationale: Verify retry grouping and content privacy.
+  - path: tests/test_workrr_procedrr.py
+    type: modified
+    span: {start_line: 182, end_line: 207}
+    summary: Verify identical prompts in separate activations have distinct trace IDs and the same prompt fingerprint.
+    rationale: Prevent content hashes from collapsing repeated logical requests.
+  - path: tests/fixtures/structrr/golden-python-symbols.yaml
+    type: modified
+    span: {start_line: 42, end_line: 43}
+    summary: Update the ProcedrrModelClient class span to include its trace-context and batch methods.
+    rationale: Keep the source-symbol golden fixture aligned with this PR's model-client additions.
+  - path: tests/fixtures/structrr/golden-python-symbols.yaml
+    type: modified
+    span: {start_line: 49, end_line: 50}
+    summary: Update the complete_json method span after adding interaction tracing.
+    rationale: Keep the method's expected source range aligned with the expanded implementation.
+entities:
+  - id: issue-worker-procedrr-interaction-tracing
+    type: Feature
+    action: added
+entity_relationships: []
+invariants:
+  - id: procedrr-interaction-identity
+    description: Each judge activation has a unique interaction ID; transport attempts for one logical provider request share a request trace ID.
+    action: added
+    rationale: Repeated prompts must remain distinct across activations while retries remain attributable to the request that caused them.
+  - id: procedrr-telemetry-content-boundary
+    description: Provider-attempt telemetry records identifiers, fingerprints, retry metadata, and usage without copying prompt or response content.
+    action: added
+    rationale: Preserve traceability while keeping private request and response data in existing run artifacts.
+guidance:
+  - id: link-new-judge-routes-to-interaction-traces
+    description: New issue-worker judge routes should propagate caller identity and gate/path metadata through provider-attempt telemetry.
+    action: added
+    rationale: Keep per-route request and retry counts reconstructable as WP0 coverage expands.

@@ -13,6 +13,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import asdict, dataclass, field, replace
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
+from threading import Lock
 from typing import Any, Literal, TextIO
 from uuid import uuid4
 
@@ -6862,6 +6863,16 @@ def run_workflow_task(
             max_retries=config.max_stalled_roundtrips,
             provider_retry_attempts=config.max_timeout_retries,
             provider_retry_delay_seconds=config.timeout_backoff_seconds,
+            telemetry_sink=None,
+            telemetry_role="issue_worker",
+            telemetry_context={
+                "task_id": task.task_id,
+                "attempt_id": task.task_id,
+                "process_id": process_id,
+                "process_fingerprint": process_catalog.get(
+                    process_id
+                ).identity.fingerprint,
+            },
         )
         operations = _TaskProcedrrOperations(
             strategy,
@@ -6906,7 +6917,9 @@ def run_workflow_task(
         run_directory = repo_root / ".powdrr" / "procedrr-runs"
         run_directory.mkdir(parents=True, exist_ok=True)
         events_path = run_directory / f"{task.task_id}.events.jsonl"
+        telemetry_path = run_directory / f"{task.task_id}.telemetry.jsonl"
         manifest_path = run_directory / f"{task.task_id}.json"
+        event_write_lock = Lock()
         checkpoint = (
             ProcessExecutionCheckpoint.from_data(task.process_checkpoint)
             if task.process_checkpoint is not None
@@ -6914,6 +6927,7 @@ def run_workflow_task(
         )
         if checkpoint is None:
             events_path.write_text("", encoding="utf-8")
+            telemetry_path.write_text("", encoding="utf-8")
         manifest: dict[str, Any] = {
             "schema_version": 1,
             "execution_id": task.task_id,
@@ -6932,11 +6946,27 @@ def run_workflow_task(
             events_file: Path = events_path,
             task_manifest: dict[str, Any] = manifest,
             task_manifest_path: Path = manifest_path,
+            write_lock: Lock = event_write_lock,
         ) -> None:
-            with events_file.open("a", encoding="utf-8") as stream:
-                stream.write(json.dumps(event.to_data(), ensure_ascii=False) + "\n")
-            task_manifest["event_cursor"] = event.sequence + 1
-            _write_task_process_manifest(task_manifest_path, task_manifest)
+            with write_lock:
+                with events_file.open("a", encoding="utf-8") as stream:
+                    stream.write(json.dumps(event.to_data(), ensure_ascii=False) + "\n")
+                task_manifest["event_cursor"] = event.sequence + 1
+                _write_task_process_manifest(task_manifest_path, task_manifest)
+
+        def persist_provider_attempt(
+            record: Mapping[str, Any],
+            telemetry_file: Path = telemetry_path,
+            write_lock: Lock = event_write_lock,
+        ) -> None:
+            with write_lock:
+                with telemetry_file.open("a", encoding="utf-8") as stream:
+                    stream.write(
+                        json.dumps(dict(record), ensure_ascii=False, sort_keys=True)
+                        + "\n"
+                    )
+
+        process_client.set_telemetry_sink(persist_provider_attempt)
 
         execution_service = ProcedrrExecutionService(
             process_catalog,

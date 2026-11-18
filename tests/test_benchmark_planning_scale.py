@@ -315,7 +315,6 @@ def test_compact_summary_omits_large_shape_diagnostics_but_keeps_run_metrics() -
         },
         "by_question_kind": {
             "review_dependency_candidate": {"questions": 600},
-            "describe_confirmed_dependency": {"questions": 400},
         },
         "dependency_candidates": {
             "output_consumer_candidate_count": 600,
@@ -469,11 +468,6 @@ def test_live_report_includes_dependency_candidate_and_confirmation_counts() -> 
             kind = packet["exact_question"]["kind"]
             if kind == "review_dependency_candidate":
                 return {"required": True}
-            if kind == "describe_confirmed_dependency":
-                return {
-                    "requirement_ids": ["req-0001"],
-                    "reason": "The consumer uses the producer response contract.",
-                }
             return super()._answer(packet)
 
         def _propose_work_units(self, packet: Any) -> dict[str, Any]:

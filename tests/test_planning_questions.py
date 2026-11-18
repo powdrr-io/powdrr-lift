@@ -385,7 +385,11 @@ def test_batch_question_request_preserves_each_question_schema_and_identity() ->
 def test_batch_question_requests_keep_non_extraction_default_at_four() -> None:
     requests = tuple(
         _request(
-            _question(f"q-{index:06d}", f"block-{index:02d}", kind="describe_item")
+            _question(
+                f"q-{index:06d}",
+                f"block-{index:02d}",
+                kind="assess_requirement_coverage",
+            )
         )
         for index in range(1, 9)
     )
@@ -442,7 +446,7 @@ def test_oversized_batch_correction_subdivides_and_revalidates_each_member() -> 
                 f"q-{index:06d}",
                 f"block-{index:02d}",
                 (f"evidence-{index:02d}",),
-                kind="describe_item",
+                kind="assess_requirement_coverage",
             ),
             accepted_facts=(
                 ContextRecord(f"evidence-{index:02d}", {"body": "c" * 1800}),

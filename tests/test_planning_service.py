@@ -243,11 +243,6 @@ class _PlanningScriptClient:
                 "has_more": False,
                 "next_anchor": None,
             }
-        if kind == "describe_item":
-            return {
-                "title": f"Implement behavior in {question['subject_ids'][0]}",
-                "objective": "Implement the behavior described by the plan.",
-            }
         if kind == "plan_test_coverage":
             plan = next(
                 item["value"]
@@ -286,11 +281,6 @@ class _PlanningScriptClient:
             }
         if kind == "review_dependency_candidate":
             return {"required": True}
-        if kind == "describe_confirmed_dependency":
-            return {
-                "requirement_ids": ["req-0001"],
-                "reason": "The consumer uses the producer output.",
-            }
         if kind == "enumerate_structural_subjects":
             return {"records": [], "has_more": False, "next_anchor": None}
         if kind == "describe_structural_change":
@@ -1453,9 +1443,6 @@ def test_source_question_machine_accounts_for_normative_and_context_blocks() -> 
                 "has_more": False,
                 "next_anchor": None,
             }
-        elif question.kind == "describe_item":
-            answer = dict(request.valid_example)
-            answer["title"] = f"Implement behavior in {question.subject_ids[0]}"
         elif question.kind == "plan_test_coverage":
             answer = dict(request.valid_example)
         elif question.kind == "assess_requirement_coverage":
@@ -1467,11 +1454,6 @@ def test_source_question_machine_accounts_for_normative_and_context_blocks() -> 
             }
         elif question.kind == "review_dependency_candidate":
             answer = {"required": True}
-        elif question.kind == "describe_confirmed_dependency":
-            answer = {
-                "requirement_ids": ["req-0001"],
-                "reason": "The focused test consumes the implementation contract.",
-            }
         elif question.kind == "confirm_dependency":
             answer = {
                 "result": "required",

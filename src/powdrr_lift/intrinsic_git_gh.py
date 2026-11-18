@@ -107,6 +107,11 @@ def execute_intrinsic_git_gh_tool(
     if tool == GH_TOOL and parameters.get("operation") == "pr_create":
         existing = _existing_pull_request(worktree_root)
         if existing is not None:
+            _ensure_intrinsic_pr_changelog(
+                worktree_root,
+                pull_request_url=existing.strip(),
+                parameters=parameters,
+            )
             return {
                 "tool": tool,
                 "command": [executable, *command],
@@ -139,6 +144,23 @@ def execute_intrinsic_git_gh_tool(
         text=True,
         check=False,
     )
+    if (
+        tool == GH_TOOL
+        and parameters.get("operation") == "pr_create"
+        and result.returncode == 0
+    ):
+        output_lines = result.stdout.strip().splitlines()
+        if not output_lines:
+            raise PowdrrExecutionError(
+                "GitHub created the pull request but did not return its URL; "
+                "provide the pull request URL and retry changelog generation."
+            )
+        pull_request_url = output_lines[-1]
+        _ensure_intrinsic_pr_changelog(
+            worktree_root,
+            pull_request_url=pull_request_url,
+            parameters=parameters,
+        )
     normalized_returncode = result.returncode
     normalized_stdout = result.stdout
     normalized_stderr = result.stderr
@@ -205,6 +227,24 @@ def execute_intrinsic_git_gh_tool(
         "stderr": normalized_stderr,
         "no_op": no_op,
     }
+
+
+def _ensure_intrinsic_pr_changelog(
+    worktree_root: Path,
+    *,
+    pull_request_url: str,
+    parameters: Mapping[str, Any],
+) -> None:
+    from powdrr_lift.clean_pr_publisher import _ensure_pull_request_changelog
+
+    _ensure_pull_request_changelog(
+        worktree_root,
+        pull_request_url=pull_request_url,
+        base="main",
+        title=_required_text(parameters.get("title"), "title"),
+        description_sections=None,
+        branch=_current_branch(worktree_root),
+    )
 
 
 def _execute_review_threads(

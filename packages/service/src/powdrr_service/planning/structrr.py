@@ -114,8 +114,7 @@ class StructuralBaselineIndex:
 @dataclass(frozen=True, slots=True)
 class StructuralSubjectPage:
     records: tuple[BoundStructuralSubject, ...]
-    has_more: bool
-    next_anchor: str | None
+    is_full: bool
     page_ordinal: int
 
 
@@ -275,7 +274,7 @@ def parse_structural_subject_page(
     prior_subject_ids: set[tuple[str, str]] | frozenset[tuple[str, str]] = frozenset(),
     page_ordinal: int = 1,
 ) -> StructuralSubjectPage:
-    _exact(value, {"records", "has_more", "next_anchor"}, "/")
+    _exact(value, {"records"}, "/")
     raw_records = _array(
         value["records"], "/records", minimum=0, maximum=MAX_ENUMERATION_RECORDS
     )
@@ -491,41 +490,22 @@ def parse_structural_subject_page(
                 identity_description=identity_description,
             )
         )
-    has_more = value["has_more"]
-    if not isinstance(has_more, bool):
-        raise PlanningContractError("/has_more", "must be a boolean")
-    if has_more and not records:
-        raise PlanningContractError(
-            "/records", "a non-final page must add at least one new subject"
-        )
-    next_anchor = value["next_anchor"]
-    expected_next = f"structural-page-{page_ordinal + 1:04d}"
-    if has_more:
-        if next_anchor != expected_next:
-            raise PlanningContractError(
-                "/next_anchor",
-                f"must equal the next runtime-owned cursor {expected_next!r}",
-            )
-    elif next_anchor is not None:
-        raise PlanningContractError("/next_anchor", "must be null on the final page")
-    return StructuralSubjectPage(tuple(records), has_more, next_anchor, page_ordinal)
+    return StructuralSubjectPage(
+        tuple(records), len(raw_records) == MAX_ENUMERATION_RECORDS, page_ordinal
+    )
 
 
 def complete_subject_enumeration(
     pages: Sequence[StructuralSubjectPage],
 ) -> tuple[BoundStructuralSubject, ...]:
-    """Accept only a contiguous page sequence that reaches an explicit last page."""
+    """Accept contiguous pages ending when the scheduler-owned page is not full."""
     if not pages:
         raise StructrrPlanningError("at least one subject page is required")
     if [page.page_ordinal for page in pages] != list(range(1, len(pages) + 1)):
         raise StructrrPlanningError("subject pages are missing or out of order")
-    for page in pages[:-1]:
-        if (
-            not page.has_more
-            or page.next_anchor != f"structural-page-{page.page_ordinal + 1:04d}"
-        ):
-            raise StructrrPlanningError("subject enumeration has a broken page cursor")
-    if pages[-1].has_more or pages[-1].next_anchor is not None:
+    if any(not page.is_full for page in pages[:-1]):
+        raise StructrrPlanningError("subject enumeration ended before a full page")
+    if pages[-1].is_full:
         raise StructrrPlanningError("subject enumeration is incomplete")
     return coalesce_structural_subjects(
         record for page in pages for record in page.records
@@ -780,13 +760,6 @@ def build_subject_enumeration_request(
         if prior_counts
         else ()
     )
-    pagination_fact = ContextRecord(
-        f"structural-pagination:{item_id}:{page_ordinal:04d}",
-        {
-            "current_page": page_ordinal,
-            "next_anchor_if_more": f"structural-page-{page_ordinal + 1:04d}",
-        },
-    )
     facts = (
         *unit_facts,
         *path_refs,
@@ -794,7 +767,6 @@ def build_subject_enumeration_request(
         reference_fact,
         *coverage_facts,
         *prior_facts,
-        pagination_fact,
     )
     context_ids = (
         *(excerpt.ref_id for excerpt in excerpt_map),
@@ -834,18 +806,18 @@ def build_subject_enumeration_request(
         # The projected baseline can contain aliases that resolve to the same
         # canonical subject. Prefer a parser-proven empty shape over letting a
         # stale example stop the complete planning run before any model call.
-        valid_example = {"records": [], "has_more": False, "next_anchor": None}
+        valid_example = {"records": []}
         parse(valid_example)
 
     return QuestionRequest(
         question=Question(
             (
-                f"structural-subjects-{item_id}-{scope_id}-{page_ordinal:04d}"
+                f"structural-subjects-v2-{item_id}-{scope_id}-{page_ordinal:04d}"
                 if scope_id is not None
-                else f"structural-subjects-{item_id}-{page_ordinal:04d}"
+                else f"structural-subjects-v2-{item_id}-{page_ordinal:04d}"
             ),
             "enumerate_structural_subjects",
-            1,
+            2,
             (item_id, *sorted(unit_ids)),
             _digest(
                 {
@@ -860,12 +832,13 @@ def build_subject_enumeration_request(
                         if scoped_code_symbol_coverage is None
                         else dict(scoped_code_symbol_coverage)
                     ),
+                    "schema_version": 2,
                     "page": page_ordinal,
                 }
             ),
             context_ids,
-            "structural-subject-page-v1",
-            1,
+            "structural-subject-page-v2",
+            2,
         ),
         exact_question=(
             "Find additional entity and relationship subjects this one plan item "
@@ -897,11 +870,11 @@ def build_subject_enumeration_request(
             "new_identity_description is non-null. An existing subject_ref must "
             "use changed, deleted, or removed; never mark an existing subject "
             "as added. "
-            "Return at most eight subjects. An empty final page means no "
-            "structural change is needed for this item."
-            " If another page is needed, set has_more true and copy the exact "
-            "next_anchor_if_more value from accepted facts; otherwise set "
-            "has_more false and next_anchor null."
+            f"Return at most {MAX_ENUMERATION_RECORDS} subjects. The planner "
+            f"automatically requests another page when you return exactly "
+            f"{MAX_ENUMERATION_RECORDS} records. Return fewer records only when "
+            "you have listed every additional subject supported by the supplied "
+            "evidence. An empty answer means no more structural changes are needed."
         ),
         answer_field_definitions={
             "section": "entities or entity_relationships.",
@@ -922,17 +895,12 @@ def build_subject_enumeration_request(
                 "Exact source_excerpts ref_id values justifying the change; never "
                 "use accepted-fact IDs."
             ),
-            "has_more": "True when another subject page is required.",
-            "next_anchor": (
-                "Copy next_anchor_if_more from accepted facts when has_more is "
-                "true; otherwise null."
-            ),
         },
         source_excerpts=excerpt_map,
         repository_evidence=(),
         accepted_facts=facts,
         valid_example=valid_example,
-        empty_example={"records": [], "has_more": False, "next_anchor": None},
+        empty_example={"records": []},
         answer_schema=_subject_page_schema(
             sections=("entities", "entity_relationships"),
             source_refs=source_refs,
@@ -1517,8 +1485,8 @@ def _example_subject_page(
             "source_refs": [source_refs[0]],
         }
     else:
-        return {"records": [], "has_more": False, "next_anchor": None}
-    return {"records": [candidate], "has_more": False, "next_anchor": None}
+        return {"records": []}
+    return {"records": [candidate]}
 
 
 def _structural_subject_index(
@@ -2352,23 +2320,14 @@ SUBJECT_RECORD_SCHEMA: dict[str, Any] = {
 SUBJECT_PAGE_SCHEMA: dict[str, Any] = {
     "type": "object",
     "additionalProperties": False,
-    "required": ["records", "has_more", "next_anchor"],
+    "required": ["records"],
     "properties": {
         "records": {
             "type": "array",
             "maxItems": MAX_ENUMERATION_RECORDS,
             "items": SUBJECT_RECORD_SCHEMA,
         },
-        "has_more": {"type": "boolean"},
-        "next_anchor": {"type": ["string", "null"]},
     },
-    "allOf": [
-        {
-            "if": {"properties": {"has_more": {"const": True}}},
-            "then": {"properties": {"next_anchor": {"type": "string", "minLength": 1}}},
-            "else": {"properties": {"next_anchor": {"type": "null"}}},
-        }
-    ],
 }
 
 

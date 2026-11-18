@@ -280,7 +280,7 @@ class _PlanningScriptClient:
         if kind == "review_dependency_candidate":
             return {"required": True}
         if kind == "enumerate_structural_subjects":
-            return {"records": [], "has_more": False, "next_anchor": None}
+            return {"records": []}
         if kind == "describe_structural_change":
             return {
                 "result": "change",
@@ -1487,7 +1487,7 @@ def test_source_question_machine_accounts_for_normative_and_context_blocks() -> 
                 "enumerate_structural_subjects"
             )
             assert not structural_requests[0].batch_members
-            answer = {"records": [], "has_more": False, "next_anchor": None}
+            answer = {"records": []}
         else:
             answer = {"decision": "accept", "reason": "Faithful to the source."}
         answers[question.question_id] = answer

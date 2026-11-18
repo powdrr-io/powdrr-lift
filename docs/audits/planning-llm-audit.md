@@ -30,10 +30,15 @@ ordered group of at most four unresolved requirements. The model returns only
 semantic proposal records; the scheduler detects uncovered requirements and
 creates deterministic singleton follow-up requests. Proposal answers no longer
 contain `has_more` or `next_anchor`. The question contract is version 8, so old
-version 7 answers are not replayed. Subject pagination, copied runtime and
-component bindings, and other recommendations in milestone 2 remain
-unimplemented. The detailed request catalog below preserves the audited source
-snapshot and its historical schemas.
+version 7 answers are not replayed.
+
+Structural subject update: answers now contain subject records only. The planner
+automatically requests another page when a response fills the eight-record
+capacity, and stops after the first shorter response. The question contract is
+version 2. The model no longer chooses whether or where to continue. Copied
+runtime, component, and validation bindings, and other recommendations in
+milestone 2 remain unimplemented. The detailed request catalog below preserves
+the audited source snapshot and its historical schemas.
 
 ## 1. Answer to the central question
 
@@ -576,10 +581,11 @@ check public API/test consumers explicitly; this audit changes none of them.
    requirement extraction now uses scheduler-owned fixed anchor windows, and the
    model returns only semantic records for its supplied window. Work-unit proposal
    progression now uses fixed groups plus deterministic singleton supplements;
-   proposal answers contain no cursor. Remaining work: apply the same ownership
-   to subject windows and phase/runtime/component/validation bindings. Verify no
-   duplicate/skipped obligations, source-edit invalidation, and oversized answers
-   without lossy truncation across these paths.
+   proposal answers contain no cursor. Structural-subject enumeration now
+   continues automatically after a full eight-record response and ends after a
+   shorter one. Remaining work: derive phase/runtime/component/validation
+   bindings. Verify no duplicate or skipped obligations, source-edit
+   invalidation, and oversized answers without lossy truncation across these paths.
 3. **Carry accepted semantics directly.** Typed source requirements, human setup,
    phases, cases and observations bypass rediscovery. Preserve conditional/Boolean
    source relations and scenario dimensions. Unknown meaning stops or goes to
@@ -601,8 +607,8 @@ check public API/test consumers explicitly; this audit changes none of them.
    Do not add a second planner to bypass deterministic compilation failures.
 
 The request catalog describes the audited revision, while milestones 1 and the
-source/work-unit pagination portions of milestone 2 are implemented in the
-current planner. Remaining milestone 2 work and milestones 3–6 remain
+source/work-unit/subject-pagination portions of milestone 2 are implemented in
+the current planner. Remaining milestone 2 work and milestones 3–6 remain
 recommendations.
 Later changes should be separately reviewable and retain pinned intent, private
 verification, full scenario closure and explicit human decision boundaries.

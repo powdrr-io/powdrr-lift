@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import shutil
 import socket
 import subprocess
@@ -39,6 +40,7 @@ from powdrr_local.miniswe_inference import trace_miniswe_inference_handler
 from powdrr_local.structrr_context import StructrrContextBridge
 from powdrr_service.behavior_contract import BehaviorScenario
 from powdrr_service.intent_packet import IntentPacket
+from powdrr_service.planning.checkpoints import sanitize_diagnostic
 from powdrr_service.structrr.reference_catalog import ReferenceCatalog
 from powdrr_service.structrr.source_observation import SourceObservationSession
 from powdrr_service.structrr.source_reader import ReaderLimits, SourceReader
@@ -1421,13 +1423,28 @@ class MiniSWEAgentProvider:
             inference_parent.close()
             inference_child.close()
             shutil.rmtree(inference_config_root, ignore_errors=True)
+        trajectory_path = output_path or (
+            self.diagnostics_root / f"{attempt_id}.traj.json"
+            if self.diagnostics_root is not None
+            else None
+        )
         if output_path is not None and output_path.exists():
             if execution is None:
                 self.session_trajectory = output_path
+        if completed.returncode != 0 and trajectory_path is not None:
+            diagnostic = _mini_trajectory_failure(trajectory_path)
+            if diagnostic is not None:
+                stderr = "\n".join(
+                    part for part in (completed.stderr.strip(), diagnostic) if part
+                )
+                completed = subprocess.CompletedProcess(
+                    completed.args,
+                    completed.returncode,
+                    completed.stdout,
+                    stderr,
+                )
         if completed.returncode == 0 and self.diagnostics_root is not None:
-            trajectory_path = (
-                output_path or self.diagnostics_root / f"{attempt_id}.traj.json"
-            )
+            assert trajectory_path is not None
             exit_status = _mini_trajectory_exit_status(trajectory_path)
             if exit_status is not None and exit_status != "Submitted":
                 diagnostic = (
@@ -1528,6 +1545,10 @@ _PROVIDER_ENVIRONMENT_NAMES = frozenset(
         "SYSTEM_ONE_BASE_URL",
     }
 )
+_PROVIDER_CREDENTIAL_RE = re.compile(
+    r"(?i)((?:api[_-]?key|access[_-]?key|secret|password|token|authorization)"
+    r"\s*[:=]\s*[\"']?)[^\s,}\"']+"
+)
 
 
 def _remove_provider_credentials(environment: dict[str, str]) -> None:
@@ -1558,6 +1579,65 @@ def _mini_trajectory_exit_status(path: Path) -> str | None:
         return None
     status = info.get("exit_status")
     return status if isinstance(status, str) else None
+
+
+def _mini_trajectory_failure(path: Path) -> str | None:
+    """Return MiniSWE's terminal failure so process errors retain their cause."""
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(data, Mapping):
+        return None
+    info = data.get("info")
+    if not isinstance(info, Mapping):
+        return None
+    status = info.get("exit_status")
+    if not isinstance(status, str) or status == "Submitted":
+        return None
+    messages = data.get("messages")
+    if not isinstance(messages, list):
+        return f"MiniSWE exit_status={status!r}"
+    exit_message = next(
+        (
+            message
+            for message in reversed(messages)
+            if isinstance(message, Mapping) and message.get("role") == "exit"
+        ),
+        None,
+    )
+    content = exit_message.get("content") if isinstance(exit_message, Mapping) else None
+    if not isinstance(content, str) or not content.strip():
+        return f"MiniSWE exit_status={status!r}"
+    secrets = tuple(
+        value for name in _PROVIDER_ENVIRONMENT_NAMES if (value := os.environ.get(name))
+    )
+    safe_content = _safe_coding_agent_diagnostic(content, secret_values=secrets)
+    return f"MiniSWE exit_status={status!r}: {safe_content[:1000]}"
+
+
+def _coding_agent_failure_message(returncode: int, stderr: str) -> str:
+    """Keep process failures actionable without persisting unbounded output."""
+    message = " ".join(stderr.split())
+    if not message:
+        return f"coding-agent process failed (exit code {returncode})"
+    secrets = tuple(
+        value for name in _PROVIDER_ENVIRONMENT_NAMES if (value := os.environ.get(name))
+    )
+    safe_message = _safe_coding_agent_diagnostic(message, secret_values=secrets)
+    return (
+        f"coding-agent process failed (exit code {returncode}): {safe_message[:1000]}"
+    )
+
+
+def _safe_coding_agent_diagnostic(
+    value: str, *, secret_values: Sequence[str] = ()
+) -> str:
+    message = " ".join(value.split())
+    for secret in secret_values:
+        message = message.replace(secret, "[REDACTED]")
+    message = _PROVIDER_CREDENTIAL_RE.sub(r"\1[REDACTED]", message)
+    return str(sanitize_diagnostic(message))
 
 
 def _format_elapsed(seconds: float) -> str:
@@ -1953,7 +2033,10 @@ def run_coding_agent(
     elif completed.returncode == 0:
         status, terminal_error = CodingAgentStatus.COMPLETED, None
     else:
-        status, terminal_error = CodingAgentStatus.FAILED, "coding-agent process failed"
+        status = CodingAgentStatus.FAILED
+        terminal_error = _coding_agent_failure_message(
+            completed.returncode, completed.stderr
+        )
     return CodingAgentAttempt(
         attempt_id=attempt_id,
         request_id=request.request_id,

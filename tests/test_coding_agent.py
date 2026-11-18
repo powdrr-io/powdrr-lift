@@ -32,6 +32,7 @@ from powdrr_lift.workrr.coding_agent import (
     _repair_contract_protected_paths,
     _seatbelt_write_deny_profile,
     _write_denied_command,
+    build_coding_agent_provider,
     classify_coding_agent_attempt,
     run_coding_agent,
 )
@@ -308,6 +309,32 @@ def test_miniswe_enforcement_requires_frozen_inputs(tmp_path: Path) -> None:
     )
     with pytest.raises(ValueError, match="frozen catalog"):
         provider.run(_request(), worktree_root=tmp_path, attempt_id="missing")
+
+
+def test_coding_provider_preserves_miniswe_trace_attribution(tmp_path: Path) -> None:
+    provider = build_coding_agent_provider(
+        "minisweagent",
+        opencode_executable="opencode",
+        opencode_model=None,
+        minisweagent_executable="mini",
+        minisweagent_model="test-model",
+        timeout_seconds=30,
+        diagnostics_root=tmp_path / "diagnostics",
+        permission_policy=OpenCodePermissionPolicy(()),
+        miniswe_inference_handler=_unused_inference_handler,
+        trace_caller="ci_repair",
+        trace_gate_consumer="ci_repair_contract_validation",
+        trace_evidence_fingerprint="evidence-hash",
+        trace_evidence_ids=("repair-1", "failure-2"),
+        trace_check_id="failure-2",
+    )
+
+    assert isinstance(provider, MiniSWEAgentProvider)
+    assert provider.trace_caller == "ci_repair"
+    assert provider.trace_gate_consumer == "ci_repair_contract_validation"
+    assert provider.trace_evidence_fingerprint == "evidence-hash"
+    assert provider.trace_evidence_ids == ("repair-1", "failure-2")
+    assert provider.trace_check_id == "failure-2"
 
 
 def test_execution_unit_compiles_to_worker_request() -> None:

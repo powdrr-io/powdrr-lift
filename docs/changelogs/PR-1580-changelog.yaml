@@ -1,0 +1,591 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1580
+title: Make source requirement paging deterministic
+intent:
+  problem: Requirement extraction allowed the model to choose a source cursor, which made page coverage
+    and answer correlation dependent on model output.
+  goal: Have the scheduler create fixed source-anchor windows and accept only semantic requirement records
+    tied to each supplied window.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/audits/planning-llm-audit.md
+  type: modified
+  span:
+    start_line: 3
+    end_line: 5
+  summary: Record deterministic source paging progress and remaining planner work.
+  rationale: Keep the audit plan aligned with the active implementation.
+- path: docs/audits/planning-llm-audit.md
+  type: modified
+  span:
+    start_line: 20
+    end_line: 27
+  summary: Record deterministic source paging progress and remaining planner work.
+  rationale: Keep the audit plan aligned with the active implementation.
+- path: docs/audits/planning-llm-audit.md
+  type: modified
+  span:
+    start_line: 565
+    end_line: 570
+  summary: Record deterministic source paging progress and remaining planner work.
+  rationale: Keep the audit plan aligned with the active implementation.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 75
+    end_line: 75
+  summary: Schedule and correlate deterministic source extraction windows.
+  rationale: Keep source page progression under scheduler control.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 716
+    end_line: 716
+  summary: Schedule and correlate deterministic source extraction windows.
+  rationale: Keep source page progression under scheduler control.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 718
+    end_line: 720
+  summary: Schedule and correlate deterministic source extraction windows.
+  rationale: Keep source page progression under scheduler control.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 732
+    end_line: 734
+  summary: Schedule and correlate deterministic source extraction windows.
+  rationale: Keep source page progression under scheduler control.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 2818
+    end_line: 2818
+  summary: Schedule and correlate deterministic source extraction windows.
+  rationale: Keep source page progression under scheduler control.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 2812
+    end_line: 2814
+  summary: Schedule and correlate deterministic source extraction windows.
+  rationale: Keep source page progression under scheduler control.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 2830
+    end_line: 2832
+  summary: Schedule and correlate deterministic source extraction windows.
+  rationale: Keep source page progression under scheduler control.
+- path: packages/service/src/powdrr_service/planning/source.py
+  type: modified
+  span:
+    start_line: 26
+    end_line: 27
+  summary: Build bounded source windows and validate semantic records without model cursors.
+  rationale: Bind answers to the supplied anchors and remove model-controlled paging.
+- path: packages/service/src/powdrr_service/planning/source.py
+  type: modified
+  span:
+    start_line: 73
+    end_line: 83
+  summary: Build bounded source windows and validate semantic records without model cursors.
+  rationale: Bind answers to the supplied anchors and remove model-controlled paging.
+- path: packages/service/src/powdrr_service/planning/source.py
+  type: modified
+  span:
+    start_line: 286
+    end_line: 287
+  summary: Build bounded source windows and validate semantic records without model cursors.
+  rationale: Bind answers to the supplied anchors and remove model-controlled paging.
+- path: packages/service/src/powdrr_service/planning/source.py
+  type: modified
+  span:
+    start_line: 747
+    end_line: 747
+  summary: Build bounded source windows and validate semantic records without model cursors.
+  rationale: Bind answers to the supplied anchors and remove model-controlled paging.
+- path: packages/service/src/powdrr_service/planning/source.py
+  type: modified
+  span:
+    start_line: 749
+    end_line: 750
+  summary: Build bounded source windows and validate semantic records without model cursors.
+  rationale: Bind answers to the supplied anchors and remove model-controlled paging.
+- path: packages/service/src/powdrr_service/planning/source.py
+  type: modified
+  span:
+    start_line: 755
+    end_line: 755
+  summary: Build bounded source windows and validate semantic records without model cursors.
+  rationale: Bind answers to the supplied anchors and remove model-controlled paging.
+- path: packages/service/src/powdrr_service/planning/source.py
+  type: modified
+  span:
+    start_line: 758
+    end_line: 760
+  summary: Build bounded source windows and validate semantic records without model cursors.
+  rationale: Bind answers to the supplied anchors and remove model-controlled paging.
+- path: packages/service/src/powdrr_service/planning/source.py
+  type: modified
+  span:
+    start_line: 788
+    end_line: 792
+  summary: Build bounded source windows and validate semantic records without model cursors.
+  rationale: Bind answers to the supplied anchors and remove model-controlled paging.
+- path: packages/service/src/powdrr_service/planning/source.py
+  type: modified
+  span:
+    start_line: 801
+    end_line: 801
+  summary: Build bounded source windows and validate semantic records without model cursors.
+  rationale: Bind answers to the supplied anchors and remove model-controlled paging.
+- path: packages/service/src/powdrr_service/planning/source.py
+  type: modified
+  span:
+    start_line: 861
+    end_line: 885
+  summary: Build bounded source windows and validate semantic records without model cursors.
+  rationale: Bind answers to the supplied anchors and remove model-controlled paging.
+- path: packages/service/src/powdrr_service/planning/source.py
+  type: modified
+  span:
+    start_line: 890
+    end_line: 890
+  summary: Build bounded source windows and validate semantic records without model cursors.
+  rationale: Bind answers to the supplied anchors and remove model-controlled paging.
+- path: packages/service/src/powdrr_service/planning/source.py
+  type: modified
+  span:
+    start_line: 892
+    end_line: 897
+  summary: Build bounded source windows and validate semantic records without model cursors.
+  rationale: Bind answers to the supplied anchors and remove model-controlled paging.
+- path: packages/service/src/powdrr_service/planning/source.py
+  type: modified
+  span:
+    start_line: 899
+    end_line: 903
+  summary: Build bounded source windows and validate semantic records without model cursors.
+  rationale: Bind answers to the supplied anchors and remove model-controlled paging.
+- path: packages/service/src/powdrr_service/planning/source.py
+  type: modified
+  span:
+    start_line: 917
+    end_line: 917
+  summary: Build bounded source windows and validate semantic records without model cursors.
+  rationale: Bind answers to the supplied anchors and remove model-controlled paging.
+- path: packages/service/src/powdrr_service/planning/source.py
+  type: modified
+  span:
+    start_line: 919
+    end_line: 921
+  summary: Build bounded source windows and validate semantic records without model cursors.
+  rationale: Bind answers to the supplied anchors and remove model-controlled paging.
+- path: packages/service/src/powdrr_service/planning/source.py
+  type: modified
+  span:
+    start_line: 923
+    end_line: 923
+  summary: Build bounded source windows and validate semantic records without model cursors.
+  rationale: Bind answers to the supplied anchors and remove model-controlled paging.
+- path: packages/service/src/powdrr_service/planning/source.py
+  type: modified
+  span:
+    start_line: 930
+    end_line: 930
+  summary: Build bounded source windows and validate semantic records without model cursors.
+  rationale: Bind answers to the supplied anchors and remove model-controlled paging.
+- path: packages/service/src/powdrr_service/planning/source.py
+  type: modified
+  span:
+    start_line: 933
+    end_line: 933
+  summary: Build bounded source windows and validate semantic records without model cursors.
+  rationale: Bind answers to the supplied anchors and remove model-controlled paging.
+- path: packages/service/src/powdrr_service/planning/source.py
+  type: modified
+  span:
+    start_line: 936
+    end_line: 936
+  summary: Build bounded source windows and validate semantic records without model cursors.
+  rationale: Bind answers to the supplied anchors and remove model-controlled paging.
+- path: packages/service/src/powdrr_service/planning/source.py
+  type: modified
+  span:
+    start_line: 938
+    end_line: 939
+  summary: Build bounded source windows and validate semantic records without model cursors.
+  rationale: Bind answers to the supplied anchors and remove model-controlled paging.
+- path: packages/service/src/powdrr_service/planning/source.py
+  type: modified
+  span:
+    start_line: 942
+    end_line: 949
+  summary: Build bounded source windows and validate semantic records without model cursors.
+  rationale: Bind answers to the supplied anchors and remove model-controlled paging.
+- path: packages/service/src/powdrr_service/planning/source.py
+  type: modified
+  span:
+    start_line: 954
+    end_line: 954
+  summary: Build bounded source windows and validate semantic records without model cursors.
+  rationale: Bind answers to the supplied anchors and remove model-controlled paging.
+- path: packages/service/src/powdrr_service/planning/source.py
+  type: modified
+  span:
+    start_line: 956
+    end_line: 963
+  summary: Build bounded source windows and validate semantic records without model cursors.
+  rationale: Bind answers to the supplied anchors and remove model-controlled paging.
+- path: packages/service/src/powdrr_service/planning/source.py
+  type: modified
+  span:
+    start_line: 966
+    end_line: 969
+  summary: Build bounded source windows and validate semantic records without model cursors.
+  rationale: Bind answers to the supplied anchors and remove model-controlled paging.
+- path: packages/service/src/powdrr_service/planning/source.py
+  type: modified
+  span:
+    start_line: 971
+    end_line: 971
+  summary: Build bounded source windows and validate semantic records without model cursors.
+  rationale: Bind answers to the supplied anchors and remove model-controlled paging.
+- path: packages/service/src/powdrr_service/planning/source.py
+  type: modified
+  span:
+    start_line: 973
+    end_line: 974
+  summary: Build bounded source windows and validate semantic records without model cursors.
+  rationale: Bind answers to the supplied anchors and remove model-controlled paging.
+- path: packages/service/src/powdrr_service/planning/source.py
+  type: modified
+  span:
+    start_line: 977
+    end_line: 981
+  summary: Build bounded source windows and validate semantic records without model cursors.
+  rationale: Bind answers to the supplied anchors and remove model-controlled paging.
+- path: packages/service/src/powdrr_service/planning/source.py
+  type: modified
+  span:
+    start_line: 1519
+    end_line: 1520
+  summary: Build bounded source windows and validate semantic records without model cursors.
+  rationale: Bind answers to the supplied anchors and remove model-controlled paging.
+- path: packages/service/src/powdrr_service/planning/source.py
+  type: modified
+  span:
+    start_line: 1534
+    end_line: 1534
+  summary: Build bounded source windows and validate semantic records without model cursors.
+  rationale: Bind answers to the supplied anchors and remove model-controlled paging.
+- path: packages/service/src/powdrr_service/planning/source.py
+  type: modified
+  span:
+    start_line: 1543
+    end_line: 1543
+  summary: Build bounded source windows and validate semantic records without model cursors.
+  rationale: Bind answers to the supplied anchors and remove model-controlled paging.
+- path: scripts/benchmark_planning_scale.py
+  type: modified
+  span:
+    start_line: 652
+    end_line: 652
+  summary: Update benchmark extraction responses and source page metrics.
+  rationale: Keep benchmark behavior aligned with scheduler-owned windows.
+- path: scripts/benchmark_planning_scale.py
+  type: modified
+  span:
+    start_line: 675
+    end_line: 675
+  summary: Update benchmark extraction responses and source page metrics.
+  rationale: Keep benchmark behavior aligned with scheduler-owned windows.
+- path: scripts/benchmark_planning_scale.py
+  type: modified
+  span:
+    start_line: 932
+    end_line: 933
+  summary: Update benchmark extraction responses and source page metrics.
+  rationale: Keep benchmark behavior aligned with scheduler-owned windows.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 208
+    end_line: 208
+  summary: Update planner integration fixtures for records-only extraction and per-window correlation.
+  rationale: Verify the reduced answer contract through the source-ledger flow.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1385
+    end_line: 1407
+  summary: Update planner integration fixtures for records-only extraction and per-window correlation.
+  rationale: Verify the reduced answer contract through the source-ledger flow.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1422
+    end_line: 1422
+  summary: Update planner integration fixtures for records-only extraction and per-window correlation.
+  rationale: Verify the reduced answer contract through the source-ledger flow.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 2122
+    end_line: 2123
+  summary: Update planner integration fixtures for records-only extraction and per-window correlation.
+  rationale: Verify the reduced answer contract through the source-ledger flow.
+- path: tests/test_planning_source.py
+  type: modified
+  span:
+    start_line: 6
+    end_line: 6
+  summary: Cover fixed windows, window-scoped citations, invalidation, and oversized answers.
+  rationale: Protect deterministic source coverage without lossy answer truncation.
+- path: tests/test_planning_source.py
+  type: modified
+  span:
+    start_line: 13
+    end_line: 13
+  summary: Cover fixed windows, window-scoped citations, invalidation, and oversized answers.
+  rationale: Protect deterministic source coverage without lossy answer truncation.
+- path: tests/test_planning_source.py
+  type: modified
+  span:
+    start_line: 15
+    end_line: 15
+  summary: Cover fixed windows, window-scoped citations, invalidation, and oversized answers.
+  rationale: Protect deterministic source coverage without lossy answer truncation.
+- path: tests/test_planning_source.py
+  type: modified
+  span:
+    start_line: 24
+    end_line: 24
+  summary: Cover fixed windows, window-scoped citations, invalidation, and oversized answers.
+  rationale: Protect deterministic source coverage without lossy answer truncation.
+- path: tests/test_planning_source.py
+  type: modified
+  span:
+    start_line: 33
+    end_line: 33
+  summary: Cover fixed windows, window-scoped citations, invalidation, and oversized answers.
+  rationale: Protect deterministic source coverage without lossy answer truncation.
+- path: tests/test_planning_source.py
+  type: modified
+  span:
+    start_line: 258
+    end_line: 258
+  summary: Cover fixed windows, window-scoped citations, invalidation, and oversized answers.
+  rationale: Protect deterministic source coverage without lossy answer truncation.
+- path: tests/test_planning_source.py
+  type: modified
+  span:
+    start_line: 264
+    end_line: 264
+  summary: Cover fixed windows, window-scoped citations, invalidation, and oversized answers.
+  rationale: Protect deterministic source coverage without lossy answer truncation.
+- path: tests/test_planning_source.py
+  type: modified
+  span:
+    start_line: 276
+    end_line: 276
+  summary: Cover fixed windows, window-scoped citations, invalidation, and oversized answers.
+  rationale: Protect deterministic source coverage without lossy answer truncation.
+- path: tests/test_planning_source.py
+  type: modified
+  span:
+    start_line: 282
+    end_line: 282
+  summary: Cover fixed windows, window-scoped citations, invalidation, and oversized answers.
+  rationale: Protect deterministic source coverage without lossy answer truncation.
+- path: tests/test_planning_source.py
+  type: modified
+  span:
+    start_line: 429
+    end_line: 431
+  summary: Cover fixed windows, window-scoped citations, invalidation, and oversized answers.
+  rationale: Protect deterministic source coverage without lossy answer truncation.
+- path: tests/test_planning_source.py
+  type: modified
+  span:
+    start_line: 475
+    end_line: 475
+  summary: Cover fixed windows, window-scoped citations, invalidation, and oversized answers.
+  rationale: Protect deterministic source coverage without lossy answer truncation.
+- path: tests/test_planning_source.py
+  type: modified
+  span:
+    start_line: 485
+    end_line: 486
+  summary: Cover fixed windows, window-scoped citations, invalidation, and oversized answers.
+  rationale: Protect deterministic source coverage without lossy answer truncation.
+- path: tests/test_planning_source.py
+  type: modified
+  span:
+    start_line: 499
+    end_line: 508
+  summary: Cover fixed windows, window-scoped citations, invalidation, and oversized answers.
+  rationale: Protect deterministic source coverage without lossy answer truncation.
+- path: tests/test_planning_source.py
+  type: modified
+  span:
+    start_line: 510
+    end_line: 525
+  summary: Cover fixed windows, window-scoped citations, invalidation, and oversized answers.
+  rationale: Protect deterministic source coverage without lossy answer truncation.
+- path: tests/test_planning_source.py
+  type: modified
+  span:
+    start_line: 527
+    end_line: 528
+  summary: Cover fixed windows, window-scoped citations, invalidation, and oversized answers.
+  rationale: Protect deterministic source coverage without lossy answer truncation.
+- path: tests/test_planning_source.py
+  type: modified
+  span:
+    start_line: 530
+    end_line: 540
+  summary: Cover fixed windows, window-scoped citations, invalidation, and oversized answers.
+  rationale: Protect deterministic source coverage without lossy answer truncation.
+- path: tests/test_planning_source.py
+  type: modified
+  span:
+    start_line: 542
+    end_line: 542
+  summary: Cover fixed windows, window-scoped citations, invalidation, and oversized answers.
+  rationale: Protect deterministic source coverage without lossy answer truncation.
+- path: tests/test_planning_source.py
+  type: modified
+  span:
+    start_line: 546
+    end_line: 547
+  summary: Cover fixed windows, window-scoped citations, invalidation, and oversized answers.
+  rationale: Protect deterministic source coverage without lossy answer truncation.
+- path: tests/test_planning_source.py
+  type: modified
+  span:
+    start_line: 550
+    end_line: 550
+  summary: Cover fixed windows, window-scoped citations, invalidation, and oversized answers.
+  rationale: Protect deterministic source coverage without lossy answer truncation.
+- path: tests/test_planning_source.py
+  type: modified
+  span:
+    start_line: 553
+    end_line: 554
+  summary: Cover fixed windows, window-scoped citations, invalidation, and oversized answers.
+  rationale: Protect deterministic source coverage without lossy answer truncation.
+- path: tests/test_planning_source.py
+  type: modified
+  span:
+    start_line: 649
+    end_line: 663
+  summary: Cover fixed windows, window-scoped citations, invalidation, and oversized answers.
+  rationale: Protect deterministic source coverage without lossy answer truncation.
+- path: tests/test_planning_source.py
+  type: modified
+  span:
+    start_line: 557
+    end_line: 571
+  summary: Cover fixed windows, window-scoped citations, invalidation, and oversized answers.
+  rationale: Protect deterministic source coverage without lossy answer truncation.
+- path: tests/test_planning_source.py
+  type: modified
+  span:
+    start_line: 573
+    end_line: 574
+  summary: Cover fixed windows, window-scoped citations, invalidation, and oversized answers.
+  rationale: Protect deterministic source coverage without lossy answer truncation.
+- path: tests/test_planning_source.py
+  type: modified
+  span:
+    start_line: 576
+    end_line: 577
+  summary: Cover fixed windows, window-scoped citations, invalidation, and oversized answers.
+  rationale: Protect deterministic source coverage without lossy answer truncation.
+- path: tests/test_planning_source.py
+  type: modified
+  span:
+    start_line: 587
+    end_line: 587
+  summary: Cover fixed windows, window-scoped citations, invalidation, and oversized answers.
+  rationale: Protect deterministic source coverage without lossy answer truncation.
+- path: tests/test_planning_source.py
+  type: modified
+  span:
+    start_line: 589
+    end_line: 591
+  summary: Cover fixed windows, window-scoped citations, invalidation, and oversized answers.
+  rationale: Protect deterministic source coverage without lossy answer truncation.
+- path: tests/test_planning_source.py
+  type: modified
+  span:
+    start_line: 593
+    end_line: 594
+  summary: Cover fixed windows, window-scoped citations, invalidation, and oversized answers.
+  rationale: Protect deterministic source coverage without lossy answer truncation.
+- path: tests/test_planning_source.py
+  type: modified
+  span:
+    start_line: 597
+    end_line: 597
+  summary: Cover fixed windows, window-scoped citations, invalidation, and oversized answers.
+  rationale: Protect deterministic source coverage without lossy answer truncation.
+- path: tests/test_planning_source.py
+  type: modified
+  span:
+    start_line: 611
+    end_line: 612
+  summary: Cover fixed windows, window-scoped citations, invalidation, and oversized answers.
+  rationale: Protect deterministic source coverage without lossy answer truncation.
+- path: tests/test_planning_source.py
+  type: modified
+  span:
+    start_line: 733
+    end_line: 737
+  summary: Cover fixed windows, window-scoped citations, invalidation, and oversized answers.
+  rationale: Protect deterministic source coverage without lossy answer truncation.
+- path: tests/test_planning_source.py
+  type: modified
+  span:
+    start_line: 625
+    end_line: 628
+  summary: Cover fixed windows, window-scoped citations, invalidation, and oversized answers.
+  rationale: Protect deterministic source coverage without lossy answer truncation.
+- path: tests/test_planning_source.py
+  type: modified
+  span:
+    start_line: 630
+    end_line: 631
+  summary: Cover fixed windows, window-scoped citations, invalidation, and oversized answers.
+  rationale: Protect deterministic source coverage without lossy answer truncation.
+- path: tests/test_planning_source.py
+  type: modified
+  span:
+    start_line: 633
+    end_line: 633
+  summary: Cover fixed windows, window-scoped citations, invalidation, and oversized answers.
+  rationale: Protect deterministic source coverage without lossy answer truncation.
+- path: tests/test_planning_source.py
+  type: modified
+  span:
+    start_line: 649
+    end_line: 649
+  summary: Cover fixed windows, window-scoped citations, invalidation, and oversized answers.
+  rationale: Protect deterministic source coverage without lossy answer truncation.
+- path: tests/test_planning_source.py
+  type: modified
+  span:
+    start_line: 815
+    end_line: 816
+  summary: Cover fixed windows, window-scoped citations, invalidation, and oversized answers.
+  rationale: Protect deterministic source coverage without lossy answer truncation.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []
+features: []
+proposed_prs: []

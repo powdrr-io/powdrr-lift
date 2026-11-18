@@ -205,7 +205,7 @@ class _PlanningScriptClient:
                 if "Implement" in source_text
                 else []
             )
-            return {"records": records, "has_more": False, "next_anchor": None}
+            return {"records": records}
         if kind == "classify_source_block":
             if "Implement" in source_text:
                 return {"disposition": "normative", "requirement_ids": ["req-0001"]}
@@ -1382,6 +1382,29 @@ def test_source_question_machine_accounts_for_normative_and_context_blocks() -> 
             break
         question = request.question
         requested_kinds.append(question.kind)
+        if request.batch_members:
+            for member in request.batch_members:
+                block = block_by_id[member.question.subject_ids[0]]
+                if "Implement" in block.text:
+                    page_fact = next(
+                        fact
+                        for fact in member.accepted_facts
+                        if fact.ref_id.startswith("source-window-")
+                    )
+                    source_ref = page_fact.value["anchor_ids"][0]
+                    records = [
+                        {
+                            "statement": "Implement the requested behavior.",
+                            "kind": "behavior",
+                            "source_refs": [source_ref],
+                            "related_source_refs": [],
+                        }
+                    ]
+                else:
+                    records = []
+                answers[member.question.question_id] = {"records": records}
+            continue
+        answer: dict[str, Any]
         if question.kind == "extract_requirements":
             block = block_by_id[question.subject_ids[0]]
             records = (
@@ -1396,7 +1419,7 @@ def test_source_question_machine_accounts_for_normative_and_context_blocks() -> 
                 if "Implement" in block.text
                 else []
             )
-            answer = {"records": records, "has_more": False, "next_anchor": None}
+            answer = {"records": records}
         elif question.kind == "propose_work_units":
             answer = {
                 "records": [
@@ -2119,8 +2142,6 @@ def test_exact_source_fidelity_shortcut_leaves_paraphrases_for_review() -> None:
                         "related_source_refs": [],
                     }
                 ],
-                "has_more": False,
-                "next_anchor": None,
             }
         }
         return machine, answers

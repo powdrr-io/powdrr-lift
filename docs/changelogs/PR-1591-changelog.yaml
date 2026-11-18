@@ -1,5 +1,5 @@
 schema: https://powdrr.io/schema/changelog-v2
-change_id: 1590
+change_id: 1591
 title: Reconcile source-reference membership deterministically
 intent:
   problem: Post-worker source-reference membership mismatches were sent to a model even though the accepted edge set and observed Python annotations are available as exact data.

@@ -806,6 +806,47 @@ def test_minisweagent_provider_rejects_clean_exit_without_submission(
     assert "exit_status='LimitsExceeded'" in result.stderr
 
 
+def test_minisweagent_failure_preserves_sanitized_trajectory_error(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    worktree = _git_repo(tmp_path)
+    provider = MiniSWEAgentProvider(
+        inference_handler=_unused_inference_handler,
+        diagnostics_root=tmp_path / "diagnostics",
+    )
+    failure = (
+        "DeepInfra request failed with HTTP 429: Model busy, retry later; "
+        "api_key=secret-value"
+    )
+
+    def fake_run(command: list[str], **_: object) -> subprocess.CompletedProcess[str]:
+        output = Path(command[command.index("--output") + 1])
+        output.write_text(
+            json.dumps(
+                {
+                    "info": {"exit_status": "RuntimeError"},
+                    "messages": [{"role": "exit", "content": failure}],
+                }
+            ),
+            encoding="utf-8",
+        )
+        return subprocess.CompletedProcess(command, 1, "", "")
+
+    monkeypatch.setattr("powdrr_lift.workrr.coding_agent.run_minisweagent", fake_run)
+    attempt = run_coding_agent(
+        provider,
+        _request(_head(worktree)),
+        worktree_root=worktree,
+        attempt_id="provider-429",
+    )
+
+    assert attempt.status is CodingAgentStatus.FAILED
+    assert attempt.exit_code == 1
+    assert "HTTP 429" in (attempt.error or "")
+    assert "Model busy, retry later" in (attempt.error or "")
+    assert "secret-value" not in (attempt.error or "")
+
+
 def test_execution_plan_compiles_selected_unit_to_worker_request() -> None:
     request = ImplementationRequest.from_execution_plan(
         ExecutionPlan(

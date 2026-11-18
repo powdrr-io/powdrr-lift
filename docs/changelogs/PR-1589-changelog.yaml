@@ -1,0 +1,60 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1589
+title: Preserve MiniSWE provider failure details
+intent:
+  problem: MiniSWE provider errors were saved in its trajectory but reduced to a generic coding-agent process failure in the structured attempt result.
+  goal: Preserve a bounded, credential-sanitized terminal cause so provider and worker failures can be diagnosed from the durable result.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/coding_agent.py
+    type: modified
+    span: {start_line: 13, end_line: 13}
+    summary: Add regular-expression support for credential redaction.
+    rationale: Provider diagnostics must not persist embedded credential values.
+  - path: src/powdrr_lift/workrr/coding_agent.py
+    type: modified
+    span: {start_line: 43, end_line: 43}
+    summary: Use the shared diagnostic sanitizer for coding-agent errors.
+    rationale: Apply common token redaction to terminal provider failures.
+  - path: src/powdrr_lift/workrr/coding_agent.py
+    type: modified
+    span: {start_line: 1426, end_line: 1430}
+    summary: Resolve the MiniSWE trajectory path for failed runs.
+    rationale: Read terminal failure details from the attempt artifact.
+  - path: src/powdrr_lift/workrr/coding_agent.py
+    type: modified
+    span: {start_line: 1434, end_line: 1445}
+    summary: Attach MiniSWE's terminal trajectory error to process stderr.
+    rationale: Preserve provider failures when the MiniSWE process exits unsuccessfully.
+  - path: src/powdrr_lift/workrr/coding_agent.py
+    type: modified
+    span: {start_line: 1447, end_line: 1447}
+    summary: Reuse the resolved trajectory path for successful-run checks.
+    rationale: Keep terminal submission validation on the same artifact path.
+  - path: src/powdrr_lift/workrr/coding_agent.py
+    type: modified
+    span: {start_line: 1548, end_line: 1551}
+    summary: Match credential assignments when sanitizing failure text.
+    rationale: Prevent key and token values embedded in provider errors from being persisted.
+  - path: src/powdrr_lift/workrr/coding_agent.py
+    type: modified
+    span: {start_line: 1584, end_line: 1642}
+    summary: Extract and sanitize MiniSWE terminal failure details.
+    rationale: Preserve a bounded provider cause while redacting credentials.
+  - path: src/powdrr_lift/workrr/coding_agent.py
+    type: modified
+    span: {start_line: 2036, end_line: 2039}
+    summary: Include bounded stderr details in failed coding-agent attempt errors.
+    rationale: Make the structured attempt error actionable for provider and process failures.
+  - path: tests/test_coding_agent.py
+    type: modified
+    span: {start_line: 809, end_line: 849}
+    summary: Cover a MiniSWE HTTP 429 failure and embedded credential redaction.
+    rationale: Ensure a failed model request keeps its diagnostic cause without exposing an API key.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []
+features: []
+proposed_prs: []

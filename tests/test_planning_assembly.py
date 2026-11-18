@@ -88,9 +88,8 @@ def _proposal(
     path: str = "Tests/Validator.swift",
     runtime: str = "swift",
 ) -> dict[str, object]:
-    return {
+    proposal: dict[str, object] = {
         "requirement_ids": ["req-0001"],
-        "implementation_phase_id": None,
         "deliverable": "A focused acceptance test.",
         "planned_writes": [
             {
@@ -104,6 +103,9 @@ def _proposal(
         "acceptance_criteria": ["The test covers the required behavior."],
         "required_outputs": [],
     }
+    if len(context.implementation_phases) > 1:
+        proposal["implementation_phase_id"] = None
+    return proposal
 
 
 def _set_proposal_requirements(
@@ -506,6 +508,40 @@ def test_work_unit_question_requires_the_source_declared_phase() -> None:
         request.parse_answer({"records": [unassigned]})
 
 
+def test_work_unit_phase_is_derived_when_source_has_one_phase() -> None:
+    context, anchor = _context()
+    context = replace(
+        context,
+        implementation_phases=(ImplementationPhase("pr-01", "Implement", ()),),
+    )
+    proposal = _proposal(context, anchor)
+    request = build_work_unit_proposal_request(
+        context, ["req-0001"], valid_example={"records": [proposal]}
+    )
+
+    parsed = request.parse_answer({"records": [proposal]})
+
+    assert parsed.records[0].implementation_phase_id == "pr-01"
+    assert "implementation_phase_id" not in request.answer_schema["properties"]
+    assert "implementation_phase_id" not in proposal
+
+
+def test_work_unit_phase_is_empty_when_source_has_no_phases() -> None:
+    context, anchor = _context()
+    proposal = _proposal(context, anchor)
+    request = build_work_unit_proposal_request(
+        context, ["req-0001"], valid_example={"records": [proposal]}
+    )
+
+    parsed = request.parse_answer({"records": [proposal]})
+
+    assert parsed.records[0].implementation_phase_id is None
+    with pytest.raises(PlanningContractError, match="unknown fields"):
+        request.parse_answer(
+            {"records": [{**proposal, "implementation_phase_id": None}]}
+        )
+
+
 def test_explicit_sizing_handles_large_plan_deterministically() -> None:
     units = [
         ExplicitWorkUnit(f"unit-{index:04d}", "core", "neutral", 1)
@@ -623,9 +659,9 @@ def test_work_unit_question_has_a_parser_valid_example_and_exact_context() -> No
 
     request.validate()
     assert request.question.kind == "propose_work_units"
-    assert request.question.contract_version == 8
-    assert request.question.expected_answer_schema == "work-unit-proposals-v8"
-    assert request.question.question_id.startswith("propose-units-v8-")
+    assert request.question.contract_version == 9
+    assert request.question.expected_answer_schema == "work-unit-proposals-v9"
+    assert request.question.question_id.startswith("propose-units-v9-")
     assert "requirement_coverage" in request.exact_question
     assert (
         "Do not schedule work or tests that already satisfy" in request.exact_question
@@ -647,6 +683,7 @@ def test_work_unit_question_has_a_parser_valid_example_and_exact_context() -> No
     assert "component" not in record_schema["properties"]
     assert "implementation_runtime" not in record_schema["properties"]
     assert "validation_ids" not in record_schema["properties"]
+    assert "implementation_phase_id" not in record_schema["properties"]
     assert MAX_WORK_UNIT_REQUIREMENTS_PER_QUESTION == 4
     with pytest.raises(PlanningContractError, match="must contain"):
         request.parse_answer(
@@ -951,7 +988,6 @@ def test_work_unit_proposals_scope_evidence_and_batch_independent_groups() -> No
                 "records": [
                     {
                         "requirement_ids": list(all_requirement_ids[:5]),
-                        "implementation_phase_id": None,
                         "deliverable": "Implement one bounded unit.",
                         "planned_writes": [],
                         "implementation_step": "Implement the bounded change.",
@@ -1052,7 +1088,6 @@ def test_work_unit_proposals_scope_evidence_and_batch_independent_groups() -> No
                 "records": [
                     {
                         "requirement_ids": [all_requirement_ids[0]],
-                        "implementation_phase_id": None,
                         "deliverable": "Implement the scoped behavior.",
                         "planned_writes": [
                             {
@@ -1170,7 +1205,6 @@ def test_work_unit_continuation_only_includes_uncovered_requirements(
     assert len(example_records) == 1
     assert set(example_records[0]) == {
         "requirement_ids",
-        "implementation_phase_id",
         "deliverable",
         "planned_writes",
         "implementation_step",

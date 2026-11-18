@@ -1,0 +1,425 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1587
+title: Derive unambiguous planner phase assignments
+intent:
+  problem: The work-unit planner asked the model to return implementation phase values that were already
+    determined when the source declared zero or one phase.
+  goal: Derive empty or sole phase assignments deterministically and retain model selection only when
+    multiple source phases require a choice.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/audits/planning-llm-audit.md
+  type: modified
+  span:
+    start_line: 5
+    end_line: 7
+  summary: Record that zero-or-one phase binding is derived deterministically.
+  rationale: Keep the audit aligned with the current planner and distinguish deterministic binding from
+    the remaining multi-phase semantic choice.
+- path: docs/audits/planning-llm-audit.md
+  type: modified
+  span:
+    start_line: 33
+    end_line: 38
+  summary: Record that zero-or-one phase binding is derived deterministically.
+  rationale: Keep the audit aligned with the current planner and distinguish deterministic binding from
+    the remaining multi-phase semantic choice.
+- path: docs/audits/planning-llm-audit.md
+  type: modified
+  span:
+    start_line: 43
+    end_line: 45
+  summary: Record that zero-or-one phase binding is derived deterministically.
+  rationale: Keep the audit aligned with the current planner and distinguish deterministic binding from
+    the remaining multi-phase semantic choice.
+- path: docs/audits/planning-llm-audit.md
+  type: modified
+  span:
+    start_line: 590
+    end_line: 594
+  summary: Record that zero-or-one phase binding is derived deterministically.
+  rationale: Keep the audit aligned with the current planner and distinguish deterministic binding from
+    the remaining multi-phase semantic choice.
+- path: docs/audits/planning-llm-audit.md
+  type: modified
+  span:
+    start_line: 616
+    end_line: 618
+  summary: Record that zero-or-one phase binding is derived deterministically.
+  rationale: Keep the audit aligned with the current planner and distinguish deterministic binding from
+    the remaining multi-phase semantic choice.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 94
+    end_line: 94
+  summary: Derive phase assignments when there are zero or one source phases and request an explicit choice
+    only for multiple phases.
+  rationale: Avoid asking the model to repeat facts determined by source phase count while preserving
+    validated semantic selection when multiple phases exist.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 102
+    end_line: 102
+  summary: Derive phase assignments when there are zero or one source phases and request an explicit choice
+    only for multiple phases.
+  rationale: Avoid asking the model to repeat facts determined by source phase count while preserving
+    validated semantic selection when multiple phases exist.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 382
+    end_line: 382
+  summary: Derive phase assignments when there are zero or one source phases and request an explicit choice
+    only for multiple phases.
+  rationale: Avoid asking the model to repeat facts determined by source phase count while preserving
+    validated semantic selection when multiple phases exist.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 386
+    end_line: 387
+  summary: Derive phase assignments when there are zero or one source phases and request an explicit choice
+    only for multiple phases.
+  rationale: Avoid asking the model to repeat facts determined by source phase count while preserving
+    validated semantic selection when multiple phases exist.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 397
+    end_line: 397
+  summary: Derive phase assignments when there are zero or one source phases and request an explicit choice
+    only for multiple phases.
+  rationale: Avoid asking the model to repeat facts determined by source phase count while preserving
+    validated semantic selection when multiple phases exist.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 397
+    end_line: 398
+  summary: Derive phase assignments when there are zero or one source phases and request an explicit choice
+    only for multiple phases.
+  rationale: Avoid asking the model to repeat facts determined by source phase count while preserving
+    validated semantic selection when multiple phases exist.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 405
+    end_line: 406
+  summary: Derive phase assignments when there are zero or one source phases and request an explicit choice
+    only for multiple phases.
+  rationale: Avoid asking the model to repeat facts determined by source phase count while preserving
+    validated semantic selection when multiple phases exist.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 408
+    end_line: 408
+  summary: Derive phase assignments when there are zero or one source phases and request an explicit choice
+    only for multiple phases.
+  rationale: Avoid asking the model to repeat facts determined by source phase count while preserving
+    validated semantic selection when multiple phases exist.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 1093
+    end_line: 1093
+  summary: Derive phase assignments when there are zero or one source phases and request an explicit choice
+    only for multiple phases.
+  rationale: Avoid asking the model to repeat facts determined by source phase count while preserving
+    validated semantic selection when multiple phases exist.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 1095
+    end_line: 1095
+  summary: Derive phase assignments when there are zero or one source phases and request an explicit choice
+    only for multiple phases.
+  rationale: Avoid asking the model to repeat facts determined by source phase count while preserving
+    validated semantic selection when multiple phases exist.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 1097
+    end_line: 1097
+  summary: Derive phase assignments when there are zero or one source phases and request an explicit choice
+    only for multiple phases.
+  rationale: Avoid asking the model to repeat facts determined by source phase count while preserving
+    validated semantic selection when multiple phases exist.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 1099
+    end_line: 1099
+  summary: Derive phase assignments when there are zero or one source phases and request an explicit choice
+    only for multiple phases.
+  rationale: Avoid asking the model to repeat facts determined by source phase count while preserving
+    validated semantic selection when multiple phases exist.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 1120
+    end_line: 1126
+  summary: Derive phase assignments when there are zero or one source phases and request an explicit choice
+    only for multiple phases.
+  rationale: Avoid asking the model to repeat facts determined by source phase count while preserving
+    validated semantic selection when multiple phases exist.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 1179
+    end_line: 1186
+  summary: Derive phase assignments when there are zero or one source phases and request an explicit choice
+    only for multiple phases.
+  rationale: Avoid asking the model to repeat facts determined by source phase count while preserving
+    validated semantic selection when multiple phases exist.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 1418
+    end_line: 1426
+  summary: Derive phase assignments when there are zero or one source phases and request an explicit choice
+    only for multiple phases.
+  rationale: Avoid asking the model to repeat facts determined by source phase count while preserving
+    validated semantic selection when multiple phases exist.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 1471
+    end_line: 1471
+  summary: Derive phase assignments when there are zero or one source phases and request an explicit choice
+    only for multiple phases.
+  rationale: Avoid asking the model to repeat facts determined by source phase count while preserving
+    validated semantic selection when multiple phases exist.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 1208
+    end_line: 1211
+  summary: Generate phase-aware examples and recognize the v9 work-unit proposal contract.
+  rationale: Keep generated examples and replay behavior aligned with the versioned answer schema.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 1213
+    end_line: 1214
+  summary: Generate phase-aware examples and recognize the v9 work-unit proposal contract.
+  rationale: Keep generated examples and replay behavior aligned with the versioned answer schema.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 1216
+    end_line: 1216
+  summary: Generate phase-aware examples and recognize the v9 work-unit proposal contract.
+  rationale: Keep generated examples and replay behavior aligned with the versioned answer schema.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 1219
+    end_line: 1221
+  summary: Generate phase-aware examples and recognize the v9 work-unit proposal contract.
+  rationale: Keep generated examples and replay behavior aligned with the versioned answer schema.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 1223
+    end_line: 1225
+  summary: Generate phase-aware examples and recognize the v9 work-unit proposal contract.
+  rationale: Keep generated examples and replay behavior aligned with the versioned answer schema.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 1255
+    end_line: 1255
+  summary: Generate phase-aware examples and recognize the v9 work-unit proposal contract.
+  rationale: Keep generated examples and replay behavior aligned with the versioned answer schema.
+- path: scripts/benchmark_planning_scale.py
+  type: modified
+  span:
+    start_line: 693
+    end_line: 693
+  summary: Remove the redundant phase answer from no-phase benchmark inputs.
+  rationale: Keep benchmark requests valid under the deterministic v9 contract.
+- path: tests/test_benchmark_planning_scale.py
+  type: modified
+  span:
+    start_line: 218
+    end_line: 218
+  summary: Update benchmark contract expectations to v9.
+  rationale: Verify benchmark behavior against the current proposal schema.
+- path: tests/test_benchmark_planning_scale.py
+  type: modified
+  span:
+    start_line: 220
+    end_line: 220
+  summary: Update benchmark contract expectations to v9.
+  rationale: Verify benchmark behavior against the current proposal schema.
+- path: tests/test_benchmark_planning_scale.py
+  type: modified
+  span:
+    start_line: 224
+    end_line: 224
+  summary: Update benchmark contract expectations to v9.
+  rationale: Verify benchmark behavior against the current proposal schema.
+- path: tests/test_benchmark_planning_scale.py
+  type: modified
+  span:
+    start_line: 243
+    end_line: 243
+  summary: Update benchmark contract expectations to v9.
+  rationale: Verify benchmark behavior against the current proposal schema.
+- path: tests/test_benchmark_planning_scale.py
+  type: modified
+  span:
+    start_line: 259
+    end_line: 259
+  summary: Update benchmark contract expectations to v9.
+  rationale: Verify benchmark behavior against the current proposal schema.
+- path: tests/test_benchmark_planning_scale.py
+  type: modified
+  span:
+    start_line: 261
+    end_line: 261
+  summary: Update benchmark contract expectations to v9.
+  rationale: Verify benchmark behavior against the current proposal schema.
+- path: tests/test_benchmark_planning_scale.py
+  type: modified
+  span:
+    start_line: 265
+    end_line: 265
+  summary: Update benchmark contract expectations to v9.
+  rationale: Verify benchmark behavior against the current proposal schema.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 91
+    end_line: 91
+  summary: Cover derived phase assignments, rejected extraneous fields, and the v9 contract.
+  rationale: Protect deterministic binding for zero or one phase and explicit selection for multiple phases.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 93
+    end_line: 93
+  summary: Cover derived phase assignments, rejected extraneous fields, and the v9 contract.
+  rationale: Protect deterministic binding for zero or one phase and explicit selection for multiple phases.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 106
+    end_line: 108
+  summary: Cover derived phase assignments, rejected extraneous fields, and the v9 contract.
+  rationale: Protect deterministic binding for zero or one phase and explicit selection for multiple phases.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 511
+    end_line: 544
+  summary: Cover derived phase assignments, rejected extraneous fields, and the v9 contract.
+  rationale: Protect deterministic binding for zero or one phase and explicit selection for multiple phases.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 662
+    end_line: 664
+  summary: Cover derived phase assignments, rejected extraneous fields, and the v9 contract.
+  rationale: Protect deterministic binding for zero or one phase and explicit selection for multiple phases.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 686
+    end_line: 686
+  summary: Cover derived phase assignments, rejected extraneous fields, and the v9 contract.
+  rationale: Protect deterministic binding for zero or one phase and explicit selection for multiple phases.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 954
+    end_line: 954
+  summary: Cover derived phase assignments, rejected extraneous fields, and the v9 contract.
+  rationale: Protect deterministic binding for zero or one phase and explicit selection for multiple phases.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 1055
+    end_line: 1055
+  summary: Cover derived phase assignments, rejected extraneous fields, and the v9 contract.
+  rationale: Protect deterministic binding for zero or one phase and explicit selection for multiple phases.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 1173
+    end_line: 1173
+  summary: Cover derived phase assignments, rejected extraneous fields, and the v9 contract.
+  rationale: Protect deterministic binding for zero or one phase and explicit selection for multiple phases.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 228
+    end_line: 228
+  summary: Update service fixtures and checkpoint expectations to v9.
+  rationale: Ensure cached and replayed planner interactions use the current contract.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1019
+    end_line: 1019
+  summary: Update service fixtures and checkpoint expectations to v9.
+  rationale: Ensure cached and replayed planner interactions use the current contract.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1021
+    end_line: 1021
+  summary: Update service fixtures and checkpoint expectations to v9.
+  rationale: Ensure cached and replayed planner interactions use the current contract.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1025
+    end_line: 1025
+  summary: Update service fixtures and checkpoint expectations to v9.
+  rationale: Ensure cached and replayed planner interactions use the current contract.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1042
+    end_line: 1042
+  summary: Update service fixtures and checkpoint expectations to v9.
+  rationale: Ensure cached and replayed planner interactions use the current contract.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1044
+    end_line: 1044
+  summary: Update service fixtures and checkpoint expectations to v9.
+  rationale: Ensure cached and replayed planner interactions use the current contract.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1048
+    end_line: 1048
+  summary: Update service fixtures and checkpoint expectations to v9.
+  rationale: Ensure cached and replayed planner interactions use the current contract.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1426
+    end_line: 1426
+  summary: Update service fixtures and checkpoint expectations to v9.
+  rationale: Ensure cached and replayed planner interactions use the current contract.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1447
+    end_line: 1447
+  summary: Update service fixtures and checkpoint expectations to v9.
+  rationale: Ensure cached and replayed planner interactions use the current contract.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []
+features: []
+proposed_prs: []

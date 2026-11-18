@@ -1205,30 +1205,24 @@ class SourceLedgerQuestionMachine:
     def _work_unit_example(
         self, context: WorkUnitContext, requirement_ids: tuple[str, ...]
     ) -> Mapping[str, Any]:
-        return {
-            "records": [
+        record: dict[str, Any] = {
+            "requirement_ids": list(requirement_ids),
+            "deliverable": "One cohesive illustrative deliverable.",
+            "planned_writes": [
                 {
+                    "path": "example-output.txt",
+                    "role": "documentation",
                     "requirement_ids": list(requirement_ids),
-                    "implementation_phase_id": (
-                        context.implementation_phases[0].id
-                        if context.implementation_phases
-                        else None
-                    ),
-                    "deliverable": "One cohesive illustrative deliverable.",
-                    "planned_writes": [
-                        {
-                            "path": "example-output.txt",
-                            "role": "documentation",
-                            "requirement_ids": list(requirement_ids),
-                            "evidence_ids": [],
-                        }
-                    ],
-                    "implementation_step": "Describe one concrete implementation step.",
-                    "acceptance_criteria": ["State one observable result."],
-                    "required_outputs": [],
+                    "evidence_ids": [],
                 }
             ],
+            "implementation_step": "Describe one concrete implementation step.",
+            "acceptance_criteria": ["State one observable result."],
+            "required_outputs": [],
         }
+        if len(context.implementation_phases) > 1:
+            record["implementation_phase_id"] = context.implementation_phases[0].id
+        return {"records": [record]}
 
     @staticmethod
     def _runtime_fact_records(
@@ -1258,7 +1252,7 @@ class SourceLedgerQuestionMachine:
         proposal_answers = {
             question_id: answer
             for question_id, answer in accepted_answers.items()
-            if question_id.startswith("propose-units-v8-")
+            if question_id.startswith("propose-units-v9-")
         }
         cache_key = hashlib.sha256(
             json.dumps(

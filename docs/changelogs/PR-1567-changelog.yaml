@@ -1,0 +1,18 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: PR-1567
+title: Audit LLM interactions in GitHub issue worker execution
+intent:
+  problem: The PR execution path contains nested model interactions without a consolidated inventory distinguishing semantic work from deterministic bookkeeping and available algorithms.
+  goal: Catalog the supported worker path's model requests, inputs, outputs, gates and retry multipliers, with concrete deterministic replacements and explicit limits on residual semantic automation.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/audits/github-issue-worker-llm-audit.md
+  type: added
+  span: {start_line: 1, end_line: 2294}
+  summary: Trace issue-worker model interactions and evaluate every identified request family and test-quality question for deterministic replacement.
+  rationale: Provide source-backed audit evidence, exact prompt and schema snapshots, reachability distinctions, replacement algorithms and a prioritized removal sequence without changing runtime behavior.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []

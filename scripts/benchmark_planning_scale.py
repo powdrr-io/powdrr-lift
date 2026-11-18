@@ -649,7 +649,7 @@ class _ExampleAnswerClient:
         excerpts = packet["source_excerpts"]
         facts = packet["accepted_facts"]
         if not excerpts:
-            return {"records": [], "has_more": False, "next_anchor": None}
+            return {"records": []}
         excerpt = excerpts[0]
         anchor_records = [
             (fact["ref_id"], fact["value"])
@@ -672,7 +672,7 @@ class _ExampleAnswerClient:
                     "related_source_refs": [],
                 }
             )
-        return {"records": records, "has_more": False, "next_anchor": None}
+        return {"records": records}
 
     def _propose_work_units(self, packet: Mapping[str, Any]) -> dict[str, Any]:
         requirement_ids = tuple(packet["exact_question"]["subject_ids"])
@@ -929,8 +929,8 @@ def run_profile(
         1
         for event in journal.events
         if event.event_type == "answer_accepted"
-        and isinstance(event.payload.get("accepted_answer"), Mapping)
-        and "has_more" in event.payload["accepted_answer"]
+        and isinstance(event.payload.get("question"), Mapping)
+        and event.payload["question"].get("kind") == "extract_requirements"
     )
     dependency_metrics, dependency_metrics_error = dependency_metrics_for(
         machine, accepted

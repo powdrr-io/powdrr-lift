@@ -23,6 +23,8 @@ from powdrr_service.planning.story_allocation import StoryPlanRef
 
 MAX_SOURCE_BLOCK_CHARS = 8_000
 MAX_CLAUSES_PER_SOURCE_BLOCK = 64
+MAX_REQUIREMENT_ANCHORS_PER_PAGE = 8
+MAX_REQUIREMENTS_PER_EXTRACTION_PAGE = MAX_CLAUSES_PER_SOURCE_BLOCK
 _SHA_RE = re.compile(r"^[0-9a-f]{40,64}$")
 _REQUIREMENT_KINDS = frozenset({"behavior", "constraint", "acceptance", "human_setup"})
 _ENUMERATION_SCHEMA: dict[str, Any] = {
@@ -67,6 +69,17 @@ _ENUMERATION_SCHEMA: dict[str, Any] = {
             "else": {"properties": {"next_anchor": {"type": "null"}}},
         }
     ],
+}
+_REQUIREMENT_EXTRACTION_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "additionalProperties": False,
+    "required": ["records"],
+    "properties": {
+        "records": {
+            **_ENUMERATION_SCHEMA["properties"]["records"],
+            "maxItems": MAX_REQUIREMENTS_PER_EXTRACTION_PAGE,
+        },
+    },
 }
 _DISPOSITION_SCHEMA: dict[str, Any] = {
     "oneOf": [
@@ -283,8 +296,6 @@ class RequirementDraft:
 @dataclass(frozen=True, slots=True)
 class RequirementExtractionPage:
     records: tuple[dict[str, Any], ...]
-    has_more: bool
-    next_anchor: str | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -733,19 +744,20 @@ def parse_requirement_page(
     value: Mapping[str, Any],
     *,
     allowed_source_refs: set[str],
-    pagination_anchor_ids: Sequence[str],
-    after_anchor: str | None = None,
+    page_anchor_ids: Sequence[str],
 ) -> RequirementExtractionPage:
-    """Validate one extraction page and constrain references to supplied source."""
-    _exact_fields(value, {"records", "has_more", "next_anchor"}, "/")
+    """Validate semantic records against a scheduler-owned source window."""
+    _exact_fields(value, {"records"}, "/")
     records = value["records"]
     if (
         not isinstance(records, Sequence)
         or isinstance(records, (str, bytes))
-        or len(records) > 8
+        or len(records) > MAX_REQUIREMENTS_PER_EXTRACTION_PAGE
     ):
         raise PlanningContractError(
-            "/records", "must be an array of at most eight records"
+            "/records",
+            "must be an array of at most "
+            f"{MAX_REQUIREMENTS_PER_EXTRACTION_PAGE} records",
         )
     parsed: list[dict[str, Any]] = []
     for index, record in enumerate(records):
@@ -773,6 +785,11 @@ def parse_requirement_page(
             raise PlanningContractError(
                 pointer, "references an anchor outside supplied context"
             )
+        if not set(refs) <= set(page_anchor_ids):
+            raise PlanningContractError(
+                f"{pointer}/source_refs",
+                "direct source references must belong to the supplied page window",
+            )
         parsed.append(
             {
                 "statement": statement,
@@ -781,32 +798,7 @@ def parse_requirement_page(
                 "related_source_refs": related,
             }
         )
-    has_more = value["has_more"]
-    anchor = value["next_anchor"]
-    if not isinstance(has_more, bool):
-        raise PlanningContractError("/has_more", "must be a boolean")
-    if has_more and (not isinstance(anchor, str) or not anchor.strip()):
-        raise PlanningContractError("/next_anchor", "is required when has_more is true")
-    if not has_more and anchor is not None:
-        raise PlanningContractError("/next_anchor", "must be null on the final page")
-    if has_more:
-        if anchor not in pagination_anchor_ids:
-            raise PlanningContractError(
-                "/next_anchor", "must reference an anchor in the current source block"
-            )
-        cursor = -1
-        if after_anchor is not None:
-            try:
-                cursor = pagination_anchor_ids.index(after_anchor)
-            except ValueError as exc:
-                raise PlanningContractError(
-                    "/next_anchor", "the supplied page cursor is not in this block"
-                ) from exc
-        if pagination_anchor_ids.index(anchor) <= cursor:
-            raise PlanningContractError(
-                "/next_anchor", "must advance beyond the page cursor"
-            )
-    return RequirementExtractionPage(tuple(parsed), has_more, anchor)
+    return RequirementExtractionPage(tuple(parsed))
 
 
 def parse_block_disposition(
@@ -866,52 +858,49 @@ def parse_equivalence_decision(value: Mapping[str, Any]) -> EquivalenceDecision:
     return EquivalenceDecision(value["equivalent"], _text(value["reason"], "/reason"))
 
 
+def requirement_extraction_anchor_pages(
+    block: SourceBlock, anchors: Mapping[str, SourceAnchor]
+) -> tuple[tuple[str, ...], ...]:
+    """Partition canonical anchors into fixed, ordered windows."""
+    if any(ref not in anchors for ref in block.anchor_ids):
+        raise PlanningSourceError("source block references a missing source anchor")
+    anchor_ids = _canonical_extraction_anchor_ids(block, anchors)
+    return tuple(
+        tuple(anchor_ids[index : index + MAX_REQUIREMENT_ANCHORS_PER_PAGE])
+        for index in range(0, len(anchor_ids), MAX_REQUIREMENT_ANCHORS_PER_PAGE)
+    )
+
+
+def build_extract_requirements_requests(
+    block: SourceBlock, *, anchors: Mapping[str, SourceAnchor]
+) -> tuple[QuestionRequest[RequirementExtractionPage], ...]:
+    """Build all deterministic source windows for one block."""
+    return tuple(
+        build_extract_requirements_request(
+            block, anchors=anchors, page_anchor_ids=page_anchor_ids
+        )
+        for page_anchor_ids in requirement_extraction_anchor_pages(block, anchors)
+    )
+
+
 def build_extract_requirements_request(
     block: SourceBlock,
     *,
     anchors: Mapping[str, SourceAnchor],
-    after_anchor: str | None = None,
+    page_anchor_ids: Sequence[str],
 ) -> QuestionRequest[RequirementExtractionPage]:
-    """Build one bounded obligation question using only its target source block."""
-    empty = {"records": [], "has_more": False, "next_anchor": None}
-    if any(ref not in anchors for ref in block.anchor_ids):
-        raise PlanningSourceError("source block references a missing source anchor")
-    current_anchor_ids = _canonical_extraction_anchor_ids(block, anchors)
-    if after_anchor is not None and after_anchor not in current_anchor_ids:
-        raise ValueError("after_anchor must identify an obligation anchor in the block")
-    cursor_index = (
-        -1 if after_anchor is None else current_anchor_ids.index(after_anchor)
-    )
-    pagination_candidates = current_anchor_ids[cursor_index + 1 :]
-    context_anchor_ids = pagination_candidates
-    anchor_id = pagination_candidates[0] if pagination_candidates else None
-    valid = {
-        # A positive example cannot be valid for every source block: some
-        # blocks are navigation or context and impose no obligation. Reuse the
-        # empty shape while retaining the correct pagination cursor.
-        "records": [],
-        "has_more": len(pagination_candidates) > 1,
-        "next_anchor": anchor_id if len(pagination_candidates) > 1 else None,
-    }
-    current_excerpt_start = block.start_offset
-    if after_anchor is not None:
-        current_excerpt_start = min(
-            block.end_offset,
-            max(block.start_offset, anchors[after_anchor].end_offset),
+    """Build a semantic extraction question for one scheduled source window."""
+    pages = requirement_extraction_anchor_pages(block, anchors)
+    page = tuple(page_anchor_ids)
+    if page not in pages:
+        raise ValueError(
+            "page_anchor_ids must be one deterministic window for this block"
         )
-    current_excerpt_offset = current_excerpt_start - block.start_offset
-    current_excerpt = block.text[current_excerpt_offset:]
-    excerpts = (
-        (
-            SourceExcerpt(
-                block.id,
-                current_excerpt,
-                current_excerpt_start,
-            ),
-        )
-        if current_excerpt
-        else ()
-    )
+    page_start = anchors[page[0]].start_offset
+    page_end = anchors[page[-1]].end_offset
+    excerpt_start = page_start - block.start_offset
+    excerpt_end = page_end - block.start_offset
+    excerpt = SourceExcerpt(block.id, block.text[excerpt_start:excerpt_end], page_start)
     anchor_facts = tuple(
         ContextRecord(
             ref,
@@ -925,137 +914,71 @@ def build_extract_requirements_request(
                 "quote_sha256": anchors[ref].quote_sha256,
             },
         )
-        for ref in context_anchor_ids
+        for ref in page
     )
-    anchor_facts += (
-        ContextRecord(
-            f"pagination-candidates-{block.id}",
-            {
-                "after_anchor": after_anchor,
-                "allowed_next_anchor_ids": list(pagination_candidates),
-            },
-        ),
+    page_fact = ContextRecord(
+        f"source-window-{block.id}-{page[0]}-{page[-1]}",
+        {"anchor_ids": list(page)},
     )
-    allowed_refs = set(current_anchor_ids)
+    accepted_facts = (*anchor_facts, page_fact)
     input_digest = _digest_json(
         {
             "block": source_block_input_digest(block),
             "anchor_registry": [
                 {"id": item.ref_id, "value": dict(item.value)} for item in anchor_facts
             ],
-            "after_anchor": after_anchor,
+            "page_anchor_ids": list(page),
         }
     )
+    allowed_source_refs = set(page)
 
     def parse(answer: Mapping[str, Any]) -> RequirementExtractionPage:
-        page = parse_requirement_page(
+        return parse_requirement_page(
             answer,
-            allowed_source_refs=allowed_refs,
-            pagination_anchor_ids=current_anchor_ids,
-            after_anchor=after_anchor,
-        )
-        last_processed_index = (
-            current_anchor_ids.index(page.next_anchor)
-            if page.has_more and page.next_anchor is not None
-            else len(current_anchor_ids) - 1
-        )
-        processed_current_anchors = set(
-            current_anchor_ids[cursor_index + 1 : last_processed_index + 1]
-        )
-        current_anchor_set = set(current_anchor_ids)
-        already_processed_anchors = set(current_anchor_ids[: cursor_index + 1])
-        normalized_records: list[dict[str, Any]] = []
-        for index, record in enumerate(page.records):
-            source_refs = set(record["source_refs"])
-            current_refs = source_refs & current_anchor_set
-            not_yet_processed = current_refs - already_processed_anchors
-            if not not_yet_processed <= processed_current_anchors:
-                raise PlanningContractError(
-                    f"/records/{index}/source_refs",
-                    "must cite current-block anchors processed on this page",
-                )
-            page_source_refs = tuple(
-                ref for ref in record["source_refs"] if ref in processed_current_anchors
-            )
-            if not page_source_refs:
-                # The model can repeat an earlier page even when the cursor and
-                # source context are clear. Those anchors were already extracted;
-                # discard the duplicate while retaining newly cited obligations.
-                continue
-            related_refs = tuple(
-                dict.fromkeys(
-                    (
-                        *record["related_source_refs"],
-                        *(
-                            ref
-                            for ref in record["source_refs"]
-                            if ref not in current_anchor_set
-                        ),
-                    )
-                )
-            )
-            normalized_records.append(
-                {
-                    **record,
-                    "source_refs": page_source_refs,
-                    "related_source_refs": related_refs,
-                }
-            )
-        return RequirementExtractionPage(
-            tuple(normalized_records), page.has_more, page.next_anchor
+            allowed_source_refs=allowed_source_refs,
+            page_anchor_ids=page,
         )
 
+    schema = {
+        "type": "object",
+        "additionalProperties": False,
+        "required": ["records"],
+        "properties": {
+            "records": _REQUIREMENT_EXTRACTION_SCHEMA["properties"]["records"]
+        },
+    }
     return _source_question_request(
         question_kind="extract_requirements",
         subject_id=block.id,
         input_digest=input_digest,
-        schema_name="extract-requirements-answer-v1",
+        schema_name="extract-requirements-answer-v2",
         prompt=(
-            "Which independently checkable obligations does this target block "
-            "impose? This question covers only the target block. Do not extract "
-            "requirements from other blocks. Cite only anchors from this block; "
-            "related_source_refs may cite another anchor in this block only when "
-            "the relationship is explicit. The anchor registry gives IDs and exact "
-            "source ranges. "
-            "For direct source_refs, use only current-block anchors after the "
-            "pagination cursor; earlier current-block anchors are already complete. "
-            "Return at most eight. If current-block anchors remain after this page, "
-            "set next_anchor to the last current-block anchor processed on this "
-            "page, selected from the pagination-candidates fact. The next page "
-            "starts after that cursor. Do not cite current-block anchors after it. "
-            "Only current-block anchors may be used for "
-            "next_anchor. next_anchor is a cursor, "
-            "not a citation. If this page reaches the final current-block anchor, "
-            "return has_more=false and next_anchor=null. "
-            "Always include both pagination fields: has_more=true requires a "
-            "non-null next_anchor from the candidates; has_more=false requires "
-            "next_anchor=null."
+            "Which independently checkable obligations do these source anchors impose? "
+            "This question covers only the supplied source window. Return every "
+            "obligation represented in this window, and do not add obligations "
+            "from other anchors. Every direct source_refs entry must be one of "
+            "the supplied page-window anchor IDs. related_source_refs may cite "
+            "another anchor in this same page only when the relationship is "
+            "explicit. Return at most 64 records. Return records only; the "
+            "scheduler owns page boundaries and progression."
         ),
         field_definitions={
-            "records": "Obligations with statement, kind, and source references.",
+            "records": (
+                "Obligations with statement, kind, direct source references, and "
+                "explicitly related source references."
+            ),
             "kind": "One of behavior, constraint, acceptance, or human_setup.",
-            "source_refs": "One or more anchors directly imposing this obligation.",
+            "source_refs": "Page-window anchors that directly impose this obligation.",
             "related_source_refs": (
-                "Other anchors in this block that explicitly qualify or "
-                "cross-reference "
-                "the obligation; otherwise use an empty array."
-            ),
-            "has_more": (
-                "Whether another page remains. When true, next_anchor is required; "
-                "when false, next_anchor must be null."
-            ),
-            "next_anchor": (
-                "If has_more is true, exactly one ID from the pagination-candidates "
-                "fact in accepted facts, representing the last current-block anchor "
-                "processed on this page. This is only a pagination cursor, not a "
-                "source citation. Otherwise null."
+                "Other anchors in this page that explicitly qualify or "
+                "cross-reference the obligation; otherwise use an empty array."
             ),
         },
-        excerpts=excerpts,
-        accepted_facts=anchor_facts,
-        valid_example=valid,
-        empty_example=empty,
-        schema=_ENUMERATION_SCHEMA,
+        excerpts=(excerpt,),
+        accepted_facts=accepted_facts,
+        valid_example={"records": []},
+        empty_example={"records": []},
+        schema=schema,
         parse=parse,
     )
 
@@ -1593,6 +1516,8 @@ __all__ = [
     "ImplementationPhase",
     "MAX_SOURCE_BLOCK_CHARS",
     "MAX_CLAUSES_PER_SOURCE_BLOCK",
+    "MAX_REQUIREMENT_ANCHORS_PER_PAGE",
+    "MAX_REQUIREMENTS_PER_EXTRACTION_PAGE",
     "PinnedSourceDocument",
     "PlanningSourceError",
     "Requirement",
@@ -1606,6 +1531,7 @@ __all__ = [
     "build_block_disposition_request",
     "build_equivalence_request",
     "build_extract_requirements_request",
+    "build_extract_requirements_requests",
     "build_fidelity_request",
     "extract_implementation_phases",
     "merge_equivalent_requirements",
@@ -1614,6 +1540,7 @@ __all__ = [
     "parse_equivalence_decision",
     "parse_fidelity_decision",
     "parse_requirement_page",
+    "requirement_extraction_anchor_pages",
     "pinned_source_document",
     "segment_markdown_source",
     "source_block_input_digest",

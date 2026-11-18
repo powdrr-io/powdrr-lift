@@ -1,7 +1,8 @@
 # Planning: LLM interaction and determinism audit
 
-Status: audited recommendations; the first removal milestone (P07/P09) is
-implemented in the active planning path. Milestones 2–6 remain proposed.
+Status: audited recommendations; the first removal milestone (P07/P09) and
+deterministic source-extraction paging are implemented in the active planning
+path. The remaining work in milestones 2–6 is still proposed.
 
 Audited revision: `cfc0b514c43c1d14269147a03e5d7ec5ec5cc739`, fetched from
 `origin/main` on 2026-11-17. This is a static source audit, not a measured live
@@ -15,6 +16,14 @@ produces an edge using the declared output and its requirement provenance. The
 follow-up item-description and confirmed-dependency-details requests are no
 longer reachable in the active planner. The exact request catalog and source
 snippets below remain a historical snapshot of the audited revision above.
+
+Source-extraction update: source obligation requests now use fixed, ordered
+windows of at most eight canonical clause anchors. The scheduler creates every
+window and correlates each answer; the model returns only semantic requirement
+records. It cannot select a cursor or page boundary. Each record's direct source
+references must belong to that request's window, and the question digest binds
+the source block and window anchors. Unit and subject pagination, copied runtime
+bindings, and other recommendations in milestone 2 remain unimplemented.
 
 ## 1. Answer to the central question
 
@@ -553,11 +562,12 @@ check public API/test consumers explicitly; this audit changes none of them.
    the fixed output and its declared requirement IDs; its reason is rendered
    deterministically. Tests assert neither follow-up request is emitted and
    preserve scope and dependency identities.
-2. **Remove model-controlled pagination and copied fields.** Scheduler owns fixed
-   source/unit/subject windows, next cursor, known IDs, phase/runtime/component/
-   validation bindings and answer correlation. Models return only semantic records
-   within a supplied window. Test no duplicate/skipped obligations across pages,
-   source edits invalidation and oversized answers without lossy truncation.
+2. **In progress: remove model-controlled pagination and copied fields.** Source
+   requirement extraction now uses scheduler-owned fixed anchor windows, and the
+   model returns only semantic records for its supplied window. Remaining work:
+   apply the same ownership to unit/subject windows and phase/runtime/component/
+   validation bindings. Verify no duplicate/skipped obligations, source-edit
+   invalidation, and oversized answers without lossy truncation across these paths.
 3. **Carry accepted semantics directly.** Typed source requirements, human setup,
    phases, cases and observations bypass rediscovery. Preserve conditional/Boolean
    source relations and scenario dimensions. Unknown meaning stops or goes to

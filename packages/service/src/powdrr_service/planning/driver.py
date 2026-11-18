@@ -72,7 +72,7 @@ from powdrr_service.planning.source import (
     SegmentedSource,
     allocate_requirements,
     build_block_disposition_request,
-    build_extract_requirements_request,
+    build_extract_requirements_requests,
     build_fidelity_request,
     deduplicate_requirement_records,
     extract_implementation_phases,
@@ -713,15 +713,11 @@ class SourceLedgerQuestionMachine:
                 and len(pending_extractions) >= frontier_limit
             ):
                 break
-            after_anchor: str | None = None
             page_records: list[dict[str, Any]] = []
             block_incomplete = False
-            while True:
-                extract_request = build_extract_requirements_request(
-                    block,
-                    anchors=anchor_by_id,
-                    after_anchor=after_anchor,
-                )
+            for extract_request in build_extract_requirements_requests(
+                block, anchors=anchor_by_id
+            ):
                 answer = accepted_answers.get(extract_request.question.question_id)
                 if answer is None:
                     pending_extractions.append(extract_request)
@@ -729,9 +725,6 @@ class SourceLedgerQuestionMachine:
                     break
                 page = extract_request.parse_answer(answer)
                 page_records.extend(dict(record) for record in page.records)
-                if not page.has_more:
-                    break
-                after_anchor = page.next_anchor
             if not block_incomplete:
                 raw_records.extend(page_records)
 
@@ -2815,21 +2808,14 @@ class SourceLedgerQuestionMachine:
         anchor_by_id = {anchor.id: anchor for anchor in self.source.anchors}
         raw_records: list[dict[str, Any]] = []
         for block in self.source.blocks:
-            cursor: str | None = None
             records: list[dict[str, Any]] = []
-            while True:
-                extract_request = build_extract_requirements_request(
-                    block,
-                    anchors=anchor_by_id,
-                    after_anchor=cursor,
-                )
+            for extract_request in build_extract_requirements_requests(
+                block, anchors=anchor_by_id
+            ):
                 page = extract_request.parse_answer(
                     accepted_answers[extract_request.question.question_id]
                 )
                 records.extend(dict(item) for item in page.records)
-                if not page.has_more:
-                    break
-                cursor = page.next_anchor
             raw_records.extend(records)
 
         requirements, drafts = allocate_requirements(

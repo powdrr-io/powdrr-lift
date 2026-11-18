@@ -3,16 +3,13 @@ from __future__ import annotations
 import hashlib
 import json
 import subprocess
-from dataclasses import replace
 from pathlib import Path
 
 import pytest
 from powdrr_local.planning.source import read_pinned_source
 from powdrr_service.planning.contracts import PlanningContractError
 from powdrr_service.planning.questions import (
-    MAX_QUESTION_INPUT_CHARS,
     MAX_SOURCE_EXTRACTION_BATCH_INPUT_CHARS,
-    QuestionInputTooLarge,
     batch_question_requests,
     build_question_messages,
 )
@@ -24,7 +21,7 @@ from powdrr_service.planning.source import (
     allocate_requirements,
     build_block_disposition_request,
     build_equivalence_request,
-    build_extract_requirements_request,
+    build_extract_requirements_requests,
     build_fidelity_request,
     deduplicate_requirement_records,
     extract_implementation_phases,
@@ -33,6 +30,7 @@ from powdrr_service.planning.source import (
     parse_equivalence_decision,
     parse_fidelity_decision,
     parse_requirement_page,
+    requirement_extraction_anchor_pages,
     segment_markdown_source,
     source_block_input_digest,
     validate_source_coverage,
@@ -257,15 +255,13 @@ def test_extraction_contract_rejects_unknown_or_unanchored_obligations() -> None
                 "source_refs": ["anchor-0001"],
                 "related_source_refs": ["anchor-0002"],
             }
-        ],
-        "has_more": False,
-        "next_anchor": None,
+        ]
     }
 
     parsed = parse_requirement_page(
         answer,
         allowed_source_refs={"anchor-0001", "anchor-0002"},
-        pagination_anchor_ids=("anchor-0001",),
+        page_anchor_ids=("anchor-0001",),
     )
 
     assert parsed.records[0]["kind"] == "human_setup"
@@ -277,15 +273,13 @@ def test_extraction_contract_rejects_unknown_or_unanchored_obligations() -> None
                 "source_refs": [],
                 "related_source_refs": ["anchor-0002"],
             }
-        ],
-        "has_more": False,
-        "next_anchor": None,
+        ]
     }
     with pytest.raises(ValueError, match="cite at least one anchor"):
         parse_requirement_page(
             unanchored_answer,
             allowed_source_refs={"anchor-0001", "anchor-0002"},
-            pagination_anchor_ids=("anchor-0001",),
+            page_anchor_ids=("anchor-0001",),
         )
 
 
@@ -432,10 +426,9 @@ def test_source_question_builders_bind_context_examples_and_digests() -> None:
     first_block, second_block = (
         block for block in segmented.blocks if block.kind == "paragraph"
     )
-    extraction = build_extract_requirements_request(
-        first_block,
-        anchors={item.id: item for item in segmented.anchors},
-    )
+    extraction = build_extract_requirements_requests(
+        first_block, anchors={item.id: item for item in segmented.anchors}
+    )[0]
     assert extraction.question.kind == "extract_requirements"
     assert len(extraction.source_excerpts) == 1
     extraction.validate()
@@ -479,11 +472,9 @@ def test_requirement_extraction_example_does_not_invent_an_obligation() -> None:
     block = next(item for item in segmented.blocks if "Navigation:" in item.text)
     anchors = {item.id: item for item in segmented.anchors}
 
-    request = build_extract_requirements_request(block, anchors=anchors)
+    request = build_extract_requirements_requests(block, anchors=anchors)[0]
 
     assert request.valid_example["records"] == []
-    assert request.valid_example["has_more"] is False
-    assert request.valid_example["next_anchor"] is None
     request.parse_answer(request.valid_example)
 
 
@@ -505,187 +496,85 @@ def test_block_without_extracted_requirements_can_be_classified_as_context() -> 
     }
 
 
-def test_requirement_extraction_pagination_cursor_must_advance_in_block() -> None:
-    page = {
-        "records": [],
-        "has_more": True,
-        "next_anchor": "anchor-0002",
+def test_requirement_extraction_uses_fixed_non_overlapping_windows() -> None:
+    clauses = [
+        f"Requirement {index:02d} must preserve behavior and validation."
+        for index in range(1, 19)
+    ]
+    segmented = segment_markdown_source(_document("# Plan\n\n" + " ".join(clauses)))
+    block = next(item for item in segmented.blocks if item.kind == "paragraph")
+    anchors = {item.id: item for item in segmented.anchors}
+    expected = tuple(
+        ref for ref in block.anchor_ids if anchors[ref].clause_id is not None
+    )
+    windows = requirement_extraction_anchor_pages(block, anchors)
+
+    assert tuple(ref for window in windows for ref in window) == expected
+    assert all(1 <= len(window) <= 8 for window in windows)
+    assert len({ref for window in windows for ref in window}) == len(expected)
+    requests = build_extract_requirements_requests(block, anchors=anchors)
+    assert len(requests) == len(windows)
+    for request, window in zip(requests, windows, strict=True):
+        assert request.question.context_ref_ids.count(block.id) == 1
+        assert request.answer_schema["required"] == ["records"]
+        assert "has_more" not in request.answer_schema["properties"]
+        assert "next_anchor" not in request.answer_schema["properties"]
+        window_fact = next(
+            fact
+            for fact in request.accepted_facts
+            if fact.ref_id.startswith("source-window-")
+        )
+        assert window_fact.value["anchor_ids"] == list(window)
+        assert request.parse_answer({"records": []}).records == ()
+
+    first_request = requests[0]
+    first_page = windows[0]
+    valid_record = {
+        "statement": "Preserve the behavior required by this clause.",
+        "kind": "behavior",
+        "source_refs": [first_page[0]],
+        "related_source_refs": [first_page[1]],
     }
-    parsed = parse_requirement_page(
-        page,
-        allowed_source_refs={"anchor-0001", "anchor-0002"},
-        pagination_anchor_ids=("anchor-0001", "anchor-0002"),
-        after_anchor="anchor-0001",
-    )
-    assert parsed.next_anchor == "anchor-0002"
-    with pytest.raises(ValueError, match="must advance"):
-        parse_requirement_page(
-            {**page, "next_anchor": "anchor-0001"},
-            allowed_source_refs={"anchor-0001", "anchor-0002"},
-            pagination_anchor_ids=("anchor-0001", "anchor-0002"),
-            after_anchor="anchor-0001",
-        )
-
-
-def test_requirement_question_is_scoped_to_current_block_and_cursor() -> None:
-    segmented = segment_markdown_source(
-        _document(
-            "# Plan\n\n"
-            "First requirement must work. Second requirement must persist. "
-            "Third requirement must be checked.\n\n"
-            "Adjacent context explains the first requirement.\n"
-        )
-    )
-    blocks = [block for block in segmented.blocks if block.kind == "paragraph"]
-    assert len(blocks) == 2
-    block, adjacent = blocks
-    anchor_by_id = {anchor.id: anchor for anchor in segmented.anchors}
-    obligation_anchors = tuple(
-        ref for ref in block.anchor_ids if anchor_by_id[ref].clause_id is not None
-    )
-    adjacent_anchor = next(
-        (ref for ref in adjacent.anchor_ids if anchor_by_id[ref].clause_id is not None),
-        adjacent.anchor_ids[0],
-    )
-    request = build_extract_requirements_request(
-        block,
-        anchors=anchor_by_id,
-    )
-
-    pagination_fact = next(
-        item
-        for item in request.accepted_facts
-        if item.ref_id == f"pagination-candidates-{block.id}"
-    )
-    assert pagination_fact.value["allowed_next_anchor_ids"] == list(obligation_anchors)
-    assert ", ".join(obligation_anchors) not in request.exact_question
-    assert "only the target block" in request.exact_question
-    assert "has_more=true requires a non-null next_anchor" in request.exact_question
-    assert len(request.source_excerpts) == 1
-    assert request.source_excerpts[0].ref_id == block.id
-    assert adjacent_anchor not in request.question.context_ref_ids
-    assert request.valid_example["has_more"] is True
-    assert request.valid_example["next_anchor"] == obligation_anchors[0]
-    assert block.anchor_ids[0] not in request.question.context_ref_ids
-    request.parse_answer(request.valid_example)
-    assert adjacent.anchor_ids[0] not in block.anchor_ids
-    with pytest.raises(ValueError, match="current source block"):
-        request.parse_answer(
-            {
-                "records": [],
-                "has_more": True,
-                "next_anchor": adjacent_anchor,
-            }
-        )
-
-    next_request = build_extract_requirements_request(
-        block,
-        anchors=anchor_by_id,
-        after_anchor=obligation_anchors[0],
-    )
-    assert next_request.valid_example["records"] == []
-    assert obligation_anchors[0] not in next_request.question.context_ref_ids
-    assert obligation_anchors[1] in next_request.question.context_ref_ids
-    assert (
-        next_request.source_excerpts[0].text
-        == block.text[
-            anchor_by_id[obligation_anchors[0]].end_offset - block.start_offset :
-        ]
-    )
-    assert next_request.valid_example["has_more"] is True
-    assert next_request.valid_example["next_anchor"] == obligation_anchors[1]
-    next_request.parse_answer(next_request.valid_example)
-    repeated = next_request.parse_answer(
-        {
-            "records": [
-                {
-                    "statement": "Repeat the already extracted obligation.",
-                    "kind": "behavior",
-                    "source_refs": [obligation_anchors[0]],
-                    "related_source_refs": [],
-                }
-            ],
-            "has_more": False,
-            "next_anchor": None,
-        }
-    )
-    assert repeated.records == ()
-
-    mixed_page = next_request.parse_answer(
-        {
-            "records": [
-                {
-                    "statement": "Repeat an old clause and add the next one.",
-                    "kind": "behavior",
-                    "source_refs": [
-                        obligation_anchors[0],
-                        obligation_anchors[1],
-                    ],
-                    "related_source_refs": [],
-                }
-            ],
-            "has_more": True,
-            "next_anchor": obligation_anchors[1],
-        }
-    )
-    assert mixed_page.records[0]["source_refs"] == (obligation_anchors[1],)
-
+    assert first_request.parse_answer({"records": [valid_record]}).records[0][
+        "source_refs"
+    ] == (first_page[0],)
     with pytest.raises(PlanningContractError, match="outside supplied context"):
-        next_request.parse_answer(
+        first_request.parse_answer(
             {
                 "records": [
                     {
-                        "statement": "Cite an unknown anchor.",
-                        "kind": "behavior",
-                        "source_refs": ["anchor-9999"],
+                        **valid_record,
+                        "source_refs": [windows[1][0]],
                         "related_source_refs": [],
                     }
-                ],
-                "has_more": False,
-                "next_anchor": None,
+                ]
             }
         )
+    with pytest.raises(PlanningContractError, match="at most 64"):
+        first_request.parse_answer({"records": [valid_record] * 65})
 
-    with pytest.raises(PlanningContractError, match="processed on this page"):
-        next_request.parse_answer(
-            {
-                "records": [
-                    {
-                        "statement": "Skip forward and omit an intervening clause.",
-                        "kind": "behavior",
-                        "source_refs": [obligation_anchors[2]],
-                        "related_source_refs": [],
-                    }
-                ],
-                "has_more": True,
-                "next_anchor": obligation_anchors[1],
-            }
-        )
 
-    final_request = build_extract_requirements_request(
-        block,
-        anchors=anchor_by_id,
-        after_anchor=obligation_anchors[1],
+def test_source_edit_invalidates_deterministic_extraction_windows() -> None:
+    first = segment_markdown_source(
+        _document("# Plan\n\nThe source requires stable behavior.\n")
     )
-    assert final_request.valid_example["records"] == []
-    assert final_request.valid_example["has_more"] is False
-    assert final_request.valid_example["next_anchor"] is None
-    final_request.parse_answer(final_request.valid_example)
-
-    exhausted_request = build_extract_requirements_request(
-        block,
-        anchors=anchor_by_id,
-        after_anchor=obligation_anchors[-1],
+    second = segment_markdown_source(
+        _document("# Plan\n\nThe source requires stable output.\n")
     )
-    assert exhausted_request.valid_example == {
-        "records": [],
-        "has_more": False,
-        "next_anchor": None,
-    }
-    exhausted_request.parse_answer(exhausted_request.valid_example)
+    first_block = next(item for item in first.blocks if item.kind == "paragraph")
+    second_block = next(item for item in second.blocks if item.kind == "paragraph")
+    first_request = build_extract_requirements_requests(
+        first_block, anchors={item.id: item for item in first.anchors}
+    )[0]
+    second_request = build_extract_requirements_requests(
+        second_block, anchors={item.id: item for item in second.anchors}
+    )[0]
+
+    assert first_request.question.question_id != second_request.question.question_id
+    assert first_request.question.input_digest != second_request.question.input_digest
 
 
-def test_source_extraction_cursor_pages_keep_question_input_bounded() -> None:
+def test_source_extraction_windows_keep_question_input_bounded() -> None:
     clauses = [
         f"Requirement {index:02d} must preserve its own behavior and validation result"
         for index in range(1, 41)
@@ -695,22 +584,17 @@ def test_source_extraction_cursor_pages_keep_question_input_bounded() -> None:
     )
     block = next(item for item in segmented.blocks if item.kind == "paragraph")
     anchors = {item.id: item for item in segmented.anchors}
-    obligation_anchors = tuple(
-        ref for ref in block.anchor_ids if anchors[ref].clause_id is not None
-    )
-    assert len(obligation_anchors) >= 40
+    windows = requirement_extraction_anchor_pages(block, anchors)
 
-    for after_anchor in (None, *obligation_anchors[:-1]):
-        request = build_extract_requirements_request(
-            block,
-            anchors=anchors,
-            after_anchor=after_anchor,
-        )
+    assert len(windows) >= 5
+    requests = build_extract_requirements_requests(block, anchors=anchors)
+    for request, window in zip(requests, windows, strict=True):
         build_question_messages(request)
-        request.parse_answer(request.valid_example)
+        assert len(window) <= 8
+        assert request.parse_answer(request.valid_example).records == ()
 
 
-def test_extraction_questions_batch_with_distinct_pagination_candidates() -> None:
+def test_extraction_questions_batch_with_distinct_source_windows() -> None:
     segmented = segment_markdown_source(
         _document(
             "# Plan\n\n"
@@ -724,17 +608,13 @@ def test_extraction_questions_batch_with_distinct_pagination_candidates() -> Non
     assert len(blocks) == 6
     anchors = {anchor.id: anchor for anchor in segmented.anchors}
     requests = tuple(
-        build_extract_requirements_request(block, anchors=anchors) for block in blocks
+        build_extract_requirements_requests(block, anchors=anchors)[0]
+        for block in blocks
     )
 
     (batch,) = batch_question_requests(requests)
     assert len(batch.batch_members) == 6
     assert batch.max_input_chars == MAX_SOURCE_EXTRACTION_BATCH_INPUT_CHARS
-    with pytest.raises(QuestionInputTooLarge) as error:
-        build_question_messages(
-            replace(batch, max_input_chars=MAX_QUESTION_INPUT_CHARS)
-        )
-    assert error.value.limit_chars == MAX_QUESTION_INPUT_CHARS
     packet = json.loads(build_question_messages(batch)[1]["content"])
     shared_contract = next(
         item["value"]
@@ -742,46 +622,15 @@ def test_extraction_questions_batch_with_distinct_pagination_candidates() -> Non
         if item["ref_id"] == "shared-member-question-contract"
     )
     assert shared_contract["prompt"] == requests[0].exact_question
-    child_packets = [
-        item["value"]
-        for item in packet["accepted_facts"]
-        if item["ref_id"].startswith("question:")
-    ]
-    assert all("prompt" not in item["exact_question"] for item in child_packets)
-    assert all("definitions" not in item["answer_fields"] for item in child_packets)
-    for member_request in requests:
-        pagination_fact = next(
+    for request in requests:
+        request.parse_answer(request.valid_example)
+        assert "next_anchor" not in request.answer_schema["properties"]
+        window_fact = next(
             fact
-            for fact in member_request.accepted_facts
-            if fact.ref_id
-            == f"pagination-candidates-{member_request.question.subject_ids[0]}"
+            for fact in request.accepted_facts
+            if fact.ref_id.startswith("source-window-")
         )
-        candidate_ids = pagination_fact.value["allowed_next_anchor_ids"]
-        member_request.parse_answer(
-            {
-                "records": [],
-                "has_more": True,
-                "next_anchor": candidate_ids[0],
-            }
-        )
-        other_request = next(
-            candidate for candidate in requests if candidate is not member_request
-        )
-        other_pagination_fact = next(
-            fact
-            for fact in other_request.accepted_facts
-            if fact.ref_id.startswith("pagination-candidates-")
-        )
-        other_ids = set(other_pagination_fact.value["allowed_next_anchor_ids"])
-        if other_ids and not other_ids.issubset(set(candidate_ids)):
-            with pytest.raises(ValueError, match="current source block"):
-                member_request.parse_answer(
-                    {
-                        "records": [],
-                        "has_more": True,
-                        "next_anchor": next(iter(other_ids)),
-                    }
-                )
+        assert len(window_fact.value["anchor_ids"]) == 1
 
 
 def test_requirement_extraction_excludes_block_alias_when_clause_anchor_exists() -> (
@@ -797,7 +646,7 @@ def test_requirement_extraction_excludes_block_alias_when_clause_anchor_exists()
     )
     assert len(clause_ids) == 1
 
-    request = build_extract_requirements_request(block, anchors=anchors)
+    request = build_extract_requirements_requests(block, anchors=anchors)[0]
 
     assert clause_ids[0] in request.question.context_ref_ids
     assert block.anchor_ids[0] not in request.question.context_ref_ids
@@ -812,8 +661,6 @@ def test_requirement_extraction_excludes_block_alias_when_clause_anchor_exists()
                         "related_source_refs": [],
                     }
                 ],
-                "has_more": False,
-                "next_anchor": None,
             }
         )
 

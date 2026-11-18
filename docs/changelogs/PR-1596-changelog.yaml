@@ -1,0 +1,232 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1596
+title: Move source task bookkeeping into runtime
+intent:
+  problem: Source-reference worker prompts repeated exact owner metadata, reference commands, verification commands, and completion-envelope fields already known to the runtime.
+  goal: Keep the worker focused on implementation and unresolved design gaps while the runtime compiles owner metadata, runs checks, and serializes completion evidence from accepted typed state.
+human-decisions: []
+structured_files: []
+files:
+- path: packages/service/src/powdrr_service/structrr/source_reference_handoff.py
+  type: modified
+  span:
+    start_line: 38
+    end_line: 39
+  summary: Move fixed reference and verifier bookkeeping out of the task prompt.
+  rationale: The runtime retains the accepted typed contract while the worker receives only semantic implementation requirements and design-gap reporting.
+- path: packages/service/src/powdrr_service/structrr/source_reference_handoff.py
+  type: modified
+  span:
+    start_line: 52
+    end_line: 56
+  summary: Move fixed reference and verifier bookkeeping out of the task prompt.
+  rationale: The runtime retains the accepted typed contract while the worker receives only semantic implementation requirements and design-gap reporting.
+- path: packages/service/src/powdrr_service/structrr/source_reference_handoff.py
+  type: modified
+  span:
+    start_line: 532
+    end_line: 534
+  summary: Move fixed reference and verifier bookkeeping out of the task prompt.
+  rationale: The runtime retains the accepted typed contract while the worker receives only semantic implementation requirements and design-gap reporting.
+- path: packages/service/src/powdrr_service/structrr/source_reference_handoff.py
+  type: modified
+  span:
+    start_line: 537
+    end_line: 541
+  summary: Move fixed reference and verifier bookkeeping out of the task prompt.
+  rationale: The runtime retains the accepted typed contract while the worker receives only semantic implementation requirements and design-gap reporting.
+- path: packages/service/src/powdrr_service/structrr/source_reference_handoff.py
+  type: modified
+  span:
+    start_line: 545
+    end_line: 551
+  summary: Move fixed reference and verifier bookkeeping out of the task prompt.
+  rationale: The runtime retains the accepted typed contract while the worker receives only semantic implementation requirements and design-gap reporting.
+- path: packages/service/src/powdrr_service/structrr/source_reference_handoff.py
+  type: modified
+  span:
+    start_line: 554
+    end_line: 554
+  summary: Move fixed reference and verifier bookkeeping out of the task prompt.
+  rationale: The runtime retains the accepted typed contract while the worker receives only semantic implementation requirements and design-gap reporting.
+- path: packages/service/src/powdrr_service/structrr/source_reference_handoff.py
+  type: modified
+  span:
+    start_line: 576
+    end_line: 586
+  summary: Move fixed reference and verifier bookkeeping out of the task prompt.
+  rationale: The runtime retains the accepted typed contract while the worker receives only semantic implementation requirements and design-gap reporting.
+- path: packages/service/src/powdrr_service/structrr/source_reference_handoff.py
+  type: modified
+  span:
+    start_line: 591
+    end_line: 593
+  summary: Move fixed reference and verifier bookkeeping out of the task prompt.
+  rationale: The runtime retains the accepted typed contract while the worker receives only semantic implementation requirements and design-gap reporting.
+- path: packages/service/src/powdrr_service/structrr/source_reference_handoff.py
+  type: modified
+  span:
+    start_line: 617
+    end_line: 629
+  summary: Move fixed reference and verifier bookkeeping out of the task prompt.
+  rationale: The runtime retains the accepted typed contract while the worker receives only semantic implementation requirements and design-gap reporting.
+- path: packages/service/src/powdrr_service/structrr/source_reference_handoff.py
+  type: modified
+  span:
+    start_line: 619
+    end_line: 619
+  summary: Move fixed reference and verifier bookkeeping out of the task prompt.
+  rationale: The runtime retains the accepted typed contract while the worker receives only semantic implementation requirements and design-gap reporting.
+- path: packages/service/src/powdrr_service/structrr/source_reference_handoff.py
+  type: modified
+  span:
+    start_line: 655
+    end_line: 655
+  summary: Move fixed reference and verifier bookkeeping out of the task prompt.
+  rationale: The runtime retains the accepted typed contract while the worker receives only semantic implementation requirements and design-gap reporting.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span:
+    start_line: 78
+    end_line: 104
+  summary: Generate completion metadata from accepted runtime state.
+  rationale: The worker reports semantic design gaps; code serializes the versioned envelope and exact accepted owner inventory.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span:
+    start_line: 1221
+    end_line: 1221
+  summary: Generate completion metadata from accepted runtime state.
+  rationale: The worker reports semantic design gaps; code serializes the versioned envelope and exact accepted owner inventory.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span:
+    start_line: 1225
+    end_line: 1225
+  summary: Generate completion metadata from accepted runtime state.
+  rationale: The worker reports semantic design gaps; code serializes the versioned envelope and exact accepted owner inventory.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span:
+    start_line: 1227
+    end_line: 1227
+  summary: Generate completion metadata from accepted runtime state.
+  rationale: The worker reports semantic design gaps; code serializes the versioned envelope and exact accepted owner inventory.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span:
+    start_line: 1230
+    end_line: 1230
+  summary: Generate completion metadata from accepted runtime state.
+  rationale: The worker reports semantic design gaps; code serializes the versioned envelope and exact accepted owner inventory.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span:
+    start_line: 1232
+    end_line: 1232
+  summary: Generate completion metadata from accepted runtime state.
+  rationale: The worker reports semantic design gaps; code serializes the versioned envelope and exact accepted owner inventory.
+- path: src/powdrr_lift/workrr/source_reference_run.py
+  type: modified
+  span:
+    start_line: 1242
+    end_line: 1248
+  summary: Generate completion metadata from accepted runtime state.
+  rationale: The worker reports semantic design gaps; code serializes the versioned envelope and exact accepted owner inventory.
+- path: tests/test_source_reference_dispatch.py
+  type: modified
+  span:
+    start_line: 861
+    end_line: 861
+  summary: Exercise the reduced worker completion payload.
+  rationale: Verify dispatch uses runtime-owned completion metadata.
+- path: tests/test_source_reference_handoff.py
+  type: modified
+  span:
+    start_line: 173
+    end_line: 174
+  summary: Verify prompt bookkeeping is removed without weakening semantic review.
+  rationale: Cover behavior-only, exact-owner, retirement, and runtime-owned verification cases.
+- path: tests/test_source_reference_handoff.py
+  type: modified
+  span:
+    start_line: 176
+    end_line: 178
+  summary: Verify prompt bookkeeping is removed without weakening semantic review.
+  rationale: Cover behavior-only, exact-owner, retirement, and runtime-owned verification cases.
+- path: tests/test_source_reference_handoff.py
+  type: modified
+  span:
+    start_line: 400
+    end_line: 400
+  summary: Verify prompt bookkeeping is removed without weakening semantic review.
+  rationale: Cover behavior-only, exact-owner, retirement, and runtime-owned verification cases.
+- path: tests/test_source_reference_handoff.py
+  type: modified
+  span:
+    start_line: 484
+    end_line: 484
+  summary: Verify prompt bookkeeping is removed without weakening semantic review.
+  rationale: Cover behavior-only, exact-owner, retirement, and runtime-owned verification cases.
+- path: tests/test_source_reference_handoff.py
+  type: modified
+  span:
+    start_line: 486
+    end_line: 489
+  summary: Verify prompt bookkeeping is removed without weakening semantic review.
+  rationale: Cover behavior-only, exact-owner, retirement, and runtime-owned verification cases.
+- path: tests/test_source_reference_handoff.py
+  type: modified
+  span:
+    start_line: 665
+    end_line: 665
+  summary: Verify prompt bookkeeping is removed without weakening semantic review.
+  rationale: Cover behavior-only, exact-owner, retirement, and runtime-owned verification cases.
+- path: tests/test_source_reference_handoff.py
+  type: modified
+  span:
+    start_line: 670
+    end_line: 672
+  summary: Verify prompt bookkeeping is removed without weakening semantic review.
+  rationale: Cover behavior-only, exact-owner, retirement, and runtime-owned verification cases.
+- path: tests/test_source_reference_run.py
+  type: modified
+  span:
+    start_line: 553
+    end_line: 554
+  summary: Verify runtime constructs the completion envelope and owner inventory.
+  rationale: Ensure worker input no longer carries fixed completion metadata.
+- path: tests/test_source_reference_run.py
+  type: modified
+  span:
+    start_line: 620
+    end_line: 620
+  summary: Verify runtime constructs the completion envelope and owner inventory.
+  rationale: Ensure worker input no longer carries fixed completion metadata.
+- path: tests/test_source_reference_run.py
+  type: modified
+  span:
+    start_line: 661
+    end_line: 678
+  summary: Verify runtime constructs the completion envelope and owner inventory.
+  rationale: Ensure worker input no longer carries fixed completion metadata.
+- path: tests/test_source_reference_run.py
+  type: modified
+  span:
+    start_line: 893
+    end_line: 893
+  summary: Verify runtime constructs the completion envelope and owner inventory.
+  rationale: Ensure worker input no longer carries fixed completion metadata.
+- path: tests/test_story_execution.py
+  type: modified
+  span:
+    start_line: 765
+    end_line: 765
+  summary: Use the reduced worker completion payload in story execution.
+  rationale: Keep story execution aligned with runtime-owned metadata.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []
+features: []
+proposed_prs: []

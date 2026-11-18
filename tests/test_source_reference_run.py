@@ -550,7 +550,8 @@ def test_prepared_inputs_are_bound_and_cannot_be_reused_or_mutated(
     assert "repository_contract_closure" not in run.request.prompt
     assert "PRIVATE-ORACLE" not in run.request.prompt
     assert str(run.private_root) not in run.request.prompt
-    assert "structrr-reference-completion-v1" in run.request.prompt
+    assert "structrr-reference-completion-v1" not in run.request.prompt
+    assert "reference_owners" not in run.request.prompt
     provider = MiniSWEAgentProvider(
         inference_handler=unused_inference,
         model=run.model,
@@ -616,13 +617,7 @@ def test_completed_source_worker_accepts_prevalidated_supporting_edits(
             {
                 "messages": [
                     {
-                        "content": json.dumps(
-                            {
-                                "schema_version": "structrr-reference-completion-v1",
-                                "reference_owners": [],
-                                "design_gaps": [],
-                            }
-                        ),
+                        "content": json.dumps({"design_gaps": []}),
                         "extra": {"exit_status": "Submitted"},
                     }
                 ]
@@ -663,6 +658,24 @@ def test_completed_source_worker_accepts_prevalidated_supporting_edits(
     run.finalize_worker(attempt)
 
     assert run._candidate_after_worker == run._candidate_state()
+    assert run.completion == {
+        "schema_version": "structrr-reference-completion-v1",
+        "reference_owners": [
+            {
+                "ref": "decision:helper",
+                "path": "retry.py",
+                "kind": "function",
+                "qualified_name": "helper",
+            },
+            {
+                "ref": "invariant:retry",
+                "path": "retry.py",
+                "kind": "function",
+                "qualified_name": "retry",
+            },
+        ],
+        "design_gaps": [],
+    }
 
 
 @pytest.mark.parametrize(
@@ -877,24 +890,7 @@ def test_native_fake_model_end_to_end_protects_private_inputs_and_validates_owne
     edit = (
         "from pathlib import Path; Path('retry.py').write_text(" + repr(candidate) + ")"
     )
-    completion = {
-        "schema_version": "structrr-reference-completion-v1",
-        "reference_owners": [
-            {
-                "ref": "invariant:retry",
-                "path": "retry.py",
-                "kind": "function",
-                "qualified_name": "retry",
-            },
-            {
-                "ref": "decision:helper",
-                "path": "retry.py",
-                "kind": "function",
-                "qualified_name": "helper",
-            },
-        ],
-        "design_gaps": [],
-    }
+    completion: dict[str, Any] = {"design_gaps": []}
     commands = [
         "pwd; git rev-parse --show-toplevel",
         f"{shlex.quote(sys.executable)} -c {shlex.quote(probe)}",

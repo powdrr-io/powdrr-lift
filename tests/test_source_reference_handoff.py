@@ -170,11 +170,12 @@ def test_behavior_only_handoff_does_not_require_source_reference_placements() ->
     assert contract["obligations"] == []
     assert contract["preservation"] == []
     assert contract["behavior_case_ids"] == {"retry-result": ["case:retry"]}
-    assert "Implement the accepted behavior scenarios" in prompt
-    assert "Add the supplied Structrr IDs" not in prompt
+    assert "Implement the accepted behavior requirements" in prompt
+    assert '"commands"' not in prompt
     assert "COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT" in prompt
-    assert '\'{"schema_version":"structrr-reference-completion-v1",' in prompt
-    assert '"reference_owners":[],"design_gaps":[]}\'' in prompt
+    assert '"design_gaps"' in prompt
+    assert "reference_owners" not in prompt
+    assert "structrr-reference-completion-v1" not in prompt
 
 
 def test_placement_verification_reference_requires_accepted_behavior_case() -> None:
@@ -396,7 +397,7 @@ def test_semantic_owner_binding_remains_an_independent_review_obligation() -> No
     handoff = compile_document(document(item))
     bound = handoff.validation_manifest["contract"]["obligations"][0]
     assert bound["owner"]["binding"] == "requires_semantic_review"
-    assert "independent review" in handoff.worker_prompt.prompt
+    assert "Owner adequacy is assessed independently" in handoff.worker_prompt.prompt
     assert "passing binding" in handoff.worker_prompt.prompt
     assert "qualified_name" not in bound["owner"]
     with pytest.raises(ValueError, match="one_or_more"):
@@ -480,9 +481,12 @@ def test_preservation_relocation_removal_and_canonical_supersession() -> None:
     assert handoff.validation_manifest["contract"]["preservation"][0][
         "verification_refs"
     ] == ["case:retry"]
-    assert "baseline_reference_rules" in handoff.worker_prompt.prompt
+    assert "Keep the original key." in handoff.worker_prompt.prompt
     removal = preservation(disposition="remove", reason="Accepted retirement.")
-    assert compile_document(document(preservation=[removal]))
+    retired_document = document(preservation=[removal])
+    retired_document["source_reference_placements"] = []
+    retired = compile_document(retired_document)
+    assert "Keep the original key." not in retired.worker_prompt.prompt
     old = ReferenceDefinition(
         "old",
         "invariant",
@@ -658,12 +662,14 @@ def test_design_projection_keeps_placement_identity_and_cannot_use_legacy_handof
         ImplementationRequest.from_structrr_handoff(handoff)
 
 
-def test_preservation_only_handoff_and_unavailable_local_check_are_explicit() -> None:
+def test_preservation_only_handoff_leaves_reference_checks_to_runtime() -> None:
     doc = document(preservation=[preservation()])
     doc["source_reference_placements"] = []
     handoff = compile_document(doc)
     assert handoff.validation_manifest["contract"]["obligations"] == []
-    assert "unavailable in this build" in handoff.worker_prompt.prompt
+    assert "runtime supplies source context and performs reference checks" in (
+        handoff.worker_prompt.prompt
+    )
     assert handoff.worker_prompt.to_data()["source_reference_mode"] == "enforce"
     with pytest.raises(ValueError, match="empty"):
         compile_document(document(), reference_check_command=())

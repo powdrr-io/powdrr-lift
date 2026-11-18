@@ -1,0 +1,70 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1584
+title: Make PR publication base branch deterministic
+intent:
+  problem: PR preparation relied on the LLM-provided workflow context to pass the fixed base branch, and a publication attempt failed with an empty base branch.
+  goal: Make the clean PR publication process provide main deterministically and remove base-branch from LLM-authored workflow metadata.
+human-decisions: []
+structured_files: []
+files:
+  - path: packages/service/src/powdrr_service/resources/processes/create-pull-request.yaml
+    type: modified
+    span: {start_line: 15, end_line: 15}
+    summary: Make base-branch optional in the PR publication context.
+    rationale: The publication process now supplies the repository base branch directly.
+  - path: packages/service/src/powdrr_service/resources/processes/create-pull-request.yaml
+    type: modified
+    span: {start_line: 39, end_line: 39}
+    summary: Pass main as a literal base to the clean PR publisher.
+    rationale: Keep the base branch independent of LLM-authored metadata.
+  - path: packages/service/src/powdrr_service/resources/processes/create-pull-request.yaml
+    type: modified
+    span: {start_line: 61, end_line: 61}
+    summary: Remove base-branch from description-repair instructions.
+    rationale: The recovery model does not need to select or preserve the fixed base.
+  - path: packages/service/src/powdrr_service/resources/processes/create-pull-request.yaml
+    type: modified
+    span: {start_line: 70, end_line: 70}
+    summary: Make base-branch optional in the recovery response schema.
+    rationale: Recovery can repair PR description fields without authoring base metadata.
+  - path: packages/service/src/powdrr_service/resources/processes/finish-implementation-pr.yaml
+    type: modified
+    span: {start_line: 42, end_line: 42}
+    summary: Stop asking the implementation PR LLM to set the base branch.
+    rationale: The nested publication process supplies the fixed base.
+  - path: packages/service/src/powdrr_service/resources/processes/finish-implementation-pr.yaml
+    type: modified
+    span: {start_line: 55, end_line: 55}
+    summary: Remove base-branch from required implementation PR response fields.
+    rationale: The model response no longer owns publication base metadata.
+  - path: packages/service/src/powdrr_service/resources/processes/finish-implementation-pr.yaml
+    type: modified
+    span: {start_line: 65, end_line: 65}
+    summary: Remove base-branch from implementation PR response schema.
+    rationale: The process passes main directly to clean publication.
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 1244, end_line: 1244}
+    summary: Omit base-branch from the LLM recovery response fixture.
+    rationale: Confirm PR recovery does not rely on model-authored base metadata.
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 1268, end_line: 1268}
+    summary: Assert the clean publisher receives main separately from workflow context.
+    rationale: Protect deterministic base selection when the LLM omits base-branch.
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 1271, end_line: 1271}
+    summary: Assert the clean publisher receives main separately from workflow context.
+    rationale: Protect deterministic base selection when the LLM omits base-branch.
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 1295, end_line: 1295}
+    summary: Omit base-branch from the initial PR publication context.
+    rationale: Verify the process injects the fixed base for initial publication too.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []
+features: []
+proposed_prs: []

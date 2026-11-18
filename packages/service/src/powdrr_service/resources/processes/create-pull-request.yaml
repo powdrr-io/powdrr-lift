@@ -12,7 +12,7 @@ inputs:
     required: true
     schema:
       type: object
-      required: [feature-name, commit-message, base-branch, publication-branch]
+      required: [feature-name, commit-message, publication-branch]
       properties:
         feature-name: {type: string, minLength: 1, maxLength: 100}
         commit-message: {type: string, minLength: 1}
@@ -36,6 +36,7 @@ steps:
               tool: gh
               parameters:
                 operation: pr_publish_clean
+                base: {type: literal, value: main}
                 files_to_publish: {type: reference, value: files_to_publish}
                 workflow_context: {type: reference, value: workflow_context}
                 require_standard_pr_description: true
@@ -57,7 +58,7 @@ recoveries:
           prompt_system: Return only the declared JSON object.
           instructions:
             - Treat failure.error as authoritative evidence of why publication failed.
-            - Preserve the user request, feature name, commit message, base branch, and publication branch from the supplied inputs.
+            - Preserve the user request, feature name, commit message, and publication branch from the supplied inputs.
             - Provide non-empty body text for all six required section fields; do not return Markdown headings because Powdrr assembles the fixed template.
             - Ground every claim in user_request, workflow_context, and files_to_publish; preserve all validated command results and do not claim unrun checks passed.
             - Correct only the rejected PR description request and do not change publication identity or file scope.
@@ -66,7 +67,7 @@ recoveries:
             name: workflow_context
             schema:
               type: object
-              required: [feature-name, commit-message, base-branch, publication-branch, pr-description-sections]
+              required: [feature-name, commit-message, publication-branch, pr-description-sections]
               additionalProperties: true
               properties:
                 feature-name: {type: string, minLength: 1, maxLength: 100}

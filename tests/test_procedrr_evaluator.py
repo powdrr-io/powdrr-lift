@@ -1222,7 +1222,7 @@ steps:
     assert calls == ["check", "repair", "check"]
 
 
-def test_attempt_recovers_from_called_process_output_schema_error() -> None:
+def test_publication_input_failure_terminates_without_llm_recovery() -> None:
     from powdrr_service.procedrr import ProcessCatalog
 
     process = (
@@ -1231,26 +1231,11 @@ def test_attempt_recovers_from_called_process_output_schema_error() -> None:
         .document
     )
 
-    class PublicationRetryLLM:
+    class UnexpectedLLM:
         def complete_json(
             self, messages: list[dict[str, str]], **_: Any
         ) -> dict[str, Any]:
-            prompt = messages[1]["content"]
-            assert "publication rejected" in prompt
-            assert "requires structured description sections" in prompt
-            return {
-                "feature-name": "Reviewed feature",
-                "commit-message": "Implement reviewed feature",
-                "publication-branch": "powdrr/reviewed-feature-implementation",
-                "pr-description-sections": {
-                    "objective": "Corrected after the publication rejection.",
-                    "scope": "Update the approved files.",
-                    "implementation_details": "Add the implementation and tests.",
-                    "acceptance_criteria": "Meet the reviewed criteria.",
-                    "validation": "- `pytest -q` passed.",
-                    "advisory_test_quality_notes": "None.",
-                },
-            }
+            raise AssertionError("publication failure must not invoke an LLM")
 
     publication_calls = 0
 
@@ -1270,22 +1255,17 @@ def test_attempt_recovers_from_called_process_output_schema_error() -> None:
             assert isinstance(workflow_context, Mapping)
             assert "base-branch" not in workflow_context
             publication_calls += 1
-            if publication_calls == 1:
-                assert "pr-description-sections" not in workflow_context
-                return {
-                    "error": (
-                        "Clean PR publication requires structured description sections."
-                    ),
-                    "retryable": True,
-                }
-            sections = workflow_context["pr-description-sections"]
-            assert isinstance(sections, Mapping)
-            assert sections["objective"] == "Corrected after the publication rejection."
-            return "https://github.com/example/repo/pull/123"
+            assert "pr-description-sections" not in workflow_context
+            return {
+                "error": (
+                    "Clean PR publication requires structured description sections."
+                ),
+                "retryable": True,
+            }
         raise AssertionError(f"Unexpected operation: {tool} {parameters!r}")
 
     result = Evaluator(
-        PublicationRetryLLM(), execute, process_directory=bundled_process_directory()
+        UnexpectedLLM(), execute, process_directory=bundled_process_directory()
     ).evaluate(
         process,
         {
@@ -1300,10 +1280,9 @@ def test_attempt_recovers_from_called_process_output_schema_error() -> None:
         },
     )
 
-    assert publication_calls == 2
-    assert result.bindings["pull_request_url"] == (
-        "https://github.com/example/repo/pull/123"
-    )
+    assert publication_calls == 1
+    assert result.llm_activations == 0
+    assert result.events[-1].data["status"] == "failed"
 
 
 def test_evaluator_resolves_tool_output_into_declared_judge_context() -> None:

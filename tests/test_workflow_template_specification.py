@@ -436,9 +436,9 @@ def test_create_pull_request_preserves_runtime_state_and_accepts_committed_files
     )
     attempt = process["steps"][0]["attempt"]
     assert attempt["id"] == "publish-pr"
-    assert attempt["max_attempts"] == 2
+    assert attempt["max_attempts"] == 1
     assert attempt["on_failure"] == {
-        "recovery": "repair-pr-description",
+        "recovery": "fail-publication",
         "resume": "publish-pr",
     }
     operation = attempt["body"][0]["operation"]
@@ -448,17 +448,8 @@ def test_create_pull_request_preserves_runtime_state_and_accepts_committed_files
     assert parameters["require_standard_pr_description"] is True
     assert parameters["workflow_context"]["value"] == "workflow_context"
     assert "body" not in parameters
-    recovery_judge = process["recoveries"]["repair-pr-description"]["steps"][0]["judge"]
-    recovery_sections = recovery_judge["output"]["schema"]["properties"][
-        "pr-description-sections"
-    ]
-    assert recovery_sections["required"] == [
-        "objective",
-        "scope",
-        "implementation_details",
-        "acceptance_criteria",
-        "validation",
-        "advisory_test_quality_notes",
+    assert process["recoveries"]["fail-publication"]["steps"] == [
+        {"terminal": "failed"}
     ]
     assert process["outputs"]["pull_request_url"]["pattern"].endswith("/pull/[0-9]+$")
 

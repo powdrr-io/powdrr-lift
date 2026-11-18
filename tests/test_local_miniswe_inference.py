@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+import json
 from collections.abc import Callable
+from pathlib import Path
 
 import pytest
 from powdrr_contracts.models import ChatCompletionRequest, ChatCompletionResponse
-from powdrr_local.miniswe_inference import create_miniswe_inference_handler
+from powdrr_local.miniswe_inference import (
+    create_miniswe_inference_handler,
+    trace_miniswe_inference_handler,
+)
 
 
 class FakeInferenceClient:
@@ -72,3 +77,67 @@ def test_local_composition_bounds_provider_timeout(
 
     assert captured["timeout"] == 120.0
     assert actual == response
+
+
+def test_miniswe_trace_records_redacted_success_metadata(tmp_path: Path) -> None:
+    response = ChatCompletionResponse(
+        content="private response text",
+        usage={"prompt_tokens": 11, "completion_tokens": 5, "cost": 0.02},
+    )
+    trace_path = tmp_path / "trace.jsonl"
+    request = ChatCompletionRequest(
+        model="deepinfra/test-model",
+        messages=({"role": "user", "content": "private prompt text"},),
+        request_id="request-123",
+    )
+    traced = trace_miniswe_inference_handler(
+        lambda _: response,
+        trace_path=trace_path,
+        task_id="task-456",
+        attempt_id="attempt-2",
+    )
+
+    assert traced(request) == response
+    record = json.loads(trace_path.read_text(encoding="utf-8"))
+    assert record["record_type"] == "powdrr_service.miniswe.provider_attempt"
+    assert record["interaction_id"] == "request-123"
+    assert record["task_id"] == "task-456"
+    assert record["attempt_id"] == "attempt-2"
+    assert record["provider"] == "deepinfra"
+    assert record["model"] == "deepinfra/test-model"
+    assert record["prompt_fingerprint"]
+    assert record["usage"] == {
+        "prompt_tokens": 11,
+        "completion_tokens": 5,
+        "cost": 0.02,
+    }
+    assert "private prompt text" not in trace_path.read_text(encoding="utf-8")
+    assert "private response text" not in trace_path.read_text(encoding="utf-8")
+
+
+def test_miniswe_trace_records_error_then_reraises(tmp_path: Path) -> None:
+    trace_path = tmp_path / "trace.jsonl"
+    request = ChatCompletionRequest(
+        model="isoquant/test-model",
+        messages=({"role": "user", "content": "private prompt text"},),
+        request_id="request-error",
+    )
+
+    def fail(_: ChatCompletionRequest) -> ChatCompletionResponse:
+        raise RuntimeError("provider failure containing private prompt text")
+
+    traced = trace_miniswe_inference_handler(
+        fail,
+        trace_path=trace_path,
+        task_id="task-789",
+        attempt_id="attempt-1",
+    )
+
+    with pytest.raises(RuntimeError, match="provider failure"):
+        traced(request)
+    record = json.loads(trace_path.read_text(encoding="utf-8"))
+    assert record["outcome"] == "error"
+    assert record["error_type"] == "RuntimeError"
+    assert record["provider"] == "isoquant"
+    assert "error message" not in record
+    assert "private prompt text" not in trace_path.read_text(encoding="utf-8")

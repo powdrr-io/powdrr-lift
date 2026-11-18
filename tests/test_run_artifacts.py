@@ -258,6 +258,43 @@ def test_run_telemetry_aggregates_retries_replays_stages_and_receipts(
     )
 
 
+def test_run_telemetry_includes_miniswe_interactions(tmp_path: Path) -> None:
+    diagnostics = tmp_path / "coding" / "diagnostics"
+    diagnostics.mkdir(parents=True)
+    (diagnostics / "attempt-1.inference-attempts.jsonl").write_text(
+        json.dumps(
+            {
+                "record_type": "powdrr_service.miniswe.provider_attempt",
+                "interaction_id": "ipc-1",
+                "caller": "minisweagent",
+                "model": "deepinfra/test-model",
+                "outcome": "success",
+                "duration_ms": 17,
+                "prompt_tokens": 8,
+                "completion_tokens": 4,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    telemetry = run_artifacts.summarize_run_telemetry(tmp_path)
+
+    assert telemetry["provider_calls"] == 1
+    assert telemetry["transport_requests"] == 1
+    assert (
+        telemetry["provider_calls_by_model"]["minisweagent:deepinfra/test-model"][
+            "provider_calls"
+        ]
+        == 1
+    )
+    assert telemetry["tokens"] == {
+        "prompt": 8,
+        "completion": 4,
+        "status": "observed",
+    }
+
+
 def test_telemetry_artifact_write_failure_does_not_lose_run_report(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

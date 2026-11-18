@@ -286,18 +286,27 @@ def summarize_run_telemetry(
     except OSError:
         pass
 
+    # MiniSWE makes model calls inside its own loop. Keep its wire attempts in
+    # per-attempt diagnostics, then join only those explicit records here.
+    for trace_path in output_root.rglob("*.inference-attempts.jsonl"):
+        records.extend(_read_jsonl_records(trace_path))
+
     provider_attempts = [
         item
         for item in records
-        if item.get("record_type") == "powdrr_service.procedrr.provider_attempt"
+        if item.get("record_type")
+        in {
+            "powdrr_service.procedrr.provider_attempt",
+            "powdrr_service.miniswe.provider_attempt",
+        }
     ]
     provider_calls: dict[str, dict[str, Any]] = {}
     traces: dict[str, list[dict[str, Any]]] = {}
     for item in provider_attempts:
-        trace_id = item.get("trace_id")
+        trace_id = item.get("trace_id", item.get("interaction_id"))
         trace_key = str(trace_id) if trace_id is not None else f"unkeyed-{len(traces)}"
         traces.setdefault(trace_key, []).append(item)
-        role = str(item.get("role") or "unknown")
+        role = str(item.get("role") or item.get("caller") or "unknown")
         model = str(item.get("model") or item.get("provider_client") or "unknown")
         label = f"{role}:{model}"
         group = provider_calls.setdefault(
@@ -318,7 +327,7 @@ def summarize_run_telemetry(
             group["duration_ms"] += duration
     for attempts in traces.values():
         first = attempts[0]
-        role = str(first.get("role") or "unknown")
+        role = str(first.get("role") or first.get("caller") or "unknown")
         model = str(first.get("model") or first.get("provider_client") or "unknown")
         label = f"{role}:{model}"
         provider_calls[label]["provider_calls"] += 1

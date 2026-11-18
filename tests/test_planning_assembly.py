@@ -8,7 +8,7 @@ from typing import Any
 import pytest
 from powdrr_service.planning.assembly import (
     MAX_WORK_UNIT_EVIDENCE_PER_REQUIREMENT,
-    MAX_WORK_UNIT_PROPOSALS_PER_PAGE,
+    MAX_WORK_UNIT_PROPOSALS_PER_QUESTION,
     MAX_WORK_UNIT_REQUIREMENTS_PER_PROPOSAL,
     MAX_WORK_UNIT_REQUIREMENTS_PER_QUESTION,
     AllocationGroup,
@@ -23,7 +23,7 @@ from powdrr_service.planning.assembly import (
     build_unit_cohesion_request,
     build_work_unit_proposal_request,
     parse_work_unit_proposal,
-    parse_work_unit_proposal_page,
+    parse_work_unit_proposal_answer,
 )
 from powdrr_service.planning.contracts import PlanningContractError
 from powdrr_service.planning.driver import SourceLedgerQuestionMachine
@@ -254,12 +254,12 @@ def test_requirement_can_be_covered_by_runtime_specific_units() -> None:
         valid_example=_proposal(context, anchor),
     )
 
-    page = parse_work_unit_proposal_page(
-        {"records": [mixed_answer], "has_more": False, "next_anchor": None},
+    answer = parse_work_unit_proposal_answer(
+        {"records": [mixed_answer]},
         context=context,
         requirement_order=("req-0001",),
     )
-    allocated = allocate_work_units(page.records, context=context)
+    allocated = allocate_work_units(answer.records, context=context)
 
     assert "assign each requirement to the appropriate runtime's writes" in (
         request.exact_question
@@ -492,12 +492,10 @@ def test_work_unit_question_requires_the_source_declared_phase() -> None:
     request = build_work_unit_proposal_request(
         context,
         ["req-0001"],
-        valid_example={"records": [proposal], "has_more": False, "next_anchor": None},
+        valid_example={"records": [proposal]},
     )
 
-    parsed = request.parse_answer(
-        {"records": [proposal], "has_more": False, "next_anchor": None}
-    )
+    parsed = request.parse_answer({"records": [proposal]})
 
     assert parsed.records[0].implementation_phase_id == "pr-02"
     assert request.answer_schema["properties"]["records"]["items"]["properties"][
@@ -505,9 +503,7 @@ def test_work_unit_question_requires_the_source_declared_phase() -> None:
     ]["enum"] == ["pr-01", "pr-02"]
     unassigned = {**proposal, "implementation_phase_id": None}
     with pytest.raises(PlanningContractError, match="source-declared"):
-        request.parse_answer(
-            {"records": [unassigned], "has_more": False, "next_anchor": None}
-        )
+        request.parse_answer({"records": [unassigned]})
 
 
 def test_explicit_sizing_handles_large_plan_deterministically() -> None:
@@ -606,11 +602,7 @@ def test_deterministic_item_description_copies_frozen_deliverable() -> None:
 def test_work_unit_question_has_a_parser_valid_example_and_exact_context() -> None:
     context, anchor = _context()
     example_proposal = _proposal(context, anchor)
-    example = {
-        "records": [example_proposal],
-        "has_more": False,
-        "next_anchor": None,
-    }
+    example = {"records": [example_proposal]}
 
     context = replace(
         context,
@@ -631,9 +623,9 @@ def test_work_unit_question_has_a_parser_valid_example_and_exact_context() -> No
 
     request.validate()
     assert request.question.kind == "propose_work_units"
-    assert request.question.contract_version == 7
-    assert request.question.expected_answer_schema == "work-unit-proposals-v7"
-    assert request.question.question_id.startswith("propose-units-v7-")
+    assert request.question.contract_version == 8
+    assert request.question.expected_answer_schema == "work-unit-proposals-v8"
+    assert request.question.question_id.startswith("propose-units-v8-")
     assert "requirement_coverage" in request.exact_question
     assert (
         "Do not schedule work or tests that already satisfy" in request.exact_question
@@ -644,13 +636,12 @@ def test_work_unit_question_has_a_parser_valid_example_and_exact_context() -> No
     assert "runtime are derived" in request.exact_question
     assert "return separate proposals" in request.exact_question
     assert "A .sh file is a shell write" in request.exact_question
-    assert "If every supplied requirement is covered" in request.exact_question
-    assert (
-        "requirements remain uncovered" in request.answer_field_definitions["has_more"]
-    )
+    assert "planner tracks which supplied requirements" in request.exact_question
+    assert "has_more" not in request.answer_schema["properties"]
+    assert "next_anchor" not in request.answer_schema["properties"]
     assert (
         request.answer_schema["properties"]["records"]["maxItems"]
-        == MAX_WORK_UNIT_PROPOSALS_PER_PAGE
+        == MAX_WORK_UNIT_PROPOSALS_PER_QUESTION
     )
     record_schema = request.answer_schema["properties"]["records"]["items"]
     assert "component" not in record_schema["properties"]
@@ -661,8 +652,6 @@ def test_work_unit_question_has_a_parser_valid_example_and_exact_context() -> No
         request.parse_answer(
             {
                 "records": [example_proposal] * 4,
-                "has_more": False,
-                "next_anchor": None,
             }
         )
     with pytest.raises(ValueError, match="one to four requirements"):
@@ -687,13 +676,7 @@ def test_work_unit_question_has_a_parser_valid_example_and_exact_context() -> No
         valid_example=example,
     )
     assert larger_batch.question.question_id != request.question.question_id
-    next_page = build_work_unit_proposal_request(
-        two_requirement_context,
-        ["req-0001", "req-0002"],
-        valid_example=example,
-        page_after="req-0001",
-    )
-    assert next_page.question.question_id != larger_batch.question.question_id
+    assert larger_batch.question.subject_ids == ("req-0001", "req-0002")
     one_proposal = build_work_unit_proposal_request(
         two_requirement_context,
         ["req-0001"],
@@ -711,8 +694,6 @@ def test_work_unit_question_has_a_parser_valid_example_and_exact_context() -> No
         one_proposal.parse_answer(
             {
                 "records": [example_proposal, example_proposal],
-                "has_more": False,
-                "next_anchor": None,
             }
         )
 
@@ -773,8 +754,6 @@ def test_work_unit_question_bounds_evidence_without_losing_evidence_kinds() -> N
         requirement_ids,
         valid_example={
             "records": [proposal],
-            "has_more": False,
-            "next_anchor": None,
         },
     )
 
@@ -938,8 +917,6 @@ def test_work_unit_proposals_scope_evidence_and_batch_independent_groups() -> No
             requirement_ids,
             valid_example={
                 "records": [],
-                "has_more": False,
-                "next_anchor": None,
             },
         )
         request_evidence_ids = {
@@ -958,7 +935,7 @@ def test_work_unit_proposals_scope_evidence_and_batch_independent_groups() -> No
     four_requirement_request = build_work_unit_proposal_request(
         context,
         all_requirement_ids[:4],
-        valid_example={"records": [], "has_more": False, "next_anchor": None},
+        valid_example={"records": []},
     )
     assert len(four_requirement_request.question.subject_ids) == 4
     record_schema = four_requirement_request.answer_schema["properties"]["records"][
@@ -982,8 +959,6 @@ def test_work_unit_proposals_scope_evidence_and_batch_independent_groups() -> No
                         "required_outputs": [],
                     }
                 ],
-                "has_more": False,
-                "next_anchor": None,
             }
         )
 
@@ -1021,7 +996,7 @@ def test_work_unit_proposals_scope_evidence_and_batch_independent_groups() -> No
     unchanged_request = build_work_unit_proposal_request(
         changed_context,
         all_requirement_ids[:4],
-        valid_example={"records": [], "has_more": False, "next_anchor": None},
+        valid_example={"records": []},
     )
     assert unchanged_request.question.input_digest == requests[0].question.input_digest
 
@@ -1037,8 +1012,6 @@ def test_work_unit_proposals_scope_evidence_and_batch_independent_groups() -> No
             all_requirement_ids[offset : offset + 4],
             valid_example={
                 "records": [],
-                "has_more": False,
-                "next_anchor": None,
             },
         )
         for offset in range(0, len(all_requirement_ids), 4)
@@ -1053,7 +1026,7 @@ def test_work_unit_proposals_scope_evidence_and_batch_independent_groups() -> No
     explicitly_unindexed_request = build_work_unit_proposal_request(
         explicitly_unindexed_context,
         all_requirement_ids[:4],
-        valid_example={"records": [], "has_more": False, "next_anchor": None},
+        valid_example={"records": []},
     )
     assert not any(
         item.ref_id.startswith("evidence:")
@@ -1094,8 +1067,6 @@ def test_work_unit_proposals_scope_evidence_and_batch_independent_groups() -> No
                         "required_outputs": [],
                     }
                 ],
-                "has_more": False,
-                "next_anchor": None,
             }
         )
 
@@ -1126,9 +1097,7 @@ def test_work_unit_question_carries_pinned_repository_runtime_preferences() -> N
     assert preference_facts[0].value["runtimes"] == ["python", "swift"]
 
 
-def test_work_unit_page_cursor_is_derived_and_cannot_skip_uncovered_requirements() -> (
-    None
-):
+def test_work_unit_answer_has_no_model_controlled_pagination() -> None:
     base_context, anchor = _context()
     requirement_ids = ("req-0013", "req-0014", "req-0015", "req-0016")
     base_requirement = base_context.requirements["req-0001"]
@@ -1149,51 +1118,17 @@ def test_work_unit_page_cursor_is_derived_and_cannot_skip_uncovered_requirements
     request = build_work_unit_proposal_request(
         context,
         requirement_ids,
-        valid_example={
-            "records": [proposals[0]],
-            "has_more": False,
-            "next_anchor": None,
-        },
+        valid_example={"records": [proposals[0]]},
     )
 
-    assert request.answer_schema["properties"]["next_anchor"]["enum"] == [
-        *requirement_ids[:-1],
-        None,
-    ]
-    page = request.parse_answer(
-        {"records": proposals, "has_more": True, "next_anchor": None}
-    )
-    assert page.next_anchor == "req-0015"
-    page_with_first_uncovered_cursor = request.parse_answer(
-        {"records": proposals, "has_more": True, "next_anchor": "req-0016"}
-    )
-    assert page_with_first_uncovered_cursor.next_anchor == "req-0015"
-
-    with pytest.raises(PlanningContractError, match="must not skip requirements"):
+    assert "has_more" not in request.answer_schema["properties"]
+    assert "next_anchor" not in request.answer_schema["properties"]
+    parsed = request.parse_answer({"records": proposals})
+    assert len(parsed.records) == 3
+    with pytest.raises(PlanningContractError, match="unknown fields"):
         request.parse_answer(
-            {
-                "records": [proposals[0], proposals[2]],
-                "has_more": True,
-                "next_anchor": "req-0015",
-            }
+            {"records": proposals, "has_more": True, "next_anchor": "req-0015"}
         )
-
-    final_proposal = _proposal(context, anchor)
-    _set_proposal_requirements(final_proposal, ["req-0016"])
-    next_request = build_work_unit_proposal_request(
-        context,
-        requirement_ids,
-        valid_example={
-            "records": [final_proposal],
-            "has_more": False,
-            "next_anchor": None,
-        },
-        page_after=page.next_anchor,
-    )
-    final_page = next_request.parse_answer(
-        {"records": [final_proposal], "has_more": False, "next_anchor": None}
-    )
-    assert final_page.next_anchor is None
 
 
 def test_work_unit_continuation_only_includes_uncovered_requirements(
@@ -1226,7 +1161,9 @@ def test_work_unit_continuation_only_includes_uncovered_requirements(
         machine, "_work_unit_context", lambda _ledger, _unresolved, _coverage: context
     )
 
-    initial_request = machine._work_unit_requests({})[0]
+    initial_request = next(
+        request for request in machine._work_unit_requests({}) if request is not None
+    )
     assert initial_request is not None
     initial_request.validate()
     example_records = initial_request.valid_example["records"]
@@ -1248,12 +1185,14 @@ def test_work_unit_continuation_only_includes_uncovered_requirements(
     accepted = {
         initial_request.question.question_id: {
             "records": proposals,
-            "has_more": True,
-            "next_anchor": None,
         }
     }
 
-    continuation = machine._work_unit_requests(accepted)[0]
+    continuation = next(
+        request
+        for request in machine._work_unit_requests(accepted)
+        if request is not None
+    )
 
     assert continuation is not None
     assert continuation.question.subject_ids == ("req-0016",)
@@ -1261,8 +1200,6 @@ def test_work_unit_continuation_only_includes_uncovered_requirements(
     _set_proposal_requirements(final_proposal, ["req-0016"])
     accepted[continuation.question.question_id] = {
         "records": [final_proposal],
-        "has_more": False,
-        "next_anchor": None,
     }
     monkeypatch.setattr(machine, "accepted_ledger", lambda _answers: ledger)
     _, reconstructed_proposals = machine._accepted_work_unit_proposals(accepted)
@@ -1329,8 +1266,6 @@ def test_missing_grouped_requirement_gets_a_supplemental_question(
     accepted: dict[str, dict[str, object]] = {
         grouped_request.question.question_id: {
             "records": grouped_records,
-            "has_more": False,
-            "next_anchor": None,
         }
     }
 
@@ -1344,8 +1279,6 @@ def test_missing_grouped_requirement_gets_a_supplemental_question(
     _set_proposal_requirements(supplemental_proposal, ["req-0021"])
     accepted[supplemental_request.question.question_id] = {
         "records": [supplemental_proposal],
-        "has_more": False,
-        "next_anchor": None,
     }
 
     _, proposals = machine._accepted_work_unit_proposals(accepted)

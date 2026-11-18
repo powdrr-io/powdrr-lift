@@ -41,7 +41,7 @@ from powdrr_service.planning.story_allocation import StoryPlanRef, merge_story_r
 MAX_WORK_UNIT_CRITERIA = 2
 MAX_WORK_UNIT_REQUIREMENTS_PER_PROPOSAL = 4
 MAX_WORK_UNIT_REQUIREMENTS_PER_QUESTION = 4
-MAX_WORK_UNIT_PROPOSALS_PER_PAGE = 3
+MAX_WORK_UNIT_PROPOSALS_PER_QUESTION = 3
 MAX_WORK_UNIT_EVIDENCE_PER_REQUIREMENT = 4
 MAX_ITEM_CRITERIA = 5
 MAX_ITEM_SCOPE_ENTRIES = 3
@@ -78,14 +78,14 @@ _PLACEHOLDER_RE = re.compile(
     re.IGNORECASE,
 )
 
-WORK_UNIT_PROPOSAL_PAGE_JSON_SCHEMA: dict[str, Any] = {
+WORK_UNIT_PROPOSAL_JSON_SCHEMA: dict[str, Any] = {
     "type": "object",
     "additionalProperties": False,
-    "required": ["records", "has_more", "next_anchor"],
+    "required": ["records"],
     "properties": {
         "records": {
             "type": "array",
-            "maxItems": MAX_WORK_UNIT_PROPOSALS_PER_PAGE,
+            "maxItems": MAX_WORK_UNIT_PROPOSALS_PER_QUESTION,
             "items": {
                 "type": "object",
                 "additionalProperties": False,
@@ -177,8 +177,6 @@ WORK_UNIT_PROPOSAL_PAGE_JSON_SCHEMA: dict[str, Any] = {
                 },
             },
         },
-        "has_more": {"type": "boolean"},
-        "next_anchor": {"type": ["string", "null"]},
     },
 }
 
@@ -342,10 +340,8 @@ class UnitAllocation:
 
 
 @dataclass(frozen=True, slots=True)
-class RequirementEnumerationPage:
+class WorkUnitProposalAnswer:
     records: tuple[WorkUnitProposal, ...]
-    has_more: bool
-    next_anchor: str | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -597,15 +593,15 @@ def _parse_required_output(
     )
 
 
-def parse_work_unit_proposal_page(
+def parse_work_unit_proposal_answer(
     value: Mapping[str, Any],
     *,
     context: WorkUnitContext,
     requirement_order: Sequence[str],
-    after_anchor: str | None = None,
-    maximum_proposals: int = MAX_WORK_UNIT_PROPOSALS_PER_PAGE,
-) -> RequirementEnumerationPage:
-    _exact_fields(value, {"records", "has_more", "next_anchor"}, "/")
+    maximum_proposals: int = MAX_WORK_UNIT_PROPOSALS_PER_QUESTION,
+) -> WorkUnitProposalAnswer:
+    """Validate proposals against one scheduler-owned requirement group."""
+    _exact_fields(value, {"records"}, "/")
     raw_records = _array(value["records"], "/records", maximum=maximum_proposals)
     proposals = tuple(
         proposal
@@ -621,74 +617,9 @@ def parse_work_unit_proposal_page(
     ):
         raise PlanningContractError(
             "/records/requirement_ids",
-            "must reference only requirements supplied to this page",
+            "must reference only requirements supplied to this question",
         )
-    has_more = _bool(value["has_more"], "/has_more")
-    raw_anchor = value["next_anchor"]
-    if has_more:
-        if after_anchor is not None and after_anchor not in requirement_order:
-            raise PlanningContractError(
-                "/next_anchor", "supplied cursor is not in the requirement range"
-            )
-        after_index = (
-            requirement_order.index(after_anchor) if after_anchor is not None else -1
-        )
-        covered_ids = {
-            requirement_id
-            for proposal in proposals
-            for requirement_id in proposal.requirement_ids
-        }
-        contiguous_covered: list[str] = []
-        for requirement_id in requirement_order[after_index + 1 :]:
-            if requirement_id not in covered_ids:
-                break
-            contiguous_covered.append(requirement_id)
-        if not contiguous_covered:
-            if raw_anchor is None:
-                raise PlanningContractError(
-                    "/next_anchor",
-                    "cannot infer a page cursor without a proposed requirement",
-                )
-        if raw_anchor is None:
-            anchor = contiguous_covered[-1]
-        else:
-            anchor = _text(raw_anchor, "/next_anchor", max_length=120)
-        if anchor not in requirement_order:
-            raise PlanningContractError(
-                "/next_anchor", "must be in the supplied requirement range"
-            )
-        anchor_index = requirement_order.index(anchor)
-        first_uncovered_index = after_index + len(contiguous_covered) + 1
-        if (
-            contiguous_covered
-            and anchor_index == first_uncovered_index
-            and first_uncovered_index < len(requirement_order)
-        ):
-            # Older answers treated next_anchor as the first requirement for the
-            # next page. Normalize that to this journal's cursor meaning: the
-            # last requirement completed on the current page.
-            anchor = contiguous_covered[-1]
-            anchor_index = requirement_order.index(anchor)
-        if anchor_index <= after_index:
-            raise PlanningContractError(
-                "/next_anchor", "must advance beyond the page cursor"
-            )
-        page_requirement_ids = requirement_order[after_index + 1 : anchor_index + 1]
-        if any(item not in covered_ids for item in page_requirement_ids):
-            raise PlanningContractError(
-                "/next_anchor", "must not skip requirements without a proposal"
-            )
-        if anchor_index == len(requirement_order) - 1:
-            raise PlanningContractError(
-                "/next_anchor", "must leave a requirement for the next page"
-            )
-    else:
-        if raw_anchor is not None:
-            raise PlanningContractError(
-                "/next_anchor", "must be null on the final page"
-            )
-        anchor = None
-    return RequirementEnumerationPage(proposals, has_more, anchor)
+    return WorkUnitProposalAnswer(proposals)
 
 
 def _parse_or_split_work_unit_proposal(
@@ -959,15 +890,14 @@ def build_work_unit_proposal_request(
     requirement_ids: Sequence[str],
     *,
     valid_example: Mapping[str, Any],
-    page_after: str | None = None,
-    maximum_proposals: int = MAX_WORK_UNIT_PROPOSALS_PER_PAGE,
-) -> QuestionRequest[RequirementEnumerationPage]:
-    """Build one bounded enumeration question for a small requirement set."""
+    maximum_proposals: int = MAX_WORK_UNIT_PROPOSALS_PER_QUESTION,
+) -> QuestionRequest[WorkUnitProposalAnswer]:
+    """Build one bounded proposal question for a fixed requirement group."""
     if not 1 <= len(requirement_ids) <= MAX_WORK_UNIT_REQUIREMENTS_PER_QUESTION:
         raise ValueError("work-unit questions require one to four requirements")
     if len(set(requirement_ids)) != len(requirement_ids):
         raise ValueError("work-unit question requirement IDs must be unique")
-    if not 1 <= maximum_proposals <= MAX_WORK_UNIT_PROPOSALS_PER_PAGE:
+    if not 1 <= maximum_proposals <= MAX_WORK_UNIT_PROPOSALS_PER_QUESTION:
         raise ValueError("work-unit proposal limit must be one to three")
     if not set(requirement_ids) <= set(context.unresolved_requirement_ids):
         raise ValueError("work-unit question includes a non-unresolved requirement")
@@ -1148,7 +1078,6 @@ def build_work_unit_proposal_request(
         "implementation_phases": [
             phase.to_data() for phase in context.implementation_phases
         ],
-        "page_after": page_after,
     }
     story_refs = merge_story_refs(
         [context.requirements[identity].story_refs for identity in requirement_ids]
@@ -1159,20 +1088,19 @@ def build_work_unit_proposal_request(
     question_identity: dict[str, Any] = {
         "requirement_ids": list(requirement_ids),
         "implementation_phases": [phase.id for phase in context.implementation_phases],
-        "page_after": page_after,
     }
-    if maximum_proposals != MAX_WORK_UNIT_PROPOSALS_PER_PAGE:
+    if maximum_proposals != MAX_WORK_UNIT_PROPOSALS_PER_QUESTION:
         input_facts["maximum_proposals"] = maximum_proposals
         question_identity["maximum_proposals"] = maximum_proposals
     question_key = _digest(question_identity)[-12:]
     question = Question(
-        question_id=f"propose-units-v7-{requirement_ids[0]}-{question_key}",
+        question_id=f"propose-units-v8-{requirement_ids[0]}-{question_key}",
         kind="propose_work_units",
-        contract_version=7,
+        contract_version=8,
         subject_ids=tuple(requirement_ids),
-        input_digest=_digest({"schema_version": 7, **input_facts}),
+        input_digest=_digest({"schema_version": 8, **input_facts}),
         context_ref_ids=all_refs,
-        expected_answer_schema="work-unit-proposals-v7",
+        expected_answer_schema="work-unit-proposals-v8",
         attempt=1,
     )
     request_context = replace(
@@ -1181,16 +1109,15 @@ def build_work_unit_proposal_request(
         evidence=request_evidence,
     )
 
-    def parse(value: Mapping[str, Any]) -> RequirementEnumerationPage:
-        return parse_work_unit_proposal_page(
+    def parse(value: Mapping[str, Any]) -> WorkUnitProposalAnswer:
+        return parse_work_unit_proposal_answer(
             value,
             context=request_context,
             requirement_order=requirement_ids,
-            after_anchor=page_after,
             maximum_proposals=maximum_proposals,
         )
 
-    answer_schema = deepcopy(WORK_UNIT_PROPOSAL_PAGE_JSON_SCHEMA)
+    answer_schema = deepcopy(WORK_UNIT_PROPOSAL_JSON_SCHEMA)
     answer_schema["properties"]["records"]["maxItems"] = maximum_proposals
     record_properties = answer_schema["properties"]["records"]["items"]["properties"]
     record_properties["requirement_ids"]["items"]["enum"] = list(requirement_ids)
@@ -1206,15 +1133,6 @@ def build_work_unit_proposal_request(
     write_properties["evidence_ids"]["items"]["enum"] = sorted(request_evidence)
     output_properties = record_properties["required_outputs"]["items"]["properties"]
     output_properties["requirement_ids"]["items"]["enum"] = list(requirement_ids)
-    next_anchors = list(requirement_ids[:-1])
-    if page_after is not None:
-        cursor = requirement_ids.index(page_after)
-        next_anchors = list(requirement_ids[cursor + 1 : -1])
-    answer_schema["properties"]["next_anchor"] = {
-        "type": ["string", "null"],
-        "enum": [*next_anchors, None],
-    }
-
     return QuestionRequest(
         question=question,
         exact_question=(
@@ -1272,12 +1190,9 @@ def build_work_unit_proposal_request(
             "Use the valid example for field shape only; do not copy its "
             "placeholder path or example wording. "
             f"Keep descriptions concise. Return at most {maximum_proposals} records "
-            "in this response, within the 4,000-character answer limit. Set "
-            "has_more only when at least one supplied requirement remains uncovered "
-            "for another page. If every supplied requirement is covered, set "
-            "has_more=false and next_anchor=null. When has_more=true, next_anchor "
-            "must be the last requirement covered on this page and must leave a "
-            "later supplied requirement for the next page."
+            "for this question, within the 4,000-character answer limit. Return "
+            "records only. The planner tracks which supplied requirements these "
+            "proposals cover and schedules any missing requirement separately."
         ),
         answer_field_definitions={
             "records": "WorkUnitProposal records with the exact fields in the schema.",
@@ -1285,20 +1200,12 @@ def build_work_unit_proposal_request(
                 "Concrete outputs needed by later work, with references only to "
                 "requirements this unit addresses."
             ),
-            "has_more": (
-                "Whether any supplied requirements remain uncovered for another page."
-            ),
-            "next_anchor": (
-                "When has_more is true, the last requirement represented by this "
-                "page, leaving at least one supplied requirement for the next page. "
-                "Return null on the final page."
-            ),
         },
         source_excerpts=excerpts,
         repository_evidence=(*paths, *evidence),
         accepted_facts=accepted,
         valid_example=valid_example,
-        empty_example={"records": [], "has_more": False, "next_anchor": None},
+        empty_example={"records": []},
         answer_schema=answer_schema,
         parse_answer=parse,
     )
@@ -1548,7 +1455,7 @@ def build_unit_cohesion_request(
                             "type": "array",
                             "minItems": 2,
                             "maxItems": 4,
-                            "items": WORK_UNIT_PROPOSAL_PAGE_JSON_SCHEMA["properties"][
+                            "items": WORK_UNIT_PROPOSAL_JSON_SCHEMA["properties"][
                                 "records"
                             ]["items"],
                         },

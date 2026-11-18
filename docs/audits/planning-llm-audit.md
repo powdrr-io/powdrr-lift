@@ -1,8 +1,9 @@
 # Planning: LLM interaction and determinism audit
 
-Status: audited recommendations; the first removal milestone (P07/P09) and
-deterministic source-extraction paging are implemented in the active planning
-path. The remaining work in milestones 2–6 is still proposed.
+Status: audited recommendations; the first removal milestone (P07/P09),
+deterministic source-extraction paging, and deterministic work-unit proposal
+progression are implemented in the active planning path. Remaining work in
+milestones 2–6 is still proposed.
 
 Audited revision: `cfc0b514c43c1d14269147a03e5d7ec5ec5cc739`, fetched from
 `origin/main` on 2026-11-17. This is a static source audit, not a measured live
@@ -22,8 +23,17 @@ windows of at most eight canonical clause anchors. The scheduler creates every
 window and correlates each answer; the model returns only semantic requirement
 records. It cannot select a cursor or page boundary. Each record's direct source
 references must belong to that request's window, and the question digest binds
-the source block and window anchors. Unit and subject pagination, copied runtime
-bindings, and other recommendations in milestone 2 remain unimplemented.
+the source block and window anchors.
+
+Work-unit proposal update: the scheduler now creates one fixed request for each
+ordered group of at most four unresolved requirements. The model returns only
+semantic proposal records; the scheduler detects uncovered requirements and
+creates deterministic singleton follow-up requests. Proposal answers no longer
+contain `has_more` or `next_anchor`. The question contract is version 8, so old
+version 7 answers are not replayed. Subject pagination, copied runtime and
+component bindings, and other recommendations in milestone 2 remain
+unimplemented. The detailed request catalog below preserves the audited source
+snapshot and its historical schemas.
 
 ## 1. Answer to the central question
 
@@ -564,10 +574,12 @@ check public API/test consumers explicitly; this audit changes none of them.
    preserve scope and dependency identities.
 2. **In progress: remove model-controlled pagination and copied fields.** Source
    requirement extraction now uses scheduler-owned fixed anchor windows, and the
-   model returns only semantic records for its supplied window. Remaining work:
-   apply the same ownership to unit/subject windows and phase/runtime/component/
-   validation bindings. Verify no duplicate/skipped obligations, source-edit
-   invalidation, and oversized answers without lossy truncation across these paths.
+   model returns only semantic records for its supplied window. Work-unit proposal
+   progression now uses fixed groups plus deterministic singleton supplements;
+   proposal answers contain no cursor. Remaining work: apply the same ownership
+   to subject windows and phase/runtime/component/validation bindings. Verify no
+   duplicate/skipped obligations, source-edit invalidation, and oversized answers
+   without lossy truncation across these paths.
 3. **Carry accepted semantics directly.** Typed source requirements, human setup,
    phases, cases and observations bypass rediscovery. Preserve conditional/Boolean
    source relations and scenario dimensions. Unknown meaning stops or goes to
@@ -588,8 +600,10 @@ check public API/test consumers explicitly; this audit changes none of them.
    subject/source/candidate identities, latency/tokens/cost and gate consumer.
    Do not add a second planner to bypass deterministic compilation failures.
 
-The request catalog describes the audited revision, while milestone 1 above is
-implemented in the current planner. Milestones 2–6 remain recommendations.
+The request catalog describes the audited revision, while milestones 1 and the
+source/work-unit pagination portions of milestone 2 are implemented in the
+current planner. Remaining milestone 2 work and milestones 3–6 remain
+recommendations.
 Later changes should be separately reviewable and retain pinned intent, private
 verification, full scenario closure and explicit human decision boundaries.
 

@@ -709,7 +709,7 @@ class _ExampleAnswerClient:
                     "required_outputs": [],
                 }
             )
-        return {"records": records, "has_more": False, "next_anchor": None}
+        return {"records": records}
 
 
 def _source_document(profile: Profile) -> PinnedSourceDocument:

@@ -232,6 +232,16 @@ files:
     span: {start_line: 182, end_line: 207}
     summary: Verify identical prompts in separate activations have distinct trace IDs and the same prompt fingerprint.
     rationale: Prevent content hashes from collapsing repeated logical requests.
+  - path: tests/fixtures/structrr/golden-python-symbols.yaml
+    type: modified
+    span: {start_line: 42, end_line: 43}
+    summary: Update the ProcedrrModelClient class span to include its trace-context and batch methods.
+    rationale: Keep the source-symbol golden fixture aligned with this PR's model-client additions.
+  - path: tests/fixtures/structrr/golden-python-symbols.yaml
+    type: modified
+    span: {start_line: 49, end_line: 50}
+    summary: Update the complete_json method span after adding interaction tracing.
+    rationale: Keep the method's expected source range aligned with the expanded implementation.
 entities:
   - id: issue-worker-procedrr-interaction-tracing
     type: Feature

@@ -1,0 +1,843 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1583
+title: Make work-unit proposal progression deterministic
+intent:
+  problem: Work-unit proposal answers controlled their own cursor, making coverage
+    and follow-up question selection dependent on model output.
+  goal: Have the scheduler create fixed requirement groups, accept semantic proposal
+    records only, and schedule uncovered requirements deterministically.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/audits/planning-llm-audit.md
+  type: modified
+  span:
+    start_line: 3
+    end_line: 6
+  summary: Update planner audit progress for deterministic work-unit proposal progression.
+  rationale: Keep the audit aligned with implemented request scheduling and remaining
+    milestone work.
+- path: docs/audits/planning-llm-audit.md
+  type: modified
+  span:
+    start_line: 26
+    end_line: 36
+  summary: Update planner audit progress for deterministic work-unit proposal progression.
+  rationale: Keep the audit aligned with implemented request scheduling and remaining
+    milestone work.
+- path: docs/audits/planning-llm-audit.md
+  type: modified
+  span:
+    start_line: 577
+    end_line: 582
+  summary: Update planner audit progress for deterministic work-unit proposal progression.
+  rationale: Keep the audit aligned with implemented request scheduling and remaining
+    milestone work.
+- path: docs/audits/planning-llm-audit.md
+  type: modified
+  span:
+    start_line: 603
+    end_line: 606
+  summary: Update planner audit progress for deterministic work-unit proposal progression.
+  rationale: Keep the audit aligned with implemented request scheduling and remaining
+    milestone work.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 44
+    end_line: 44
+  summary: Remove work-unit proposal cursors from the answer contract and version
+    the fixed-group request.
+  rationale: Keep model output semantic while binding it to a scheduler-owned requirement
+    group.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 81
+    end_line: 81
+  summary: Remove work-unit proposal cursors from the answer contract and version
+    the fixed-group request.
+  rationale: Keep model output semantic while binding it to a scheduler-owned requirement
+    group.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 84
+    end_line: 84
+  summary: Remove work-unit proposal cursors from the answer contract and version
+    the fixed-group request.
+  rationale: Keep model output semantic while binding it to a scheduler-owned requirement
+    group.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 88
+    end_line: 88
+  summary: Remove work-unit proposal cursors from the answer contract and version
+    the fixed-group request.
+  rationale: Keep model output semantic while binding it to a scheduler-owned requirement
+    group.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 180
+    end_line: 181
+  summary: Remove work-unit proposal cursors from the answer contract and version
+    the fixed-group request.
+  rationale: Keep model output semantic while binding it to a scheduler-owned requirement
+    group.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 343
+    end_line: 343
+  summary: Remove work-unit proposal cursors from the answer contract and version
+    the fixed-group request.
+  rationale: Keep model output semantic while binding it to a scheduler-owned requirement
+    group.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 347
+    end_line: 348
+  summary: Remove work-unit proposal cursors from the answer contract and version
+    the fixed-group request.
+  rationale: Keep model output semantic while binding it to a scheduler-owned requirement
+    group.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 596
+    end_line: 596
+  summary: Remove work-unit proposal cursors from the answer contract and version
+    the fixed-group request.
+  rationale: Keep model output semantic while binding it to a scheduler-owned requirement
+    group.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 601
+    end_line: 604
+  summary: Remove work-unit proposal cursors from the answer contract and version
+    the fixed-group request.
+  rationale: Keep model output semantic while binding it to a scheduler-owned requirement
+    group.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 620
+    end_line: 620
+  summary: Remove work-unit proposal cursors from the answer contract and version
+    the fixed-group request.
+  rationale: Keep model output semantic while binding it to a scheduler-owned requirement
+    group.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 622
+    end_line: 622
+  summary: Remove work-unit proposal cursors from the answer contract and version
+    the fixed-group request.
+  rationale: Keep model output semantic while binding it to a scheduler-owned requirement
+    group.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 893
+    end_line: 895
+  summary: Remove work-unit proposal cursors from the answer contract and version
+    the fixed-group request.
+  rationale: Keep model output semantic while binding it to a scheduler-owned requirement
+    group.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 900
+    end_line: 900
+  summary: Remove work-unit proposal cursors from the answer contract and version
+    the fixed-group request.
+  rationale: Keep model output semantic while binding it to a scheduler-owned requirement
+    group.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 1151
+    end_line: 1151
+  summary: Remove work-unit proposal cursors from the answer contract and version
+    the fixed-group request.
+  rationale: Keep model output semantic while binding it to a scheduler-owned requirement
+    group.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 1162
+    end_line: 1162
+  summary: Remove work-unit proposal cursors from the answer contract and version
+    the fixed-group request.
+  rationale: Keep model output semantic while binding it to a scheduler-owned requirement
+    group.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 1092
+    end_line: 1092
+  summary: Remove work-unit proposal cursors from the answer contract and version
+    the fixed-group request.
+  rationale: Keep model output semantic while binding it to a scheduler-owned requirement
+    group.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 1097
+    end_line: 1097
+  summary: Remove work-unit proposal cursors from the answer contract and version
+    the fixed-group request.
+  rationale: Keep model output semantic while binding it to a scheduler-owned requirement
+    group.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 1099
+    end_line: 1099
+  summary: Remove work-unit proposal cursors from the answer contract and version
+    the fixed-group request.
+  rationale: Keep model output semantic while binding it to a scheduler-owned requirement
+    group.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 1101
+    end_line: 1101
+  summary: Remove work-unit proposal cursors from the answer contract and version
+    the fixed-group request.
+  rationale: Keep model output semantic while binding it to a scheduler-owned requirement
+    group.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 1103
+    end_line: 1103
+  summary: Remove work-unit proposal cursors from the answer contract and version
+    the fixed-group request.
+  rationale: Keep model output semantic while binding it to a scheduler-owned requirement
+    group.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 1112
+    end_line: 1113
+  summary: Remove work-unit proposal cursors from the answer contract and version
+    the fixed-group request.
+  rationale: Keep model output semantic while binding it to a scheduler-owned requirement
+    group.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 1189
+    end_line: 1189
+  summary: Remove work-unit proposal cursors from the answer contract and version
+    the fixed-group request.
+  rationale: Keep model output semantic while binding it to a scheduler-owned requirement
+    group.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 1120
+    end_line: 1120
+  summary: Remove work-unit proposal cursors from the answer contract and version
+    the fixed-group request.
+  rationale: Keep model output semantic while binding it to a scheduler-owned requirement
+    group.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 1209
+    end_line: 1217
+  summary: Remove work-unit proposal cursors from the answer contract and version
+    the fixed-group request.
+  rationale: Keep model output semantic while binding it to a scheduler-owned requirement
+    group.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 1193
+    end_line: 1195
+  summary: Remove work-unit proposal cursors from the answer contract and version
+    the fixed-group request.
+  rationale: Keep model output semantic while binding it to a scheduler-owned requirement
+    group.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 1288
+    end_line: 1295
+  summary: Remove work-unit proposal cursors from the answer contract and version
+    the fixed-group request.
+  rationale: Keep model output semantic while binding it to a scheduler-owned requirement
+    group.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 1208
+    end_line: 1208
+  summary: Remove work-unit proposal cursors from the answer contract and version
+    the fixed-group request.
+  rationale: Keep model output semantic while binding it to a scheduler-owned requirement
+    group.
+- path: packages/service/src/powdrr_service/planning/assembly.py
+  type: modified
+  span:
+    start_line: 1458
+    end_line: 1458
+  summary: Remove work-unit proposal cursors from the answer contract and version
+    the fixed-group request.
+  rationale: Keep model output semantic while binding it to a scheduler-owned requirement
+    group.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 13
+    end_line: 13
+  summary: Schedule fixed requirement groups and deterministic singleton follow-ups
+    for uncovered requirements.
+  rationale: Ensure proposal progress and replay are derived from accepted records
+    by the planner.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 1058
+    end_line: 1066
+  summary: Schedule fixed requirement groups and deterministic singleton follow-ups
+    for uncovered requirements.
+  rationale: Ensure proposal progress and replay are derived from accepted records
+    by the planner.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 1068
+    end_line: 1073
+  summary: Schedule fixed requirement groups and deterministic singleton follow-ups
+    for uncovered requirements.
+  rationale: Ensure proposal progress and replay are derived from accepted records
+    by the planner.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 1075
+    end_line: 1085
+  summary: Schedule fixed requirement groups and deterministic singleton follow-ups
+    for uncovered requirements.
+  rationale: Ensure proposal progress and replay are derived from accepted records
+    by the planner.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 1091
+    end_line: 1092
+  summary: Schedule fixed requirement groups and deterministic singleton follow-ups
+    for uncovered requirements.
+  rationale: Ensure proposal progress and replay are derived from accepted records
+    by the planner.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 1104
+    end_line: 1104
+  summary: Schedule fixed requirement groups and deterministic singleton follow-ups
+    for uncovered requirements.
+  rationale: Ensure proposal progress and replay are derived from accepted records
+    by the planner.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 1112
+    end_line: 1112
+  summary: Schedule fixed requirement groups and deterministic singleton follow-ups
+    for uncovered requirements.
+  rationale: Ensure proposal progress and replay are derived from accepted records
+    by the planner.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 1121
+    end_line: 1121
+  summary: Schedule fixed requirement groups and deterministic singleton follow-ups
+    for uncovered requirements.
+  rationale: Ensure proposal progress and replay are derived from accepted records
+    by the planner.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 1257
+    end_line: 1258
+  summary: Schedule fixed requirement groups and deterministic singleton follow-ups
+    for uncovered requirements.
+  rationale: Ensure proposal progress and replay are derived from accepted records
+    by the planner.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 1261
+    end_line: 1261
+  summary: Schedule fixed requirement groups and deterministic singleton follow-ups
+    for uncovered requirements.
+  rationale: Ensure proposal progress and replay are derived from accepted records
+    by the planner.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 1308
+    end_line: 1324
+  summary: Schedule fixed requirement groups and deterministic singleton follow-ups
+    for uncovered requirements.
+  rationale: Ensure proposal progress and replay are derived from accepted records
+    by the planner.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 1334
+    end_line: 1334
+  summary: Schedule fixed requirement groups and deterministic singleton follow-ups
+    for uncovered requirements.
+  rationale: Ensure proposal progress and replay are derived from accepted records
+    by the planner.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 1337
+    end_line: 1340
+  summary: Schedule fixed requirement groups and deterministic singleton follow-ups
+    for uncovered requirements.
+  rationale: Ensure proposal progress and replay are derived from accepted records
+    by the planner.
+- path: packages/service/src/powdrr_service/planning/questions.py
+  type: modified
+  span:
+    start_line: 302
+    end_line: 302
+  summary: Remove batch schema handling for the deleted proposal cursor field.
+  rationale: Keep batch schemas consistent with the records-only proposal contract.
+- path: scripts/benchmark_planning_scale.py
+  type: modified
+  span:
+    start_line: 712
+    end_line: 712
+  summary: Emit records-only work-unit proposal answers in the scale fixture.
+  rationale: Keep benchmark responses valid under the version 8 proposal contract.
+- path: tests/test_benchmark_planning_scale.py
+  type: modified
+  span:
+    start_line: 218
+    end_line: 218
+  summary: Update work-unit question fixtures to contract version 8.
+  rationale: Ensure diagnostic tests represent current proposal questions.
+- path: tests/test_benchmark_planning_scale.py
+  type: modified
+  span:
+    start_line: 220
+    end_line: 220
+  summary: Update work-unit question fixtures to contract version 8.
+  rationale: Ensure diagnostic tests represent current proposal questions.
+- path: tests/test_benchmark_planning_scale.py
+  type: modified
+  span:
+    start_line: 224
+    end_line: 224
+  summary: Update work-unit question fixtures to contract version 8.
+  rationale: Ensure diagnostic tests represent current proposal questions.
+- path: tests/test_benchmark_planning_scale.py
+  type: modified
+  span:
+    start_line: 243
+    end_line: 243
+  summary: Update work-unit question fixtures to contract version 8.
+  rationale: Ensure diagnostic tests represent current proposal questions.
+- path: tests/test_benchmark_planning_scale.py
+  type: modified
+  span:
+    start_line: 259
+    end_line: 259
+  summary: Update work-unit question fixtures to contract version 8.
+  rationale: Ensure diagnostic tests represent current proposal questions.
+- path: tests/test_benchmark_planning_scale.py
+  type: modified
+  span:
+    start_line: 261
+    end_line: 261
+  summary: Update work-unit question fixtures to contract version 8.
+  rationale: Ensure diagnostic tests represent current proposal questions.
+- path: tests/test_benchmark_planning_scale.py
+  type: modified
+  span:
+    start_line: 265
+    end_line: 265
+  summary: Update work-unit question fixtures to contract version 8.
+  rationale: Ensure diagnostic tests represent current proposal questions.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 11
+    end_line: 11
+  summary: Verify records-only proposal parsing and deterministic uncovered-requirement
+    follow-ups.
+  rationale: Protect the fixed-group scheduler behavior and reject model-controlled
+    cursors.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 26
+    end_line: 26
+  summary: Verify records-only proposal parsing and deterministic uncovered-requirement
+    follow-ups.
+  rationale: Protect the fixed-group scheduler behavior and reject model-controlled
+    cursors.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 257
+    end_line: 258
+  summary: Verify records-only proposal parsing and deterministic uncovered-requirement
+    follow-ups.
+  rationale: Protect the fixed-group scheduler behavior and reject model-controlled
+    cursors.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 262
+    end_line: 262
+  summary: Verify records-only proposal parsing and deterministic uncovered-requirement
+    follow-ups.
+  rationale: Protect the fixed-group scheduler behavior and reject model-controlled
+    cursors.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 495
+    end_line: 495
+  summary: Verify records-only proposal parsing and deterministic uncovered-requirement
+    follow-ups.
+  rationale: Protect the fixed-group scheduler behavior and reject model-controlled
+    cursors.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 498
+    end_line: 498
+  summary: Verify records-only proposal parsing and deterministic uncovered-requirement
+    follow-ups.
+  rationale: Protect the fixed-group scheduler behavior and reject model-controlled
+    cursors.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 506
+    end_line: 506
+  summary: Verify records-only proposal parsing and deterministic uncovered-requirement
+    follow-ups.
+  rationale: Protect the fixed-group scheduler behavior and reject model-controlled
+    cursors.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 605
+    end_line: 605
+  summary: Verify records-only proposal parsing and deterministic uncovered-requirement
+    follow-ups.
+  rationale: Protect the fixed-group scheduler behavior and reject model-controlled
+    cursors.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 626
+    end_line: 628
+  summary: Verify records-only proposal parsing and deterministic uncovered-requirement
+    follow-ups.
+  rationale: Protect the fixed-group scheduler behavior and reject model-controlled
+    cursors.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 639
+    end_line: 641
+  summary: Verify records-only proposal parsing and deterministic uncovered-requirement
+    follow-ups.
+  rationale: Protect the fixed-group scheduler behavior and reject model-controlled
+    cursors.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 644
+    end_line: 644
+  summary: Verify records-only proposal parsing and deterministic uncovered-requirement
+    follow-ups.
+  rationale: Protect the fixed-group scheduler behavior and reject model-controlled
+    cursors.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 664
+    end_line: 665
+  summary: Verify records-only proposal parsing and deterministic uncovered-requirement
+    follow-ups.
+  rationale: Protect the fixed-group scheduler behavior and reject model-controlled
+    cursors.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 679
+    end_line: 679
+  summary: Verify records-only proposal parsing and deterministic uncovered-requirement
+    follow-ups.
+  rationale: Protect the fixed-group scheduler behavior and reject model-controlled
+    cursors.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 714
+    end_line: 715
+  summary: Verify records-only proposal parsing and deterministic uncovered-requirement
+    follow-ups.
+  rationale: Protect the fixed-group scheduler behavior and reject model-controlled
+    cursors.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 776
+    end_line: 777
+  summary: Verify records-only proposal parsing and deterministic uncovered-requirement
+    follow-ups.
+  rationale: Protect the fixed-group scheduler behavior and reject model-controlled
+    cursors.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 941
+    end_line: 942
+  summary: Verify records-only proposal parsing and deterministic uncovered-requirement
+    follow-ups.
+  rationale: Protect the fixed-group scheduler behavior and reject model-controlled
+    cursors.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 938
+    end_line: 938
+  summary: Verify records-only proposal parsing and deterministic uncovered-requirement
+    follow-ups.
+  rationale: Protect the fixed-group scheduler behavior and reject model-controlled
+    cursors.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 985
+    end_line: 986
+  summary: Verify records-only proposal parsing and deterministic uncovered-requirement
+    follow-ups.
+  rationale: Protect the fixed-group scheduler behavior and reject model-controlled
+    cursors.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 999
+    end_line: 999
+  summary: Verify records-only proposal parsing and deterministic uncovered-requirement
+    follow-ups.
+  rationale: Protect the fixed-group scheduler behavior and reject model-controlled
+    cursors.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 1040
+    end_line: 1041
+  summary: Verify records-only proposal parsing and deterministic uncovered-requirement
+    follow-ups.
+  rationale: Protect the fixed-group scheduler behavior and reject model-controlled
+    cursors.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 1029
+    end_line: 1029
+  summary: Verify records-only proposal parsing and deterministic uncovered-requirement
+    follow-ups.
+  rationale: Protect the fixed-group scheduler behavior and reject model-controlled
+    cursors.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 1097
+    end_line: 1098
+  summary: Verify records-only proposal parsing and deterministic uncovered-requirement
+    follow-ups.
+  rationale: Protect the fixed-group scheduler behavior and reject model-controlled
+    cursors.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 1100
+    end_line: 1100
+  summary: Verify records-only proposal parsing and deterministic uncovered-requirement
+    follow-ups.
+  rationale: Protect the fixed-group scheduler behavior and reject model-controlled
+    cursors.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 1121
+    end_line: 1121
+  summary: Verify records-only proposal parsing and deterministic uncovered-requirement
+    follow-ups.
+  rationale: Protect the fixed-group scheduler behavior and reject model-controlled
+    cursors.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 1170
+    end_line: 1170
+  summary: Verify records-only proposal parsing and deterministic uncovered-requirement
+    follow-ups.
+  rationale: Protect the fixed-group scheduler behavior and reject model-controlled
+    cursors.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 1124
+    end_line: 1128
+  summary: Verify records-only proposal parsing and deterministic uncovered-requirement
+    follow-ups.
+  rationale: Protect the fixed-group scheduler behavior and reject model-controlled
+    cursors.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 1130
+    end_line: 1130
+  summary: Verify records-only proposal parsing and deterministic uncovered-requirement
+    follow-ups.
+  rationale: Protect the fixed-group scheduler behavior and reject model-controlled
+    cursors.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 1181
+    end_line: 1197
+  summary: Verify records-only proposal parsing and deterministic uncovered-requirement
+    follow-ups.
+  rationale: Protect the fixed-group scheduler behavior and reject model-controlled
+    cursors.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 1164
+    end_line: 1166
+  summary: Verify records-only proposal parsing and deterministic uncovered-requirement
+    follow-ups.
+  rationale: Protect the fixed-group scheduler behavior and reject model-controlled
+    cursors.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 1251
+    end_line: 1252
+  summary: Verify records-only proposal parsing and deterministic uncovered-requirement
+    follow-ups.
+  rationale: Protect the fixed-group scheduler behavior and reject model-controlled
+    cursors.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 1191
+    end_line: 1195
+  summary: Verify records-only proposal parsing and deterministic uncovered-requirement
+    follow-ups.
+  rationale: Protect the fixed-group scheduler behavior and reject model-controlled
+    cursors.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 1264
+    end_line: 1265
+  summary: Verify records-only proposal parsing and deterministic uncovered-requirement
+    follow-ups.
+  rationale: Protect the fixed-group scheduler behavior and reject model-controlled
+    cursors.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 1332
+    end_line: 1333
+  summary: Verify records-only proposal parsing and deterministic uncovered-requirement
+    follow-ups.
+  rationale: Protect the fixed-group scheduler behavior and reject model-controlled
+    cursors.
+- path: tests/test_planning_assembly.py
+  type: modified
+  span:
+    start_line: 1347
+    end_line: 1348
+  summary: Verify records-only proposal parsing and deterministic uncovered-requirement
+    follow-ups.
+  rationale: Protect the fixed-group scheduler behavior and reject model-controlled
+    cursors.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 243
+    end_line: 244
+  summary: Update planner fixtures and replay cases to the version 8 proposal contract.
+  rationale: Keep end-to-end and checkpoint behavior aligned with records-only answers.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1020
+    end_line: 1020
+  summary: Update planner fixtures and replay cases to the version 8 proposal contract.
+  rationale: Keep end-to-end and checkpoint behavior aligned with records-only answers.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1022
+    end_line: 1022
+  summary: Update planner fixtures and replay cases to the version 8 proposal contract.
+  rationale: Keep end-to-end and checkpoint behavior aligned with records-only answers.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1026
+    end_line: 1026
+  summary: Update planner fixtures and replay cases to the version 8 proposal contract.
+  rationale: Keep end-to-end and checkpoint behavior aligned with records-only answers.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1043
+    end_line: 1043
+  summary: Update planner fixtures and replay cases to the version 8 proposal contract.
+  rationale: Keep end-to-end and checkpoint behavior aligned with records-only answers.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1045
+    end_line: 1045
+  summary: Update planner fixtures and replay cases to the version 8 proposal contract.
+  rationale: Keep end-to-end and checkpoint behavior aligned with records-only answers.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1049
+    end_line: 1049
+  summary: Update planner fixtures and replay cases to the version 8 proposal contract.
+  rationale: Keep end-to-end and checkpoint behavior aligned with records-only answers.
+- path: tests/test_planning_service.py
+  type: modified
+  span:
+    start_line: 1466
+    end_line: 1467
+  summary: Update planner fixtures and replay cases to the version 8 proposal contract.
+  rationale: Keep end-to-end and checkpoint behavior aligned with records-only answers.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []
+features: []
+proposed_prs: []

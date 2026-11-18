@@ -299,7 +299,6 @@ def _build_question_batch(
             # child question facts carry the allowed IDs, so repeating large enum
             # lists in every provider schema needlessly prevents useful batching.
             answer_properties = member_schema["properties"]
-            answer_properties["next_anchor"].pop("enum", None)
             record_properties = answer_properties["records"]["items"]["properties"]
             record_properties["requirement_ids"]["items"].pop("enum", None)
             planned_write_properties = record_properties["planned_writes"]["items"]

@@ -51,6 +51,13 @@ or supplies desired content; code retains the candidate identity, action, item
 ownership, provenance, and operation binding. This removes the separate P11
 relevance call and avoids asking P13 only after a prior boolean answer.
 
+Human-setup update: when a human_setup requirement exactly matches one cited source
+anchor and begins with a recognized imperative setup verb, the scheduler carries
+that sentence verbatim and uses the configured repository validation as its
+completion check. It records a deterministic answer instead of asking P05 to
+restate known wording. Paraphrases, multi-anchor requirements, and unrecognized
+forms retain the semantic setup-description question.
+
 Structural subject update: answers now contain subject records only. The planner
 automatically requests another page when a response fills the eight-record
 capacity, and stops after the first shorter response. The question contract is
@@ -195,7 +202,7 @@ not resolve the new semantic choice; human review remains an alternative.
 | P02 | Classify residual source block normative/context/duplicate | Split; often already zero calls | A block with only related/cross-referenced obligations can require semantic interpretation. | Direct citation and exact duplicate accounting already have rules. Track normative span coverage; compare known memberships in code. Do not ask a model whether a known set is empty. |
 | P03 | Requirement fidelity: accept or revise statement | Split; exact copied text already automatic | Paraphrase entailment against arbitrary source is semantic. | Preserve source wording/spans and typed conditions to avoid paraphrase review; validate exact equality/explicit edits algorithmically. Review only transformations that genuinely change representation. |
 | P04 | Classify requirement already complete/partial/missing from pinned repository evidence | Split / conditional | Existing arbitrary source/tests may realize a prose obligation indirectly; lexical hits cannot decide semantic coverage. | Trusted requirement-bound receipts and executable checks first; known fact-set guards stay code-owned. Model may propose evidence relevance and residual behavior, but cannot invent observations, infer absence from failed search or certify tests passed. |
-| P05 | Describe explicitly required human setup | Split; No when instructions already explicit | Novel third-party setup guidance may need human/design interpretation, but ownership/trigger/IDs and existing instructions are known. | Copy typed setup instructions/verification exactly; use a reviewed setup catalog keyed by capability/resource. Ask only for missing actionable wording, preserving source and unresolved configuration decisions. |
+| P05 | Describe explicitly required human setup | Split; No when instructions already explicit | Novel third-party setup guidance may need human/design interpretation, but ownership/trigger/IDs and existing instructions are known. | Implemented for an exact, single-anchor imperative setup: copy the source sentence verbatim and bind the configured repository validation as its completion check. Continue asking for paraphrased, multi-anchor, or unrecognized setup wording; preserve unresolved configuration decisions. |
 
 ### P01: every request responsibility and output field
 
@@ -607,10 +614,12 @@ check public API/test consumers explicitly; this audit changes none of them.
    or has one possible value; choosing among multiple source phases remains a
    semantic model decision. Verify no duplicate or skipped obligations,
    source-edit invalidation, and oversized answers without lossy truncation.
-3. **Carry accepted semantics directly.** Typed source requirements, human setup,
-   phases, cases and observations bypass rediscovery. Preserve conditional/Boolean
-   source relations and scenario dimensions. Unknown meaning stops or goes to
-   review rather than silently becoming context/not_applicable.
+3. **Carry accepted semantics directly.** Typed source requirements, phases, cases
+   and observations bypass rediscovery. Exact, single-anchor imperative human
+   setup text is now carried verbatim; semantic setup requests remain for other
+   forms. Preserve conditional/Boolean source relations and scenario dimensions.
+   Unknown meaning stops or goes to review rather than silently becoming
+   context/not_applicable.
 4. **Compile formal dependency/structural cases.** Typed resource use and exact
    planned deltas derive edges/operations. Existing deterministic candidate
    relevance and desired-content proposals now share one validated request; new

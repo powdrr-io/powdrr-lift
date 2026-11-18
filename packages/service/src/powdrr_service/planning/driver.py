@@ -977,6 +977,26 @@ class SourceLedgerQuestionMachine:
             question_id = request.question.question_id
             answer = accepted_answers.get(question_id)
             if answer is None:
+                deterministic_answer = _deterministic_human_setup_answer(
+                    requirement, validation, self.source
+                )
+                if deterministic_answer is not None:
+                    try:
+                        request.parse_answer(deterministic_answer)
+                    except PlanningContractError:
+                        requests.append(request)
+                        continue
+                    self._pending_deterministic_answers[question_id] = {
+                        "question": request.question,
+                        "answer": deterministic_answer,
+                        "rule_id": "exact-source-human-setup-v1",
+                        "reason": (
+                            "The setup is one exact actionable source anchor; the "
+                            "planner carries it verbatim and binds the configured "
+                            "validation as its completion check."
+                        ),
+                    }
+                    continue
                 requests.append(request)
                 continue
             if (
@@ -2875,6 +2895,64 @@ class SourceLedgerQuestionMachine:
             evidence_excerpts=excerpts,
             repository_search=None if search is None else search.to_data(),
         )
+
+
+_EXPLICIT_SETUP_ACTION_VERBS = frozenset(
+    {
+        "add",
+        "allow",
+        "connect",
+        "configure",
+        "create",
+        "define",
+        "enable",
+        "grant",
+        "install",
+        "provide",
+        "register",
+        "run",
+        "set",
+        "upload",
+    }
+)
+
+
+def _deterministic_human_setup_answer(
+    requirement: Requirement,
+    validation: Validation,
+    source: SegmentedSource,
+) -> dict[str, Any] | None:
+    """Copy one exact imperative setup anchor without a prose restatement call."""
+    if (
+        requirement.kind != "human_setup"
+        or len(requirement.source_refs) != 1
+        or validation.kind != "local_command"
+        or not validation.target.strip()
+    ):
+        return None
+    source_ref = requirement.source_refs[0]
+    anchor_by_id = {anchor.id: anchor for anchor in source.anchors}
+    anchor = anchor_by_id.get(source_ref)
+    if anchor is None:
+        return None
+    exact_source_text = source.document.text[anchor.start_offset : anchor.end_offset]
+    if requirement.statement != exact_source_text:
+        return None
+    words = requirement.statement.split(maxsplit=1)
+    if not words or words[0].rstrip(".,:;").casefold() not in (
+        _EXPLICIT_SETUP_ACTION_VERBS
+    ):
+        return None
+    return {
+        "title": (
+            requirement.statement
+            if len(requirement.statement) <= 160
+            else "Complete required setup"
+        ),
+        "instructions": [requirement.statement],
+        "verification": f"Run `{validation.target}` and confirm it passes.",
+        "source_refs": [source_ref],
+    }
 
 
 def _normalized_block_fingerprint(text: str) -> str:

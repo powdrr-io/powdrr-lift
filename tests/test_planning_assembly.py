@@ -19,6 +19,7 @@ from powdrr_service.planning.assembly import (
     WorkUnitContext,
     allocate_work_unit_groups,
     allocate_work_units,
+    build_deterministic_item_description,
     build_item_description_request,
     build_unit_cohesion_request,
     build_work_unit_proposal_request,
@@ -634,6 +635,22 @@ def test_item_description_title_quality_is_specific_and_distinct() -> None:
     )
     assert duplicate.title == "Implement signed manifest verification script"
     assert duplicate.title != "Verify signed manifest contents"
+
+
+def test_deterministic_item_description_copies_frozen_deliverable() -> None:
+    group = AllocationGroup(
+        "allocation-0001", ("unit-0001",), ("req-0001",), ("core",), "neutral", 1
+    )
+    unit = replace(
+        _unit(1),
+        deliverable="A signed manifest verification script",
+    )
+
+    description = build_deterministic_item_description(group, {unit.id: unit})
+
+    assert description.title == "Implement signed manifest verification script"
+    assert description.objective == unit.deliverable
+    assert description.scope[0].unit_ids == group.unit_ids
 
 
 def test_work_unit_question_has_a_parser_valid_example_and_exact_context() -> None:

@@ -1,12 +1,20 @@
 # Planning: LLM interaction and determinism audit
 
-Status: audited recommendations; no runtime changes implemented.
+Status: audited recommendations; the first removal milestone (P07/P09) is
+implemented in the active planning path. Milestones 2–6 remain proposed.
 
 Audited revision: `cfc0b514c43c1d14269147a03e5d7ec5ec5cc739`, fetched from
 `origin/main` on 2026-11-17. This is a static source audit, not a measured live
 planning session. Request counts below are conditional formulas, not observed
 latency, spend or quality. Companion format: [issue-worker audit PR #1567](https://github.com/powdrr-io/powdrr-lift/pull/1567).
 That PR need not be merged for this document to stand independently.
+
+Implementation update: item titles and objectives are now derived from the
+allocated work units, and a positive dependency-candidate decision directly
+produces an edge using the declared output and its requirement provenance. The
+follow-up item-description and confirmed-dependency-details requests are no
+longer reachable in the active planner. The exact request catalog and source
+snippets below remain a historical snapshot of the audited revision above.
 
 ## 1. Answer to the central question
 
@@ -538,11 +546,13 @@ check public API/test consumers explicitly; this audit changes none of them.
 
 ## 11. Recommended removal sequence and verification criteria
 
-1. **Remove cosmetic/duplicated calls P07/P09.** Promote deterministic item title
-   and objective rendering. Return exact dependency provenance with the original
-   semantic decision or typed resource edge, then render its reason. Assert no
-   model invocation for frozen item descriptions or confirmed-edge bookkeeping.
-   Preserve scope, criterion and dependency identities byte-for-byte.
+1. **Implemented: remove cosmetic/duplicated calls P07/P09.** Item titles use
+   deterministic rendering from allocated deliverables, objectives copy the
+   first accepted deliverable, and scope remains derived from the frozen group.
+   A positive dependency-candidate decision now creates an edge directly from
+   the fixed output and its declared requirement IDs; its reason is rendered
+   deterministically. Tests assert neither follow-up request is emitted and
+   preserve scope and dependency identities.
 2. **Remove model-controlled pagination and copied fields.** Scheduler owns fixed
    source/unit/subject windows, next cursor, known IDs, phase/runtime/component/
    validation bindings and answer correlation. Models return only semantic records
@@ -568,9 +578,10 @@ check public API/test consumers explicitly; this audit changes none of them.
    subject/source/candidate identities, latency/tokens/cost and gate consumer.
    Do not add a second planner to bypass deterministic compilation failures.
 
-These are audit recommendations, not runtime changes or completed implementation
-milestones. Later changes should be separately reviewable and retain pinned intent,
-private verification, full scenario closure and explicit human decision boundaries.
+The request catalog describes the audited revision, while milestone 1 above is
+implemented in the current planner. Milestones 2–6 remain recommendations.
+Later changes should be separately reviewable and retain pinned intent, private
+verification, full scenario closure and explicit human decision boundaries.
 
 ## 12. Measurement, gaps and handoff
 

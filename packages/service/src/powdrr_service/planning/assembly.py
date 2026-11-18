@@ -1869,6 +1869,27 @@ def _deterministic_item_title(
     )
 
 
+def build_deterministic_item_description(
+    group: AllocationGroup,
+    units: Mapping[str, WorkUnit],
+    *,
+    already_used_titles: Sequence[tuple[str, str]] = (),
+) -> ItemDescription:
+    """Render item metadata from the frozen group and its accepted deliverables."""
+    selected = [units[unit_id] for unit_id in group.unit_ids]
+    if not selected:
+        raise PlanningContractError("/scope", "allocation has no work units")
+    return ItemDescription(
+        _deterministic_item_title(
+            group=group,
+            units=units,
+            already_used_titles=already_used_titles,
+        ),
+        selected[0].deliverable,
+        _derive_item_scopes(group, units),
+    )
+
+
 def _truncate_item_title(title: str) -> str:
     if len(title) <= 160:
         return title

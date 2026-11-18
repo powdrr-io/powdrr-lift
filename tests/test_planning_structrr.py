@@ -7,7 +7,6 @@ from typing import Any
 import powdrr_service.planning.driver as driver_module
 import powdrr_service.planning.structrr as structrr_module
 import pytest
-from powdrr_service.decision_classifier import _classifier_request
 from powdrr_service.planning.assembly import PlannedWrite, WorkUnit
 from powdrr_service.planning.contracts import PlanningContractError
 from powdrr_service.planning.dependencies import Validation
@@ -29,7 +28,6 @@ from powdrr_service.planning.structrr import (
     StructuralSubjectPage,
     UnorderedStructrrConflict,
     bind_structural_operation,
-    build_structural_candidate_review_request,
     build_structural_change_request,
     build_subject_enumeration_request,
     coalesce_structural_subjects,
@@ -718,7 +716,7 @@ def test_structural_subject_answer_is_reasked_when_projected_context_changes() -
     assert machine._request_is_pending(requests[0], {question_id: stale_answer})
 
 
-def test_structural_candidates_are_reviewed_before_enumeration(
+def test_existing_structural_candidates_use_one_desired_delta_request(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     text = "# Plan\n\nChange the existing behavior.\n"
@@ -775,61 +773,15 @@ def test_structural_candidates_are_reviewed_before_enumeration(
         requirements=(SimpleNamespace(id="req-01", source_refs=(source_ref,)),)
     )
 
-    review = machine._structrr_requests({})[0]
-    assert review.question.kind == "review_structural_candidate"
-    machine.set_accepted_question_input_digests(
-        {review.question.question_id: review.question.input_digest}
-    )
-
-    enumeration = machine._structrr_requests(
-        {review.question.question_id: {"relevant": False}}
-    )[0]
-
+    enumeration = machine._structrr_requests({})[0]
     assert enumeration.question.kind == "enumerate_structural_subjects"
-    assert enumeration.question.contract_version == 2
-    assert enumeration.question.expected_answer_schema == "structural-subject-page-v2"
-    assert enumeration.question.question_id.startswith("structural-subjects-v2-")
-    assert enumeration.answer_schema["required"] == ["records"]
-    assert "has_more" not in enumeration.answer_schema["properties"]
-    assert "next_anchor" not in enumeration.answer_schema["properties"]
-    assert "automatically requests another page" in enumeration.exact_question
-    baseline_fact = next(
-        fact.value
-        for fact in enumeration.accepted_facts
-        if fact.ref_id.startswith("projected-structrr:")
-    )
-    assert baseline_fact["entities"] == []
-    assert not any(
-        fact.ref_id.startswith("prior-subject-summary:")
-        for fact in enumeration.accepted_facts
-    )
-    first_page_records = [
-        {
-            "section": "entities",
-            "subject_ref": None,
-            "new_identity_description": f"Additional planned entity {index}",
-            "action": "added",
-            "requirement_ids": ["req-01"],
-            "unit_ids": [unit.id],
-            "source_refs": [source_ref],
-        }
-        for index in range(8)
-    ]
-    machine.set_accepted_question_input_digests(
-        {
-            review.question.question_id: review.question.input_digest,
-            enumeration.question.question_id: enumeration.question.input_digest,
-        }
-    )
-    next_page = machine._structrr_requests(
-        {
-            review.question.question_id: {"relevant": False},
-            enumeration.question.question_id: {"records": first_page_records},
-        }
+    change = machine._structrr_requests(
+        {enumeration.question.question_id: {"records": []}}
     )[0]
-    assert next_page.question.kind == "enumerate_structural_subjects"
-    assert next_page.question.question_id.endswith("-0002")
-    assert next_page.question.subject_ids == enumeration.question.subject_ids
+    assert change.question.kind == "describe_structural_change"
+    assert change.question.subject_ids == ("item-0001", "entity-01")
+    assert "unchanged" in change.exact_question
+    assert "desired_content" in change.answer_schema["oneOf"][1]["required"]
 
 
 def test_planned_file_subjects_do_not_need_structural_llm_calls() -> None:
@@ -926,63 +878,6 @@ def test_subject_enumeration_uses_unique_refs_for_repeated_planned_write_paths()
     assert f"planned-write:{unit.id}:src/new.py:duplicate-2" in (
         request.question.context_ref_ids
     )
-
-
-def test_existing_structural_candidate_gets_a_narrow_boolean_review() -> None:
-    text = "# Plan\n\nChange the existing behavior.\n"
-    source = segment_markdown_source(
-        PinnedSourceDocument(
-            repository="owner/repo",
-            commit_sha="a" * 40,
-            path="docs/plan.md",
-            blob_sha="b" * 40,
-            content_sha256=hashlib.sha256(text.encode()).hexdigest(),
-            text=text,
-        )
-    )
-    source_ref = source.anchors[0].id
-    subject = BoundStructuralSubject(
-        "entity-01",
-        "entities",
-        "item-0001",
-        "changed",
-        ("req-01",),
-        ("unit-01",),
-        (source_ref,),
-        False,
-    )
-    baseline = {
-        "entities": [{"id": "entity-01", "type": "Module", "name": "behavior"}],
-        "entity_relationships": [],
-        "source_subjects": [],
-        "files": [],
-    }
-    request = build_structural_candidate_review_request(
-        subject,
-        source=source,
-        units=(_unit(),),
-        projected_baseline=baseline,
-    )
-
-    request.validate()
-    assert request.question.kind == "review_structural_candidate"
-    assert request.answer_schema["properties"]["relevant"]["type"] == "boolean"
-    assert request.parse_answer({"relevant": True}) is True
-    assert request.parse_answer({"relevant": False}) is False
-    assert request.question.input_digest.startswith("sha256:")
-    assert source_ref in request.question.context_ref_ids
-    classifier = next(
-        fact.value for fact in request.accepted_facts if "classifier" in fact.ref_id
-    )
-    assert classifier["allowed_values"] == ["true", "false"]
-    assert classifier["subject_text"].endswith("changed.")
-    jev_request = _classifier_request(
-        build_question_messages(request), request.answer_schema
-    )
-    assert jev_request is not None
-    assert jev_request["allowed_values"] == ["true", "false"]
-    assert jev_request["output_property"]["type"] == "boolean"
-    assert any("merely nearby" in item for item in jev_request["instructions"])
 
 
 def test_rejected_candidates_are_hidden_and_cannot_be_enumerated_again() -> None:

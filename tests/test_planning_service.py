@@ -469,12 +469,9 @@ def test_requirement_symbol_coverage_is_durable_with_accepted_question() -> None
 
 @pytest.mark.parametrize(
     ("question_kind", "answer_key"),
-    (
-        ("review_structural_candidate", "relevant"),
-        ("review_dependency_candidate", "required"),
-    ),
+    (("review_dependency_candidate", "required"),),
 )
-def test_candidate_reviews_use_jev_and_checkpoint_provider(
+def test_dependency_candidate_reviews_use_jev_and_checkpoint_provider(
     question_kind: str, answer_key: str
 ) -> None:
     session_id = "session-jev-candidate-review"

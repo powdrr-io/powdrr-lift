@@ -14,6 +14,7 @@ import re
 import time
 from collections.abc import Callable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import nullcontext
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Protocol
@@ -997,12 +998,26 @@ class Evaluator:
             json.dumps(messages, ensure_ascii=False, sort_keys=True).encode("utf-8")
         ).hexdigest()
         try:
-            try:
-                output = client.complete_json(  # type: ignore[call-arg]
-                    messages, response_schema=schema
+            context_factory = getattr(client, "interaction_context", None)
+            context = (
+                context_factory(
+                    caller_path=path,
+                    question_kind=str(judge.get("kind", "unknown")),
+                    output_name=str(judge["output"]["name"]),
+                    gate_consumer=path,
+                    prompt_fingerprint=trace_id,
+                    prompt_builder_version="procedrr-judge-v1",
                 )
-            except TypeError:
-                output = client.complete_json(messages)
+                if callable(context_factory)
+                else nullcontext()
+            )
+            with context:
+                try:
+                    output = client.complete_json(  # type: ignore[call-arg]
+                        messages, response_schema=schema
+                    )
+                except TypeError:
+                    output = client.complete_json(messages)
         except Exception as exc:
             events.append(
                 EvaluationEvent(
@@ -1034,6 +1049,7 @@ class Evaluator:
                     "replay_value": output,
                     "messages": messages,
                     "context_metrics": context_metrics,
+                    "trace_id": trace_id,
                 },
             )
         )
@@ -1134,9 +1150,22 @@ class Evaluator:
         usage["llm"] += len(pending)
         self._limit(usage, limits, "llm_activations", "LLM activations")
         try:
-            outputs = batch_complete(
-                [(messages, schema) for _, _, messages, _ in pending]
+            context_factory = getattr(client, "interaction_context", None)
+            context = (
+                context_factory(
+                    caller_paths=[path for _, path, _, _ in pending],
+                    gate_consumer="procedrr-batch",
+                    question_kind=str(judge.get("kind", "unknown")),
+                    output_name=str(judge["output"]["name"]),
+                    prompt_builder_version="procedrr-judge-v1",
+                )
+                if callable(context_factory)
+                else nullcontext()
             )
+            with context:
+                outputs = batch_complete(
+                    [(messages, schema) for _, _, messages, _ in pending]
+                )
             if len(outputs) != len(pending):
                 raise EvaluationError("batch judge returned an unexpected result count")
         except Exception as exc:
@@ -1162,6 +1191,11 @@ class Evaluator:
                         "replay_value": output,
                         "messages": messages,
                         "context_metrics": metrics,
+                        "trace_id": hashlib.sha256(
+                            json.dumps(
+                                messages, ensure_ascii=False, sort_keys=True
+                            ).encode("utf-8")
+                        ).hexdigest(),
                     },
                 )
             )

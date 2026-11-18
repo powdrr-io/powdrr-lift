@@ -8,7 +8,9 @@ import os
 import re
 import time
 import uuid
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterator, Mapping
+from contextlib import contextmanager
+from contextvars import ContextVar
 from pathlib import Path
 from typing import Any, cast
 
@@ -24,6 +26,9 @@ _PROVIDER_CREDENTIAL_RE = re.compile(
 _PROVIDER_TOKEN_RE = re.compile(
     r"(?:ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|"
     r"AKIA[0-9A-Z]{16}|Bearer\s+[A-Za-z0-9._-]{20,}|sk-[A-Za-z0-9_-]{20,})"
+)
+_INTERACTION_CONTEXT: ContextVar[Mapping[str, Any] | None] = ContextVar(
+    "powdrr_model_interaction_context", default=None
 )
 
 
@@ -106,6 +111,15 @@ class ProcedrrModelClient:
         self._telemetry_sink = telemetry_sink
         self._telemetry_role = telemetry_role
 
+    @contextmanager
+    def interaction_context(self, **context: Any) -> Iterator[None]:
+        """Attach safe caller metadata to provider-attempt telemetry."""
+        token = _INTERACTION_CONTEXT.set(dict(context))
+        try:
+            yield
+        finally:
+            _INTERACTION_CONTEXT.reset(token)
+
     @staticmethod
     def replay_key(messages: list[dict[str, str]]) -> str:
         """Return a stable, non-reversible key for one completed judge request."""
@@ -117,6 +131,8 @@ class ProcedrrModelClient:
         messages: list[dict[str, str]],
         response_schema: Mapping[str, Any],
         trace_id: str,
+        *,
+        interaction_id: str,
     ) -> dict[str, Any]:
         for attempt in range(self._provider_retry_attempts + 1):
             started = time.monotonic()
@@ -141,6 +157,8 @@ class ProcedrrModelClient:
                     trace_id,
                     attempt,
                     started,
+                    interaction_id=interaction_id,
+                    prompt_fingerprint=self.replay_key(messages),
                     outcome="succeeded",
                     **_usage_fields(self._client),
                 )
@@ -152,10 +170,13 @@ class ProcedrrModelClient:
                     trace_id,
                     attempt,
                     started,
+                    interaction_id=interaction_id,
+                    prompt_fingerprint=self.replay_key(messages),
                     outcome="retrying" if will_retry else "failed",
                     error_type=type(exc).__name__,
                     error_module=type(exc).__module__,
                     error_message=_safe_provider_error(exc),
+                    retry_cause=_retry_cause(exc),
                     error_status_code=(
                         getattr(exc, "status_code", None)
                         if type(getattr(exc, "status_code", None)) is int
@@ -176,10 +197,14 @@ class ProcedrrModelClient:
         attempt: int,
         started: float,
         *,
+        interaction_id: str | None = None,
+        prompt_fingerprint: str | None = None,
+        batch_member_trace_ids: list[str] | None = None,
         outcome: str,
         error_type: str | None = None,
         error_module: str | None = None,
         error_message: str | None = None,
+        retry_cause: str | None = None,
         error_status_code: int | None = None,
         retryable: bool | None = None,
         transport_kind: str = "single",
@@ -193,10 +218,15 @@ class ProcedrrModelClient:
             return
         client = self._client
         delegate = getattr(client, "_fallback", None)
+        context = _INTERACTION_CONTEXT.get() or {}
         self._telemetry_sink(
             {
                 "record_type": "powdrr_service.procedrr.provider_attempt",
+                **context,
                 "trace_id": trace_id,
+                "interaction_id": interaction_id or trace_id,
+                "prompt_fingerprint": prompt_fingerprint or trace_id,
+                "batch_member_trace_ids": batch_member_trace_ids,
                 "attempt": attempt + 1,
                 "provider_client": type(client).__name__,
                 "role": self._telemetry_role,
@@ -217,6 +247,7 @@ class ProcedrrModelClient:
                 "error_module": error_module,
                 "error_message": error_message,
                 "error_status_code": error_status_code,
+                "retry_cause": retry_cause,
                 "retryable": retryable,
                 "transport_kind": transport_kind,
                 "batch_member_count": batch_member_count,
@@ -321,12 +352,20 @@ class ProcedrrModelClient:
                         error_type=(
                             type(batch_error).__name__ if batch_error else None
                         ),
+                        retry_cause=(
+                            _retry_cause(batch_error)
+                            if batch_error is not None
+                            else None
+                        ),
                         error_module=(
                             type(batch_error).__module__ if batch_error else None
                         ),
                         error_message=(str(batch_error) if batch_error else None),
                         transport_kind="batch",
                         batch_member_count=len(pending),
+                        batch_member_trace_ids=[
+                            member_id for _, _, _, member_id in pending
+                        ],
                         **(_usage_fields(self._client) if batch_error is None else {}),
                     )
         return [output for output in outputs if output is not None]
@@ -354,6 +393,7 @@ class ProcedrrModelClient:
 
         last_error = ""
         for attempt in range(self._max_retries + 1):
+            interaction_id = uuid.uuid4().hex
             if attempt:
                 messages = [
                     *messages,
@@ -368,7 +408,10 @@ class ProcedrrModelClient:
                 ]
             try:
                 payload = self._complete_from_provider(
-                    messages, response_schema, replay_key
+                    messages,
+                    response_schema,
+                    replay_key,
+                    interaction_id=interaction_id,
                 )
                 return parse(payload)
             except JsonSchemaError as exc:
@@ -415,6 +458,18 @@ def _is_retryable_provider_failure(error: Exception) -> bool:
             "response message content was empty",
         )
     )
+
+
+def _retry_cause(error: Exception) -> str:
+    """Return a bounded transport failure class without provider error text."""
+    status_code = getattr(error, "status_code", getattr(error, "code", None))
+    if isinstance(status_code, int):
+        return f"http_{status_code}"
+    if isinstance(error, TimeoutError) or "timeout" in str(error).casefold():
+        return "timeout"
+    if isinstance(error, ConnectionError):
+        return "connection"
+    return type(error).__name__
 
 
 def _is_invalid_json_response(error: Exception) -> bool:

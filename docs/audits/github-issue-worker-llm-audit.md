@@ -1,6 +1,6 @@
 # GitHub issue worker: LLM interaction and determinism audit
 
-Status: source-backed audit and proposed implementation work breakdown; no runtime changes implemented.
+Status: source-backed audit; proposed work breakdown is in implementation, with WP0 partial.
 
 Audited revision: `a3f4a6cb6173cec50daa39deef978496adb6905d`, fetched from
 `origin/main` on 2026-11-17. Source locations and prompt snapshots below refer to
@@ -585,9 +585,9 @@ independent semantic review.
 ## 11. Proposed implementation sequence and verification gates
 
 This sequence turns the audit recommendations into independently reviewable
-work packages. It is still a proposal: no runtime changes are implemented or
-authorized by this document. Complete WP0 first so later decisions can be
-compared with observed request and retry counts rather than static estimates.
+work packages. Implementation is authorized and underway. Complete WP0 first
+so later decisions can be compared with observed request and retry counts
+rather than static estimates.
 
 0. **Establish a model-interaction baseline (all active IDs).** Add or verify a
    trace record for each logical model interaction and wire attempt. Record the
@@ -603,6 +603,18 @@ compared with observed request and retry counts rather than static estimates.
    reviewer can reconstruct per-path request counts and retry causes from trace
    IDs, and the baseline report marks missing or unobserved paths instead of
    extrapolating them.
+
+   **Implementation status:** Initial durable-task instrumentation records
+   Procedrr provider attempts in a task-scoped JSONL artifact and summarizes
+   logical interactions, batch members, retries, failures, duration, token and
+   cost totals, and counts by judge path in the process manifest. Records carry
+   task/workflow/process identity, process fingerprint, prompt-builder version,
+   prompt fingerprint, provider/model, and attempt identity; raw prompt,
+   response, and provider error text are excluded. WP0 remains incomplete:
+   direct workflow action and compaction calls, external coding-agent turns,
+   checkpoint and prompt-response replay hits, and representative story,
+   amendment, publication-recovery, and CI-repair runs still need usable traces
+   or explicit unobserved-route findings.
 
 1. **Render publication requests in code (A16-A18).** Use one typed renderer for
    implementation and amendment publication. Test immutable field preservation,

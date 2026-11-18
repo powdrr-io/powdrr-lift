@@ -67,6 +67,9 @@ from powdrr_lift.workrr.llm import (
     WorkflowLLMHTTPError,
     complete_json_with_timeout_retry,
 )
+from powdrr_lift.workrr.model_interaction_telemetry import (
+    TaskModelInteractionTelemetry,
+)
 from powdrr_lift.workrr.task_agent import (
     WorkflowTaskAgentConfig,
     _append_inline_plan_adjustments_to_pr_body,
@@ -2298,6 +2301,100 @@ def test_process_workflow_task_completes_claimed_agent_task(
     assert ('"step_json"' in displayed) is verbose
     assert "received streamed LLM data" not in displayed
     assert "Completed workflow task: agent-task" in stdout.getvalue()
+
+    run_dir = tmp_path / ".powdrr" / "procedrr-runs"
+    manifest = json.loads((run_dir / "agent-task.json").read_text(encoding="utf-8"))
+    telemetry = manifest["model_interaction_telemetry"]
+    assert telemetry["schema_version"] == "powdrr-model-interactions-v1"
+    assert telemetry["request_response_artifact"] == "agent-task.events.jsonl"
+    assert telemetry["correlation_field"] == "trace_id"
+    assert telemetry["status"] == "partial"
+    assert telemetry["logical_interactions"] == 2
+    assert telemetry["wire_attempts"] == 2
+    assert telemetry["logical_question_members"] == 2
+    assert telemetry["by_caller_path"]
+    assert telemetry["trace_linkage"] == {
+        "linked_interactions": 2,
+        "unmatched_interactions": 0,
+        "status": "observed",
+    }
+    attempts = [
+        json.loads(line)
+        for line in (run_dir / telemetry["attempts_file"])
+        .read_text(encoding="utf-8")
+        .splitlines()
+    ]
+    assert all(item["task_id"] == "agent-task" for item in attempts)
+    assert all(item["process_fingerprint"] for item in attempts)
+    assert all(
+        item["prompt_builder_version"] == "procedrr-judge-v1" for item in attempts
+    )
+    assert all(
+        "Complete the claimed durable task" not in str(item) for item in attempts
+    )
+    assert telemetry["unobserved_routes"] == [
+        "direct workflow action and compaction calls outside Procedrr",
+        "external MiniSWE/coding-agent model turns",
+        "durable checkpoint and prompt-response replay hits",
+    ]
+
+
+def test_model_interaction_summary_counts_batch_members_per_caller(
+    tmp_path: Path,
+) -> None:
+    attempts_path = tmp_path / "model-interactions.jsonl"
+    events_path = tmp_path / "events.jsonl"
+    attempts_path.write_text(
+        json.dumps(
+            {
+                "record_type": "powdrr_service.procedrr.provider_attempt",
+                "interaction_id": "batch-1",
+                "trace_id": "batch-1",
+                "batch_member_trace_ids": ["trace-a", "trace-b"],
+                "caller_paths": ["judge-a", "judge-b"],
+                "batch_member_count": 2,
+                "transport_kind": "batch",
+                "outcome": "succeeded",
+                "duration_ms": 12,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    events_path.write_text(
+        "".join(
+            json.dumps({"data": {"trace_id": trace_id}}) + "\n"
+            for trace_id in ("trace-a", "trace-b")
+        ),
+        encoding="utf-8",
+    )
+    manifest: dict[str, Any] = {
+        "model_interaction_telemetry": {
+            "schema_version": "powdrr-model-interactions-v1",
+            "status": "partial",
+        }
+    }
+    telemetry = TaskModelInteractionTelemetry(
+        attempts_path=attempts_path,
+        events_path=events_path,
+        manifest=manifest,
+        task_id="task-1",
+        workflow_id="workflow-1",
+        process_id="process-1",
+        process_fingerprint="fingerprint-1",
+    )
+
+    telemetry.refresh_summary()
+
+    summary = manifest["model_interaction_telemetry"]
+    assert summary["logical_question_members"] == 2
+    assert summary["by_caller_path"]["judge-a"]["logical_question_members"] == 1
+    assert summary["by_caller_path"]["judge-b"]["logical_question_members"] == 1
+    assert summary["trace_linkage"] == {
+        "linked_interactions": 2,
+        "unmatched_interactions": 0,
+        "status": "observed",
+    }
 
 
 def test_unmanaged_git_worker_can_run_in_external_worktree(tmp_path: Path) -> None:

@@ -260,6 +260,9 @@ from powdrr_lift.workrr.llm import (
     workflow_action_summary,
 )
 from powdrr_lift.workrr.local_model import resolve_local_model_path
+from powdrr_lift.workrr.model_interaction_telemetry import (
+    TaskModelInteractionTelemetry,
+)
 from powdrr_lift.workrr.observer import (
     ObserverActionRecommendation,
     ObserverDecision,
@@ -6856,12 +6859,61 @@ def run_workflow_task(
             requires_deterministic_output_state=requires_deterministic_output_state,
             execution_base_commit=execution_base_commit,
         )
+        run_directory = repo_root / ".powdrr" / "procedrr-runs"
+        run_directory.mkdir(parents=True, exist_ok=True)
+        events_path = run_directory / f"{task.task_id}.events.jsonl"
+        model_attempts_path = run_directory / f"{task.task_id}.model-interactions.jsonl"
+        manifest_path = run_directory / f"{task.task_id}.json"
+        checkpoint = (
+            ProcessExecutionCheckpoint.from_data(task.process_checkpoint)
+            if task.process_checkpoint is not None
+            else None
+        )
+        if checkpoint is None:
+            events_path.write_text("", encoding="utf-8")
+            model_attempts_path.write_text("", encoding="utf-8")
+        manifest: dict[str, Any] = {
+            "schema_version": 1,
+            "execution_id": task.task_id,
+            "process_id": process_id,
+            "process_fingerprint": process_catalog.get(process_id).identity.fingerprint,
+            "status": "running",
+            "event_cursor": checkpoint.evaluator.event_cursor
+            if checkpoint is not None
+            else 0,
+            "started_at": datetime.now(UTC).isoformat(),
+            "model_interaction_telemetry": {
+                "schema_version": "powdrr-model-interactions-v1",
+                "attempts_file": model_attempts_path.name,
+                "request_response_artifact": events_path.name,
+                "correlation_field": "trace_id",
+                "status": "partial",
+                "unobserved_routes": [
+                    "direct workflow action and compaction calls outside Procedrr",
+                    "external MiniSWE/coding-agent model turns",
+                    "durable checkpoint and prompt-response replay hits",
+                ],
+            },
+        }
+        _write_task_process_manifest(manifest_path, manifest)
+        model_interaction_telemetry = TaskModelInteractionTelemetry(
+            attempts_path=model_attempts_path,
+            events_path=events_path,
+            manifest=manifest,
+            task_id=task.task_id,
+            workflow_id=workflow_id_from_task_id(task.task_id) or task.task_id,
+            process_id=process_id,
+            process_fingerprint=process_catalog.get(process_id).identity.fingerprint,
+        )
+
         process_client = ProcedrrModelClient(
             task_client,
             process_directory=process_directory,
             max_retries=config.max_stalled_roundtrips,
             provider_retry_attempts=config.max_timeout_retries,
             provider_retry_delay_seconds=config.timeout_backoff_seconds,
+            telemetry_sink=model_interaction_telemetry.record_attempt,
+            telemetry_role="github-issue-worker",
         )
         operations = _TaskProcedrrOperations(
             strategy,
@@ -6903,29 +6955,6 @@ def run_workflow_task(
             {name: operation_handler(name) for name in operation_names}
         )
         operations.operation_executor = operation_executor
-        run_directory = repo_root / ".powdrr" / "procedrr-runs"
-        run_directory.mkdir(parents=True, exist_ok=True)
-        events_path = run_directory / f"{task.task_id}.events.jsonl"
-        manifest_path = run_directory / f"{task.task_id}.json"
-        checkpoint = (
-            ProcessExecutionCheckpoint.from_data(task.process_checkpoint)
-            if task.process_checkpoint is not None
-            else None
-        )
-        if checkpoint is None:
-            events_path.write_text("", encoding="utf-8")
-        manifest: dict[str, Any] = {
-            "schema_version": 1,
-            "execution_id": task.task_id,
-            "process_id": process_id,
-            "process_fingerprint": process_catalog.get(process_id).identity.fingerprint,
-            "status": "running",
-            "event_cursor": checkpoint.evaluator.event_cursor
-            if checkpoint is not None
-            else 0,
-            "started_at": datetime.now(UTC).isoformat(),
-        }
-        _write_task_process_manifest(manifest_path, manifest)
 
         def persist_process_event(
             event: Any,
@@ -6981,6 +7010,7 @@ def run_workflow_task(
             manifest["status"] = "failed"
             manifest["failure"] = f"{type(error).__name__}: {error}"
             manifest["finished_at"] = datetime.now(UTC).isoformat()
+            model_interaction_telemetry.refresh_summary()
             _write_task_process_manifest(manifest_path, manifest)
             print(f"Procedrr task failed: {error}", file=stderr)
             return 1
@@ -7028,6 +7058,7 @@ def run_workflow_task(
                         "record."
                     )
                     manifest["finished_at"] = datetime.now(UTC).isoformat()
+                    model_interaction_telemetry.refresh_summary()
                     _write_task_process_manifest(manifest_path, manifest)
                     print(manifest["failure"], file=stderr)
                     return 1
@@ -7071,9 +7102,11 @@ def run_workflow_task(
                     manifest["status"] = "failed"
                     manifest["failure"] = f"{type(error).__name__}: {error}"
                     manifest["finished_at"] = datetime.now(UTC).isoformat()
+                    model_interaction_telemetry.refresh_summary()
                     _write_task_process_manifest(manifest_path, manifest)
                     print(f"Procedrr task failed: {error}", file=stderr)
                     return 1
+        model_interaction_telemetry.refresh_summary()
         _write_task_process_manifest(manifest_path, manifest)
         workflow = _select_workflow_instance(
             WorkflowInstance.from_directory(workflow_dir),

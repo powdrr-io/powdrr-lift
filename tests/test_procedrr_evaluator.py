@@ -183,6 +183,12 @@ steps:
     assert len(telemetry) == 1
     assert telemetry[0]["transport_kind"] == "batch"
     assert telemetry[0]["batch_member_count"] == 2
+    assert telemetry[0]["caller_paths"] == [
+        "steps[0].for_each[0][0][0]",
+        "steps[0].for_each[0][1][0]",
+    ]
+    assert telemetry[0]["prompt_builder_version"] == "procedrr-judge-v1"
+    assert len(telemetry[0]["batch_member_trace_ids"]) == 2
     assert telemetry[0]["outcome"] == "succeeded"
     assert result.bindings["decisions"] == [
         {"item": "yes, include this", "result": {"positive": True}},

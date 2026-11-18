@@ -151,15 +151,35 @@ def test_procedrr_records_provider_retry_attempts_without_prompt_content(
         telemetry_sink=lambda record: events.append(dict(record)),
     )
 
-    client.complete_json(
-        [{"role": "user", "content": "secret prompt text"}],
-        response_schema=SCHEMA,
-    )
+    with client.interaction_context(
+        caller_path="steps[0].judge",
+        gate_consumer="steps[0].judge",
+        prompt_builder_version="procedrr-judge-v1",
+    ):
+        client.complete_json(
+            [{"role": "user", "content": "secret prompt text"}],
+            response_schema=SCHEMA,
+        )
+        client.complete_json(
+            [{"role": "user", "content": "secret prompt text"}],
+            response_schema=SCHEMA,
+        )
 
-    assert [event["outcome"] for event in events] == ["retrying", "succeeded"]
-    assert [event["attempt"] for event in events] == [1, 2]
+    assert [event["outcome"] for event in events] == [
+        "retrying",
+        "succeeded",
+        "succeeded",
+    ]
+    assert [event["attempt"] for event in events] == [1, 2, 1]
     assert events[0]["retryable"] is True
+    assert events[0]["retry_cause"] == "http_503"
     assert events[0]["trace_id"] == events[1]["trace_id"]
+    assert events[0]["interaction_id"] == events[1]["interaction_id"]
+    assert events[0]["interaction_id"] != events[2]["interaction_id"]
+    assert events[0]["caller_path"] == "steps[0].judge"
+    assert events[0]["gate_consumer"] == "steps[0].judge"
+    assert events[0]["prompt_builder_version"] == "procedrr-judge-v1"
+    assert len(events[0]["prompt_fingerprint"]) == 64
     assert events[0]["provider_delegate"] == "RetryOnce"
     assert "secret prompt text" not in str(events)
 

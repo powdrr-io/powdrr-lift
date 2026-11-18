@@ -585,9 +585,12 @@ independent semantic review.
 ## 11. Proposed implementation sequence and verification gates
 
 This sequence turns the audit recommendations into independently reviewable
-work packages. It is still a proposal: no runtime changes are implemented or
-authorized by this document. Complete WP0 first so later decisions can be
-compared with observed request and retry counts rather than static estimates.
+work packages. WP0 trace instrumentation and artifact aggregation have been
+implemented. Its baseline report records the available trace coverage and marks
+runtime counts unobserved because representative run artifacts were unavailable.
+The empirical WP0 exit remains open until those route runs are captured; later
+decisions should use observed request and retry counts rather than static
+estimates.
 
 0. **Establish a model-interaction baseline (all active IDs).** Add or verify a
    trace record for each logical model interaction and wire attempt. Record the
@@ -602,7 +605,8 @@ compared with observed request and retry counts rather than static estimates.
    from transport retries and identify paths without usable traces. **Exit:** a
    reviewer can reconstruct per-path request counts and retry causes from trace
    IDs, and the baseline report marks missing or unobserved paths instead of
-   extrapolating them.
+   extrapolating them. Current instrumentation coverage and unobserved runtime
+   routes are listed in [the WP0 baseline report](../reports/github-issue-worker-model-interaction-baseline-2026-11-18.md).
 
 1. **Render publication requests in code (A16-A18).** Use one typed renderer for
    implementation and amendment publication. Test immutable field preservation,

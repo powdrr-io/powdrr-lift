@@ -1871,6 +1871,8 @@ def _review_execute_pr_test_quality(
     config: WorkflowTaskAgentConfig,
     suggest_tests: bool = True,
     service: Any | None = None,
+    task_id: str | None = None,
+    attempt_id: str | None = None,
 ) -> dict[str, Any]:
     """Request advisory test-quality review through the serialized service API."""
     request = OperationRequest(
@@ -1885,6 +1887,8 @@ def _review_execute_pr_test_quality(
             "max_timeout_retries": config.max_timeout_retries,
             "timeout_backoff_seconds": config.timeout_backoff_seconds,
             "suggest_tests": suggest_tests,
+            **({"task_id": task_id} if task_id else {}),
+            **({"attempt_id": attempt_id} if attempt_id else {}),
         },
     )
     try:
@@ -1955,6 +1959,7 @@ def _author_execute_pr_tests(
     store_root: Path,
     validation_profile: ValidationProfile,
     quality_review_service: Any | None = None,
+    task_id: str | None = None,
 ) -> tuple[dict[str, str], dict[str, Any]]:
     """Ask MiniSWE to write and baseline-check independent integration tests."""
     test_root = store_root / "integration-tests"
@@ -2270,6 +2275,12 @@ def _author_execute_pr_tests(
                     config=config,
                     suggest_tests=not quality_repair_attempted,
                     service=quality_review_service,
+                    task_id=task_id,
+                    attempt_id=(
+                        f"{task_id}-integration-test-author-{len(attempts) + 1:02d}"
+                        if task_id
+                        else None
+                    ),
                 )
                 quality_reviews.append(quality_report)
                 if story_links:
@@ -4048,6 +4059,7 @@ class _TaskWorkflowExecutionStrategy:
                         config=self.config,
                         store_root=story_store,
                         validation_profile=validation_profile,
+                        task_id=self.task.task_id,
                     )
                     story_validation_bundle = {
                         "snapshot": source_story_snapshot,
@@ -4259,6 +4271,7 @@ class _TaskWorkflowExecutionStrategy:
             config=self.config,
             store_root=store_root,
             validation_profile=validation_profile,
+            task_id=self.task.task_id,
         )
         status_before_test_install = _execute_pr_test_install_worktree_status(
             self.repo_root, self.config.workflow_dir
@@ -4341,6 +4354,13 @@ class _TaskWorkflowExecutionStrategy:
                 if self.config.code_agent == "minisweagent"
                 else None
             ),
+            trace_caller="issue_worker_implementation",
+            trace_gate_consumer="implementation_candidate_validation",
+            trace_evidence_fingerprint=hashlib.sha256(
+                request.prompt.encode("utf-8")
+            ).hexdigest(),
+            trace_evidence_ids=tuple(request.context_refs),
+            trace_check_id=request.request_id,
         )
         runner = CodingAgentRunner(
             provider=provider,
@@ -4435,6 +4455,8 @@ class _TaskWorkflowExecutionStrategy:
                             correction_evidence,
                             config=self.config,
                             suggest_tests=False,
+                            task_id=self.task.task_id,
+                            attempt_id=attempt_id,
                         )
                         require_story_test_quality(
                             correction_review, corrected_baseline["story_test_links"]
@@ -4548,6 +4570,8 @@ class _TaskWorkflowExecutionStrategy:
                     },
                     config=self.config,
                     suggest_tests=False,
+                    task_id=self.task.task_id,
+                    attempt_id=attempt_id,
                 )
                 integration_test_authoring.setdefault(
                     "correction_quality_reviews", []
@@ -6147,6 +6171,17 @@ class _TaskProcedrrOperations:
                 miniswe_inference_handler=create_miniswe_inference_handler(
                     self.strategy.config.coding_agent_timeout_seconds
                 ),
+                trace_caller="ci_repair",
+                trace_gate_consumer="ci_repair_contract_validation",
+                trace_evidence_fingerprint=hashlib.sha256(
+                    request.prompt.encode("utf-8")
+                ).hexdigest(),
+                trace_evidence_ids=(
+                    contract.contract_id,
+                    contract.observation_id,
+                    contract.failure_id,
+                ),
+                trace_check_id=contract.failure_id,
             )
             runner = CodingAgentRunner(provider=provider, store=attempt_store)
             _write_ci_repair_json(

@@ -1581,6 +1581,11 @@ def build_coding_agent_provider(
     progress_callback: Callable[[str], None] | None = None,
     miniswe_inference_handler: Callable[[ChatCompletionRequest], ChatCompletionResponse]
     | None = None,
+    trace_caller: str = "minisweagent",
+    trace_gate_consumer: str | None = None,
+    trace_evidence_fingerprint: str | None = None,
+    trace_evidence_ids: tuple[str, ...] = (),
+    trace_check_id: str | None = None,
 ) -> CodingAgentProvider:
     """Build the configured provider behind the common coding-agent boundary."""
     if target == "opencode":
@@ -1607,6 +1612,11 @@ def build_coding_agent_provider(
             prompt_prefix=prompt_prefix,
             prompt_suffix=prompt_suffix,
             progress_callback=progress_callback,
+            trace_caller=trace_caller,
+            trace_gate_consumer=trace_gate_consumer,
+            trace_evidence_fingerprint=trace_evidence_fingerprint,
+            trace_evidence_ids=trace_evidence_ids,
+            trace_check_id=trace_check_id,
         )
     raise ValueError(f"unsupported code agent target {target!r}")
 

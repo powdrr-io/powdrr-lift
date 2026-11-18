@@ -291,6 +291,8 @@ def summarize_run_telemetry(
     for trace_path in output_root.rglob("*.inference-attempts.jsonl"):
         records.extend(_read_jsonl_records(trace_path))
 
+    quality_attempts = _read_test_quality_attempts(output_root)
+
     provider_attempts = [
         item
         for item in records
@@ -444,9 +446,36 @@ def summarize_run_telemetry(
     telemetry_errors = result.get("telemetry_errors", [])
     if not isinstance(telemetry_errors, list):
         telemetry_errors = []
+    quality_by_role: dict[str, dict[str, int]] = {}
+    quality_interactions: set[str] = set()
+    role_interactions: set[tuple[str, str]] = set()
+    for item in quality_attempts:
+        interaction_id = item.get("interaction_id")
+        if isinstance(interaction_id, str) and interaction_id:
+            quality_interactions.add(interaction_id)
+        role = str(item.get("role") or "unknown")
+        group = quality_by_role.setdefault(
+            role,
+            {
+                "logical_interactions": 0,
+                "provider_call_attempts": 0,
+                "failed_attempts": 0,
+                "retry_attempts": 0,
+            },
+        )
+        if isinstance(interaction_id, str) and interaction_id:
+            role_interaction = (role, interaction_id)
+            if role_interaction not in role_interactions:
+                group["logical_interactions"] += 1
+                role_interactions.add(role_interaction)
+        group["provider_call_attempts"] += 1
+        group["failed_attempts"] += int(item.get("outcome") != "success")
+        provider_call_attempt = item.get("provider_call_attempt")
+        if isinstance(provider_call_attempt, int) and provider_call_attempt > 1:
+            group["retry_attempts"] += 1
     return {
         "schema_version": "powdrr-run-telemetry-v1",
-        "status": "observed" if records else "partial",
+        "status": "observed" if records or quality_attempts else "partial",
         "total_wall_ms": total_wall_ms,
         "stage_wall_ms": stages,
         "stage_wall_ms_overlap": "nested process stages overlap; do not sum",
@@ -454,6 +483,20 @@ def summarize_run_telemetry(
         "provider_calls": len(traces),
         "transport_requests": len(provider_attempts),
         "provider_calls_by_model": provider_calls,
+        "test_quality_review": {
+            "status": "observed" if quality_attempts else "unobserved",
+            "logical_interactions": len(quality_interactions),
+            "provider_call_attempts": len(quality_attempts),
+            "failed_attempts": sum(
+                item.get("outcome") != "success" for item in quality_attempts
+            ),
+            "retry_attempts": sum(
+                isinstance(item.get("provider_call_attempt"), int)
+                and item["provider_call_attempt"] > 1
+                for item in quality_attempts
+            ),
+            "calls_by_role": quality_by_role,
+        },
         "provider_batches": {
             "count": len(batch_attempts),
             "member_count": batch_members,
@@ -526,6 +569,39 @@ def _read_jsonl_records(path: Path) -> list[dict[str, Any]]:
             continue
         if isinstance(value, dict):
             records.append(value)
+    return records
+
+
+def _read_test_quality_attempts(output_root: Path) -> list[dict[str, Any]]:
+    """Read redacted quality-review attempts embedded in test-suite artifacts."""
+    records: list[dict[str, Any]] = []
+    seen: set[tuple[str, int]] = set()
+    for suite_path in output_root.rglob("suite.json"):
+        try:
+            document = json.loads(suite_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        pending: list[Any] = [document]
+        while pending:
+            value = pending.pop()
+            if isinstance(value, Mapping):
+                if (
+                    value.get("record_type")
+                    == "powdrr_service.test_quality.provider_attempt"
+                ):
+                    interaction_id = value.get("interaction_id")
+                    call_attempt = value.get("provider_call_attempt")
+                    if isinstance(interaction_id, str) and isinstance(
+                        call_attempt, int
+                    ):
+                        identity = (interaction_id, call_attempt)
+                        if identity not in seen:
+                            records.append(dict(value))
+                            seen.add(identity)
+                    continue
+                pending.extend(value.values())
+            elif isinstance(value, list):
+                pending.extend(value)
     return records
 
 

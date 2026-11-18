@@ -351,9 +351,12 @@ class LocalPowdrrService:
                 suggest_tests=suggest_tests,
                 trace_context={
                     "request_id": request.request_id,
-                    "task_id": str(request.inputs.get("task_id", "")),
-                    "attempt_id": str(request.inputs.get("attempt_id", "")),
                     "story_review": str(bool(evidence.get("story_test_links"))).lower(),
+                }
+                | {
+                    key: value
+                    for key in ("task_id", "attempt_id")
+                    if isinstance((value := request.inputs.get(key)), str) and value
                 },
             )
         except Exception as exc:  # Quality review is advisory, including outages.

@@ -1369,6 +1369,13 @@ class SourceReferenceRun:
                 source_reference_catalog=self.catalog,
                 source_reader_limits=self.reader_limits,
                 source_reference_execution=self,
+                trace_caller="source_reference_implementation",
+                trace_gate_consumer="source_reference_contract_validation",
+                trace_evidence_fingerprint=hashlib.sha256(
+                    self.request.prompt.encode("utf-8")
+                ).hexdigest(),
+                trace_evidence_ids=tuple(self.request.context_refs),
+                trace_check_id=self.request.request_id,
             )
             execution = execute_coding_agent_attempt(
                 CodingAgentRunner(

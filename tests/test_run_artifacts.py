@@ -295,6 +295,66 @@ def test_run_telemetry_includes_miniswe_interactions(tmp_path: Path) -> None:
     }
 
 
+def test_run_telemetry_counts_embedded_test_quality_interactions(
+    tmp_path: Path,
+) -> None:
+    suite_dir = tmp_path / "integration-tests"
+    suite_dir.mkdir()
+    trace = [
+        {
+            "record_type": "powdrr_service.test_quality.provider_attempt",
+            "interaction_id": "quality-1:test-a:observable_coverage:opinion",
+            "role": "opinion",
+            "provider_call_attempt": 1,
+            "outcome": "error",
+        },
+        {
+            "record_type": "powdrr_service.test_quality.provider_attempt",
+            "interaction_id": "quality-1:test-a:observable_coverage:opinion",
+            "role": "opinion",
+            "provider_call_attempt": 2,
+            "outcome": "success",
+        },
+        {
+            "record_type": "powdrr_service.test_quality.provider_attempt",
+            "interaction_id": "quality-1:test-a:observable_coverage:decision",
+            "role": "decision",
+            "provider_call_attempt": 1,
+            "outcome": "success",
+        },
+    ]
+    (suite_dir / "suite.json").write_text(
+        json.dumps({"quality_review": {"interaction_trace": trace}}),
+        encoding="utf-8",
+    )
+
+    telemetry = run_artifacts.summarize_run_telemetry(tmp_path)
+
+    assert telemetry["status"] == "observed"
+    assert telemetry["test_quality_review"] == {
+        "status": "observed",
+        "logical_interactions": 2,
+        "provider_call_attempts": 3,
+        "failed_attempts": 1,
+        "retry_attempts": 1,
+        "calls_by_role": {
+            "opinion": {
+                "logical_interactions": 1,
+                "provider_call_attempts": 2,
+                "failed_attempts": 1,
+                "retry_attempts": 1,
+            },
+            "decision": {
+                "logical_interactions": 1,
+                "provider_call_attempts": 1,
+                "failed_attempts": 0,
+                "retry_attempts": 0,
+            },
+        },
+    }
+    assert telemetry["transport_requests"] == 0
+
+
 def test_telemetry_artifact_write_failure_does_not_lose_run_report(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

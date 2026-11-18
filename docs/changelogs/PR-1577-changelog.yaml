@@ -1,0 +1,65 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1577
+title: Generate a changelog for every clean PR publication
+intent:
+  problem: Clean PR publication could return a draft PR without a PR-numbered changelog, leaving changelog creation to a later manual step.
+  goal: Generate and validate a changelog from the actual PR diff before clean publication completes.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/clean_pr_publisher.py
+    type: modified
+    span: {start_line: 7, end_line: 7}
+    summary: Import regular-expression support for PR identity parsing.
+    rationale: Resolve the generated changelog filename from the created PR URL.
+  - path: src/powdrr_lift/clean_pr_publisher.py
+    type: modified
+    span: {start_line: 15, end_line: 18}
+    summary: Import YAML and changelog validation support.
+    rationale: Render and validate the generated PR changelog.
+  - path: src/powdrr_lift/clean_pr_publisher.py
+    type: modified
+    span: {start_line: 395, end_line: 406}
+    summary: Generate a changelog after clean publication creates or updates the draft PR.
+    rationale: Ensure every clean PR has its changelog before the publisher reports success.
+  - path: src/powdrr_lift/clean_pr_publisher.py
+    type: modified
+    span: {start_line: 426, end_line: 654}
+    summary: Build, validate, commit, and push a PR-numbered changelog from the published diff.
+    rationale: Capture actual changed-file spans and retain prior semantic changelog sections on updates.
+  - path: tests/test_clean_pr_publisher.py
+    type: modified
+    span: {start_line: 9, end_line: 9}
+    summary: Import YAML parsing for generated changelog assertions.
+    rationale: Inspect the changelog committed to the remote publication branch.
+  - path: tests/test_clean_pr_publisher.py
+    type: modified
+    span: {start_line: 307, end_line: 319}
+    summary: Verify new clean PR branches include a populated PR-numbered changelog.
+    rationale: Ensure generated file entries match the published product changes.
+  - path: tests/test_clean_pr_publisher.py
+    type: modified
+    span: {start_line: 433, end_line: 437}
+    summary: Expect the changelog artifact when updating an existing PR branch.
+    rationale: Enforce changelog presence on updates as well as new publications.
+  - path: tests/test_reliable_plan_execution_scenario.py
+    type: modified
+    span: {start_line: 14, end_line: 14}
+    summary: Import YAML parsing for the publication scenario.
+    rationale: Verify the generated changelog on the remote PR branch.
+  - path: tests/test_reliable_plan_execution_scenario.py
+    type: modified
+    span: {start_line: 532, end_line: 532}
+    summary: Capture the published file list for changelog assertions.
+    rationale: Verify the generated changelog on the remote PR branch.
+  - path: tests/test_reliable_plan_execution_scenario.py
+    type: modified
+    span: {start_line: 537, end_line: 551}
+    summary: Assert the reliable-plan publication includes the generated PR changelog and actual changed paths.
+    rationale: Cover changelog generation after recovering from a lost PR creation response.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []
+features: []
+proposed_prs: []

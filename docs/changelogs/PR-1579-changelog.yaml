@@ -1,5 +1,5 @@
 schema: https://powdrr.io/schema/changelog-v2
-change_id: 1578
+change_id: 1579
 title: Trace per-test quality review interactions
 intent:
   problem: The specialized per-test quality reviewer made decision, opinion, and suggestion calls without durable request attribution or retry records.

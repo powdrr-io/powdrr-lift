@@ -1386,7 +1386,7 @@ class Evaluator:
         path: str,
     ) -> None:
         subject = str(gate["subject"])
-        observed = _resolve_binding(state, subject)
+        observed = _resolve_gate_binding(state, subject)
         if observed == gate["equals"]:
             return
         if state.get("benchmark_mode") is True:
@@ -1429,6 +1429,27 @@ def _resolve_binding(state: Mapping[str, Any], path: str) -> Any:
     value: Any = state
     for segment in path.split("."):
         if not isinstance(value, Mapping) or segment not in value:
+            raise EvaluationError(f"unknown binding: {path}")
+        value = value[segment]
+    return value
+
+
+def _resolve_gate_binding(state: Mapping[str, Any], path: str) -> Any:
+    """Resolve a gate subject, treating a missing nested field as no value.
+
+    Tool failures may return a structured error object without the success
+    fields that a gate normally checks (for example, ``returncode``). Such a
+    result should fail the gate with its original error evidence rather than
+    aborting evaluation with an unrelated unknown-binding error. Top-level
+    bindings remain strict so misspelled process variables are still reported
+    as evaluation errors.
+    """
+    value: Any = state
+    segments = path.split(".")
+    for index, segment in enumerate(segments):
+        if not isinstance(value, Mapping) or segment not in value:
+            if index > 0:
+                return None
             raise EvaluationError(f"unknown binding: {path}")
         value = value[segment]
     return value

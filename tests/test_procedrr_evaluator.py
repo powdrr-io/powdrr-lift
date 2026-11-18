@@ -48,6 +48,64 @@ def test_non_benchmark_gate_still_raises() -> None:
         )
 
 
+def test_gate_missing_nested_field_fails_with_root_evidence() -> None:
+    failure = {"error": "BrokenPipeError", "retryable": True}
+
+    with pytest.raises(ValidationGateError) as raised:
+        Evaluator(FakeLLM(), lambda *_: None)._gate(
+            {"subject": "validation_result.returncode", "equals": 0},
+            {"validation_result": failure},
+            [],
+            "steps[0].gate",
+        )
+
+    assert raised.value.evidence is failure
+
+
+def test_finish_pr_prep_preserves_tool_error_in_gate_failure() -> None:
+    from powdrr_service.procedrr import parse_and_validate
+
+    process_path = bundled_process_directory() / "finish-pr-prep.yaml"
+    document = parse_and_validate(process_path.read_text(encoding="utf-8"))
+    shell_attempts = 0
+    tool_error = {"error": "BrokenPipeError", "retryable": True}
+
+    def execute(tool: str, parameters: Mapping[str, Any]) -> Any:
+        nonlocal shell_attempts
+        if tool == "invoke_tool":
+            if parameters["tool"] == "git":
+                return {
+                    "confirmed": True,
+                    "findings": [],
+                    "paths": ["src/example.py"],
+                }
+            assert parameters["tool"] == "shell"
+            shell_attempts += 1
+            return tool_error
+        if tool == "gather_context":
+            return {
+                "validation_inventory_status": "missing",
+                "matches": [],
+            }
+        raise AssertionError(f"unexpected operation: {tool}")
+
+    with pytest.raises(ValidationGateError) as raised:
+        Evaluator(
+            FakeLLM(),
+            execute,
+            process_directory=bundled_process_directory(),
+        ).evaluate(
+            document,
+            {
+                "files_to_publish": ["src/example.py"],
+                "verification_command": "check",
+            },
+        )
+
+    assert shell_attempts == 1
+    assert raised.value.evidence == tool_error
+
+
 class FakeLLM:
     def __init__(self) -> None:
         self.messages: list[dict[str, str]] = []

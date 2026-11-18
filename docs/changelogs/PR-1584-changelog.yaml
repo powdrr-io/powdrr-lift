@@ -1,0 +1,85 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1584
+title: Stop publication failures from invoking description repair
+intent:
+  problem: PR publication recovery sent every failed publish attempt to a model judge, including failures unrelated to the description such as GitHub, network, or authorization errors.
+  goal: Fail publication after one validated attempt without generating or changing publication input through an LLM recovery call.
+human-decisions: []
+structured_files: []
+files:
+  - path: packages/service/src/powdrr_service/resources/processes/create-pull-request.yaml
+    type: modified
+    span: {start_line: 31, end_line: 31}
+    summary: Limit the clean PR publication attempt to one try.
+    rationale: Keep GitHub and transport failures out of prose generation and fail closed when publication input is rejected.
+  - path: packages/service/src/powdrr_service/resources/processes/create-pull-request.yaml
+    type: modified
+    span: {start_line: 47, end_line: 47}
+    summary: Route publication errors to a failure recovery without any judge.
+    rationale: Prevent publication errors from activating description generation.
+  - path: packages/service/src/powdrr_service/resources/processes/create-pull-request.yaml
+    type: modified
+    span: {start_line: 51, end_line: 51}
+    summary: Rename publication recovery to indicate that it terminates.
+    rationale: Make the failure route's behavior explicit.
+  - path: packages/service/src/powdrr_service/resources/processes/create-pull-request.yaml
+    type: modified
+    span: {start_line: 53, end_line: 53}
+    summary: Replace model-based description repair with a terminal failed result.
+    rationale: Keep rejected or externally failed publication attempts from retrying with generated prose.
+  - path: tests/test_workflow_template_specification.py
+    type: modified
+    span: {start_line: 439, end_line: 439}
+    summary: Assert the publisher is attempted once.
+    rationale: Prevent reintroducing model calls for publication failure handling.
+  - path: tests/test_workflow_template_specification.py
+    type: modified
+    span: {start_line: 441, end_line: 441}
+    summary: Assert the failed publication recovery has no model judge.
+    rationale: Prevent reintroducing model calls for publication failure handling.
+  - path: tests/test_workflow_template_specification.py
+    type: modified
+    span: {start_line: 451, end_line: 452}
+    summary: Verify publication recovery ends in a failed terminal state.
+    rationale: Make invalid publication input fail closed.
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 1225, end_line: 1225}
+    summary: Replace the retry expectation with a publication fail-closed scenario.
+    rationale: Exercise publication input failure without allowing LLM recovery.
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 1234, end_line: 1234}
+    summary: Use a model client that raises if publication failure handling calls it.
+    rationale: Prove no description generation occurs during publication recovery.
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 1238, end_line: 1238}
+    summary: Fail the test immediately if an LLM call is attempted.
+    rationale: Prevent any model recovery activation on publication failure.
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 1256, end_line: 1262}
+    summary: Return a representative missing-description-sections failure from the publisher.
+    rationale: Exercise deterministic failure handling for invalid publication input.
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 1266, end_line: 1266}
+    summary: Evaluate the process with the unexpected-call model client.
+    rationale: Verify publication recovery does not require model assistance.
+  - path: tests/test_procedrr_evaluator.py
+    type: modified
+    span: {start_line: 1282, end_line: 1284}
+    summary: Assert one publisher call, zero model activations, and terminal failure.
+    rationale: Exercise the failure route with a model client that raises if called.
+entities:
+  - id: deterministic-publication-failure-handling
+    type: Feature
+    action: added
+entity_relationships: []
+invariants:
+  - id: publication-failures-do-not-trigger-description-generation
+    description: Failed PR publication attempts terminate without invoking an LLM recovery judge.
+    action: added
+    rationale: GitHub, network, and authorization failures are not description-generation problems.
+guidance: []

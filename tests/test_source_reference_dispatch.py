@@ -728,47 +728,47 @@ def test_dispatch_blocks_patch_when_stable_lineage_record_is_tampered(
     (
         "initial_source",
         "has_accepted_placement",
-        "response",
-        "expected_status",
+        "owner_name",
         "expected_source",
+        "expected_status",
+        "expected_operation",
     ),
     [
         (
             "def twice(value):\n    return value\n",
             True,
-            {"status": "resolved", "value": "exists", "reason_code": None},
-            "passed",
+            "twice",
             "# structrr: feature:twice\ndef twice(value):\n    return value\n",
-        ),
-        (
-            "def twice(value):\n    return value\n",
-            True,
-            {"status": "resolved", "value": "absent", "reason_code": None},
-            "blocked",
-            "def twice(value):\n    return value\n",
+            "passed",
+            "ensure_annotation",
         ),
         (
             "# structrr: feature:twice\ndef twice(value):\n    return value\n",
             False,
-            {"status": "resolved", "value": "absent", "reason_code": None},
-            "passed",
+            "twice",
             "def twice(value):\n    return value\n",
+            "passed",
+            "remove_annotation",
+        ),
+        (
+            "def twice(value):\n    return value\n",
+            True,
+            "missing",
+            "def twice(value):\n    return value\n",
+            "blocked",
+            None,
         ),
     ],
 )
-def test_post_worker_reconciliation_uses_decision_and_changes_only_annotation(
+def test_post_worker_reconciliation_uses_exact_membership_without_model_call(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
     initial_source: str,
     has_accepted_placement: bool,
-    response: dict[str, Any],
-    expected_status: str,
+    owner_name: str,
     expected_source: str,
+    expected_status: str,
+    expected_operation: str | None,
 ) -> None:
-    monkeypatch.setattr(
-        "powdrr_lift.workrr.source_reference_postrun.DecisionProviderFactory.create",
-        lambda *_args, **_kwargs: None,
-    )
     (tmp_path / "twice.py").write_text(initial_source)
     definition = ReferenceDefinition(
         "feature:twice", "feature", "Return twice the input.", "spec:1"
@@ -781,7 +781,7 @@ def test_post_worker_reconciliation_uses_decision_and_changes_only_annotation(
         "owner": {
             "path": "twice.py",
             "kind": "function",
-            "qualified_name": "twice",
+            "qualified_name": owner_name,
             "binding": "exact",
             "role": "implementation",
         },
@@ -807,16 +807,15 @@ def test_post_worker_reconciliation_uses_decision_and_changes_only_annotation(
         def complete_json(
             self, _messages: list[dict[str, str]], *, response_schema: Any = None
         ) -> dict[str, Any]:
-            return response
+            raise AssertionError("exact edge membership must not call a model")
 
     receipt = reconcile_source_task(run, DecisionReviewer())
     assert receipt["status"] == expected_status
     assert (tmp_path / "twice.py").read_text() == expected_source
-    if expected_status == "passed":
-        assert (
-            receipt["decisions"][0]["attempts"][0]["decision"]["result"]["value"]
-            == response["value"]
-        )
+    if expected_operation is None:
+        assert receipt["issues"]
+    else:
+        assert receipt["operations"][0]["operation"] == expected_operation
 
 
 @pytest.mark.parametrize(

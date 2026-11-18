@@ -1,0 +1,195 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1591
+title: Reconcile source-reference membership deterministically
+intent:
+  problem: Post-worker source-reference membership mismatches were sent to a model even though the accepted edge set and observed Python annotations are available as exact data.
+  goal: Apply exact accepted annotation changes in code, while blocking ambiguous ownership and preserving independent semantic adequacy review.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/source_reference_postrun.py
+    type: modified
+    span: {start_line: 6, end_line: 8}
+    summary: Remove imports used only by model-based source-link decisions.
+    rationale: Exact edge membership no longer requires a semantic model decision.
+  - path: src/powdrr_lift/workrr/source_reference_postrun.py
+    type: modified
+    span: {start_line: 11, end_line: 11}
+    summary: Remove timestamp support used only for model decision receipts.
+    rationale: Deterministic reconciliation records operations directly.
+  - path: src/powdrr_lift/workrr/source_reference_postrun.py
+    type: modified
+    span: {start_line: 15, end_line: 19}
+    summary: Remove model provider dependencies from post-worker membership repair.
+    rationale: The accepted contract and parsed annotations determine exact membership.
+  - path: src/powdrr_lift/workrr/source_reference_postrun.py
+    type: modified
+    span: {start_line: 27, end_line: 28}
+    summary: Remove semantic decision helpers from membership reconciliation.
+    rationale: Membership repair is deterministic and no longer invokes these helpers.
+  - path: src/powdrr_lift/workrr/source_reference_postrun.py
+    type: modified
+    span: {start_line: 59, end_line: 60}
+    summary: Define post-worker reconciliation as exact accepted-edge repair.
+    rationale: Keep semantic adequacy review separate from annotation membership.
+  - path: src/powdrr_lift/workrr/source_reference_postrun.py
+    type: modified
+    span: {start_line: 91, end_line: 92}
+    summary: Limit source-only repairs to worker-changed Python files.
+    rationale: Avoid changing annotations outside the worker's source edit scope.
+  - path: src/powdrr_lift/workrr/source_reference_postrun.py
+    type: modified
+    span: {start_line: 126, end_line: 129}
+    summary: Block annotations with unknown references or unresolved owners.
+    rationale: Ambiguous source evidence remains fail-closed.
+  - path: src/powdrr_lift/workrr/source_reference_postrun.py
+    type: modified
+    span: {start_line: 133, end_line: 148}
+    summary: Require every accepted owner to resolve uniquely.
+    rationale: Do not apply authorized annotations to an ambiguous code owner.
+  - path: src/powdrr_lift/workrr/source_reference_postrun.py
+    type: modified
+    span: {start_line: 137, end_line: 137}
+    summary: Validate accepted owner identity before staging annotation repairs.
+    rationale: Reject accepted selectors that cannot bind to one parsed owner.
+  - path: src/powdrr_lift/workrr/source_reference_postrun.py
+    type: modified
+    span: {start_line: 156, end_line: 164}
+    summary: Compute annotation additions and removals from exact edge-set differences.
+    rationale: Use accepted contract membership directly, without model calls.
+  - path: src/powdrr_lift/workrr/source_reference_postrun.py
+    type: modified
+    span: {start_line: 161, end_line: 161}
+    summary: Select source-only edges for removal only from worker-changed files.
+    rationale: Keep annotation edits within the candidate's changed-file scope.
+  - path: src/powdrr_lift/workrr/source_reference_postrun.py
+    type: modified
+    span: {start_line: 172, end_line: 182}
+    summary: Record deterministic annotation decisions and their authority.
+    rationale: Receipts identify whether each edit follows the accepted contract or changed source.
+  - path: src/powdrr_lift/workrr/source_reference_postrun.py
+    type: modified
+    span: {start_line: 184, end_line: 184}
+    summary: Keep reconciliation issues empty for successfully compiled operations.
+    rationale: Exact repairs do not need model decision failure records.
+  - path: src/powdrr_lift/workrr/source_reference_postrun.py
+    type: modified
+    span: {start_line: 193, end_line: 196}
+    summary: Compile accepted edge differences into annotation edit requests.
+    rationale: Apply exact contract membership deterministically.
+  - path: src/powdrr_lift/workrr/source_reference_postrun.py
+    type: modified
+    span: {start_line: 204, end_line: 205}
+    summary: Preserve observed edges that are not authorized for removal.
+    rationale: Edit only the exact source-only edges selected from changed files.
+  - path: src/powdrr_lift/workrr/source_reference_postrun.py
+    type: modified
+    span: {start_line: 223, end_line: 317}
+    summary: Remove model prompts, provider fallback, and semantic membership decisions.
+    rationale: Exact edge-set comparisons replace duplicate model judgments.
+  - path: src/powdrr_lift/workrr/source_reference_postrun.py
+    type: modified
+    span: {start_line: 324, end_line: 325}
+    summary: Remove the former model-based post-worker decision flow.
+    rationale: Replace it with exact contract-to-source edge reconciliation.
+  - path: src/powdrr_lift/workrr/source_reference_postrun.py
+    type: modified
+    span: {start_line: 236, end_line: 236}
+    summary: Verify that all accepted edges survive final source re-indexing.
+    rationale: Confirm the deterministic edit produced the required membership.
+  - path: src/powdrr_lift/workrr/source_reference_postrun.py
+    type: modified
+    span: {start_line: 241, end_line: 241}
+    summary: Report exact ensure or remove annotation operations.
+    rationale: Preserve an auditable receipt of applied membership repairs.
+  - path: src/powdrr_lift/workrr/source_reference_postrun.py
+    type: modified
+    span: {start_line: 245, end_line: 245}
+    summary: Enumerate only deterministic edge-set operations in the receipt.
+    rationale: Keep the receipt aligned with edits authorized by exact membership.
+  - path: tests/test_source_reference_dispatch.py
+    type: modified
+    span: {start_line: 731, end_line: 731}
+    summary: Replace model decision cases with exact membership test inputs.
+    rationale: Verify the contract and source edges determine the repair.
+  - path: tests/test_source_reference_dispatch.py
+    type: modified
+    span: {start_line: 733, end_line: 734}
+    summary: Add operation and status expectations to reconciliation cases.
+    rationale: Assert deterministic outcomes directly.
+  - path: tests/test_source_reference_dispatch.py
+    type: modified
+    span: {start_line: 740, end_line: 740}
+    summary: Identify the exact owner for the accepted-edge case.
+    rationale: Exercise unique owner resolution.
+  - path: tests/test_source_reference_dispatch.py
+    type: modified
+    span: {start_line: 742, end_line: 743}
+    summary: Expect a deterministic annotation ensure operation.
+    rationale: Confirm a missing accepted annotation is added without a model call.
+  - path: tests/test_source_reference_dispatch.py
+    type: modified
+    span: {start_line: 748, end_line: 749}
+    summary: Expect a deterministic annotation removal operation.
+    rationale: Confirm an unaccepted edge is removed from worker-changed source.
+  - path: tests/test_source_reference_dispatch.py
+    type: modified
+    span: {start_line: 751, end_line: 756}
+    summary: Add an accepted placement whose owner does not resolve.
+    rationale: Verify ambiguous ownership blocks reconciliation.
+  - path: tests/test_source_reference_dispatch.py
+    type: modified
+    span: {start_line: 758, end_line: 759}
+    summary: Expect ambiguous owner resolution to block without editing source.
+    rationale: Keep unknown placement ownership fail-closed.
+  - path: tests/test_source_reference_dispatch.py
+    type: modified
+    span: {start_line: 761, end_line: 761}
+    summary: Rename the post-worker test around exact membership.
+    rationale: State the deterministic behavior covered by the test.
+  - path: tests/test_source_reference_dispatch.py
+    type: modified
+    span: {start_line: 763, end_line: 763}
+    summary: Verify membership repair never calls a model.
+    rationale: Exact edge membership must be code-owned.
+  - path: tests/test_source_reference_dispatch.py
+    type: modified
+    span: {start_line: 767, end_line: 767}
+    summary: Parameterize the exact owner identity in reconciliation cases.
+    rationale: Exercise both uniquely resolved and ambiguous owner cases.
+  - path: tests/test_source_reference_dispatch.py
+    type: modified
+    span: {start_line: 768, end_line: 771}
+    summary: Parameterize expected status and operation values.
+    rationale: Check successful edits and fail-closed ambiguity.
+  - path: tests/test_source_reference_dispatch.py
+    type: modified
+    span: {start_line: 769, end_line: 770}
+    summary: Assert operation output only when deterministic repair succeeds.
+    rationale: Keep blocked cases free of unauthorized edits.
+  - path: tests/test_source_reference_dispatch.py
+    type: modified
+    span: {start_line: 784, end_line: 784}
+    summary: Use the parameterized owner name in the frozen placement.
+    rationale: Drive exact owner resolution from test evidence.
+  - path: tests/test_source_reference_dispatch.py
+    type: modified
+    span: {start_line: 810, end_line: 810}
+    summary: Fail the test if reconciliation calls the model.
+    rationale: Enforce deterministic membership behavior.
+  - path: tests/test_source_reference_dispatch.py
+    type: modified
+    span: {start_line: 815, end_line: 818}
+    summary: Assert blocked ownership and emitted annotation operations.
+    rationale: Verify source changes match exact authorization.
+  - path: tests/test_structrr_reference_reconciliation.py
+    type: modified
+    span: {start_line: 481, end_line: 494}
+    summary: Verify stale source evidence is rejected before publishing edits.
+    rationale: Prevent annotation changes when source bytes differ from the indexed preimage.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []
+features: []
+proposed_prs: []

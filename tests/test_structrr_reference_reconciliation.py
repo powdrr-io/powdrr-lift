@@ -478,3 +478,17 @@ def test_interrupted_publish_retains_preimages_and_never_reports_complete(
         (Path(receipt["preimage_directory"]) / name).is_file()
         for name in receipt["preimages"].values()
     )
+
+
+def test_publish_rejects_stale_source_evidence(tmp_path: Path) -> None:
+    source = tmp_path / "retry.py"
+    source.write_bytes(b"before")
+    expected = "sha256:" + hashlib.sha256(source.read_bytes()).hexdigest()
+    source.write_bytes(b"changed after indexing")
+
+    with pytest.raises(ValueError, match="stale reconciliation input"):
+        publish_staged_files(
+            staged={source: b"after"},
+            expected_digests={source: expected},
+            receipt_path=tmp_path / "stale.receipt.json",
+        )

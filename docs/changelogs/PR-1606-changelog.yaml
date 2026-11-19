@@ -45,6 +45,13 @@ files:
 - path: src/powdrr_lift/workrr/planning_session.py
   type: modified
   span:
+    start_line: 31
+    end_line: 31
+  summary: Import validated planning Evidence records for the receipt manifest.
+  rationale: Type the evidence map passed into the deterministic planner path.
+- path: src/powdrr_lift/workrr/planning_session.py
+  type: modified
+  span:
     start_line: 64
     end_line: 66
   summary: Import the strict planning receipt manifest loader.
@@ -74,6 +81,13 @@ files:
   type: modified
   span:
     start_line: 100
+    end_line: 101
+  summary: Add the execution receipt option to the plan-resume parser test.
+  rationale: Ensure resumed plans accept the external manifest path.
+- path: tests/test_cli.py
+  type: modified
+  span:
+    start_line: 109
     end_line: 109
   summary: Verify the receipt option is available when resuming planning.
   rationale: Ensure resumed sessions can receive the same pinned evidence input.
@@ -81,7 +95,14 @@ files:
   type: modified
   span:
     start_line: 122
-    end_line: 129
+    end_line: 123
+  summary: Add the execution receipt option to the plan parser test.
+  rationale: Ensure new plans accept the external manifest path.
+- path: tests/test_cli.py
+  type: modified
+  span:
+    start_line: 128
+    end_line: 128
   summary: Verify the receipt option is available when starting planning.
   rationale: Protect the new planning CLI contract.
 - path: tests/test_planning_execution_receipts.py

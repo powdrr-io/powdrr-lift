@@ -146,7 +146,9 @@ class ReferenceValidationReport:
 
 
 def _review(
-    client: ReferenceReviewClient | None, packet: dict[str, Any]
+    client: ReferenceReviewClient | None,
+    packet: dict[str, Any],
+    receipts: tuple[Mapping[str, Any], ...] = (),
 ) -> dict[str, Any]:
     identity = content_fingerprint(packet)
     owners = packet["candidate_bindings"]
@@ -162,6 +164,37 @@ def _review(
         predicate_version=POLICY,
         evidence_requirements=tuple(sorted(available)),
     )
+    for receipt in receipts:
+        try:
+            if (
+                receipt.get("request_fingerprint") != identity
+                or receipt.get("classification") != "satisfied"
+                or receipt.get("available_evidence") != sorted(available)
+                or receipt.get("evidence_locations") != sorted(available)
+                or not isinstance(receipt.get("explanation"), str)
+                or not receipt["explanation"].strip()
+            ):
+                continue
+            decision = DecisionResult.from_data(receipt["decision"])
+            decision.validate_against(specification)
+            if (
+                decision.outcome is not DecisionOutcome.PASS
+                or decision.explanation != receipt["explanation"]
+            ):
+                continue
+        except (KeyError, TypeError, ValueError):
+            continue
+        return {
+            "subject_id": packet["subject_id"],
+            "purpose": packet.get("purpose"),
+            "classification": "satisfied",
+            "explanation": decision.explanation,
+            "evidence_locations": sorted(available),
+            "available_evidence": sorted(available),
+            "request_fingerprint": identity,
+            "decision": decision.to_data(),
+            "reused": True,
+        }
     classification, reason, locations = (
         "needs_review",
         "Independent owner review is unavailable.",
@@ -289,6 +322,7 @@ def _review(
         "available_evidence": sorted(available),
         "request_fingerprint": identity,
         "decision": decision.to_data(),
+        "reused": False,
     }
 
 
@@ -302,6 +336,7 @@ def validate_source_references(
     recorded_inputs: Mapping[str, Any],
     acquisition_findings: tuple[Mapping[str, Any], ...] = (),
     review_client: ReferenceReviewClient | None = None,
+    review_receipts: tuple[Mapping[str, Any], ...] = (),
     claims: tuple[Mapping[str, Any], ...] = (),
     test_collection_evidence: Mapping[str, Any] | None = None,
 ) -> ReferenceValidationReport:
@@ -678,7 +713,7 @@ def validate_source_references(
                 "dynamic dispatch may be unresolved."
             ),
         }
-        result = _review(review_client, packet)
+        result = _review(review_client, packet, (*review_receipts, *reviews))
         result["purpose"] = purpose
         result["obligation_id"] = packet["obligation_id"]
         reviews.append(result)

@@ -393,6 +393,100 @@ def test_flexible_owners_and_suspicious_extra_placements_need_fresh_review() -> 
     )
 
 
+def test_complete_semantic_review_receipt_is_reused_only_for_identical_packet() -> None:
+    owner = {
+        "binding": "requires_semantic_review",
+        "kind": "function",
+        "allowed_paths": ["."],
+        "responsibility": "Own retry identity.",
+    }
+    handoff, catalog = inputs(owner=owner, cardinality="one_or_more")
+    candidate = SOURCE + b"def caller(): return retry()\n"
+    first_judge = Judge()
+    first = validate(
+        candidate,
+        handoff=handoff,
+        catalog=catalog,
+        review_client=first_judge,
+    )
+    first_reviews = first.to_data()["reviews"]
+    assert len(first_judge.requests) == len(first_reviews) == 2
+    assert all(not review["reused"] for review in first_reviews)
+
+    second_judge = Judge()
+    second = validate(
+        candidate,
+        handoff=handoff,
+        catalog=catalog,
+        review_client=second_judge,
+        review_receipts=tuple(first_reviews),
+    )
+    assert second.status == "passed"
+    assert not second_judge.requests
+    assert all(review["reused"] for review in second.to_data()["reviews"])
+
+    changed_candidate = candidate + b"# caller evidence changed\n"
+    changed_judge = Judge()
+    changed = validate(
+        changed_candidate,
+        handoff=handoff,
+        catalog=catalog,
+        review_client=changed_judge,
+        review_receipts=tuple(first_reviews),
+    )
+    assert changed.status == "passed"
+    assert len(changed_judge.requests) == 2
+    assert all(not review["reused"] for review in changed.to_data()["reviews"])
+
+    changed_handoff, changed_catalog = inputs(
+        owner=owner,
+        cardinality="one_or_more",
+        definitions=[
+            ReferenceDefinition("retry", "invariant", "Keep retry identity.", "spec:2")
+        ],
+    )
+    catalog_judge = Judge()
+    catalog_changed = validate(
+        candidate,
+        handoff=changed_handoff,
+        catalog=changed_catalog,
+        review_client=catalog_judge,
+        review_receipts=tuple(first_reviews),
+    )
+    assert catalog_changed.status == "passed"
+    assert len(catalog_judge.requests) == 2
+    assert all(not review["reused"] for review in catalog_changed.to_data()["reviews"])
+
+
+def test_incomplete_or_stale_semantic_review_receipts_are_not_reused() -> None:
+    owner = {
+        "binding": "requires_semantic_review",
+        "kind": "function",
+        "allowed_paths": ["."],
+        "responsibility": "Own retry identity.",
+    }
+    handoff, catalog = inputs(owner=owner, cardinality="one_or_more")
+    candidate = SOURCE + b"def caller(): return retry()\n"
+    first = validate(candidate, handoff=handoff, catalog=catalog, review_client=Judge())
+    receipts = first.to_data()["reviews"]
+    receipt = receipts[0]
+    stale = json.loads(json.dumps(receipt))
+    stale["decision"]["predicate_version"] = "older-policy"
+    stale["evidence_locations"] = []
+
+    judge = Judge()
+    result = validate(
+        candidate,
+        handoff=handoff,
+        catalog=catalog,
+        review_client=judge,
+        review_receipts=(stale, *receipts[1:]),
+    )
+    assert result.status == "passed"
+    assert len(judge.requests) == 1
+    assert result.to_data()["reviews"][0]["reused"] is False
+
+
 def test_unchanged_legacy_findings_are_diagnostic_and_scan_gaps_block() -> None:
     handoff, catalog = inputs()
     legacy = SOURCE + b"# structrr: missing\ndef old(): pass\n"

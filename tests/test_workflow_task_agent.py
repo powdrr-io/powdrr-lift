@@ -3728,6 +3728,19 @@ def test_registered_ci_formatter_runs_before_any_coding_provider(
             "registered correction created an inference handler"
         ),
     )
+    correction_attempts: list[Any] = []
+    run_registered_correction = task_agent._run_registered_ci_correction
+
+    def capture_registered_correction(**kwargs: Any) -> Any:
+        attempt = run_registered_correction(**kwargs)
+        correction_attempts.append(attempt)
+        return attempt
+
+    monkeypatch.setattr(
+        task_agent,
+        "_run_registered_ci_correction",
+        capture_registered_correction,
+    )
     strategy: Any = SimpleNamespace(
         workflow=SimpleNamespace(),
         task=SimpleNamespace(task_id="task-ci-format", process_checkpoint=None),
@@ -3757,6 +3770,8 @@ def test_registered_ci_formatter_runs_before_any_coding_provider(
         },
     )
 
+    assert len(correction_attempts) == 1
+    assert correction_attempts[0].error is None, correction_attempts[0].error
     assert result["passed"] is True, result
     assert result["validation_status"] == "passed"
     assert result["changed_paths"] == [path]

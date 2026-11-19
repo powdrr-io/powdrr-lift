@@ -1,0 +1,92 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1597
+title: Allow additive paths in typed plan repairs
+intent:
+  problem: Plan repair rejected an evidence-backed addition to an item's allowed paths, even when an implementation step and acceptance criterion required a test at that path.
+  goal: Let Powdrr publish a reviewed repair that adds required repository paths, preserve existing permissions, and carry the repaired paths into the generated workflow.
+human-decisions: []
+structured_files: []
+files:
+- path: packages/service/src/powdrr_service/planning/repair_service.py
+  type: modified
+  span:
+    start_line: 123
+    end_line: 124
+  summary: Check workflow allowed paths against the reviewed plan when that context is present.
+  rationale: Detect stale plan and workflow path scopes during repair preparation.
+- path: packages/service/src/powdrr_service/planning/repair_service.py
+  type: modified
+  span:
+    start_line: 383
+    end_line: 383
+  summary: Write repaired allowed paths into the generated workflow context.
+  rationale: Ensure the implementation task receives the same path scope as its repaired plan.
+- path: packages/service/src/powdrr_service/planning/repair_service.py
+  type: modified
+  span:
+    start_line: 470
+    end_line: 470
+  summary: Validate replacement allowed paths before constructing the repaired item.
+  rationale: Reject malformed paths before compiling repair artifacts.
+- path: packages/service/src/powdrr_service/planning/repair_service.py
+  type: modified
+  span:
+    start_line: 498
+    end_line: 498
+  summary: Permit the allowed-path field to be handled by bounded repair checks.
+  rationale: Make evidence-backed path additions eligible for review.
+- path: packages/service/src/powdrr_service/planning/repair_service.py
+  type: modified
+  span:
+    start_line: 508
+    end_line: 514
+  summary: Reject repairs that remove previously reviewed paths.
+  rationale: Allow only additive scope changes while preserving the original permissions.
+- path: packages/service/src/powdrr_service/planning/repair_service.py
+  type: modified
+  span:
+    start_line: 518
+    end_line: 541
+  summary: Validate unique repository-relative allowed paths for replacement items.
+  rationale: Keep additive path changes within the repository.
+- path: packages/service/src/powdrr_service/planning/repair_service.py
+  type: modified
+  span:
+    start_line: 580
+    end_line: 585
+  summary: Include allowed-path changes in the plan repair PR details.
+  rationale: Make the permission expansion visible for human review.
+- path: tests/test_plan_repair_service.py
+  type: modified
+  span:
+    start_line: 30
+    end_line: 32
+  summary: Import the generated workflow parser for repair assertions.
+  rationale: Validate repaired workflow context as structured data.
+- path: tests/test_plan_repair_service.py
+  type: modified
+  span:
+    start_line: 193
+    end_line: 216
+  summary: Cover allowed-path additions and reject removals.
+  rationale: Keep repair behavior additive and bounded.
+- path: tests/test_plan_repair_service.py
+  type: modified
+  span:
+    start_line: 256
+    end_line: 259
+  summary: Add a required test path to the real artifact compilation case.
+  rationale: Exercise path changes through the production repair compiler.
+- path: tests/test_plan_repair_service.py
+  type: modified
+  span:
+    start_line: 268
+    end_line: 274
+  summary: Assert the generated workflow carries the repaired allowed paths.
+  rationale: Prevent plan and workflow path scopes from diverging.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []
+features: []
+proposed_prs: []

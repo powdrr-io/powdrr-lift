@@ -646,6 +646,94 @@ class FakeIssueClient:
         return subprocess.CompletedProcess(["gh", *arguments], 1, "", "unexpected")
 
 
+def _closed_issue_worktree(tmp_path: Path, *, dirty: bool = False) -> tuple[Path, Path]:
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    subprocess.run(["git", "init", "-b", "main", str(repository)], check=True)
+    subprocess.run(
+        ["git", "-C", str(repository), "config", "user.name", "Test"], check=True
+    )
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(repository),
+            "config",
+            "user.email",
+            "test@example.com",
+        ],
+        check=True,
+    )
+    (repository / "README.md").write_text("test\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(repository), "add", "README.md"], check=True)
+    subprocess.run(
+        ["git", "-C", str(repository), "commit", "-m", "initial"], check=True
+    )
+    worktree = repository / ".worktrees" / "powdrr" / "issue-workflow-attempt"
+    worktree.parent.mkdir(parents=True)
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(repository),
+            "worktree",
+            "add",
+            "-b",
+            "powdrr/issue-workflow-attempt",
+            str(worktree),
+        ],
+        check=True,
+    )
+    state_directory = worktree / "docs" / "workflows"
+    state_directory.mkdir(parents=True)
+    (state_directory / "issue-workflow-workflow.yaml").write_text(
+        "proposed_pr_id: issue-workflow\n"
+        "base_branch: main\n"
+        "integration_branch: powdrr/issue-workflow-attempt\n"
+        "workflow_relative_directory: docs/workflows\n",
+        encoding="utf-8",
+    )
+    subprocess.run(["git", "-C", str(worktree), "add", "docs/workflows"], check=True)
+    subprocess.run(
+        ["git", "-C", str(worktree), "commit", "-m", "workflow state"], check=True
+    )
+    if dirty:
+        (worktree / "uncommitted.txt").write_text("keep\n", encoding="utf-8")
+    github_issue_queue._write_local_task_checkpoint(
+        repo_root=repository,
+        issue_number=17,
+        checkpoint=TaskCheckpoint("plan", "item", "issue-workflow", "task", "done", {}),
+    )
+    return repository, worktree
+
+
+def test_closed_issue_cleanup_removes_matching_clean_worktree(tmp_path: Path) -> None:
+    repository, worktree = _closed_issue_worktree(tmp_path)
+    client = FakeIssueClient(
+        (QueueIssue(17, "Closed", "", "closed", (), "https://example/17"),)
+    )
+
+    github_issue_queue._cleanup_closed_issue_worktrees(
+        cast(GitHubIssueClient, client), repository
+    )
+
+    assert not worktree.exists()
+
+
+def test_closed_issue_cleanup_keeps_dirty_worktree(tmp_path: Path) -> None:
+    repository, worktree = _closed_issue_worktree(tmp_path, dirty=True)
+    client = FakeIssueClient(
+        (QueueIssue(17, "Closed", "", "closed", (), "https://example/17"),)
+    )
+
+    github_issue_queue._cleanup_closed_issue_worktrees(
+        cast(GitHubIssueClient, client), repository
+    )
+
+    assert worktree.is_dir()
+    assert (worktree / "uncommitted.txt").read_text(encoding="utf-8") == "keep\n"
+
+
 def plan() -> ReviewedExecutionPlan:
     return ReviewedExecutionPlan(
         "feature-v1",

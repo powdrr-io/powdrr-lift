@@ -1421,6 +1421,7 @@ def run_worker_once(
             "claim store; configure a shared atomic claim store before enabling them"
         )
     with _worker_lock(root) as coordination:
+        _cleanup_closed_issue_worktrees(client, root)
         _requeue_merged_plan_amendments(
             client=client,
             repo_root=root,
@@ -2002,6 +2003,90 @@ def _issue_checkpoint_path(repo_root: str | Path, issue_number: int) -> Path:
         / "checkpoints"
         / f"issue-{issue_number}.json"
     )
+
+
+def _cleanup_closed_issue_worktrees(client: GitHubIssueClient, repo_root: Path) -> None:
+    """Remove clean integration worktrees belonging to closed issue checkpoints."""
+    checkpoint_directory = repo_root / ".powdrr" / "github-issue-worker" / "checkpoints"
+    worktree_directory = repo_root / ".worktrees"
+    if not checkpoint_directory.is_dir() or not worktree_directory.is_dir():
+        return
+
+    worktrees: list[Path] = []
+    result = subprocess.run(
+        ["git", "-C", str(repo_root), "worktree", "list", "--porcelain"],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        return
+    for line in result.stdout.splitlines():
+        if not line.startswith("worktree "):
+            continue
+        path = Path(line.removeprefix("worktree ")).resolve()
+        if path != repo_root and path.is_relative_to(worktree_directory.resolve()):
+            worktrees.append(path)
+
+    for checkpoint_path in sorted(checkpoint_directory.glob("issue-*.json")):
+        match = re.fullmatch(r"issue-(\d+)\.json", checkpoint_path.name)
+        if match is None:
+            continue
+        try:
+            issue_number = int(match.group(1))
+            record = _read_local_task_checkpoint(repo_root, issue_number)
+            if record is None:
+                continue
+            issue = client.get_issue(issue_number)
+        except (GitHubIssueQueueError, OSError, ValueError):
+            continue
+        if issue.state != "closed":
+            continue
+
+        workflow_id = record["workflow_id"]
+        matching_worktrees: list[Path] = []
+        for worktree in worktrees:
+            for state_path in worktree.rglob("*-workflow.yaml"):
+                try:
+                    state = yaml.safe_load(state_path.read_text(encoding="utf-8"))
+                    if (
+                        isinstance(state, Mapping)
+                        and state.get("proposed_pr_id") == workflow_id
+                    ):
+                        matching_worktrees.append(worktree)
+                        break
+                except (OSError, yaml.YAMLError):
+                    continue
+        for worktree in matching_worktrees:
+            status = subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(worktree),
+                    "status",
+                    "--porcelain",
+                    "--untracked-files=normal",
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            if status.returncode != 0 or status.stdout.strip():
+                continue
+            subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(repo_root),
+                    "worktree",
+                    "remove",
+                    "--force",
+                    str(worktree),
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
 
 
 def _task_checkpoint_record(

@@ -1,0 +1,50 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1624
+title: Explain blocked workflow task selection failures
+intent:
+  problem: Issue workers report only that no ready agent task exists when a previous failed or interrupted task remains locked.
+  goal: Include unresolved agent task IDs, statuses, and dependencies in the failure diagnostic so the durable workflow state is actionable.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span: {start_line: 7363, end_line: 7363}
+    summary: Replace the generic no-ready-task message with a workflow-state diagnostic.
+    rationale: Preserve task-level context when a failed or interrupted run leaves no agent task runnable.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span: {start_line: 7865, end_line: 7901}
+    summary: Report unresolved agent task statuses and upstream dependencies when selection finds no ready task.
+    rationale: Identify locked tasks and direct operators to inspect the durable task and process checkpoint.
+  - path: tests/test_workflow_task_agent.py
+    type: modified
+    span: {start_line: 86, end_line: 86}
+    summary: Import the blocked-task diagnostic helper for direct regression coverage.
+    rationale: Exercise the exact diagnostic used by the workflow task runner.
+  - path: tests/test_workflow_task_agent.py
+    type: modified
+    span: {start_line: 101, end_line: 131}
+    summary: Cover diagnostics for a locked implementation task and its dependent open review task.
+    rationale: Ensure blocked task state and dependency context remain visible in the error.
+entities:
+  - id: no-ready-agent-task-diagnostic
+    type: Function
+    action: added
+  - id: blocked-task-diagnostic-regression-test
+    type: Regression test
+    action: added
+entity_relationships:
+  - id: regression-test-exercises-blocked-task-diagnostic
+    type: exercises
+    source: blocked-task-diagnostic-regression-test
+    target: no-ready-agent-task-diagnostic
+    action: added
+    description: Verifies the diagnostic identifies locked tasks and unresolved upstream dependencies.
+invariants:
+  - id: blocked-task-selection-failure-is-actionable
+    description: When no agent task is ready, the worker identifies each unresolved agent task and its status instead of reporting only a generic message.
+    action: added
+guidance: []
+features: []
+proposed_prs: []

@@ -1,0 +1,24 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1612
+title: Cover registered CI formatter failure guards
+intent:
+  problem: The registered Ruff CI correction path had runtime safeguards, but direct tests did not verify its stale evidence, no-op, protected artifact, out-of-scope, and ambiguous execution failures.
+  goal: Exercise each safety guard so unsafe corrections remain failed attempts and cannot be accepted.
+human-decisions: []
+structured_files: []
+files:
+  - path: tests/test_workflow_task_agent.py
+    type: modified
+    span: {start_line: 3633, end_line: 3785}
+    summary: Add direct failure-path tests for registered formatter corrections.
+    rationale: Verify stale evidence, no-op output, protected artifact changes, out-of-scope edits, and ambiguous formatter diagnostics are rejected.
+entities:
+  - id: registered-ci-formatter-negative-tests
+    type: Regression test
+    action: added
+entity_relationships: []
+invariants:
+  - id: unsafe-registered-formatter-attempts-fail-closed
+    description: A registered formatter correction with stale evidence, no change, protected artifact drift, out-of-scope edits, or ambiguous check output returns a failed attempt.
+    action: added
+guidance: []

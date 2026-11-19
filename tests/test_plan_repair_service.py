@@ -27,6 +27,9 @@ from powdrr_service.planning.repair_service import (
     load_repair_draft,
     prepare_repair_publication,
 )
+from powdrr_service.planning.workflow_instance import (
+    parse_plan_workflow_instance_yaml,
+)
 
 from powdrr_lift.workrr.github_issue_queue import PlannedWorkItem, ReviewedExecutionPlan
 
@@ -187,6 +190,30 @@ def test_shared_repair_service_rejects_stale_bound_plan_reference() -> None:
         apply_repair_request(_draft(), request, compile_candidate=_compile)
 
 
+def test_shared_repair_service_allows_additive_allowed_paths() -> None:
+    draft = _draft()
+    request = _request()
+    added_path = "tests/test_raw_byte_hash.py"
+    request["replacement_items"]["item-01"]["allowed_paths"] = [
+        "src/",
+        added_path,
+    ]
+
+    repaired = apply_repair_request(draft, request, compile_candidate=_compile)
+
+    assert repaired.plan.items[0].allowed_paths == ("src/", added_path)
+
+
+def test_shared_repair_service_rejects_allowed_path_removal() -> None:
+    request = _request()
+    request["replacement_items"]["item-01"]["allowed_paths"] = [
+        "tests/test_raw_byte_hash.py"
+    ]
+
+    with pytest.raises(PlanRepairServiceError, match="may only add allowed paths"):
+        apply_repair_request(_draft(), request, compile_candidate=_compile)
+
+
 def test_shared_repair_service_compiles_real_reviewed_artifacts(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -226,6 +253,10 @@ def test_shared_repair_service_compiles_real_reviewed_artifacts(
             "objective": "Add the required behavior.",
             "scope": ["Implement the behavior."],
             "acceptance_criteria": ["The behavior is covered."],
+            "allowed_paths": [
+                *draft.plan.items[0].allowed_paths,
+                "tests/test_raw_byte_hash.py",
+            ],
         }
     }
 
@@ -234,7 +265,13 @@ def test_shared_repair_service_compiles_real_reviewed_artifacts(
     assert repaired.plan.items[0].title == "Implement the corrected requirement"
     assert repaired.artifacts[compiled.plan_path] != compiled.files[compiled.plan_path]
     workflow = repaired.artifacts["docs/workflows/bounded-plan/item-01.yaml"]
-    assert "Implement the corrected requirement" in workflow
+    parsed_workflow = parse_plan_workflow_instance_yaml(workflow)
+    proposed_context = parsed_workflow.inputs["proposed_pr_context"]
+    assert proposed_context["title"] == "Implement the corrected requirement"
+    assert proposed_context["allowed_paths"] == [
+        *draft.plan.items[0].allowed_paths,
+        "tests/test_raw_byte_hash.py",
+    ]
 
     source_artifacts = tuple(
         Artifact(path, "application/vnd.powdrr.source-file", content.encode("utf-8"))

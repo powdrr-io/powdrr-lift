@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -14,6 +15,8 @@ from powdrr_service.verification.requirement_execution import (
 
 from powdrr_lift.workrr.planning.execution_receipts import (
     MANIFEST_SCHEMA,
+    RECEIPT_ARTIFACT_NAME,
+    discover_requirement_execution_receipts,
     load_requirement_execution_receipts,
 )
 
@@ -87,3 +90,92 @@ def test_receipt_manifest_rejects_excerpt_digest_mismatch(tmp_path: Path) -> Non
 
     with pytest.raises(EvidenceError, match="digest does not match"):
         load_requirement_execution_receipts(path, pinned_commit="a" * 40)
+
+
+def test_discovery_downloads_only_successful_artifacts_for_exact_commit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    commit = "a" * 40
+    calls: list[list[str]] = []
+
+    def run(command: list[str], **_kwargs: Any) -> Any:
+        calls.append(command)
+        if command[1:3] == ["run", "list"]:
+            return SimpleNamespace(
+                returncode=0,
+                stdout=json.dumps(
+                    [
+                        {
+                            "databaseId": 1,
+                            "headSha": "f" * 40,
+                            "status": "completed",
+                            "conclusion": "success",
+                        },
+                        {
+                            "databaseId": 2,
+                            "headSha": commit,
+                            "status": "completed",
+                            "conclusion": "failure",
+                        },
+                        {
+                            "databaseId": 3,
+                            "headSha": commit,
+                            "status": "completed",
+                            "conclusion": "success",
+                        },
+                    ]
+                ),
+                stderr="",
+            )
+        destination = Path(command[command.index("--dir") + 1])
+        destination.mkdir(parents=True, exist_ok=True)
+        (destination / "receipts.json").write_text(
+            json.dumps(_manifest_data(commit)), encoding="utf-8"
+        )
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(
+        "powdrr_lift.workrr.planning.execution_receipts.subprocess.run", run
+    )
+    evidence_by_requirement, _excerpts = discover_requirement_execution_receipts(
+        "owner/repo", pinned_commit=commit
+    )
+
+    assert list(evidence_by_requirement) == ["req-0001"]
+    assert calls[0][calls[0].index("--commit") + 1] == commit
+    assert calls[1][3] == "3"
+    assert calls[1][calls[1].index("--name") + 1] == RECEIPT_ARTIFACT_NAME
+
+
+def test_discovery_returns_no_evidence_when_runs_have_no_receipt_artifact(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    commit = "a" * 40
+
+    def run(command: list[str], **_kwargs: Any) -> Any:
+        if command[1:3] == ["run", "list"]:
+            return SimpleNamespace(
+                returncode=0,
+                stdout=json.dumps(
+                    [
+                        {
+                            "databaseId": 4,
+                            "headSha": commit,
+                            "status": "completed",
+                            "conclusion": "success",
+                        }
+                    ]
+                ),
+                stderr="",
+            )
+        return SimpleNamespace(
+            returncode=1, stdout="", stderr="no artifacts found for run"
+        )
+
+    monkeypatch.setattr(
+        "powdrr_lift.workrr.planning.execution_receipts.subprocess.run", run
+    )
+
+    assert discover_requirement_execution_receipts(
+        "owner/repo", pinned_commit=commit
+    ) == ({}, {})

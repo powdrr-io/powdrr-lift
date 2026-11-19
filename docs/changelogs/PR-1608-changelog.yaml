@@ -1,0 +1,92 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1608
+title: Discover planner receipt artifacts from GitHub
+intent:
+  problem: Planning can validate supplied execution receipt manifests but does not find manifests attached to GitHub workflow runs.
+  goal: Discover a receipt artifact only from a successful workflow run for the exact pinned commit, while preserving semantic fallback when no artifact is available.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/audits/planning-llm-audit.md
+  type: modified
+  span:
+    start_line: 306
+    end_line: 315
+  summary: Document exact-commit GitHub artifact discovery and the remaining producer boundary.
+  rationale: Keep the planner audit accurate about what runs automatically and what remains externally produced.
+- path: src/powdrr_lift/workrr/planning/execution_receipts.py
+  type: modified
+  span:
+    start_line: 7
+    end_line: 8
+  summary: Import subprocess and temporary-directory support for GitHub artifact lookup.
+  rationale: Discover and safely inspect downloaded workflow artifacts.
+- path: src/powdrr_lift/workrr/planning/execution_receipts.py
+  type: modified
+  span:
+    start_line: 18
+    end_line: 18
+  summary: Define the canonical GitHub Actions artifact name for planning receipts.
+  rationale: Make the planner and external workflow adapter use one artifact contract.
+- path: src/powdrr_lift/workrr/planning/execution_receipts.py
+  type: modified
+  span:
+    start_line: 103
+    end_line: 208
+  summary: Discover and validate receipt manifests from successful runs on the exact commit.
+  rationale: Exclude other revisions and failed runs, and return no evidence when the artifact is absent.
+- path: src/powdrr_lift/workrr/planning/execution_receipts.py
+  type: modified
+  span:
+    start_line: 214
+    end_line: 214
+  summary: Export GitHub receipt artifact discovery and its artifact name.
+  rationale: Make the discovery boundary available to planning sessions.
+- path: src/powdrr_lift/workrr/planning_session.py
+  type: modified
+  span:
+    start_line: 65
+    end_line: 65
+  summary: Import GitHub receipt artifact discovery into the planning boundary.
+  rationale: Connect receipt discovery to normal planning runs.
+- path: src/powdrr_lift/workrr/planning_session.py
+  type: modified
+  span:
+    start_line: 184
+    end_line: 199
+  summary: Discover receipts automatically when no explicit manifest path is supplied.
+  rationale: Use exact-commit receipts when available and fall back safely when GitHub lookup fails.
+- path: tests/test_planning_execution_receipts.py
+  type: modified
+  span:
+    start_line: 6
+    end_line: 6
+  summary: Import the subprocess result fixture helper.
+  rationale: Test GitHub workflow discovery without network access.
+- path: tests/test_planning_execution_receipts.py
+  type: modified
+  span:
+    start_line: 18
+    end_line: 19
+  summary: Import the receipt artifact discovery API and canonical name.
+  rationale: Exercise the public GitHub discovery contract.
+- path: tests/test_planning_execution_receipts.py
+  type: modified
+  span:
+    start_line: 95
+    end_line: 147
+  summary: Verify discovery selects only successful runs on the pinned commit.
+  rationale: Prevent receipt evidence from other revisions or failed workflows from being consumed.
+- path: tests/test_planning_execution_receipts.py
+  type: modified
+  span:
+    start_line: 150
+    end_line: 181
+  summary: Verify absent receipt artifacts produce no deterministic evidence.
+  rationale: Preserve the normal semantic coverage path when no workflow publishes receipts.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []
+features: []
+proposed_prs: []

@@ -18,20 +18,27 @@ files:
   type: modified
   span:
     start_line: 151
-    end_line: 233
+    end_line: 235
   summary: Convert matching structured verifier evidence into a typed requirement receipt.
   rationale: Reuse observed obligation, oracle, command, outcome, candidate-tree, and artifact data while requiring explicit requirement and commit bindings.
 - path: packages/service/src/powdrr_service/verification/requirement_execution.py
   type: modified
   span:
-    start_line: 245
-    end_line: 250
+    start_line: 249
+    end_line: 249
   summary: Export the verifier evidence adapter.
   rationale: Make the receipt conversion available to explicit integration callers.
 - path: tests/test_requirement_execution_receipt.py
   type: modified
   span:
-    start_line: 115
+    start_line: 19
+    end_line: 19
+  summary: Import the verifier evidence receipt adapter.
+  rationale: Make the producer adapter available to its focused contract test.
+- path: tests/test_requirement_execution_receipt.py
+  type: modified
+  span:
+    start_line: 113
     end_line: 166
   summary: Verify receipt conversion and candidate-tree mismatch rejection.
   rationale: Ensure the adapter binds observed results to the exact supplied candidate and requirement identities.

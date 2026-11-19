@@ -160,8 +160,18 @@ def test_environment_executes_once_preserves_failure_timeout_and_submission(
                 }
             )
         assert submitted.value.messages[0]["content"] == "final artifact\n"
+        with pytest.raises(Submitted) as inline_submitted:
+            environment.execute(
+                {
+                    "command": (
+                        "echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT "
+                        "'{\"design_gaps\":[]}'"
+                    )
+                }
+            )
+        assert inline_submitted.value.messages[0]["content"] == ('{"design_gaps":[]}\n')
     recorded = [json.loads(line) for line in events.read_text().splitlines()]
-    assert len(recorded) == 3
+    assert len(recorded) == 4
     assert recorded[-1]["enrichment_mode"] == "submission"
     assert all(e["source_reference_mode"] == "enforce" for e in recorded)
     assert "echo once" not in events.read_text()

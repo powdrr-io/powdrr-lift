@@ -97,6 +97,8 @@ def test_plan_resume_cli_requires_repository_and_session_issue() -> None:
             "owner/repository",
             "--session-issue",
             "42",
+            "--execution-receipts",
+            "receipts.json",
         ]
     )
 
@@ -104,6 +106,7 @@ def test_plan_resume_cli_requires_repository_and_session_issue() -> None:
     assert args.repository == "owner/repository"
     assert args.session_issue == 42
     assert args.planning_concurrency == 8
+    assert args.execution_receipts == Path("receipts.json")
 
 
 def test_plan_cli_defaults_to_eight_concurrent_questions() -> None:
@@ -116,10 +119,13 @@ def test_plan_cli_defaults_to_eight_concurrent_questions() -> None:
             "bounded-plan",
             "--verification-command",
             "make test",
+            "--execution-receipts",
+            "receipts.json",
         ]
     )
 
     assert args.planning_concurrency == 8
+    assert args.execution_receipts == Path("receipts.json")
     assert PlanningSessionConfig(repo_root=None).concurrency == 8
 
 

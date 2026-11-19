@@ -303,9 +303,13 @@ fingerprint, and candidate-tree fingerprint match explicit inputs. The caller
 must also supply the requirement digest, source/candidate commits, run ID, and
 evidence artifact reference; no requirement link is inferred from story refs.
 The current verification workflow does not yet supply those planning bindings
-automatically, so this adapter is an explicit integration point rather than an
-active receipt producer. The schema binds the claim but is not itself
-cryptographic proof.
+automatically. `plan` and `plan-resume` now accept an explicit JSON receipt
+manifest; the loader pins its base commit, validates each receipt and evidence
+digest, and supplies records only under their explicit requirement IDs. The
+caller must obtain the manifest from its GitHub or execution adapter; the
+planner does not guess or infer the binding. The service adapter is therefore
+an explicit integration point rather than an active receipt producer. The
+schema binds the claim but is not itself cryptographic proof.
 
 ### P05: setup instructions are not an invitation to rediscover configuration
 

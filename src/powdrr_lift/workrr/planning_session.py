@@ -28,7 +28,7 @@ from powdrr_service.decision_classifier import create_decision_provider
 from powdrr_service.planning.assembly import PathFact, WorkUnit
 from powdrr_service.planning.compiler import PlanningCompilationError
 from powdrr_service.planning.driver import SourceLedgerQuestionMachine
-from powdrr_service.planning.evidence import EvidenceError
+from powdrr_service.planning.evidence import Evidence, EvidenceError
 from powdrr_service.planning.plan_sizing import PATH_RUNTIME_SUFFIXES
 from powdrr_service.planning.service import (
     PlanningOptions,
@@ -61,6 +61,9 @@ from powdrr_lift.workrr.planning.evidence import (
     search_structural_document_analysis,
     search_structural_document_symbols,
 )
+from powdrr_lift.workrr.planning.execution_receipts import (
+    load_requirement_execution_receipts,
+)
 from powdrr_lift.workrr.provider_runtime import (
     build_workflow_client,
     resolve_workflow_provider,
@@ -84,6 +87,7 @@ class PlanningSessionConfig:
     api_key: str | None = None
     base_url: str | None = None
     concurrency: int = 8
+    execution_receipt_manifest: Path | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -163,6 +167,19 @@ def run_planning_session(
             session.base_commit if session is not None else _git_head(repo_root)
         )
         _require_clean_planning_checkout(repo_root, base_commit)
+        evidence_by_requirement: dict[str, tuple[Evidence, ...]] = {}
+        receipt_excerpts_by_evidence: dict[str, str] = {}
+        if config.execution_receipt_manifest is not None:
+            receipt_manifest = config.execution_receipt_manifest
+            if not receipt_manifest.is_absolute():
+                receipt_manifest = repo_root / receipt_manifest
+            (
+                evidence_by_requirement,
+                receipt_excerpts_by_evidence,
+            ) = load_requirement_execution_receipts(
+                receipt_manifest,
+                pinned_commit=base_commit,
+            )
 
         output_path = (
             _repository_file_path(config.output, repo_root, "Output plan")
@@ -383,9 +400,11 @@ def run_planning_session(
                 base_commit,
                 requirements,
             ),
-            evidence_excerpt_reader=lambda evidence: read_evidence_excerpt(
-                repo_root, evidence
+            evidence_excerpt_reader=lambda evidence: (
+                receipt_excerpts_by_evidence.get(evidence.id)
+                or read_evidence_excerpt(repo_root, evidence)
             ),
+            evidence_by_requirement=evidence_by_requirement,
             dependency_reference_search=search_dependency_references,
             structural_symbol_search=search_structural_symbols,
             structural_reference_search=search_structural_references,

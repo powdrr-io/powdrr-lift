@@ -62,6 +62,7 @@ from powdrr_lift.workrr.planning.evidence import (
     search_structural_document_symbols,
 )
 from powdrr_lift.workrr.planning.execution_receipts import (
+    discover_requirement_execution_receipts,
     load_requirement_execution_receipts,
 )
 from powdrr_lift.workrr.provider_runtime import (
@@ -180,6 +181,22 @@ def run_planning_session(
                 receipt_manifest,
                 pinned_commit=base_commit,
             )
+        else:
+            assert github is not None
+            try:
+                (
+                    evidence_by_requirement,
+                    receipt_excerpts_by_evidence,
+                ) = discover_requirement_execution_receipts(
+                    github.repository,
+                    pinned_commit=base_commit,
+                )
+            except EvidenceError as error:
+                print(
+                    "GitHub execution receipt discovery is unavailable; "
+                    f"coverage will use the normal evidence path: {error}",
+                    file=stream,
+                )
 
         output_path = (
             _repository_file_path(config.output, repo_root, "Output plan")

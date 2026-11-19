@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import hashlib
 import json
+import subprocess
+import tempfile
 from collections.abc import Mapping
 from pathlib import Path
 
@@ -13,6 +15,7 @@ from powdrr_service.verification.requirement_execution import (
 )
 
 MANIFEST_SCHEMA = "requirement-execution-evidence-manifest-v1"
+RECEIPT_ARTIFACT_NAME = "powdrr-requirement-execution-receipts"
 
 
 def load_requirement_execution_receipts(
@@ -97,4 +100,117 @@ def load_requirement_execution_receipts(
     return evidence_by_requirement, excerpts_by_evidence
 
 
-__all__ = ["MANIFEST_SCHEMA", "load_requirement_execution_receipts"]
+def discover_requirement_execution_receipts(
+    repository: str,
+    *,
+    pinned_commit: str,
+) -> tuple[dict[str, tuple[Evidence, ...]], dict[str, str]]:
+    """Find the latest successful GitHub Actions receipt artifact for a commit."""
+    try:
+        result = subprocess.run(
+            [
+                "gh",
+                "run",
+                "list",
+                "--repo",
+                repository,
+                "--commit",
+                pinned_commit,
+                "--json",
+                "databaseId,headSha,status,conclusion",
+                "--limit",
+                "100",
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except (OSError, subprocess.TimeoutExpired) as error:
+        raise EvidenceError(f"could not list GitHub workflow runs: {error}") from error
+    if result.returncode != 0:
+        raise EvidenceError(
+            "could not list GitHub workflow runs for the pinned commit: "
+            + result.stderr.strip()[-500:]
+        )
+    try:
+        runs = json.loads(result.stdout)
+    except json.JSONDecodeError as error:
+        raise EvidenceError("GitHub returned invalid workflow run data") from error
+    if not isinstance(runs, list):
+        raise EvidenceError("GitHub workflow run data must be a list")
+    eligible_runs = [
+        run
+        for run in runs
+        if isinstance(run, Mapping)
+        and run.get("headSha") == pinned_commit
+        and run.get("status") == "completed"
+        and run.get("conclusion") == "success"
+        and isinstance(run.get("databaseId"), int)
+        and not isinstance(run.get("databaseId"), bool)
+    ][:25]
+
+    for run in eligible_runs:
+        run_id = run["databaseId"]
+        with tempfile.TemporaryDirectory(prefix="powdrr-receipt-artifact-") as folder:
+            try:
+                download = subprocess.run(
+                    [
+                        "gh",
+                        "run",
+                        "download",
+                        str(run_id),
+                        "--repo",
+                        repository,
+                        "--name",
+                        RECEIPT_ARTIFACT_NAME,
+                        "--dir",
+                        folder,
+                    ],
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                    timeout=60,
+                )
+            except (OSError, subprocess.TimeoutExpired) as error:
+                raise EvidenceError(
+                    f"could not download receipt artifact from run {run_id}: {error}"
+                ) from error
+            if download.returncode != 0:
+                details = download.stderr.strip()
+                if (
+                    "no artifact" in details.casefold()
+                    or "no artifacts" in details.casefold()
+                ):
+                    continue
+                raise EvidenceError(
+                    f"could not download receipt artifact from workflow run {run_id}: "
+                    + details[-500:]
+                )
+            manifests = []
+            for manifest_path in Path(folder).rglob("*.json"):
+                try:
+                    candidate = json.loads(manifest_path.read_text(encoding="utf-8"))
+                except (OSError, json.JSONDecodeError):
+                    continue
+                if (
+                    isinstance(candidate, Mapping)
+                    and candidate.get("schema_version") == MANIFEST_SCHEMA
+                ):
+                    manifests.append(manifest_path)
+            if len(manifests) != 1:
+                raise EvidenceError(
+                    "receipt artifact must contain exactly one recognized JSON manifest"
+                )
+            return load_requirement_execution_receipts(
+                manifests[0], pinned_commit=pinned_commit
+            )
+    return {}, {}
+
+
+__all__ = [
+    "MANIFEST_SCHEMA",
+    "RECEIPT_ARTIFACT_NAME",
+    "discover_requirement_execution_receipts",
+    "load_requirement_execution_receipts",
+]

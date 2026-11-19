@@ -1,0 +1,57 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1605
+title: Preserve reviewed context when publishing issue worker changelogs
+intent:
+  problem: Issue-worker PR creation succeeds, but its follow-up changelog publication can fail because it reads title and description fields from unnormalized action parameters.
+  goal: Reuse the normalized publication context and reviewed PR title so changelog finalization completes with the same branch and description as the original PR.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span:
+      start_line: 3081
+      end_line: 3087
+    summary: Normalize issue-worker publication parameters before reading files to publish.
+    rationale: Make workflow-context publication fields available to changelog finalization.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span:
+      start_line: 3101
+      end_line: 3101
+    summary: Use the normalized publication branch when validating the generated changelog.
+    rationale: Keep changelog validation bound to the branch created by the original publication.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span:
+      start_line: 3103
+      end_line: 3107
+    summary: Require and reuse the reviewed PR title for the changelog publication.
+    rationale: Prevent a follow-up publication from failing when title exists in the reviewed PR context rather than direct action parameters.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span:
+      start_line: 3113
+      end_line: 3113
+    summary: Set the changelog publication title from the reviewed PR title.
+    rationale: Keep the generated changelog update on the same PR identity.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span:
+      start_line: 3115
+      end_line: 3115
+    summary: Carry the original structured description sections into changelog publication.
+    rationale: Preserve the PR description context through post-publication finalization.
+  - path: tests/test_workflow_task_agent.py
+    type: modified
+    span:
+      start_line: 151
+      end_line: 241
+    summary: Verify changelog finalization reuses the reviewed title, normalized branch, description sections, and issue comment.
+    rationale: Prevent regressions where the initial PR is created but its required changelog publication fails due to missing direct action parameters.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []
+features: []
+proposed_prs: []

@@ -260,6 +260,89 @@ def test_worker_executes_independent_items_concurrently(tmp_path: Path) -> None:
     assert {first_report.item_id, second_report.item_id} == {"first", "second"}
 
 
+def test_worker_blocks_before_execution_when_ci_inventory_is_stale(
+    tmp_path: Path,
+) -> None:
+    for item in plan().items:
+        assert item.workflow_directory is not None
+        (tmp_path / item.workflow_directory).mkdir(parents=True)
+    workflow_dir = tmp_path / ".github/workflows"
+    workflow_dir.mkdir(parents=True, exist_ok=True)
+    (workflow_dir / "ci.yml").write_text("name: CI\njobs: {}\n", encoding="utf-8")
+    baseline = tmp_path / "docs/structrr/current/baseline-bootstrap.yaml"
+    baseline.parent.mkdir(parents=True, exist_ok=True)
+    baseline.write_text("validation_inventory: []\n", encoding="utf-8")
+    client = FakeIssueClient()
+    publish_plan_issues(
+        plan=plan(),
+        plan_path="docs/plans/feature.yaml",
+        plan_commit=PLAN_COMMIT,
+        client=client,  # type: ignore[arg-type]
+    )
+    executed: list[str] = []
+
+    def run_task(_path: Path, workflow_id: str, *_args: Any) -> int:
+        executed.append(workflow_id)
+        return 0
+
+    report = run_worker_once(
+        client=client,  # type: ignore[arg-type]
+        repo_root=tmp_path,
+        worker_id="worker-a",
+        run_task=run_task,
+        plan_loader=lambda *_args, **_kwargs: plan(),
+    )
+
+    issue = client.get_issue(report.issue_number or -1)
+    assert report.outcome == "blocked"
+    assert "inventory is missing or stale" in (report.detail or "")
+    assert QUEUE_LABELS["blocked"] in issue.labels
+    assert QUEUE_LABELS["ready"] not in issue.labels
+    assert executed == []
+    assert any("regenerate and commit" in body for _, body in client.comments)
+
+
+def test_worker_blocks_before_execution_when_no_required_checks_are_configured(
+    tmp_path: Path,
+) -> None:
+    for item in plan().items:
+        assert item.workflow_directory is not None
+        (tmp_path / item.workflow_directory).mkdir(parents=True)
+    _write_test_validation_inventory(tmp_path)
+    client = FakeIssueClient()
+    client.default_branch_checks = ()
+    publish_plan_issues(
+        plan=plan(),
+        plan_path="docs/plans/feature.yaml",
+        plan_commit=PLAN_COMMIT,
+        client=client,  # type: ignore[arg-type]
+    )
+    executed: list[str] = []
+
+    def run_task(_path: Path, workflow_id: str, *_args: Any) -> int:
+        executed.append(workflow_id)
+        return 0
+
+    report = run_worker_once(
+        client=client,  # type: ignore[arg-type]
+        repo_root=tmp_path,
+        worker_id="worker-a",
+        run_task=run_task,
+        plan_loader=lambda *_args, **_kwargs: plan(),
+    )
+
+    issue = client.get_issue(report.issue_number or -1)
+    assert report.outcome == "blocked"
+    assert report.detail == "repository default branch has no required status checks"
+    assert QUEUE_LABELS["blocked"] in issue.labels
+    assert QUEUE_LABELS["ready"] not in issue.labels
+    assert executed == []
+    assert any(
+        "Configure at least one required status check" in body
+        for _, body in client.comments
+    )
+
+
 def _write_test_validation_inventory(root: Path) -> None:
     workflow_path = root / ".github/workflows/ci.yml"
     workflow_path.parent.mkdir(parents=True, exist_ok=True)
@@ -434,6 +517,7 @@ class FakeIssueClient:
         self.labels_ensured = False
         self.fulfillment_label_ensured = False
         self.merged_commit: str | None = None
+        self.default_branch_checks: tuple[str, ...] = ("test",)
         self.required_checks = [{"name": "test", "state": "pass", "workflow": "ci"}]
         self.pull_request_files: list[dict[str, str]] = []
         self.pr_head = "c" * 40
@@ -453,6 +537,9 @@ class FakeIssueClient:
 
     def ensure_plan_commit_merged(self, plan_commit: str) -> None:
         self.merged_commit = plan_commit
+
+    def default_branch_required_checks(self) -> tuple[str, ...]:
+        return self.default_branch_checks
 
     def list_issues(
         self, *, labels: tuple[str, ...] = (), state: str = "all"
@@ -1154,6 +1241,76 @@ def test_github_issue_client_closes_fulfilled_issue_with_completed_reason() -> N
     assert f"labels[]={FULFILLED_WITHOUT_PR_LABEL}" in patch_arguments
     assert "state=closed" in patch_arguments
     assert "state_reason=completed" in patch_arguments
+
+
+def test_github_issue_client_reads_required_checks_from_active_rulesets() -> None:
+    commands: list[list[str]] = []
+
+    def run(
+        arguments: list[str], **_kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
+        commands.append(arguments)
+        endpoint = arguments[2]
+        if endpoint == "repos/example/project":
+            return subprocess.CompletedProcess(
+                arguments, 0, json.dumps({"default_branch": "main"}), ""
+            )
+        if endpoint == "repos/example/project/rules/branches/main":
+            return subprocess.CompletedProcess(
+                arguments,
+                0,
+                json.dumps(
+                    [
+                        {
+                            "type": "required_status_checks",
+                            "parameters": {
+                                "required_status_checks": [
+                                    {"context": "verify", "integration_id": None}
+                                ]
+                            },
+                        }
+                    ]
+                ),
+                "",
+            )
+        raise AssertionError(f"unexpected GitHub API request: {arguments!r}")
+
+    checks = GitHubIssueClient(
+        "example/project", run=run
+    ).default_branch_required_checks()
+
+    assert checks == ("verify",)
+    assert len(commands) == 2
+
+
+def test_github_issue_client_falls_back_to_classic_branch_protection() -> None:
+    commands: list[list[str]] = []
+
+    def run(
+        arguments: list[str], **_kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
+        commands.append(arguments)
+        endpoint = arguments[2]
+        if endpoint == "repos/example/project":
+            return subprocess.CompletedProcess(
+                arguments, 0, json.dumps({"default_branch": "main"}), ""
+            )
+        if endpoint == "repos/example/project/rules/branches/main":
+            return subprocess.CompletedProcess(arguments, 0, "[]", "")
+        if endpoint == (
+            "repos/example/project/branches/main/protection/required_status_checks"
+        ):
+            return subprocess.CompletedProcess(
+                arguments, 0, json.dumps({"contexts": ["unit"], "checks": []}), ""
+            )
+        raise AssertionError(f"unexpected GitHub API request: {arguments!r}")
+
+    checks = GitHubIssueClient(
+        "example/project", run=run
+    ).default_branch_required_checks()
+
+    assert checks == ("unit",)
+    assert len(commands) == 3
 
 
 def test_github_client_skips_labels_that_already_exist() -> None:

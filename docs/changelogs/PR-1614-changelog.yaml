@@ -1,0 +1,58 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1614
+title: Reuse evidence-bound source review receipts
+intent:
+  problem: Local and final source-reference validation can repeat identical semantic review requests even when the first review already produced a complete evidence-bound decision.
+  goal: Reuse complete satisfied review receipts only when the exact review packet, policy, and complete owner evidence still match; otherwise obtain a fresh review.
+human-decisions: []
+structured_files: []
+files:
+  - path: packages/service/src/powdrr_service/structrr/reference_validation.py
+    type: modified
+    span: {start_line: 149, end_line: 151}
+    summary: Accept prior review records in the review helper.
+    rationale: Make evidence-bound review reuse available to the trusted validation path.
+  - path: packages/service/src/powdrr_service/structrr/reference_validation.py
+    type: modified
+    span: {start_line: 167, end_line: 197}
+    summary: Reuse complete satisfied owner review receipts.
+    rationale: Validate the prior decision against the current packet, policy revision, evidence set, and all candidate owner locations before reuse.
+  - path: packages/service/src/powdrr_service/structrr/reference_validation.py
+    type: modified
+    span: {start_line: 325, end_line: 325}
+    summary: Mark newly generated review records as not reused.
+    rationale: Preserve clear provenance when the validator calls the review client.
+  - path: packages/service/src/powdrr_service/structrr/reference_validation.py
+    type: modified
+    span: {start_line: 339, end_line: 339}
+    summary: Accept prior review records as optional validation input.
+    rationale: Let trusted callers carry review records between local and final validation passes.
+  - path: packages/service/src/powdrr_service/structrr/reference_validation.py
+    type: modified
+    span: {start_line: 716, end_line: 716}
+    summary: Reuse matching records during the validation pass.
+    rationale: Avoid duplicate model calls for repeated packets within or across validation passes.
+  - path: tests/test_structrr_reference_validation.py
+    type: modified
+    span: {start_line: 396, end_line: 489}
+    summary: Verify reuse and rejection of stale or incomplete receipts.
+    rationale: Confirm identical complete packets are reused while changed source, catalog, policy, or evidence requires fresh review.
+entities:
+  - id: bound-source-reference-review-reuse
+    type: Function
+    action: added
+  - id: bound-source-reference-review-reuse-tests
+    type: Regression test
+    action: added
+entity_relationships:
+  - id: receipt-reuse-is-covered
+    type: verifies
+    source: bound-source-reference-review-reuse-tests
+    target: bound-source-reference-review-reuse
+    action: added
+    description: Tests verify exact packet reuse and rejection of changed or incomplete evidence.
+invariants:
+  - id: source-review-receipt-requires-complete-current-evidence
+    description: A source-owner review receipt is reused only when its request fingerprint, current policy revision, decision binding, available evidence, and complete owner evidence locations match the current packet; stale or incomplete receipts require fresh review.
+    action: added
+guidance: []

@@ -3,9 +3,10 @@
 Status: audited recommendations; the first removal milestone (P07/P09),
 deterministic source-extraction paging, deterministic work-unit proposal
 progression, deterministic runtime/component/validation and zero-or-one phase
-bindings, deterministic batch answer-ID binding, and P11/P13 existing-subject
-review consolidation are implemented in the active planning path. Remaining work
-in milestones 2–6 is still proposed.
+bindings, deterministic batch answer-ID binding, P11/P13 existing-subject review
+consolidation, exact-source human setup, and complete typed source test-case
+carry-forward are implemented in the active planning path. Remaining work in
+milestones 2–6 is still proposed.
 
 Audited revision: `cfc0b514c43c1d14269147a03e5d7ec5ec5cc739`, fetched from
 `origin/main` on 2026-11-17. This is a static source audit, not a measured live
@@ -57,6 +58,12 @@ that sentence verbatim and uses the configured repository validation as its
 completion check. It records a deterministic answer instead of asking P05 to
 restate known wording. Paraphrases, multi-anchor requirements, and unrecognized
 forms retain the semantic setup-description question.
+
+Test-design update: when every acceptance criterion has exactly one complete
+typed required_test_cases record in a cited source anchor, the planner carries
+its test-design semantics through the existing parser and binds runtime case IDs
+and provenance in code. Partial, ambiguous, invalid, or non-matching records
+retain P10's semantic test-design question.
 
 Structural subject update: answers now contain subject records only. The planner
 automatically requests another page when a response fills the eight-record
@@ -388,7 +395,7 @@ do not simply union unrelated IDs and pretend it proves relevance.
 
 | ID | Interaction / activation | Continue as LLM? | Why any residual semantic assistance is justified | Deterministic replacement / retained state |
 | --- | --- | --- | --- | --- |
-| P10 | Per-item test and seven-dimension behavior scenario design | Split / conditional | Creating a novel observable oracle from prose can require judgment; existing confirmed cases and behavior dimensions must be carried, not reinvented. | Compile supported typed cases/boundaries/fixtures into test plans; copy pinned cases and explicit dimensions; ask only for missing scenario/adapter semantics. Keep unknown dimensions unresolved rather than blanket not_applicable. |
+| P10 | Per-item test and seven-dimension behavior scenario design | Split / conditional | Creating a novel observable oracle from prose can require judgment; existing confirmed cases and behavior dimensions must be carried, not reinvented. | Implemented for complete typed `required_test_cases` records that exactly cover all acceptance criteria in cited source anchors. Carry those records through the existing parser; continue asking for novel, partial, ambiguous, or invalid cases. Keep unknown dimensions unresolved rather than blanket not_applicable. |
 | P11 | Decision-provider relevance of existing entity/relationship candidate | Split | Path/symbol proximity alone does not decide semantic feature/relationship change. | Implemented together with P13: one desired-delta request returns unchanged or desired content for each deterministic candidate; code retains stable identity and ownership. |
 | P12 | Enumerate additional entity/relationship subjects beyond known deterministic candidates | Split / conditional | Novel conceptual entities and relationships may not be discoverable from syntax alone. | Diff explicit accepted entity intent and known schema/AST transformations first; code owns file subjects, existing IDs, source refs and page cursor. Model proposes only unrepresented semantic identities. |
 | P13 | Describe one bound subject's desired section content or unchanged | Split | New conceptual type/relationship meaning may require design. Existing types, endpoints and accepted target states should not be re-decided. | Implemented with P11 for existing deterministic candidates: one request returns unchanged or the semantic desired delta. Code derives action, IDs, operation, projection, and ownership. New subjects still need semantic content proposals. |
@@ -425,6 +432,16 @@ allocation and required-case identity remain code-owned. Replace repeated
 interpretation of already-confirmed cases with direct compilation, preserving
 all dimensions/assumptions and their evidence; only genuinely new oracle logic
 requires model or human synthesis. Do not weaken faithfulness checks to save calls.
+
+Exact-source shortcut: the deterministic path recognizes a pinned anchor that is
+itself a YAML mapping containing only `required_test_cases`. Every record must
+match the raw P10 answer fields (`id`, `description`, `status`, `test_type`,
+`scenario`, `expected_outcome`, and the seven-dimension `behavior_scenario`). Each
+acceptance criterion must match exactly one record description, with no missing
+or duplicate match. The containing anchor becomes the evidence reference; source
+case IDs are not reused as runtime IDs. Normal P10 parsing still validates all
+fields and compiles behavior. Any mismatch or parse failure falls back to the
+semantic request.
 
 ### P11-P13: projected structural state and ownership
 
@@ -616,8 +633,9 @@ check public API/test consumers explicitly; this audit changes none of them.
    source-edit invalidation, and oversized answers without lossy truncation.
 3. **Carry accepted semantics directly.** Typed source requirements, phases, cases
    and observations bypass rediscovery. Exact, single-anchor imperative human
-   setup text is now carried verbatim; semantic setup requests remain for other
-   forms. Preserve conditional/Boolean source relations and scenario dimensions.
+   setup text and complete typed source test semantics are now carried directly;
+   semantic setup and test-design requests remain for other forms. Preserve
+   conditional/Boolean source relations and scenario dimensions.
    Unknown meaning stops or goes to review rather than silently becoming
    context/not_applicable.
 4. **Compile formal dependency/structural cases.** Typed resource use and exact

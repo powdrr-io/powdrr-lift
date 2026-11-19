@@ -1,0 +1,120 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1598
+title: Carry exact typed source test cases deterministically
+intent:
+  problem: P10 asks an LLM to recreate complete test designs that can already be present as typed records in pinned source.
+  goal: Carry exact typed source test designs through existing validation and compilation, using model design only when the source records do not fully cover the plan criteria.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/audits/planning-llm-audit.md
+  type: modified
+  span:
+    start_line: 6
+    end_line: 9
+  summary: Update planner audit status with deterministic typed test-case carry-forward.
+  rationale: Keep the audit status aligned with the P10 implementation.
+- path: docs/audits/planning-llm-audit.md
+  type: modified
+  span:
+    start_line: 62
+    end_line: 67
+  summary: Document exact-source typed test-case carry-forward and its fallback conditions.
+  rationale: Explain where the planner skips test-design restatement and where semantic design remains.
+- path: docs/audits/planning-llm-audit.md
+  type: modified
+  span:
+    start_line: 398
+    end_line: 398
+  summary: Update the P10 recommendation with the implemented deterministic case.
+  rationale: Distinguish fully specified source cases from novel or incomplete test design.
+- path: docs/audits/planning-llm-audit.md
+  type: modified
+  span:
+    start_line: 436
+    end_line: 445
+  summary: Specify the exact-source shortcut contract and safety conditions.
+  rationale: Make the supported input shape and deterministic fallback behavior reviewable.
+- path: docs/audits/planning-llm-audit.md
+  type: modified
+  span:
+    start_line: 636
+    end_line: 638
+  summary: Update the accepted-semantics milestone with typed test-case carry-forward.
+  rationale: Record this implementation against the planner audit milestones.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 102
+    end_line: 105
+  summary: Import the deterministic typed source-case compiler.
+  rationale: Integrate the exact-source shortcut into per-item test planning.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 1888
+    end_line: 1909
+  summary: Record a deterministic P10 answer when complete source cases exactly cover the criteria.
+  rationale: Skip model test-design requests only after the existing parser validates the carried case semantics.
+- path: packages/service/src/powdrr_service/planning/test_coverage.py
+  type: modified
+  span:
+    start_line: 7
+    end_line: 7
+  summary: Import the regular expression utility for fenced YAML recognition.
+  rationale: Parse only complete typed source anchors in the deterministic shortcut.
+- path: packages/service/src/powdrr_service/planning/test_coverage.py
+  type: modified
+  span:
+    start_line: 11
+    end_line: 12
+  summary: Import YAML parsing for source-backed test-case records.
+  rationale: Decode typed case records from the pinned source excerpt.
+- path: packages/service/src/powdrr_service/planning/test_coverage.py
+  type: modified
+  span:
+    start_line: 29
+    end_line: 117
+  summary: Recognize exact typed test cases in a cited YAML source anchor.
+  rationale: Carry only complete, unique criterion matches and bind the containing anchor as evidence.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span:
+    start_line: 10
+    end_line: 10
+  summary: Import YAML serialization for a pinned structured-source test.
+  rationale: Build the test source using the same fenced YAML representation supported by the planner.
+- path: tests/test_planning_structrr.py
+  type: modified
+  span:
+    start_line: 1147
+    end_line: 1222
+  summary: Verify complete typed source cases skip P10 and emit a deterministic answer record.
+  rationale: Protect the planner integration, answer validation, and deterministic rule tracking.
+- path: tests/test_test_coverage_planning.py
+  type: modified
+  span:
+    start_line: 4
+    end_line: 4
+  summary: Import YAML serialization for typed source test-case fixtures.
+  rationale: Build test input in the supported fenced YAML format.
+- path: tests/test_test_coverage_planning.py
+  type: modified
+  span:
+    start_line: 6
+    end_line: 9
+  summary: Import YAML and the exact-source case compiler for coverage tests.
+  rationale: Exercise parsing of typed case records carried from pinned source.
+- path: tests/test_test_coverage_planning.py
+  type: modified
+  span:
+    start_line: 98
+    end_line: 157
+  summary: Verify exact criterion matching, parser compilation, pinned evidence, and fallback for incomplete cases.
+  rationale: Ensure the deterministic shortcut requires complete, unambiguous source coverage.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []
+features: []
+proposed_prs: []

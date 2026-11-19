@@ -1,8 +1,12 @@
 from __future__ import annotations
 
 import pytest
+import yaml
 from powdrr_service.planning.questions import SourceExcerpt
-from powdrr_service.planning.test_coverage import build_test_coverage_request
+from powdrr_service.planning.test_coverage import (
+    build_test_coverage_request,
+    exact_source_test_coverage_answer,
+)
 
 
 def _behavior(evidence_ref: str = "anchor-ci") -> dict[str, object]:
@@ -89,6 +93,66 @@ def test_planner_assigns_stable_ids_to_llm_test_designs() -> None:
     assert behavior["faithfulness_ref"]["fingerprint"].startswith("sha256:")
     assert behavior["when"] == planned["required_test_cases"][0]["scenario"]
     assert behavior["then"] == planned["required_test_cases"][0]["expected_outcome"]
+
+
+def test_complete_typed_source_test_case_is_carried_without_restatement() -> None:
+    criterion = "The account is locked after the configured failures."
+    source_case = {
+        "id": "source-case-7",
+        "description": criterion,
+        "status": "planned",
+        "test_type": "integration",
+        "scenario": "Submit the configured number of invalid credentials.",
+        "expected_outcome": "The account enters the locked state.",
+        "behavior_scenario": {
+            **_behavior("stale-untrusted-reference"),
+            "evidence": [],
+        },
+    }
+    source_excerpt = SourceExcerpt(
+        "anchor-locked-account",
+        "```yaml\n"
+        + yaml.safe_dump(
+            {"required_test_cases": [source_case]}, sort_keys=False
+        ).rstrip()
+        + "\n```",
+    )
+    item = {
+        "id": "item-0001",
+        "title": "Lock accounts after repeated failures",
+        "objective": "Apply the configured account lockout policy.",
+        "scope": ["Authentication behavior."],
+        "implementation_steps": ["Enforce failed-attempt limits."],
+        "acceptance_criteria": [criterion],
+        "allowed_paths": ["src/auth", "tests"],
+    }
+    request = build_test_coverage_request(
+        item,
+        source_excerpts=(source_excerpt,),
+    )
+
+    answer = exact_source_test_coverage_answer([criterion], (source_excerpt,))
+
+    assert answer is not None
+    planned = request.parse_answer(answer)
+    case = planned["required_test_cases"][0]
+    assert case["id"] == "AC-01"
+    assert case["description"] == criterion
+    assert case["scenario"] == source_case["scenario"]
+    assert case["behavior_scenario"]["evidence"] == [source_excerpt.ref_id]
+    assert case["behavior_scenario"]["when"] == source_case["scenario"]
+
+
+def test_typed_source_case_requires_exact_unambiguous_criterion_match() -> None:
+    criterion = "The account is locked after the configured failures."
+    incomplete = SourceExcerpt(
+        "anchor-incomplete",
+        "required_test_cases:\n"
+        "  - description: The account is locked after the configured failures.\n"
+        "    test_type: integration\n",
+    )
+
+    assert exact_source_test_coverage_answer([criterion], (incomplete,)) is None
 
 
 def test_planner_rejects_missing_or_unsupported_test_designs() -> None:

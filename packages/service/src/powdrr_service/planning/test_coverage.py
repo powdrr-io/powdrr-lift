@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from collections.abc import Mapping, Sequence
 from typing import Any, cast
+
+import yaml
 
 from powdrr_service.behavior_contract import (
     ASSUMPTION_BASES,
@@ -23,6 +26,95 @@ from powdrr_service.planning.questions import (
 
 TEST_TYPES = ("unit", "integration", "end_to_end", "contract")
 _MAX_TEXT_LENGTH = 1_000
+_TEST_CASE_SOURCE_FIELDS = frozenset(
+    {
+        "id",
+        "description",
+        "status",
+        "test_type",
+        "scenario",
+        "expected_outcome",
+        "behavior_scenario",
+    }
+)
+_RAW_BEHAVIOR_SCENARIO_FIELDS = frozenset(
+    {
+        "subject",
+        "given",
+        "dimensions",
+        "evidence",
+        "validator",
+        "capability_matrix",
+        "assumptions",
+    }
+)
+
+
+def exact_source_test_coverage_answer(
+    acceptance_criteria: Sequence[str],
+    source_excerpts: Sequence[SourceExcerpt],
+) -> dict[str, Any] | None:
+    """Carry complete typed test cases from a single exact source anchor."""
+    criteria = tuple(value.strip() for value in acceptance_criteria)
+    if not criteria or len(set(criteria)) != len(criteria) or not source_excerpts:
+        return None
+
+    matches: dict[str, list[tuple[SourceExcerpt, Mapping[str, Any]]]] = {
+        criterion: [] for criterion in criteria
+    }
+    for excerpt in source_excerpts:
+        document = excerpt.text.strip()
+        fenced = re.fullmatch(r"```(?:yaml|yml)\s*\n(.*?)\n```", document, re.S)
+        if fenced is not None:
+            document = fenced.group(1)
+        try:
+            value = yaml.safe_load(document)
+        except yaml.YAMLError:
+            continue
+        if not isinstance(value, Mapping) or set(value) != {"required_test_cases"}:
+            continue
+        raw_cases = value.get("required_test_cases")
+        if not isinstance(raw_cases, list):
+            continue
+        for raw_case in raw_cases:
+            if not isinstance(raw_case, Mapping):
+                continue
+            criterion = raw_case.get("description")
+            if (
+                isinstance(criterion, str)
+                and criterion in matches
+                and set(raw_case) == _TEST_CASE_SOURCE_FIELDS
+                and isinstance(raw_case.get("id"), str)
+                and bool(raw_case["id"].strip())
+                and raw_case.get("status") == "planned"
+            ):
+                matches[criterion].append((excerpt, raw_case))
+
+    if any(len(cases) != 1 for cases in matches.values()):
+        return None
+    raw_cases: list[dict[str, Any]] = []
+    for criterion in criteria:
+        excerpt, case = matches[criterion][0]
+        raw_behavior = case.get("behavior_scenario")
+        if (
+            not isinstance(raw_behavior, Mapping)
+            or set(raw_behavior) != _RAW_BEHAVIOR_SCENARIO_FIELDS
+        ):
+            return None
+        raw_cases.append(
+            {
+                "test_type": case.get("test_type"),
+                "scenario": case.get("scenario"),
+                "expected_outcome": case.get("expected_outcome"),
+                "behavior_scenario": {
+                    **dict(raw_behavior),
+                    # The containing pinned anchor is the provenance for this
+                    # exact typed record; source-authored IDs are not runtime IDs.
+                    "evidence": [excerpt.ref_id],
+                },
+            }
+        )
+    return {"cases": raw_cases}
 
 
 def build_test_coverage_request(

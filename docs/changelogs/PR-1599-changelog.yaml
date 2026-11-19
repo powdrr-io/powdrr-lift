@@ -1,5 +1,5 @@
 schema: https://powdrr.io/schema/changelog-v2
-change_id: 1597
+change_id: 1599
 title: Compile typed test-authoring requests in runtime
 intent:
   problem: Execute-PR test authors received broad prose and linked acceptance criteria

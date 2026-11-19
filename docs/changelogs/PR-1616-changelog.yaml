@@ -1,5 +1,5 @@
 schema: https://powdrr.io/schema/changelog-v2
-change_id: 1614
+change_id: 1616
 title: Bind planned test cases to allocated requirements
 intent:
   problem: Planner test cases do not identify which allocated requirements they are intended to verify.

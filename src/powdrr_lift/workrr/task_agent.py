@@ -3078,7 +3078,13 @@ def _finish_issue_worker_pull_request(
 
     task_state = strategy.task.input_state
     proposed = task_state.get("proposed_pr_context")
-    files_value = action.parameters.get("files_to_publish")
+    from powdrr_lift.clean_pr_publisher import (
+        normalize_clean_pr_publication_parameters,
+        publish_clean_pull_request,
+    )
+
+    parameters = normalize_clean_pr_publication_parameters(action.parameters)
+    files_value = parameters.get("files_to_publish")
     if (
         not isinstance(proposed, Mapping)
         or not isinstance(files_value, list)
@@ -3092,17 +3098,21 @@ def _finish_issue_worker_pull_request(
         pr_number=match.group(1),
         proposed=proposed,
         files_to_publish=files_value,
-        publication_branch=str(action.parameters.get("publication_branch", "")),
+        publication_branch=str(parameters.get("publication_branch", "")),
     )
-    parameters = action.parameters
-    from powdrr_lift.clean_pr_publisher import publish_clean_pull_request
+    title = proposed.get("title")
+    if not isinstance(title, str) or not title.strip():
+        raise PowdrrExecutionError(
+            "issue-worker PR finalization requires the reviewed PR title"
+        )
 
     changelog_publication: dict[str, Any] = {
         "files_to_publish": [changelog_path],
         "base": parameters.get("base"),
         "publication_branch": parameters.get("publication_branch"),
-        "title": parameters.get("title"),
+        "title": title,
         "body": parameters.get("body"),
+        "description_sections": parameters.get("description_sections"),
         "commit_message": f"Add PR-{match.group(1)} changelog descriptor",
     }
     original_authorization = parameters.get("publication_authorization")

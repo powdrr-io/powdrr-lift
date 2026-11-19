@@ -148,6 +148,97 @@ def test_issue_worker_changelog_validates_against_the_published_branch(
     ]
 
 
+def test_issue_worker_changelog_publication_reuses_reviewed_title_and_context(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    published: list[dict[str, Any]] = []
+    comments: list[tuple[int, str]] = []
+
+    class FakeGitHubIssueClient:
+        def __init__(self, _repository: str) -> None:
+            pass
+
+        def list_comments(self, _issue_number: int) -> list[dict[str, str]]:
+            return []
+
+        def add_issue_comment(self, issue_number: int, body: str) -> None:
+            comments.append((issue_number, body))
+
+    from powdrr_lift import clean_pr_publisher
+
+    monkeypatch.setattr(task_agent, "GitHubIssueClient", FakeGitHubIssueClient)
+    monkeypatch.setattr(
+        task_agent,
+        "_issue_worker_pr_changelog",
+        lambda **_kwargs: "docs/changelogs/PR-1045-changelog.yaml",
+    )
+
+    def capture_publication(
+        parameters: Mapping[str, Any], *, worktree_root: Path
+    ) -> str:
+        assert worktree_root == tmp_path
+        published.append(dict(parameters))
+        return "https://github.com/powdrr-io/powdrr-gaterr/pull/1045"
+
+    monkeypatch.setattr(
+        clean_pr_publisher, "publish_clean_pull_request", capture_publication
+    )
+    strategy = SimpleNamespace(
+        config=SimpleNamespace(
+            github_issue_number=916,
+            github_repository="powdrr-io/powdrr-gaterr",
+        ),
+        task=SimpleNamespace(
+            input_state={
+                "proposed_pr_context": {
+                    "title": "Implement raw-byte hashing and typed policy parser"
+                }
+            }
+        ),
+        repo_root=tmp_path,
+    )
+    action = SimpleNamespace(
+        parameters={
+            "operation": "pr_publish_clean",
+            "files_to_publish": ["attestation/tools/obligation_checker.py"],
+            "workflow_context": {
+                "feature-name": "Implement raw-byte hashing and typed policy parser",
+                "commit-message": "Implement raw-byte hashing and typed policy parser",
+                "base-branch": "main",
+                "publication-branch": "powdrr/example-implementation",
+                "pr-description-sections": {
+                    "objective": "Deliver the planned implementation.",
+                    "scope": "Implement the reviewed work.",
+                    "implementation_details": "Update the attestation parser.",
+                    "acceptance_criteria": "The parser validates inputs.",
+                    "validation": "verify-all.sh passed.",
+                    "advisory_test_quality_notes": "None.",
+                },
+            },
+        }
+    )
+
+    task_agent._finish_issue_worker_pull_request(
+        cast(Any, strategy),
+        action=cast(WorkflowAction, action),
+        pull_request_url="https://github.com/powdrr-io/powdrr-gaterr/pull/1045",
+    )
+
+    assert comments == [
+        (
+            916,
+            "Powdrr PR for issue #916: https://github.com/powdrr-io/powdrr-gaterr/pull/1045",
+        )
+    ]
+    assert published[0]["title"] == (
+        "Implement raw-byte hashing and typed policy parser"
+    )
+    assert published[0]["publication_branch"] == "powdrr/example-implementation"
+    assert published[0]["description_sections"]["objective"] == (
+        "Deliver the planned implementation."
+    )
+
+
 def test_pr_body_discloses_inline_plan_adjustments_to_reviewer() -> None:
     action = WorkflowAction(
         kind="invoke_tool",

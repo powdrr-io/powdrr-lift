@@ -638,6 +638,7 @@ def validate_source_references(
             result["obligation_id"] = obligation.get(
                 "obligation_id", obligation.get("id", purpose)
             )
+            result["required_gate_evidence"] = not optional
             reviews.append(result)
             if optional:
                 return False
@@ -716,6 +717,7 @@ def validate_source_references(
         result = _review(review_client, packet, (*review_receipts, *reviews))
         result["purpose"] = purpose
         result["obligation_id"] = packet["obligation_id"]
+        result["required_gate_evidence"] = not optional
         reviews.append(result)
         if result["classification"] != "satisfied":
             if optional:

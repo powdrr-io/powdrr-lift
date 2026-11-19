@@ -1,0 +1,175 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1614
+title: Bind planned test cases to allocated requirements
+intent:
+  problem: Planner test cases do not identify which allocated requirements they are intended to verify.
+  goal: Carry requirement IDs through the existing test-design request and into each planned test case, validating that all IDs belong to the item's allocated requirements.
+human-decisions: []
+structured_files: []
+files:
+  - path: packages/service/src/powdrr_service/planning/test_coverage.py
+    type: modified
+    span: {start_line: 56, end_line: 57}
+    summary: Accept exact source requirement bindings.
+    rationale: Carry deterministic exact criterion matches through the bounded answer contract.
+  - path: packages/service/src/powdrr_service/planning/test_coverage.py
+    type: modified
+    span: {start_line: 111, end_line: 113}
+    summary: Add requirement IDs to deterministic source-case answers.
+    rationale: Preserve direct exact statement matches in planner output.
+  - path: packages/service/src/powdrr_service/planning/test_coverage.py
+    type: modified
+    span: {start_line: 130, end_line: 130}
+    summary: Accept allocated requirements in the request builder.
+    rationale: Bound model selection to requirements owned by the plan item.
+  - path: packages/service/src/powdrr_service/planning/test_coverage.py
+    type: modified
+    span: {start_line: 149, end_line: 169}
+    summary: Normalize and validate requirement candidates.
+    rationale: Provide a deterministic, unique set of IDs and statements.
+  - path: packages/service/src/powdrr_service/planning/test_coverage.py
+    type: modified
+    span: {start_line: 186, end_line: 186}
+    summary: Include allocated requirement facts in question context.
+    rationale: Give the existing semantic design request the facts needed for mapping.
+  - path: packages/service/src/powdrr_service/planning/test_coverage.py
+    type: modified
+    span: {start_line: 208, end_line: 208}
+    summary: Require case-level requirement IDs in answers.
+    rationale: Make planned test coverage relationships explicit.
+  - path: packages/service/src/powdrr_service/planning/test_coverage.py
+    type: modified
+    span: {start_line: 223, end_line: 233}
+    summary: Constrain selected IDs to allocated requirements.
+    rationale: Reject invented or cross-item IDs at schema validation.
+  - path: packages/service/src/powdrr_service/planning/test_coverage.py
+    type: modified
+    span: {start_line: 366, end_line: 366}
+    summary: Show an empty requirement list in the valid example.
+    rationale: Represent cases that make no direct requirement claim.
+  - path: packages/service/src/powdrr_service/planning/test_coverage.py
+    type: modified
+    span: {start_line: 404, end_line: 404}
+    summary: Require the expanded exact answer fields.
+    rationale: Reject malformed case answers.
+  - path: packages/service/src/powdrr_service/planning/test_coverage.py
+    type: modified
+    span: {start_line: 421, end_line: 438}
+    summary: Validate case requirement IDs and uniqueness.
+    rationale: Prevent invalid references from entering planning artifacts.
+  - path: packages/service/src/powdrr_service/planning/test_coverage.py
+    type: modified
+    span: {start_line: 536, end_line: 536}
+    summary: Retain validated IDs on planned cases.
+    rationale: Make planning intent available to downstream compilation.
+  - path: packages/service/src/powdrr_service/planning/test_coverage.py
+    type: modified
+    span: {start_line: 554, end_line: 554}
+    summary: Bump the input digest contract version.
+    rationale: Invalidate accepted answers from the previous schema.
+  - path: packages/service/src/powdrr_service/planning/test_coverage.py
+    type: modified
+    span: {start_line: 563, end_line: 563}
+    summary: Bump the question contract version.
+    rationale: Identify the expanded planner response contract.
+  - path: packages/service/src/powdrr_service/planning/test_coverage.py
+    type: modified
+    span: {start_line: 570, end_line: 570}
+    summary: Publish the new answer schema identifier.
+    rationale: Distinguish the requirement-bound answer format.
+  - path: packages/service/src/powdrr_service/planning/test_coverage.py
+    type: modified
+    span: {start_line: 583, end_line: 588}
+    summary: Explain direct requirement selection to the model.
+    rationale: Limit claims to requirements whose observable behavior the case directly verifies.
+  - path: packages/service/src/powdrr_service/planning/test_coverage.py
+    type: modified
+    span: {start_line: 603, end_line: 604}
+    summary: Document the requirement IDs answer field.
+    rationale: Clarify the test-design response contract.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 1884, end_line: 1893}
+    summary: Derive the unique requirement set assigned to each item.
+    rationale: Keep case mapping scoped to the item's allocated work units.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 1914, end_line: 1917}
+    summary: Pass allocated requirement facts to test-design requests.
+    rationale: Supply stable IDs and accepted statements to the existing LLM interaction.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 1931, end_line: 1940}
+    summary: Bind exact source cases to exact matching requirements.
+    rationale: Preserve deterministic carry-forward without semantic inference.
+  - path: tests/test_planning_service.py
+    type: modified
+    span: {start_line: 255, end_line: 255}
+    summary: Update the scripted planning answer with requirement IDs.
+    rationale: Keep end-to-end planner coverage aligned with the new contract.
+  - path: tests/test_test_coverage_planning.py
+    type: modified
+    span: {start_line: 51, end_line: 60}
+    summary: Add allocated requirement candidates to the request fixture.
+    rationale: Exercise distinct case-level requirement selection.
+  - path: tests/test_test_coverage_planning.py
+    type: modified
+    span: {start_line: 68, end_line: 68}
+    summary: Bind the first case to its direct requirement.
+    rationale: Verify valid model-selected mapping.
+  - path: tests/test_test_coverage_planning.py
+    type: modified
+    span: {start_line: 77, end_line: 77}
+    summary: Bind the second case to its direct requirement.
+    rationale: Verify requirement selection is per case.
+  - path: tests/test_test_coverage_planning.py
+    type: modified
+    span: {start_line: 87, end_line: 88}
+    summary: Assert the new question contract version.
+    rationale: Ensure answers use the bumped schema.
+  - path: tests/test_test_coverage_planning.py
+    type: modified
+    span: {start_line: 98, end_line: 101}
+    summary: Assert requirement IDs persist on parsed cases.
+    rationale: Verify parser normalization retains planned coverage intent.
+  - path: tests/test_test_coverage_planning.py
+    type: modified
+    span: {start_line: 201, end_line: 201}
+    summary: Add an empty requirement list to a test answer.
+    rationale: Cover the no-direct-binding case.
+  - path: tests/test_test_coverage_planning.py
+    type: modified
+    span: {start_line: 244, end_line: 244}
+    summary: Add an empty requirement list to a behavior answer.
+    rationale: Keep behavior tests compliant with the expanded contract.
+  - path: docs/audits/planning-llm-audit.md
+    type: modified
+    span: {start_line: 320, end_line: 329}
+    summary: Document planned case-to-requirement bindings and their limits.
+    rationale: Distinguish coverage intent from execution evidence.
+  - path: docs/audits/planning-llm-audit.md
+    type: modified
+    span: {start_line: 440, end_line: 440}
+    summary: Update P10's implementation status.
+    rationale: Record case-level requirement mapping in the audit catalog.
+entities:
+  - id: build-test-coverage-request
+    type: Function
+    action: modified
+  - id: planned-test-requirement-binding-regression-test
+    type: Regression test
+    action: added
+entity_relationships:
+  - id: binding-test-covers-test-design-parser
+    type: exercises
+    source: planned-test-requirement-binding-regression-test
+    target: build-test-coverage-request
+    action: added
+    description: Planner tests verify case-level mapping and parser preservation.
+invariants:
+  - id: planned-test-requirements-owned-by-item
+    description: Every requirement ID on a planned test case belongs to the exact allocation of its plan item; an empty list makes no direct coverage claim.
+    action: added
+guidance: []
+features: []
+proposed_prs: []

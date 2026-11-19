@@ -247,6 +247,11 @@ def compile_plan(
             requirement_bindings=_requirement_bindings_for_item(
                 item.item_id, manifest.data
             ),
+            test_case_requirement_bindings=_test_case_requirement_bindings_for_item(
+                item.item_id,
+                structrr_proposal.item_proposals[item.item_id],
+                manifest.data,
+            ),
         )
         rendered = yaml.safe_dump(definition, sort_keys=False, allow_unicode=True)
         try:
@@ -466,6 +471,18 @@ def validate_compiled_plan(
                             _requirement_bindings_for_item(item.item_id, manifest.data)
                         ),
                     ),
+                    (
+                        "test_case_requirement_bindings",
+                        list(
+                            _test_case_requirement_bindings_for_item(
+                                item.item_id,
+                                item_proposals[item.item_id],
+                                manifest.data,
+                            )
+                        )
+                        if item.item_id in item_proposals
+                        else None,
+                    ),
                     ("manual_prerequisite", item.manual_prerequisite),
                 )
             ):
@@ -497,6 +514,7 @@ def _workflow_definition(
     verification_command: str,
     plan_slug: str,
     requirement_bindings: Sequence[Mapping[str, str]],
+    test_case_requirement_bindings: Sequence[Mapping[str, Any]],
 ) -> dict[str, Any]:
     context: dict[str, Any] = {
         "plan_id": plan.plan_id,
@@ -514,6 +532,9 @@ def _workflow_definition(
         "structrr_item_id": item.item_id,
         "require_structrr_proposal": True,
         "requirement_bindings": [dict(binding) for binding in requirement_bindings],
+        "test_case_requirement_bindings": [
+            dict(binding) for binding in test_case_requirement_bindings
+        ],
     }
     if item.source_reference_design_file is not None:
         context["source_reference_design_file"] = item.source_reference_design_file
@@ -581,6 +602,68 @@ def _requirement_bindings_for_item(
             }
         )
     return tuple(bindings)
+
+
+def _test_case_requirement_bindings_for_item(
+    item_id: str,
+    proposal: Any,
+    manifest: Mapping[str, Any],
+) -> tuple[dict[str, Any], ...]:
+    """Project accepted case requirement IDs to their canonical digests."""
+    if not isinstance(proposal.verification, Mapping):
+        raise PlanningCompilationError(
+            f"plan item {item_id!r} has no verification record"
+        )
+    cases = proposal.verification.get("required_test_cases")
+    if not isinstance(cases, list):
+        raise PlanningCompilationError(
+            f"plan item {item_id!r} has no required test case list"
+        )
+    allocated = {
+        binding["requirement_id"]: binding
+        for binding in _requirement_bindings_for_item(item_id, manifest)
+    }
+    result: list[dict[str, Any]] = []
+    seen_case_ids: set[str] = set()
+    for index, case in enumerate(cases):
+        if not isinstance(case, Mapping):
+            raise PlanningCompilationError(
+                f"plan item {item_id!r} test case {index} is malformed"
+            )
+        case_id = case.get("id")
+        requirement_ids = case.get("requirement_ids", [])
+        if (
+            not isinstance(case_id, str)
+            or not case_id.strip()
+            or case_id in seen_case_ids
+        ):
+            raise PlanningCompilationError(
+                f"plan item {item_id!r} has an invalid or duplicate test case ID"
+            )
+        if (
+            not isinstance(requirement_ids, Sequence)
+            or isinstance(requirement_ids, (str, bytes))
+            or not all(
+                isinstance(requirement_id, str) and requirement_id in allocated
+                for requirement_id in requirement_ids
+            )
+            or len(set(requirement_ids)) != len(requirement_ids)
+        ):
+            raise PlanningCompilationError(
+                f"plan item {item_id!r} test case {case_id!r} references an "
+                "unallocated or duplicate requirement"
+            )
+        seen_case_ids.add(case_id)
+        result.append(
+            {
+                "test_case_id": case_id,
+                "requirement_bindings": [
+                    dict(allocated[requirement_id])
+                    for requirement_id in sorted(requirement_ids)
+                ],
+            }
+        )
+    return tuple(sorted(result, key=lambda binding: binding["test_case_id"]))
 
 
 def _validate_story_allocation(

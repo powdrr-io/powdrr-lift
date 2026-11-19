@@ -5,7 +5,8 @@ deterministic source-extraction paging, deterministic work-unit proposal
 progression, deterministic runtime/component/validation and zero-or-one phase
 bindings, deterministic batch answer-ID binding, P11/P13 existing-subject review
 consolidation, exact-source human setup, and complete typed source test-case
-carry-forward are implemented in the active planning path. P04 now has a
+carry-forward with per-case requirement bindings propagated to generated
+workflow descriptors are implemented in the active planning path. P04 now has a
 deterministic shortcut for explicitly supplied, typed requirement execution
 receipts that pass exact requirement, source/candidate, oracle, command, and
 evidence binding. Semantic classification remains necessary for other evidence.
@@ -325,8 +326,8 @@ allocated requirement set. An exact source-authored case is bound deterministica
 only when its acceptance-criterion text exactly equals an accepted requirement
 statement. Empty case bindings mean no direct relationship was asserted. These
 are planned-test relationships, not execution evidence. No active verifier
-currently consumes the bindings or invokes the manifest writer; that execution
-integration remains outstanding. The schema binds claims but is not
+currently consumes the case-level bindings or invokes the manifest writer; that
+execution integration remains outstanding. The schema binds claims but is not
 cryptographic proof.
 
 ### P05: setup instructions are not an invitation to rediscover configuration
@@ -445,13 +446,22 @@ do not simply union unrelated IDs and pretend it proves relevance.
 ### P10: every requested case and behavior field
 
 Builder: `test_coverage.py::build_test_coverage_request`. Inputs: item ID/title/
-objective/scope/steps/criteria/paths, at most forty existing test paths (conventions,
+objective/scope/steps/criteria/paths, the exact requirement IDs and accepted
+statements allocated to the item, at most forty existing test paths (conventions,
 not proof of coverage) and pinned source excerpts. The driver selects at most
 four source excerpts, each <=1500 characters; longer anchors are skipped, not
 summarized. Insufficient supplied context must not lead to invented behavior.
 
 Exactly one case per criterion, in supplied order: test_type (unit/integration/
-end_to_end/contract), scenario, expected_outcome and behavior_scenario. The
+end_to_end/contract), scenario, expected_outcome, requirement_ids and
+behavior_scenario. The model chooses only directly verified IDs from the supplied
+item allocation; an empty list means no direct mapping. Code validates the IDs,
+then the planner compiles case IDs and their requirement ID/digest pairs into
+`test_case_requirement_bindings` in each generated workflow descriptor. The
+compiler rejects cross-item IDs and validates that descriptor bindings match the
+accepted Structrr proposal and planning manifest. Exact source-authored cases
+bind requirements only when the criterion exactly equals an accepted requirement
+statement. The
 behavior object requires subject, given, dimensions, evidence, validator,
 capability_matrix and assumptions. Seven dimension keys: normal_result,
 error_behavior, continuation, unsupported_behavior, cancellation_cleanup,

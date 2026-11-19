@@ -20,6 +20,7 @@ PLAN_WORKFLOW_SCHEMA = "https://powdrr.io/schemas/plan-workflow-instance-v2"
 PLAN_WORKFLOW_PROCESS = "execute-proposed-pr-workflow"
 _SAFE_ID = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._/-]{0,99}$")
 _DIGEST = re.compile(r"^sha256:[0-9a-f]{64}$")
+_TEST_CASE_ID = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._:/-]{0,199}$")
 
 
 class PlanWorkflowInstanceError(ValueError):
@@ -136,6 +137,7 @@ def parse_plan_workflow_instance_yaml(text: str) -> PlanWorkflowInstance:
         raise PlanWorkflowInstanceError(
             "proposed_pr_context.require_structrr_proposal must be true"
         )
+    requirement_bindings_by_id: dict[str, str] = {}
     if "requirement_bindings" in context:
         bindings = context.get("requirement_bindings")
         if not isinstance(bindings, list) or not bindings:
@@ -168,9 +170,75 @@ def parse_plan_workflow_instance_yaml(text: str) -> PlanWorkflowInstance:
                     f"{index}].requirement_digest is invalid"
                 )
             binding_ids.append(requirement_id)
+            requirement_bindings_by_id[requirement_id] = requirement_digest
         if binding_ids != sorted(set(binding_ids)):
             raise PlanWorkflowInstanceError(
                 "proposed_pr_context.requirement_bindings must have unique sorted IDs"
+            )
+    if "test_case_requirement_bindings" in context:
+        test_bindings = context.get("test_case_requirement_bindings")
+        if not isinstance(test_bindings, list):
+            raise PlanWorkflowInstanceError(
+                "proposed_pr_context.test_case_requirement_bindings must be a list"
+            )
+        case_ids: list[str] = []
+        for case_index, case_binding in enumerate(test_bindings):
+            if not isinstance(case_binding, Mapping) or set(case_binding) != {
+                "test_case_id",
+                "requirement_bindings",
+            }:
+                raise PlanWorkflowInstanceError(
+                    "proposed_pr_context.test_case_requirement_bindings["
+                    f"{case_index}] is invalid"
+                )
+            case_id = case_binding.get("test_case_id")
+            case_requirements = case_binding.get("requirement_bindings")
+            if not isinstance(case_id, str) or not _TEST_CASE_ID.fullmatch(case_id):
+                raise PlanWorkflowInstanceError(
+                    "proposed_pr_context.test_case_requirement_bindings["
+                    f"{case_index}].test_case_id is invalid"
+                )
+            if not isinstance(case_requirements, list):
+                raise PlanWorkflowInstanceError(
+                    "proposed_pr_context.test_case_requirement_bindings["
+                    f"{case_index}].requirement_bindings must be a list"
+                )
+            case_requirement_ids: list[str] = []
+            for requirement_index, requirement_binding in enumerate(case_requirements):
+                if not isinstance(requirement_binding, Mapping) or set(
+                    requirement_binding
+                ) != {"requirement_id", "requirement_digest"}:
+                    raise PlanWorkflowInstanceError(
+                        "proposed_pr_context.test_case_requirement_bindings["
+                        f"{case_index}].requirement_bindings[{requirement_index}] "
+                        "is invalid"
+                    )
+                requirement_id = requirement_binding.get("requirement_id")
+                requirement_digest = requirement_binding.get("requirement_digest")
+                if (
+                    not isinstance(requirement_id, str)
+                    or not _SAFE_ID.fullmatch(requirement_id)
+                    or not isinstance(requirement_digest, str)
+                    or not _DIGEST.fullmatch(requirement_digest)
+                    or requirement_bindings_by_id.get(requirement_id)
+                    != requirement_digest
+                ):
+                    raise PlanWorkflowInstanceError(
+                        "proposed_pr_context.test_case_requirement_bindings["
+                        f"{case_index}].requirement_bindings[{requirement_index}] "
+                        "does not match an item requirement binding"
+                    )
+                case_requirement_ids.append(requirement_id)
+            if case_requirement_ids != sorted(set(case_requirement_ids)):
+                raise PlanWorkflowInstanceError(
+                    "proposed_pr_context.test_case_requirement_bindings["
+                    f"{case_index}].requirement_bindings must have unique sorted IDs"
+                )
+            case_ids.append(case_id)
+        if case_ids != sorted(set(case_ids)):
+            raise PlanWorkflowInstanceError(
+                "proposed_pr_context.test_case_requirement_bindings must have "
+                "unique sorted test case IDs"
             )
     if "manual_prerequisite" in context:
         try:

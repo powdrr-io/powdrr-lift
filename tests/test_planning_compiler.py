@@ -630,6 +630,7 @@ def _fixture() -> tuple[ReviewedExecutionPlan, PlanningManifest, Any]:
                             "test_type": "integration",
                             "scenario": "Exercise the public behavior.",
                             "expected_outcome": "The result satisfies the criterion.",
+                            "requirement_ids": ["req-01"],
                             "source_clauses": ["clause:positive"],
                             "behavior_scenario": _behavior_scenario("scenario:item-01"),
                         }
@@ -817,6 +818,12 @@ def test_compiler_round_trips_plan_and_emits_linked_artifacts() -> None:
             ),
         }
     ]
+    assert workflow_context["test_case_requirement_bindings"] == [
+        {
+            "test_case_id": "AC-01",
+            "requirement_bindings": workflow_context["requirement_bindings"],
+        }
+    ]
     assert compiled.files["docs/plans/bounded-plan-structrr-proposal.json"].endswith(
         "\n"
     )
@@ -860,7 +867,40 @@ def test_compiled_plan_rejects_workflow_requirement_binding_drift() -> None:
     report = validate_compiled_plan(replace(compiled, files=files), repository_snapshot)
 
     assert not report.valid
-    assert any("lost plan context" in error for error in report.errors)
+    assert any(
+        "does not match an item requirement binding" in error for error in report.errors
+    )
+
+
+def test_compiled_plan_rejects_case_requirement_binding_drift() -> None:
+    plan, manifest, proposal = _fixture()
+    repository_snapshot = {
+        "source": manifest.data["source"],
+        "base": manifest.data["base"],
+    }
+    compiled = compile_plan(
+        plan=plan,
+        planning_manifest=manifest,
+        repository_snapshot=repository_snapshot,
+        structrr_proposal=proposal,
+        verification_command="pytest -q",
+        plan_path="docs/plans/bounded-plan.yaml",
+    )
+    workflow_path = "docs/workflows/bounded-plan/item-01.yaml"
+    workflow = yaml.safe_load(compiled.files[workflow_path])
+    case_binding = workflow["inputs"]["proposed_pr_context"][
+        "test_case_requirement_bindings"
+    ][0]["requirement_bindings"][0]
+    case_binding["requirement_digest"] = "sha256:" + "f" * 64
+    files = dict(compiled.files)
+    files[workflow_path] = yaml.safe_dump(workflow, sort_keys=False)
+
+    report = validate_compiled_plan(replace(compiled, files=files), repository_snapshot)
+
+    assert not report.valid
+    assert any(
+        "does not match an item requirement binding" in error for error in report.errors
+    )
 
 
 def test_manifest_accepts_canonical_shell_runtime() -> None:

@@ -1,0 +1,43 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1602
+title: Recognize inline MiniSWE completion submissions
+intent:
+  problem: MiniSWE can emit its completion marker and JSON payload on the same first line, which the environment treated as an ordinary command result and caused the worker to repeat indefinitely.
+  goal: Recognize the inline marker form as a submission and pass its payload to the existing submission validation flow.
+human-decisions: []
+structured_files: []
+files:
+- path: packages/agent/src/powdrr_agent/execution/minisweagent_environment.py
+  type: modified
+  span:
+    start_line: 14
+    end_line: 15
+  summary: Define the MiniSWE completion marker used by source-reference execution.
+  rationale: Keep completion detection tied to the worker protocol marker.
+- path: packages/agent/src/powdrr_agent/execution/minisweagent_environment.py
+  type: modified
+  span:
+    start_line: 88
+    end_line: 106
+  summary: Convert an inline completion marker and payload into a submitted result.
+  rationale: End MiniSWE runs that return the completion marker and JSON on one line.
+- path: tests/test_minisweagent_environment.py
+  type: modified
+  span:
+    start_line: 163
+    end_line: 172
+  summary: Cover inline completion submission and source-reference submission recording.
+  rationale: Reproduce the worker output that previously failed to terminate and verify it is recorded as a submission.
+- path: tests/test_minisweagent_environment.py
+  type: modified
+  span:
+    start_line: 174
+    end_line: 174
+  summary: Account for the additional source-reference submission event.
+  rationale: Confirm the inline submission is recorded alongside existing environment outcomes.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []
+features: []
+proposed_prs: []

@@ -11,6 +11,8 @@ from pydantic import field_validator
 
 from powdrr_agent.execution.source_reader import context_request
 
+_COMPLETION_MARKER = "COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT"
+
 
 class StructrrLocalEnvironmentConfig(LocalEnvironmentConfig):
     source_reference_mode: str = "off"
@@ -83,6 +85,25 @@ class StructrrLocalEnvironment(LocalEnvironment):
     def _check_finished(self, output: dict[str, Any]) -> None:
         self._last_output = output
         super()._check_finished(output)
+        if self.source_mode == "off" or output.get("returncode") != 0:
+            return
+        lines = output.get("output", "").lstrip().splitlines(keepends=True)
+        if not lines:
+            return
+        marker_line = lines[0].rstrip("\r\n")
+        if not marker_line.startswith(_COMPLETION_MARKER):
+            return
+        suffix = marker_line[len(_COMPLETION_MARKER) :]
+        if not suffix or not suffix[0].isspace():
+            return
+        submission = suffix.lstrip() + "\n" + "".join(lines[1:])
+        raise Submitted(
+            {
+                "role": "exit",
+                "content": submission,
+                "extra": {"exit_status": "Submitted", "submission": submission},
+            }
+        )
 
 
 class StructrrObservationModel:

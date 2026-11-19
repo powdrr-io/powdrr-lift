@@ -3757,7 +3757,7 @@ def test_registered_ci_formatter_runs_before_any_coding_provider(
         },
     )
 
-    assert result["passed"] is True
+    assert result["passed"] is True, result
     assert result["validation_status"] == "passed"
     assert result["changed_paths"] == [path]
 

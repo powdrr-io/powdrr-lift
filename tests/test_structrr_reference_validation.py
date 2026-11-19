@@ -486,6 +486,24 @@ def test_incomplete_or_stale_semantic_review_receipts_are_not_reused() -> None:
     assert len(judge.requests) == 1
     assert result.to_data()["reviews"][0]["reused"] is False
 
+    unknown = validate(
+        candidate, handoff=handoff, catalog=catalog, review_client=Judge("needs_review")
+    )
+    assert any(
+        item["classification"] == "needs_review"
+        for item in unknown.to_data()["reviews"]
+    )
+    fresh_judge = Judge()
+    resolved = validate(
+        candidate,
+        handoff=handoff,
+        catalog=catalog,
+        review_client=fresh_judge,
+        review_receipts=tuple(unknown.to_data()["reviews"]),
+    )
+    assert resolved.status == "passed"
+    assert len(fresh_judge.requests) == 2
+
 
 def test_unchanged_legacy_findings_are_diagnostic_and_scan_gaps_block() -> None:
     handoff, catalog = inputs()
@@ -656,6 +674,39 @@ def test_safe_git_acquisition_does_not_run_external_diff_or_fsmonitor(
     (tmp_path / "retry.py").write_bytes(SOURCE.replace(b"1", b"2"))
     assert context(handoff, catalog).check(tmp_path).status == "passed"
     assert not (tmp_path / "SHOULD_NOT_EXIST").exists()
+
+
+def test_validation_context_reuses_reviews_and_invalidates_changed_callers(
+    tmp_path: Path,
+) -> None:
+    _, base_catalog = repository(tmp_path)
+    handoff, catalog = inputs(
+        base=base_catalog.base_commit,
+        owner={
+            "binding": "requires_semantic_review",
+            "allowed_paths": ["."],
+            "kind": "function",
+            "responsibility": "Own retry identity.",
+        },
+        cardinality="one_or_more",
+    )
+    judge = Judge()
+    validation = context(handoff, catalog, review_client=judge)
+
+    first = validation.check(tmp_path)
+    assert first.status == "passed"
+    assert len(judge.requests) == len(first.to_data()["reviews"]) == 2
+
+    repeated = validation.check(tmp_path)
+    assert repeated.status == "passed"
+    assert len(judge.requests) == 2
+    assert all(item["reused"] for item in repeated.to_data()["reviews"])
+
+    (tmp_path / "caller.py").write_text("def caller(): return retry()\n")
+    changed = validation.check(tmp_path)
+    assert changed.status == "passed"
+    assert len(judge.requests) == 4
+    assert all(not item["reused"] for item in changed.to_data()["reviews"])
 
 
 def test_reference_report_is_separate_from_behavior_and_missing_context_blocks(

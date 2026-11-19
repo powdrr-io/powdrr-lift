@@ -1,0 +1,53 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1617
+title: Carry source review receipts across validation checks
+intent:
+  problem: The worker and final validator share a trusted source-validation context, but repeated checks did not carry complete semantic review records forward.
+  goal: Reuse complete satisfied review records across checks in one context while requiring a fresh review after source or caller evidence changes.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/source_reference_validation.py
+    type: modified
+    span: {start_line: 124, end_line: 124}
+    summary: Initialize the validation context's receipt cache.
+    rationale: Retain complete satisfied review records for later checks in the same trusted context.
+  - path: src/powdrr_lift/workrr/source_reference_validation.py
+    type: modified
+    span: {start_line: 242, end_line: 242}
+    summary: Supply retained records to reference validation.
+    rationale: Allow the bound validator to skip an identical complete review packet.
+  - path: src/powdrr_lift/workrr/source_reference_validation.py
+    type: modified
+    span: {start_line: 268, end_line: 273}
+    summary: Refresh cached receipts only after stable acquisition.
+    rationale: Do not retain review results when source changes during the validation pass, and exclude unknown outcomes from the cache.
+  - path: tests/test_structrr_reference_validation.py
+    type: modified
+    span: {start_line: 489, end_line: 506}
+    summary: Verify unknown reviews require fresh decisions.
+    rationale: Ensure a needs_review outcome cannot be reused as a satisfied receipt.
+  - path: tests/test_structrr_reference_validation.py
+    type: modified
+    span: {start_line: 679, end_line: 711}
+    summary: Exercise receipt reuse through the trusted validation context.
+    rationale: Confirm identical snapshots reuse reviews and newly discovered callers invalidate cached evidence.
+entities:
+  - id: source-validation-context-review-cache
+    type: Function
+    action: added
+  - id: source-validation-context-review-cache-tests
+    type: Regression test
+    action: added
+entity_relationships:
+  - id: validation-context-cache-is-covered
+    type: verifies
+    source: source-validation-context-review-cache-tests
+    target: source-validation-context-review-cache
+    action: added
+    description: Tests verify reuse, caller invalidation, and refusal to reuse unknown outcomes.
+invariants:
+  - id: source-validation-context-retains-only-stable-satisfied-reviews
+    description: The trusted source-validation context retains satisfied review records only after source acquisition remains stable; packet binding decides whether those records still apply on a later check.
+    action: added
+guidance: []

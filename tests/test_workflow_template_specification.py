@@ -335,11 +335,17 @@ def test_execute_proposed_pr_is_a_procedrr_workflow_process() -> None:
     assert "required" not in execute_output
     assert execute_output["properties"]["error"] == {"type": ["string", "null"]}
     assert execute_output["properties"]["retryable"] == {"type": "boolean"}
-    assert failure_steps[0]["judge"]["output"]["schema"]["properties"][
-        "classification"
-    ]["enum"] == ["plan_defect", "implementation_defect", "unclear"]
+    assert failure_steps[0]["branch"]["subject"] == (
+        "implementation_result.failure_review.classification"
+    )
+    judge = failure_steps[0]["branch"]["default"][0]["judge"]
+    assert judge["output"]["schema"]["properties"]["classification"]["enum"] == [
+        "plan_defect",
+        "implementation_defect",
+        "unclear",
+    ]
     assert (
-        failure_steps[1]["branch"]["cases"]["plan_defect"][0]["call"]["process"]
+        failure_steps[0]["branch"]["cases"]["plan_defect"][0]["call"]["process"]
         == "amend-plan-and-open-pr"
     )
     process_calls = (

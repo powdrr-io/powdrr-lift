@@ -801,14 +801,113 @@ def test_reviewed_plan_reference_to_existing_allowed_file_is_not_creation(
 
 
 def test_normalize_execute_pr_coding_attempt_marks_unshaped_error_failed() -> None:
-    assert _normalize_execute_pr_coding_attempt(
+    normalized = _normalize_execute_pr_coding_attempt(
         {"error": "coverage contract failed", "retryable": True}
-    ) == {
+    )
+    assert normalized == {
         "passed": False,
         "changed_paths": [],
         "error": "coverage contract failed",
         "retryable": True,
+        "failure_evidence": {
+            "references": [
+                "implementation_result.error",
+                "implementation_result.passed",
+            ],
+            "records": {
+                "implementation_result.error": {
+                    "kind": "operation_error",
+                    "value": "coverage contract failed",
+                },
+                "implementation_result.passed": {
+                    "kind": "coding_attempt_outcome",
+                    "value": False,
+                },
+            },
+        },
+        "failure_review": {"classification": "pending"},
     }
+
+
+def test_normalize_execute_pr_coding_attempt_routes_reviewed_plan_conflict() -> None:
+    normalized = _normalize_execute_pr_coding_attempt(
+        {
+            "passed": False,
+            "plan_defect_evidence": [
+                "reviewed create step conflicts with existing file"
+            ],
+        }
+    )
+
+    assert normalized["failure_review"] == {
+        "classification": "plan_defect",
+        "reason_code": "reviewed_plan_contradiction",
+        "evidence_ids": ["implementation_result.plan_defect_evidence.0"],
+        "evidence": ["reviewed create step conflicts with existing file"],
+        "explanation": (
+            "Preflight found a concrete conflict between a reviewed file "
+            "creation instruction and the pinned repository base."
+        ),
+    }
+    assert (
+        "implementation_result.plan_defect_evidence.0"
+        in normalized["failure_evidence"]["references"]
+    )
+
+
+def test_normalize_execute_pr_coding_attempt_leaves_semantic_failure_for_judge() -> (
+    None
+):
+    normalized = _normalize_execute_pr_coding_attempt(
+        {"passed": False, "error": "implementation validation failed"}
+    )
+
+    assert normalized["failure_review"] == {"classification": "pending"}
+    assert "implementation_result.error" in normalized["failure_evidence"]["references"]
+
+
+def test_normalize_execute_pr_coding_attempt_routes_typed_timeout_to_review() -> None:
+    normalized = _normalize_execute_pr_coding_attempt(
+        {"passed": False, "status": "timed_out"}
+    )
+
+    assert normalized["failure_review"]["classification"] == "unclear"
+    assert (
+        normalized["failure_review"]["reason_code"] == "environment_or_worker_blocked"
+    )
+    assert normalized["failure_review"]["evidence_ids"] == [
+        "implementation_result.status",
+    ]
+
+
+def test_plan_repair_evidence_references_must_be_observed_and_cited() -> None:
+    implementation_result = _normalize_execute_pr_coding_attempt(
+        {
+            "passed": False,
+            "plan_defect_evidence": ["reviewed file creation conflicts with base"],
+        }
+    )
+    failure_review = implementation_result["failure_review"]
+
+    task_agent._validate_plan_repair_evidence_references(
+        implementation_result=implementation_result,
+        failure_review=failure_review,
+        repair_request={"discovery": {"evidence_ids": failure_review["evidence_ids"]}},
+    )
+
+    with pytest.raises(PowdrrExecutionError, match="do not resolve"):
+        task_agent._validate_plan_repair_evidence_references(
+            implementation_result=implementation_result,
+            failure_review={**failure_review, "evidence_ids": ["invented.reference"]},
+            repair_request={"discovery": {"evidence_ids": ["invented.reference"]}},
+        )
+
+    with pytest.raises(PowdrrExecutionError, match="must reference evidence"):
+        task_agent._validate_plan_repair_evidence_references(
+            implementation_result=implementation_result,
+            failure_review=failure_review,
+            repair_request={"discovery": {"evidence_ids": ["uncited.reference"]}},
+        )
 
 
 def test_issue_worker_compiles_the_benchmark_implementation_request() -> None:
@@ -1974,6 +2073,8 @@ def test_plan_amendment_recovers_reviewed_context_for_nested_failure(
     )
     failure_review = {
         "classification": "plan_defect",
+        "reason_code": "reviewed_plan_contradiction",
+        "evidence_ids": ["implementation_result.plan_defect_evidence.0"],
         "evidence": [
             "verify-all.sh already exists with different content "
             "than the proposed placeholder."
@@ -1984,7 +2085,11 @@ def test_plan_amendment_recovers_reviewed_context_for_nested_failure(
         "passed": False,
         "changed_paths": [],
         "error": "pre-coding feasibility check rejected the file addition",
+        "plan_defect_evidence": [
+            "verify-all.sh already exists with different content than proposed."
+        ],
     }
+    implementation_result = _normalize_execute_pr_coding_attempt(implementation_result)
 
     result = strategy._run_coding_agent(
         mode="plan-amendment",
@@ -1992,7 +2097,12 @@ def test_plan_amendment_recovers_reviewed_context_for_nested_failure(
             "task_context": {"proposed_pr_id": workflow_id},
             "failure_review": failure_review,
             "implementation_result": implementation_result,
-            "repair_request": {"typed": "repair"},
+            "repair_request": {
+                "typed": "repair",
+                "discovery": {
+                    "evidence_ids": ["implementation_result.plan_defect_evidence.0"]
+                },
+            },
         },
     )
     assert result["passed"] is True
@@ -3404,6 +3514,23 @@ def test_coding_agent_error_result_is_normalized_at_operation_boundary() -> None
         "changed_paths": [],
         "error": "invalid test coverage contract",
         "retryable": True,
+        "failure_evidence": {
+            "references": [
+                "implementation_result.error",
+                "implementation_result.passed",
+            ],
+            "records": {
+                "implementation_result.error": {
+                    "kind": "operation_error",
+                    "value": "invalid test coverage contract",
+                },
+                "implementation_result.passed": {
+                    "kind": "coding_attempt_outcome",
+                    "value": False,
+                },
+            },
+        },
+        "failure_review": {"classification": "pending"},
     }
 
 
@@ -3455,6 +3582,8 @@ steps:
             classified_contexts.append(question)
             return {
                 "classification": "unclear",
+                "reason_code": "insufficient_evidence",
+                "evidence_ids": ["implementation_result.error"],
                 "evidence": ["The coding agent raised a retryable execution error."],
                 "explanation": "The failure does not establish a plan defect.",
             }

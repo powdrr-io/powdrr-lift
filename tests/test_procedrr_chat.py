@@ -223,8 +223,8 @@ def test_ci_response_procedure_runs_declared_verification_at_pinned_head() -> No
         "value": "task_context",
     }
     serialized_execute = yaml.safe_dump(execute.document)
-    assert serialized_execute.count("task_context.input_state.github_repository") == 2
-    assert serialized_execute.count("task_context.input_state.github_issue_number") == 2
+    assert serialized_execute.count("task_context.input_state.github_repository") == 3
+    assert serialized_execute.count("task_context.input_state.github_issue_number") == 3
 
 
 def test_specify_feature_interviews_until_structured_spec_has_no_open_assumptions() -> (

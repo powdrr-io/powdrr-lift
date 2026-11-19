@@ -44,37 +44,8 @@ steps:
               outputs:
                 ci_response_result: ci_response_result
       default:
-        - judge:
-            kind: construct_one
-            question: Does the recorded failure demonstrate that the reviewed plan item is defective?
-            subject: implementation_result
-            prompt_system: Return only the declared JSON object.
-            instructions:
-              - If implementation_result.plan_defect_evidence is non-empty, classify plan_defect and cite that concrete repository evidence.
-              - Classify plan_defect only when concrete repository evidence or contradictory acceptance criteria show that the reviewed plan cannot be implemented as written.
-              - When implementation_result.status is policy_denied because changed paths fall outside the reviewed allowed_paths, inspect each implementation_result.out_of_scope_paths entry against this item's acceptance criteria and implementation_steps.
-              - If an out-of-scope path is needed to produce an artifact required by an acceptance criterion or implementation step, classify plan_defect and cite both the path omitted from allowed_paths and the criterion or step that requires it.
-              - If out-of-scope paths do not support a criterion or implementation step, classify implementation_defect because the coding agent exceeded the reviewed scope.
-              - A policy_denied result means the changes were rejected by the path policy; it does not mean the coding agent produced no work. Use implementation_result.changed_paths and implementation_result.out_of_scope_paths as evidence.
-              - Do not classify an out-of-scope path denial as an environment failure. The policy decision and the relationship of changed paths to the reviewed item determine whether this is a plan or implementation defect.
-              - A failure in generated acceptance tests is not by itself evidence of a plan defect. Those tests may be corrected within the execute-proposed-pr process, subject to its test-correction checks.
-              - Classify implementation_defect when the failure is caused by incomplete, incorrect, or insufficiently verified implementation work.
-              - Use unclear when the evidence does not establish which is true; unclear must stop for human review.
-              - Cite the exact attempt, validation, baseline test, or Structrr finding that supports the classification. Never infer a plan defect only from a failed attempt.
-            context: [task_context, implementation_result]
-            output:
-              name: failure_review
-              schema:
-                type: object
-                required: [classification, evidence, explanation]
-                additionalProperties: false
-                properties:
-                  classification: {type: string, enum: [plan_defect, implementation_defect, unclear]}
-                  evidence: {type: array, minItems: 1, items: {type: string, minLength: 1}}
-                  explanation: {type: string, minLength: 1}
-            validation: {kind: json_schema}
         - branch:
-            subject: failure_review.classification
+            subject: implementation_result.failure_review.classification
             cases:
               plan_defect:
                 - call:
@@ -82,7 +53,7 @@ steps:
                     inputs:
                       task_context: {type: reference, value: task_context}
                       implementation_result: {type: reference, value: implementation_result}
-                      failure_review: {type: reference, value: failure_review}
+                      failure_review: {type: reference, value: implementation_result.failure_review}
                     outputs:
                       pull_request_url: pull_request_url
                 - call:
@@ -98,10 +69,69 @@ steps:
                       task_context: {type: reference, value: task_context}
                     outputs:
                       ci_response_result: ci_response_result
-              implementation_defect:
-                - terminal: failed
               unclear:
                 - terminal: failed
             default:
-              - terminal: failed
+              - judge:
+                  kind: construct_one
+                  question: Does the recorded failure demonstrate that the reviewed plan item is defective?
+                  subject: implementation_result
+                  prompt_system: Return only the declared JSON object.
+                  instructions:
+                    - If implementation_result.plan_defect_evidence is non-empty, classify plan_defect and cite that concrete repository evidence.
+                    - Classify plan_defect only when concrete repository evidence or contradictory acceptance criteria show that the reviewed plan cannot be implemented as written.
+                    - When implementation_result.status is policy_denied because changed paths fall outside the reviewed allowed_paths, inspect each implementation_result.out_of_scope_paths entry against this item's acceptance criteria and implementation_steps.
+                    - If an out-of-scope path is needed to produce an artifact required by an acceptance criterion or implementation step, classify plan_defect and cite both the path omitted from allowed_paths and the criterion or step that requires it.
+                    - If out-of-scope paths do not support a criterion or implementation step, classify implementation_defect because the coding agent exceeded the reviewed scope.
+                    - A policy_denied result means the changes were rejected by the path policy; it does not mean the coding agent produced no work. Use implementation_result.changed_paths and implementation_result.out_of_scope_paths as evidence.
+                    - Do not classify an out-of-scope path denial as an environment failure. The policy decision and the relationship of changed paths to the reviewed item determine whether this is a plan or implementation defect.
+                    - A failure in generated acceptance tests is not by itself evidence of a plan defect. Those tests may be corrected within the execute-proposed-pr process, subject to its test-correction checks.
+                    - Classify implementation_defect when the failure is caused by incomplete, incorrect, or insufficiently verified implementation work.
+                    - Use unclear when the evidence does not establish which is true; unclear must stop for human review.
+                    - Cite only IDs from implementation_result.failure_evidence.references. Do not invent evidence references. Never infer a plan defect only from a failed attempt.
+                  context: [task_context, implementation_result]
+                  output:
+                    name: failure_review
+                    schema:
+                      type: object
+                      required: [classification, reason_code, evidence_ids, evidence, explanation]
+                      additionalProperties: false
+                      properties:
+                        classification: {type: string, enum: [plan_defect, implementation_defect, unclear]}
+                        reason_code: {type: string, enum: [reviewed_plan_contradiction, semantic_necessity_ambiguous, implementation_failure, insufficient_evidence]}
+                        evidence_ids: {type: array, minItems: 1, items: {type: string, minLength: 1}}
+                        evidence: {type: array, minItems: 1, items: {type: string, minLength: 1}}
+                        explanation: {type: string, minLength: 1}
+                  validation: {kind: json_schema}
+              - branch:
+                  subject: failure_review.classification
+                  cases:
+                    plan_defect:
+                      - call:
+                          process: amend-plan-and-open-pr
+                          inputs:
+                            task_context: {type: reference, value: task_context}
+                            implementation_result: {type: reference, value: implementation_result}
+                            failure_review: {type: reference, value: failure_review}
+                          outputs:
+                            pull_request_url: pull_request_url
+                      - call:
+                          process: respond-to-pr-ci
+                          inputs:
+                            repository:
+                              {type: reference, value: task_context.input_state.github_repository}
+                            issue_number:
+                              {type: reference, value: task_context.input_state.github_issue_number}
+                            pull_request_url: {type: reference, value: pull_request_url}
+                            verification_command:
+                              {type: reference, value: task_context.input_state.proposed_pr_context.verification_command}
+                            task_context: {type: reference, value: task_context}
+                          outputs:
+                            ci_response_result: ci_response_result
+                    implementation_defect:
+                      - terminal: failed
+                    unclear:
+                      - terminal: failed
+                  default:
+                    - terminal: failed
   - terminal: succeeded

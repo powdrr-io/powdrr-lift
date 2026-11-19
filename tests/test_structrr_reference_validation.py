@@ -346,6 +346,7 @@ def test_unavailable_optional_invariant_review_is_recorded_without_blocking_audi
     assert reviews[0]["classification"] == "needs_review"
     assert reviews[0]["decision"]["outcome"] == "unknown"
     assert reviews[0]["available_evidence"]
+    assert reviews[0]["required_gate_evidence"] is False
 
 
 def test_flexible_owners_and_suspicious_extra_placements_need_fresh_review() -> None:
@@ -361,11 +362,24 @@ def test_flexible_owners_and_suspicious_extra_placements_need_fresh_review() -> 
         validate(candidate, handoff=handoff, catalog=catalog).status == "needs_review"
     )
     judge = Judge()
+    reviewed = validate(
+        candidate, handoff=handoff, catalog=catalog, review_client=judge
+    )
+    assert reviewed.status == "passed"
+    report_reviews = reviewed.to_data()["reviews"]
     assert (
-        validate(
-            candidate, handoff=handoff, catalog=catalog, review_client=judge
-        ).status
-        == "passed"
+        next(item for item in report_reviews if item["purpose"] == "flexible_owner")[
+            "required_gate_evidence"
+        ]
+        is True
+    )
+    assert (
+        next(
+            item
+            for item in report_reviews
+            if item["purpose"] == "invariant_preservation"
+        )["required_gate_evidence"]
+        is False
     )
     assert judge.requests[0]["context"]["callers"]
     assert (

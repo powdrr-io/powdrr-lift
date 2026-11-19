@@ -1,0 +1,53 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1618
+title: Mark optional source reviews as non-gating
+intent:
+  problem: Optional invariant-preservation reviews can return satisfied classifications without making their advisory-only effect clear in the validation record.
+  goal: Distinguish required owner-review decisions from optional invariant advice so downstream consumers do not treat advisory outcomes as gate evidence.
+human-decisions: []
+structured_files: []
+files:
+  - path: packages/service/src/powdrr_service/structrr/reference_validation.py
+    type: modified
+    span: {start_line: 641, end_line: 641}
+    summary: Mark no-client review results by gate effect.
+    rationale: Preserve explicit non-gating status even when independent review is unavailable.
+  - path: packages/service/src/powdrr_service/structrr/reference_validation.py
+    type: modified
+    span: {start_line: 720, end_line: 720}
+    summary: Mark reviewed results as required or advisory.
+    rationale: Let consumers distinguish placement decisions from optional invariant-preservation advice.
+  - path: tests/test_structrr_reference_validation.py
+    type: modified
+    span: {start_line: 349, end_line: 349}
+    summary: Assert unknown invariant review is non-gating.
+    rationale: Ensure missing optional evidence remains explicit without changing the passed gate status.
+  - path: tests/test_structrr_reference_validation.py
+    type: modified
+    span: {start_line: 365, end_line: 369}
+    summary: Retain the reviewed reference report for gate-effect checks.
+    rationale: Inspect the serialized decisions produced by one review pass.
+  - path: tests/test_structrr_reference_validation.py
+    type: modified
+    span: {start_line: 371, end_line: 382}
+    summary: Distinguish required owner review from optional invariant review.
+    rationale: Verify each review purpose reports the correct gate effect.
+entities:
+  - id: explicit-source-review-gate-effect
+    type: Function
+    action: added
+  - id: explicit-source-review-gate-effect-tests
+    type: Regression test
+    action: added
+entity_relationships:
+  - id: review-gate-effect-is-covered
+    type: verifies
+    source: explicit-source-review-gate-effect-tests
+    target: explicit-source-review-gate-effect
+    action: added
+    description: Tests verify optional invariant review records cannot be mistaken for required gate evidence.
+invariants:
+  - id: optional-invariant-review-never-claims-gate-authority
+    description: An invariant-preservation review record always sets required_gate_evidence to false, including when review is unavailable; required flexible-owner decisions set it to true.
+    action: added
+guidance: []

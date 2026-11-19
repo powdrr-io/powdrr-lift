@@ -6,7 +6,7 @@ import hashlib
 import json
 import subprocess
 import tempfile
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 from powdrr_service.planning.evidence import Evidence, EvidenceError
@@ -68,6 +68,10 @@ def load_requirement_execution_receipts(
         if evidence.start_line != 1 or evidence.end_line != 1:
             raise EvidenceError("receipt evidence must bind one canonical JSON line")
         receipt_data = receipt.to_data()
+        if receipt_data["outcome"] != "passed":
+            raise EvidenceError(
+                "execution receipt manifests may contain only passed receipts"
+            )
         if (
             receipt_data["source_commit"] != pinned_commit
             or receipt_data["candidate_commit"] != pinned_commit
@@ -98,6 +102,100 @@ def load_requirement_execution_receipts(
         evidence_by_requirement[requirement_id] = (evidence,)
         excerpts_by_evidence[evidence.id] = excerpt
     return evidence_by_requirement, excerpts_by_evidence
+
+
+def write_requirement_execution_receipt_manifest(
+    directory: Path,
+    *,
+    pinned_commit: str,
+    receipts: Sequence[RequirementExecutionReceipt],
+) -> Path:
+    """Write the named GitHub artifact payload from explicitly bound receipts.
+
+    The caller obtains each receipt from observed verification evidence and
+    supplies its requirement ID and digest to the verifier adapter. This
+    function performs only deterministic serialization and structural checks.
+    """
+    if (
+        not isinstance(pinned_commit, str)
+        or len(pinned_commit) not in {40, 64}
+        or any(character not in "0123456789abcdef" for character in pinned_commit)
+    ):
+        raise EvidenceError("receipt manifest requires a pinned commit")
+    records: list[dict[str, object]] = []
+    seen_requirements: set[str] = set()
+    for index, receipt in enumerate(
+        sorted(receipts, key=lambda item: item.to_data()["requirement_id"]), start=1
+    ):
+        data = receipt.to_data()
+        if data["outcome"] != "passed":
+            raise EvidenceError("only passed execution receipts can be published")
+        if (
+            data["source_commit"] != pinned_commit
+            or data["candidate_commit"] != pinned_commit
+        ):
+            raise EvidenceError("receipt does not match the pinned source candidate")
+        requirement_id = str(data["requirement_id"])
+        if requirement_id in seen_requirements:
+            raise EvidenceError(
+                f"multiple execution receipts supplied for {requirement_id}"
+            )
+        seen_requirements.add(requirement_id)
+        excerpt = (
+            json.dumps(data, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+            + "\n"
+        )
+        evidence_path = (
+            Path("artifacts/requirement-execution-receipts/receipts")
+            / f"{data['receipt_id'].removeprefix('receipt:')}.json"
+        )
+        evidence = {
+            "id": f"evidence-{index:04d}",
+            "base_commit": pinned_commit,
+            "path": evidence_path.as_posix(),
+            "start_line": 1,
+            "end_line": 1,
+            "content_sha256": hashlib.sha256(excerpt.encode("utf-8")).hexdigest(),
+            "kind": "execution_receipt",
+            "symbol": None,
+        }
+        records.append({"evidence": evidence, "receipt": data})
+
+    artifact_dir = directory / RECEIPT_ARTIFACT_NAME
+    receipt_dir = artifact_dir / "receipts"
+    receipt_dir.mkdir(parents=True, exist_ok=True)
+    for record in records:
+        receipt_data = record["receipt"]
+        assert isinstance(receipt_data, Mapping)
+        receipt_path = (
+            receipt_dir / f"{receipt_data['receipt_id'].removeprefix('receipt:')}.json"
+        )
+        receipt_path.write_text(
+            json.dumps(
+                receipt_data,
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=False,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+    manifest_path = artifact_dir / "manifest.json"
+    manifest_path.write_text(
+        json.dumps(
+            {
+                "schema_version": MANIFEST_SCHEMA,
+                "base_commit": pinned_commit,
+                "receipts": records,
+            },
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    return manifest_path
 
 
 def discover_requirement_execution_receipts(
@@ -213,4 +311,5 @@ __all__ = [
     "RECEIPT_ARTIFACT_NAME",
     "discover_requirement_execution_receipts",
     "load_requirement_execution_receipts",
+    "write_requirement_execution_receipt_manifest",
 ]

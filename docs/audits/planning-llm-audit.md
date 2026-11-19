@@ -302,16 +302,21 @@ only when its obligation identity, contract/verifier fingerprints, command
 fingerprint, and candidate-tree fingerprint match explicit inputs. The caller
 must also supply the requirement digest, source/candidate commits, run ID, and
 evidence artifact reference; no requirement link is inferred from story refs.
-The current verification workflow does not yet produce planning-bound receipts
-automatically. `plan` and `plan-resume` now discover the named
+`write_requirement_execution_receipt_manifest` serializes those receipts into
+the named artifact directory with canonical receipt sidecars, a pinned manifest,
+and deterministic evidence digests. It rejects unpassed receipts and receipts
+whose source or candidate commit differs from the pin. Manifest intake also
+rejects unpassed receipts, preventing them from being cited by the semantic
+coverage path as complete. `plan` and `plan-resume` now discover the named
 `powdrr-requirement-execution-receipts` artifact from completed successful
 GitHub Actions runs for the exact pinned commit. An explicit JSON manifest path
 can override discovery. The loader pins the manifest base commit, validates each
 receipt and evidence digest, and supplies records only under explicit
 requirement IDs. Missing artifacts or unavailable discovery leave the normal
 semantic coverage path in place; they are not evidence of missing behavior.
-The planner does not infer bindings. The service adapter remains an explicit
-integration point rather than an active receipt producer, and the schema binds
+No active workflow currently supplies planner requirement bindings to the
+verifier adapter or invokes the manifest writer. That binding and invocation
+remain integration work; the planner does not infer them. The schema binds
 claims but is not cryptographic proof.
 
 ### P05: setup instructions are not an invitation to rediscover configuration

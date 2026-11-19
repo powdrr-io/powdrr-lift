@@ -3425,6 +3425,7 @@ def _run_respond_to_pr_ci(args: argparse.Namespace) -> int:
                             )
                             else None
                         ),
+                        command=item.command,
                         test_node_id=item.test_node_id,
                     ).to_dict(),
                     "runner_labels": list(
@@ -3595,6 +3596,33 @@ def _reproduce_ci_failures(
                 phase_exercised=False,
                 environment_comparable=False,
                 locally_executable=False,
+            )
+            continue
+        if failure.phase == "formatter_failure" and failure.command:
+            try:
+                formatter_result = execute_pinned_local_command(
+                    repository_root, head_sha, failure.command
+                )
+            except (GitHubActionsError, OSError) as error:
+                results[failure.failure_id] = LocalReproduction(
+                    "execution_error",
+                    f"The exact formatter check could not run locally: {error}",
+                    command=failure.command,
+                )
+                continue
+            formatter_output = formatter_result.stdout + "\n" + formatter_result.stderr
+            comparison = compare_local_reproduction(
+                ci_signature=failure.signature,
+                local_output=formatter_output,
+                command=failure.command,
+                exit_code=formatter_result.exit_code,
+                phase_exercised=True,
+                environment_comparable=False,
+            )
+            results[failure.failure_id] = replace(
+                comparison,
+                stdout_sha256=formatter_result.stdout_sha256,
+                stderr_sha256=formatter_result.stderr_sha256,
             )
             continue
         if not verification_command or run_result is None:

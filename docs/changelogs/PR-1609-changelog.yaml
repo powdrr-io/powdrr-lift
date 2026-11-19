@@ -1,0 +1,83 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1609
+title: Add registered Ruff formatter CI correction
+intent:
+  problem: CI response handling could only prepare pytest-backed repairs, so a narrowly scoped Ruff formatting failure could not be corrected automatically.
+  goal: Reproduce an exact Ruff formatting diagnostic on the observed PR head and apply its registered formatter correction under a head-bound repair contract.
+human-decisions: []
+structured_files: []
+files:
+  - {path: &contract_file packages/contracts/src/powdrr_contracts/ci.py, type: modified, span: {start_line: 750, end_line: 798}, summary: Define the registered correction record, rationale: Bind an exact supported formatter action to its path and diagnostic digest.}
+  - {path: *contract_file, type: modified, span: {start_line: 820, end_line: 820}, summary: Add the correction to the repair contract, rationale: Carry deterministic correction data with the contract.}
+  - {path: *contract_file, type: modified, span: {start_line: 841, end_line: 842}, summary: Permit a correction contract without a protected artifact, rationale: The formatter target is itself restricted by the registered correction.}
+  - {path: *contract_file, type: modified, span: {start_line: 844, end_line: 844}, summary: Clarify protected artifact count validation, rationale: Preserve ordinary contract protection requirements.}
+  - {path: *contract_file, type: modified, span: {start_line: 861, end_line: 874}, summary: Validate registered correction scope and reproduction, rationale: Require the exact path, check command, and reproduced status.}
+  - {path: *contract_file, type: modified, span: {start_line: 945, end_line: 945}, summary: Accept correction data when compiling a repair contract, rationale: Make the registered action part of contract construction.}
+  - {path: *contract_file, type: modified, span: {start_line: 965, end_line: 966}, summary: Include correction data in the contract identity, rationale: Ensure the hash changes when the correction changes.}
+  - {path: *contract_file, type: modified, span: {start_line: 986, end_line: 986}, summary: Return the correction in compiled contracts, rationale: Preserve the selected correction after compilation.}
+  - {path: *contract_file, type: modified, span: {start_line: 990, end_line: 990}, summary: Conditionally include correction data in serialized contract content, rationale: Keep legacy contract hashes stable.}
+  - {path: *contract_file, type: modified, span: {start_line: 1012, end_line: 1014}, summary: Serialize registered correction content, rationale: Make correction contracts verifiable after persistence.}
+  - {path: *contract_file, type: modified, span: {start_line: 1055, end_line: 1057}, summary: Parse serialized correction data, rationale: Restore and validate the persisted deterministic action.}
+  - {path: *contract_file, type: modified, span: {start_line: 1086, end_line: 1090}, summary: Reconstruct registered corrections from contract data, rationale: Retain exact action identity through round trips.}
+  - {path: &evidence_file packages/service/src/powdrr_service/ci_response/evidence.py, type: modified, span: {start_line: 35, end_line: 35}, summary: Store the deterministic failure command, rationale: Carry a selected formatter check into local reproduction.}
+  - {path: *evidence_file, type: modified, span: {start_line: 124, end_line: 143}, summary: Classify exact Ruff format step failures, rationale: Register only one safe target from matching untruncated CI evidence.}
+  - {path: *evidence_file, type: modified, span: {start_line: 220, end_line: 220}, summary: Persist commands on failure units, rationale: Make typed formatter evidence available to downstream preparation.}
+  - {path: *evidence_file, type: modified, span: {start_line: 243, end_line: 280}, summary: Parse and validate Ruff formatter diagnostics, rationale: Reject ambiguous paths, summaries, or unavailable logs.}
+  - {path: &prepare_file packages/service/src/powdrr_service/ci_response/prepare_repair.py, type: modified, span: {start_line: 5, end_line: 5}, summary: Import diagnostic hashing support, rationale: Bind the observed formatter excerpt to the repair contract.}
+  - {path: *prepare_file, type: modified, span: {start_line: 16, end_line: 16}, summary: Import the registered correction contract type, rationale: Represent formatter actions as typed repair data.}
+  - {path: *prepare_file, type: modified, span: {start_line: 43, end_line: 49}, summary: Admit exact registered formatter failures, rationale: Allow a formatter repair without a pytest node only when safely registered.}
+  - {path: *prepare_file, type: modified, span: {start_line: 77, end_line: 86}, summary: Protect pytest artifacts only for test failures, rationale: Retain test file safeguards while supporting formatter-only failures.}
+  - {path: *prepare_file, type: modified, span: {start_line: 104, end_line: 112}, summary: Include the formatter check in contract validation, rationale: Require the repair to resolve the exact observed formatting diagnostic.}
+  - {path: *prepare_file, type: modified, span: {start_line: 137, end_line: 181}, summary: Compile only reproduced, exact Ruff corrections, rationale: Reject unsupported commands and any diagnostic that does not identify exactly one target.}
+  - {path: &repair_contract_file packages/service/src/powdrr_service/ci_response/repair_contract.py, type: modified, span: {start_line: 16, end_line: 16}, summary: Import registered correction data, rationale: Allow repair contract compilation to accept a typed action.}
+  - {path: *repair_contract_file, type: modified, span: {start_line: 35, end_line: 35}, summary: Accept registered correction input, rationale: Pass the correction into immutable contract compilation.}
+  - {path: *repair_contract_file, type: modified, span: {start_line: 116, end_line: 116}, summary: Forward correction data to the contract builder, rationale: Preserve the selected action in the resulting repair contract.}
+  - {path: &cli_file src/powdrr_lift/cli.py, type: modified, span: {start_line: 3428, end_line: 3428}, summary: Serialize failure commands in CI checkpoints, rationale: Preserve exact formatter commands for durable reproduction.}
+  - {path: *cli_file, type: modified, span: {start_line: 3601, end_line: 3627}, summary: Reproduce formatter failures without a pytest node, rationale: Run the selected check on the observed head and compare its exact output.}
+  - {path: &agent_file src/powdrr_lift/workrr/task_agent.py, type: modified, span: {start_line: 199, end_line: 199}, summary: Import durable coding attempt types, rationale: Persist deterministic correction results through existing attempt storage.}
+  - {path: *agent_file, type: modified, span: {start_line: 203, end_line: 203}, summary: Import coding attempt status, rationale: Report registered correction success or failure consistently.}
+  - {path: *agent_file, type: modified, span: {start_line: 5506, end_line: 5785}, summary: Apply and validate one registered Ruff correction, rationale: Recheck evidence, support Ruff's exact legacy and current diagnostics, format one target, preserve AST and protected artifacts, and reject out-of-scope changes.}
+  - {path: *agent_file, type: modified, span: {start_line: 5886, end_line: 5890}, summary: Restore registered correction attempts, rationale: Recognize deterministic correction providers during recovery.}
+  - {path: *agent_file, type: modified, span: {start_line: 5893, end_line: 5893}, summary: Select expected attempt provider by correction type, rationale: Keep replay checks aligned with deterministic dispatch.}
+  - {path: *agent_file, type: modified, span: {start_line: 6026, end_line: 6029}, summary: Prepare testless registered correction contracts, rationale: Admit the formatter route while keeping source scope constrained.}
+  - {path: *agent_file, type: modified, span: {start_line: 6057, end_line: 6067}, summary: Validate formatter reproduction and derive its path, rationale: Bind dispatch to the reproduced source target.}
+  - {path: *agent_file, type: modified, span: {start_line: 6073, end_line: 6073}, summary: Select the sole correction path, rationale: Limit the formatter operation to its registered file.}
+  - {path: *agent_file, type: modified, span: {start_line: 6574, end_line: 6582}, summary: Validate restored correction attempts, rationale: Match saved results to the registered provider identity.}
+  - {path: *agent_file, type: modified, span: {start_line: 6589, end_line: 6595}, summary: Report interrupted correction receipts, rationale: Prevent redispatch when an invocation has no durable result.}
+  - {path: *agent_file, type: modified, span: {start_line: 6601, end_line: 6601}, summary: Distinguish correction and model dispatch records, rationale: Recover the correct provider path.}
+  - {path: *agent_file, type: modified, span: {start_line: 6638, end_line: 6644}, summary: Block unsafe recovery of interrupted corrections, rationale: Avoid applying the formatter twice after an incomplete attempt.}
+  - {path: *agent_file, type: modified, span: {start_line: 6650, end_line: 6650}, summary: Use the matching recovery reason, rationale: Explain why an interrupted deterministic action cannot resume automatically.}
+  - {path: *agent_file, type: modified, span: {start_line: 6721, end_line: 6725}, summary: Record correction invocation receipts, rationale: Make deterministic dispatch durable before mutation begins.}
+  - {path: *agent_file, type: modified, span: {start_line: 6751, end_line: 6757}, summary: Dispatch registered corrections before model invocation, rationale: Execute the fixed formatter operation through the existing attempt path.}
+  - {path: *agent_file, type: modified, span: {start_line: 6759, end_line: 6759}, summary: Save the correction request, rationale: Preserve audit data for the deterministic attempt.}
+  - {path: *agent_file, type: modified, span: {start_line: 6764, end_line: 6766}, summary: Persist correction dispatch state, rationale: Support safe interruption handling.}
+  - {path: *agent_file, type: modified, span: {start_line: 6769, end_line: 6843}, summary: Run registered correction and save its result, rationale: Route the deterministic attempt through validation, acceptance, and publication checks.}
+  - {path: &cli_test_file tests/test_ci_response_cli.py, type: modified, span: {start_line: 10, end_line: 10}, summary: Import parameterized test support, rationale: Exercise fail-closed formatter evidence cases.}
+  - {path: *cli_test_file, type: modified, span: {start_line: 247, end_line: 349}, summary: Test exact formatter reproduction and rejection cases, rationale: Cover command selection plus ambiguous, truncated, and mismatched evidence.}
+  - {path: &prepare_test_file tests/test_ci_response_prepare_repair.py, type: modified, span: {start_line: 4, end_line: 4}, summary: Import digest computation for contract expectations, rationale: Verify the evidence hash stored by the registered correction.}
+  - {path: *prepare_test_file, type: modified, span: {start_line: 14, end_line: 15}, summary: Import registered correction contract types, rationale: Assert exact correction data and round-trip behavior.}
+  - {path: *prepare_test_file, type: modified, span: {start_line: 124, end_line: 180}, summary: Test exact formatter repair contract preparation, rationale: Protect the path, command, diagnostic digest, and serialized contract.}
+  - {path: &agent_test_file tests/test_workflow_task_agent.py, type: modified, span: {start_line: 22, end_line: 22}, summary: Import typed correction test data, rationale: Build a registered formatter dispatch integration case.}
+  - {path: *agent_test_file, type: modified, span: {start_line: 3580, end_line: 3856}, summary: Test deterministic correction dispatch and replay safety, rationale: Ensure no provider is invoked, the existing contract path runs, and both Ruff diagnostic formats are recognized safely.}
+entities:
+  - id: registered-ruff-ci-correction
+    type: Function
+    action: added
+  - id: registered-ruff-ci-correction-tests
+    type: Regression test
+    action: added
+entity_relationships:
+  - id: formatter-correction-is-covered
+    type: verifies
+    source: registered-ruff-ci-correction-tests
+    target: registered-ruff-ci-correction
+    action: added
+    description: Tests verify evidence selection, contract binding, and deterministic dispatch for the registered correction.
+invariants:
+  - id: formatter-fix-is-bound-to-observed-evidence
+    description: A registered Ruff correction is available only for one exact target from an available untruncated failed Ruff format step and a matching local reproduction on the observed head.
+    action: added
+  - id: formatter-fix-stays-within-contract-scope
+    description: The deterministic correction changes only its registered Python file, preserves its AST and protected artifacts, and proceeds through the contract's existing validation and acceptance path.
+    action: added
+guidance: []

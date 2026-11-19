@@ -32,6 +32,7 @@ class CIFailureUnit:
     evidence: tuple[str, ...]
     locally_executable: bool
     test_node_id: str | None = None
+    command: tuple[str, ...] = ()
 
 
 def normalize_failure_signature(message: str) -> str:
@@ -120,6 +121,26 @@ def build_failure_units(
             continue
         for step in step_failures:
             name = str(step.get("name") or "unnamed step")
+            formatter = (
+                _ruff_format_diagnostic(job) if len(step_failures) == 1 else None
+            )
+            if (
+                formatter is not None
+                and "ruff" in name.casefold()
+                and "format" in name.casefold()
+            ):
+                path, command = formatter
+                units.append(
+                    _failure_unit(
+                        job,
+                        "formatter_failure",
+                        f"Would reformat: {path}",
+                        (f"step:{name}", *_log_evidence_reference(job)),
+                        True,
+                        command=command,
+                    )
+                )
+                continue
             # The Actions job API exposes the failed step label but not its
             # failure text. Mark it as a label so local output cannot
             # accidentally match a generic word such as "pytest".
@@ -196,6 +217,7 @@ def _failure_unit(
     locally_executable: bool,
     *,
     test_node_id: str | None = None,
+    command: tuple[str, ...] = (),
 ) -> CIFailureUnit:
     identity = "\0".join(
         (
@@ -218,4 +240,42 @@ def _failure_unit(
         evidence=evidence,
         locally_executable=locally_executable,
         test_node_id=test_node_id,
+        command=command,
+    )
+
+
+def _ruff_format_diagnostic(
+    job: CIJobObservation,
+) -> tuple[str, tuple[str, ...]] | None:
+    evidence = job.log_evidence
+    if (
+        evidence is None
+        or evidence.status != "available"
+        or evidence.truncated
+        or evidence.excerpt is None
+    ):
+        return None
+    lines = [line.strip() for line in evidence.excerpt.splitlines()]
+    targets = [
+        line.removeprefix("Would reformat: ")
+        for line in lines
+        if line.startswith("Would reformat: ")
+    ]
+    summaries = [line for line in lines if line.endswith("file would be reformatted")]
+    if len(targets) != 1 or summaries != ["1 file would be reformatted"]:
+        return None
+    path = targets[0].removeprefix("./")
+    if not _safe_python_source_path(path):
+        return None
+    return path, ("ruff", "format", "--check", path)
+
+
+def _safe_python_source_path(path: str) -> bool:
+    normalized = path.replace("\\", "/")
+    return bool(
+        path.endswith(".py")
+        and path == normalized
+        and not normalized.startswith("/")
+        and all(part not in {"", ".", ".."} for part in normalized.split("/"))
+        and all(ord(character) >= 32 for character in normalized)
     )

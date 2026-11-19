@@ -13,6 +13,7 @@ from powdrr_contracts.ci import (
     CIObservation,
     LocalReproduction,
     ProtectedArtifact,
+    RegisteredCIFix,
     RepairContract,
 )
 
@@ -31,6 +32,7 @@ def compile_repair_contract(
     expires_at: str,
     research_assessment: Mapping[str, object] | None = None,
     research_claim_refs: Sequence[str] = (),
+    registered_correction: RegisteredCIFix | None = None,
 ) -> RepairContract:
     """Bind a narrow correction to one observed failure and eligible evidence.
 
@@ -111,6 +113,7 @@ def compile_repair_contract(
         research_claim_refs=refs,
         stop_conditions=stops,
         expires_at=expires_at,
+        registered_correction=registered_correction,
     )
 
 

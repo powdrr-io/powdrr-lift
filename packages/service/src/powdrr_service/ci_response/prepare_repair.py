@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import shlex
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime, timedelta
@@ -12,6 +13,7 @@ from powdrr_contracts.ci import (
     CIObservation,
     LocalReproduction,
     ProtectedArtifact,
+    RegisteredCIFix,
     RepairContract,
 )
 
@@ -38,8 +40,13 @@ def prepare_ci_repair_contract(
     """
     if reproduction.status != "reproduced" or not failure.locally_executable:
         raise ValueError("CI repair requires a locally reproduced failure")
-    if failure.test_node_id is None:
-        raise ValueError("CI repair requires a failure tied to one pytest node")
+    registered_correction = _registered_ruff_fix(
+        failure, reproduction, failure_log_excerpt
+    )
+    if failure.test_node_id is None and registered_correction is None:
+        raise ValueError(
+            "CI repair requires a pytest failure or an exact registered correction"
+        )
     if observation.head_sha != failure.head_sha:
         raise ValueError("CI failure belongs to a different observed PR head")
     if observation.required_checks_status != "available":
@@ -67,13 +74,16 @@ def prepare_ci_repair_contract(
             "source path"
         )
 
-    test_path = failure.test_node_id.split("::", 1)[0]
-    if not _safe_repo_path(test_path) or not _is_test_path(test_path):
-        raise ValueError("CI failure does not identify a safe test artifact to protect")
-    if not any(item.path == test_path for item in protected_artifacts):
-        raise ValueError(
-            "the failing test file is not protected by the repair contract"
-        )
+    if failure.test_node_id is not None:
+        test_path = failure.test_node_id.split("::", 1)[0]
+        if not _safe_repo_path(test_path) or not _is_test_path(test_path):
+            raise ValueError(
+                "CI failure does not identify a safe test artifact to protect"
+            )
+        if not any(item.path == test_path for item in protected_artifacts):
+            raise ValueError(
+                "the failing test file is not protected by the repair contract"
+            )
 
     acceptance = reviewed_context.get("acceptance_criteria")
     if (
@@ -91,7 +101,15 @@ def prepare_ci_repair_contract(
         raise ValueError("reviewed verification command is malformed") from error
     commands = tuple(
         dict.fromkeys(
-            command for command in (declared_command, reproduction.command) if command
+            command
+            for command in (
+                declared_command,
+                reproduction.command,
+                registered_correction.check_command
+                if registered_correction is not None
+                else (),
+            )
+            if command
         )
     )
     if not commands:
@@ -116,6 +134,51 @@ def prepare_ci_repair_contract(
             "unavailable.",
         ),
         expires_at=expiry.isoformat(),
+        registered_correction=registered_correction,
+    )
+
+
+def _registered_ruff_fix(
+    failure: CIFailureUnit,
+    reproduction: LocalReproduction,
+    failure_log_excerpt: str,
+) -> RegisteredCIFix | None:
+    if (
+        failure.phase != "formatter_failure"
+        or failure.test_node_id is not None
+        or not failure.command
+        or reproduction.status != "reproduced"
+        or reproduction.matching_failure is not True
+        or reproduction.exit_code != 1
+        or reproduction.command != failure.command
+    ):
+        return None
+    prefixes = (
+        ("ruff", "format", "--check"),
+        ("python", "-m", "ruff", "format", "--check"),
+    )
+    prefix = next(
+        (item for item in prefixes if failure.command[: len(item)] == item), None
+    )
+    if prefix is None or len(failure.command) != len(prefix) + 1:
+        return None
+    target = failure.command[-1]
+    if not _safe_repo_path(target) or not target.endswith(".py"):
+        return None
+    lines = [line.strip() for line in failure_log_excerpt.splitlines() if line.strip()]
+    diagnostics = [line for line in lines if line.startswith("Would reformat: ")]
+    summaries = [line for line in lines if line.endswith("file would be reformatted")]
+    if diagnostics != [f"Would reformat: {target}"] or summaries != [
+        "1 file would be reformatted"
+    ]:
+        return None
+    return RegisteredCIFix(
+        correction_id="ruff-format-v1",
+        path=target,
+        check_command=failure.command,
+        diagnostic_sha256=hashlib.sha256(
+            failure_log_excerpt.encode("utf-8")
+        ).hexdigest(),
     )
 
 

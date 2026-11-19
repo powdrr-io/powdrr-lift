@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from hashlib import sha256
 
 import pytest
 from powdrr_contracts.ci import (
@@ -10,6 +11,8 @@ from powdrr_contracts.ci import (
     CIRequiredCheck,
     LocalReproduction,
     ProtectedArtifact,
+    RegisteredCIFix,
+    RepairContract,
 )
 from powdrr_service.ci_response import prepare_ci_repair_contract
 
@@ -118,3 +121,60 @@ def test_prepare_repair_contract_rejects_ambiguous_source_evidence(
             },
             protected_artifacts=(ProtectedArtifact("tests/test_app.py", "b" * 64),),
         )
+
+
+def test_prepare_repair_contract_compiles_exact_registered_formatter_fix() -> None:
+    observation, _, _ = _case()
+    path = "src/app.py"
+    command = ("ruff", "format", "--check", path)
+    excerpt = (
+        "Run ruff format --check .\n"
+        f"Would reformat: {path}\n"
+        "1 file would be reformatted\n"
+    )
+    failure = CIFailureUnit(
+        failure_id="formatter-1",
+        observation_id="observation-1",
+        job_id=11,
+        phase="formatter_failure",
+        signature=f"Would reformat: {path}",
+        evidence=("job_log:11:sha256:" + "a" * 64,),
+        locally_executable=True,
+        head_sha=HEAD,
+        run_id=10,
+        run_attempt=1,
+        command=command,
+    )
+    reproduction = LocalReproduction(
+        status="reproduced",
+        reason="The exact formatter check reports the same single target.",
+        command=command,
+        exit_code=1,
+        matching_failure=True,
+    )
+
+    contract = prepare_ci_repair_contract(
+        observation=observation,
+        failure=failure,
+        reproduction=reproduction,
+        changed_paths=(path,),
+        failure_log_excerpt=excerpt,
+        reviewed_context={
+            "allowed_paths": ["src"],
+            "acceptance_criteria": ["Preserve application behavior."],
+            "verification_command": "pytest -q",
+        },
+        protected_artifacts=(),
+        now=datetime(2026, 11, 16, tzinfo=UTC),
+    )
+
+    assert contract.allowed_paths == (path,)
+    assert contract.protected_artifacts == ()
+    assert contract.registered_correction == RegisteredCIFix(
+        correction_id="ruff-format-v1",
+        path=path,
+        check_command=command,
+        diagnostic_sha256=sha256(excerpt.encode()).hexdigest(),
+    )
+    assert command in contract.verification_commands
+    assert RepairContract.from_dict(contract.to_dict()) == contract

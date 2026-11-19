@@ -196,9 +196,11 @@ from powdrr_lift.workrr.coding_agent import (
     DEFAULT_CODING_AGENT_RECOVERY_ATTEMPTS,
     DEFAULT_CODING_AGENT_TIMEOUT_SECONDS,
     DEFAULT_CODING_AGENT_VALIDATION_TIMEOUT_SECONDS,
+    CodingAgentAttempt,
     CodingAgentAttemptStore,
     CodingAgentRecoveryDecision,
     CodingAgentRunner,
+    CodingAgentStatus,
     ImplementationRequest,
     MiniSWEAgentProvider,
     OpenCodePermissionPolicy,
@@ -5501,6 +5503,258 @@ def _write_ci_repair_json(path: Path, value: Mapping[str, Any]) -> None:
         temporary.unlink(missing_ok=True)
 
 
+def _run_registered_ci_correction(
+    *,
+    contract: RepairContract,
+    failure: CIFailureUnit,
+    observation_result: Mapping[str, Any],
+    worker_root: Path,
+    attempt_id: str,
+    request_id: str,
+    provider: str,
+) -> CodingAgentAttempt:
+    """Apply the contract-bound Ruff fix without invoking a coding model."""
+    fix = contract.registered_correction
+    if fix is None:
+        raise ValueError("registered CI correction is missing")
+    failure_logs = observation_result.get("job_log_evidence")
+    log_data = (
+        failure_logs.get(str(failure.job_id))
+        if isinstance(failure_logs, Mapping)
+        else None
+    )
+    excerpt = (
+        log_data.get("excerpt")
+        if isinstance(log_data, Mapping) and log_data.get("status") == "available"
+        else None
+    )
+    raw_digest = log_data.get("raw_sha256") if isinstance(log_data, Mapping) else None
+    exact_log_ref = f"job_log:{failure.job_id}:sha256:{raw_digest}"
+    if (
+        not isinstance(excerpt, str)
+        or not isinstance(raw_digest, str)
+        or exact_log_ref not in failure.evidence
+        or hashlib.sha256(excerpt.encode("utf-8")).hexdigest() != fix.diagnostic_sha256
+    ):
+        return _registered_correction_attempt(
+            worker_root,
+            attempt_id=attempt_id,
+            request_id=request_id,
+            provider=provider,
+            error="the contract-bound formatter log evidence is stale or unavailable",
+        )
+
+    target = worker_root.joinpath(*PurePosixPath(fix.path).parts)
+    if (
+        fix.path not in contract.allowed_paths
+        or target.is_symlink()
+        or not target.is_file()
+        or any(parent.is_symlink() for parent in target.parents)
+    ):
+        return _registered_correction_attempt(
+            worker_root,
+            attempt_id=attempt_id,
+            request_id=request_id,
+            provider=provider,
+            error="the registered formatter target is missing or unsafe",
+        )
+    try:
+        check_result = subprocess.run(
+            fix.check_command,
+            cwd=worker_root,
+            capture_output=True,
+            text=True,
+            timeout=120,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as error:
+        return _registered_correction_attempt(
+            worker_root,
+            attempt_id=attempt_id,
+            request_id=request_id,
+            provider=provider,
+            error=f"the registered formatter check could not run: {error}",
+        )
+    check_lines = [
+        line.strip() for line in check_result.stdout.splitlines() if line.strip()
+    ]
+    if (
+        check_result.returncode != 1
+        or check_result.stderr
+        or check_lines
+        not in (
+            [f"Would reformat: {fix.path}"],
+            [f"Would reformat: {fix.path}", "1 file would be reformatted"],
+        )
+    ):
+        return _registered_correction_attempt(
+            worker_root,
+            attempt_id=attempt_id,
+            request_id=request_id,
+            provider=provider,
+            error="the exact formatter check no longer matches the observed failure",
+        )
+
+    original = target.read_bytes()
+    original_mode = target.stat().st_mode
+    try:
+        before_ast = ast.dump(
+            ast.parse(original, filename=fix.path), include_attributes=False
+        )
+    except (SyntaxError, UnicodeDecodeError) as error:
+        return _registered_correction_attempt(
+            worker_root,
+            attempt_id=attempt_id,
+            request_id=request_id,
+            provider=provider,
+            error=f"the formatter target is not valid Python: {error}",
+        )
+    before_protected = {item.path: item.sha256 for item in contract.protected_artifacts}
+    for relative, expected_digest in before_protected.items():
+        protected_path = worker_root / relative
+        if (
+            protected_path.is_symlink()
+            or not protected_path.is_file()
+            or hashlib.sha256(protected_path.read_bytes()).hexdigest()
+            != expected_digest
+        ):
+            return _registered_correction_attempt(
+                worker_root,
+                attempt_id=attempt_id,
+                request_id=request_id,
+                provider=provider,
+                error="a protected artifact changed after CI contract preparation",
+            )
+    apply_command = ("ruff", "format", "--no-cache", "--", fix.path)
+    try:
+        format_result = subprocess.run(
+            apply_command,
+            cwd=worker_root,
+            capture_output=True,
+            text=True,
+            timeout=120,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired) as error:
+        _restore_ci_correction_target(target, original, original_mode)
+        return _registered_correction_attempt(
+            worker_root,
+            attempt_id=attempt_id,
+            request_id=request_id,
+            provider=provider,
+            error=f"the registered formatter could not complete: {error}",
+        )
+    if format_result.returncode != 0 or target.is_symlink() or not target.is_file():
+        _restore_ci_correction_target(target, original, original_mode)
+        return _registered_correction_attempt(
+            worker_root,
+            attempt_id=attempt_id,
+            request_id=request_id,
+            provider=provider,
+            error="the registered formatter failed or removed its target",
+        )
+    after = target.read_bytes()
+    if after == original:
+        return _registered_correction_attempt(
+            worker_root,
+            attempt_id=attempt_id,
+            request_id=request_id,
+            provider=provider,
+            error="the observed formatter failure became a no-op",
+        )
+    try:
+        after_ast = ast.dump(
+            ast.parse(after, filename=fix.path), include_attributes=False
+        )
+    except (SyntaxError, UnicodeDecodeError) as error:
+        _restore_ci_correction_target(target, original, original_mode)
+        return _registered_correction_attempt(
+            worker_root,
+            attempt_id=attempt_id,
+            request_id=request_id,
+            provider=provider,
+            error=f"the formatter output is not valid Python: {error}",
+        )
+    if before_ast != after_ast:
+        _restore_ci_correction_target(target, original, original_mode)
+        return _registered_correction_attempt(
+            worker_root,
+            attempt_id=attempt_id,
+            request_id=request_id,
+            provider=provider,
+            error="the formatter changed Python syntax; its target was restored",
+        )
+    changed = _working_paths(worker_root)
+    if changed != {fix.path}:
+        _restore_ci_correction_target(target, original, original_mode)
+        return _registered_correction_attempt(
+            worker_root,
+            attempt_id=attempt_id,
+            request_id=request_id,
+            provider=provider,
+            error="the formatter changed files outside its registered target",
+        )
+    for relative, expected_digest in before_protected.items():
+        protected_path = worker_root / relative
+        if (
+            protected_path.is_symlink()
+            or not protected_path.is_file()
+            or hashlib.sha256(protected_path.read_bytes()).hexdigest()
+            != expected_digest
+        ):
+            _restore_ci_correction_target(target, original, original_mode)
+            return _registered_correction_attempt(
+                worker_root,
+                attempt_id=attempt_id,
+                request_id=request_id,
+                provider=provider,
+                error="the formatter changed a protected artifact",
+            )
+    return CodingAgentAttempt(
+        attempt_id=attempt_id,
+        request_id=request_id,
+        provider=provider,
+        status=CodingAgentStatus.COMPLETED,
+        exit_code=0,
+        changed_paths=tuple(sorted(changed)),
+        diff_fingerprint=_worktree_fingerprint(worker_root, tuple(sorted(changed))),
+    )
+
+
+def _registered_correction_attempt(
+    worker_root: Path,
+    *,
+    attempt_id: str,
+    request_id: str,
+    provider: str,
+    error: str,
+) -> CodingAgentAttempt:
+    changed = tuple(sorted(_working_paths(worker_root)))
+    return CodingAgentAttempt(
+        attempt_id=attempt_id,
+        request_id=request_id,
+        provider=provider,
+        status=CodingAgentStatus.FAILED,
+        exit_code=1,
+        changed_paths=changed,
+        diff_fingerprint=(
+            _worktree_fingerprint(worker_root, changed) if changed else None
+        ),
+        error=error,
+    )
+
+
+def _restore_ci_correction_target(path: Path, content: bytes, mode: int) -> None:
+    if any(parent.is_symlink() for parent in path.parents):
+        raise PowdrrExecutionError(
+            "cannot safely restore the registered formatter target"
+        )
+    if path.is_symlink():
+        path.unlink()
+    path.write_bytes(content)
+    path.chmod(mode & 0o7777)
+
+
 def _ci_repair_portable_files(root: Path, paths: Sequence[str]) -> list[dict[str, Any]]:
     files: list[dict[str, Any]] = []
     for relative in sorted(set(paths)):
@@ -5601,9 +5855,14 @@ def _restore_ci_repair_portable_artifact(
     ):
         raise PowdrrExecutionError("durable CI repair paths exceed the contract")
     attempt_paths = raw_attempt.get("changed_paths")
+    expected_provider = (
+        "minisweagent"
+        if contract.registered_correction is None
+        else (f"registered-correction:{contract.registered_correction.correction_id}")
+    )
     if (
         raw_attempt.get("request_id") != contract.contract_id
-        or raw_attempt.get("provider") != "minisweagent"
+        or raw_attempt.get("provider") != expected_provider
         or raw_attempt.get("status") != "completed"
         or not isinstance(attempt_paths, list)
         or not all(isinstance(path, str) for path in attempt_paths)
@@ -5736,6 +5995,10 @@ class _TaskProcedrrOperations:
             if not isinstance(reproduction_data, Mapping):
                 raise ValueError("local reproduction evidence is unavailable")
             reproduction = LocalReproduction.from_dict(reproduction_data)
+            if not failure.command and reproduction.command:
+                failure = CIFailureUnit.from_dict(
+                    {**failure.to_dict(), "command": list(reproduction.command)}
+                )
             root = (
                 Path(tempfile.gettempdir())
                 / "powdrr-lift-ci-response"
@@ -5763,14 +6026,23 @@ class _TaskProcedrrOperations:
                 if failure.test_node_id is not None
                 else None
             )
-            if test_path is None:
-                raise ValueError("the failed check does not identify one pytest file")
+            formatter_failure = (
+                failure.phase == "formatter_failure"
+                and reproduction.status == "reproduced"
+                and reproduction.matching_failure is True
+                and reproduction.command == failure.command
+            )
+            if test_path is None and not formatter_failure:
+                raise ValueError(
+                    "the failed check is neither one pytest node nor an exact "
+                    "reproduced formatter failure"
+                )
             changed_paths = observation_result.get("changed_paths")
             if not isinstance(changed_paths, list) or not all(
                 isinstance(path, str) for path in changed_paths
             ):
                 raise ValueError("the exact PR changed-file list is unavailable")
-            protected_paths = {test_path}
+            protected_paths = {test_path} if test_path is not None else set()
             protected_paths.update(
                 path
                 for path in changed_paths
@@ -6271,22 +6543,34 @@ class _TaskProcedrrOperations:
                 ) from error
             if (
                 prior_attempt.request_id != contract.contract_id
-                or prior_attempt.provider != "minisweagent"
+                or prior_attempt.provider
+                != (
+                    "minisweagent"
+                    if contract.registered_correction is None
+                    else (
+                        "registered-correction:"
+                        f"{contract.registered_correction.correction_id}"
+                    )
+                )
             ):
                 raise PowdrrExecutionError(
                     "saved CI repair attempt does not match the contract request"
                 )
         elif isinstance(remote_artifact, Mapping) and not dispatch_path.is_file():
             if remote_artifact.get("phase") == "invoking":
+                interrupted_reason = (
+                    "a durable registered-correction receipt exists without a "
+                    "saved result; automatic redispatch is blocked"
+                    if remote_artifact.get("registered_correction") is not None
+                    else "a durable MiniSWE invocation receipt exists without a "
+                    "saved result; automatic redispatch is blocked"
+                )
                 return {
                     "passed": False,
                     "dispatch_status": "interrupted",
                     "attempt_id": attempt_id,
                     "attempt_status": "interrupted",
-                    "reasons": [
-                        "a durable MiniSWE invocation receipt exists without a "
-                        "saved result; automatic redispatch is blocked"
-                    ],
+                    "reasons": [interrupted_reason],
                 }
             if remote_artifact.get("phase") == "completed":
                 try:
@@ -6323,16 +6607,19 @@ class _TaskProcedrrOperations:
                 raise PowdrrExecutionError(
                     "saved CI repair dispatch checkpoint does not match the contract"
                 )
+            interrupted_reason = (
+                "a registered correction started but has no saved attempt result; "
+                "automatic redispatch is blocked"
+                if dispatch_record.get("registered_correction") is not None
+                else "a prior MiniSWE invocation started but has no saved attempt "
+                "result; automatic redispatch is blocked to avoid repeating the repair"
+            )
             return {
                 "passed": False,
                 "dispatch_status": "interrupted",
                 "attempt_id": attempt_id,
                 "attempt_status": "interrupted",
-                "reasons": [
-                    "a prior MiniSWE invocation started but has no saved attempt "
-                    "result; "
-                    "automatic redispatch is blocked to avoid repeating the repair"
-                ],
+                "reasons": [interrupted_reason],
             }
         actual_head = subprocess.run(
             ["git", "rev-parse", "HEAD"],
@@ -6403,7 +6690,11 @@ class _TaskProcedrrOperations:
             raise PowdrrExecutionError(
                 "CI repair worktree must be clean before MiniSWE dispatch"
             )
-        if prior_attempt is None and self.strategy.config.code_agent != "minisweagent":
+        if (
+            prior_attempt is None
+            and contract.registered_correction is None
+            and self.strategy.config.code_agent != "minisweagent"
+        ):
             raise PowdrrExecutionError(
                 "contract-bound CI repair currently requires MiniSWE"
             )
@@ -6429,56 +6720,99 @@ class _TaskProcedrrOperations:
             validation_profiles=profile_names,
         )
         if prior_attempt is None:
-            provider = build_coding_agent_provider(
-                "minisweagent",
-                opencode_executable=self.strategy.config.opencode_executable,
-                opencode_model=self.strategy.config.opencode_model,
-                minisweagent_executable=self.strategy.config.minisweagent_executable,
-                minisweagent_model=self.strategy.config.minisweagent_model,
-                timeout_seconds=self.strategy.config.coding_agent_timeout_seconds,
-                diagnostics_root=store_root / "diagnostics",
-                permission_policy=OpenCodePermissionPolicy(()),
-                miniswe_inference_handler=create_miniswe_inference_handler(
-                    self.strategy.config.coding_agent_timeout_seconds
-                ),
-                trace_caller="ci_repair",
-                trace_gate_consumer="ci_repair_contract_validation",
-                trace_evidence_fingerprint=hashlib.sha256(
-                    request.prompt.encode("utf-8")
-                ).hexdigest(),
-                trace_evidence_ids=(
-                    contract.contract_id,
-                    contract.observation_id,
-                    contract.failure_id,
-                ),
-                trace_check_id=contract.failure_id,
-            )
-            runner = CodingAgentRunner(provider=provider, store=attempt_store)
-            _write_ci_repair_json(
-                dispatch_path,
-                {
-                    "schema_version": "ci-repair-dispatch-v1",
-                    "contract_id": contract.contract_id,
-                    "observation_id": contract.observation_id,
-                    "attempt_id": attempt_id,
-                    "phase": "invoking",
-                },
-            )
-            if callable(persist_artifact):
-                persist_artifact(
-                    contract.contract_id,
+            if contract.registered_correction is not None:
+                correction_provider = (
+                    "registered-correction:"
+                    + contract.registered_correction.correction_id
+                )
+                _write_ci_repair_json(
+                    dispatch_path,
                     {
+                        "schema_version": "ci-repair-dispatch-v1",
+                        "contract_id": contract.contract_id,
+                        "observation_id": contract.observation_id,
+                        "attempt_id": attempt_id,
+                        "phase": "invoking",
+                        "registered_correction": (
+                            contract.registered_correction.to_dict()
+                        ),
+                    },
+                )
+                if callable(persist_artifact):
+                    persist_artifact(
+                        contract.contract_id,
+                        {
+                            "contract_id": contract.contract_id,
+                            "observation_id": contract.observation_id,
+                            "attempt_id": attempt_id,
+                            "phase": "invoking",
+                            "registered_correction": (
+                                contract.registered_correction.to_dict()
+                            ),
+                        },
+                    )
+                attempt_store.save_request(request)
+                attempt = _run_registered_ci_correction(
+                    contract=contract,
+                    failure=failure,
+                    observation_result=observation,
+                    worker_root=worker_root,
+                    attempt_id=attempt_id,
+                    request_id=request_id,
+                    provider=correction_provider,
+                )
+                attempt_store.save_attempt(attempt)
+            else:
+                provider = build_coding_agent_provider(
+                    "minisweagent",
+                    opencode_executable=self.strategy.config.opencode_executable,
+                    opencode_model=self.strategy.config.opencode_model,
+                    minisweagent_executable=self.strategy.config.minisweagent_executable,
+                    minisweagent_model=self.strategy.config.minisweagent_model,
+                    timeout_seconds=self.strategy.config.coding_agent_timeout_seconds,
+                    diagnostics_root=store_root / "diagnostics",
+                    permission_policy=OpenCodePermissionPolicy(()),
+                    miniswe_inference_handler=create_miniswe_inference_handler(
+                        self.strategy.config.coding_agent_timeout_seconds
+                    ),
+                    trace_caller="ci_repair",
+                    trace_gate_consumer="ci_repair_contract_validation",
+                    trace_evidence_fingerprint=hashlib.sha256(
+                        request.prompt.encode("utf-8")
+                    ).hexdigest(),
+                    trace_evidence_ids=(
+                        contract.contract_id,
+                        contract.observation_id,
+                        contract.failure_id,
+                    ),
+                    trace_check_id=contract.failure_id,
+                )
+                runner = CodingAgentRunner(provider=provider, store=attempt_store)
+                _write_ci_repair_json(
+                    dispatch_path,
+                    {
+                        "schema_version": "ci-repair-dispatch-v1",
                         "contract_id": contract.contract_id,
                         "observation_id": contract.observation_id,
                         "attempt_id": attempt_id,
                         "phase": "invoking",
                     },
                 )
-            attempt = runner.run(
-                request,
-                worktree_root=worker_root,
-                attempt_id=attempt_id,
-            )
+                if callable(persist_artifact):
+                    persist_artifact(
+                        contract.contract_id,
+                        {
+                            "contract_id": contract.contract_id,
+                            "observation_id": contract.observation_id,
+                            "attempt_id": attempt_id,
+                            "phase": "invoking",
+                        },
+                    )
+                attempt = runner.run(
+                    request,
+                    worktree_root=worker_root,
+                    attempt_id=attempt_id,
+                )
         else:
             attempt = prior_attempt
         profiles = {

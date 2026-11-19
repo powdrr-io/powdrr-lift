@@ -748,6 +748,55 @@ class ProtectedArtifact:
 
 
 @dataclass(frozen=True, slots=True)
+class RegisteredCIFix:
+    """One exact deterministic repair selected from an observed CI log."""
+
+    correction_id: str
+    path: str
+    check_command: tuple[str, ...]
+    diagnostic_sha256: str
+
+    def __post_init__(self) -> None:
+        if self.correction_id != "ruff-format-v1":
+            raise ContractError("registered_ci_fix.correction_id is unsupported")
+        _validate_repository_path(self.path, "registered_ci_fix.path")
+        if not self.path.endswith(".py"):
+            raise ContractError("registered_ci_fix.path must identify a Python file")
+        expected_commands = {
+            ("ruff", "format", "--check", self.path),
+            ("python", "-m", "ruff", "format", "--check", self.path),
+        }
+        if self.check_command not in expected_commands:
+            raise ContractError("registered_ci_fix.check_command is unsupported")
+        _validate_sha256(self.diagnostic_sha256, "registered_ci_fix.diagnostic_sha256")
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "correction_id": self.correction_id,
+            "path": self.path,
+            "check_command": list(self.check_command),
+            "diagnostic_sha256": self.diagnostic_sha256,
+        }
+
+    @classmethod
+    def from_dict(cls, value: object) -> Self:
+        data = _object(value, "registered_ci_fix")
+        command = data.get("check_command")
+        if not isinstance(command, list) or not all(
+            isinstance(item, str) and item for item in command
+        ):
+            raise ContractError("registered_ci_fix.check_command must be an argv list")
+        return cls(
+            correction_id=_string(data.get("correction_id"), "correction_id"),
+            path=_string(data.get("path"), "path"),
+            check_command=tuple(command),
+            diagnostic_sha256=_string(
+                data.get("diagnostic_sha256"), "diagnostic_sha256"
+            ),
+        )
+
+
+@dataclass(frozen=True, slots=True)
 class RepairContract:
     """Immutable, head-bound limits and obligations for one CI correction."""
 
@@ -768,6 +817,7 @@ class RepairContract:
     research_claim_refs: tuple[str, ...]
     stop_conditions: tuple[str, ...]
     expires_at: str
+    registered_correction: RegisteredCIFix | None = None
 
     def __post_init__(self) -> None:
         for name in ("contract_id", "observation_id", "failure_id", "reproduction_id"):
@@ -788,9 +838,10 @@ class RepairContract:
             )
         if not isinstance(self.allowed_paths, tuple):
             raise ContractError("repair_contract.allowed_paths must be immutable")
-        if not 1 <= len(self.protected_artifacts) <= 100:
+        minimum_protected = 0 if self.registered_correction is not None else 1
+        if not minimum_protected <= len(self.protected_artifacts) <= 100:
             raise ContractError(
-                "repair_contract.protected_artifacts must contain 1 to 100 artifacts"
+                "repair_contract.protected_artifacts has an invalid count"
             )
         if not isinstance(self.protected_artifacts, tuple) or not all(
             isinstance(item, ProtectedArtifact) for item in self.protected_artifacts
@@ -807,6 +858,20 @@ class RepairContract:
             raise ContractError(
                 "repair_contract allowed paths overlap protected artifacts"
             )
+        if self.registered_correction is not None:
+            if not isinstance(self.registered_correction, RegisteredCIFix):
+                raise ContractError(
+                    "repair_contract.registered_correction is malformed"
+                )
+            if (
+                self.allowed_paths != (self.registered_correction.path,)
+                or self.registered_correction.check_command
+                not in self.verification_commands
+                or self.reproduction_status != "reproduced"
+            ):
+                raise ContractError(
+                    "registered correction does not match the repair contract"
+                )
         _validate_text_items(
             self.required_behavior, "repair_contract.required_behavior", 20
         )
@@ -877,6 +942,7 @@ class RepairContract:
         research_claim_refs: tuple[str, ...],
         stop_conditions: tuple[str, ...],
         expires_at: str,
+        registered_correction: RegisteredCIFix | None = None,
     ) -> Self:
         payload = {
             "schema_version": 1,
@@ -896,6 +962,8 @@ class RepairContract:
             "stop_conditions": list(stop_conditions),
             "expires_at": expires_at,
         }
+        if registered_correction is not None:
+            payload["registered_correction"] = registered_correction.to_dict()
         digest = hashlib.sha256(_canonical_json(payload)).hexdigest()
         return cls(
             contract_id=f"repair-{digest[:20]}",
@@ -915,10 +983,11 @@ class RepairContract:
             research_claim_refs=research_claim_refs,
             stop_conditions=stop_conditions,
             expires_at=expires_at,
+            registered_correction=registered_correction,
         )
 
     def _content_payload(self) -> dict[str, Any]:
-        return {
+        payload = {
             "schema_version": 1,
             "repository": self.repository,
             "pull_request_number": self.pull_request_number,
@@ -940,6 +1009,9 @@ class RepairContract:
             "stop_conditions": list(self.stop_conditions),
             "expires_at": self.expires_at,
         }
+        if self.registered_correction is not None:
+            payload["registered_correction"] = self.registered_correction.to_dict()
+        return payload
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -980,6 +1052,9 @@ class RepairContract:
             "execution_error",
         }:
             raise ContractError("repair_contract.reproduction_status is unsupported")
+        raw_correction = data.get("registered_correction")
+        if raw_correction is not None and not isinstance(raw_correction, dict):
+            raise ContractError("repair_contract.registered_correction is malformed")
         return cls(
             contract_id=_string(data.get("contract_id"), "repair_contract.contract_id"),
             content_sha256=_string(
@@ -1008,6 +1083,11 @@ class RepairContract:
             research_claim_refs=claim_refs,
             stop_conditions=stops,
             expires_at=_string(data.get("expires_at"), "repair_contract.expires_at"),
+            registered_correction=(
+                RegisteredCIFix.from_dict(raw_correction)
+                if raw_correction is not None
+                else None
+            ),
         )
 
 

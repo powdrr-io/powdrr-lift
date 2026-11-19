@@ -19,6 +19,7 @@ from powdrr_contracts.ci import (
     CIFailureUnit,
     LocalReproduction,
     ProtectedArtifact,
+    RegisteredCIFix,
     RepairContract,
 )
 from powdrr_local import LocalPowdrrService
@@ -3574,6 +3575,191 @@ def test_ci_repair_dispatch_runs_contract_validations_and_acceptance(
     )
     assert interrupted["dispatch_status"] == "interrupted"
     assert provider_calls == 1
+
+
+def test_registered_ci_formatter_runs_before_any_coding_provider(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repository = tmp_path / "seed-repository"
+    repository.mkdir()
+    (repository / "src").mkdir()
+    (repository / "tests").mkdir()
+    source = repository / "src" / "app.py"
+    source.write_text("def value(): return 1\n", encoding="utf-8")
+    protected_path = repository / "tests" / "test_app.py"
+    protected_path.write_text("assert True\n", encoding="utf-8")
+
+    def git(*args: str) -> str:
+        result = subprocess.run(
+            ["git", *args], cwd=repository, capture_output=True, text=True, check=True
+        )
+        return result.stdout.strip()
+
+    git("init", "-b", "main")
+    git("config", "user.name", "CI correction test")
+    git("config", "user.email", "ci-correction@example.invalid")
+    git("add", ".")
+    git("commit", "-m", "initial")
+    head_sha = git("rev-parse", "HEAD")
+    git("remote", "add", "origin", "https://github.com/example/project.git")
+    worker_root = (
+        tmp_path
+        / "temp"
+        / "powdrr-lift-ci-response"
+        / f"example--project-pr-270-{head_sha[:12]}"
+        / "worktree"
+    )
+    worker_root.parent.mkdir(parents=True)
+    subprocess.run(
+        ["git", "worktree", "add", "--detach", str(worker_root), head_sha],
+        cwd=repository,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+
+    path = "src/app.py"
+    check_command = ("ruff", "format", "--check", path)
+    excerpt = f"Would reformat: {path}\n1 file would be reformatted\n"
+    log_digest = hashlib.sha256(excerpt.encode()).hexdigest()
+    reproduction = LocalReproduction(
+        status="reproduced",
+        reason="the exact formatter diagnostic reproduced on the observed head",
+        command=check_command,
+        exit_code=1,
+        matching_failure=True,
+        stdout_sha256=log_digest,
+        stderr_sha256=hashlib.sha256(b"").hexdigest(),
+    )
+    reproduction_id = (
+        "reproduction-"
+        + hashlib.sha256(
+            json.dumps(
+                reproduction.to_dict(),
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=False,
+            ).encode("utf-8")
+        ).hexdigest()[:20]
+    )
+    failure = CIFailureUnit(
+        failure_id="formatter-1",
+        observation_id="observation-1",
+        job_id=11,
+        phase="formatter_failure",
+        signature=f"Would reformat: {path}",
+        evidence=(f"job_log:11:sha256:{'a' * 64}",),
+        locally_executable=True,
+        head_sha=head_sha,
+        run_id=10,
+        run_attempt=1,
+        command=check_command,
+    )
+    format_fix = RegisteredCIFix(
+        correction_id="ruff-format-v1",
+        path=path,
+        check_command=check_command,
+        diagnostic_sha256=log_digest,
+    )
+    contract = RepairContract.create(
+        repository="example/project",
+        pull_request_number=270,
+        head_sha=head_sha,
+        observation_id=failure.observation_id,
+        failure_id=failure.failure_id,
+        reproduction_id=reproduction_id,
+        reproduction_status="reproduced",
+        allowed_paths=(path,),
+        protected_artifacts=(
+            ProtectedArtifact(
+                "tests/test_app.py",
+                hashlib.sha256(protected_path.read_bytes()).hexdigest(),
+            ),
+        ),
+        required_behavior=("Preserve application behavior.",),
+        verification_commands=(
+            check_command,
+            (
+                sys.executable,
+                "-c",
+                "import ast; ast.parse(open('src/app.py').read())",
+            ),
+        ),
+        required_checks=("CI / format",),
+        research_claim_refs=(),
+        stop_conditions=("Stop if another path must change.",),
+        expires_at=(datetime.now(UTC) + timedelta(hours=1)).isoformat(),
+        registered_correction=format_fix,
+    )
+    observation_result = {
+        "repository": contract.repository,
+        "pull_request": contract.pull_request_number,
+        "head_sha": head_sha,
+        "observation_id": contract.observation_id,
+        "response_state": "failed",
+        "pull_request_metadata": {
+            "head_ref": "feature/example",
+            "head_repository": "example/project",
+        },
+        "job_log_evidence": {
+            "11": {
+                "status": "available",
+                "excerpt": excerpt,
+                "raw_sha256": "a" * 64,
+            }
+        },
+        "failures": [
+            {**failure.to_dict(), "local_reproduction": reproduction.to_dict()}
+        ],
+    }
+
+    monkeypatch.setattr(
+        task_agent.tempfile, "gettempdir", lambda: str(tmp_path / "temp")
+    )
+    monkeypatch.setattr(
+        task_agent,
+        "build_coding_agent_provider",
+        lambda *_args, **_kwargs: pytest.fail("registered correction invoked MiniSWE"),
+    )
+    monkeypatch.setattr(
+        task_agent,
+        "create_miniswe_inference_handler",
+        lambda _timeout: pytest.fail(
+            "registered correction created an inference handler"
+        ),
+    )
+    strategy: Any = SimpleNamespace(
+        workflow=SimpleNamespace(),
+        task=SimpleNamespace(task_id="task-ci-format", process_checkpoint=None),
+        config=SimpleNamespace(
+            code_agent="opencode",
+            opencode_executable="opencode",
+            opencode_model=None,
+            minisweagent_executable="mini",
+            minisweagent_model=None,
+            coding_agent_timeout_seconds=30,
+            coding_agent_validation_timeout_seconds=30,
+        ),
+        events=[],
+    )
+    operations = _TaskProcedrrOperations(
+        strategy,
+        process_id="respond-to-pr-ci",
+        process_catalog=cast(Any, SimpleNamespace()),
+        process_client=cast(Any, SimpleNamespace()),
+    )
+
+    result = operations.execute(
+        "ci_repair_dispatch",
+        {
+            "repair_contract": contract.to_dict(),
+            "observation_result": observation_result,
+        },
+    )
+
+    assert result["passed"] is True
+    assert result["validation_status"] == "passed"
+    assert result["changed_paths"] == [path]
 
 
 def test_coding_agent_error_result_is_normalized_at_operation_boundary() -> None:

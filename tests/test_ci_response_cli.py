@@ -7,6 +7,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
+import pytest
 from powdrr_agent.execution.github_actions import GitHubActionsSnapshot
 from powdrr_contracts.ci import CIFailureUnit, CIJobLogEvidence, CIJobObservation
 from powdrr_service.ci_response import build_failure_units
@@ -241,6 +242,109 @@ def test_local_reproduction_targets_the_test_node_from_ci_logs(
         ("pytest", "-vv", "tests/test_calc.py::test_sum"),
     ]
     assert reproductions[failure.failure_id].status == "reproduced"
+
+
+def test_local_reproduction_runs_one_exact_formatter_failure_without_pytest(
+    monkeypatch: Any,
+) -> None:
+    head_sha = "6c85b1e5c334a113b3db274b2c1b7a8f350b9707"
+    path = "src/app.py"
+    excerpt = "Would reformat: src/app.py\n1 file would be reformatted\n"
+    (failure,) = build_failure_units(
+        (
+            CIJobObservation(
+                job_id=31,
+                run_id=32,
+                run_attempt=1,
+                head_sha=head_sha,
+                status="completed",
+                conclusion="failure",
+                steps=({"name": "Ruff format check", "conclusion": "failure"},),
+                log_evidence=CIJobLogEvidence(
+                    status="available",
+                    excerpt=excerpt,
+                    raw_sha256=sha256(excerpt.encode()).hexdigest(),
+                ),
+            ),
+        )
+    )
+    commands: list[tuple[str, ...]] = []
+
+    def run_pinned(
+        _root: Any, _commit: str, command: tuple[str, ...]
+    ) -> SimpleNamespace:
+        commands.append(command)
+        return SimpleNamespace(
+            stdout=excerpt,
+            stderr="",
+            exit_code=1,
+            stdout_sha256=sha256(excerpt.encode()).hexdigest(),
+            stderr_sha256=sha256(b"").hexdigest(),
+        )
+
+    monkeypatch.setattr(cli, "execute_pinned_local_command", run_pinned)
+
+    reproductions = cli._reproduce_ci_failures(
+        (failure,),
+        repository_root=cli.Path.cwd(),
+        head_sha=head_sha,
+        verification_command=None,
+    )
+
+    assert failure.phase == "formatter_failure"
+    assert failure.command == ("ruff", "format", "--check", path)
+    assert commands == [failure.command]
+    reproduction = reproductions[failure.failure_id]
+    assert reproduction.status == "reproduced"
+    assert reproduction.matching_failure is True
+
+
+@pytest.mark.parametrize(
+    ("step_name", "excerpt", "truncated"),
+    (
+        (
+            "Ruff format check",
+            "Would reformat: src/app.py\nWould reformat: src/other.py\n"
+            "2 files would be reformatted\n",
+            False,
+        ),
+        (
+            "Ruff format check",
+            "Would reformat: src/app.py\n1 file would be reformatted\n",
+            True,
+        ),
+        (
+            "Python checks",
+            "Would reformat: src/app.py\n1 file would be reformatted\n",
+            False,
+        ),
+    ),
+)
+def test_ambiguous_formatter_evidence_does_not_create_registered_command(
+    step_name: str, excerpt: str, truncated: bool
+) -> None:
+    (failure,) = build_failure_units(
+        (
+            CIJobObservation(
+                job_id=41,
+                run_id=42,
+                run_attempt=1,
+                head_sha="6c85b1e5c334a113b3db274b2c1b7a8f350b9707",
+                status="completed",
+                conclusion="failure",
+                steps=({"name": step_name, "conclusion": "failure"},),
+                log_evidence=CIJobLogEvidence(
+                    status="available",
+                    excerpt=excerpt,
+                    raw_sha256=sha256(excerpt.encode()).hexdigest(),
+                    truncated=truncated,
+                ),
+            ),
+        )
+    )
+
+    assert failure.phase == "step_failure"
+    assert failure.command == ()
 
 
 def test_response_command_retries_issue_link_lookup_for_eventual_consistency(

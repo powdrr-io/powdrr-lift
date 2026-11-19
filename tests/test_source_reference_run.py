@@ -27,6 +27,8 @@ from powdrr_lift.workrr.coding_agent_validation import (
     ValidationProfile,
     ValidationReport,
     ValidationReportStatus,
+    ValidationResult,
+    ValidationResultStatus,
 )
 from powdrr_lift.workrr.source_reference_run import (
     SourceReferenceRun,
@@ -781,6 +783,163 @@ def test_protected_process_cannot_write_story_support_files(
     assert result.returncode != 0
     assert path.read_text() == "def test_story(): pass\n"
     run.verify_inputs()
+
+
+def test_registered_formatter_restores_candidate_if_python_ast_changes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    run = prepare(tmp_path, monkeypatch)
+    target = run.workspace_root / "retry.py"
+    original = "def retry(value): return value + 1\n"
+    target.write_text(original)
+    run._candidate_after_worker = run._candidate_state()
+    attempt = CodingAgentAttempt(
+        attempt_id=run.run_id,
+        request_id=run.run_id,
+        provider="minisweagent",
+        status=CodingAgentStatus.COMPLETED,
+        exit_code=0,
+        changed_paths=("retry.py",),
+        diff_fingerprint="sha256:candidate",
+    )
+    report = ValidationReport(
+        attempt_id=run.run_id,
+        request_id=run.run_id,
+        status=ValidationReportStatus.FAILED,
+        results=(
+            ValidationResult(
+                profile="format",
+                command=("ruff", "format", "--check", "retry.py"),
+                status=ValidationResultStatus.FAILED,
+                returncode=1,
+                stdout="Would reformat: retry.py\n1 file would be reformatted\n",
+            ),
+        ),
+    )
+    original_run = subprocess.run
+
+    def alter_python_syntax(command: Any, *args: Any, **kwargs: Any) -> Any:
+        if isinstance(command, (tuple, list)) and command[-3:] == (
+            "--no-cache",
+            "--",
+            "retry.py",
+        ):
+            target.write_text("def retry(value): return value + 2\n")
+            return subprocess.CompletedProcess(command, 0, "", "")
+        return original_run(command, *args, **kwargs)
+
+    monkeypatch.setattr(
+        source_reference_run_module.subprocess, "run", alter_python_syntax
+    )
+
+    receipt = run.apply_registered_correction(attempt, report)
+
+    assert receipt is not None
+    assert receipt["status"] == "blocked"
+    assert target.read_text() == original
+
+
+def test_registered_formatter_marks_noop_as_stale(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    run = prepare(tmp_path, monkeypatch)
+    target = run.workspace_root / "retry.py"
+    target.write_text("def retry(value): return value + 1\n")
+    run._candidate_after_worker = run._candidate_state()
+    attempt = CodingAgentAttempt(
+        attempt_id=run.run_id,
+        request_id=run.run_id,
+        provider="minisweagent",
+        status=CodingAgentStatus.COMPLETED,
+        exit_code=0,
+        changed_paths=("retry.py",),
+        diff_fingerprint="sha256:candidate",
+    )
+    report = ValidationReport(
+        attempt_id=run.run_id,
+        request_id=run.run_id,
+        status=ValidationReportStatus.FAILED,
+        results=(
+            ValidationResult(
+                profile="format",
+                command=("ruff", "format", "--check", "retry.py"),
+                status=ValidationResultStatus.FAILED,
+                returncode=1,
+                stdout="Would reformat: retry.py\n",
+            ),
+        ),
+    )
+    original_run = subprocess.run
+
+    def no_op_formatter(command: Any, *args: Any, **kwargs: Any) -> Any:
+        if isinstance(command, (tuple, list)) and command[-3:] == (
+            "--no-cache",
+            "--",
+            "retry.py",
+        ):
+            return subprocess.CompletedProcess(command, 0, "", "")
+        return original_run(command, *args, **kwargs)
+
+    monkeypatch.setattr(source_reference_run_module.subprocess, "run", no_op_formatter)
+
+    receipt = run.apply_registered_correction(attempt, report)
+
+    assert receipt is not None
+    assert receipt["status"] == "stale"
+    assert target.read_text() == "def retry(value): return value + 1\n"
+
+
+def test_registered_formatter_records_ast_preserving_candidate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    run = prepare(tmp_path, monkeypatch)
+    target = run.workspace_root / "retry.py"
+    target.write_text("def retry(value): return value + 1\n")
+    run._candidate_after_worker = run._candidate_state()
+    attempt = CodingAgentAttempt(
+        attempt_id=run.run_id,
+        request_id=run.run_id,
+        provider="minisweagent",
+        status=CodingAgentStatus.COMPLETED,
+        exit_code=0,
+        changed_paths=("retry.py",),
+        diff_fingerprint="sha256:candidate",
+    )
+    report = ValidationReport(
+        attempt_id=run.run_id,
+        request_id=run.run_id,
+        status=ValidationReportStatus.FAILED,
+        results=(
+            ValidationResult(
+                profile="format",
+                command=("ruff", "format", "--check", "retry.py"),
+                status=ValidationResultStatus.FAILED,
+                returncode=1,
+                stdout="Would reformat: retry.py\n1 file would be reformatted\n",
+            ),
+        ),
+    )
+    original_run = subprocess.run
+
+    def format_candidate(command: Any, *args: Any, **kwargs: Any) -> Any:
+        if isinstance(command, (tuple, list)) and command[-3:] == (
+            "--no-cache",
+            "--",
+            "retry.py",
+        ):
+            target.write_text("def retry(value):\n    return value + 1\n")
+            return subprocess.CompletedProcess(command, 0, "", "")
+        return original_run(command, *args, **kwargs)
+
+    monkeypatch.setattr(source_reference_run_module.subprocess, "run", format_candidate)
+
+    receipt = run.apply_registered_correction(attempt, report)
+
+    assert receipt is not None
+    assert receipt["status"] == "applied"
+    assert receipt["python_ast_preserved"] is True
+    run.record_registered_correction_candidate()
+    run.verify_candidate()
 
 
 def test_context_delivery_requires_every_exact_page_and_trusted_catalog() -> None:

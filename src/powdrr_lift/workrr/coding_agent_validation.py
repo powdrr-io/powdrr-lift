@@ -576,6 +576,7 @@ class CodingAgentExecutionResult:
     attempt: CodingAgentAttempt
     validation: ValidationReport
     diff_check: subprocess.CompletedProcess[str]
+    registered_corrections: tuple[Mapping[str, Any], ...] = ()
 
 
 def execute_coding_agent_attempt(
@@ -614,6 +615,21 @@ def execute_coding_agent_attempt(
         environment_overrides=execution.validation_environment() if execution else None,
         reference_claims=execution.claims if execution else (),
     ).run(request, attempt, worktree_root=worktree_root)
+    registered_corrections: tuple[Mapping[str, Any], ...] = ()
+    if execution is not None:
+        correction = execution.apply_registered_correction(attempt, validation)
+        if correction is not None:
+            registered_corrections = (correction,)
+            if correction.get("status") == "applied":
+                validation = ValidationRunner(
+                    profiles,
+                    timeout_seconds=validation_timeout_seconds,
+                    reference_context=reference_context,
+                    command_wrapper=execution.protect_command,
+                    environment_overrides=execution.validation_environment(),
+                    reference_claims=execution.claims,
+                ).run(request, attempt, worktree_root=worktree_root)
+                execution.record_registered_correction_candidate()
     runner.store.save_validation_report(validation)
     diff_check = subprocess.run(
         ["git", "diff", "--check"],
@@ -622,7 +638,9 @@ def execute_coding_agent_attempt(
         text=True,
         check=False,
     )
-    return CodingAgentExecutionResult(attempt, validation, diff_check)
+    return CodingAgentExecutionResult(
+        attempt, validation, diff_check, registered_corrections
+    )
 
 
 def normalize_failure(

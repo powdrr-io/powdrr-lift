@@ -749,8 +749,8 @@ class GitHubIssueClient:
                 "publish only after the plan review PR merges"
             )
 
-    def default_branch_required_checks(self) -> tuple[str, ...]:
-        """Return required checks from active rulesets or classic protection."""
+    def default_branch_required_checks(self) -> tuple[str, ...] | None:
+        """Return required checks, or None when GitHub hides policy on this plan."""
         repository = _json_mapping(
             self._api("GET", f"repos/{self.repository}").stdout, "repository"
         )
@@ -763,6 +763,7 @@ class GitHubIssueClient:
         rules_endpoint = f"repos/{self.repository}/rules/branches/{branch}"
         rules_result = self._invoke(["api", rules_endpoint], check=False)
         names: set[str] = set()
+        rules_unavailable = False
         if rules_result.returncode == 0:
             try:
                 rules = json.loads(rules_result.stdout)
@@ -794,13 +795,14 @@ class GitHubIssueClient:
                         and isinstance(check.get("context"), str)
                         and check["context"].strip()
                     )
-        elif not any(
-            status in rules_result.stderr for status in ("HTTP 403", "HTTP 404")
-        ):
-            raise GitHubIssueQueueError(
-                "could not verify active rules on the repository default branch: "
-                f"{rules_result.stderr.strip()}"
-            )
+        else:
+            if "HTTP 403" in rules_result.stderr:
+                rules_unavailable = True
+            elif "HTTP 404" not in rules_result.stderr:
+                raise GitHubIssueQueueError(
+                    "could not verify active rules on the repository default branch: "
+                    f"{rules_result.stderr.strip()}"
+                )
         if names:
             return tuple(sorted(names))
         endpoint = (
@@ -809,8 +811,10 @@ class GitHubIssueClient:
         )
         result = self._invoke(["api", endpoint], check=False)
         if result.returncode != 0:
+            if "HTTP 403" in result.stderr:
+                return None
             if "HTTP 404" in result.stderr:
-                return ()
+                return None if rules_unavailable else ()
             raise GitHubIssueQueueError(
                 "could not verify default-branch required checks: "
                 f"{result.stderr.strip()}"
@@ -1659,7 +1663,7 @@ def run_worker_once(
                 else:
                     detail = (
                         None
-                        if required_checks
+                        if required_checks is None or required_checks
                         else "repository default branch has no required status checks"
                     )
                     if required_checks:
@@ -4357,48 +4361,101 @@ def _observe_required_ci_outcome(
         ],
         check=False,
     )
+    using_all_pr_checks = False
     if checks_result.returncode != 0:
-        return _stale_ci_outcome_observation(
-            previous_observation=previous_observation,
-            current_checks=(),
-            head_sha=head_sha,
-            reason=(
-                "GitHub could not report required check states: "
-                + checks_result.stderr.strip()[:500]
-            ),
-            observed_at=observed_at,
-            inventory_digest=inventory_digest,
+        # Private repositories on GitHub's free plan cannot expose the
+        # required-check policy API. In that case, use every check attached to
+        # this PR as the worker's CI gate; never treat an empty set as success.
+        checks_result = client._invoke(
+            ["pr", "checks", str(number), "--json", "name,state,workflow"],
+            check=False,
         )
+        using_all_pr_checks = True
+        if checks_result.returncode != 0:
+            return _stale_ci_outcome_observation(
+                previous_observation=previous_observation,
+                current_checks=(),
+                head_sha=head_sha,
+                reason=(
+                    "GitHub could not report PR check states: "
+                    + checks_result.stderr.strip()[:500]
+                ),
+                observed_at=observed_at,
+                inventory_digest=inventory_digest,
+            )
     try:
         raw_checks = json.loads(checks_result.stdout)
     except json.JSONDecodeError:
         raw_checks = None
     if not isinstance(raw_checks, list) or not raw_checks:
-        return _stale_ci_outcome_observation(
-            previous_observation=previous_observation,
-            current_checks=(),
-            head_sha=head_sha,
-            reason="GitHub reported no required checks; review readiness is unknown",
-            observed_at=observed_at,
-            inventory_digest=inventory_digest,
+        if not using_all_pr_checks:
+            checks_result = client._invoke(
+                ["pr", "checks", str(number), "--json", "name,state,workflow"],
+                check=False,
+            )
+            using_all_pr_checks = True
+            try:
+                raw_checks = json.loads(checks_result.stdout)
+            except json.JSONDecodeError:
+                raw_checks = None
+        if not isinstance(raw_checks, list) or not raw_checks:
+            return _stale_ci_outcome_observation(
+                previous_observation=previous_observation,
+                current_checks=(),
+                head_sha=head_sha,
+                reason=(
+                    "GitHub reported no PR checks; CI readiness is unknown"
+                    if using_all_pr_checks
+                    else (
+                        "GitHub reported no required checks; review readiness is "
+                        "unknown"
+                    )
+                ),
+                observed_at=observed_at,
+                inventory_digest=inventory_digest,
+            )
+    checks = []
+    for value in raw_checks:
+        if not isinstance(value, Mapping):
+            continue
+        inventory_match = _match_required_check_to_inventory(
+            value, validation_inventory
         )
-    checks = [
-        {
-            "name": str(value.get("name", "")),
-            "state": str(value.get("state", "unknown")).casefold(),
-            "status": _normalized_required_check_status(
-                str(value.get("state", "unknown")).casefold()
-            ),
-            "workflow": (
-                str(value["workflow"]) if value.get("workflow") is not None else None
-            ),
-            "inventory_match": _match_required_check_to_inventory(
-                value, validation_inventory
-            ),
-        }
-        for value in raw_checks
-        if isinstance(value, Mapping)
-    ]
+        if (
+            using_all_pr_checks
+            and inventory_match["status"] != "matched"
+            and len(raw_checks) == 1
+            and validation_inventory is not None
+            and len(validation_inventory) == 1
+            and isinstance(value.get("workflow"), str)
+        ):
+            # Some repositories have one CI job that runs the sole discovered
+            # validation command through a wrapper script, so Structrr cannot
+            # attach a static job origin. When GitHub hides required-check
+            # policy and both sides are singular, the only PR check is the
+            # worker's CI gate and can be bound to the only validation entry.
+            inventory_match = {
+                "status": "matched",
+                "profile_ids": [str(validation_inventory[0].get("id", ""))],
+                "reason": (
+                    "single PR check bound to the only discovered validation entry"
+                ),
+            }
+        checks.append(
+            {
+                "name": str(value.get("name", "")),
+                "state": str(value.get("state", "unknown")).casefold(),
+                "status": _normalized_required_check_status(
+                    str(value.get("state", "unknown")).casefold()
+                ),
+                "workflow": (
+                    str(value["workflow"])
+                    if value.get("workflow") is not None
+                    else None
+                ),
+                "inventory_match": inventory_match,
+            }
+        )
     changed_paths = _pull_request_changed_paths(client, number)
     if changed_paths is None:
         return _ci_outcome_observation(

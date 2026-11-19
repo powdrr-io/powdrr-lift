@@ -286,6 +286,7 @@ def test_worker_discovers_inventory_before_execution_when_committed_inventory_is
         github_issue_queue, "_discover_repository_validation_inventory", discover
     )
     client = FakeIssueClient()
+    client.default_branch_checks = None
     client.required_checks = [{"name": "test", "state": "pass", "workflow": "CI"}]
     publish_plan_issues(
         plan=plan(),
@@ -530,7 +531,7 @@ class FakeIssueClient:
         self.labels_ensured = False
         self.fulfillment_label_ensured = False
         self.merged_commit: str | None = None
-        self.default_branch_checks: tuple[str, ...] = ("test",)
+        self.default_branch_checks: tuple[str, ...] | None = ("test",)
         self.required_checks = [{"name": "test", "state": "pass", "workflow": "ci"}]
         self.pull_request_files: list[dict[str, str]] = []
         self.pr_head = "c" * 40
@@ -551,7 +552,7 @@ class FakeIssueClient:
     def ensure_plan_commit_merged(self, plan_commit: str) -> None:
         self.merged_commit = plan_commit
 
-    def default_branch_required_checks(self) -> tuple[str, ...]:
+    def default_branch_required_checks(self) -> tuple[str, ...] | None:
         return self.default_branch_checks
 
     def list_issues(
@@ -1443,6 +1444,40 @@ def test_github_issue_client_falls_back_when_rulesets_are_not_available() -> Non
     ).default_branch_required_checks()
 
     assert checks == ("unit",)
+    assert len(commands) == 3
+
+
+def test_github_issue_client_reports_unavailable_protection_policy_on_free_plan() -> (
+    None
+):
+    commands: list[list[str]] = []
+
+    def run(
+        arguments: list[str], **_kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
+        commands.append(arguments)
+        endpoint = arguments[2]
+        if endpoint == "repos/example/project":
+            return subprocess.CompletedProcess(
+                arguments, 0, json.dumps({"default_branch": "main"}), ""
+            )
+        if endpoint == "repos/example/project/rules/branches/main":
+            return subprocess.CompletedProcess(
+                arguments, 1, "", "HTTP 403: Upgrade to GitHub Pro"
+            )
+        if endpoint == (
+            "repos/example/project/branches/main/protection/required_status_checks"
+        ):
+            return subprocess.CompletedProcess(
+                arguments, 1, "", "HTTP 403: Upgrade to GitHub Pro"
+            )
+        raise AssertionError(f"unexpected GitHub API request: {arguments!r}")
+
+    checks = GitHubIssueClient(
+        "example/project", run=run
+    ).default_branch_required_checks()
+
+    assert checks is None
     assert len(commands) == 3
 
 
@@ -3435,6 +3470,49 @@ def test_required_ci_readiness_uses_timestamped_normalized_current_head_checks(
     assert '"observed_at"' in checkpoint
     assert '"validation_inventory_digest": "test-digest"' in checkpoint
     assert '"status": "unknown"' in checkpoint
+
+
+def test_free_plan_ci_observation_uses_all_pr_checks_when_none_are_required(
+    tmp_path: Path,
+) -> None:
+    class FreePlanClient(FakeIssueClient):
+        check_queries: list[list[str]] = []
+
+        def _invoke(
+            self, arguments: list[str] | tuple[str, ...], *, check: bool = True
+        ) -> subprocess.CompletedProcess[str]:
+            if arguments[:2] == ["pr", "checks"]:
+                query = list(arguments)
+                self.check_queries.append(query)
+                if "--required" in query:
+                    return subprocess.CompletedProcess(["gh", *query], 0, "[]", "")
+                return subprocess.CompletedProcess(
+                    ["gh", *query],
+                    0,
+                    json.dumps([{"name": "test", "state": "pass", "workflow": "ci"}]),
+                    "",
+                )
+            return super()._invoke(arguments, check=check)
+
+    client = FreePlanClient()
+    only_check = dict(_test_validation_checks(tmp_path)[0])
+    only_check["ci_origins"] = []
+    observation = github_issue_queue._observe_required_ci_outcome(
+        client,  # type: ignore[arg-type]
+        "https://github.com/example/project/pull/123",
+        validation_inventory=(only_check,),
+        inventory_digest="test-digest",
+    )
+
+    assert observation["outcome"] == "awaiting_review"
+    assert len(client.check_queries) == 2
+    assert "--required" in client.check_queries[0]
+    assert "--required" not in client.check_queries[1]
+    assert observation["checks"][0]["inventory_match"]["status"] == "matched"
+    assert (
+        "only discovered validation entry"
+        in observation["checks"][0]["inventory_match"]["reason"]
+    )
 
 
 def test_failed_remote_refresh_preserves_prior_checks_as_dated_stale_evidence(

@@ -48,6 +48,16 @@ def test_planner_assigns_stable_ids_to_llm_test_designs() -> None:
         },
         existing_test_paths=("tests/test_ci.py",),
         source_excerpts=(SourceExcerpt("anchor-ci", "CI runs on pull requests."),),
+        requirements=(
+            {
+                "id": "req-ci-trigger",
+                "statement": "The workflow runs on pull requests.",
+            },
+            {
+                "id": "req-test-command",
+                "statement": "The workflow runs the required test command.",
+            },
+        ),
     )
     answer = {
         "cases": [
@@ -55,6 +65,7 @@ def test_planner_assigns_stable_ids_to_llm_test_designs() -> None:
                 "test_type": "integration",
                 "scenario": "Parse the workflow and inspect its pull_request triggers.",
                 "expected_outcome": "Pull requests trigger the verification workflow.",
+                "requirement_ids": ["req-ci-trigger"],
                 "behavior_scenario": _behavior(),
             },
             {
@@ -63,6 +74,7 @@ def test_planner_assigns_stable_ids_to_llm_test_designs() -> None:
                 "expected_outcome": (
                     "The configured step invokes the repository test command."
                 ),
+                "requirement_ids": ["req-test-command"],
                 "behavior_scenario": _behavior(),
             },
         ]
@@ -72,8 +84,8 @@ def test_planner_assigns_stable_ids_to_llm_test_designs() -> None:
     planned = request.parse_answer(answer)
 
     assert request.question.kind == "plan_test_coverage"
-    assert request.question.contract_version == 4
-    assert request.question.expected_answer_schema == "plan-test-coverage-v4"
+    assert request.question.contract_version == 5
+    assert request.question.expected_answer_schema == "plan-test-coverage-v5"
     assert request.max_answer_chars == 8_000
     assert [case["id"] for case in planned["required_test_cases"]] == [
         "AC-01",
@@ -83,6 +95,10 @@ def test_planner_assigns_stable_ids_to_llm_test_designs() -> None:
     assert planned["required_test_cases"][1]["scenario"] == (
         "Inspect the verification step in the CI job."
     )
+    assert [case["requirement_ids"] for case in planned["required_test_cases"]] == [
+        ["req-ci-trigger"],
+        ["req-test-command"],
+    ]
     assert [case["description"] for case in planned["required_test_cases"]] == [
         "The workflow runs on pull requests.",
         "The workflow runs the required test command.",
@@ -182,6 +198,7 @@ def test_planner_rejects_missing_or_unsupported_test_designs() -> None:
                         "test_type": "manual",
                         "scenario": "Check the behavior.",
                         "expected_outcome": "The behavior works.",
+                        "requirement_ids": [],
                         "behavior_scenario": _behavior("anchor-behavior"),
                     }
                 ]
@@ -224,6 +241,7 @@ def test_planner_does_not_store_source_backed_behavior_as_an_assumption() -> Non
                     "test_type": "unit",
                     "scenario": "Exercise a denial path.",
                     "expected_outcome": "The denial behavior is covered.",
+                    "requirement_ids": [],
                     "behavior_scenario": behavior,
                 }
             ]

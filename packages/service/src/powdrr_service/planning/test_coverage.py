@@ -53,6 +53,8 @@ _RAW_BEHAVIOR_SCENARIO_FIELDS = frozenset(
 def exact_source_test_coverage_answer(
     acceptance_criteria: Sequence[str],
     source_excerpts: Sequence[SourceExcerpt],
+    *,
+    requirement_ids_by_statement: Mapping[str, Sequence[str]] | None = None,
 ) -> dict[str, Any] | None:
     """Carry complete typed test cases from a single exact source anchor."""
     criteria = tuple(value.strip() for value in acceptance_criteria)
@@ -106,6 +108,9 @@ def exact_source_test_coverage_answer(
                 "test_type": case.get("test_type"),
                 "scenario": case.get("scenario"),
                 "expected_outcome": case.get("expected_outcome"),
+                "requirement_ids": list(
+                    (requirement_ids_by_statement or {}).get(criterion, ())
+                ),
                 "behavior_scenario": {
                     **dict(raw_behavior),
                     # The containing pinned anchor is the provenance for this
@@ -122,6 +127,7 @@ def build_test_coverage_request(
     *,
     existing_test_paths: Sequence[str] = (),
     source_excerpts: Sequence[SourceExcerpt] = (),
+    requirements: Sequence[Mapping[str, Any]] = (),
 ) -> QuestionRequest[dict[str, Any]]:
     """Ask for one concrete test design per accepted PR criterion."""
     item_id = item.get("id")
@@ -140,6 +146,27 @@ def build_test_coverage_request(
     normalized_criteria = tuple(
         value.strip() for value in cast(Sequence[str], criteria)
     )
+    normalized_requirements: list[dict[str, str]] = []
+    for index, requirement in enumerate(requirements):
+        requirement_id = requirement.get("id")
+        statement = requirement.get("statement")
+        if (
+            not isinstance(requirement_id, str)
+            or not requirement_id.strip()
+            or not isinstance(statement, str)
+            or not statement.strip()
+        ):
+            raise PlanningContractError(
+                f"/requirements/{index}", "must include a non-empty id and statement"
+            )
+        normalized_requirements.append(
+            {"id": requirement_id.strip(), "statement": statement.strip()}
+        )
+    if len({entry["id"] for entry in normalized_requirements}) != len(
+        normalized_requirements
+    ):
+        raise PlanningContractError("/requirements", "must have unique IDs")
+    normalized_requirements.sort(key=lambda entry: entry["id"])
     if not source_excerpts:
         raise PlanningContractError(
             "/source_excerpts",
@@ -156,6 +183,7 @@ def build_test_coverage_request(
                 "scope": list(item.get("scope", [])),
                 "implementation_steps": list(item.get("implementation_steps", [])),
                 "acceptance_criteria": list(normalized_criteria),
+                "requirements": normalized_requirements,
                 "allowed_paths": list(item.get("allowed_paths", [])),
             },
         ),
@@ -177,6 +205,7 @@ def build_test_coverage_request(
                         "test_type",
                         "scenario",
                         "expected_outcome",
+                        "requirement_ids",
                         "behavior_scenario",
                     ],
                     "properties": {
@@ -190,6 +219,17 @@ def build_test_coverage_request(
                             "type": "string",
                             "minLength": 1,
                             "maxLength": _MAX_TEXT_LENGTH,
+                        },
+                        "requirement_ids": {
+                            "type": "array",
+                            "uniqueItems": True,
+                            "items": {
+                                "type": "string",
+                                "enum": [
+                                    requirement["id"]
+                                    for requirement in normalized_requirements
+                                ],
+                            },
                         },
                         "behavior_scenario": {
                             "type": "object",
@@ -323,6 +363,7 @@ def build_test_coverage_request(
                 "expected_outcome": (
                     "The externally visible result satisfies the criterion."
                 ),
+                "requirement_ids": [],
                 "behavior_scenario": {
                     "subject": "The behavior covered by this criterion.",
                     "given": "The source-defined preconditions hold.",
@@ -360,6 +401,7 @@ def build_test_coverage_request(
                 "test_type",
                 "scenario",
                 "expected_outcome",
+                "requirement_ids",
                 "behavior_scenario",
             }:
                 raise PlanningContractError(
@@ -376,6 +418,24 @@ def build_test_coverage_request(
             expected = _required_text(
                 raw_case.get("expected_outcome"), f"{path}/expected_outcome"
             )
+            raw_requirement_ids = raw_case.get("requirement_ids")
+            allowed_requirement_ids = {
+                requirement["id"] for requirement in normalized_requirements
+            }
+            if (
+                not isinstance(raw_requirement_ids, Sequence)
+                or isinstance(raw_requirement_ids, (str, bytes))
+                or not all(
+                    isinstance(requirement_id, str)
+                    and requirement_id in allowed_requirement_ids
+                    for requirement_id in raw_requirement_ids
+                )
+                or len(set(raw_requirement_ids)) != len(raw_requirement_ids)
+            ):
+                raise PlanningContractError(
+                    f"{path}/requirement_ids",
+                    "must contain unique IDs allocated to this plan item",
+                )
             raw_behavior = raw_case.get("behavior_scenario")
             if not isinstance(raw_behavior, Mapping):
                 raise PlanningContractError(
@@ -473,6 +533,7 @@ def build_test_coverage_request(
                     "test_type": str(test_type),
                     "scenario": scenario,
                     "expected_outcome": expected,
+                    "requirement_ids": sorted(raw_requirement_ids),
                     "behavior_scenario": compiled_behavior.to_data(),
                 }
             )
@@ -490,7 +551,7 @@ def build_test_coverage_request(
             }
             for excerpt in source_excerpts
         ],
-        "contract_version": 4,
+        "contract_version": 5,
     }
     digest = hashlib.sha256(
         json.dumps(digest_data, sort_keys=True, separators=(",", ":")).encode()
@@ -499,14 +560,14 @@ def build_test_coverage_request(
         question=Question(
             question_id=question_id,
             kind="plan_test_coverage",
-            contract_version=4,
+            contract_version=5,
             subject_ids=(item_id,),
             input_digest=f"sha256:{digest}",
             context_ref_ids=(
                 *(excerpt.ref_id for excerpt in source_excerpts),
                 *(fact.ref_id for fact in facts),
             ),
-            expected_answer_schema="plan-test-coverage-v4",
+            expected_answer_schema="plan-test-coverage-v5",
             attempt=1,
         ),
         exact_question=(
@@ -519,7 +580,12 @@ def build_test_coverage_request(
             "Do not repeat or rewrite the acceptance criterion, propose test IDs, "
             "invent behavior, or choose a broader test type without a reason. "
             "For each case, also provide a typed behavior_scenario with all seven "
-            "behavior dimensions explicitly resolved. Use not_applicable only "
+            "behavior dimensions explicitly resolved and requirement_ids: the "
+            "IDs of supplied requirements whose observable behavior this case "
+            "directly verifies. Use an empty list when no supplied requirement "
+            "is directly verified; do not include an ID merely because it belongs "
+            "to this PR. Never invent requirement IDs. "
+            "Use not_applicable only "
             "when the pinned source evidence makes a dimension irrelevant; use "
             "an explicit assumption when repository conventions must resolve an "
             "unspecified dimension. Do not add assumptions for dimensions marked "
@@ -534,7 +600,8 @@ def build_test_coverage_request(
         answer_field_definitions={
             "cases": (
                 "One test type, test scenario, expected outcome, and typed "
-                "source-grounded behavior scenario per criterion."
+                "source-grounded behavior scenario per criterion, plus direct "
+                "requirement IDs verified by that case."
             ),
         },
         source_excerpts=tuple(source_excerpts),

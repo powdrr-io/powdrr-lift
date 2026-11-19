@@ -252,6 +252,7 @@ class _PlanningScriptClient:
                         "test_type": "integration",
                         "scenario": "Exercise the public behavior for this criterion.",
                         "expected_outcome": criterion,
+                        "requirement_ids": [],
                         "behavior_scenario": {
                             "subject": criterion,
                             "given": "The source-defined preconditions hold.",

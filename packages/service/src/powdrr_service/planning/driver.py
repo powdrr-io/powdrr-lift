@@ -1881,6 +1881,16 @@ class SourceLedgerQuestionMachine:
                 if len(excerpt_records) == 4:
                     break
             excerpts = tuple(excerpt_records)
+            item_requirements = tuple(
+                requirements[requirement_id]
+                for unit in item_units
+                for requirement_id in unit.requirement_ids
+            )
+            item_requirements = tuple(
+                {
+                    requirement.id: requirement for requirement in item_requirements
+                }.values()
+            )
             test_paths = tuple(
                 sorted(
                     path
@@ -1901,6 +1911,10 @@ class SourceLedgerQuestionMachine:
                 },
                 existing_test_paths=test_paths,
                 source_excerpts=excerpts,
+                requirements=tuple(
+                    {"id": requirement.id, "statement": requirement.statement}
+                    for requirement in item_requirements
+                ),
             )
             question_id = request.question.question_id
             answer = accepted_answers.get(question_id)
@@ -1914,7 +1928,16 @@ class SourceLedgerQuestionMachine:
                 answer = None
             if answer is None:
                 deterministic_answer = exact_source_test_coverage_answer(
-                    item.acceptance_criteria, excerpts
+                    item.acceptance_criteria,
+                    excerpts,
+                    requirement_ids_by_statement={
+                        statement: [
+                            requirement.id
+                            for requirement in item_requirements
+                            if requirement.statement == statement
+                        ]
+                        for statement in item.acceptance_criteria
+                    },
                 )
                 if deterministic_answer is not None:
                     try:

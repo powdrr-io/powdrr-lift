@@ -1,0 +1,73 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1610
+title: Produce pinned planner receipt artifacts
+intent:
+  problem: Planning can discover receipt artifacts but has no deterministic writer for verifier receipts, and unsuccessful receipts must not be usable as complete coverage evidence.
+  goal: Emit the named GitHub artifact from explicitly requirement-bound passed receipts and reject unsuccessful receipts at both production and intake.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/planning/execution_receipts.py
+    type: modified
+    span: {start_line: 9, end_line: 9}
+    summary: Import sequence support for ordered receipt serialization.
+    rationale: Keep receipt output deterministic for identical explicit verifier results.
+  - path: src/powdrr_lift/workrr/planning/execution_receipts.py
+    type: modified
+    span: {start_line: 71, end_line: 74}
+    summary: Reject unsuccessful receipts during manifest intake.
+    rationale: Prevent failed or blocked execution from being cited as complete coverage.
+  - path: src/powdrr_lift/workrr/planning/execution_receipts.py
+    type: modified
+    span: {start_line: 107, end_line: 200}
+    summary: Add a deterministic writer for the named receipt artifact and reject unsuccessful receipts.
+    rationale: Keep produced and consumed receipts pinned, explicit, and eligible for deterministic coverage only when verification passed.
+  - path: src/powdrr_lift/workrr/planning/execution_receipts.py
+    type: modified
+    span: {start_line: 314, end_line: 314}
+    summary: Export the receipt manifest writer.
+    rationale: Make artifact production available to the external workflow integration.
+  - path: tests/test_planning_execution_receipts.py
+    type: modified
+    span: {start_line: 21, end_line: 21}
+    summary: Import the receipt artifact writer for its contract tests.
+    rationale: Exercise the producer through the same public interface used by workflows.
+  - path: tests/test_planning_execution_receipts.py
+    type: modified
+    span: {start_line: 96, end_line: 149}
+    summary: Verify artifact production, round-trip loading, and rejection of unpassed receipts.
+    rationale: Protect the producer and consumer boundary against invalid coverage evidence.
+  - path: docs/audits/planning-llm-audit.md
+    type: modified
+    span: {start_line: 305, end_line: 310}
+    summary: Record the manifest writer and remaining workflow integration gap.
+    rationale: Keep the planner audit accurate about active behavior and remaining work.
+  - path: docs/audits/planning-llm-audit.md
+    type: modified
+    span: {start_line: 317, end_line: 319}
+    summary: Identify the workflow binding and invocation as remaining integration work.
+    rationale: Avoid claiming the receipt producer is wired into active verification runs.
+entities:
+  - id: requirement-execution-receipt-manifest-writer
+    type: Function
+    action: added
+  - id: receipt-manifest-unpassed-rejection
+    type: Function
+    action: added
+  - id: receipt-manifest-producer-test
+    type: Regression test
+    action: added
+entity_relationships:
+  - id: receipt-manifest-test-exercises-writer
+    type: exercises
+    source: receipt-manifest-producer-test
+    target: requirement-execution-receipt-manifest-writer
+    action: added
+    description: Tests artifact generation, strict loading, and rejection of unpassed receipts.
+invariants:
+  - id: planner-receipt-manifest-passed-only
+    description: Only requirement-bound receipts with passed outcomes and matching pinned source and candidate commits can enter the deterministic planning coverage path.
+    action: added
+guidance: []
+features: []
+proposed_prs: []

@@ -35,7 +35,7 @@ from powdrr_service.structrr.source_references import (
 )
 
 SCHEMA = "structrr-reference-validation-v1"
-POLICY = "structrr-reference-owner-review-v1"
+POLICY = "structrr-reference-owner-review-v2"
 
 
 class ReferenceReviewClient(Protocol):
@@ -149,6 +149,8 @@ def _review(
     client: ReferenceReviewClient | None,
     packet: dict[str, Any],
     receipts: tuple[Mapping[str, Any], ...] = (),
+    *,
+    required: bool = True,
 ) -> dict[str, Any]:
     identity = content_fingerprint(packet)
     owners = packet["candidate_bindings"]
@@ -162,12 +164,14 @@ def _review(
         "Does the actual owning source satisfy this reference responsibility?",
         identity,
         predicate_version=POLICY,
+        required=required,
         evidence_requirements=tuple(sorted(available)),
     )
     for receipt in receipts:
         try:
             if (
                 receipt.get("request_fingerprint") != identity
+                or receipt.get("decision_specification") != specification.to_data()
                 or receipt.get("classification") != "satisfied"
                 or receipt.get("available_evidence") != sorted(available)
                 or receipt.get("evidence_locations") != sorted(available)
@@ -189,6 +193,7 @@ def _review(
             "purpose": packet.get("purpose"),
             "classification": "satisfied",
             "explanation": decision.explanation,
+            "decision_specification": specification.to_data(),
             "evidence_locations": sorted(available),
             "available_evidence": sorted(available),
             "request_fingerprint": identity,
@@ -318,6 +323,7 @@ def _review(
         "purpose": packet.get("purpose"),
         "classification": classification,
         "explanation": reason,
+        "decision_specification": specification.to_data(),
         "evidence_locations": locations,
         "available_evidence": sorted(available),
         "request_fingerprint": identity,
@@ -634,6 +640,7 @@ def validate_source_references(
                     ],
                     "purpose": purpose,
                 },
+                required=not optional,
             )
             result["obligation_id"] = obligation.get(
                 "obligation_id", obligation.get("id", purpose)
@@ -714,7 +721,12 @@ def validate_source_references(
                 "dynamic dispatch may be unresolved."
             ),
         }
-        result = _review(review_client, packet, (*review_receipts, *reviews))
+        result = _review(
+            review_client,
+            packet,
+            (*review_receipts, *reviews),
+            required=not optional,
+        )
         result["purpose"] = purpose
         result["obligation_id"] = packet["obligation_id"]
         result["required_gate_evidence"] = not optional

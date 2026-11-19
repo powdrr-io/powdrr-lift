@@ -10,7 +10,7 @@ files:
 - path: docs/audits/planning-llm-audit.md
   type: modified
   span:
-    start_line: 306
+    start_line: 305
     end_line: 315
   summary: Document exact-commit GitHub artifact discovery and the remaining producer boundary.
   rationale: Keep the planner audit accurate about what runs automatically and what remains externally produced.
@@ -73,17 +73,10 @@ files:
 - path: tests/test_planning_execution_receipts.py
   type: modified
   span:
-    start_line: 95
-    end_line: 147
-  summary: Verify discovery selects only successful runs on the pinned commit.
-  rationale: Prevent receipt evidence from other revisions or failed workflows from being consumed.
-- path: tests/test_planning_execution_receipts.py
-  type: modified
-  span:
-    start_line: 150
+    start_line: 93
     end_line: 181
-  summary: Verify absent receipt artifacts produce no deterministic evidence.
-  rationale: Preserve the normal semantic coverage path when no workflow publishes receipts.
+  summary: Verify exact-commit successful-run filtering and safe behavior when artifacts are absent.
+  rationale: Prevent stale or failed runs from proving coverage and preserve semantic assessment when no receipt artifact is published.
 entities: []
 entity_relationships: []
 invariants: []

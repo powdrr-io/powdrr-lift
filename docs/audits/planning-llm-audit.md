@@ -5,8 +5,11 @@ deterministic source-extraction paging, deterministic work-unit proposal
 progression, deterministic runtime/component/validation and zero-or-one phase
 bindings, deterministic batch answer-ID binding, P11/P13 existing-subject review
 consolidation, exact-source human setup, and complete typed source test-case
-carry-forward are implemented in the active planning path. Remaining work in
-milestones 2–6 is still proposed.
+carry-forward are implemented in the active planning path. P04 now has a
+deterministic shortcut for explicitly supplied, typed requirement execution
+receipts that pass exact requirement, source/candidate, oracle, command, and
+evidence binding. Semantic classification remains necessary for other evidence.
+Other work in milestones 2–6 is still proposed.
 
 Audited revision: `cfc0b514c43c1d14269147a03e5d7ec5ec5cc739`, fetched from
 `origin/main` on 2026-11-17. This is a static source audit, not a measured live
@@ -283,9 +286,18 @@ BasedPyright available/coverage complete, ripgrep complete, no evidence, zero
 matching paths/lines, same base commit. This is a planning search rule, not a
 proof that arbitrary equivalent behavior exists nowhere in the repository.
 Preserve unknown/incomplete search separately, and do not convert search failure
-into either complete or universally absent. A trusted receipt needs exact
-requirement, source revision, executable oracle and candidate binding before it
-can replace semantic coverage classification.
+into either complete or universally absent. A deterministic receipt shortcut is
+now available only for one explicitly requirement-keyed `execution_receipt`.
+The versioned receipt validates a stable content-derived ID, exact requirement
+digest (ID, accepted wording, kind, and source refs), pinned source and candidate
+commits, oracle ID/digest, command digest, passed outcome, run ID, and artifact
+references. The generic Evidence record independently validates the receipt
+excerpt against its pinned commit, path, line range, and content digest.
+Search-derived receipts and ambiguous multiple receipts do not take this
+shortcut. Arbitrary implementation and test evidence still require semantic
+coverage classification. A trusted observed-run adapter must create receipts
+only from actual oracle execution; the schema binds that claim but is not itself
+cryptographic proof.
 
 ### P05: setup instructions are not an invitation to rediscover configuration
 

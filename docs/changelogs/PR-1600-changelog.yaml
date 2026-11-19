@@ -1,0 +1,64 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1600
+title: Bind deterministic planning coverage to execution receipts
+intent:
+  problem: Generic execution-receipt evidence does not prove that a specific accepted requirement passed against the pinned source and candidate.
+  goal: Allow deterministic completion only when one explicitly supplied typed receipt binds the exact requirement, source and candidate commits, oracle, command, observed pass, and pinned artifact evidence.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/audits/planning-llm-audit.md
+  type: modified
+  span:
+    start_line: 8
+    end_line: 12
+  summary: Record the implemented P04 receipt shortcut and its semantic fallback boundary.
+  rationale: Keep the audit status aligned with the planner behavior and its limits.
+- path: docs/audits/planning-llm-audit.md
+  type: modified
+  span:
+    start_line: 289
+    end_line: 300
+  summary: Specify typed receipt requirements and the boundary where semantic classification remains.
+  rationale: Make the deterministic shortcut and its trust assumption explicit.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 109
+    end_line: 112
+  summary: Import the typed requirement execution receipt contract.
+  rationale: Make the deterministic planner branch depend on the validated receipt schema.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 909
+    end_line: 933
+  summary: Derive complete coverage only from one validated explicit requirement-bound receipt.
+  rationale: Avoid an LLM classification call when exact execution evidence proves the accepted requirement passed.
+- path: packages/service/src/powdrr_service/planning/driver.py
+  type: modified
+  span:
+    start_line: 3123
+    end_line: 3175
+  summary: Parse and validate receipt evidence against exact requirement and pinned revision.
+  rationale: Reject ambiguous, malformed, stale, or mismatched receipts and retain semantic fallback.
+- path: packages/service/src/powdrr_service/verification/requirement_execution.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 164
+  summary: Define a strict versioned execution receipt and canonical requirement digest.
+  rationale: Bind a passed oracle run to stable requirement, source, candidate, command, and artifact identities.
+- path: tests/test_requirement_execution_receipt.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 111
+  summary: Verify exact receipt bindings and reject a different candidate revision.
+  rationale: Protect deterministic coverage from stale or mismatched execution evidence.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []
+features: []
+proposed_prs: []

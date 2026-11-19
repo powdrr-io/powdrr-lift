@@ -106,6 +106,10 @@ from powdrr_service.planning.test_coverage import (
 from powdrr_service.planning.workflow_ids import slugify_workflow_id
 from powdrr_service.structrr.code_symbols import CodeSymbolSearchResult
 from powdrr_service.structrr.snapshot import snapshot_digest
+from powdrr_service.verification.requirement_execution import (
+    RequirementExecutionReceipt,
+    requirement_coverage_digest,
+)
 
 
 def _planned_file_subjects(
@@ -902,7 +906,31 @@ class SourceLedgerQuestionMachine:
                 )
                 self._coverage_request_cache[requirement.id] = coverage_request
             if coverage_request.question.question_id not in accepted_answers:
-                coverage_requests.append(coverage_request)
+                receipt_answer = _requirement_bound_execution_receipt_answer(
+                    requirement,
+                    self.evidence_by_requirement.get(requirement.id, ()),
+                    coverage_request,
+                    pinned_commit=self.source.document.commit_sha,
+                )
+                if receipt_answer is None:
+                    coverage_requests.append(coverage_request)
+                    continue
+                try:
+                    coverage_request.parse_answer(receipt_answer)
+                except PlanningContractError:
+                    coverage_requests.append(coverage_request)
+                    continue
+                self._pending_deterministic_answers[
+                    coverage_request.question.question_id
+                ] = {
+                    "question": coverage_request.question,
+                    "answer": receipt_answer,
+                    "rule_id": "requirement-bound-execution-receipt-v1",
+                    "reason": (
+                        "A passed execution receipt matches this requirement, pinned "
+                        "source commit, candidate commit, and oracle identity."
+                    ),
+                }
         if coverage_requests:
             return self._batch_requests(coverage_requests)
 
@@ -3090,6 +3118,59 @@ def _is_completed_zero_hit_search(search: Any, *, pinned_commit: str) -> bool:
         and search.matching_line_count == 0
         and search.matching_path_count == 0
     )
+
+
+def _requirement_bound_execution_receipt_answer(
+    requirement: Requirement,
+    evidence: Sequence[Evidence],
+    request: QuestionRequest[Any],
+    *,
+    pinned_commit: str,
+) -> Mapping[str, Any] | None:
+    """Return complete only for one validated receipt bound to this exact input."""
+    if len(evidence) != 1 or evidence[0].kind != "execution_receipt":
+        return None
+    evidence_id = evidence[0].id
+    context = next(
+        (
+            item.value
+            for item in request.repository_evidence
+            if item.ref_id == evidence_id
+        ),
+        None,
+    )
+    if not isinstance(context, Mapping):
+        return None
+    raw_excerpt = context.get("source_excerpt")
+    if not isinstance(raw_excerpt, str):
+        return None
+    try:
+        raw_receipt = json.loads(raw_excerpt)
+        if not isinstance(raw_receipt, Mapping):
+            return None
+        receipt = RequirementExecutionReceipt.from_data(raw_receipt)
+    except (json.JSONDecodeError, ValueError, TypeError):
+        return None
+    requirement_digest = requirement_coverage_digest(
+        requirement_id=requirement.id,
+        statement=requirement.statement,
+        kind=requirement.kind,
+        source_refs=requirement.source_refs,
+    )
+    if not receipt.proves_coverage(
+        requirement_id=requirement.id,
+        requirement_digest=requirement_digest,
+        source_commit=pinned_commit,
+        candidate_commit=pinned_commit,
+    ):
+        return None
+    return {
+        "status": "complete",
+        "evidence_ids": [evidence_id],
+        "reason": (
+            "The pinned passed execution receipt matches this requirement and oracle."
+        ),
+    }
 
 
 def _exact_source_text_fidelity_answer(

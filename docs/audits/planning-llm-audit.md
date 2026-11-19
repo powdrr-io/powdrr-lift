@@ -296,7 +296,15 @@ excerpt against its pinned commit, path, line range, and content digest.
 Search-derived receipts and ambiguous multiple receipts do not take this
 shortcut. Arbitrary implementation and test evidence still require semantic
 coverage classification. A trusted observed-run adapter must create receipts
-only from actual oracle execution; the schema binds that claim but is not itself
+only from actual oracle execution. The service adapter
+`receipt_from_verification_evidence` now converts a structured verifier result
+only when its obligation identity, contract/verifier fingerprints, command
+fingerprint, and candidate-tree fingerprint match explicit inputs. The caller
+must also supply the requirement digest, source/candidate commits, run ID, and
+evidence artifact reference; no requirement link is inferred from story refs.
+The current verification workflow does not yet supply those planning bindings
+automatically, so this adapter is an explicit integration point rather than an
+active receipt producer. The schema binds the claim but is not itself
 cryptographic proof.
 
 ### P05: setup instructions are not an invitation to rediscover configuration

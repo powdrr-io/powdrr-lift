@@ -79,25 +79,6 @@ DECISION_SCHEMA = {
     "required": ["shortcoming_present"],
     "additionalProperties": False,
 }
-OPINION_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "shortcoming_present": {"type": "boolean"},
-        "explanation": {"type": "string"},
-    },
-    "required": ["shortcoming_present", "explanation"],
-    "additionalProperties": False,
-}
-SUGGESTION_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "test_name": {"type": "string"},
-        "test_code": {"type": "string"},
-        "rationale": {"type": "string"},
-    },
-    "required": ["test_name", "test_code", "rationale"],
-    "additionalProperties": False,
-}
 
 
 def build_quality_question(
@@ -120,44 +101,6 @@ def build_quality_question(
             ensure_ascii=False,
             sort_keys=True,
         )
-    )
-
-
-def build_opinion_system_prompt() -> str:
-    return (
-        "Answer the exact same yes-or-no question as the decision provider. Do "
-        "not broaden it or make an overall quality judgment. Use the supplied plan, "
-        "criterion, test source, and baseline result as evidence. Return "
-        "shortcoming_present=true only when the specific shortcoming in the "
-        "question is present. Include a concise explanation."
-    )
-
-
-def build_suggestion_system_prompt() -> str:
-    return (
-        "Suggest one concrete pytest test that fixes the specific shortcoming. "
-        "Use only supplied criteria, accepted Structrr operations, repository "
-        "facts, existing tests, and baseline evidence. Test real public behavior; "
-        "do not mock the behavior under test or invent requirements. Return a "
-        "complete test function body with a descriptive test name. Do not change "
-        "the verdict."
-    )
-
-
-def build_suggestion_context(
-    suite_evidence: Mapping[str, Any],
-    target: Mapping[str, Any],
-    explanation: str,
-) -> str:
-    return json.dumps(
-        {
-            **suite_evidence,
-            "review_target": target,
-            "decision_reports_shortcoming": True,
-            "llm_explanation": explanation,
-        },
-        ensure_ascii=False,
-        sort_keys=True,
     )
 
 
@@ -409,47 +352,16 @@ def execute_pr_test_quality_notes(
             )
             continue
         if assessment.get("decision_reports_shortcoming") is True:
-            explanation = assessment.get("llm_explanation")
-            if assessment.get("llm_agrees_shortcoming") is True:
-                suggestion = assessment.get("suggestion")
-                if isinstance(suggestion, Mapping):
-                    note = (
-                        f"{assessment.get('test_id')}: both the decision provider "
-                        "and the LLM "
-                        "identified "
-                        f"{assessment.get('check_id')}; suggested test: "
-                        f"{suggestion.get('test_name', 'unspecified')}. Review whether "
-                        "the added coverage fully addresses it."
-                    )
-                elif assessment.get("repair_suggestion_requested") is False:
-                    note = (
-                        f"{assessment.get('test_id')}: both the decision provider "
-                        "and the LLM still "
-                        f"identified {assessment.get('check_id')} after a targeted "
-                        "repair attempt; consider adding more coverage."
-                    )
-                else:
-                    note = (
-                        f"{assessment.get('test_id')}: both the decision provider "
-                        "and the LLM identified "
-                        f"{assessment.get('check_id')}, but a test suggestion was "
-                        f"unavailable ({assessment.get('llm_error', 'no result')}); "
-                        "consider adding more coverage."
-                    )
-                notes.append(note)
-            elif assessment.get("llm_agrees_shortcoming") is False:
-                notes.append(
-                    f"{assessment.get('test_id')}: the decision provider and the LLM "
-                    "disagreed about "
-                    f"{assessment.get('check_id')}; review manually. "
-                    f"LLM view: {explanation or 'no explanation returned'}"
-                )
-            else:
-                notes.append(
-                    f"{assessment.get('test_id')}: the decision provider flagged "
-                    f"{assessment.get('check_id')}, but the LLM comparison was "
-                    f"unavailable ({assessment.get('llm_error', 'no result')})."
-                )
+            finding = assessment.get("residual_finding", {})
+            explanation = (
+                finding.get("explanation") if isinstance(finding, Mapping) else None
+            )
+            notes.append(
+                f"{assessment.get('test_id')}: unresolved test-quality concern "
+                f"{assessment.get('check_id')} for "
+                f"{', '.join(assessment.get('criterion_ids', []))}; "
+                f"{explanation or 'review the linked criterion and assertion evidence'}"
+            )
     return notes
 
 
@@ -476,7 +388,7 @@ def review_execute_pr_test_quality(
 ) -> dict[str, Any]:
     """Run advisory, per-test quality review with service-owned prompts and policy."""
     assessments: list[dict[str, Any]] = []
-    suggestions: list[dict[str, str]] = []
+    findings: list[dict[str, Any]] = []
     interaction_trace: list[dict[str, Any]] = []
 
     for target in execute_pr_test_review_targets(suite_evidence):
@@ -521,17 +433,38 @@ def review_execute_pr_test_quality(
                 "check_id": check_id,
                 "question": question,
                 "decision_reports_shortcoming": None,
-                "llm_agrees_shortcoming": None,
-                "llm_explanation": None,
-                "suggestion": None,
-                "repair_suggestion_requested": suggest_tests,
+                "resolution": "unresolved",
             }
+            deterministic_finding = _deterministic_quality_finding(
+                check_id, target["test_source"]
+            )
+            if deterministic_finding is not None:
+                assessment.update(
+                    {
+                        "decision_reports_shortcoming": True,
+                        "resolution": "deterministic_finding",
+                        "deterministic_finding": deterministic_finding,
+                    }
+                )
+                assessment["residual_finding"] = {
+                    "test_id": target["test_id"],
+                    "criterion_ids": list(target["criterion_ids"]),
+                    "check_id": check_id,
+                    "question": question,
+                    "evidence": deterministic_finding,
+                    "resolution": "registered_ast_rule",
+                }
+                findings.append(assessment["residual_finding"])
+                assessments.append(assessment)
+                continue
             try:
                 if trace_context:
-                    decision = _complete_json_traced(
+                    decision = _complete_json_with_retry(
                         decision_client,
                         messages,
                         response_schema=DECISION_SCHEMA,
+                        max_retries=max_timeout_retries,
+                        backoff_seconds=timeout_backoff_seconds,
                         trace=interaction_trace,
                         trace_context=trace_context,
                         role="decision",
@@ -540,8 +473,12 @@ def review_execute_pr_test_quality(
                         evidence_fingerprint=evidence_fingerprint,
                     )
                 else:
-                    decision = decision_client.complete_json(
-                        messages, response_schema=DECISION_SCHEMA
+                    decision = _complete_json_with_retry(
+                        decision_client,
+                        messages,
+                        response_schema=DECISION_SCHEMA,
+                        max_retries=max_timeout_retries,
+                        backoff_seconds=timeout_backoff_seconds,
                     )
                 verdict = decision.get("shortcoming_present")
                 if not isinstance(verdict, bool):
@@ -549,90 +486,18 @@ def review_execute_pr_test_quality(
                         "Decision-provider test-quality result did not return a boolean"
                     )
                 assessment["decision_reports_shortcoming"] = verdict
+                if verdict:
+                    assessment["residual_finding"] = {
+                        "test_id": target["test_id"],
+                        "criterion_ids": list(target["criterion_ids"]),
+                        "check_id": check_id,
+                        "question": question,
+                        "evidence_fingerprint": evidence_fingerprint,
+                        "resolution": "semantic_review_required",
+                    }
+                    findings.append(assessment["residual_finding"])
             except Exception as error:  # Review outages remain advisory.
                 assessment["decision_error"] = str(error)
-
-            if assessment["decision_reports_shortcoming"] is True:
-                try:
-                    opinion = _complete_json_with_retry(
-                        llm_client,
-                        [
-                            {
-                                "role": "system",
-                                "content": build_opinion_system_prompt(),
-                            },
-                            {"role": "user", "content": question_text},
-                        ],
-                        response_schema=OPINION_SCHEMA,
-                        max_retries=max_timeout_retries,
-                        backoff_seconds=timeout_backoff_seconds,
-                        trace=interaction_trace,
-                        trace_context=trace_context,
-                        role="opinion",
-                        target=target,
-                        check_id=check_id,
-                        evidence_fingerprint=evidence_fingerprint,
-                    )
-                    agrees = opinion.get("shortcoming_present")
-                    if not isinstance(agrees, bool):
-                        raise ValueError(
-                            "LLM test-quality opinion did not return a boolean"
-                        )
-                    assessment["llm_agrees_shortcoming"] = agrees
-                    assessment["llm_explanation"] = str(
-                        opinion.get("explanation", "")
-                    ).strip()
-                    if agrees and suggest_tests:
-                        suggestion = _complete_json_with_retry(
-                            llm_client,
-                            [
-                                {
-                                    "role": "system",
-                                    "content": build_suggestion_system_prompt(),
-                                },
-                                {
-                                    "role": "user",
-                                    "content": (
-                                        "Question with agreed shortcoming:\n"
-                                        f"{question}\n\n"
-                                        "Full evidence and target test:\n"
-                                        + build_suggestion_context(
-                                            suite_evidence,
-                                            target,
-                                            assessment["llm_explanation"],
-                                        )
-                                    ),
-                                },
-                            ],
-                            response_schema=SUGGESTION_SCHEMA,
-                            max_retries=max_timeout_retries,
-                            backoff_seconds=timeout_backoff_seconds,
-                            trace=interaction_trace,
-                            trace_context=trace_context,
-                            role="suggestion",
-                            target=target,
-                            check_id=check_id,
-                            evidence_fingerprint=evidence_fingerprint,
-                        )
-                        normalized = {
-                            key: str(suggestion.get(key, "")).strip()
-                            for key in ("test_name", "test_code", "rationale")
-                        }
-                        if not all(normalized.values()):
-                            raise ValueError(
-                                "LLM test suggestion omitted required content"
-                            )
-                        assessment["suggestion"] = normalized
-                        suggestions.append(
-                            {
-                                "test_id": target["test_id"],
-                                "check_id": check_id,
-                                "question": question,
-                                **normalized,
-                            }
-                        )
-                except Exception as error:  # Keep advice non-blocking.
-                    assessment["llm_error"] = str(error)
             assessments.append(assessment)
 
     from powdrr_service.verification.story_execution import story_review_fingerprint
@@ -641,7 +506,9 @@ def review_execute_pr_test_quality(
         "provider": getattr(decision_client, "provider_name", "decision-provider"),
         "outcome": "advisory",
         "assessments": assessments,
-        "suggestions": suggestions,
+        "findings": findings,
+        # Kept as an empty compatibility field; repairs are authored from findings.
+        "suggestions": [],
         "notes": execute_pr_test_quality_notes(assessments),
         **({"interaction_trace": interaction_trace} if trace_context else {}),
         **(
@@ -650,6 +517,43 @@ def review_execute_pr_test_quality(
             else {}
         ),
     }
+
+
+def _deterministic_quality_finding(
+    check_id: str, test_source: str
+) -> dict[str, Any] | None:
+    """Return only syntax-proven findings from the registered AST subset."""
+    if check_id != "tautological_assertion":
+        return None
+    try:
+        tree = ast.parse(test_source)
+    except SyntaxError:
+        return None
+    for node in ast.walk(tree):
+        if not isinstance(node, ast.Assert):
+            continue
+        test = node.test
+        if isinstance(test, ast.Constant) and test.value is True:
+            return {
+                "rule_id": "assert-literal-true-v1",
+                "line": node.lineno,
+                "assertion": ast.unparse(test),
+            }
+        if (
+            isinstance(test, ast.Compare)
+            and len(test.ops) == 1
+            and len(test.comparators) == 1
+            and isinstance(test.ops[0], (ast.Eq, ast.Is))
+            and ast.dump(test.left, include_attributes=False)
+            == ast.dump(test.comparators[0], include_attributes=False)
+            and isinstance(test.left, (ast.Name, ast.Constant))
+        ):
+            return {
+                "rule_id": "assert-identical-operands-v1",
+                "line": node.lineno,
+                "assertion": ast.unparse(test),
+            }
+    return None
 
 
 def _complete_json_with_retry(
@@ -790,8 +694,7 @@ def render_execute_pr_test_quality_pr_notes(notes: Sequence[str]) -> list[str]:
         "## Advisory test-review notes for the pull request",
         "Test-quality review is advisory and did not block implementation. Include "
         "these unresolved coverage concerns in a clearly labeled section of the "
-        "pull request description, with a suggestion for where more coverage may "
-        "be useful:",
+        "pull request description, with the linked criterion and evidence:",
         *(
             [f"- {note}" for note in notes]
             if notes
@@ -805,13 +708,8 @@ def render_execute_pr_test_quality_pr_notes(notes: Sequence[str]) -> list[str]:
 
 __all__ = [
     "DECISION_SCHEMA",
-    "OPINION_SCHEMA",
     "QUALITY_CHECKS",
-    "SUGGESTION_SCHEMA",
-    "build_opinion_system_prompt",
     "build_quality_question",
-    "build_suggestion_context",
-    "build_suggestion_system_prompt",
     "execute_pr_test_baseline_failure_excerpt",
     "execute_pr_test_quality_notes",
     "review_execute_pr_test_quality",

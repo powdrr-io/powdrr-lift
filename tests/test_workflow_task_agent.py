@@ -349,7 +349,11 @@ def test_execute_pr_test_findings_retry_provider_429_with_backoff(
         ) -> dict[str, Any]:
             self.calls += 1
             assert response_schema["required"] == ["shortcoming_present"]
-            return {"shortcoming_present": self.calls == 1}
+            if self.calls == 1:
+                raise WorkflowLLMHTTPError(
+                    "OpenAI", 429, '{"error":{"code":"engine_overloaded"}}'
+                )
+            return {"shortcoming_present": False}
 
     service = LocalPowdrrService(quality_review_clients=(FakeJevClient(), client))
     review = _review_execute_pr_test_quality(
@@ -372,7 +376,7 @@ def test_execute_pr_test_findings_retry_provider_429_with_backoff(
     )
 
     assert review["outcome"] == "advisory"
-    assert client.calls == 3
+    assert client.calls == 0
     assert delays == [1.5]
 
 

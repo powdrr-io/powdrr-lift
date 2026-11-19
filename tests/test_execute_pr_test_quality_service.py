@@ -166,16 +166,7 @@ def test_quality_review_records_redacted_interaction_metadata() -> None:
     assert "validate('value')" not in json.dumps(records)
 
 
-def test_quality_review_trace_records_retry_attempts_and_causes() -> None:
-    class OneFinding:
-        calls = 0
-
-        def complete_json(
-            self, _messages: list[dict[str, str]], *, response_schema: Any = None
-        ) -> dict[str, Any]:
-            self.calls += 1
-            return {"shortcoming_present": self.calls == 1}
-
+def test_quality_review_trace_records_primary_retry_attempts_and_causes() -> None:
     class RetryOnce:
         calls = 0
 
@@ -185,10 +176,7 @@ def test_quality_review_trace_records_retry_attempts_and_causes() -> None:
             self.calls += 1
             if self.calls == 1:
                 raise TimeoutError("temporary provider timeout")
-            return {
-                "shortcoming_present": False,
-                "explanation": "The question is not demonstrated by this test.",
-            }
+            return {"shortcoming_present": False}
 
     evidence = {
         "test_obligations": [
@@ -203,7 +191,7 @@ def test_quality_review_trace_records_retry_attempts_and_causes() -> None:
     }
     report = review_execute_pr_test_quality(
         evidence,
-        decision_client=OneFinding(),
+        decision_client=RetryOnce(),
         llm_client=RetryOnce(),
         max_timeout_retries=1,
         timeout_backoff_seconds=0,
@@ -211,15 +199,130 @@ def test_quality_review_trace_records_retry_attempts_and_causes() -> None:
         trace_context={"request_id": "quality-retry"},
     )
 
-    opinion_attempts = [
-        record for record in report["interaction_trace"] if record["role"] == "opinion"
+    decision_attempts = [
+        record for record in report["interaction_trace"] if record["role"] == "decision"
     ]
-    assert [record["outcome"] for record in opinion_attempts] == ["error", "success"]
-    assert [record["provider_call_attempt"] for record in opinion_attempts] == [1, 2]
-    assert "TimeoutError" in opinion_attempts[1]["retry_cause"]
+    assert [record["outcome"] for record in decision_attempts[:2]] == [
+        "error",
+        "success",
+    ]
+    assert [record["provider_call_attempt"] for record in decision_attempts[:2]] == [
+        1,
+        2,
+    ]
+    assert "TimeoutError" in decision_attempts[1]["retry_cause"]
     assert (
-        opinion_attempts[0]["interaction_id"] == opinion_attempts[1]["interaction_id"]
+        decision_attempts[0]["interaction_id"] == decision_attempts[1]["interaction_id"]
     )
+
+
+def test_registered_tautology_rule_emits_finding_without_model_calls() -> None:
+    class UnusedClient:
+        def complete_json(self, *_args: Any, **_kwargs: Any) -> dict[str, Any]:
+            raise AssertionError("a registered tautology needs no model judgment")
+
+    report = review_execute_pr_test_quality(
+        {
+            "test_obligations": [
+                {"obligation_id": "AC-01", "source_text": "Return a value."}
+            ],
+            "coverage_references": {"AC-01": ["tests/test_values.py::test_value"]},
+            "test_sources": {
+                "tests/test_values.py": "def test_value():\n    assert True\n"
+            },
+        },
+        decision_client=UnusedClient(),
+        llm_client=UnusedClient(),
+    )
+
+    finding = next(
+        item
+        for item in report["assessments"]
+        if item["check_id"] == "tautological_assertion"
+    )
+    assert finding["decision_reports_shortcoming"] is True
+    assert finding["resolution"] == "deterministic_finding"
+    assert finding["deterministic_finding"]["rule_id"] == "assert-literal-true-v1"
+    assert report["findings"] == [finding["residual_finding"]]
+
+
+def test_dynamic_assertion_is_left_for_semantic_review() -> None:
+    class NoShortcoming:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def complete_json(
+            self, _messages: list[dict[str, str]], *, response_schema: Any = None
+        ) -> dict[str, Any]:
+            self.calls += 1
+            return {"shortcoming_present": False}
+
+    decision = NoShortcoming()
+    report = review_execute_pr_test_quality(
+        {
+            "test_obligations": [
+                {"obligation_id": "AC-01", "source_text": "Return a value."}
+            ],
+            "coverage_references": {"AC-01": ["tests/test_values.py::test_value"]},
+            "test_sources": {
+                "tests/test_values.py": (
+                    "def test_value(expected):\n    assert result == expected\n"
+                )
+            },
+        },
+        decision_client=decision,
+        llm_client=NoShortcoming(),
+    )
+
+    assert decision.calls == len(QUALITY_CHECKS)
+    tautology = next(
+        item
+        for item in report["assessments"]
+        if item["check_id"] == "tautological_assertion"
+    )
+    assert tautology["resolution"] == "unresolved"
+    assert tautology["decision_reports_shortcoming"] is False
+
+
+def test_evidence_change_changes_per_check_review_fingerprint() -> None:
+    class NoShortcoming:
+        def complete_json(
+            self, _messages: list[dict[str, str]], *, response_schema: Any = None
+        ) -> dict[str, Any]:
+            return {"shortcoming_present": False}
+
+    def review(assertion: str) -> dict[str, Any]:
+        return review_execute_pr_test_quality(
+            {
+                "test_obligations": [
+                    {"obligation_id": "AC-01", "source_text": "Return a value."}
+                ],
+                "coverage_references": {"AC-01": ["tests/test_values.py::test_value"]},
+                "test_sources": {
+                    "tests/test_values.py": (
+                        f"def test_value():\n    assert {assertion}\n"
+                    )
+                },
+            },
+            decision_client=NoShortcoming(),
+            llm_client=NoShortcoming(),
+            trace_context={"request_id": "quality-evidence-change"},
+        )
+
+    first = review("result == expected")
+    second = review("result == fallback")
+    first_fingerprint = next(
+        record["evidence_fingerprint"]
+        for record in first["interaction_trace"]
+        if record["check_id"] == "observable_coverage"
+    )
+    second_fingerprint = next(
+        record["evidence_fingerprint"]
+        for record in second["interaction_trace"]
+        if record["check_id"] == "observable_coverage"
+    )
+
+    assert first_fingerprint != second_fingerprint
 
 
 def test_review_context_limits_baseline_log_to_targeted_failure() -> None:

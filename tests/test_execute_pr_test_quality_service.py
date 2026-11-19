@@ -83,6 +83,31 @@ def test_quality_review_targets_are_split_by_linked_acceptance_criterion() -> No
     )
 
 
+def test_quality_review_targets_use_runtime_compiled_selectors() -> None:
+    targets = execute_pr_test_review_targets(
+        {
+            "test_obligations": [
+                {"obligation_id": "AC-01", "source_text": "Accept a valid value."}
+            ],
+            "coverage_references": {
+                "AC-01": ["tests/test_values.py::test_value_contract"]
+            },
+            "test_sources": {
+                "tests/test_values.py": (
+                    "__powdrr_test_case_links__ = "
+                    "{'test_value_contract': ['AC-01']}\n"
+                    "def test_value_contract():\n"
+                    "    assert validate('value')\n"
+                )
+            },
+        }
+    )
+
+    assert len(targets) == 1
+    assert targets[0]["test_id"] == "tests/test_values.py::test_value_contract"
+    assert targets[0]["criterion_ids"] == ["AC-01"]
+
+
 def test_quality_question_contains_only_scoped_evidence_as_data() -> None:
     question = QUALITY_CHECKS[0][1]
     prompt = build_quality_question(

@@ -137,6 +137,10 @@ from powdrr_service.verification.story_test_links import (
     require_story_test_quality,
     story_link_coverage,
 )
+from powdrr_service.verification.test_case_requests import (
+    TestCaseRequestError,
+    compile_test_case_requests,
+)
 from powdrr_service.verification.test_obligations import (
     acceptance_criteria_contract,
 )
@@ -1186,13 +1190,12 @@ def _write_issue_worker_structrr_diff_artifacts(
             )
         selectors: list[str] = []
         for test_name in coverage_references.get(case_id, ()):
-            if obligation.get("story_refs"):
+            if "::" in test_name:
                 test_path, _, function = test_name.partition("::")
-                if function.split("[", 1)[0] not in test_names_by_file.get(
-                    test_path, set()
-                ):
+                function_name = function.split("[", 1)[0]
+                if function_name not in test_names_by_file.get(test_path, set()):
                     raise PowdrrExecutionError(
-                        f"unresolved collected story selector: {test_name}"
+                        f"unresolved collected test selector: {test_name}"
                     )
                 selectors.append(test_name)
                 test_case_ids_by_file.setdefault(test_path, []).append(case_id)
@@ -1777,20 +1780,15 @@ def _validate_execute_pr_test_correction(
     approved_operations: Sequence[Mapping[str, Any]] = (),
 ) -> tuple[dict[str, str], dict[str, list[str]], dict[str, Any]]:
     """Accept only corrections that preserve coverage and remain baseline-red."""
-    validated, coverage = validate_test_correction(
+    validated = validate_generated_test_files(
         corrected_sources,
-        expected_paths=tuple(original_sources),
-        obligations=obligations,
         test_root=test_root,
-        linked_story_tests=tuple(
-            node.name
-            for source in corrected_sources.values()
-            for node in ast.parse(source).body
-            if isinstance(node, ast.FunctionDef) and node.name.startswith("test_")
-        )
-        if any(obligation.get("story_refs") for obligation in obligations)
-        else (),
     )
+    if set(validated) != set(original_sources):
+        raise ExecutePrTestError(
+            "test correction must edit only the originally generated test files; "
+            f"expected={sorted(original_sources)}, actual={sorted(validated)}"
+        )
 
     corrected_test_ids = changed_execute_pr_test_cases(original_sources, validated)
     shutil.rmtree(baseline_worktree, ignore_errors=True)
@@ -1799,29 +1797,34 @@ def _validate_execute_pr_test_correction(
             repo_root, baseline_worktree, base_commit=baseline_commit
         )
         install_frozen_test_files(baseline_worktree, validated)
-        story_links = {}
-        if any(obligation.get("story_refs") for obligation in obligations):
-            collection = collect_story_tests(
-                validation_profile,
-                root=baseline_worktree,
-                paths=tuple(validated),
-                timeout_seconds=timeout_seconds,
+        story_links: dict[str, Any] = {}
+        collection = collect_story_tests(
+            validation_profile,
+            root=baseline_worktree,
+            paths=tuple(validated),
+            timeout_seconds=timeout_seconds,
+        )
+        if collection["status"] != "collected":
+            raise ExecutePrTestError(
+                f"corrected pytest collection unavailable: {collection}"
             )
-            if collection["status"] != "collected":
-                raise StoryCoverageError(
-                    f"corrected story test collection unavailable: {collection}"
-                )
+        if any(obligation.get("story_refs") for obligation in obligations):
             story_links = compile_story_test_links(
                 validated, obligations, collection["selectors"]
             )
-            coverage = validate_coverage_references(
-                validated,
-                obligations,
-                linked_story_tests=tuple(
-                    link["test_name"] for link in story_links["links"]
-                ),
-            )
-            coverage.update(story_link_coverage(story_links))
+        validated, coverage = validate_test_correction(
+            validated,
+            expected_paths=tuple(original_sources),
+            obligations=[
+                record for record in obligations if not record.get("story_refs")
+            ],
+            test_root=test_root,
+            linked_story_tests=tuple(
+                link["test_name"] for link in story_links.get("links", [])
+            ),
+            collected_selectors=collection["selectors"],
+        )
+        coverage.update(story_link_coverage(story_links))
         if story_links:
             baseline_result = run_story_tests(
                 validation_profile,
@@ -2036,15 +2039,31 @@ def _author_execute_pr_tests(
                 f"generated execute-PR test path already exists: {test_path}; "
                 "use a more specific proposed PR title"
             )
+        try:
+            case_requests = compile_test_case_requests(
+                obligations,
+                planned_cases=plan_context.get("planned_test_cases", []),
+                public_boundary=plan_context.get(
+                    "public_entrypoint_evidence", request.allowed_paths
+                ),
+                baseline_policy=baseline_policy,
+                assigned_test_path=test_path,
+            )
+        except TestCaseRequestError as error:
+            raise PowdrrExecutionError(
+                f"could not compile typed test-authoring requests: {error}"
+            ) from error
         prompt = build_execute_pr_test_author_prompt(
             test_path=test_path,
             plan_context=plan_context,
             obligations=obligations,
+            case_requests=[case.to_data() for case in case_requests],
         )
         trace_evidence = {
             "plan_fingerprint": request.plan_fingerprint,
             "plan_context": plan_context,
             "test_obligations": obligations,
+            "test_case_requests": [case.to_data() for case in case_requests],
         }
         trace_evidence_fingerprint = hashlib.sha256(
             json.dumps(trace_evidence, sort_keys=True, separators=(",", ":")).encode(
@@ -2122,6 +2141,7 @@ def _author_execute_pr_tests(
         baseline_report: dict[str, Any] | None = None
         quality_report: dict[str, Any] | None = None
         coverage_references: dict[str, list[str]] = {}
+        collected_selectors: list[str] = []
         story_links: dict[str, Any] = {}
         accepted_story_review: dict[str, Any] = {}
         story_review_evidence: dict[str, Any] = {}
@@ -2139,6 +2159,7 @@ def _author_execute_pr_tests(
                 baseline_report = None
                 quality_report = None
                 coverage_references = {}
+                collected_selectors = []
                 story_links = {}
                 author_request = replace(
                     author_request,
@@ -2189,17 +2210,18 @@ def _author_execute_pr_tests(
                 test_sources = validate_generated_test_files(
                     raw_sources, test_root=test_root_relative
                 )
-                if story_obligations:
-                    collection = collect_story_tests(
-                        validation_profile,
-                        root=authoring_worktree,
-                        paths=tuple(test_sources),
-                        timeout_seconds=config.coding_agent_validation_timeout_seconds,
+                collection = collect_story_tests(
+                    validation_profile,
+                    root=authoring_worktree,
+                    paths=tuple(test_sources),
+                    timeout_seconds=config.coding_agent_validation_timeout_seconds,
+                )
+                if collection["status"] != "collected":
+                    raise ExecutePrTestError(
+                        f"pytest collection unavailable: {collection}"
                     )
-                    if collection["status"] != "collected":
-                        raise StoryCoverageError(
-                            f"story collection unavailable: {collection}"
-                        )
+                collected_selectors = list(collection["selectors"])
+                if story_obligations:
                     story_links = compile_story_test_links(
                         test_sources, obligations, collection["selectors"]
                     )
@@ -2209,6 +2231,7 @@ def _author_execute_pr_tests(
                     linked_story_tests=tuple(
                         link["test_name"] for link in story_links.get("links", [])
                     ),
+                    collected_selectors=collection["selectors"],
                 )
                 coverage_references.update(story_link_coverage(story_links))
                 for path in test_sources:
@@ -2265,6 +2288,7 @@ def _author_execute_pr_tests(
                 suite_evidence = {
                     "contract": plan_context,
                     "test_obligations": obligations,
+                    "test_case_requests": [case.to_data() for case in case_requests],
                     "coverage_references": coverage_references,
                     "test_sources": test_sources,
                     "baseline_result": baseline_report,
@@ -2294,6 +2318,7 @@ def _author_execute_pr_tests(
                         "baseline_result": baseline_report,
                         "baseline_classification": baseline_classification,
                         "coverage_references": dict(coverage_references),
+                        "collected_selectors": list(collected_selectors),
                         "story_test_links": story_links,
                         "accepted_story_review": accepted_story_review,
                         "story_review_evidence": story_review_evidence,
@@ -2343,6 +2368,7 @@ def _author_execute_pr_tests(
             baseline_report = quality_repair_fallback["baseline_result"]
             baseline_classification = quality_repair_fallback["baseline_classification"]
             coverage_references = quality_repair_fallback["coverage_references"]
+            collected_selectors = quality_repair_fallback["collected_selectors"]
             story_links = quality_repair_fallback["story_test_links"]
             accepted_story_review = quality_repair_fallback["accepted_story_review"]
             story_review_evidence = quality_repair_fallback["story_review_evidence"]
@@ -2380,6 +2406,20 @@ def _author_execute_pr_tests(
             "test_sources": test_sources,
             "test_sha256": fingerprint_test_files(test_sources),
             "test_obligations": obligations,
+            "test_case_requests": [case.to_data() for case in case_requests],
+            "test_case_manifest": {
+                "schema_version": "execute-pr-test-case-manifest-v1",
+                "cases": [
+                    {
+                        **case.to_data(),
+                        "collected_selectors": coverage_references.get(
+                            case.case_id, []
+                        ),
+                    }
+                    for case in case_requests
+                ],
+                "collection_selectors": sorted(collected_selectors),
+            },
             "coverage_references": coverage_references,
             "quality_review": quality_report,
             "baseline_result": baseline_report,

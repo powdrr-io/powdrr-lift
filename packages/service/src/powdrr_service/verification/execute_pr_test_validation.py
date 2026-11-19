@@ -90,8 +90,9 @@ def validate_coverage_references(
     obligations: Sequence[Mapping[str, Any]],
     *,
     linked_story_tests: Sequence[str] = (),
+    collected_selectors: Sequence[str] | None = None,
 ) -> dict[str, list[str]]:
-    """Require every deterministic obligation to link to an actual authored test."""
+    """Compile obligation links from AST declarations and collected pytest items."""
     tests = {
         node.name
         for source in files.values()
@@ -104,6 +105,8 @@ def validate_coverage_references(
         for item in obligations
         if not item.get("story_refs")
     ]
+    if not expected_ids and linked_story_tests:
+        return {}
     if not expected_ids or any(not item for item in expected_ids):
         raise ExecutePrTestAuthoringValidationError(
             "coverage obligations must have non-empty IDs"
@@ -113,22 +116,96 @@ def validate_coverage_references(
             "coverage obligations contain duplicate IDs"
         )
     references: dict[str, set[str]] = {item: set() for item in expected_ids}
-    markers = re.compile(
-        r"(?m)^[ \t]*#[ \t]*Covers:[ \t]*(AC-[0-9]{2,})"
-        r"[ \t]+(test_[A-Za-z0-9_]+)[ \t]*$"
-    )
-    for source in files.values():
-        for obligation_id, test_name in markers.findall(source):
-            if obligation_id not in references:
-                raise ExecutePrTestAuthoringValidationError(
-                    f"test coverage marker refers to unknown obligation {obligation_id}"
+    if collected_selectors is None:
+        # Compatibility for callers validating archived test suites. New runtime
+        # authoring always supplies collection and uses the literal declaration.
+        markers = re.compile(
+            r"(?m)^[ \t]*#[ \t]*Covers:[ \t]*(AC-[0-9]{2,})"
+            r"[ \t]+(test_[A-Za-z0-9_]+)[ \t]*$"
+        )
+        for source in files.values():
+            for obligation_id, test_name in markers.findall(source):
+                if obligation_id not in references:
+                    raise ExecutePrTestAuthoringValidationError(
+                        "test coverage marker refers to unknown obligation "
+                        f"{obligation_id}"
+                    )
+                if test_name not in tests:
+                    raise ExecutePrTestAuthoringValidationError(
+                        f"coverage marker {obligation_id} refers to missing test "
+                        f"{test_name}"
+                    )
+                references[obligation_id].add(test_name)
+    else:
+        actual = set(collected_selectors)
+        if not actual:
+            raise ExecutePrTestAuthoringValidationError(
+                "test case links require actual pytest collection"
+            )
+        declarations_seen = 0
+        for path, source in sorted(files.items()):
+            tree = ast.parse(source, filename=path)
+            declarations = [
+                node
+                for node in tree.body
+                if isinstance(node, ast.Assign)
+                and any(
+                    isinstance(target, ast.Name)
+                    and target.id == "__powdrr_test_case_links__"
+                    for target in node.targets
                 )
-            if test_name not in tests:
+            ]
+            if not declarations:
+                continue
+            declarations_seen += len(declarations)
+            if len(declarations) != 1:
                 raise ExecutePrTestAuthoringValidationError(
-                    f"coverage marker {obligation_id} refers to missing test "
-                    f"{test_name}"
+                    f"{path}: require one literal "
+                    "__powdrr_test_case_links__ declaration"
                 )
-            references[obligation_id].add(test_name)
+            try:
+                requests = ast.literal_eval(declarations[0].value)
+            except (ValueError, TypeError, SyntaxError) as error:
+                raise ExecutePrTestAuthoringValidationError(
+                    "test case links require a literal mapping"
+                ) from error
+            if not isinstance(requests, dict) or not requests:
+                raise ExecutePrTestAuthoringValidationError(
+                    "test case links must map test function names to obligation IDs"
+                )
+            for test_name, identities in requests.items():
+                if not isinstance(test_name, str) or test_name not in tests:
+                    raise ExecutePrTestAuthoringValidationError(
+                        f"test case link refers to missing test {test_name!r}"
+                    )
+                if not isinstance(identities, list) or not identities:
+                    raise ExecutePrTestAuthoringValidationError(
+                        f"test case link for {test_name} must include obligation IDs"
+                    )
+                selectors = sorted(
+                    selector
+                    for selector in actual
+                    if selector.split("[", 1)[0] == f"{path}::{test_name}"
+                )
+                if not selectors:
+                    raise ExecutePrTestAuthoringValidationError(
+                        f"test case link is not collected: {path}::{test_name}"
+                    )
+                for obligation_id in identities:
+                    if (
+                        not isinstance(obligation_id, str)
+                        or obligation_id not in references
+                    ):
+                        raise ExecutePrTestAuthoringValidationError(
+                            "test case link refers to unknown obligation "
+                            f"{obligation_id!r}"
+                        )
+                    references[obligation_id].update(selectors)
+        if declarations_seen != 1:
+            raise ExecutePrTestAuthoringValidationError(
+                "require one __powdrr_test_case_links__ declaration across "
+                "authored files"
+            )
     covered_ids = {key for key, test_names in references.items() if test_names}
     missing = sorted(set(expected_ids) - covered_ids)
     if missing:
@@ -142,6 +219,24 @@ def validate_coverage_references(
             "coverage references contain no actual tests"
         )
     referenced_tests = set().union(*references.values())
+    if collected_selectors is not None:
+        collected_names = {
+            selector.split("::", 1)[1].split("[", 1)[0]
+            for selector in collected_selectors
+        }
+        referenced_tests = {
+            selector.split("::", 1)[1].split("[", 1)[0]
+            if "::" in selector
+            else selector
+            for selector in referenced_tests
+        }
+        tests = collected_names
+        linked_story_tests = tuple(
+            selector.split("::", 1)[1].split("[", 1)[0]
+            if "::" in selector
+            else selector
+            for selector in linked_story_tests
+        )
     unlinked_tests = sorted(tests - referenced_tests - set(linked_story_tests))
     if unlinked_tests:
         raise ExecutePrTestAuthoringValidationError(
@@ -217,6 +312,7 @@ def validate_test_correction(
     obligations: Sequence[Mapping[str, Any]],
     test_root: str = "tests",
     linked_story_tests: Sequence[str] = (),
+    collected_selectors: Sequence[str] | None = None,
 ) -> tuple[dict[str, str], dict[str, list[str]]]:
     """Validate a bounded correction to the generated acceptance-test suite."""
     if set(files) != set(expected_paths):
@@ -226,7 +322,10 @@ def validate_test_correction(
         )
     validated = validate_generated_test_files(files, test_root=test_root)
     return validated, validate_coverage_references(
-        validated, obligations, linked_story_tests=linked_story_tests
+        validated,
+        obligations,
+        linked_story_tests=linked_story_tests,
+        collected_selectors=collected_selectors,
     )
 
 

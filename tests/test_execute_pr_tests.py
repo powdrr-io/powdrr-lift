@@ -26,6 +26,10 @@ from powdrr_service.verification.execute_pr_test_validation import (
     validate_coverage_references,
     validate_generated_test_files,
 )
+from powdrr_service.verification.test_case_requests import (
+    TestCaseRequestError,
+    compile_test_case_requests,
+)
 from powdrr_service.verification.test_obligations import (
     ObligationError,
     acceptance_criteria_contract,
@@ -160,6 +164,90 @@ def test_acceptance_criteria_get_deterministic_ids_and_require_test_links() -> N
                 "def test_other():\n    assert True\n"
             },
             obligations[:1],
+        )
+
+
+def test_runtime_compiles_coverage_from_literal_ast_and_pytest_collection() -> None:
+    files = {
+        "tests/test_parser.py": (
+            "__powdrr_test_case_links__ = {"
+            "'test_precedence': ['AC-01'], "
+            "'test_invalid': ['AC-02']}\n"
+            "def test_precedence():\n    assert evaluate('4 + 3') == 7\n\n"
+            "def test_invalid():\n    assert evaluate('4 +') is None\n"
+        )
+    }
+    selectors = (
+        "tests/test_parser.py::test_precedence",
+        "tests/test_parser.py::test_invalid",
+    )
+    obligations = acceptance_criteria_contract(
+        ["Preserves precedence", "Rejects invalid syntax"]
+    )
+
+    assert validate_coverage_references(
+        files, obligations, collected_selectors=selectors
+    ) == {
+        "AC-01": ["tests/test_parser.py::test_precedence"],
+        "AC-02": ["tests/test_parser.py::test_invalid"],
+    }
+    with pytest.raises(
+        ExecutePrTestAuthoringValidationError, match="one __powdrr_test_case_links__"
+    ):
+        validate_coverage_references(
+            {
+                "tests/test_parser.py": (
+                    "# Covers: AC-01 test_precedence\n"
+                    "def test_precedence():\n    assert evaluate('4 + 3') == 7\n"
+                )
+            },
+            obligations[:1],
+            collected_selectors=("tests/test_parser.py::test_precedence",),
+        )
+
+
+def test_typed_test_requests_bind_semantics_to_runtime_owned_fields() -> None:
+    requests = compile_test_case_requests(
+        acceptance_criteria_contract(["The public API returns the computed value."]),
+        planned_cases=[
+            {
+                "id": "AC-01",
+                "test_type": "integration",
+                "scenario": "Call the public API with a supported input.",
+                "expected_outcome": "It returns 7.",
+                "behavior_scenario": {
+                    "dimensions": {"input": "4 + 3"},
+                    "evidence": ["src/calculator.py#L10-L14"],
+                },
+            }
+        ],
+        public_boundary=[{"path": "src/calculator.py"}],
+        baseline_policy="new_behavior",
+        assigned_test_path="tests/test_calculator.py",
+    )
+
+    assert requests[0].to_data() == {
+        "case_id": "AC-01",
+        "requirement": "The public API returns the computed value.",
+        "test_type": "integration",
+        "scenario": "Call the public API with a supported input.",
+        "expected_outcome": "It returns 7.",
+        "public_boundary": ["src/calculator.py"],
+        "fixtures": [],
+        "evidence_refs": ["src/calculator.py#L10-L14"],
+        "inputs": {"input": "4 + 3"},
+        "expected_observations": ["It returns 7."],
+        "permitted_substitutions": [],
+        "baseline_policy": "new_behavior",
+        "assigned_test_path": "tests/test_calculator.py",
+    }
+    with pytest.raises(TestCaseRequestError, match="baseline policy"):
+        compile_test_case_requests(
+            acceptance_criteria_contract(["Criterion"]),
+            planned_cases=[],
+            public_boundary=[],
+            baseline_policy="model_decides",
+            assigned_test_path="tests/test_api.py",
         )
 
 

@@ -396,6 +396,16 @@ def test_execute_pr_test_author_prompt_leaves_workspace_path_for_agent(
         obligations=acceptance_criteria_contract(
             ["The workflow runs on pull requests."]
         ),
+        case_requests=[
+            {
+                "case_id": "AC-01",
+                "scenario": "Parse the workflow and inspect its trigger.",
+                "expected_outcome": "Pull requests trigger the workflow.",
+                "assigned_test_path": (
+                    "attestation/tests/test_add_ci_preservation_note.py"
+                ),
+            }
+        ],
     )
 
     assert (
@@ -410,11 +420,12 @@ def test_execute_pr_test_author_prompt_leaves_workspace_path_for_agent(
     )
     assert "implementation is intentionally absent" in prompt
     assert "fail through a behavioral assertion" in prompt
-    assert "Deterministic test obligations" in prompt
-    assert "# Covers: AC-01 test_function_name" in prompt
+    assert "Deterministic typed test requests" in prompt
+    assert "__powdrr_test_case_links__" in prompt
+    assert "Do not write coverage comments or a manifest." in prompt
     assert "attestation/tests/test_add_ci_preservation_note.py" in prompt
     assert "do not create other files" in prompt
-    assert '"obligation_id": "AC-01"' in prompt
+    assert '"case_id": "AC-01"' in prompt
     assert "Follow each case's test_type, scenario, and expected_outcome" in prompt
     assert "partitions" not in prompt
     assert "do not treat a pull-request review, merge" in prompt

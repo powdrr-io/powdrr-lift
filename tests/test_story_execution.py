@@ -129,13 +129,14 @@ BAD = GOOD.replace(
 def persistence_source(obligations: list[dict[str, Any]]) -> str:
     lines = ["import json", "from app import resume", ""]
     links = {}
+    case_links = {}
     for index, obligation in enumerate(obligations):
         ref = obligation["story_refs"][0]
         available = ref["step_ids"][-1].endswith(":step:3")
         name = f"test_case_{index}"
+        case_links[name] = ["AC-01"]
         lines.extend(
             [
-                f"# Covers: AC-01 {name}",
                 f"def {name}(tmp_path):",
                 "    checkpoint = tmp_path / 'checkpoint.json'",
                 "    checkpoint.write_text(json.dumps({'accepted': ['kept'], "
@@ -167,7 +168,14 @@ def persistence_source(obligations: list[dict[str, Any]]) -> str:
             }
         ]
         lines.append("")
-    return "\n".join(lines) + "\n__powdrr_story_links__ = " + repr(links) + "\n"
+    return (
+        "\n".join(lines)
+        + "\n__powdrr_test_case_links__ = "
+        + repr(case_links)
+        + "\n__powdrr_story_links__ = "
+        + repr(links)
+        + "\n"
+    )
 
 
 def author(

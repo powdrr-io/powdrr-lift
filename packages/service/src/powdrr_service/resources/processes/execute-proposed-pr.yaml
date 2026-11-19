@@ -14,6 +14,15 @@ outputs:
       error: {type: [string, "null"]}
       retryable: {type: boolean}
       plan_defect_evidence: {type: array, items: {type: string}}
+      failure_evidence: {type: object}
+      failure_review:
+        type: object
+        properties:
+          classification: {type: string, enum: [plan_defect, implementation_defect, unclear, pending]}
+          reason_code: {type: string}
+          evidence_ids: {type: array, items: {type: string}}
+          evidence: {type: array, items: {type: string}}
+          explanation: {type: string}
       structrr:
         type: object
         required: [passed]

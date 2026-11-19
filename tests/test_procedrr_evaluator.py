@@ -649,6 +649,18 @@ steps:
                         if plan_defect_detected or policy_denied_required_paths
                         else "implementation_defect"
                     ),
+                    "reason_code": (
+                        "reviewed_plan_contradiction"
+                        if plan_defect_detected or policy_denied_required_paths
+                        else "insufficient_evidence"
+                        if unshaped_execution_error
+                        else "implementation_failure"
+                    ),
+                    "evidence_ids": [
+                        "implementation_result.out_of_scope_paths.0"
+                        if policy_denied_required_paths
+                        else "implementation_result.error"
+                    ],
                     "evidence": [
                         "The child process returned a retryable contract error."
                         if unshaped_execution_error
@@ -844,42 +856,50 @@ steps:
                     *out_of_scope_paths,
                     "attestation/verifier/src/powdrr_attestation/dsse.py",
                 ]
-                return {
-                    "passed": False,
-                    "status": "policy_denied",
-                    "changed_paths": changed_paths,
-                    "out_of_scope_paths": out_of_scope_paths,
-                    "error": "worker changed paths outside the implementation request",
-                    "plan_defect_evidence": [],
-                    "attempts": [
-                        {
-                            "attempt": {
-                                "status": "policy_denied",
-                                "error": (
-                                    "worker changed paths outside the implementation "
-                                    "request"
-                                ),
-                                "out_of_scope_paths": out_of_scope_paths,
-                            },
-                            "changed_paths": changed_paths,
-                        }
-                    ],
+                return _normalize_execute_pr_coding_attempt(
+                    {
+                        "passed": False,
+                        "status": "policy_denied",
+                        "changed_paths": changed_paths,
+                        "out_of_scope_paths": out_of_scope_paths,
+                        "error": (
+                            "worker changed paths outside the implementation request"
+                        ),
+                        "plan_defect_evidence": [],
+                        "attempts": [
+                            {
+                                "attempt": {
+                                    "status": "policy_denied",
+                                    "error": (
+                                        "worker changed paths outside the "
+                                        "implementation request"
+                                    ),
+                                    "out_of_scope_paths": out_of_scope_paths,
+                                },
+                                "changed_paths": changed_paths,
+                            }
+                        ],
+                        "structrr": {"passed": True},
+                        "integration_tests": {"passed": True},
+                    }
+                )
+            return _normalize_execute_pr_coding_attempt(
+                {
+                    "passed": implementation_passes,
+                    "changed_paths": implementation_paths
+                    if implementation_passes
+                    else [],
+                    "plan_defect_evidence": plan_defect_evidence,
                     "structrr": {"passed": True},
-                    "integration_tests": {"passed": True},
+                    "integration_tests": {
+                        "passed": True,
+                        "paths": ["tests/test_feature.py"],
+                        "baseline": {},
+                        "candidate": {},
+                        "repair_findings": [],
+                    },
                 }
-            return {
-                "passed": implementation_passes,
-                "changed_paths": implementation_paths if implementation_passes else [],
-                "plan_defect_evidence": plan_defect_evidence,
-                "structrr": {"passed": True},
-                "integration_tests": {
-                    "passed": True,
-                    "paths": ["tests/test_feature.py"],
-                    "baseline": {},
-                    "candidate": {},
-                    "repair_findings": [],
-                },
-            }
+            )
         if command == "finish":
             return [{"command": "pytest", "status": "passed"}]
         if command == "publish":
@@ -1071,7 +1091,7 @@ steps:
             assert result.bindings["pull_request_url"] == (
                 "https://github.com/example/repo/pull/123"
             )
-            assert result.llm_activations == 2
+            assert result.llm_activations == 1
             assert call_parameters[-2]["files_to_publish"] == [
                 "docs/plans/feature-v1-execution-plan.yaml",
                 "docs/plans/feature-v1-structrr-proposal.json",

@@ -1661,18 +1661,233 @@ def _bounded_candidate_diff(
 
 
 def _normalize_execute_pr_coding_attempt(value: Any) -> dict[str, Any]:
-    """Give failed execute-PR attempts the status field consumed by the workflow."""
+    """Normalize an attempt and attach its code-owned failure evidence."""
     if isinstance(value, Mapping) and isinstance(value.get("passed"), bool):
-        return dict(value)
-    error = value.get("error") if isinstance(value, Mapping) else None
-    message = str(error) if error else "execute-PR process returned no pass status"
-    retryable = value.get("retryable") if isinstance(value, Mapping) else None
-    return {
-        "passed": False,
-        "changed_paths": [],
-        "error": message,
-        "retryable": retryable if isinstance(retryable, bool) else False,
-    }
+        result = dict(value)
+    else:
+        error = value.get("error") if isinstance(value, Mapping) else None
+        message = str(error) if error else "execute-PR process returned no pass status"
+        retryable = value.get("retryable") if isinstance(value, Mapping) else None
+        result = {
+            "passed": False,
+            "changed_paths": [],
+            "error": message,
+            "retryable": retryable if isinstance(retryable, bool) else False,
+        }
+    catalog = _execute_pr_failure_evidence_catalog(result)
+    if catalog["references"]:
+        result["failure_evidence"] = catalog
+    if result.get("passed") is False:
+        review = _classify_known_execute_pr_failure(result, catalog)
+        result["failure_review"] = review or {"classification": "pending"}
+    return result
+
+
+def _execute_pr_failure_evidence_catalog(
+    result: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Bind stable references to the structured evidence emitted by gates."""
+    records: dict[str, dict[str, Any]] = {}
+    if result.get("passed") is False:
+        records["implementation_result.passed"] = {
+            "kind": "coding_attempt_outcome",
+            "value": False,
+        }
+    status = result.get("status")
+    if isinstance(status, str) and status:
+        records["implementation_result.status"] = {
+            "kind": "execution_status",
+            "value": status,
+        }
+    plan_defects = result.get("plan_defect_evidence")
+    if isinstance(plan_defects, list):
+        for index, evidence in enumerate(plan_defects):
+            if isinstance(evidence, str) and evidence.strip():
+                records[f"implementation_result.plan_defect_evidence.{index}"] = {
+                    "kind": "reviewed_plan_contradiction",
+                    "value": evidence,
+                }
+    out_of_scope = result.get("out_of_scope_paths")
+    if isinstance(out_of_scope, list):
+        for index, path in enumerate(out_of_scope):
+            if isinstance(path, str) and path.strip():
+                records[f"implementation_result.out_of_scope_paths.{index}"] = {
+                    "kind": "out_of_scope_path",
+                    "value": path,
+                }
+    changed_paths = result.get("changed_paths")
+    if isinstance(changed_paths, list):
+        for index, path in enumerate(changed_paths):
+            if isinstance(path, str) and path.strip():
+                records[f"implementation_result.changed_paths.{index}"] = {
+                    "kind": "changed_path",
+                    "value": path,
+                }
+    validation = result.get("validation")
+    if isinstance(validation, Mapping) and isinstance(validation.get("results"), list):
+        for index, check in enumerate(validation["results"]):
+            if isinstance(check, Mapping) and check.get("status") != "passed":
+                records[f"implementation_result.validation.results.{index}"] = {
+                    "kind": "validation_result",
+                    "value": {
+                        key: check.get(key)
+                        for key in ("profile", "status", "returncode", "test_id")
+                        if check.get(key) is not None
+                    },
+                }
+    attempts = result.get("attempts")
+    if isinstance(attempts, list):
+        for index, record in enumerate(attempts):
+            if not isinstance(record, Mapping):
+                continue
+            attempt = record.get("attempt")
+            if isinstance(attempt, Mapping):
+                records[f"implementation_result.attempts.{index}.attempt"] = {
+                    "kind": "coding_attempt",
+                    "value": {
+                        key: attempt.get(key)
+                        for key in (
+                            "attempt_id",
+                            "status",
+                            "error",
+                            "changed_paths",
+                            "out_of_scope_paths",
+                        )
+                        if attempt.get(key) is not None
+                    },
+                }
+    for review_field in (
+        "planning_decision_review",
+        "implementation_decision_review",
+        "repair_findings",
+    ):
+        structrr = result.get("structrr")
+        findings = structrr.get(review_field) if isinstance(structrr, Mapping) else None
+        if isinstance(findings, list):
+            for index, finding in enumerate(findings):
+                records[f"implementation_result.structrr.{review_field}.{index}"] = {
+                    "kind": "structrr_finding",
+                    "value": finding,
+                }
+    error = result.get("error")
+    if isinstance(error, str) and error.strip():
+        records["implementation_result.error"] = {
+            "kind": "operation_error",
+            "value": error[:1000],
+        }
+    return {"references": sorted(records), "records": records}
+
+
+def _classify_known_execute_pr_failure(
+    result: Mapping[str, Any], catalog: Mapping[str, Any]
+) -> dict[str, Any] | None:
+    """Route explicit plan contradictions and environment blocks without a judge."""
+    references = catalog.get("references", [])
+    records = catalog.get("records", {})
+    if not isinstance(references, list) or not isinstance(records, Mapping):
+        return None
+    contradiction_refs = [
+        reference
+        for reference in references
+        if isinstance(reference, str)
+        and reference.startswith("implementation_result.plan_defect_evidence.")
+    ]
+    if contradiction_refs:
+        return {
+            "classification": "plan_defect",
+            "reason_code": "reviewed_plan_contradiction",
+            "evidence_ids": contradiction_refs,
+            "evidence": [
+                str(records[reference]["value"])
+                for reference in contradiction_refs
+                if isinstance(records.get(reference), Mapping)
+            ],
+            "explanation": (
+                "Preflight found a concrete conflict between a reviewed file "
+                "creation instruction and the pinned repository base."
+            ),
+        }
+    environment_refs = []
+    for reference in references:
+        record = records.get(reference) if isinstance(reference, str) else None
+        value = record.get("value") if isinstance(record, Mapping) else None
+        if (
+            isinstance(reference, str)
+            and reference.startswith("implementation_result.validation.results.")
+            and isinstance(value, Mapping)
+            and value.get("status") in {"blocked", "pending", "timed_out"}
+        ):
+            environment_refs.append(reference)
+    if result.get("status") in {"blocked", "pending", "timed_out"}:
+        environment_refs.append("implementation_result.status")
+    if result.get("status") == "timed_out":
+        environment_refs.extend(
+            reference
+            for reference in references
+            if isinstance(reference, str)
+            and reference.startswith("implementation_result.attempts.")
+        )
+    if environment_refs:
+        selected = sorted(set(environment_refs))
+        return {
+            "classification": "unclear",
+            "reason_code": "environment_or_worker_blocked",
+            "evidence_ids": selected,
+            "evidence": [
+                json.dumps(records[reference], sort_keys=True)
+                for reference in selected
+                if reference in records
+            ],
+            "explanation": (
+                "A typed environment or worker timeout stopped validation; this "
+                "does not establish a plan defect. Stop for human review."
+            ),
+        }
+    return None
+
+
+def _validate_plan_repair_evidence_references(
+    *,
+    implementation_result: Any,
+    failure_review: Any,
+    repair_request: Mapping[str, Any],
+) -> None:
+    """Bind A15 discovery references to evidence IDs actually observed by A14."""
+    catalog = (
+        implementation_result.get("failure_evidence")
+        if isinstance(implementation_result, Mapping)
+        else None
+    )
+    records = catalog.get("records") if isinstance(catalog, Mapping) else None
+    review_refs = (
+        failure_review.get("evidence_ids")
+        if isinstance(failure_review, Mapping)
+        else None
+    )
+    discovery = repair_request.get("discovery")
+    discovery_refs = (
+        discovery.get("evidence_ids") if isinstance(discovery, Mapping) else None
+    )
+    if (
+        not isinstance(records, Mapping)
+        or not isinstance(review_refs, list)
+        or not review_refs
+        or any(
+            not isinstance(reference, str) or reference not in records
+            for reference in review_refs
+        )
+    ):
+        raise PowdrrExecutionError(
+            "plan amendment evidence IDs do not resolve to observed failure evidence"
+        )
+    if (
+        not isinstance(discovery_refs, list)
+        or not discovery_refs
+        or any(reference not in review_refs for reference in discovery_refs)
+    ):
+        raise PowdrrExecutionError(
+            "repair discovery must reference evidence cited by the failure review"
+        )
 
 
 def _repository_default_branch_evidence(repo_root: Path) -> dict[str, str] | None:
@@ -3914,6 +4129,11 @@ class _TaskWorkflowExecutionStrategy:
                 "plan amendment requires a typed repair_request produced from the "
                 "failure evidence; direct plan-file editing is disabled"
             )
+        _validate_plan_repair_evidence_references(
+            implementation_result=mode_context.get("implementation_result"),
+            failure_review=mode_context.get("failure_review"),
+            repair_request=repair_request,
+        )
         task_context = mode_context.get("task_context")
         if not isinstance(task_context, Mapping) or not isinstance(
             task_context.get("proposed_pr_context"), Mapping

@@ -17,6 +17,7 @@ steps:
       prompt_system: Return only the declared JSON object. Do not edit or rewrite plan files.
       instructions:
         - Use only the exact plan, item, requirement, unit, validation, and evidence IDs supplied in task_context, implementation_result, and failure_review.
+        - Put only IDs from failure_review.evidence_ids in discovery.evidence_ids. The runtime rejects references not present in the observed failure evidence catalog.
         - Describe one concrete discovery and the directly affected subjects. Do not widen impact to the whole plan.
         - Prefer a dependency correction when an existing dependency is missing or wrong. Use update_item only when the reviewed item text itself prevents correct execution.
         - For update_item, return a complete replacement item for the same item ID, preserving its workflow ID and workflow file. Do not invent a new ID or change requirement allocation.

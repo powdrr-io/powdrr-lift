@@ -32,16 +32,9 @@ files:
   type: modified
   span:
     start_line: 103
-    end_line: 208
+    end_line: 216
   summary: Discover and validate receipt manifests from successful runs on the exact commit.
   rationale: Exclude other revisions and failed runs, and return no evidence when the artifact is absent.
-- path: src/powdrr_lift/workrr/planning/execution_receipts.py
-  type: modified
-  span:
-    start_line: 214
-    end_line: 214
-  summary: Export GitHub receipt artifact discovery and its artifact name.
-  rationale: Make the discovery boundary available to planning sessions.
 - path: src/powdrr_lift/workrr/planning_session.py
   type: modified
   span:

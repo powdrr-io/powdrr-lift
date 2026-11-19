@@ -2311,8 +2311,8 @@ def _author_execute_pr_tests(
                     require_story_test_quality(quality_report, story_links)
                     accepted_story_review = quality_report
                     story_review_evidence = suite_evidence
-                suggestions = quality_report.get("suggestions", [])
-                if suggestions and not quality_repair_attempted:
+                findings = quality_report.get("findings", [])
+                if findings and not quality_repair_attempted:
                     quality_repair_fallback = {
                         "test_sources": dict(test_sources),
                         "baseline_result": baseline_report,
@@ -2324,11 +2324,11 @@ def _author_execute_pr_tests(
                         "story_review_evidence": story_review_evidence,
                     }
                     validation_error = (
-                        "Independent per-test review suggested these targeted "
-                        "coverage improvements. Apply the suggestions where they "
-                        "fit the accepted plan, keeping the tests independent and "
-                        "behavioral:\n"
-                        + json.dumps(suggestions, indent=2, sort_keys=True)
+                        "Independent per-test review returned these structured "
+                        "findings. Address each finding within the accepted plan, "
+                        "or explain why the current assertion evidence resolves it. "
+                        "Keep the tests independent and behavioral:\n"
+                        + json.dumps(findings, indent=2, sort_keys=True)
                     )
                     quality_repair_attempted = True
                     continue

@@ -1,0 +1,223 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1601
+title: Reduce per-test quality review calls
+intent:
+  problem: Each positive test-quality decision triggered duplicate opinion and generated-test suggestion calls; registered tautological assertions also required a model decision.
+  goal: Detect registered tautologies deterministically, retain semantic review for unresolved checks, and route structured findings to the independent test author.
+human-decisions: []
+structured_files: []
+files:
+  - path: packages/service/src/powdrr_service/verification/execute_pr_test_quality.py
+    type: modified
+    span: {start_line: 82, end_line: 100}
+    summary: "Implement deterministic AST findings and emit structured residual review results."
+    rationale: "Avoid duplicate opinion and suggestion calls while keeping dynamic semantic checks unresolved."
+  - path: packages/service/src/powdrr_service/verification/execute_pr_test_quality.py
+    type: modified
+    span: {start_line: 126, end_line: 163}
+    summary: "Implement deterministic AST findings and emit structured residual review results."
+    rationale: "Avoid duplicate opinion and suggestion calls while keeping dynamic semantic checks unresolved."
+  - path: packages/service/src/powdrr_service/verification/execute_pr_test_quality.py
+    type: modified
+    span: {start_line: 355, end_line: 364}
+    summary: "Implement deterministic AST findings and emit structured residual review results."
+    rationale: "Avoid duplicate opinion and suggestion calls while keeping dynamic semantic checks unresolved."
+  - path: packages/service/src/powdrr_service/verification/execute_pr_test_quality.py
+    type: modified
+    span: {start_line: 391, end_line: 391}
+    summary: "Implement deterministic AST findings and emit structured residual review results."
+    rationale: "Avoid duplicate opinion and suggestion calls while keeping dynamic semantic checks unresolved."
+  - path: packages/service/src/powdrr_service/verification/execute_pr_test_quality.py
+    type: modified
+    span: {start_line: 436, end_line: 436}
+    summary: "Implement deterministic AST findings and emit structured residual review results."
+    rationale: "Avoid duplicate opinion and suggestion calls while keeping dynamic semantic checks unresolved."
+  - path: packages/service/src/powdrr_service/verification/execute_pr_test_quality.py
+    type: modified
+    span: {start_line: 438, end_line: 459}
+    summary: "Implement deterministic AST findings and emit structured residual review results."
+    rationale: "Avoid duplicate opinion and suggestion calls while keeping dynamic semantic checks unresolved."
+  - path: packages/service/src/powdrr_service/verification/execute_pr_test_quality.py
+    type: modified
+    span: {start_line: 462, end_line: 462}
+    summary: "Implement deterministic AST findings and emit structured residual review results."
+    rationale: "Avoid duplicate opinion and suggestion calls while keeping dynamic semantic checks unresolved."
+  - path: packages/service/src/powdrr_service/verification/execute_pr_test_quality.py
+    type: modified
+    span: {start_line: 466, end_line: 467}
+    summary: "Implement deterministic AST findings and emit structured residual review results."
+    rationale: "Avoid duplicate opinion and suggestion calls while keeping dynamic semantic checks unresolved."
+  - path: packages/service/src/powdrr_service/verification/execute_pr_test_quality.py
+    type: modified
+    span: {start_line: 476, end_line: 481}
+    summary: "Implement deterministic AST findings and emit structured residual review results."
+    rationale: "Avoid duplicate opinion and suggestion calls while keeping dynamic semantic checks unresolved."
+  - path: packages/service/src/powdrr_service/verification/execute_pr_test_quality.py
+    type: modified
+    span: {start_line: 489, end_line: 498}
+    summary: "Implement deterministic AST findings and emit structured residual review results."
+    rationale: "Avoid duplicate opinion and suggestion calls while keeping dynamic semantic checks unresolved."
+  - path: packages/service/src/powdrr_service/verification/execute_pr_test_quality.py
+    type: modified
+    span: {start_line: 554, end_line: 635}
+    summary: "Implement deterministic AST findings and emit structured residual review results."
+    rationale: "Avoid duplicate opinion and suggestion calls while keeping dynamic semantic checks unresolved."
+  - path: packages/service/src/powdrr_service/verification/execute_pr_test_quality.py
+    type: modified
+    span: {start_line: 509, end_line: 511}
+    summary: "Implement deterministic AST findings and emit structured residual review results."
+    rationale: "Avoid duplicate opinion and suggestion calls while keeping dynamic semantic checks unresolved."
+  - path: packages/service/src/powdrr_service/verification/execute_pr_test_quality.py
+    type: modified
+    span: {start_line: 522, end_line: 558}
+    summary: "Implement deterministic AST findings and emit structured residual review results."
+    rationale: "Avoid duplicate opinion and suggestion calls while keeping dynamic semantic checks unresolved."
+  - path: packages/service/src/powdrr_service/verification/execute_pr_test_quality.py
+    type: modified
+    span: {start_line: 697, end_line: 697}
+    summary: "Implement deterministic AST findings and emit structured residual review results."
+    rationale: "Avoid duplicate opinion and suggestion calls while keeping dynamic semantic checks unresolved."
+  - path: packages/service/src/powdrr_service/verification/execute_pr_test_quality.py
+    type: modified
+    span: {start_line: 808, end_line: 808}
+    summary: "Implement deterministic AST findings and emit structured residual review results."
+    rationale: "Avoid duplicate opinion and suggestion calls while keeping dynamic semantic checks unresolved."
+  - path: packages/service/src/powdrr_service/verification/execute_pr_test_quality.py
+    type: modified
+    span: {start_line: 810, end_line: 811}
+    summary: "Implement deterministic AST findings and emit structured residual review results."
+    rationale: "Avoid duplicate opinion and suggestion calls while keeping dynamic semantic checks unresolved."
+  - path: packages/service/src/powdrr_service/verification/execute_pr_test_quality.py
+    type: modified
+    span: {start_line: 813, end_line: 814}
+    summary: "Implement deterministic AST findings and emit structured residual review results."
+    rationale: "Avoid duplicate opinion and suggestion calls while keeping dynamic semantic checks unresolved."
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span: {start_line: 2314, end_line: 2315}
+    summary: "Pass structured quality findings to the independent test author for one repair attempt."
+    rationale: "Keep test repair within accepted scope without generated-test suggestions."
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span: {start_line: 2327, end_line: 2331}
+    summary: "Pass structured quality findings to the independent test author for one repair attempt."
+    rationale: "Keep test repair within accepted scope without generated-test suggestions."
+  - path: tests/test_execute_pr_test_authoring.py
+    type: modified
+    span: {start_line: 404, end_line: 404}
+    summary: "Verify structured findings replace duplicate review and generated suggestions."
+    rationale: "Protect the independent author repair flow and advisory reporting."
+  - path: tests/test_execute_pr_test_authoring.py
+    type: modified
+    span: {start_line: 493, end_line: 494}
+    summary: "Verify structured findings replace duplicate review and generated suggestions."
+    rationale: "Protect the independent author repair flow and advisory reporting."
+  - path: tests/test_execute_pr_test_authoring.py
+    type: modified
+    span: {start_line: 502, end_line: 503}
+    summary: "Verify structured findings replace duplicate review and generated suggestions."
+    rationale: "Protect the independent author repair flow and advisory reporting."
+  - path: tests/test_execute_pr_test_authoring.py
+    type: modified
+    span: {start_line: 500, end_line: 501}
+    summary: "Verify structured findings replace duplicate review and generated suggestions."
+    rationale: "Protect the independent author repair flow and advisory reporting."
+  - path: tests/test_execute_pr_test_authoring.py
+    type: modified
+    span: {start_line: 505, end_line: 505}
+    summary: "Verify structured findings replace duplicate review and generated suggestions."
+    rationale: "Protect the independent author repair flow and advisory reporting."
+  - path: tests/test_execute_pr_test_authoring.py
+    type: modified
+    span: {start_line: 549, end_line: 549}
+    summary: "Verify structured findings replace duplicate review and generated suggestions."
+    rationale: "Protect the independent author repair flow and advisory reporting."
+  - path: tests/test_execute_pr_test_authoring.py
+    type: modified
+    span: {start_line: 551, end_line: 552}
+    summary: "Verify structured findings replace duplicate review and generated suggestions."
+    rationale: "Protect the independent author repair flow and advisory reporting."
+  - path: tests/test_execute_pr_test_authoring.py
+    type: modified
+    span: {start_line: 668, end_line: 671}
+    summary: "Verify structured findings replace duplicate review and generated suggestions."
+    rationale: "Protect the independent author repair flow and advisory reporting."
+  - path: tests/test_execute_pr_test_authoring.py
+    type: modified
+    span: {start_line: 752, end_line: 752}
+    summary: "Verify structured findings replace duplicate review and generated suggestions."
+    rationale: "Protect the independent author repair flow and advisory reporting."
+  - path: tests/test_execute_pr_test_authoring.py
+    type: modified
+    span: {start_line: 755, end_line: 755}
+    summary: "Verify structured findings replace duplicate review and generated suggestions."
+    rationale: "Protect the independent author repair flow and advisory reporting."
+  - path: tests/test_execute_pr_test_authoring.py
+    type: modified
+    span: {start_line: 760, end_line: 760}
+    summary: "Verify structured findings replace duplicate review and generated suggestions."
+    rationale: "Protect the independent author repair flow and advisory reporting."
+  - path: tests/test_execute_pr_test_quality_service.py
+    type: modified
+    span: {start_line: 169, end_line: 169}
+    summary: "Cover registered AST findings, unresolved dynamic checks, retries, and evidence fingerprints."
+    rationale: "Ensure deterministic rules are narrow and trace identity changes with evidence."
+  - path: tests/test_execute_pr_test_quality_service.py
+    type: modified
+    span: {start_line: 179, end_line: 179}
+    summary: "Cover registered AST findings, unresolved dynamic checks, retries, and evidence fingerprints."
+    rationale: "Ensure deterministic rules are narrow and trace identity changes with evidence."
+  - path: tests/test_execute_pr_test_quality_service.py
+    type: modified
+    span: {start_line: 194, end_line: 194}
+    summary: "Cover registered AST findings, unresolved dynamic checks, retries, and evidence fingerprints."
+    rationale: "Ensure deterministic rules are narrow and trace identity changes with evidence."
+  - path: tests/test_execute_pr_test_quality_service.py
+    type: modified
+    span: {start_line: 202, end_line: 203}
+    summary: "Cover registered AST findings, unresolved dynamic checks, retries, and evidence fingerprints."
+    rationale: "Ensure deterministic rules are narrow and trace identity changes with evidence."
+  - path: tests/test_execute_pr_test_quality_service.py
+    type: modified
+    span: {start_line: 205, end_line: 213}
+    summary: "Cover registered AST findings, unresolved dynamic checks, retries, and evidence fingerprints."
+    rationale: "Ensure deterministic rules are narrow and trace identity changes with evidence."
+  - path: tests/test_execute_pr_test_quality_service.py
+    type: modified
+    span: {start_line: 215, end_line: 281}
+    summary: "Cover registered AST findings, unresolved dynamic checks, retries, and evidence fingerprints."
+    rationale: "Ensure deterministic rules are narrow and trace identity changes with evidence."
+  - path: tests/test_execute_pr_test_quality_service.py
+    type: modified
+    span: {start_line: 283, end_line: 325}
+    summary: "Cover registered AST findings, unresolved dynamic checks, retries, and evidence fingerprints."
+    rationale: "Ensure deterministic rules are narrow and trace identity changes with evidence."
+  - path: tests/test_workflow_task_agent.py
+    type: modified
+    span: {start_line: 352, end_line: 356}
+    summary: "Verify transient retries remain bounded for primary quality decisions."
+    rationale: "Preserve provider retry behavior after removing follow-up review calls."
+  - path: tests/test_workflow_task_agent.py
+    type: modified
+    span: {start_line: 379, end_line: 379}
+    summary: "Verify transient retries remain bounded for primary quality decisions."
+    rationale: "Preserve provider retry behavior after removing follow-up review calls."
+entities:
+  - id: deterministic-tautological-assertion-rule
+    type: Static analysis rule
+    action: added
+  - id: execute-pr-test-quality-review
+    type: Function
+    action: modified
+  - id: reduce-test-quality-review-calls-tests
+    type: Unit test
+    action: added
+entity_relationships: []
+invariants:
+  - id: dynamic-assertions-remain-unresolved
+    description: Assertions outside registered AST rules continue to receive semantic review and are never treated as deterministic passes.
+    action: added
+guidance: []
+features: []
+proposed_prs: []
+

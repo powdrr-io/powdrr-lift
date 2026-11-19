@@ -401,7 +401,7 @@ def test_repository_default_branch_evidence_uses_remote_show_fallback(
     ]
 
 
-def test_execute_pr_test_quality_asks_individual_questions_and_suggests_a_fix(
+def test_execute_pr_test_quality_returns_one_primary_decision_per_unresolved_check(
     monkeypatch: Any,
 ) -> None:
     subq_calls: list[list[dict[str, str]]] = []
@@ -490,23 +490,19 @@ def test_execute_pr_test_quality_asks_individual_questions_and_suggests_a_fix(
         service=service,
     )
 
-    assert len(subq_calls) == 7
-    assert len(llm_calls) == 2
-    assert subq_calls[0][1]["content"] == llm_calls[0][0][1]["content"]
-    assert "tests/test_api.py::test_rejects_payload" in llm_calls[0][0][1]["content"]
-    assert "AC-01: Reject invalid payloads." in llm_calls[0][0][1]["content"]
+    assert len(subq_calls) == 6
+    assert len(llm_calls) == 0
     assert "test_unrelated_repository_behavior" not in subq_calls[0][1]["content"]
     assert "AC-99" not in subq_calls[0][1]["content"]
     assert "unrelated evidence" not in subq_calls[0][1]["content"]
     assert len(subq_calls[0][1]["content"]) < 8_000
-    assert "baseline_result" in llm_calls[1][0][1]["content"]
-    assert "unrelated_repository_dump" in llm_calls[1][0][1]["content"]
     assert review["outcome"] == "advisory"
-    assert review["suggestions"][0]["test_name"] == "test_rejects_invalid_payload"
+    assert review["suggestions"] == []
+    assert review["findings"][0]["check_id"] == "observable_coverage"
     assert review["assessments"][0]["check_id"] == "observable_coverage"
 
 
-def test_execute_pr_test_quality_accepts_subq_concern_as_advisory_on_disagreement(
+def test_execute_pr_test_quality_routes_subq_concern_as_structured_finding(
     monkeypatch: Any,
 ) -> None:
     llm_calls = 0
@@ -550,9 +546,10 @@ def test_execute_pr_test_quality_accepts_subq_concern_as_advisory_on_disagreemen
         service=service,
     )
     assert review["outcome"] == "advisory"
-    assert llm_calls == 7
+    assert llm_calls == 0
     assert review["suggestions"] == []
-    assert any("disagreed" in note for note in review["notes"])
+    assert review["findings"]
+    assert review["findings"][0]["resolution"] == "semantic_review_required"
 
 
 def test_execute_pr_test_quality_review_outage_is_advisory(
@@ -668,9 +665,10 @@ def test_quality_shortcoming_is_repaired_once_then_accepted_with_pr_note(
             del attempt_id
             author_prompts.append(request.prompt)
             if len(author_prompts) == 2:
-                assert "test_observes_expected_value" in request.prompt, request.prompt[
-                    -1800:
-                ]
+                assert "Independent per-test review returned these structured" in (
+                    request.prompt
+                )
+                assert '"check_id": "observable_coverage"' in request.prompt
                 assert request.allow_existing_changes is False
             _write(worktree_root, request.allowed_paths[0], test_source)
             return subprocess.CompletedProcess(["fake-miniswe"], 0, "done\n", "")
@@ -751,12 +749,12 @@ def test_quality_shortcoming_is_repaired_once_then_accepted_with_pr_note(
 
     assert tuple(sources) == (test_path,)
     assert len(author_prompts) == 2
-    assert llm_calls == 3
+    assert llm_calls == 0
     assert artifact["quality_review"]["outcome"] == "advisory"
     assert len(artifact["quality_review"]["reviews"]) == 2
-    assert "after a targeted repair attempt" in artifact["quality_review"]["notes"][0]
+    assert "unresolved test-quality concern" in artifact["quality_review"]["notes"][0]
     pr_notes = task_agent.render_execute_pr_test_quality_pr_notes(
         artifact["quality_review"]["notes"]
     )
     assert "Test-quality review is advisory" in " ".join(pr_notes)
-    assert "consider adding more coverage" in " ".join(pr_notes)
+    assert "review the linked criterion and assertion evidence" in " ".join(pr_notes)

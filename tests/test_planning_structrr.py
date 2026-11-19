@@ -7,6 +7,7 @@ from typing import Any
 import powdrr_service.planning.driver as driver_module
 import powdrr_service.planning.structrr as structrr_module
 import pytest
+import yaml
 from powdrr_service.planning.assembly import PlannedWrite, WorkUnit
 from powdrr_service.planning.contracts import PlanningContractError
 from powdrr_service.planning.dependencies import Validation
@@ -1141,6 +1142,82 @@ def test_exact_actionable_setup_anchor_skips_description_question() -> None:
     assert owner_item_id == "item-0001"
     assert setup.instructions == ("Install the signed provider.",)
     assert setup.verification == "Run `make test` and confirm it passes."
+
+
+def test_complete_source_test_cases_skip_test_design_question() -> None:
+    criterion = "The account locks after the configured failures."
+    behavior_scenario = {
+        "subject": "Account lockout behavior",
+        "given": "The account has the configured failure threshold.",
+        "dimensions": {
+            "normal_result": "The failure threshold is reached.",
+            "error_behavior": "Invalid credentials are rejected.",
+            "continuation": "The next attempt observes the locked account.",
+            "unsupported_behavior": "Not applicable by source definition.",
+            "cancellation_cleanup": "Not applicable by source definition.",
+            "compatibility": "Not applicable by source definition.",
+            "negative_boundaries": "One fewer failure does not lock the account.",
+        },
+        "evidence": [],
+        "validator": "Run the account lockout integration test.",
+        "capability_matrix": [],
+        "assumptions": [],
+    }
+    typed_case = {
+        "id": "case-source-01",
+        "description": criterion,
+        "status": "planned",
+        "test_type": "integration",
+        "scenario": "Submit invalid credentials up to the configured limit.",
+        "expected_outcome": "The account is locked after the final failure.",
+        "behavior_scenario": behavior_scenario,
+    }
+    source_yaml = yaml.safe_dump({"required_test_cases": [typed_case]}, sort_keys=False)
+    text = f"## Plan\n\n```yaml\n{source_yaml}```\n"
+    source = segment_markdown_source(
+        PinnedSourceDocument(
+            repository="owner/repo",
+            commit_sha="a" * 40,
+            path="docs/plan.md",
+            blob_sha="b" * 40,
+            content_sha256=hashlib.sha256(text.encode()).hexdigest(),
+            text=text,
+        )
+    )
+    source_ref = next(
+        anchor.id
+        for anchor in source.anchors
+        if text[anchor.start_offset : anchor.end_offset].startswith("```yaml\n")
+        and "required_test_cases:" in text[anchor.start_offset : anchor.end_offset]
+    )
+    requirement = Requirement("req-0001", criterion, "behavior", (source_ref,), (), ())
+    item = SimpleNamespace(
+        item_id="item-0001",
+        title="Implement account lockout",
+        objective="Lock accounts after repeated failed credentials.",
+        scope=("Authentication behavior",),
+        implementation_steps=("Enforce the failure threshold",),
+        acceptance_criteria=(criterion,),
+        allowed_paths=("src/auth", "tests"),
+    )
+    assembly = SimpleNamespace(
+        plan=SimpleNamespace(items=(item,)),
+        item_unit_ids={item.item_id: ("unit-0001",)},
+        units=(SimpleNamespace(id="unit-0001", requirement_ids=(requirement.id,)),),
+    )
+    machine: Any = SourceLedgerQuestionMachine(source, plan_id="plan-01")
+    machine.accepted_assembly = lambda *_args, **_kwargs: assembly
+    machine.accepted_ledger = lambda _answers: SourceLedger((requirement,), ())
+    machine.repository_paths = {}
+
+    pending, accepted = machine._accepted_test_coverage({})
+
+    assert pending == ()
+    assert accepted["item-0001"]["required_test_cases"][0]["description"] == criterion
+    assert (
+        machine._pending_deterministic_answers["plan-tests-item-0001"]["rule_id"]
+        == "exact-source-test-coverage-v1"
+    )
 
 
 def test_file_structural_change_omits_unrelated_entity_identity_index() -> None:

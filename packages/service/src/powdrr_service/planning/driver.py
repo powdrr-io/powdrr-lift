@@ -99,7 +99,10 @@ from powdrr_service.planning.structrr import (
     partition_subject_enumeration_units,
     reject_unordered_subject_conflicts,
 )
-from powdrr_service.planning.test_coverage import build_test_coverage_request
+from powdrr_service.planning.test_coverage import (
+    build_test_coverage_request,
+    exact_source_test_coverage_answer,
+)
 from powdrr_service.planning.workflow_ids import slugify_workflow_id
 from powdrr_service.structrr.code_symbols import CodeSymbolSearchResult
 from powdrr_service.structrr.snapshot import snapshot_digest
@@ -1882,6 +1885,28 @@ class SourceLedgerQuestionMachine:
                 self._invalid_accepted_question_ids.add(question_id)
                 answer = None
             if answer is None:
+                deterministic_answer = exact_source_test_coverage_answer(
+                    item.acceptance_criteria, excerpts
+                )
+                if deterministic_answer is not None:
+                    try:
+                        parsed = request.parse_answer(deterministic_answer)
+                    except PlanningContractError:
+                        pass
+                    else:
+                        self._pending_deterministic_answers[question_id] = {
+                            "question": request.question,
+                            "answer": deterministic_answer,
+                            "rule_id": "exact-source-test-coverage-v1",
+                            "reason": (
+                                "Every acceptance criterion has one complete typed "
+                                "test case in its cited pinned source anchor; the "
+                                "planner carries test semantics and binds runtime "
+                                "identity and provenance in code."
+                            ),
+                        }
+                        accepted[item.item_id] = parsed
+                        continue
                 pending.append(request)
                 continue
             try:

@@ -1,0 +1,43 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1604
+title: Adapt verifier evidence into planning receipts
+intent:
+  problem: The planner receipt consumer has no deterministic bridge from observed verifier evidence and must not infer requirement identity from intent or story references.
+  goal: Provide an explicit adapter that binds verifier results to caller-supplied requirement, revision, run, and artifact identities.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/audits/planning-llm-audit.md
+  type: modified
+  span:
+    start_line: 299
+    end_line: 307
+  summary: Document the verifier evidence adapter and its remaining integration boundary.
+  rationale: State which identities are validated and clarify that the current workflow does not yet supply planner bindings automatically.
+- path: packages/service/src/powdrr_service/verification/requirement_execution.py
+  type: modified
+  span:
+    start_line: 151
+    end_line: 233
+  summary: Convert matching structured verifier evidence into a typed requirement receipt.
+  rationale: Reuse observed obligation, oracle, command, outcome, candidate-tree, and artifact data while requiring explicit requirement and commit bindings.
+- path: packages/service/src/powdrr_service/verification/requirement_execution.py
+  type: modified
+  span:
+    start_line: 245
+    end_line: 250
+  summary: Export the verifier evidence adapter.
+  rationale: Make the receipt conversion available to explicit integration callers.
+- path: tests/test_requirement_execution_receipt.py
+  type: modified
+  span:
+    start_line: 115
+    end_line: 166
+  summary: Verify receipt conversion and candidate-tree mismatch rejection.
+  rationale: Ensure the adapter binds observed results to the exact supplied candidate and requirement identities.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []
+features: []
+proposed_prs: []

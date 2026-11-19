@@ -1,0 +1,113 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1619
+title: Carry per-case requirement bindings into planner workflows
+intent:
+  problem: Generated planner workflows carry item-level requirements but not the requirements each planned test case is intended to verify.
+  goal: Compile accepted case-level requirement IDs into workflow descriptors with canonical requirement digests, and validate the mapping against the item allocation and accepted Structrr proposal.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/audits/planning-llm-audit.md
+    type: modified
+    span: {start_line: 8, end_line: 9}
+    summary: Record case-level workflow binding propagation as implemented.
+    rationale: Keep the planner audit status aligned with generated artifacts.
+  - path: docs/audits/planning-llm-audit.md
+    type: modified
+    span: {start_line: 329, end_line: 330}
+    summary: Clarify that verifier integration remains outstanding for case-level mappings.
+    rationale: Distinguish propagation from actual receipt production and consumption.
+  - path: docs/audits/planning-llm-audit.md
+    type: modified
+    span: {start_line: 449, end_line: 450}
+    summary: Document accepted requirement IDs and statements as test-design inputs.
+    rationale: Describe the planner-owned facts given to the existing test-design interaction.
+  - path: docs/audits/planning-llm-audit.md
+    type: modified
+    span: {start_line: 456, end_line: 464}
+    summary: Document case-level requirement selection and workflow digest propagation.
+    rationale: Clarify validation, exact-source behavior, and the boundary between planned intent and execution proof.
+  - path: packages/service/src/powdrr_service/planning/compiler.py
+    type: modified
+    span: {start_line: 250, end_line: 254}
+    summary: Supply case-level bindings when generating each workflow.
+    rationale: Connect accepted Structrr test intent to downstream execution context.
+  - path: packages/service/src/powdrr_service/planning/compiler.py
+    type: modified
+    span: {start_line: 474, end_line: 485}
+    summary: Recompute expected case bindings during compiled-plan validation.
+    rationale: Detect artifact drift from the accepted proposal or planning manifest.
+  - path: packages/service/src/powdrr_service/planning/compiler.py
+    type: modified
+    span: {start_line: 517, end_line: 517}
+    summary: Add typed case bindings to workflow construction inputs.
+    rationale: Make the generated contract explicit.
+  - path: packages/service/src/powdrr_service/planning/compiler.py
+    type: modified
+    span: {start_line: 535, end_line: 537}
+    summary: Serialize case-to-requirement digest bindings in workflow context.
+    rationale: Preserve exact planned coverage intent for downstream consumers.
+  - path: packages/service/src/powdrr_service/planning/compiler.py
+    type: modified
+    span: {start_line: 607, end_line: 668}
+    summary: Derive sorted per-case requirement digest records and reject invalid allocation references.
+    rationale: Bind case claims to canonical item requirement identities deterministically.
+  - path: packages/service/src/powdrr_service/planning/workflow_instance.py
+    type: modified
+    span: {start_line: 23, end_line: 23}
+    summary: Define the accepted stable test-case ID shape.
+    rationale: Validate case identities in generated workflow context.
+  - path: packages/service/src/powdrr_service/planning/workflow_instance.py
+    type: modified
+    span: {start_line: 140, end_line: 140}
+    summary: Index item-level requirement digests during workflow validation.
+    rationale: Check each case mapping against its owning item bindings.
+  - path: packages/service/src/powdrr_service/planning/workflow_instance.py
+    type: modified
+    span: {start_line: 173, end_line: 173}
+    summary: Retain validated item requirement digests for nested checks.
+    rationale: Prevent case-level digest drift.
+  - path: packages/service/src/powdrr_service/planning/workflow_instance.py
+    type: modified
+    span: {start_line: 178, end_line: 242}
+    summary: Validate case IDs, sorted unique requirement bindings, and digest membership.
+    rationale: Reject malformed, duplicate, unallocated, or inconsistent mappings.
+  - path: tests/test_planning_compiler.py
+    type: modified
+    span: {start_line: 633, end_line: 633}
+    summary: Bind the fixture test case to its allocated requirement.
+    rationale: Exercise end-to-end case-to-requirement compilation.
+  - path: tests/test_planning_compiler.py
+    type: modified
+    span: {start_line: 821, end_line: 826}
+    summary: Assert workflow output carries the expected test case binding.
+    rationale: Verify stable IDs and canonical digests reach generated descriptors.
+  - path: tests/test_planning_compiler.py
+    type: modified
+    span: {start_line: 870, end_line: 903}
+    summary: Reject item-level and case-level digest drift.
+    rationale: Ensure workflow bindings cannot diverge from accepted requirement content.
+entities:
+  - id: test-case-requirement-binding-compilation
+    type: Function
+    action: added
+  - id: workflow-case-requirement-binding-validation
+    type: Function
+    action: added
+  - id: planner-case-binding-compiler-regression-tests
+    type: Regression test
+    action: added
+entity_relationships:
+  - id: compiler-tests-exercise-case-binding
+    type: exercises
+    source: planner-case-binding-compiler-regression-tests
+    target: test-case-requirement-binding-compilation
+    action: added
+    description: Planner compiler tests verify generated case mappings and reject digest drift.
+invariants:
+  - id: case-bindings-match-item-requirements
+    description: Each generated test case references only requirements allocated to its plan item, with digests identical to the item's canonical requirement bindings.
+    action: added
+guidance: []
+features: []
+proposed_prs: []

@@ -93,7 +93,7 @@ jobs:
 
       - name: Install RTK
         run: |
-          curl -fsSL https://raw.githubusercontent.com/rtk-ai/rtk/master/install.sh | sh
+          curl -fsSL https://raw.githubusercontent.com/rtk-ai/rtk/master/install.sh | RTK_VERSION=v1.2.1 sh
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Verify RTK

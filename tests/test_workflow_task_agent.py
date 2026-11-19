@@ -3577,6 +3577,59 @@ def test_ci_repair_dispatch_runs_contract_validations_and_acceptance(
     assert provider_calls == 1
 
 
+@pytest.mark.parametrize(
+    ("stdout", "returncode", "expected"),
+    (
+        (
+            "Would reformat: src/app.py\n1 file would be reformatted\n",
+            1,
+            True,
+        ),
+        (
+            "unformatted: File would be reformatted\n"
+            " --> src/app.py:1:13\n"
+            "  |\n"
+            "  - def value(): return 1\n"
+            "1 + def value():\n"
+            "2 +     return 1\n"
+            "  |\n"
+            "\n"
+            "1 file would be reformatted\n",
+            1,
+            True,
+        ),
+        (
+            "unformatted: File would be reformatted\n"
+            " --> src/other.py:1:13\n"
+            "1 file would be reformatted\n",
+            1,
+            False,
+        ),
+        (
+            "unformatted: File would be reformatted\n"
+            " --> src/app.py:1:13\n"
+            " --> src/other.py:1:13\n"
+            "2 files would be reformatted\n",
+            1,
+            False,
+        ),
+        ("", 0, False),
+    ),
+)
+def test_registered_ruff_check_matches_only_one_supported_target(
+    stdout: str, returncode: int, expected: bool
+) -> None:
+    assert (
+        task_agent._registered_ruff_check_matches(
+            stdout,
+            "",
+            returncode=returncode,
+            path="src/app.py",
+        )
+        is expected
+    )
+
+
 def test_registered_ci_formatter_runs_before_any_coding_provider(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -5575,17 +5575,11 @@ def _run_registered_ci_correction(
             provider=provider,
             error=f"the registered formatter check could not run: {error}",
         )
-    check_lines = [
-        line.strip() for line in check_result.stdout.splitlines() if line.strip()
-    ]
-    if (
-        check_result.returncode != 1
-        or check_result.stderr
-        or check_lines
-        not in (
-            [f"Would reformat: {fix.path}"],
-            [f"Would reformat: {fix.path}", "1 file would be reformatted"],
-        )
+    if not _registered_ruff_check_matches(
+        check_result.stdout,
+        check_result.stderr,
+        returncode=check_result.returncode,
+        path=fix.path,
     ):
         return _registered_correction_attempt(
             worker_root,
@@ -5719,6 +5713,40 @@ def _run_registered_ci_correction(
         changed_paths=tuple(sorted(changed)),
         diff_fingerprint=_worktree_fingerprint(worker_root, tuple(sorted(changed))),
     )
+
+
+def _registered_ruff_check_matches(
+    stdout: str, stderr: str, *, returncode: int, path: str
+) -> bool:
+    if returncode != 1 or stderr:
+        return False
+    lines = [line.strip() for line in stdout.splitlines() if line.strip()]
+    summaries = [line for line in lines if line.endswith("file would be reformatted")]
+    if summaries not in ([], ["1 file would be reformatted"]):
+        return False
+    legacy_targets = [
+        line.removeprefix("Would reformat: ")
+        for line in lines
+        if line.startswith("Would reformat: ")
+    ]
+    if legacy_targets:
+        return legacy_targets == [path] and all(
+            line in {f"Would reformat: {path}", "1 file would be reformatted"}
+            for line in lines
+        )
+
+    if (
+        summaries != ["1 file would be reformatted"]
+        or not lines
+        or lines[0] != "unformatted: File would be reformatted"
+    ):
+        return False
+    locations = [
+        match.group(1)
+        for line in lines
+        if (match := re.fullmatch(r"--> (.+?):\d+:\d+", line)) is not None
+    ]
+    return locations == [path]
 
 
 def _registered_correction_attempt(

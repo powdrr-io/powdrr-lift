@@ -37,6 +37,9 @@ from powdrr_service.structrr.snapshot import snapshot_digest
 from powdrr_service.structrr.source_reference_handoff import (
     compile_source_reference_handoff,
 )
+from powdrr_service.verification.requirement_execution import (
+    requirement_coverage_digest,
+)
 
 from powdrr_lift.core.contract_closure import (
     collect_python_evidence,
@@ -802,6 +805,18 @@ def test_compiler_round_trips_plan_and_emits_linked_artifacts() -> None:
     assert "dependencies: []" in workflow
     assert "docs/plans/bounded-plan.yaml" in workflow
     assert "docs/plans/bounded-plan-structrr-proposal.json" in workflow
+    workflow_context = yaml.safe_load(workflow)["inputs"]["proposed_pr_context"]
+    assert workflow_context["requirement_bindings"] == [
+        {
+            "requirement_id": "req-01",
+            "requirement_digest": requirement_coverage_digest(
+                requirement_id="req-01",
+                statement="Implement the behavior.",
+                kind="behavior",
+                source_refs=("anchor-01",),
+            ),
+        }
+    ]
     assert compiled.files["docs/plans/bounded-plan-structrr-proposal.json"].endswith(
         "\n"
     )
@@ -819,6 +834,33 @@ def test_compiler_round_trips_plan_and_emits_linked_artifacts() -> None:
             verification_command="pytest -q",
             plan_path="docs/plans/bounded-plan.yaml",
         )
+
+
+def test_compiled_plan_rejects_workflow_requirement_binding_drift() -> None:
+    plan, manifest, proposal = _fixture()
+    repository_snapshot = {
+        "source": manifest.data["source"],
+        "base": manifest.data["base"],
+    }
+    compiled = compile_plan(
+        plan=plan,
+        planning_manifest=manifest,
+        repository_snapshot=repository_snapshot,
+        structrr_proposal=proposal,
+        verification_command="pytest -q",
+        plan_path="docs/plans/bounded-plan.yaml",
+    )
+    workflow_path = "docs/workflows/bounded-plan/item-01.yaml"
+    workflow = yaml.safe_load(compiled.files[workflow_path])
+    binding = workflow["inputs"]["proposed_pr_context"]["requirement_bindings"][0]
+    binding["requirement_digest"] = "sha256:" + "f" * 64
+    files = dict(compiled.files)
+    files[workflow_path] = yaml.safe_dump(workflow, sort_keys=False)
+
+    report = validate_compiled_plan(replace(compiled, files=files), repository_snapshot)
+
+    assert not report.valid
+    assert any("lost plan context" in error for error in report.errors)
 
 
 def test_manifest_accepts_canonical_shell_runtime() -> None:

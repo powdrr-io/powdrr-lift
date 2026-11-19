@@ -19,6 +19,7 @@ from powdrr_service.planning.story_allocation import parse_story_refs
 PLAN_WORKFLOW_SCHEMA = "https://powdrr.io/schemas/plan-workflow-instance-v2"
 PLAN_WORKFLOW_PROCESS = "execute-proposed-pr-workflow"
 _SAFE_ID = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9._/-]{0,99}$")
+_DIGEST = re.compile(r"^sha256:[0-9a-f]{64}$")
 
 
 class PlanWorkflowInstanceError(ValueError):
@@ -135,6 +136,42 @@ def parse_plan_workflow_instance_yaml(text: str) -> PlanWorkflowInstance:
         raise PlanWorkflowInstanceError(
             "proposed_pr_context.require_structrr_proposal must be true"
         )
+    if "requirement_bindings" in context:
+        bindings = context.get("requirement_bindings")
+        if not isinstance(bindings, list) or not bindings:
+            raise PlanWorkflowInstanceError(
+                "proposed_pr_context.requirement_bindings must be a non-empty list"
+            )
+        binding_ids: list[str] = []
+        for index, binding in enumerate(bindings):
+            if not isinstance(binding, Mapping) or set(binding) != {
+                "requirement_id",
+                "requirement_digest",
+            }:
+                raise PlanWorkflowInstanceError(
+                    f"proposed_pr_context.requirement_bindings[{index}] is invalid"
+                )
+            requirement_id = binding.get("requirement_id")
+            requirement_digest = binding.get("requirement_digest")
+            if not isinstance(requirement_id, str) or not _SAFE_ID.fullmatch(
+                requirement_id
+            ):
+                raise PlanWorkflowInstanceError(
+                    "proposed_pr_context.requirement_bindings["
+                    f"{index}].requirement_id is invalid"
+                )
+            if not isinstance(requirement_digest, str) or not _DIGEST.fullmatch(
+                requirement_digest
+            ):
+                raise PlanWorkflowInstanceError(
+                    "proposed_pr_context.requirement_bindings["
+                    f"{index}].requirement_digest is invalid"
+                )
+            binding_ids.append(requirement_id)
+        if binding_ids != sorted(set(binding_ids)):
+            raise PlanWorkflowInstanceError(
+                "proposed_pr_context.requirement_bindings must have unique sorted IDs"
+            )
     if "manual_prerequisite" in context:
         try:
             parse_manual_prerequisite(

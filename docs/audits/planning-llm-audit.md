@@ -314,10 +314,13 @@ can override discovery. The loader pins the manifest base commit, validates each
 receipt and evidence digest, and supplies records only under explicit
 requirement IDs. Missing artifacts or unavailable discovery leave the normal
 semantic coverage path in place; they are not evidence of missing behavior.
-No active workflow currently supplies planner requirement bindings to the
-verifier adapter or invokes the manifest writer. That binding and invocation
-remain integration work; the planner does not infer them. The schema binds
-claims but is not cryptographic proof.
+Planner-generated workflow descriptors now carry the exact requirement IDs and
+digests allocated to each item, derived from its work units and accepted
+requirement records. This supplies stable planner-owned bindings to downstream
+execution without claiming that every requirement maps to every test. No active
+verifier currently consumes those bindings or invokes the manifest writer; that
+execution integration remains outstanding. The schema binds claims but is not
+cryptographic proof.
 
 ### P05: setup instructions are not an invitation to rediscover configuration
 

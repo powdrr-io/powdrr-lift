@@ -41,6 +41,9 @@ from powdrr_service.planning.workflow_instance import (
     PlanWorkflowInstanceError,
     parse_plan_workflow_instance_yaml,
 )
+from powdrr_service.verification.requirement_execution import (
+    requirement_coverage_digest,
+)
 
 PLANNING_MANIFEST_SCHEMA = "https://powdrr.io/schemas/planning-manifest-v1"
 _SHA1_RE = re.compile(r"^[0-9a-f]{40,64}$")
@@ -241,6 +244,9 @@ def compile_plan(
             proposal_path=proposal_path,
             verification_command=verification_command,
             plan_slug=plan_slug,
+            requirement_bindings=_requirement_bindings_for_item(
+                item.item_id, manifest.data
+            ),
         )
         rendered = yaml.safe_dump(definition, sort_keys=False, allow_unicode=True)
         try:
@@ -454,6 +460,12 @@ def validate_compiled_plan(
                     ("verification_command", compiled.verification_command),
                     ("structrr_item_id", item.item_id),
                     ("require_structrr_proposal", True),
+                    (
+                        "requirement_bindings",
+                        list(
+                            _requirement_bindings_for_item(item.item_id, manifest.data)
+                        ),
+                    ),
                     ("manual_prerequisite", item.manual_prerequisite),
                 )
             ):
@@ -484,6 +496,7 @@ def _workflow_definition(
     proposal_path: str,
     verification_command: str,
     plan_slug: str,
+    requirement_bindings: Sequence[Mapping[str, str]],
 ) -> dict[str, Any]:
     context: dict[str, Any] = {
         "plan_id": plan.plan_id,
@@ -500,6 +513,7 @@ def _workflow_definition(
         "structrr_proposal_file": proposal_path,
         "structrr_item_id": item.item_id,
         "require_structrr_proposal": True,
+        "requirement_bindings": [dict(binding) for binding in requirement_bindings],
     }
     if item.source_reference_design_file is not None:
         context["source_reference_design_file"] = item.source_reference_design_file
@@ -528,6 +542,45 @@ def _workflow_definition(
             "proposed_pr_context": context,
         },
     }
+
+
+def _requirement_bindings_for_item(
+    item_id: str, manifest: Mapping[str, Any]
+) -> tuple[dict[str, str], ...]:
+    """Project each item's allocated requirements into stable ID/digest pairs."""
+    requirements = {
+        str(record["id"]): record
+        for record in manifest["requirements"]
+        if isinstance(record, Mapping)
+    }
+    units = {
+        str(record["id"]): record
+        for record in manifest["units"]
+        if isinstance(record, Mapping)
+    }
+    item_unit_ids = manifest["item_unit_ids"][item_id]
+    requirement_ids = sorted(
+        {
+            str(requirement_id)
+            for unit_id in item_unit_ids
+            for requirement_id in units[str(unit_id)]["requirement_ids"]
+        }
+    )
+    bindings: list[dict[str, str]] = []
+    for requirement_id in requirement_ids:
+        requirement = requirements[requirement_id]
+        bindings.append(
+            {
+                "requirement_id": requirement_id,
+                "requirement_digest": requirement_coverage_digest(
+                    requirement_id=requirement_id,
+                    statement=str(requirement["statement"]),
+                    kind=str(requirement["kind"]),
+                    source_refs=tuple(str(ref) for ref in requirement["source_refs"]),
+                ),
+            }
+        )
+    return tuple(bindings)
 
 
 def _validate_story_allocation(

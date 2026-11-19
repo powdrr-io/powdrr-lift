@@ -3728,6 +3728,20 @@ def test_registered_ci_formatter_runs_before_any_coding_provider(
             "registered correction created an inference handler"
         ),
     )
+    formatter_checks: list[Any] = []
+    run_subprocess = subprocess.run
+
+    def capture_formatter_check(command: Any, *args: Any, **kwargs: Any) -> Any:
+        result = run_subprocess(command, *args, **kwargs)
+        if isinstance(command, (tuple, list)) and tuple(command[:3]) == (
+            "ruff",
+            "format",
+            "--check",
+        ):
+            formatter_checks.append(result)
+        return result
+
+    monkeypatch.setattr(task_agent.subprocess, "run", capture_formatter_check)
     correction_attempts: list[Any] = []
     run_registered_correction = task_agent._run_registered_ci_correction
 
@@ -3771,7 +3785,17 @@ def test_registered_ci_formatter_runs_before_any_coding_provider(
     )
 
     assert len(correction_attempts) == 1
-    assert correction_attempts[0].error is None, correction_attempts[0].error
+    formatter_details = [
+        {
+            "returncode": check.returncode,
+            "stdout": check.stdout,
+            "stderr": check.stderr,
+        }
+        for check in formatter_checks
+    ]
+    assert correction_attempts[0].error is None, (
+        f"{correction_attempts[0].error}; formatter_checks={formatter_details!r}"
+    )
     assert result["passed"] is True, result
     assert result["validation_status"] == "passed"
     assert result["changed_paths"] == [path]

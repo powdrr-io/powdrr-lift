@@ -67,6 +67,9 @@ from powdrr_lift.workrr.coding_agent_validation import (
     ValidationReportStatus,
     execute_coding_agent_attempt,
 )
+from powdrr_lift.workrr.registered_corrections import (
+    select_registered_correction,
+)
 from powdrr_lift.workrr.source_reference_validation import (
     SourceReferenceValidationContext,
     _git,
@@ -116,6 +119,17 @@ def _digest(path: Path) -> str:
     if path.is_symlink() or not path.is_file():
         raise ValueError("Frozen source inputs are missing or replaced.")
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _restore_file(path: Path, content: bytes, mode: int) -> None:
+    if any(parent.is_symlink() for parent in path.parents):
+        raise SourceRunFailure(
+            "invalid_candidate", "Cannot safely restore a formatter target"
+        )
+    if path.is_symlink():
+        path.unlink()
+    path.write_bytes(content)
+    path.chmod(mode & 0o7777)
 
 
 def context_delivery_status(
@@ -1332,6 +1346,141 @@ class SourceReferenceRun:
             )
         self._candidate_after_worker = self._candidate_state()
 
+    def apply_registered_correction(
+        self, attempt: CodingAgentAttempt, validation: Any
+    ) -> dict[str, Any] | None:
+        """Run one exact Ruff formatter action when its failed check proves scope."""
+        if validation.status is not ValidationReportStatus.FAILED:
+            return None
+        correction = select_registered_correction(
+            validation.to_data(),
+            changed_paths=attempt.changed_paths,
+            allowed_paths=self.request.allowed_paths,
+        )
+        if correction is None:
+            return None
+        self.verify_inputs()
+        if (
+            self._candidate_after_worker is None
+            or self._candidate_after_worker != self._candidate_state()
+        ):
+            return {
+                "correction_id": correction.correction_id,
+                "status": "blocked",
+                "path": correction.path,
+                "reason": "candidate changed after validation produced the evidence",
+            }
+        path = self.workspace_root / correction.path
+        if path.is_symlink() or not path.is_file():
+            return {
+                "correction_id": correction.correction_id,
+                "status": "blocked",
+                "path": correction.path,
+                "reason": "the exact formatter target is missing or unsafe",
+            }
+        original = path.read_bytes()
+        original_mode = path.stat().st_mode
+        before_digest = _digest(path)
+        before_ast = self._python_ast_snapshot()
+        validation_artifact = self.private_root / (
+            f"{attempt.attempt_id}.pre-correction-validation.json"
+        )
+        _write_once(validation_artifact, validation.to_data())
+        formatter = (
+            ("python", "-m", "ruff", "format", "--no-cache", "--", correction.path)
+            if correction.check_command[:3] == ("python", "-m", "ruff")
+            else ("ruff", "format", "--no-cache", "--", correction.path)
+        )
+        try:
+            outcome = subprocess.run(
+                self.protect_command(formatter),
+                cwd=self.workspace_root,
+                env=os.environ | self.validation_environment(),
+                capture_output=True,
+                text=True,
+                timeout=120,
+                check=False,
+            )
+        except (OSError, subprocess.TimeoutExpired) as error:
+            _restore_file(path, original, original_mode)
+            return {
+                "correction_id": correction.correction_id,
+                "status": "blocked",
+                "path": correction.path,
+                "before_sha256": before_digest,
+                "reason": f"registered formatter could not complete: {error}",
+            }
+        after_digest = (
+            _digest(path) if path.is_file() and not path.is_symlink() else None
+        )
+        if outcome.returncode != 0 or after_digest is None:
+            _restore_file(path, original, original_mode)
+            return {
+                "correction_id": correction.correction_id,
+                "status": "blocked",
+                "path": correction.path,
+                "before_sha256": before_digest,
+                "returncode": outcome.returncode,
+                "reason": (
+                    "registered formatter returned a nonzero exit status"
+                    if outcome.returncode != 0
+                    else "registered formatter removed its target"
+                ),
+            }
+        if after_digest == before_digest:
+            return {
+                "correction_id": correction.correction_id,
+                "status": "stale",
+                "path": correction.path,
+                "before_sha256": before_digest,
+                "reason": (
+                    "formatter check reported a difference but "
+                    "formatter changed no bytes"
+                ),
+            }
+        try:
+            after_ast = self._python_ast_snapshot()
+        except SourceRunFailure as error:
+            _restore_file(path, original, original_mode)
+            return {
+                "correction_id": correction.correction_id,
+                "status": "blocked",
+                "path": correction.path,
+                "before_sha256": before_digest,
+                "reason": str(error),
+            }
+        if after_ast != before_ast:
+            _restore_file(path, original, original_mode)
+            return {
+                "correction_id": correction.correction_id,
+                "status": "blocked",
+                "path": correction.path,
+                "before_sha256": before_digest,
+                "reason": (
+                    "formatter changed Python syntax, so the candidate was restored"
+                ),
+            }
+        self.verify_inputs()
+        return {
+            "correction_id": correction.correction_id,
+            "status": "applied",
+            "path": correction.path,
+            "check_command": list(correction.check_command),
+            "apply_command": list(formatter),
+            "before_sha256": before_digest,
+            "after_sha256": after_digest,
+            "python_ast_preserved": True,
+        }
+
+    def record_registered_correction_candidate(self) -> None:
+        """Bind subsequent verification to the code-owned corrected candidate."""
+        if self._candidate_after_worker is None:
+            raise SourceRunFailure(
+                "invalid_candidate", "No worker candidate exists for correction"
+            )
+        self.verify_inputs()
+        self._candidate_after_worker = self._candidate_state()
+
     def _python_ast_snapshot(self) -> dict[str, str]:
         import ast
 
@@ -1378,6 +1527,7 @@ class SourceReferenceRun:
             "completion": None,
             "context_delivery": None,
             "reconciliation": None,
+            "registered_corrections": [],
         }
         try:
             self.verify_inputs()
@@ -1413,6 +1563,9 @@ class SourceReferenceRun:
                 execution.attempt.to_data(),
                 execution.validation.to_data(),
             )
+            result["registered_corrections"] = [
+                dict(item) for item in execution.registered_corrections
+            ]
             result["diff_check"] = {
                 "passed": execution.diff_check.returncode == 0,
                 "returncode": execution.diff_check.returncode,
@@ -1453,7 +1606,16 @@ class SourceReferenceRun:
                     source_validation_fingerprint=reference_report.get("fingerprint"),
                 )
             result["reconciliation"] = self.reconciliation
-            if execution.attempt.status is not CodingAgentStatus.COMPLETED:
+            if execution.registered_corrections and any(
+                item.get("status") != "applied"
+                for item in execution.registered_corrections
+            ):
+                result["outcome"] = "registered_correction_blocked"
+                result["error"] = str(
+                    execution.registered_corrections[0].get("reason")
+                    or "registered correction did not pass its postconditions"
+                )
+            elif execution.attempt.status is not CodingAgentStatus.COMPLETED:
                 result["outcome"] = classify_coding_agent_attempt(
                     execution.attempt
                 ).value

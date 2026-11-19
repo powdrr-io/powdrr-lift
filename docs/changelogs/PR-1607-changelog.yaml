@@ -1,0 +1,93 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1607
+title: Apply registered formatting fixes before source retries
+intent:
+  problem: Source correction retries invoked MiniSWE even when the sole failed validation was an exact Ruff format check for one allowed changed Python file.
+  goal: Apply that narrowly selected formatter deterministically, preserve the original Python syntax, and rerun all validations before accepting the candidate.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/registered_corrections.py
+    type: added
+    span: {start_line: 1, end_line: 103}
+    summary: Select one Ruff formatting correction from exact validation output and path evidence.
+    rationale: Avoid another model call for a deterministic correction while rejecting stale, ambiguous, unsafe, or out-of-scope evidence.
+  - path: src/powdrr_lift/workrr/coding_agent_validation.py
+    type: modified
+    span: {start_line: 579, end_line: 579}
+    summary: Add registered correction receipts to the shared coding execution result.
+    rationale: Preserve deterministic correction provenance for the source run.
+  - path: src/powdrr_lift/workrr/coding_agent_validation.py
+    type: modified
+    span: {start_line: 618, end_line: 632}
+    summary: Apply a selected source correction after initial validation and rerun the full validation set when it applies.
+    rationale: Make validation results after correction authoritative before candidate acceptance.
+  - path: src/powdrr_lift/workrr/coding_agent_validation.py
+    type: modified
+    span: {start_line: 641, end_line: 643}
+    summary: Return the correction receipt alongside the attempt, final validation, and diff check.
+    rationale: Carry the deterministic action record to source-run result serialization.
+  - path: src/powdrr_lift/workrr/source_reference_run.py
+    type: modified
+    span: {start_line: 70, end_line: 72}
+    summary: Import the exact registered correction selector into the source-run coordinator.
+    rationale: Keep formatter applicability selection in the bounded source implementation route.
+  - path: src/powdrr_lift/workrr/source_reference_run.py
+    type: modified
+    span: {start_line: 124, end_line: 134}
+    summary: Restore the original formatter target safely after a failed postcondition.
+    rationale: Keep rejected deterministic actions from leaving a partially changed target.
+  - path: src/powdrr_lift/workrr/source_reference_run.py
+    type: modified
+    span: {start_line: 1349, end_line: 1483}
+    summary: Execute one sandboxed Ruff formatter action with candidate freshness, path, byte-change, and Python AST postconditions.
+    rationale: Allow only the exact code-owned correction and bind later verification to the resulting candidate.
+  - path: src/powdrr_lift/workrr/source_reference_run.py
+    type: modified
+    span: {start_line: 1530, end_line: 1530}
+    summary: Initialize registered correction receipts in the source-run result.
+    rationale: Keep deterministic action evidence explicit for every source run.
+  - path: src/powdrr_lift/workrr/source_reference_run.py
+    type: modified
+    span: {start_line: 1566, end_line: 1568}
+    summary: Serialize correction receipts into the source-run result.
+    rationale: Preserve correction provenance for the caller and terminal artifact.
+  - path: src/powdrr_lift/workrr/source_reference_run.py
+    type: modified
+    span: {start_line: 1609, end_line: 1618}
+    summary: Stop normal acceptance when a registered correction fails its postconditions.
+    rationale: Prevent blocked actions from entering the validation acceptance path.
+  - path: tests/test_registered_corrections.py
+    type: added
+    span: {start_line: 1, end_line: 112}
+    summary: Cover exact formatter selection and rejection of stale, ambiguous, and out-of-scope evidence.
+    rationale: Keep the registry fail-closed as validation shapes and path rules evolve.
+  - path: tests/test_source_reference_run.py
+    type: modified
+    span: {start_line: 30, end_line: 31}
+    summary: Import validation result types used to exercise deterministic corrections.
+    rationale: Construct exact validation evidence for source-run correction tests.
+  - path: tests/test_source_reference_run.py
+    type: modified
+    span: {start_line: 788, end_line: 944}
+    summary: Verify syntax-changing formatter output is restored, no-op output is stale, and AST-preserving output is recorded.
+    rationale: Exercise the action postconditions and candidate binding at the source-run boundary.
+entities:
+  - id: registered-source-format-correction
+    type: Feature
+    action: added
+entity_relationships: []
+invariants:
+  - id: exact-formatter-correction-selection
+    description: A registered Ruff formatting correction requires one exact failed check, matching single-file output, and a changed Python path that is allowed by the source request.
+    action: added
+    rationale: Unknown or broader failures remain on the existing bounded semantic correction path.
+  - id: formatter-correction-revalidation
+    description: A formatter action is accepted only when it changes the target bytes, preserves the Python AST, and is followed by the complete validation set.
+    action: added
+    rationale: Formatting alone does not establish candidate correctness.
+guidance:
+  - id: keep-registered-corrections-narrow
+    description: Add a deterministic correction only when its exact applicability, scope, and postconditions can be checked in code.
+    action: added
+    rationale: Preserve semantic synthesis for unsupported implementation failures and stop safely when correction evidence is uncertain.

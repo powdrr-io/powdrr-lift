@@ -121,6 +121,7 @@ class SourceReferenceValidationContext:
         self._test_evidence_json = json.dumps(
             test_collection_evidence, sort_keys=True, allow_nan=False
         )
+        self._review_receipts: tuple[dict[str, Any], ...] = ()
 
     def _collect(
         self, workspace: Path
@@ -238,6 +239,7 @@ class SourceReferenceValidationContext:
             recorded_inputs=json.loads(self._inputs_json),
             acquisition_findings=errors,
             review_client=self.review_client,
+            review_receipts=self._review_receipts,
             claims=claims,
             test_collection_evidence=json.loads(self._test_evidence_json),
         )
@@ -262,6 +264,12 @@ class SourceReferenceValidationContext:
                     },
                 ),
                 claims=claims,
+            )
+        else:
+            self._review_receipts = tuple(
+                item
+                for item in report.to_data()["reviews"]
+                if item.get("classification") == "satisfied"
             )
         return report
 

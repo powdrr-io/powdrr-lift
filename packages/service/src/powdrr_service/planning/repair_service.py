@@ -120,6 +120,8 @@ def load_repair_draft(repo_root: Path, plan_path: Path) -> RepairDraft:
             "acceptance_criteria": list(item.acceptance_criteria),
             "dependencies": list(item.dependencies),
         }
+        if "allowed_paths" in context:
+            expected_context["allowed_paths"] = list(item.allowed_paths)
         if any(context.get(key) != value for key, value in expected_context.items()):
             raise PlanRepairServiceError(
                 f"workflow {item.workflow_file!r} context disagrees with plan"
@@ -378,6 +380,7 @@ def _compile_artifacts(
                 "scope": list(item.scope),
                 "implementation_steps": list(item.implementation_steps),
                 "acceptance_criteria": list(item.acceptance_criteria),
+                "allowed_paths": list(item.allowed_paths),
             }
         )
         inputs["proposed_pr_context"] = context
@@ -464,9 +467,7 @@ def _planned_item(
                 "implementation_steps", current.implementation_steps if current else ()
             )
         ),
-        allowed_paths=tuple(
-            value.get("allowed_paths", current.allowed_paths if current else (".",))
-        ),
+        allowed_paths=_replacement_allowed_paths(value, current, item_id),
         code_evidence=tuple(
             reference
             for reference in (current.code_evidence if current else ())
@@ -495,7 +496,6 @@ def _planned_item(
             "workflow_id",
             "workflow_file",
             "implementation_steps",
-            "allowed_paths",
             "manual_prerequisite",
             "inline_adjustments",
         )
@@ -505,7 +505,38 @@ def _planned_item(
             "changes; scope, acceptance, setup, and structural edits need "
             "a refreshed Structrr proposal"
         )
+    if current is not None and not set(current.allowed_paths) <= set(
+        replacement.allowed_paths
+    ):
+        raise PlanRepairServiceError(
+            f"replacement item {item_id!r} may only add allowed paths; "
+            "it cannot remove previously reviewed paths"
+        )
     return replacement
+
+
+def _replacement_allowed_paths(
+    value: Mapping[str, Any], current: PlannedWorkItem | None, item_id: str
+) -> tuple[str, ...]:
+    raw_paths = value.get(
+        "allowed_paths", list(current.allowed_paths) if current is not None else ["."]
+    )
+    if (
+        not isinstance(raw_paths, list)
+        or not raw_paths
+        or not all(isinstance(path, str) and path.strip() for path in raw_paths)
+        or len(set(raw_paths)) != len(raw_paths)
+        or any(
+            Path(path).is_absolute() or ".." in Path(path).parts
+            for path in raw_paths
+            if isinstance(path, str)
+        )
+    ):
+        raise PlanRepairServiceError(
+            f"replacement item {item_id!r} allowed_paths must be unique "
+            "repository-relative paths"
+        )
+    return tuple(raw_paths)
 
 
 def _evidence_path_is_in_scope(path: Any, allowed_paths: Sequence[str]) -> bool:
@@ -545,6 +576,12 @@ def _repair_pr_body(
                     "  - Dependencies: "
                     f"{list(old_items[item_id].dependencies)} → "
                     f"{list(new_items[item_id].dependencies)}"
+                )
+            if old_items[item_id].allowed_paths != new_items[item_id].allowed_paths:
+                details.append(
+                    "  - Allowed paths: "
+                    f"{list(old_items[item_id].allowed_paths)} → "
+                    f"{list(new_items[item_id].allowed_paths)}"
                 )
             if new_items[item_id].manual_prerequisite is not None:
                 details.append(

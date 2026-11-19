@@ -317,9 +317,16 @@ semantic coverage path in place; they are not evidence of missing behavior.
 Planner-generated workflow descriptors now carry the exact requirement IDs and
 digests allocated to each item, derived from its work units and accepted
 requirement records. This supplies stable planner-owned bindings to downstream
-execution without claiming that every requirement maps to every test. No active
-verifier currently consumes those bindings or invokes the manifest writer; that
-execution integration remains outstanding. The schema binds claims but is not
+execution without claiming that every requirement maps to every test. The
+existing per-item test-design request now receives those exact requirement IDs
+and accepted statements; each planned case records only the IDs it claims to
+directly verify. Code checks that every returned ID belongs to the item's
+allocated requirement set. An exact source-authored case is bound deterministically
+only when its acceptance-criterion text exactly equals an accepted requirement
+statement. Empty case bindings mean no direct relationship was asserted. These
+are planned-test relationships, not execution evidence. No active verifier
+currently consumes the bindings or invokes the manifest writer; that execution
+integration remains outstanding. The schema binds claims but is not
 cryptographic proof.
 
 ### P05: setup instructions are not an invitation to rediscover configuration
@@ -430,7 +437,7 @@ do not simply union unrelated IDs and pretend it proves relevance.
 
 | ID | Interaction / activation | Continue as LLM? | Why any residual semantic assistance is justified | Deterministic replacement / retained state |
 | --- | --- | --- | --- | --- |
-| P10 | Per-item test and seven-dimension behavior scenario design | Split / conditional | Creating a novel observable oracle from prose can require judgment; existing confirmed cases and behavior dimensions must be carried, not reinvented. | Implemented for complete typed `required_test_cases` records that exactly cover all acceptance criteria in cited source anchors. Carry those records through the existing parser; continue asking for novel, partial, ambiguous, or invalid cases. Keep unknown dimensions unresolved rather than blanket not_applicable. |
+| P10 | Per-item test and seven-dimension behavior scenario design | Split / conditional | Creating a novel observable oracle from prose can require judgment; existing confirmed cases and behavior dimensions must be carried, not reinvented. | Implemented for complete typed `required_test_cases` records that exactly cover all acceptance criteria in cited source anchors. Carry those records through the existing parser; continue asking for novel, partial, ambiguous, or invalid cases. Every case carries validated direct requirement IDs from its owning item's allocation; exact source carry-forward binds only exact statement matches. This records planned coverage intent, not execution proof. Keep unknown dimensions unresolved rather than blanket not_applicable. |
 | P11 | Decision-provider relevance of existing entity/relationship candidate | Split | Path/symbol proximity alone does not decide semantic feature/relationship change. | Implemented together with P13: one desired-delta request returns unchanged or desired content for each deterministic candidate; code retains stable identity and ownership. |
 | P12 | Enumerate additional entity/relationship subjects beyond known deterministic candidates | Split / conditional | Novel conceptual entities and relationships may not be discoverable from syntax alone. | Diff explicit accepted entity intent and known schema/AST transformations first; code owns file subjects, existing IDs, source refs and page cursor. Model proposes only unrepresented semantic identities. |
 | P13 | Describe one bound subject's desired section content or unchanged | Split | New conceptual type/relationship meaning may require design. Existing types, endpoints and accepted target states should not be re-decided. | Implemented with P11 for existing deterministic candidates: one request returns unchanged or the semantic desired delta. Code derives action, IDs, operation, projection, and ownership. New subjects still need semantic content proposals. |

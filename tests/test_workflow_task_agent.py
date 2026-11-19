@@ -3630,6 +3630,159 @@ def test_registered_ruff_check_matches_only_one_supported_target(
     )
 
 
+def _registered_ci_correction_case(
+    tmp_path: Path,
+) -> tuple[Path, RepairContract, CIFailureUnit, dict[str, Any]]:
+    repository = tmp_path / "repository"
+    (repository / "src").mkdir(parents=True)
+    (repository / "tests").mkdir()
+    source = repository / "src" / "app.py"
+    source.write_text("def value(): return 1\n", encoding="utf-8")
+    protected = repository / "tests" / "test_app.py"
+    protected.write_text("assert True\n", encoding="utf-8")
+
+    def git(*args: str) -> str:
+        result = subprocess.run(
+            ["git", *args], cwd=repository, capture_output=True, text=True, check=True
+        )
+        return result.stdout.strip()
+
+    git("init", "-b", "main")
+    git("config", "user.name", "CI correction test")
+    git("config", "user.email", "ci-correction@example.invalid")
+    git("add", ".")
+    git("commit", "-m", "initial")
+    head_sha = git("rev-parse", "HEAD")
+
+    path = "src/app.py"
+    command = ("ruff", "format", "--check", path)
+    excerpt = f"Would reformat: {path}\n1 file would be reformatted\n"
+    log_digest = hashlib.sha256(excerpt.encode()).hexdigest()
+    failure = CIFailureUnit(
+        failure_id="formatter-negative-test",
+        observation_id="observation-negative-test",
+        job_id=11,
+        phase="formatter_failure",
+        signature=f"Would reformat: {path}",
+        evidence=(f"job_log:11:sha256:{'a' * 64}",),
+        locally_executable=True,
+        head_sha=head_sha,
+        run_id=10,
+        run_attempt=1,
+        command=command,
+    )
+    contract = RepairContract.create(
+        repository="example/project",
+        pull_request_number=270,
+        head_sha=head_sha,
+        observation_id=failure.observation_id,
+        failure_id=failure.failure_id,
+        reproduction_id="reproduction-negative-test",
+        reproduction_status="reproduced",
+        allowed_paths=(path,),
+        protected_artifacts=(
+            ProtectedArtifact(
+                "tests/test_app.py",
+                hashlib.sha256(protected.read_bytes()).hexdigest(),
+            ),
+        ),
+        required_behavior=("Preserve application behavior.",),
+        verification_commands=(command,),
+        required_checks=("CI / format",),
+        research_claim_refs=(),
+        stop_conditions=("Stop if another path must change.",),
+        expires_at=(datetime.now(UTC) + timedelta(hours=1)).isoformat(),
+        registered_correction=RegisteredCIFix(
+            correction_id="ruff-format-v1",
+            path=path,
+            check_command=command,
+            diagnostic_sha256=log_digest,
+        ),
+    )
+    observation_result = {
+        "job_log_evidence": {
+            "11": {
+                "status": "available",
+                "excerpt": excerpt,
+                "raw_sha256": "a" * 64,
+            }
+        }
+    }
+    return repository, contract, failure, observation_result
+
+
+@pytest.mark.parametrize(
+    ("scenario", "expected_error", "expected_commands"),
+    (
+        ("stale_evidence", "stale or unavailable", 0),
+        ("noop", "became a no-op", 2),
+        ("protected_artifact", "protected artifact changed", 1),
+        ("out_of_scope", "outside its registered target", 2),
+        ("ambiguous_execution", "no longer matches", 1),
+    ),
+)
+def test_registered_ci_formatter_rejects_stale_noop_and_unsafe_attempts(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    scenario: str,
+    expected_error: str,
+    expected_commands: int,
+) -> None:
+    repository, contract, failure, observation = _registered_ci_correction_case(
+        tmp_path
+    )
+    source = repository / "src" / "app.py"
+    protected = repository / "tests" / "test_app.py"
+    if scenario == "stale_evidence":
+        observation["job_log_evidence"]["11"]["excerpt"] += "changed\n"
+    elif scenario == "protected_artifact":
+        protected.write_text("assert False\n", encoding="utf-8")
+
+    check_output = "Would reformat: src/app.py\n1 file would be reformatted\n"
+    if scenario == "ambiguous_execution":
+        check_output = (
+            "unformatted: File would be reformatted\n"
+            " --> src/app.py:1:13\n"
+            " --> src/other.py:1:13\n"
+            "2 files would be reformatted\n"
+        )
+    calls: list[tuple[str, ...]] = []
+    real_run = subprocess.run
+
+    def run_registered_command(
+        command: Any, *args: Any, **kwargs: Any
+    ) -> subprocess.CompletedProcess[str]:
+        if isinstance(command, (tuple, list)) and command and command[0] == "ruff":
+            argv = tuple(command)
+            calls.append(argv)
+            if argv[2] == "--check":
+                return subprocess.CompletedProcess(
+                    args=argv, returncode=1, stdout=check_output, stderr=""
+                )
+            if scenario == "out_of_scope":
+                source.write_text("def value():\n    return 1\n", encoding="utf-8")
+                (repository / "README.md").write_text("unexpected\n", encoding="utf-8")
+            return subprocess.CompletedProcess(
+                args=argv, returncode=0, stdout="", stderr=""
+            )
+        return real_run(command, *args, **kwargs)
+
+    monkeypatch.setattr(task_agent.subprocess, "run", run_registered_command)
+    attempt = task_agent._run_registered_ci_correction(
+        contract=contract,
+        failure=failure,
+        observation_result=observation,
+        worker_root=repository,
+        attempt_id="attempt-negative-test",
+        request_id=contract.contract_id,
+        provider="registered-correction:ruff-format-v1",
+    )
+
+    assert attempt.status is task_agent.CodingAgentStatus.FAILED
+    assert expected_error in (attempt.error or "")
+    assert len(calls) == expected_commands
+
+
 def test_registered_ci_formatter_runs_before_any_coding_provider(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

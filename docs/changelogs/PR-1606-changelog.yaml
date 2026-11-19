@@ -1,0 +1,127 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1606
+title: Load pinned execution receipts in planning sessions
+intent:
+  problem: The planner has a typed receipt consumer but no supported input path for external observed execution receipts.
+  goal: Let planning sessions consume a strict external receipt manifest pinned to the planning commit and requirement IDs.
+human-decisions: []
+structured_files: []
+files:
+- path: docs/audits/planning-llm-audit.md
+  type: modified
+  span:
+    start_line: 306
+    end_line: 312
+  summary: Document manifest intake and its external GitHub or execution adapter boundary.
+  rationale: Clarify what planning validates and what artifact discovery remains with the caller.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 421
+    end_line: 428
+  summary: Add the execution receipt manifest option to new planning sessions.
+  rationale: Allow an external GitHub or execution adapter to provide receipt artifacts.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 452
+    end_line: 459
+  summary: Add the execution receipt manifest option to resumed planning sessions.
+  rationale: Keep receipt evidence available when resuming a pinned planning session.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 2928
+    end_line: 2928
+  summary: Forward the receipt manifest path into planning session configuration.
+  rationale: Connect the CLI input to the planning service adapter.
+- path: src/powdrr_lift/workrr/planning/execution_receipts.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 100
+  summary: Parse receipt manifests and validate pinned evidence before requirement-keyed use.
+  rationale: Reject stale commits, malformed receipts, digest mismatches, and duplicate requirement or evidence IDs.
+- path: src/powdrr_lift/workrr/planning_session.py
+  type: modified
+  span:
+    start_line: 31
+    end_line: 31
+  summary: Import validated planning Evidence records for the receipt manifest.
+  rationale: Type the evidence map passed into the deterministic planner path.
+- path: src/powdrr_lift/workrr/planning_session.py
+  type: modified
+  span:
+    start_line: 64
+    end_line: 66
+  summary: Import the strict planning receipt manifest loader.
+  rationale: Keep manifest parsing in the planning application boundary.
+- path: src/powdrr_lift/workrr/planning_session.py
+  type: modified
+  span:
+    start_line: 90
+    end_line: 90
+  summary: Add the optional receipt manifest to planning session configuration.
+  rationale: Make externally supplied execution evidence available to new and resumed sessions.
+- path: src/powdrr_lift/workrr/planning_session.py
+  type: modified
+  span:
+    start_line: 170
+    end_line: 182
+  summary: Load receipt evidence against the session’s pinned base commit.
+  rationale: Prevent stale or mismatched receipts from entering planning context.
+- path: src/powdrr_lift/workrr/planning_session.py
+  type: modified
+  span:
+    start_line: 403
+    end_line: 405
+  summary: Supply validated explicit receipts and excerpts to the planner.
+  rationale: Activate deterministic requirement coverage without inferring links from story references.
+- path: src/powdrr_lift/workrr/planning_session.py
+  type: modified
+  span:
+    start_line: 407
+    end_line: 407
+  summary: Pass explicit requirement-keyed evidence into the source-ledger planner.
+  rationale: Let the existing deterministic receipt branch use only validated manifest records.
+- path: tests/test_cli.py
+  type: modified
+  span:
+    start_line: 100
+    end_line: 101
+  summary: Add the execution receipt option to the plan-resume parser test.
+  rationale: Ensure resumed plans accept the external manifest path.
+- path: tests/test_cli.py
+  type: modified
+  span:
+    start_line: 109
+    end_line: 109
+  summary: Verify the receipt option is available when resuming planning.
+  rationale: Ensure resumed sessions can receive the same pinned evidence input.
+- path: tests/test_cli.py
+  type: modified
+  span:
+    start_line: 122
+    end_line: 123
+  summary: Add the execution receipt option to the plan parser test.
+  rationale: Ensure new plans accept the external manifest path.
+- path: tests/test_cli.py
+  type: modified
+  span:
+    start_line: 128
+    end_line: 128
+  summary: Verify the receipt option is available when starting planning.
+  rationale: Protect the new planning CLI contract.
+- path: tests/test_planning_execution_receipts.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 89
+  summary: Verify receipt manifest pinning, explicit requirement mapping, and digest rejection.
+  rationale: Ensure only matching, intact receipt evidence reaches planner coverage.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []
+features: []
+proposed_prs: []

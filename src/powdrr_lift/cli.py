@@ -418,6 +418,14 @@ def build_parser() -> argparse.ArgumentParser:
         help="Repository validation command embedded in each generated PR workflow.",
     )
     plan_parser.add_argument("--output", type=Path)
+    plan_parser.add_argument(
+        "--execution-receipts",
+        type=Path,
+        help=(
+            "Read a JSON manifest of observed requirement receipts, bound to the "
+            "pinned planning commit."
+        ),
+    )
     plan_parser.add_argument("--repo-root", type=Path)
     plan_parser.add_argument(
         "--planning-provider", default="deepinfra-cheap", choices=ALL_PROVIDERS
@@ -441,6 +449,14 @@ def build_parser() -> argparse.ArgumentParser:
     plan_resume_parser.add_argument("--repository", required=True)
     plan_resume_parser.add_argument("--session-issue", type=int, required=True)
     plan_resume_parser.add_argument("--repo-root", type=Path)
+    plan_resume_parser.add_argument(
+        "--execution-receipts",
+        type=Path,
+        help=(
+            "Read a JSON manifest of observed requirement receipts, bound to the "
+            "pinned planning commit."
+        ),
+    )
     plan_resume_parser.add_argument(
         "--planning-provider", default="deepinfra-cheap", choices=ALL_PROVIDERS
     )
@@ -2909,6 +2925,7 @@ def _run_plan_session(args: argparse.Namespace, *, resume: bool = False) -> int:
                 plan_id=getattr(args, "plan_id", None) if not resume else None,
                 verification_command=getattr(args, "verification_command", ""),
                 output=getattr(args, "output", None) if not resume else None,
+                execution_receipt_manifest=getattr(args, "execution_receipts", None),
                 provider=getattr(args, "planning_provider", "auto"),
                 model=getattr(args, "planning_model", None),
                 api_key=getattr(args, "planning_api_key", None),

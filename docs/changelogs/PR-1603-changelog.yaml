@@ -1,0 +1,255 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1603
+title: Route typed execute-PR failures and bind repair evidence
+intent:
+  problem: Execute-PR failure review relied on a model to detect known plan contradictions and accepted
+    repair evidence IDs without binding them to observed gate output.
+  goal: Route explicit contradictions and typed worker/environment blocks deterministically, preserve
+    semantic review for ambiguous failures, and bind plan repair discovery to observed, cited evidence.
+human-decisions: []
+structured_files: []
+files:
+- path: packages/service/src/powdrr_service/resources/processes/amend-plan-and-open-pr.yaml
+  type: modified
+  span:
+    start_line: 20
+    end_line: 20
+  summary: Restrict repair discovery to evidence IDs cited by the failure review.
+  rationale: Keep plan amendment evidence traceable to observed failure evidence.
+- path: packages/service/src/powdrr_service/resources/processes/execute-proposed-pr-workflow.yaml
+  type: modified
+  span:
+    start_line: 47
+    end_line: 75
+  summary: Route typed failures and require reason-coded, evidence-linked semantic classifications.
+  rationale: Bypass the judge for explicit contradictions and typed worker blocks while preserving semantic
+    review.
+- path: packages/service/src/powdrr_service/resources/processes/execute-proposed-pr-workflow.yaml
+  type: modified
+  span:
+    start_line: 48
+    end_line: 48
+  summary: Route typed failures and require reason-coded, evidence-linked semantic classifications.
+  rationale: Bypass the judge for explicit contradictions and typed worker blocks while preserving semantic
+    review.
+- path: packages/service/src/powdrr_service/resources/processes/execute-proposed-pr-workflow.yaml
+  type: modified
+  span:
+    start_line: 56
+    end_line: 56
+  summary: Route typed failures and require reason-coded, evidence-linked semantic classifications.
+  rationale: Bypass the judge for explicit contradictions and typed worker blocks while preserving semantic
+    review.
+- path: packages/service/src/powdrr_service/resources/processes/execute-proposed-pr-workflow.yaml
+  type: modified
+  span:
+    start_line: 101
+    end_line: 102
+  summary: Route typed failures and require reason-coded, evidence-linked semantic classifications.
+  rationale: Bypass the judge for explicit contradictions and typed worker blocks while preserving semantic
+    review.
+- path: packages/service/src/powdrr_service/resources/processes/execute-proposed-pr-workflow.yaml
+  type: modified
+  span:
+    start_line: 75
+    end_line: 136
+  summary: Route typed failures and require reason-coded, evidence-linked semantic classifications.
+  rationale: Bypass the judge for explicit contradictions and typed worker blocks while preserving semantic
+    review.
+- path: packages/service/src/powdrr_service/resources/processes/execute-proposed-pr.yaml
+  type: modified
+  span:
+    start_line: 17
+    end_line: 25
+  summary: Expose the failure evidence catalog and typed review in the coding-attempt result.
+  rationale: Carry deterministic evidence and failure classifications through the workflow.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 1664
+    end_line: 1664
+  summary: Build stable failure evidence records, route known failures, and validate repair evidence IDs.
+  rationale: Keep evidence identity and known failure handling under deterministic runtime control.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 1666
+    end_line: 1890
+  summary: Build stable failure evidence records, route known failures, and validate repair evidence IDs.
+  rationale: Keep evidence identity and known failure handling under deterministic runtime control.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 4132
+    end_line: 4136
+  summary: Build stable failure evidence records, route known failures, and validate repair evidence IDs.
+  rationale: Keep evidence identity and known failure handling under deterministic runtime control.
+- path: tests/test_procedrr_chat.py
+  type: modified
+  span:
+    start_line: 226
+    end_line: 227
+  summary: Update the expected workflow references for each failure route.
+  rationale: Keep workflow process structure assertions aligned with executable branches.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span:
+    start_line: 652
+    end_line: 663
+  summary: Exercise deterministic and semantic failure classifications in the process evaluator.
+  rationale: Verify typed failure routing and plan amendment publication behavior.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span:
+    start_line: 859
+    end_line: 892
+  summary: Exercise deterministic and semantic failure classifications in the process evaluator.
+  rationale: Verify typed failure routing and plan amendment publication behavior.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span:
+    start_line: 894
+    end_line: 900
+  summary: Exercise deterministic and semantic failure classifications in the process evaluator.
+  rationale: Verify typed failure routing and plan amendment publication behavior.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span:
+    start_line: 902
+    end_line: 902
+  summary: Exercise deterministic and semantic failure classifications in the process evaluator.
+  rationale: Verify typed failure routing and plan amendment publication behavior.
+- path: tests/test_procedrr_evaluator.py
+  type: modified
+  span:
+    start_line: 1094
+    end_line: 1094
+  summary: Exercise deterministic and semantic failure classifications in the process evaluator.
+  rationale: Verify typed failure routing and plan amendment publication behavior.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 804
+    end_line: 804
+  summary: Cover evidence catalogs, deterministic failure routing, and repair evidence validation.
+  rationale: Reject invented or uncited evidence and preserve typed failure outcomes.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 806
+    end_line: 807
+  summary: Cover evidence catalogs, deterministic failure routing, and repair evidence validation.
+  rationale: Reject invented or uncited evidence and preserve typed failure outcomes.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 812
+    end_line: 850
+  summary: Cover evidence catalogs, deterministic failure routing, and repair evidence validation.
+  rationale: Reject invented or uncited evidence and preserve typed failure outcomes.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 852
+    end_line: 910
+  summary: Cover evidence catalogs, deterministic failure routing, and repair evidence validation.
+  rationale: Reject invented or uncited evidence and preserve typed failure outcomes.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 2076
+    end_line: 2077
+  summary: Cover evidence catalogs, deterministic failure routing, and repair evidence validation.
+  rationale: Reject invented or uncited evidence and preserve typed failure outcomes.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 2088
+    end_line: 2090
+  summary: Cover evidence catalogs, deterministic failure routing, and repair evidence validation.
+  rationale: Reject invented or uncited evidence and preserve typed failure outcomes.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 2092
+    end_line: 2092
+  summary: Cover evidence catalogs, deterministic failure routing, and repair evidence validation.
+  rationale: Reject invented or uncited evidence and preserve typed failure outcomes.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 2100
+    end_line: 2105
+  summary: Cover evidence catalogs, deterministic failure routing, and repair evidence validation.
+  rationale: Reject invented or uncited evidence and preserve typed failure outcomes.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 3517
+    end_line: 3533
+  summary: Cover evidence catalogs, deterministic failure routing, and repair evidence validation.
+  rationale: Reject invented or uncited evidence and preserve typed failure outcomes.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 3585
+    end_line: 3586
+  summary: Cover evidence catalogs, deterministic failure routing, and repair evidence validation.
+  rationale: Reject invented or uncited evidence and preserve typed failure outcomes.
+- path: tests/test_workflow_template_specification.py
+  type: modified
+  span:
+    start_line: 338
+    end_line: 346
+  summary: Assert typed failure routing and the evidence-aware judge contract.
+  rationale: Protect the declared workflow structure and schema.
+- path: tests/test_workflow_template_specification.py
+  type: modified
+  span:
+    start_line: 348
+    end_line: 348
+  summary: Assert typed failure routing and the evidence-aware judge contract.
+  rationale: Protect the declared workflow structure and schema.
+entities:
+- id: execute-pr-failure-review
+  type: Workflow
+  action: added
+- id: execute-pr-failure-evidence-catalog
+  type: Function
+  action: added
+- id: classify-known-execute-pr-failure
+  type: Function
+  action: added
+- id: validate-plan-repair-evidence-references
+  type: Function
+  action: added
+- id: execute-pr-failure-routing-tests
+  type: Test suite
+  action: added
+entity_relationships:
+- id: catalog-supports-failure-review
+  type: supports
+  source: execute-pr-failure-evidence-catalog
+  target: execute-pr-failure-review
+  action: added
+  description: The runtime catalog supplies stable evidence IDs used by deterministic routing and semantic
+    failure review.
+- id: repair-evidence-bound-to-review
+  type: validates
+  source: validate-plan-repair-evidence-references
+  target: execute-pr-failure-review
+  action: added
+  description: Plan repair discovery can reference only evidence recorded by the runtime and cited by
+    the failure review.
+invariants:
+- id: known-failures-route-deterministically
+  description: Explicit reviewed-plan contradictions route to plan amendment and typed worker/environment
+    blocks stop as unclear; other failures remain subject to semantic review.
+  action: added
+- id: repair-evidence-must-be-observed-and-cited
+  description: Every failure-review evidence ID resolves to the runtime evidence catalog, and every plan
+    repair discovery evidence ID is a member of the cited failure-review IDs.
+  action: added
+guidance: []
+features: []
+proposed_prs: []

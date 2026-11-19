@@ -1,0 +1,110 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1620
+title: Support CI checks on free private repositories
+intent:
+  problem: Powdrr requires reading branch-protection APIs and required-check metadata that GitHub Free does not expose for private repositories.
+  goal: Let the issue worker use the checks reported on its pull request as its CI gate when required-check policy is unavailable, without treating missing checks as success.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 752, end_line: 753}
+    summary: Represent branch-protection policy as unavailable when GitHub hides it on the repository plan.
+    rationale: Distinguish inaccessible required-check policy from an accessible policy with no configured checks.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 766, end_line: 766}
+    summary: Track whether the ruleset API denied access.
+    rationale: Preserve the difference between unavailable rulesets and no applicable rulesets.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 798, end_line: 805}
+    summary: Treat HTTP 403 from ruleset lookup as unavailable policy while continuing to check classic protection.
+    rationale: Support private repositories whose plan does not expose the ruleset API.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 814, end_line: 815}
+    summary: Return unavailable when classic branch protection also denies access.
+    rationale: Allow the worker to use PR checks when GitHub hides branch policy.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 817, end_line: 817}
+    summary: Preserve unavailable policy when ruleset access failed and classic protection is absent.
+    rationale: Avoid interpreting inaccessible rulesets as proof that no rules apply.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 1665, end_line: 1665}
+    summary: Permit preflight to continue when branch policy is unavailable.
+    rationale: Let free private repositories proceed to their pull-request CI checks.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 4279, end_line: 4279}
+    summary: Track when CI observation uses all checks reported for the pull request.
+    rationale: Distinguish the free-plan fallback from explicitly required checks.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 4281, end_line: 4286}
+    summary: Fall back to all pull-request checks when required-check policy cannot be queried.
+    rationale: Gate worker progress on available CI results without requiring paid branch-protection APIs.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 4288, end_line: 4300}
+    summary: Report API failures and retry empty required-check results using all PR checks.
+    rationale: Keep check observation actionable and avoid accepting an empty result.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 4300, end_line: 4316}
+    summary: Parse the all-PR-check fallback and reject responses that still contain no checks.
+    rationale: Ensure unavailable required-check metadata cannot turn an empty CI result into success.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 4306, end_line: 4372}
+    summary: Normalize the selected PR checks and bind a single unmapped check to a sole discovered validation entry when the policy API is unavailable.
+    rationale: Support wrapper workflows that expose one CI job but no static Structrr origin while retaining strict mapping for other cases.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 289, end_line: 289}
+    summary: Configure the stale-inventory worker test with inaccessible branch-protection policy.
+    rationale: Verify the worker can continue through free-plan preflight.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 534, end_line: 534}
+    summary: Allow the fake issue client to represent unavailable branch policy.
+    rationale: Exercise the free-plan fallback in queue tests.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 555, end_line: 555}
+    summary: Reflect that branch-policy lookup may be unavailable.
+    rationale: Keep the fake client interface aligned with the GitHub client.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 1362, end_line: 1395}
+    summary: Verify both branch-protection endpoints returning HTTP 403 produce an unavailable-policy result.
+    rationale: Prevent plan-level API restrictions from being confused with missing required checks.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 3387, end_line: 3429}
+    summary: Verify CI observation falls back to all PR checks when GitHub reports no required checks.
+    rationale: Ensure free private repositories can gate work on available CI results and still reject empty results.
+entities:
+  - id: free-private-repository-ci-fallback
+    type: Function
+    action: added
+  - id: free-plan-pr-check-fallback-test
+    type: Regression test
+    action: added
+entity_relationships:
+  - id: free-plan-test-covers-pr-check-fallback
+    type: exercises
+    source: free-plan-pr-check-fallback-test
+    target: free-private-repository-ci-fallback
+    action: added
+    description: Confirms the CI observer uses available PR checks when required-check metadata is unavailable.
+invariants:
+  - id: unavailable-required-policy-never-means-success
+    description: When branch-protection policy is unavailable, the worker requires at least one PR check and blocks when no check result can be read.
+    action: added
+guidance: []
+features: []
+proposed_prs: []

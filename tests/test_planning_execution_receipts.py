@@ -18,6 +18,7 @@ from powdrr_lift.workrr.planning.execution_receipts import (
     RECEIPT_ARTIFACT_NAME,
     discover_requirement_execution_receipts,
     load_requirement_execution_receipts,
+    write_requirement_execution_receipt_manifest,
 )
 
 
@@ -90,6 +91,60 @@ def test_receipt_manifest_rejects_excerpt_digest_mismatch(tmp_path: Path) -> Non
 
     with pytest.raises(EvidenceError, match="digest does not match"):
         load_requirement_execution_receipts(path, pinned_commit="a" * 40)
+
+
+def test_receipt_manifest_producer_writes_named_artifact_and_loads_it(
+    tmp_path: Path,
+) -> None:
+    source = _manifest_data()
+    source_record = source["receipts"][0]
+    assert isinstance(source_record, dict)
+    receipt = RequirementExecutionReceipt.from_data(source_record["receipt"])
+
+    manifest_path = write_requirement_execution_receipt_manifest(
+        tmp_path, pinned_commit="a" * 40, receipts=(receipt,)
+    )
+
+    assert manifest_path.parts[-2:] == (RECEIPT_ARTIFACT_NAME, "manifest.json")
+    evidence_by_requirement, excerpts = load_requirement_execution_receipts(
+        manifest_path, pinned_commit="a" * 40
+    )
+    assert set(evidence_by_requirement) == {"req-0001"}
+    evidence = evidence_by_requirement["req-0001"][0]
+    assert json.loads(excerpts[evidence.id])["outcome"] == "passed"
+    receipt_file = (
+        tmp_path
+        / RECEIPT_ARTIFACT_NAME
+        / "receipts"
+        / (receipt.to_data()["receipt_id"].removeprefix("receipt:") + ".json")
+    )
+    assert json.loads(receipt_file.read_text(encoding="utf-8")) == receipt.to_data()
+
+
+def test_receipt_manifest_producer_rejects_unpassed_receipts(tmp_path: Path) -> None:
+    requirement_digest = requirement_coverage_digest(
+        requirement_id="req-0001",
+        statement="Implement expected behavior.",
+        kind="functional",
+        source_refs=("anchor-0001",),
+    )
+    receipt = RequirementExecutionReceipt.observed(
+        requirement_id="req-0001",
+        requirement_digest=requirement_digest,
+        source_commit="a" * 40,
+        candidate_commit="a" * 40,
+        oracle_id="oracle:sample",
+        oracle_digest="sha256:" + "b" * 64,
+        command_digest="sha256:" + "c" * 64,
+        outcome="failed",
+        run_id="github:run/456",
+        artifact_refs=("artifact:run/456/result.json",),
+    )
+
+    with pytest.raises(EvidenceError, match="only passed"):
+        write_requirement_execution_receipt_manifest(
+            tmp_path, pinned_commit="a" * 40, receipts=(receipt,)
+        )
 
 
 def test_discovery_downloads_only_successful_artifacts_for_exact_commit(

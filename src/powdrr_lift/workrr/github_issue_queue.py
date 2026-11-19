@@ -749,6 +749,87 @@ class GitHubIssueClient:
                 "publish only after the plan review PR merges"
             )
 
+    def default_branch_required_checks(self) -> tuple[str, ...]:
+        """Return required checks from active rulesets or classic protection."""
+        repository = _json_mapping(
+            self._api("GET", f"repos/{self.repository}").stdout, "repository"
+        )
+        branch = repository.get("default_branch")
+        if not isinstance(branch, str) or not branch:
+            raise GitHubIssueQueueError(
+                "GitHub did not return the repository default branch name"
+            )
+        branch = quote(branch, safe="")
+        rules_endpoint = f"repos/{self.repository}/rules/branches/{branch}"
+        rules_result = self._invoke(["api", rules_endpoint], check=False)
+        names: set[str] = set()
+        if rules_result.returncode == 0:
+            try:
+                rules = json.loads(rules_result.stdout)
+            except json.JSONDecodeError as error:
+                raise GitHubIssueQueueError(
+                    "GitHub returned malformed active branch rules"
+                ) from error
+            if not isinstance(rules, list):
+                raise GitHubIssueQueueError(
+                    "GitHub returned active branch rules in an unexpected format"
+                )
+            for rule in rules:
+                if (
+                    not isinstance(rule, Mapping)
+                    or rule.get("type") != "required_status_checks"
+                ):
+                    continue
+                parameters = rule.get("parameters")
+                checks = (
+                    parameters.get("required_status_checks")
+                    if isinstance(parameters, Mapping)
+                    else None
+                )
+                if isinstance(checks, list):
+                    names.update(
+                        str(check["context"])
+                        for check in checks
+                        if isinstance(check, Mapping)
+                        and isinstance(check.get("context"), str)
+                        and check["context"].strip()
+                    )
+        elif "HTTP 404" not in rules_result.stderr:
+            raise GitHubIssueQueueError(
+                "could not verify active rules on the repository default branch: "
+                f"{rules_result.stderr.strip()}"
+            )
+        if names:
+            return tuple(sorted(names))
+        endpoint = (
+            f"repos/{self.repository}/branches/{branch}/"
+            "protection/required_status_checks"
+        )
+        result = self._invoke(["api", endpoint], check=False)
+        if result.returncode != 0:
+            if "HTTP 404" in result.stderr:
+                return ()
+            raise GitHubIssueQueueError(
+                "could not verify default-branch required checks: "
+                f"{result.stderr.strip()}"
+            )
+        value = _json_mapping(result.stdout, "required status checks")
+        contexts = value.get("contexts", [])
+        checks = value.get("checks", [])
+        if isinstance(contexts, list):
+            names.update(
+                name for name in contexts if isinstance(name, str) and name.strip()
+            )
+        if isinstance(checks, list):
+            names.update(
+                name
+                for check in checks
+                if isinstance(check, Mapping)
+                and isinstance((name := check.get("context")), str)
+                and name.strip()
+            )
+        return tuple(sorted(names))
+
     def update_issue(
         self,
         issue: QueueIssue,
@@ -1521,6 +1602,54 @@ def run_worker_once(
                     )
                     client.add_comment(
                         issue, f"Powdrr worker blocked this item: {detail}."
+                    )
+                    return WorkerReport("blocked", issue.number, item.item_id, detail)
+            # A repository that has CI workflows opted into the committed
+            # Structrr inventory contract. Validate that contract before the
+            # workflow can create a PR; the post-PR CI observer cannot repair
+            # missing or stale inventory and otherwise leaves an orphan PR.
+            if (root / ".github/workflows").is_dir():
+                inventory = _read_repository_validation_inventory(root)
+                if inventory is None:
+                    detail = (
+                        "repository CI workflows are present, but the committed "
+                        "Structrr validation inventory is missing or stale; "
+                        "regenerate and commit docs/structrr/current/"
+                        "baseline-bootstrap.yaml and its freshness report before "
+                        "running queued work"
+                    )
+                    client.update_issue(
+                        issue,
+                        labels=_replace_queue_status(issue.labels, "blocked"),
+                    )
+                    client.add_comment(
+                        issue, f"Powdrr worker blocked this item: {detail}."
+                    )
+                    return WorkerReport("blocked", issue.number, item.item_id, detail)
+                try:
+                    required_checks = client.default_branch_required_checks()
+                except GitHubIssueQueueError as error:
+                    required_checks = None
+                    detail = (
+                        "could not verify required checks on the repository default "
+                        f"branch: {error}"
+                    )
+                else:
+                    detail = (
+                        None
+                        if required_checks
+                        else "repository default branch has no required status checks"
+                    )
+                if detail is not None:
+                    client.update_issue(
+                        issue,
+                        labels=_replace_queue_status(issue.labels, "blocked"),
+                    )
+                    client.add_comment(
+                        issue,
+                        "Powdrr worker blocked this item before execution: "
+                        f"{detail}. Configure at least one required status check "
+                        "on the default branch, then retry.",
                     )
                     return WorkerReport("blocked", issue.number, item.item_id, detail)
             try:

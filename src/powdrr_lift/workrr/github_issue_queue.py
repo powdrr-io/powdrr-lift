@@ -794,7 +794,9 @@ class GitHubIssueClient:
                         and isinstance(check.get("context"), str)
                         and check["context"].strip()
                     )
-        elif "HTTP 404" not in rules_result.stderr:
+        elif not any(
+            status in rules_result.stderr for status in ("HTTP 403", "HTTP 404")
+        ):
             raise GitHubIssueQueueError(
                 "could not verify active rules on the repository default branch: "
                 f"{rules_result.stderr.strip()}"
@@ -1604,19 +1606,38 @@ def run_worker_once(
                         issue, f"Powdrr worker blocked this item: {detail}."
                     )
                     return WorkerReport("blocked", issue.number, item.item_id, detail)
-            # A repository that has CI workflows opted into the committed
-            # Structrr inventory contract. Validate that contract before the
-            # workflow can create a PR; the post-PR CI observer cannot repair
-            # missing or stale inventory and otherwise leaves an orphan PR.
+            worker_validation_inventory: dict[str, Any] | None = None
+            # A repository with CI workflows needs a trustworthy inventory
+            # before execution. Refresh stale committed metadata from a clean
+            # worktree rather than blocking the task or scanning worker files.
             if (root / ".github/workflows").is_dir():
-                inventory = _read_repository_validation_inventory(root)
-                if inventory is None:
+                worker_validation_inventory = _read_repository_validation_inventory(
+                    root
+                )
+                if worker_validation_inventory is None:
+                    try:
+                        worker_validation_inventory = (
+                            _discover_repository_validation_inventory(root)
+                        )
+                    except GitHubIssueQueueError as error:
+                        detail = (
+                            "could not refresh the Structrr validation inventory: "
+                            f"{error}"
+                        )
+                        client.update_issue(
+                            issue,
+                            labels=_replace_queue_status(issue.labels, "blocked"),
+                        )
+                        client.add_comment(
+                            issue, f"Powdrr worker blocked this item: {detail}."
+                        )
+                        return WorkerReport(
+                            "blocked", issue.number, item.item_id, detail
+                        )
+                if not worker_validation_inventory["checks"]:
                     detail = (
-                        "repository CI workflows are present, but the committed "
-                        "Structrr validation inventory is missing or stale; "
-                        "regenerate and commit docs/structrr/current/"
-                        "baseline-bootstrap.yaml and its freshness report before "
-                        "running queued work"
+                        "Structrr discovered no validation checks for the repository "
+                        "CI workflows"
                     )
                     client.update_issue(
                         issue,
@@ -1640,6 +1661,20 @@ def run_worker_once(
                         if required_checks
                         else "repository default branch has no required status checks"
                     )
+                    if required_checks:
+                        unmatched = tuple(
+                            name
+                            for name in required_checks
+                            if _match_required_check_to_inventory(
+                                {"name": name}, worker_validation_inventory["checks"]
+                            )["status"]
+                            != "matched"
+                        )
+                        if unmatched:
+                            detail = (
+                                "required checks do not map to discovered validation "
+                                "inventory entries: " + ", ".join(unmatched)
+                            )
                 if detail is not None:
                     client.update_issue(
                         issue,
@@ -1752,7 +1787,10 @@ def run_worker_once(
                     ci_response_result = _ci_response_result_from_task_record(
                         task_record
                     )
-                    inventory = _read_repository_validation_inventory(root)
+                    inventory = (
+                        worker_validation_inventory
+                        or _read_repository_validation_inventory(root)
+                    )
                     observation = _observe_required_ci_outcome(
                         client,
                         pull_request_url,
@@ -2109,6 +2147,11 @@ def continue_awaiting_ci_issue(
             f"issue #{issue_number} is not awaiting CI or a CI human prerequisite"
         )
     inventory = _read_repository_validation_inventory(repo_root)
+    if inventory is None and (Path(repo_root) / ".github/workflows").is_dir():
+        try:
+            inventory = _discover_repository_validation_inventory(repo_root)
+        except GitHubIssueQueueError:
+            inventory = None
     observation = _observe_required_ci_outcome(
         client,
         pull_request_url,
@@ -2309,6 +2352,11 @@ def _continue_manual_prerequisite_issue_locked(
             or str(checkpoint["pull_request_url"])
         )
         inventory = _read_repository_validation_inventory(repo_root)
+        if inventory is None and (Path(repo_root) / ".github/workflows").is_dir():
+            try:
+                inventory = _discover_repository_validation_inventory(repo_root)
+            except GitHubIssueQueueError:
+                inventory = None
         observation = _observe_required_ci_outcome(
             client,
             pull_request_url,
@@ -3939,6 +3987,89 @@ def _read_repository_validation_inventory(
 
 def _sha256_file(path: Path) -> str:
     return "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _discover_repository_validation_inventory(
+    repo_root: str | Path,
+) -> dict[str, Any]:
+    """Discover validation obligations from a clean worktree at the current HEAD."""
+    from powdrr_lift.workrr.task_agent import (
+        _bootstrap_issue_worker_structrr_baseline,
+    )
+
+    root = Path(repo_root).resolve()
+    try:
+        document, _manifest = _bootstrap_issue_worker_structrr_baseline(
+            root,
+            proposed={"plan_id": "issue-worker-validation-preflight"},
+            base_commit="HEAD",
+        )
+    except Exception as error:
+        raise GitHubIssueQueueError(
+            f"clean-worktree discovery failed: {error}"
+        ) from error
+    inventory = document.get("validation_inventory")
+    context = document.get("validation_context")
+    fingerprints = (
+        context.get("input_fingerprints") if isinstance(context, Mapping) else None
+    )
+    if not isinstance(inventory, list) or not isinstance(fingerprints, list):
+        raise GitHubIssueQueueError(
+            "clean-worktree discovery did not produce validation checks and input "
+            "fingerprints"
+        )
+    try:
+        checks = tuple(
+            ValidationCheck.from_data(value).to_data()
+            for value in inventory
+            if isinstance(value, Mapping)
+        )
+    except (TypeError, ValueError) as error:
+        raise GitHubIssueQueueError(
+            f"discovered validation inventory is invalid: {error}"
+        ) from error
+    if len(checks) != len(inventory):
+        raise GitHubIssueQueueError(
+            "discovered validation inventory contains invalid entries"
+        )
+    input_paths: list[str] = []
+    for fingerprint in fingerprints:
+        if not isinstance(fingerprint, Mapping):
+            raise GitHubIssueQueueError(
+                "discovery returned an invalid input fingerprint"
+            )
+        relative = fingerprint.get("path")
+        expected = fingerprint.get("digest")
+        if (
+            not isinstance(relative, str)
+            or not relative
+            or Path(relative).is_absolute()
+            or ".." in Path(relative).parts
+            or not isinstance(expected, str)
+        ):
+            raise GitHubIssueQueueError(
+                "discovery returned an unsafe input fingerprint"
+            )
+        try:
+            resolved = (root / relative).resolve(strict=True)
+            resolved.relative_to(root)
+            actual = _sha256_file(resolved)
+        except (OSError, ValueError) as error:
+            raise GitHubIssueQueueError(
+                f"discovered validation input {relative!r} is unavailable"
+            ) from error
+        if actual != expected:
+            raise GitHubIssueQueueError(
+                f"discovered validation input {relative!r} differs from current HEAD"
+            )
+        input_paths.append(relative)
+    return {
+        "checks": checks,
+        "digest": content_fingerprint(
+            {"validation_inventory": inventory, "validation_context": context}
+        ),
+        "input_paths": tuple(input_paths),
+    }
 
 
 def _pull_request_changed_paths(

@@ -260,8 +260,8 @@ def test_worker_executes_independent_items_concurrently(tmp_path: Path) -> None:
     assert {first_report.item_id, second_report.item_id} == {"first", "second"}
 
 
-def test_worker_blocks_before_execution_when_ci_inventory_is_stale(
-    tmp_path: Path,
+def test_worker_discovers_inventory_before_execution_when_committed_inventory_is_stale(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     for item in plan().items:
         assert item.workflow_directory is not None
@@ -269,10 +269,24 @@ def test_worker_blocks_before_execution_when_ci_inventory_is_stale(
     workflow_dir = tmp_path / ".github/workflows"
     workflow_dir.mkdir(parents=True, exist_ok=True)
     (workflow_dir / "ci.yml").write_text("name: CI\njobs: {}\n", encoding="utf-8")
+    _write_test_validation_inventory(tmp_path)
+    discovered_inventory = github_issue_queue._read_repository_validation_inventory(
+        tmp_path
+    )
+    assert discovered_inventory is not None
     baseline = tmp_path / "docs/structrr/current/baseline-bootstrap.yaml"
-    baseline.parent.mkdir(parents=True, exist_ok=True)
     baseline.write_text("validation_inventory: []\n", encoding="utf-8")
+    discoveries: list[Path] = []
+
+    def discover(root: str | Path) -> dict[str, Any]:
+        discoveries.append(Path(root))
+        return discovered_inventory
+
+    monkeypatch.setattr(
+        github_issue_queue, "_discover_repository_validation_inventory", discover
+    )
     client = FakeIssueClient()
+    client.required_checks = [{"name": "test", "state": "pass", "workflow": "CI"}]
     publish_plan_issues(
         plan=plan(),
         plan_path="docs/plans/feature.yaml",
@@ -285,7 +299,7 @@ def test_worker_blocks_before_execution_when_ci_inventory_is_stale(
         executed.append(workflow_id)
         return 0
 
-    report = run_worker_once(
+    run_worker_once(
         client=client,  # type: ignore[arg-type]
         repo_root=tmp_path,
         worker_id="worker-a",
@@ -293,13 +307,12 @@ def test_worker_blocks_before_execution_when_ci_inventory_is_stale(
         plan_loader=lambda *_args, **_kwargs: plan(),
     )
 
-    issue = client.get_issue(report.issue_number or -1)
-    assert report.outcome == "blocked"
-    assert "inventory is missing or stale" in (report.detail or "")
-    assert QUEUE_LABELS["blocked"] in issue.labels
-    assert QUEUE_LABELS["ready"] not in issue.labels
-    assert executed == []
-    assert any("regenerate and commit" in body for _, body in client.comments)
+    assert discoveries == [tmp_path.resolve()]
+    assert not any(
+        "validation inventory is missing or stale" in body.lower()
+        for _, body in client.comments
+    )
+    assert executed == ["base"]
 
 
 def test_worker_blocks_before_execution_when_no_required_checks_are_configured(
@@ -1297,6 +1310,38 @@ def test_github_issue_client_falls_back_to_classic_branch_protection() -> None:
             )
         if endpoint == "repos/example/project/rules/branches/main":
             return subprocess.CompletedProcess(arguments, 0, "[]", "")
+        if endpoint == (
+            "repos/example/project/branches/main/protection/required_status_checks"
+        ):
+            return subprocess.CompletedProcess(
+                arguments, 0, json.dumps({"contexts": ["unit"], "checks": []}), ""
+            )
+        raise AssertionError(f"unexpected GitHub API request: {arguments!r}")
+
+    checks = GitHubIssueClient(
+        "example/project", run=run
+    ).default_branch_required_checks()
+
+    assert checks == ("unit",)
+    assert len(commands) == 3
+
+
+def test_github_issue_client_falls_back_when_rulesets_are_not_available() -> None:
+    commands: list[list[str]] = []
+
+    def run(
+        arguments: list[str], **_kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
+        commands.append(arguments)
+        endpoint = arguments[2]
+        if endpoint == "repos/example/project":
+            return subprocess.CompletedProcess(
+                arguments, 0, json.dumps({"default_branch": "main"}), ""
+            )
+        if endpoint == "repos/example/project/rules/branches/main":
+            return subprocess.CompletedProcess(
+                arguments, 1, "", "HTTP 403: Upgrade to GitHub Pro"
+            )
         if endpoint == (
             "repos/example/project/branches/main/protection/required_status_checks"
         ):

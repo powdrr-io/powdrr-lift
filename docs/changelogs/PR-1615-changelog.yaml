@@ -1,0 +1,115 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1615
+title: Refresh stale validation inventory before issue work
+intent:
+  problem: The issue worker blocks when the committed Structrr inventory is missing or stale, even though Powdrr can discover validation checks from the repository source.
+  goal: Automatically discover a safe, current validation inventory before running queued work and report actionable failures when checks cannot be verified.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 797, end_line: 799}
+    summary: Fall back to classic branch protection when branch ruleset lookup returns 403 or 404.
+    rationale: Allow required status checks to be verified when GitHub does not expose the rulesets API.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 1609, end_line: 1612}
+    summary: Initialize the inventory carried through worker execution and document clean-worktree refresh behavior.
+    rationale: Ensure preflight can use a freshly discovered inventory without scanning worker artifacts.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 1614, end_line: 1637}
+    summary: Refresh missing or stale inventory from a clean worktree and report discovery failures.
+    rationale: Let queued work proceed using current source evidence and retain actionable errors when discovery fails.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 1639, end_line: 1640}
+    summary: Report when discovery finds no validation checks.
+    rationale: Prevent execution when CI obligations cannot be identified.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 1664, end_line: 1677}
+    summary: Require default-branch checks to map to discovered validation entries before running work.
+    rationale: Avoid creating PRs whose required checks cannot be observed against known validation jobs.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 1790, end_line: 1793}
+    summary: Reuse the inventory discovered during worker preflight for post-task CI observation.
+    rationale: Keep the preflight and post-task observer consistent without repeating discovery.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 2150, end_line: 2154}
+    summary: Discover inventory when resuming CI observation and the committed baseline is stale.
+    rationale: Preserve validation context for resumed issue work.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 2355, end_line: 2359}
+    summary: Discover inventory when resuming a manual prerequisite and the committed baseline is stale.
+    rationale: Preserve validation context for resumed prerequisite handling.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 3992, end_line: 4074}
+    summary: Build and validate inventory from a clean temporary worktree and verify discovered input fingerprints against the current checkout.
+    rationale: Exclude untracked worker artifacts from discovery and ensure inventory inputs remain current.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 263, end_line: 264}
+    summary: Change the stale-inventory worker test to cover automatic discovery.
+    rationale: Replace the obsolete expectation that stale metadata always blocks work.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 272, end_line: 276}
+    summary: Prepare a valid discovered inventory fixture for the stale-baseline test.
+    rationale: Ensure preflight has a usable inventory to refresh from.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 273, end_line: 273}
+    summary: Read a valid fixture inventory for use as the discovered result.
+    rationale: Ensure automatic discovery returns a fresh validation inventory.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 279, end_line: 287}
+    summary: Stub clean-worktree discovery and record its invocation.
+    rationale: Verify the worker invokes the automatic refresh path.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 289, end_line: 289}
+    summary: Set a required check identity that maps to the fixture inventory.
+    rationale: Allow the test to verify execution proceeds after refresh.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 302, end_line: 302}
+    summary: Run the worker against the stale committed inventory.
+    rationale: Exercise discovery as part of normal queue execution.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 310, end_line: 315}
+    summary: Assert discovery ran and the task runner was reached without a stale-inventory block.
+    rationale: Protect the automatic refresh behavior from regressions.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 1316, end_line: 1347}
+    summary: Test that a ruleset API 403 falls back to classic branch protection.
+    rationale: Preserve required-check discovery when the ruleset endpoint is unavailable.
+entities:
+  - id: issue-worker-validation-inventory-discovery
+    type: Function
+    action: added
+  - id: issue-worker-stale-inventory-refresh-test
+    type: Regression test
+    action: added
+entity_relationships:
+  - id: stale-inventory-test-exercises-discovery
+    type: exercises
+    source: issue-worker-stale-inventory-refresh-test
+    target: issue-worker-validation-inventory-discovery
+    action: added
+    description: Confirms the worker discovers a current inventory when its committed snapshot is stale.
+invariants:
+  - id: discovered-inventory-matches-current-inputs
+    description: A dynamically discovered inventory is used only when its fingerprinted inputs match files in the current checkout.
+    action: added
+guidance: []
+features: []
+proposed_prs: []

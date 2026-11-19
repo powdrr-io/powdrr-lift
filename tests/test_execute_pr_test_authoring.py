@@ -89,9 +89,9 @@ def test_test_correction_must_remain_red_on_a_fresh_baseline(
     original = {
         "tests/test_behavior.py": (
             "from sample import value\n"
-            "# Covers: AC-01 test_behavior\n"
+            "__powdrr_test_case_links__ = {'test_behavior': ['AC-01'], "
+            "'test_existing_behavior': ['AC-01']}\n"
             "def test_behavior():\n    assert value == 3\n\n"
-            "# Covers: AC-01 test_existing_behavior\n"
             "def test_existing_behavior():\n    assert value == 1\n"
         )
     }
@@ -108,9 +108,9 @@ def test_test_correction_must_remain_red_on_a_fresh_baseline(
         corrected_sources={
             "tests/test_behavior.py": (
                 "from sample import value\n"
-                "# Covers: AC-01 test_behavior\n"
+                "__powdrr_test_case_links__ = {'test_behavior': ['AC-01'], "
+                "'test_existing_behavior': ['AC-01']}\n"
                 "def test_behavior():\n    assert value == 2, 'AssertionError'\n\n"
-                "# Covers: AC-01 test_existing_behavior\n"
                 "def test_existing_behavior():\n    assert value == 1\n"
             )
         },
@@ -120,7 +120,12 @@ def test_test_correction_must_remain_red_on_a_fresh_baseline(
         validation_profile=profile,
         timeout_seconds=30,
     )
-    assert coverage == {"AC-01": ["test_behavior", "test_existing_behavior"]}
+    assert coverage == {
+        "AC-01": [
+            "tests/test_behavior.py::test_behavior",
+            "tests/test_behavior.py::test_existing_behavior",
+        ]
+    }
     assert "assert value == 2, 'AssertionError'" in validated["tests/test_behavior.py"]
     assert baseline["passed"] is False
     assert "1 failed" in baseline["stdout"]
@@ -133,9 +138,9 @@ def test_test_correction_must_remain_red_on_a_fresh_baseline(
             corrected_sources={
                 "tests/test_behavior.py": (
                     "from sample import value\n"
-                    "# Covers: AC-01 test_behavior\n"
+                    "__powdrr_test_case_links__ = {'test_behavior': ['AC-01'], "
+                    "'test_existing_behavior': ['AC-01']}\n"
                     "def test_behavior():\n    assert value == 1\n\n"
-                    "# Covers: AC-01 test_existing_behavior\n"
                     "def test_existing_behavior():\n    assert value == 1\n"
                 )
             },
@@ -225,7 +230,7 @@ def test_execute_pr_test_repair_uses_nested_root_and_clean_baseline(
     expected_test_path = "attestation/tests/test_add_attestation_ci.py"
     test_source = (
         "from sample import value\n\n"
-        "# Covers: AC-01 test_expected_value\n"
+        "__powdrr_test_case_links__ = {'test_expected_value': ['AC-01']}\n\n"
         "def test_expected_value():\n"
         "    assert value == 2, 'AssertionError: expected value 2'\n"
     )
@@ -628,7 +633,7 @@ def test_quality_shortcoming_is_repaired_once_then_accepted_with_pr_note(
         "import sys\n\n"
         "sys.path.insert(0, str(Path(__file__).resolve().parents[1]))\n"
         "from sample import value\n\n"
-        "# Covers: AC-01 test_expected_value\n"
+        "__powdrr_test_case_links__ = {'test_expected_value': ['AC-01']}\n\n"
         "def test_expected_value():\n"
         "    assert value == 2\n"
     )

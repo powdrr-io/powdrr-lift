@@ -196,13 +196,15 @@ def test_missing_cases_return_candidates_to_normal_design_workflow(
 def linked_source(obligations: list[dict[str, Any]]) -> str:
     lines = ["from app import resume", ""]
     requests = {}
+    case_links = {}
     for index, obligation in enumerate(obligations):
         name = f"test_case_{index}"
         ref = obligation["story_refs"][0]
         available = ref["step_ids"][-1] == STORY + ":step:3"
         expected = "published" if available else "unavailable"
         retries = ref["transition_ids"].count(STORY + ":transition:5")
-        lines.extend([f"# Covers: AC-01 {name}", f"def {name}():"])
+        lines.append(f"def {name}():")
+        case_links[name] = ["AC-01"]
         argument = f"{available!r}, retries={retries}" if retries else repr(available)
         lines.append(f"    result = resume({argument})")
         lines.append(f"    assert result['outcome'] == {expected!r}")
@@ -226,7 +228,14 @@ def linked_source(obligations: list[dict[str, Any]]) -> str:
                 "substitutions": [],
             }
         ]
-    return "\n".join(lines) + "\n__powdrr_story_links__ = " + repr(requests) + "\n"
+    return (
+        "\n".join(lines)
+        + "\n__powdrr_test_case_links__ = "
+        + repr(case_links)
+        + "\n__powdrr_story_links__ = "
+        + repr(requests)
+        + "\n"
+    )
 
 
 def test_manifest_requires_collected_tests_and_executable_observation_assertions(

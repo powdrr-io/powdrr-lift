@@ -170,14 +170,37 @@ def execute_pr_test_review_targets(
     if not isinstance(sources, Mapping) or not isinstance(obligations, list):
         return []
     criteria = {
-        str(item.get("obligation_id")): str(item.get("source_text", ""))
+        str(item.get("obligation_id")): dict(item)
         for item in obligations
         if isinstance(item, Mapping)
     }
-    marker = re.compile(
-        r"(?m)^[ \t]*#[ \t]*Covers:[ \t]*(AC-[0-9]{2,})"
-        r"[ \t]+(test_[A-Za-z0-9_]+)[ \t]*$"
-    )
+    coverage_references = suite_evidence.get("coverage_references")
+    linked: list[tuple[str, str, str | None]] = []
+    if isinstance(coverage_references, Mapping):
+        for criterion_id, selectors in coverage_references.items():
+            if not isinstance(selectors, Sequence) or isinstance(
+                selectors, (str, bytes)
+            ):
+                continue
+            for selector in selectors:
+                if not isinstance(selector, str):
+                    continue
+                if "::" in selector:
+                    path, test_name = selector.split("::", 1)
+                    linked.append((str(criterion_id), test_name.split("[", 1)[0], path))
+                else:
+                    linked.append((str(criterion_id), selector, None))
+    else:
+        # Read older artifacts which stored coverage only in source comments.
+        marker = re.compile(
+            r"(?m)^[ \t]*#[ \t]*Covers:[ \t]*(AC-[0-9]{2,})"
+            r"[ \t]+(test_[A-Za-z0-9_]+)[ \t]*$"
+        )
+        for raw_path, raw_source in sources.items():
+            linked.extend(
+                (criterion_id, test_name, str(raw_path))
+                for criterion_id, test_name in marker.findall(str(raw_source))
+            )
     targets: dict[str, dict[str, Any]] = {}
     for raw_path, raw_source in sources.items():
         path, source = str(raw_path), str(raw_source)
@@ -192,7 +215,9 @@ def execute_pr_test_review_targets(
             and node.name.startswith("test_")
             and node.end_lineno is not None
         }
-        for criterion_id, test_name in marker.findall(source):
+        for criterion_id, test_name, linked_path in linked:
+            if linked_path is not None and linked_path != path:
+                continue
             node = functions.get(test_name)
             if node is None:
                 continue
@@ -213,10 +238,10 @@ def execute_pr_test_review_targets(
             if criterion_id not in target["criterion_ids"]:
                 target["criterion_ids"].append(criterion_id)
                 target["acceptance_criteria"].append(
-                    {
-                        "obligation_id": criterion_id,
-                        "source_text": criteria.get(criterion_id, ""),
-                    }
+                    criteria.get(
+                        criterion_id,
+                        {"obligation_id": criterion_id, "source_text": ""},
+                    )
                 )
     manifest = suite_evidence.get("story_test_links", {})
     if isinstance(manifest, Mapping):
@@ -315,6 +340,16 @@ def execute_pr_test_review_context(
         "test_source": str(target.get("test_source", "")),
         "baseline_result": baseline_context,
     }
+    requests = suite_evidence.get("test_case_requests")
+    if isinstance(requests, list):
+        criterion_ids = set(target.get("criterion_ids", []))
+        typed_requests = [
+            dict(request)
+            for request in requests
+            if isinstance(request, Mapping) and request.get("case_id") in criterion_ids
+        ]
+        if typed_requests:
+            context["typed_test_requests"] = typed_requests
     if contract_context:
         context["plan_context"] = contract_context
     story_criteria = [

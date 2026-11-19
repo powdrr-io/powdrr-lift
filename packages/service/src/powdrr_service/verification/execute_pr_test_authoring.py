@@ -14,6 +14,7 @@ def build_execute_pr_test_author_prompt(
     test_path: str,
     plan_context: Mapping[str, Any],
     obligations: Sequence[Mapping[str, Any]],
+    case_requests: Sequence[Mapping[str, Any]],
 ) -> str:
     """Build the private authoring prompt without receiving a repository path."""
     existing = plan_context.get("baseline_policy") == "existing_behavior"
@@ -56,12 +57,19 @@ def build_execute_pr_test_author_prompt(
         )
         + "Reviewed PR contract:\n"
         f"{json.dumps(plan_context, indent=2, sort_keys=True)}\n"
-        "Deterministic test obligations. IDs are assigned in acceptance-criterion "
-        "order. Every authored test must identify the criterion or criteria it "
-        "covers with one or more comments of the form `# Covers: AC-01 "
-        "test_function_name` immediately above the test. Cover every AC ID. You "
-        "may use multiple tests for a criterion and one test for multiple "
-        "criteria. Choose useful normal, boundary, invalid, interaction, or "
+        "Pinned requirement records (read-only):\n"
+        f"{json.dumps(list(obligations), indent=2, sort_keys=True)}\n"
+        "Deterministic typed test requests follow. Their IDs, public boundary, "
+        "expected observations, baseline policy and destination path come from "
+        "the runtime. Implement each request without changing its intent. "
+        "Declare the links from authored test functions to supplied request IDs "
+        "once at module scope using the literal mapping "
+        "`__powdrr_test_case_links__ = {'test_function': ['AC-01']}`. Use only "
+        "the supplied IDs. Cover every request; multiple tests may cover one "
+        "request, and one test may cover several. The runtime checks the mapping "
+        "against Python source and actual pytest collection, then writes the "
+        "coverage manifest. Do not write coverage comments or a manifest. "
+        "Choose useful normal, boundary, invalid, interaction, or "
         "state cases from the contract; do not invent behavior beyond it. "
         "The reviewed PR contract includes planned_test_cases. Follow each "
         "case's test_type, scenario, and expected_outcome when authoring its "
@@ -88,7 +96,7 @@ def build_execute_pr_test_author_prompt(
         "Documentation review is a pull-request process requirement. For a "
         "documentation criterion, test the required statements and tracked file "
         "path without expecting generated bootstrap metadata to change.\n\n"
-        f"{json.dumps(list(obligations), indent=2, sort_keys=True)}\n"
+        f"{json.dumps(list(case_requests), indent=2, sort_keys=True)}\n"
         + (
             "\nPinned story cases are additional obligations. Follow their complete "
             "transition walks, fixtures, initial conditions and observations. "

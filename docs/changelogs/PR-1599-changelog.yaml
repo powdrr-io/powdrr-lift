@@ -1,0 +1,569 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1599
+title: Compile typed test-authoring requests in runtime
+intent:
+  problem: Execute-PR test authors received broad prose and linked acceptance criteria
+    with comments, while runtime metadata and actual pytest collection were validated
+    separately.
+  goal: Compile accepted cases into typed requests, compile coverage links from AST
+    and collected selectors, and generate the test manifest and baseline policy in
+    runtime code.
+human-decisions: []
+structured_files: []
+files:
+- path: packages/service/src/powdrr_service/verification/execute_pr_test_authoring.py
+  type: modified
+  span:
+    start_line: 17
+    end_line: 17
+  summary: Send typed requests and pinned requirements to the test author.
+  rationale: Prevent the author from choosing test paths, inventing request IDs, or
+    writing coverage manifests.
+- path: packages/service/src/powdrr_service/verification/execute_pr_test_authoring.py
+  type: modified
+  span:
+    start_line: 60
+    end_line: 72
+  summary: Send typed requests and pinned requirements to the test author.
+  rationale: Prevent the author from choosing test paths, inventing request IDs, or
+    writing coverage manifests.
+- path: packages/service/src/powdrr_service/verification/execute_pr_test_authoring.py
+  type: modified
+  span:
+    start_line: 99
+    end_line: 99
+  summary: Send typed requests and pinned requirements to the test author.
+  rationale: Prevent the author from choosing test paths, inventing request IDs, or
+    writing coverage manifests.
+- path: packages/service/src/powdrr_service/verification/execute_pr_test_quality.py
+  type: modified
+  span:
+    start_line: 173
+    end_line: 173
+  summary: Build quality review targets from runtime-compiled selectors and typed
+    requests.
+  rationale: Keep independent review aligned with collected coverage and preserve
+    complete pinned story obligations.
+- path: packages/service/src/powdrr_service/verification/execute_pr_test_quality.py
+  type: modified
+  span:
+    start_line: 177
+    end_line: 203
+  summary: Build quality review targets from runtime-compiled selectors and typed
+    requests.
+  rationale: Keep independent review aligned with collected coverage and preserve
+    complete pinned story obligations.
+- path: packages/service/src/powdrr_service/verification/execute_pr_test_quality.py
+  type: modified
+  span:
+    start_line: 218
+    end_line: 220
+  summary: Build quality review targets from runtime-compiled selectors and typed
+    requests.
+  rationale: Keep independent review aligned with collected coverage and preserve
+    complete pinned story obligations.
+- path: packages/service/src/powdrr_service/verification/execute_pr_test_quality.py
+  type: modified
+  span:
+    start_line: 241
+    end_line: 244
+  summary: Build quality review targets from runtime-compiled selectors and typed
+    requests.
+  rationale: Keep independent review aligned with collected coverage and preserve
+    complete pinned story obligations.
+- path: packages/service/src/powdrr_service/verification/execute_pr_test_quality.py
+  type: modified
+  span:
+    start_line: 343
+    end_line: 352
+  summary: Build quality review targets from runtime-compiled selectors and typed
+    requests.
+  rationale: Keep independent review aligned with collected coverage and preserve
+    complete pinned story obligations.
+- path: packages/service/src/powdrr_service/verification/execute_pr_test_validation.py
+  type: modified
+  span:
+    start_line: 93
+    end_line: 93
+  summary: Compile acceptance coverage from literal AST links and actual pytest selectors.
+  rationale: Reject unknown IDs, uncollected tests, missing requests, and unlinked
+    test functions before baseline execution.
+- path: packages/service/src/powdrr_service/verification/execute_pr_test_validation.py
+  type: modified
+  span:
+    start_line: 95
+    end_line: 95
+  summary: Compile acceptance coverage from literal AST links and actual pytest selectors.
+  rationale: Reject unknown IDs, uncollected tests, missing requests, and unlinked
+    test functions before baseline execution.
+- path: packages/service/src/powdrr_service/verification/execute_pr_test_validation.py
+  type: modified
+  span:
+    start_line: 108
+    end_line: 109
+  summary: Compile acceptance coverage from literal AST links and actual pytest selectors.
+  rationale: Reject unknown IDs, uncollected tests, missing requests, and unlinked
+    test functions before baseline execution.
+- path: packages/service/src/powdrr_service/verification/execute_pr_test_validation.py
+  type: modified
+  span:
+    start_line: 119
+    end_line: 161
+  summary: Compile acceptance coverage from literal AST links and actual pytest selectors.
+  rationale: Reject unknown IDs, uncollected tests, missing requests, and unlinked
+    test functions before baseline execution.
+- path: packages/service/src/powdrr_service/verification/execute_pr_test_validation.py
+  type: modified
+  span:
+    start_line: 163
+    end_line: 164
+  summary: Compile acceptance coverage from literal AST links and actual pytest selectors.
+  rationale: Reject unknown IDs, uncollected tests, missing requests, and unlinked
+    test functions before baseline execution.
+- path: packages/service/src/powdrr_service/verification/execute_pr_test_validation.py
+  type: modified
+  span:
+    start_line: 166
+    end_line: 168
+  summary: Compile acceptance coverage from literal AST links and actual pytest selectors.
+  rationale: Reject unknown IDs, uncollected tests, missing requests, and unlinked
+    test functions before baseline execution.
+- path: packages/service/src/powdrr_service/verification/execute_pr_test_validation.py
+  type: modified
+  span:
+    start_line: 170
+    end_line: 188
+  summary: Compile acceptance coverage from literal AST links and actual pytest selectors.
+  rationale: Reject unknown IDs, uncollected tests, missing requests, and unlinked
+    test functions before baseline execution.
+- path: packages/service/src/powdrr_service/verification/execute_pr_test_validation.py
+  type: modified
+  span:
+    start_line: 190
+    end_line: 208
+  summary: Compile acceptance coverage from literal AST links and actual pytest selectors.
+  rationale: Reject unknown IDs, uncollected tests, missing requests, and unlinked
+    test functions before baseline execution.
+- path: packages/service/src/powdrr_service/verification/execute_pr_test_validation.py
+  type: modified
+  span:
+    start_line: 222
+    end_line: 239
+  summary: Compile acceptance coverage from literal AST links and actual pytest selectors.
+  rationale: Reject unknown IDs, uncollected tests, missing requests, and unlinked
+    test functions before baseline execution.
+- path: packages/service/src/powdrr_service/verification/execute_pr_test_validation.py
+  type: modified
+  span:
+    start_line: 315
+    end_line: 315
+  summary: Compile acceptance coverage from literal AST links and actual pytest selectors.
+  rationale: Reject unknown IDs, uncollected tests, missing requests, and unlinked
+    test functions before baseline execution.
+- path: packages/service/src/powdrr_service/verification/execute_pr_test_validation.py
+  type: modified
+  span:
+    start_line: 325
+    end_line: 328
+  summary: Compile acceptance coverage from literal AST links and actual pytest selectors.
+  rationale: Reject unknown IDs, uncollected tests, missing requests, and unlinked
+    test functions before baseline execution.
+- path: packages/service/src/powdrr_service/verification/test_case_requests.py
+  type: added
+  span:
+    start_line: 1
+    end_line: 219
+  summary: Compile reviewed obligations into typed test case requests.
+  rationale: Bind case semantics to runtime-owned boundaries, evidence, baseline policy,
+    and assigned test path.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 140
+    end_line: 143
+  summary: Compile typed requests, collect selectors, and persist the runtime test
+    manifest.
+  rationale: Apply the same source and collection checks to initial authoring and
+    corrections before baseline gates.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 1193
+    end_line: 1193
+  summary: Compile typed requests, collect selectors, and persist the runtime test
+    manifest.
+  rationale: Apply the same source and collection checks to initial authoring and
+    corrections before baseline gates.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 1195
+    end_line: 1196
+  summary: Compile typed requests, collect selectors, and persist the runtime test
+    manifest.
+  rationale: Apply the same source and collection checks to initial authoring and
+    corrections before baseline gates.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 1198
+    end_line: 1198
+  summary: Compile typed requests, collect selectors, and persist the runtime test
+    manifest.
+  rationale: Apply the same source and collection checks to initial authoring and
+    corrections before baseline gates.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 1783
+    end_line: 1783
+  summary: Compile typed requests, collect selectors, and persist the runtime test
+    manifest.
+  rationale: Apply the same source and collection checks to initial authoring and
+    corrections before baseline gates.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 1782
+    end_line: 1783
+  summary: Compile typed requests, collect selectors, and persist the runtime test
+    manifest.
+  rationale: Apply the same source and collection checks to initial authoring and
+    corrections before baseline gates.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 1785
+    end_line: 1792
+  summary: Compile typed requests, collect selectors, and persist the runtime test
+    manifest.
+  rationale: Apply the same source and collection checks to initial authoring and
+    corrections before baseline gates.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 1787
+    end_line: 1791
+  summary: Compile typed requests, collect selectors, and persist the runtime test
+    manifest.
+  rationale: Apply the same source and collection checks to initial authoring and
+    corrections before baseline gates.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 1800
+    end_line: 1809
+  summary: Compile typed requests, collect selectors, and persist the runtime test
+    manifest.
+  rationale: Apply the same source and collection checks to initial authoring and
+    corrections before baseline gates.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 1811
+    end_line: 1811
+  summary: Compile typed requests, collect selectors, and persist the runtime test
+    manifest.
+  rationale: Apply the same source and collection checks to initial authoring and
+    corrections before baseline gates.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 1815
+    end_line: 1827
+  summary: Compile typed requests, collect selectors, and persist the runtime test
+    manifest.
+  rationale: Apply the same source and collection checks to initial authoring and
+    corrections before baseline gates.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 2042
+    end_line: 2055
+  summary: Compile typed requests, collect selectors, and persist the runtime test
+    manifest.
+  rationale: Apply the same source and collection checks to initial authoring and
+    corrections before baseline gates.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 2060
+    end_line: 2060
+  summary: Compile typed requests, collect selectors, and persist the runtime test
+    manifest.
+  rationale: Apply the same source and collection checks to initial authoring and
+    corrections before baseline gates.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 2066
+    end_line: 2066
+  summary: Compile typed requests, collect selectors, and persist the runtime test
+    manifest.
+  rationale: Apply the same source and collection checks to initial authoring and
+    corrections before baseline gates.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 2144
+    end_line: 2144
+  summary: Compile typed requests, collect selectors, and persist the runtime test
+    manifest.
+  rationale: Apply the same source and collection checks to initial authoring and
+    corrections before baseline gates.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 2162
+    end_line: 2162
+  summary: Compile typed requests, collect selectors, and persist the runtime test
+    manifest.
+  rationale: Apply the same source and collection checks to initial authoring and
+    corrections before baseline gates.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 2213
+    end_line: 2221
+  summary: Compile typed requests, collect selectors, and persist the runtime test
+    manifest.
+  rationale: Apply the same source and collection checks to initial authoring and
+    corrections before baseline gates.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 2223
+    end_line: 2224
+  summary: Compile typed requests, collect selectors, and persist the runtime test
+    manifest.
+  rationale: Apply the same source and collection checks to initial authoring and
+    corrections before baseline gates.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 2234
+    end_line: 2234
+  summary: Compile typed requests, collect selectors, and persist the runtime test
+    manifest.
+  rationale: Apply the same source and collection checks to initial authoring and
+    corrections before baseline gates.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 2291
+    end_line: 2291
+  summary: Compile typed requests, collect selectors, and persist the runtime test
+    manifest.
+  rationale: Apply the same source and collection checks to initial authoring and
+    corrections before baseline gates.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 2321
+    end_line: 2321
+  summary: Compile typed requests, collect selectors, and persist the runtime test
+    manifest.
+  rationale: Apply the same source and collection checks to initial authoring and
+    corrections before baseline gates.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 2371
+    end_line: 2371
+  summary: Compile typed requests, collect selectors, and persist the runtime test
+    manifest.
+  rationale: Apply the same source and collection checks to initial authoring and
+    corrections before baseline gates.
+- path: src/powdrr_lift/workrr/task_agent.py
+  type: modified
+  span:
+    start_line: 2409
+    end_line: 2422
+  summary: Compile typed requests, collect selectors, and persist the runtime test
+    manifest.
+  rationale: Apply the same source and collection checks to initial authoring and
+    corrections before baseline gates.
+- path: tests/test_execute_pr_test_authoring.py
+  type: modified
+  span:
+    start_line: 92
+    end_line: 93
+  summary: Exercise typed coverage links during correction and authoring flows.
+  rationale: Confirm corrections remain scoped, collected, and behaviorally failing
+    on the untouched baseline.
+- path: tests/test_execute_pr_test_authoring.py
+  type: modified
+  span:
+    start_line: 94
+    end_line: 94
+  summary: Exercise typed coverage links during correction and authoring flows.
+  rationale: Confirm corrections remain scoped, collected, and behaviorally failing
+    on the untouched baseline.
+- path: tests/test_execute_pr_test_authoring.py
+  type: modified
+  span:
+    start_line: 111
+    end_line: 112
+  summary: Exercise typed coverage links during correction and authoring flows.
+  rationale: Confirm corrections remain scoped, collected, and behaviorally failing
+    on the untouched baseline.
+- path: tests/test_execute_pr_test_authoring.py
+  type: modified
+  span:
+    start_line: 113
+    end_line: 113
+  summary: Exercise typed coverage links during correction and authoring flows.
+  rationale: Confirm corrections remain scoped, collected, and behaviorally failing
+    on the untouched baseline.
+- path: tests/test_execute_pr_test_authoring.py
+  type: modified
+  span:
+    start_line: 123
+    end_line: 128
+  summary: Exercise typed coverage links during correction and authoring flows.
+  rationale: Confirm corrections remain scoped, collected, and behaviorally failing
+    on the untouched baseline.
+- path: tests/test_execute_pr_test_authoring.py
+  type: modified
+  span:
+    start_line: 141
+    end_line: 142
+  summary: Exercise typed coverage links during correction and authoring flows.
+  rationale: Confirm corrections remain scoped, collected, and behaviorally failing
+    on the untouched baseline.
+- path: tests/test_execute_pr_test_authoring.py
+  type: modified
+  span:
+    start_line: 138
+    end_line: 138
+  summary: Exercise typed coverage links during correction and authoring flows.
+  rationale: Confirm corrections remain scoped, collected, and behaviorally failing
+    on the untouched baseline.
+- path: tests/test_execute_pr_test_authoring.py
+  type: modified
+  span:
+    start_line: 233
+    end_line: 233
+  summary: Exercise typed coverage links during correction and authoring flows.
+  rationale: Confirm corrections remain scoped, collected, and behaviorally failing
+    on the untouched baseline.
+- path: tests/test_execute_pr_test_authoring.py
+  type: modified
+  span:
+    start_line: 636
+    end_line: 636
+  summary: Exercise typed coverage links during correction and authoring flows.
+  rationale: Confirm corrections remain scoped, collected, and behaviorally failing
+    on the untouched baseline.
+- path: tests/test_execute_pr_test_quality_service.py
+  type: modified
+  span:
+    start_line: 86
+    end_line: 110
+  summary: Verify quality targets use runtime-compiled selectors.
+  rationale: Ensure independent review no longer depends on source coverage comments.
+- path: tests/test_execute_pr_tests.py
+  type: modified
+  span:
+    start_line: 29
+    end_line: 32
+  summary: Test typed request compilation and AST coverage validation.
+  rationale: Cover assigned paths, baseline policy, request IDs, literal declarations,
+    and actual collection selectors.
+- path: tests/test_execute_pr_tests.py
+  type: modified
+  span:
+    start_line: 170
+    end_line: 253
+  summary: Test typed request compilation and AST coverage validation.
+  rationale: Cover assigned paths, baseline policy, request IDs, literal declarations,
+    and actual collection selectors.
+- path: tests/test_story_execution.py
+  type: modified
+  span:
+    start_line: 132
+    end_line: 132
+  summary: Use the typed case link declaration in story execution fixtures.
+  rationale: Keep acceptance coverage metadata compatible with pinned story assertion
+    links.
+- path: tests/test_story_execution.py
+  type: modified
+  span:
+    start_line: 137
+    end_line: 137
+  summary: Use the typed case link declaration in story execution fixtures.
+  rationale: Keep acceptance coverage metadata compatible with pinned story assertion
+    links.
+- path: tests/test_story_execution.py
+  type: modified
+  span:
+    start_line: 138
+    end_line: 138
+  summary: Use the typed case link declaration in story execution fixtures.
+  rationale: Keep acceptance coverage metadata compatible with pinned story assertion
+    links.
+- path: tests/test_story_execution.py
+  type: modified
+  span:
+    start_line: 171
+    end_line: 178
+  summary: Use the typed case link declaration in story execution fixtures.
+  rationale: Keep acceptance coverage metadata compatible with pinned story assertion
+    links.
+- path: tests/test_story_test_authoring.py
+  type: modified
+  span:
+    start_line: 199
+    end_line: 199
+  summary: Use the typed case link declaration in story authoring fixtures.
+  rationale: Verify standard acceptance coverage and pinned story links from source
+    and collection.
+- path: tests/test_story_test_authoring.py
+  type: modified
+  span:
+    start_line: 206
+    end_line: 207
+  summary: Use the typed case link declaration in story authoring fixtures.
+  rationale: Verify standard acceptance coverage and pinned story links from source
+    and collection.
+- path: tests/test_story_test_authoring.py
+  type: modified
+  span:
+    start_line: 231
+    end_line: 238
+  summary: Use the typed case link declaration in story authoring fixtures.
+  rationale: Verify standard acceptance coverage and pinned story links from source
+    and collection.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 399
+    end_line: 408
+  summary: Verify the author prompt exposes typed requests and prohibits self-written
+    coverage comments.
+  rationale: Keep test identity, collection facts, and manifest generation under runtime
+    control.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 423
+    end_line: 425
+  summary: Verify the author prompt exposes typed requests and prohibits self-written
+    coverage comments.
+  rationale: Keep test identity, collection facts, and manifest generation under runtime
+    control.
+- path: tests/test_workflow_task_agent.py
+  type: modified
+  span:
+    start_line: 428
+    end_line: 428
+  summary: Verify the author prompt exposes typed requests and prohibits self-written
+    coverage comments.
+  rationale: Keep test identity, collection facts, and manifest generation under runtime
+    control.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []
+features: []
+proposed_prs: []

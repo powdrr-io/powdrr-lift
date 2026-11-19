@@ -1,5 +1,5 @@
 schema: https://powdrr.io/schema/changelog-v2
-change_id: 1618
+change_id: 1619
 title: Carry per-case requirement bindings into planner workflows
 intent:
   problem: Generated planner workflows carry item-level requirements but not the requirements each planned test case is intended to verify.
@@ -93,7 +93,7 @@ entities:
     action: added
   - id: workflow-case-requirement-binding-validation
     type: Function
-    action: modified
+    action: added
   - id: planner-case-binding-compiler-regression-tests
     type: Regression test
     action: added

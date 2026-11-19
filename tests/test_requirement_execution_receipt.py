@@ -16,6 +16,7 @@ from powdrr_service.planning.source import (
 )
 from powdrr_service.verification.requirement_execution import (
     RequirementExecutionReceipt,
+    receipt_from_verification_evidence,
     requirement_coverage_digest,
 )
 
@@ -109,3 +110,57 @@ def test_receipt_shortcut_requires_exact_requirement_and_candidate_binding() -> 
         )
         is None
     )
+
+
+def test_verification_adapter_requires_explicit_requirement_and_tree_binding() -> None:
+    obligation = {
+        "obligation_id": "obligation:unit",
+        "contract_id": "contract:behavior",
+        "provider": "pytest",
+        "selector": "tests/test_behavior.py::test_contract",
+        "profile": "python",
+        "contract_fingerprint": "sha256:" + "1" * 64,
+        "verifier_fingerprint": "sha256:" + "2" * 64,
+    }
+    evidence = {
+        **obligation,
+        "status": "passed",
+        "candidate_tree": "sha256:" + "3" * 64,
+        "command_fingerprint": "sha256:" + "4" * 64,
+        "artifact_refs": ["artifact:stdout"],
+    }
+
+    receipt = receipt_from_verification_evidence(
+        evidence=evidence,
+        obligation=obligation,
+        requirement_id="req-0001",
+        requirement_digest="sha256:" + "5" * 64,
+        source_commit="a" * 40,
+        candidate_commit="a" * 40,
+        expected_candidate_tree="sha256:" + "3" * 64,
+        run_id="github:run/321",
+        evidence_artifact_ref="artifact:evidence.json",
+    )
+
+    assert receipt.to_data()["outcome"] == "passed"
+    assert receipt.to_data()["requirement_id"] == "req-0001"
+    assert receipt.to_data()["artifact_refs"] == [
+        "artifact:stdout",
+        "artifact:evidence.json",
+    ]
+    try:
+        receipt_from_verification_evidence(
+            evidence=evidence,
+            obligation=obligation,
+            requirement_id="req-0001",
+            requirement_digest="sha256:" + "5" * 64,
+            source_commit="a" * 40,
+            candidate_commit="a" * 40,
+            expected_candidate_tree="sha256:" + "6" * 64,
+            run_id="github:run/321",
+            evidence_artifact_ref="artifact:evidence.json",
+        )
+    except ValueError as error:
+        assert "different candidate tree" in str(error)
+    else:
+        raise AssertionError("candidate tree mismatch was accepted")

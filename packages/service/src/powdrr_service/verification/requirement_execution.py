@@ -148,6 +148,91 @@ def requirement_coverage_digest(
     return "sha256:" + hashlib.sha256(_canonical(payload)).hexdigest()
 
 
+def receipt_from_verification_evidence(
+    *,
+    evidence: Mapping[str, Any],
+    obligation: Mapping[str, Any],
+    requirement_id: str,
+    requirement_digest: str,
+    source_commit: str,
+    candidate_commit: str,
+    expected_candidate_tree: str,
+    run_id: str,
+    evidence_artifact_ref: str,
+) -> RequirementExecutionReceipt:
+    """Adapt an observed verifier record using an explicit requirement binding.
+
+    Callers must supply the requirement linkage and commit identities from the
+    execution session. The adapter checks those identities against the verifier
+    record and refuses to infer requirement coverage from story or intent refs.
+    """
+    if evidence.get("obligation_id") != obligation.get("obligation_id"):
+        raise ValueError("verification evidence does not match its obligation")
+    if evidence.get("candidate_tree") != expected_candidate_tree:
+        raise ValueError("verification evidence is for a different candidate tree")
+    for field in (
+        "contract_id",
+        "provider",
+        "selector",
+        "profile",
+        "contract_fingerprint",
+        "verifier_fingerprint",
+    ):
+        if evidence.get(field) != obligation.get(field):
+            raise ValueError(f"verification evidence has mismatched {field}")
+    command_digest = evidence.get("command_fingerprint")
+    if not isinstance(command_digest, str) or not _DIGEST.fullmatch(command_digest):
+        raise ValueError("verification evidence has an invalid command fingerprint")
+    provider = obligation.get("provider")
+    selector = obligation.get("selector")
+    profile = obligation.get("profile")
+    if not all(
+        isinstance(item, str) and item for item in (provider, selector, profile)
+    ):
+        raise ValueError("verification obligation lacks an oracle identity")
+    oracle_data = {
+        "contract_fingerprint": obligation.get("contract_fingerprint"),
+        "provider": provider,
+        "profile": profile,
+        "selector": selector,
+        "verifier_fingerprint": obligation.get("verifier_fingerprint"),
+    }
+    oracle_digest = "sha256:" + hashlib.sha256(_canonical(oracle_data)).hexdigest()
+    oracle_id = "oracle:" + hashlib.sha256(_canonical(oracle_data)).hexdigest()
+    raw_status = evidence.get("status")
+    outcome = getattr(raw_status, "value", raw_status)
+    outcome_map: dict[str, ReceiptOutcome] = {
+        "passed": "passed",
+        "failed": "failed",
+        "blocked": "blocked",
+        "errored": "blocked",
+        "not_collected": "not_run",
+    }
+    if not isinstance(outcome, str) or outcome not in outcome_map:
+        raise ValueError("verification evidence has an unsupported outcome")
+    raw_refs = evidence.get("artifact_refs")
+    if not isinstance(raw_refs, Sequence) or isinstance(raw_refs, (str, bytes)):
+        raise ValueError("verification evidence artifact references are invalid")
+    artifact_refs = [
+        item for item in raw_refs if isinstance(item, str) and item.strip()
+    ]
+    if not isinstance(evidence_artifact_ref, str) or not evidence_artifact_ref.strip():
+        raise ValueError("verification evidence artifact reference is required")
+    artifact_refs.append(evidence_artifact_ref)
+    return RequirementExecutionReceipt.observed(
+        requirement_id=requirement_id,
+        requirement_digest=requirement_digest,
+        source_commit=source_commit,
+        candidate_commit=candidate_commit,
+        oracle_id=oracle_id,
+        oracle_digest=oracle_digest,
+        command_digest=command_digest,
+        outcome=outcome_map[outcome],
+        run_id=run_id,
+        artifact_refs=tuple(dict.fromkeys(artifact_refs)),
+    )
+
+
 def _canonical(value: Mapping[str, Any]) -> bytes:
     return json.dumps(
         value,
@@ -161,4 +246,5 @@ __all__ = [
     "RECEIPT_SCHEMA",
     "RequirementExecutionReceipt",
     "requirement_coverage_digest",
+    "receipt_from_verification_evidence",
 ]

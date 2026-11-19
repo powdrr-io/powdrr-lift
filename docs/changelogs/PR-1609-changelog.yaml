@@ -58,9 +58,7 @@ files:
   - {path: *prepare_test_file, type: modified, span: {start_line: 14, end_line: 15}, summary: Import registered correction contract types, rationale: Assert exact correction data and round-trip behavior.}
   - {path: *prepare_test_file, type: modified, span: {start_line: 124, end_line: 180}, summary: Test exact formatter repair contract preparation, rationale: Protect the path, command, diagnostic digest, and serialized contract.}
   - {path: &agent_test_file tests/test_workflow_task_agent.py, type: modified, span: {start_line: 22, end_line: 22}, summary: Import typed correction test data, rationale: Build a registered formatter dispatch integration case.}
-  - {path: *agent_test_file, type: modified, span: {start_line: 3580, end_line: 3764}, summary: Test deterministic correction dispatch and replay safety, rationale: Ensure no provider is invoked and existing contract validations and acceptance still run.}
-  - {path: *agent_test_file, type: modified, span: {start_line: 3731, end_line: 3743}, summary: Capture the deterministic correction attempt, rationale: Make its failure details observable in CI.}
-  - {path: *agent_test_file, type: modified, span: {start_line: 3773, end_line: 3774}, summary: Assert a successful correction attempt, rationale: Report its exact failure when CI cannot complete the registered formatter action.}
+  - {path: *agent_test_file, type: modified, span: {start_line: 3580, end_line: 3779}, summary: Test deterministic correction dispatch and replay safety, rationale: Ensure no provider is invoked, the existing contract path runs, and CI exposes any correction failure.}
 entities:
   - id: registered-ruff-ci-correction
     type: Function

@@ -844,6 +844,17 @@ def test_local_planning_telemetry_summarizes_large_runs_without_journal_data(
         return {
             "question_ids": [f"extract-requirements-{index:05d}"],
             "question_kinds": ["extract_requirements"],
+            "question_context": [
+                {
+                    "question_id": f"extract-requirements-{index:05d}",
+                    "builder_policy": "extract_requirements:v1",
+                    "answer_schema": "requirement-records",
+                    "subject_ids": ["block-1"],
+                    "source_context_ids": ["source-anchor-1"],
+                    "attempt": 1,
+                    "gate_consumer": "source_ledger_validation",
+                }
+            ],
             "phase": "source-ledger",
             "input_digests": ["sha256:" + "a" * 64],
             "batch_member_count": 1,

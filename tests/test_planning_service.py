@@ -605,6 +605,15 @@ def test_dependency_candidate_reviews_use_jev_and_checkpoint_provider(
     assert {metric["provider"] for metric in metrics} == {"JEV"}
     assert sum(int(metric["api_calls"]) for metric in metrics) == 2
     assert sorted(int(metric["batch_member_count"]) for metric in metrics) == [1, 2, 2]
+    contexts = [context for metric in metrics for context in metric["question_context"]]
+    assert len(contexts) == 3
+    assert {context["builder_policy"] for context in contexts} == {
+        "review_dependency_candidate:v1"
+    }
+    assert {context["gate_consumer"] for context in contexts} == {
+        "dependency_graph_compilation"
+    }
+    assert all(context["subject_ids"] for context in contexts)
     events = store.load().events
     assert len(events) == 3
     assert {event.payload["validation_result"]["provider"] for event in events} == {

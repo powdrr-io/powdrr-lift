@@ -76,6 +76,16 @@ version 2. The model no longer chooses whether or where to continue. The
 detailed request catalog below preserves the audited source snapshot and its
 historical schemas.
 
+Telemetry attribution update: each local provider-call record now carries a
+per-question contract identity (kind and contract version), expected answer
+schema, stable subject IDs, source/context reference IDs, attempt number, and the
+downstream planner gate that consumes the answer. This makes batch members
+individually traceable without persisting prompt or response text. Telemetry
+records use schema v2; the local summary reader still accepts existing v1
+records. Request latency, token counts, provider/model, retries, and pagination
+were already recorded. Actual cost remains unavailable unless providers report
+it, and raw message retention remains a separate privacy/design decision.
+
 ## 1. Answer to the central question
 
 Yes. Planning should retain models for proposing missing semantic decisions,
@@ -710,7 +720,9 @@ check public API/test consumers explicitly; this audit changes none of them.
 The request catalog describes the audited revision, while milestones 1 and the
 source/work-unit/subject-pagination and deterministic binding portions of
 milestone 2 are implemented in the current planner. Multi-phase assignment and
-milestones 3–6 remain recommendations.
+milestones 3–5 remain recommendations. Milestone 6 has baseline call accounting
+and per-question gate attribution; provider-reported cost and any decision to
+retain exact request/response content remain open.
 Later changes should be separately reviewable and retain pinned intent, private
 verification, full scenario closure and explicit human decision boundaries.
 

@@ -1,0 +1,93 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1613
+title: Carry requirement bindings into planner workflows
+intent:
+  problem: Receipt production needs stable planner-owned requirement identity, but generated work-item workflows currently omit the allocated requirement IDs and their accepted-content digests.
+  goal: Carry each workflow item's exact allocated requirement IDs and canonical digests into its generated context, and validate that binding against the planning manifest.
+human-decisions: []
+structured_files: []
+files:
+  - path: packages/service/src/powdrr_service/planning/compiler.py
+    type: modified
+    span: {start_line: 44, end_line: 46}
+    summary: Import the canonical requirement digest function.
+    rationale: Reuse the receipt schema's deterministic digest for planner-owned bindings.
+  - path: packages/service/src/powdrr_service/planning/compiler.py
+    type: modified
+    span: {start_line: 247, end_line: 249}
+    summary: Derive requirement bindings from the item's allocated units.
+    rationale: Restrict workflow bindings to requirements assigned to that work item.
+  - path: packages/service/src/powdrr_service/planning/compiler.py
+    type: modified
+    span: {start_line: 463, end_line: 468}
+    summary: Revalidate generated workflow bindings against the accepted manifest.
+    rationale: Catch stale or altered requirement identities before writing plan artifacts.
+  - path: packages/service/src/powdrr_service/planning/compiler.py
+    type: modified
+    span: {start_line: 499, end_line: 499}
+    summary: Add typed bindings to workflow generation inputs.
+    rationale: Keep workflow construction explicit about the planner-owned requirement set.
+  - path: packages/service/src/powdrr_service/planning/compiler.py
+    type: modified
+    span: {start_line: 516, end_line: 516}
+    summary: Serialize requirement ID and digest pairs into workflow context.
+    rationale: Let downstream verification preserve explicit planner requirement identity.
+  - path: packages/service/src/powdrr_service/planning/compiler.py
+    type: modified
+    span: {start_line: 547, end_line: 585}
+    summary: Compute sorted requirement bindings from item units and accepted requirement content.
+    rationale: Derive stable identifiers and canonical digests deterministically without inferring test coverage.
+  - path: packages/service/src/powdrr_service/planning/workflow_instance.py
+    type: modified
+    span: {start_line: 22, end_line: 22}
+    summary: Define the accepted SHA-256 digest shape for workflow requirement bindings.
+    rationale: Reject malformed digests at the generated workflow boundary.
+  - path: packages/service/src/powdrr_service/planning/workflow_instance.py
+    type: modified
+    span: {start_line: 139, end_line: 174}
+    summary: Validate requirement binding records and require sorted unique IDs.
+    rationale: Keep downstream planner context explicit and structurally trustworthy.
+  - path: tests/test_planning_compiler.py
+    type: modified
+    span: {start_line: 40, end_line: 42}
+    summary: Import canonical requirement digest generation for compiler assertions.
+    rationale: Verify emitted workflow bindings use the receipt schema's digest algorithm.
+  - path: tests/test_planning_compiler.py
+    type: modified
+    span: {start_line: 808, end_line: 819}
+    summary: Assert that compiled workflow context contains the item's exact requirement binding.
+    rationale: Ensure planner outputs expose stable requirement identity to execution.
+  - path: tests/test_planning_compiler.py
+    type: modified
+    span: {start_line: 839, end_line: 865}
+    summary: Reject workflow requirement binding drift from the accepted planning manifest.
+    rationale: Prevent altered IDs or digests from crossing the compilation boundary.
+  - path: docs/audits/planning-llm-audit.md
+    type: modified
+    span: {start_line: 317, end_line: 323}
+    summary: Document planner-owned workflow bindings and the remaining verifier integration gap.
+    rationale: Distinguish binding availability from verified coverage and artifact publication.
+entities:
+  - id: requirement-bindings-for-plan-item
+    type: Function
+    action: added
+  - id: workflow-requirement-binding-validation
+    type: Function
+    action: added
+  - id: workflow-requirement-binding-test
+    type: Regression test
+    action: added
+entity_relationships:
+  - id: workflow-binding-test-exercises-compiler
+    type: exercises
+    source: workflow-requirement-binding-test
+    target: requirement-bindings-for-plan-item
+    action: added
+    description: The compiler test verifies exact binding generation and drift rejection.
+invariants:
+  - id: planner-workflow-requirement-binding-exact
+    description: Each generated work-item workflow carries exactly the sorted requirement IDs allocated through its units, with digests derived from accepted requirement content.
+    action: added
+guidance: []
+features: []
+proposed_prs: []

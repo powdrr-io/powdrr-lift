@@ -718,9 +718,14 @@ check public API/test consumers explicitly; this audit changes none of them.
    setup text and complete typed source test semantics are now carried directly;
    semantic setup and test-design requests remain for other forms. Requirement
    validation group relations now carry through coverage and test-design facts.
+   Test-design instructions now define how all-together, ordered, alternatives,
+   and conditional relations must affect scenarios; contract version 7 invalidates
+   earlier answers that did not receive this direction. Nested Boolean scope that
+   cannot be represented by these flat relations remains unresolved work.
    Canonical unresolved test dimensions now remain unresolved through the typed
    behavior scenario and are visible to downstream gates.
-   Preserve remaining conditional/Boolean source semantics and scenario dimensions.
+   Define a typed representation for nested conditional/Boolean source semantics
+   before removing further semantic review.
    Unknown meaning stops or goes to review rather than silently becoming
    context/not_applicable.
 4. **Compile formal dependency/structural cases.** Typed resource use and exact

@@ -609,7 +609,7 @@ def build_test_coverage_request(
             }
             for excerpt in source_excerpts
         ],
-        "contract_version": 6,
+        "contract_version": 7,
     }
     digest = hashlib.sha256(
         json.dumps(digest_data, sort_keys=True, separators=(",", ":")).encode()
@@ -618,14 +618,14 @@ def build_test_coverage_request(
         question=Question(
             question_id=question_id,
             kind="plan_test_coverage",
-            contract_version=6,
+            contract_version=7,
             subject_ids=(item_id,),
             input_digest=f"sha256:{digest}",
             context_ref_ids=(
                 *(excerpt.ref_id for excerpt in source_excerpts),
                 *(fact.ref_id for fact in facts),
             ),
-            expected_answer_schema="plan-test-coverage-v6",
+            expected_answer_schema="plan-test-coverage-v7",
             attempt=1,
         ),
         exact_question=(
@@ -643,6 +643,16 @@ def build_test_coverage_request(
             "directly verifies. Use an empty list when no supplied requirement "
             "is directly verified; do not include an ID merely because it belongs "
             "to this PR. Never invent requirement IDs. "
+            "Requirement facts may include source_validation_groups. These are "
+            "accepted source relationships, not suggestions: all_together means "
+            "related requirements apply together in one scenario; ordered means "
+            "preserve their source order; alternatives means the source permits "
+            "choosing one branch, so do not require all alternatives in one run; "
+            "conditional means require each branch only when its source condition "
+            "applies. Do not treat members of one group as independent when their "
+            "relationship changes the observable behavior. Use the supplied source "
+            "excerpt to retain the actual condition and branch meaning; if it is "
+            "unclear, mark the relevant dimension unresolved instead of guessing. "
             "Use not_applicable only "
             "when the pinned source evidence makes a dimension irrelevant; use "
             "an explicit assumption when repository conventions must resolve an "

@@ -980,6 +980,9 @@ def _run_question_batch(
         metric = {
             "question_ids": [member.question.question_id for member in members],
             "question_kinds": sorted({member.question.kind for member in members}),
+            "question_context": [
+                _question_telemetry_context(member) for member in members
+            ],
             "phase": _question_phase(members[0].question.kind),
             "input_digests": [member.question.input_digest for member in members],
             "batch_member_count": len(members),
@@ -1152,6 +1155,7 @@ def _run_decision_question_batch(
             metric = {
                 "question_ids": [request.question.question_id],
                 "question_kinds": [request.question.kind],
+                "question_context": [_question_telemetry_context(request)],
                 "phase": _question_phase(request.question.kind),
                 "input_digests": [request.question.input_digest],
                 "batch_member_count": len(batch_requests),
@@ -1206,6 +1210,28 @@ def _run_decision_question_batch(
     if callable(flush):
         flush()
     return tuple(outcomes)
+
+
+def _question_telemetry_context(request: QuestionRequest[Any]) -> Mapping[str, Any]:
+    """Identify the request contract and the gate that consumes its answer."""
+    question = request.question
+    phase = _question_phase(question.kind)
+    gate_consumer = {
+        "source-ledger": "source_ledger_validation",
+        "repository-coverage": "repository_coverage_gate",
+        "work-unit-design": "work_unit_compilation",
+        "dependency-and-pr-slicing": "dependency_graph_compilation",
+        "structural-review": "structrr_projection_compilation",
+    }.get(phase, "planning_state_machine")
+    return {
+        "question_id": question.question_id,
+        "builder_policy": f"{question.kind}:v{question.contract_version}",
+        "answer_schema": question.expected_answer_schema,
+        "subject_ids": list(question.subject_ids),
+        "source_context_ids": list(question.context_ref_ids),
+        "attempt": question.attempt,
+        "gate_consumer": gate_consumer,
+    }
 
 
 def _question_phase(kind: str) -> str:

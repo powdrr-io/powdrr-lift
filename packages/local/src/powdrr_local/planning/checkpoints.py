@@ -443,6 +443,7 @@ class LocalPlanningTelemetryStore:
         {
             "question_ids",
             "question_kinds",
+            "question_context",
             "phase",
             "input_digests",
             "batch_member_count",
@@ -503,7 +504,7 @@ class LocalPlanningTelemetryStore:
         if set(metric) != self._RECORD_FIELDS:
             raise PlanningJournalError("planning telemetry fields are malformed")
         record = {
-            "schema": "planning-call-telemetry-v1",
+            "schema": "planning-call-telemetry-v2",
             "session_id": self.session_id,
             "run_id": run_id,
             **metric,
@@ -668,7 +669,10 @@ class LocalPlanningTelemetryStore:
                         deterministic_count += 1
                         deterministic_by_rule[rule_id] += 1
                         continue
-                    if record.get("schema") != "planning-call-telemetry-v1":
+                    if record.get("schema") not in {
+                        "planning-call-telemetry-v1",
+                        "planning-call-telemetry-v2",
+                    }:
                         raise PlanningJournalError("planning telemetry is malformed")
                     run_id = record.get("run_id")
                     ids = record.get("question_ids")

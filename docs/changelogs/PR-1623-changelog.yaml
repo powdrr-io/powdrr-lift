@@ -1,0 +1,66 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1623
+title: Attribute planner telemetry to answer consumers
+intent:
+  problem: Planner call metrics counted requests but did not retain each batched question's contract, source and subject references, or downstream gate consumer.
+  goal: Make local planning telemetry traceable from an individual question through the planner gate that consumes its answer.
+human-decisions: []
+structured_files: []
+files:
+  - path: packages/service/src/powdrr_service/planning/service.py
+    type: modified
+    span: {start_line: 983, end_line: 985}
+    summary: Attach per-question contract and provenance metadata to provider call records.
+    rationale: Keep each member of a provider batch traceable to its contract, subjects, source context, attempt, and consumer gate.
+  - path: packages/service/src/powdrr_service/planning/service.py
+    type: modified
+    span: {start_line: 1158, end_line: 1158}
+    summary: Attach member contract and provenance metadata to decision-provider records.
+    rationale: Keep decision-provider questions traceable through batching.
+  - path: packages/service/src/powdrr_service/planning/service.py
+    type: modified
+    span: {start_line: 1215, end_line: 1236}
+    summary: Map typed question metadata to its downstream planner gate.
+    rationale: Identify which validation or compilation gate consumes an LLM answer.
+  - path: packages/local/src/powdrr_local/planning/checkpoints.py
+    type: modified
+    span: {start_line: 446, end_line: 446}
+    summary: Require question attribution in the telemetry record shape.
+    rationale: Reject records that omit per-question trace metadata.
+  - path: packages/local/src/powdrr_local/planning/checkpoints.py
+    type: modified
+    span: {start_line: 507, end_line: 507}
+    summary: Validate the expanded telemetry record and write schema v2.
+    rationale: Persist attribution metadata while keeping the local record shape explicit.
+  - path: packages/local/src/powdrr_local/planning/checkpoints.py
+    type: modified
+    span: {start_line: 672, end_line: 675}
+    summary: Read v1 and v2 call telemetry records.
+    rationale: Preserve local run summaries for telemetry written before the schema update.
+  - path: tests/test_planning_service.py
+    type: modified
+    span: {start_line: 608, end_line: 616}
+    summary: Verify batched question records carry contract and gate attribution.
+    rationale: Prevent provider batching from losing member-specific planner context.
+  - path: tests/test_planning_checkpoints.py
+    type: modified
+    span: {start_line: 847, end_line: 857}
+    summary: Exercise writing attributed telemetry records in summary coverage.
+    rationale: Keep strict local telemetry validation aligned with schema v2.
+  - path: docs/audits/planning-llm-audit.md
+    type: modified
+    span: {start_line: 79, end_line: 88}
+    summary: Record the planner telemetry attribution implementation.
+    rationale: Keep the implementation audit aligned with current planner behavior and open telemetry gaps.
+  - path: docs/audits/planning-llm-audit.md
+    type: modified
+    span: {start_line: 723, end_line: 725}
+    summary: Update the remaining status of telemetry work.
+    rationale: Distinguish completed gate attribution from the open cost and content-retention decisions.
+entities: []
+entity_relationships: []
+invariants:
+  - id: planner-telemetry-preserves-question-attribution
+    description: Each provider-call record attributes every logical question member to its contract, subject and source context identities, attempt, and downstream planner gate.
+    action: added
+guidance: []

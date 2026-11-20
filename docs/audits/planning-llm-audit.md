@@ -748,9 +748,12 @@ check public API/test consumers explicitly; this audit changes none of them.
    code against its excerpt digest, receipt schema and ID, requirement ID and
    digest, pinned source/candidate commit, and passed outcome before it can enter
    the coverage question or support a complete answer. The model cannot promote
-   a malformed or stale receipt to coverage. Test an irrelevant passing test, a
-   partial implementation, unavailable indexing, repeated words with wrong meaning
-   and an assertion that executes but proves the wrong observation.
+   a malformed or stale receipt to coverage. Without a trusted receipt, coverage
+   examples no longer imply that the first implementation/test pair is relevant;
+   the prompt explicitly reserves that judgment for the supplied evidence. Tests
+   cover an irrelevant passing test, partial implementation, and unavailable
+   indexing. Still test repeated words with wrong meaning and an assertion that
+   executes but proves the wrong observation.
 6. **Bound and instrument the remaining semantic work.** Preserve checkpoints and
    local parser/schema gates; distinguish member questions, batches, seeded results,
    output repairs and actual HTTP/provider calls. Track request builder/policy,

@@ -21,6 +21,10 @@ from powdrr_service.planning.contracts import (
 from powdrr_service.planning.evidence import Evidence, EvidenceError
 from powdrr_service.planning.questions import ContextRecord, QuestionRequest
 from powdrr_service.planning.source import Requirement, SegmentedSource
+from powdrr_service.verification.requirement_execution import (
+    RequirementExecutionReceipt,
+    requirement_coverage_digest,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -124,6 +128,9 @@ def bind_coverage_answer(
     *,
     evidence_by_id: Mapping[str, Evidence],
     supplied_evidence_ids: Sequence[str],
+    requirement: Requirement | ResidualRequirement | None = None,
+    pinned_commit: str | None = None,
+    evidence_excerpts: Mapping[str, str] | None = None,
 ) -> CoverageAnswer:
     """Validate answer references and enforce evidence required by its status."""
     answer = parse_coverage_answer(value)
@@ -146,6 +153,25 @@ def bind_coverage_answer(
                 "/evidence_ids", f"coverage answer cites unknown evidence {evidence_id}"
             )
         evidence.append(record)
+
+    for record in evidence:
+        if record.kind != "execution_receipt":
+            continue
+        excerpt = (evidence_excerpts or {}).get(record.id)
+        if (
+            requirement is None
+            or pinned_commit is None
+            or not _receipt_proves_requirement(
+                record,
+                excerpt,
+                requirement=requirement,
+                pinned_commit=pinned_commit,
+            )
+        ):
+            raise PlanningContractError(
+                "/evidence_ids",
+                "execution receipt is not valid for this requirement and pinned commit",
+            )
 
     supplied_evidence = tuple(
         evidence_by_id[evidence_id]
@@ -204,6 +230,36 @@ def bind_coverage_answer(
     return answer
 
 
+def _receipt_proves_requirement(
+    evidence: Evidence,
+    excerpt: str | None,
+    *,
+    requirement: Requirement | ResidualRequirement,
+    pinned_commit: str,
+) -> bool:
+    if evidence.base_commit != pinned_commit or excerpt is None:
+        return False
+    try:
+        raw = json.loads(_validated_evidence_excerpt(evidence, excerpt))
+        if not isinstance(raw, Mapping):
+            return False
+        receipt = RequirementExecutionReceipt.from_data(raw)
+    except (json.JSONDecodeError, TypeError, ValueError):
+        return False
+    digest = requirement_coverage_digest(
+        requirement_id=requirement.id,
+        statement=requirement.statement,
+        kind=requirement.kind,
+        source_refs=requirement.source_refs,
+    )
+    return receipt.proves_coverage(
+        requirement_id=requirement.id,
+        requirement_digest=digest,
+        source_commit=pinned_commit,
+        candidate_commit=pinned_commit,
+    )
+
+
 def build_requirement_coverage_request(
     requirement: Requirement,
     *,
@@ -216,20 +272,31 @@ def build_requirement_coverage_request(
     known_anchor_ids = {item.id for item in source.anchors}
     if not set(requirement.source_refs) <= known_anchor_ids:
         raise EvidenceError("requirement cites unknown source anchor")
-    evidence_records = tuple(evidence)
-    evidence_by_id = {item.id: item for item in evidence_records}
-    if len(evidence_by_id) != len(evidence_records):
+    supplied_evidence = tuple(evidence)
+    supplied_by_id = {item.id: item for item in supplied_evidence}
+    if len(supplied_by_id) != len(supplied_evidence):
         raise EvidenceError("evidence IDs must be unique")
     evidence_context: list[ContextRecord] = []
-    for item in evidence_records:
+    trusted_evidence: list[Evidence] = []
+    for item in supplied_evidence:
         if item.base_commit != source.document.commit_sha:
             raise EvidenceError(
                 "evidence and requirement source use different base commits"
             )
         excerpt = _validated_evidence_excerpt(item, evidence_excerpts.get(item.id))
+        if item.kind == "execution_receipt" and not _receipt_proves_requirement(
+            item,
+            excerpt,
+            requirement=requirement,
+            pinned_commit=source.document.commit_sha,
+        ):
+            continue
+        trusted_evidence.append(item)
         evidence_context.append(
             ContextRecord(item.id, {**item.to_data(), "source_excerpt": excerpt})
         )
+    evidence_records = tuple(trusted_evidence)
+    evidence_by_id = {item.id: item for item in evidence_records}
     requirement_context = ContextRecord(
         requirement.id,
         {
@@ -386,6 +453,9 @@ def build_requirement_coverage_request(
             answer,
             evidence_by_id=evidence_by_id,
             supplied_evidence_ids=supplied_ids,
+            requirement=requirement,
+            pinned_commit=source.document.commit_sha,
+            evidence_excerpts=evidence_excerpts,
         ),
     )
 
@@ -396,6 +466,8 @@ def create_requirement_coverage(
     *,
     evidence_by_id: Mapping[str, Evidence],
     supplied_evidence_ids: Sequence[str],
+    evidence_excerpts: Mapping[str, str] | None = None,
+    pinned_commit: str | None = None,
     revision: int,
 ) -> RequirementCoverage:
     """Keep the accepted result and compile a provenance-preserving residual."""
@@ -419,6 +491,9 @@ def create_requirement_coverage(
         raw,
         evidence_by_id=evidence_by_id,
         supplied_evidence_ids=supplied_evidence_ids,
+        requirement=requirement,
+        pinned_commit=pinned_commit,
+        evidence_excerpts=evidence_excerpts,
     )
     if not isinstance(bound, PartialCoverage):
         return RequirementCoverage(requirement.id, bound)

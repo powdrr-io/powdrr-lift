@@ -744,7 +744,11 @@ check public API/test consumers explicitly; this audit changes none of them.
    superseded source and contradictory projected states.
 5. **Improve coverage/oracle evidence before removing semantic reviews.** Use
    requirement-bound receipts, executable checks, registered boundary adapters,
-   typed case compilation and provenance. Test an irrelevant passing test, a
+   typed case compilation and provenance. Receipt evidence is now validated in
+   code against its excerpt digest, receipt schema and ID, requirement ID and
+   digest, pinned source/candidate commit, and passed outcome before it can enter
+   the coverage question or support a complete answer. The model cannot promote
+   a malformed or stale receipt to coverage. Test an irrelevant passing test, a
    partial implementation, unavailable indexing, repeated words with wrong meaning
    and an assertion that executes but proves the wrong observation.
 6. **Bound and instrument the remaining semantic work.** Preserve checkpoints and

@@ -2951,6 +2951,12 @@ class SourceLedgerQuestionMachine:
                 answer,
                 evidence_by_id={item.id: item for item in evidence},
                 supplied_evidence_ids=tuple(item.id for item in evidence),
+                evidence_excerpts={
+                    item.ref_id: excerpt
+                    for item in request.repository_evidence
+                    if isinstance((excerpt := item.value.get("source_excerpt")), str)
+                },
+                pinned_commit=self.source.document.commit_sha,
                 revision=1,
             )
             self._accepted_coverage_cache[requirement.id] = (

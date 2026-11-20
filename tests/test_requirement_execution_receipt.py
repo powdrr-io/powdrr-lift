@@ -3,7 +3,12 @@ from __future__ import annotations
 import hashlib
 import json
 
-from powdrr_service.planning.coverage import build_requirement_coverage_request
+import pytest
+from powdrr_service.planning.contracts import PlanningContractError
+from powdrr_service.planning.coverage import (
+    bind_coverage_answer,
+    build_requirement_coverage_request,
+)
 from powdrr_service.planning.driver import (
     _requirement_bound_execution_receipt_answer,
 )
@@ -21,7 +26,19 @@ from powdrr_service.verification.requirement_execution import (
 )
 
 
-def test_receipt_shortcut_requires_exact_requirement_and_candidate_binding() -> None:
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("requirement_id", "req-9999"),
+        ("requirement_digest", "sha256:" + "e" * 64),
+        ("source_commit", "f" * 40),
+        ("candidate_commit", "e" * 40),
+        ("outcome", "failed"),
+    ],
+)
+def test_receipt_coverage_requires_exact_requirement_and_run_binding(
+    field: str, value: str
+) -> None:
     text = "# Plan\n\nImplement the required behavior.\n"
     commit = "a" * 40
     document = PinnedSourceDocument(
@@ -90,7 +107,7 @@ def test_receipt_shortcut_requires_exact_requirement_and_candidate_binding() -> 
     request.parse_answer(answer)
 
     altered = receipt.to_data()
-    altered["candidate_commit"] = "e" * 40
+    altered[field] = value
     unsigned = {key: value for key, value in altered.items() if key != "receipt_id"}
     altered["receipt_id"] = (
         "receipt:"
@@ -110,6 +127,28 @@ def test_receipt_shortcut_requires_exact_requirement_and_candidate_binding() -> 
         )
         is None
     )
+    invalid_complete_answer = {
+        "status": "complete",
+        "evidence_ids": [altered_evidence.id],
+        "reason": "The cited execution receipt passed.",
+    }
+    with pytest.raises(
+        PlanningContractError,
+        match="execution receipt is not valid for this requirement and pinned commit",
+    ):
+        bind_coverage_answer(
+            invalid_complete_answer,
+            evidence_by_id={altered_evidence.id: altered_evidence},
+            supplied_evidence_ids=(altered_evidence.id,),
+            requirement=requirement,
+            pinned_commit=commit,
+            evidence_excerpts={
+                altered_evidence.id: json.dumps(altered, sort_keys=True) + "\n"
+            },
+        )
+    assert altered_evidence.id not in altered_request.question.context_ref_ids
+    with pytest.raises(PlanningContractError, match="outside the question context"):
+        altered_request.parse_answer(invalid_complete_answer)
 
 
 def test_verification_adapter_requires_explicit_requirement_and_tree_binding() -> None:

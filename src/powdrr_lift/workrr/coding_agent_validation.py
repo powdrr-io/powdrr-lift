@@ -600,7 +600,9 @@ def execute_coding_agent_attempt(
     if execution is not None:
         execution.finalize_worker(attempt)
         reconcile_after_worker = getattr(execution, "reconcile_after_worker", None)
-        if callable(reconcile_after_worker):
+        if callable(reconcile_after_worker) and (
+            attempt.status is CodingAgentStatus.COMPLETED
+        ):
             reconcile_after_worker()
         if (
             reference_context is not None

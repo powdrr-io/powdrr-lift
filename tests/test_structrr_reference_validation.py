@@ -333,7 +333,7 @@ def test_removal_needs_accepted_authorization_and_relocation_needs_review() -> N
 def test_unavailable_optional_invariant_review_is_recorded_without_blocking_audit() -> (
     None
 ):
-    report = validate(SOURCE)
+    report = validate(SOURCE.replace(b"return 1", b"return 2"))
 
     reviews = [
         item
@@ -348,6 +348,16 @@ def test_unavailable_optional_invariant_review_is_recorded_without_blocking_audi
     assert reviews[0]["available_evidence"]
     assert reviews[0]["required_gate_evidence"] is False
     assert reviews[0]["decision_specification"]["required"] is False
+
+
+def test_ast_unchanged_candidate_skips_optional_invariant_review() -> None:
+    judge = Judge()
+    report = validate(SOURCE + b"# comment-only change\n", review_client=judge)
+
+    assert report.status == "passed"
+    assert not judge.requests
+    assert not report.to_data()["reviews"]
+    assert report.to_data()["behavioral_evidence_satisfied"] is False
 
 
 def test_flexible_owners_and_suspicious_extra_placements_need_fresh_review() -> None:
@@ -725,17 +735,17 @@ def test_validation_context_reuses_reviews_and_invalidates_changed_callers(
 
     first = validation.check(tmp_path)
     assert first.status == "passed"
-    assert len(judge.requests) == len(first.to_data()["reviews"]) == 2
+    assert len(judge.requests) == len(first.to_data()["reviews"]) == 1
 
     repeated = validation.check(tmp_path)
     assert repeated.status == "passed"
-    assert len(judge.requests) == 2
+    assert len(judge.requests) == 1
     assert all(item["reused"] for item in repeated.to_data()["reviews"])
 
     (tmp_path / "caller.py").write_text("def caller(): return retry()\n")
     changed = validation.check(tmp_path)
     assert changed.status == "passed"
-    assert len(judge.requests) == 4
+    assert len(judge.requests) == 3
     assert all(not item["reused"] for item in changed.to_data()["reviews"])
 
 

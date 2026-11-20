@@ -592,6 +592,30 @@ def validate_source_references(
         {"coverage": coverage, "changed_paths": sorted(changed_paths)}
     )
 
+    def has_behavioral_source_delta() -> bool:
+        if not scan_complete:
+            return True
+        for path in paths:
+            previous, current = baseline.get(path), candidate.get(path)
+            if previous == current:
+                continue
+            if previous is None or current is None:
+                return True
+            try:
+                previous_ast = ast.dump(
+                    ast.parse(_text(previous)), include_attributes=False
+                )
+                current_ast = ast.dump(
+                    ast.parse(_text(current)), include_attributes=False
+                )
+            except (RecursionError, SyntaxError, UnicodeError, ValueError):
+                return True
+            if previous_ast != current_ast:
+                return True
+        return False
+
+    behavioral_source_delta = has_behavioral_source_delta()
+
     def select(
         selector: Mapping[str, Any], ref: str, side: str = "candidate"
     ) -> list[dict[str, Any]]:
@@ -972,14 +996,15 @@ def validate_source_references(
                     )
                 )
             required_binding_keys.update((target_ref, *_key(b)) for b in found)
-    for obligation, candidates, previous in optional_invariant_reviews:
-        review(
-            obligation,
-            candidates,
-            purpose="invariant_preservation",
-            previous=previous,
-            optional=True,
-        )
+    if behavioral_source_delta:
+        for obligation, candidates, previous in optional_invariant_reviews:
+            review(
+                obligation,
+                candidates,
+                purpose="invariant_preservation",
+                previous=previous,
+                optional=True,
+            )
     for binding in bindings["baseline"]:
         key = binding["ref"], *_key(binding)
         index = indexes["baseline"][binding["path"]]

@@ -5133,15 +5133,8 @@ def _dependency_is_fulfilled(
         )
         merge_commit = pull_request.get("merge_commit_sha")
         body = pull_request.get("body")
-        closes_dependency = (
-            isinstance(body, str)
-            and re.search(
-                rf"\b(?:close[sd]?|fix(?:es)?|resolve[sd]?)\s+"
-                rf"(?:{re.escape(client.repository)}#|#){current.number}\b",
-                body,
-                re.IGNORECASE,
-            )
-            is not None
+        closes_dependency = _pull_request_closes_issue(
+            body, repository=client.repository, issue_number=current.number
         )
         if (
             pull_request.get("merged") is True
@@ -5150,7 +5143,82 @@ def _dependency_is_fulfilled(
             and re.fullmatch(r"[0-9a-fA-F]{40}|[0-9a-fA-F]{64}", merge_commit)
         ):
             return remember(True)
+    if _dependency_has_merged_publication(
+        current,
+        comments,
+        client=client,
+        evidence_cache=evidence_cache,
+    ):
+        return remember(True)
     return remember(False)
+
+
+def _dependency_has_merged_publication(
+    issue: QueueIssue,
+    comments: Sequence[Mapping[str, Any]],
+    *,
+    client: GitHubIssueClient,
+    evidence_cache: _DependencyEvidenceCache | None,
+) -> bool:
+    """Recover dependency completion when PR publication outlived its task run."""
+    pull_request_url = _latest_published_pr_url_from_issue_comments(
+        comments, issue_number=issue.number
+    )
+    pull_request_number = _same_repository_pull_request_number(
+        pull_request_url, client.repository
+    )
+    if pull_request_number is None:
+        return False
+    pull_request = (
+        evidence_cache.pull_request(client, pull_request_number)
+        if evidence_cache is not None
+        else client.pull_request(pull_request_number)
+    )
+    merge_commit = pull_request.get("merge_commit_sha")
+    return (
+        pull_request.get("merged") is True
+        and _pull_request_closes_issue(
+            pull_request.get("body"),
+            repository=client.repository,
+            issue_number=issue.number,
+        )
+        and isinstance(merge_commit, str)
+        and re.fullmatch(r"[0-9a-fA-F]{40}|[0-9a-fA-F]{64}", merge_commit) is not None
+    )
+
+
+def _latest_published_pr_url_from_issue_comments(
+    comments: Sequence[Mapping[str, Any]], *, issue_number: int
+) -> str | None:
+    marker_pattern = re.compile(
+        rf"^Powdrr PR for issue #{issue_number}: "
+        r"(https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/pull/\d+)\s*$",
+        re.MULTILINE,
+    )
+    for comment in reversed(comments):
+        body = comment.get("body")
+        if not isinstance(body, str):
+            continue
+        match = marker_pattern.search(body)
+        if match is not None:
+            return match.group(1)
+    return None
+
+
+def _pull_request_closes_issue(
+    body: object, *, repository: str, issue_number: int
+) -> bool:
+    if not isinstance(body, str):
+        return False
+    return (
+        re.search(
+            rf"\b(?:close[sd]?|fix(?:es)?|resolve[sd]?)\s+"
+            rf"(?:{re.escape(repository)}#|#){issue_number}\b",
+            body,
+            re.IGNORECASE,
+        )
+        is not None
+    )
 
 
 def _dependency_has_verified_noop_receipt(

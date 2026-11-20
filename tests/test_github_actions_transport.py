@@ -110,6 +110,7 @@ def test_observation_fetches_annotations_even_when_runner_never_started() -> Non
         {"name": "CI / unit", "state": "pass", "workflow": "CI"},
     )
     assert snapshot.required_checks_reason is None
+    assert snapshot.required_checks_source == "gh pr checks --required"
     assert snapshot.logs_by_job is not None
     log = snapshot.logs_by_job["127527360223"]
     assert log.status == "available"
@@ -265,9 +266,10 @@ def test_required_check_refresh_accepts_pending_cli_status_for_pinned_head() -> 
         raise AssertionError(f"unexpected gh command: {call}")
 
     client = GitHubActionsClient("example/project", run=run)
-    checks, reason = client.refresh_required_checks(270, HEAD)
+    checks, reason, source = client.refresh_required_checks(270, HEAD)
 
     assert reason is None
+    assert source == "gh pr checks --required"
     assert checks == ({"name": "unit", "state": "PENDING", "workflow": "ci.yml"},)
     assert len(calls) == 3
     assert "--repo" in calls[1]
@@ -282,14 +284,22 @@ def test_required_check_refresh_stops_when_pr_head_moves() -> None:
     ) -> subprocess.CompletedProcess[str]:
         nonlocal calls
         calls += 1
+        if arguments[1:3] == ["pr", "checks"]:
+            return subprocess.CompletedProcess(
+                arguments,
+                0,
+                json.dumps([{"name": "unit", "state": "SUCCESS"}]),
+                "",
+            )
         payload = {"head": {"sha": HEAD if calls == 1 else "a" * 40}}
         return subprocess.CompletedProcess(arguments, 0, json.dumps(payload), "")
 
     client = GitHubActionsClient("example/project", run=run)
-    checks, reason = client.refresh_required_checks(270, HEAD)
+    checks, reason, source = client.refresh_required_checks(270, HEAD)
 
     assert checks is None
     assert reason == "pull request head changed while waiting for required checks"
+    assert source is None
     assert calls == 3
 
 
@@ -301,10 +311,50 @@ def test_required_check_permission_error_is_explicitly_unavailable() -> None:
         ),
     )
 
-    checks, reason = client._required_checks(270)
+    checks, reason, source = client._required_checks(270)
 
     assert checks is None
-    assert reason == "GitHub did not make required-check policy available"
+    assert reason is not None
+    assert "GitHub did not make required-check policy available" in reason
+    assert source is None
+
+
+def test_required_check_policy_falls_back_to_all_reported_pr_checks() -> None:
+    calls: list[list[str]] = []
+
+    def run(
+        arguments: Sequence[str], **_kwargs: object
+    ) -> subprocess.CompletedProcess[str]:
+        call = list(arguments)
+        calls.append(call)
+        if "--required" in call:
+            return subprocess.CompletedProcess(
+                call, 1, "", "Upgrade to GitHub Pro to use required checks"
+            )
+        return subprocess.CompletedProcess(
+            call,
+            0,
+            json.dumps(
+                [
+                    {"name": "verify", "state": "SUCCESS", "workflow": "CI"},
+                    {"name": "lint", "state": "SUCCESS", "workflow": "CI"},
+                ]
+            ),
+            "",
+        )
+
+    client = GitHubActionsClient("example/project", run=run)
+    checks, reason, source = client._required_checks(270)
+
+    assert checks == (
+        {"name": "verify", "state": "SUCCESS", "workflow": "CI"},
+        {"name": "lint", "state": "SUCCESS", "workflow": "CI"},
+    )
+    assert reason is not None
+    assert "using all checks reported" in reason
+    assert source == "gh pr checks (all reported)"
+    assert len(calls) == 2
+    assert "--required" not in calls[1]
 
 
 def test_pagination_merges_object_collection_fields() -> None:

@@ -435,13 +435,14 @@ def test_response_command_checkpoints_before_wait_and_records_current_head_succe
 
         def refresh_required_checks(
             self, _number: int, expected_head: str
-        ) -> tuple[tuple[dict[str, str], ...], None]:
+        ) -> tuple[tuple[dict[str, str], ...], None, str]:
             nonlocal refreshes
             assert expected_head == head_sha
             refreshes += 1
             return (
                 ({"name": "unit", "state": "SUCCESS", "workflow": "ci.yml"},),
                 None,
+                "gh pr checks --required",
             )
 
         def add_issue_comment(self, _number: int, body: str) -> None:
@@ -513,13 +514,14 @@ def test_response_command_records_wait_deadline_when_checks_remain_pending(
 
         def refresh_required_checks(
             self, _number: int, expected_head: str
-        ) -> tuple[tuple[dict[str, str], ...], None]:
+        ) -> tuple[tuple[dict[str, str], ...], None, str]:
             nonlocal refreshes
             assert expected_head == head_sha
             refreshes += 1
             return (
                 ({"name": "unit", "state": "PENDING", "workflow": "ci.yml"},),
                 None,
+                "gh pr checks --required",
             )
 
         def add_issue_comment(self, _number: int, body: str) -> None:

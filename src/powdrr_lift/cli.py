@@ -3200,6 +3200,7 @@ def _run_respond_to_pr_ci(args: argparse.Namespace) -> int:
                 },
                 "required_checks": snapshot.required_checks,
                 "observed_at": snapshot.observed_at,
+                "required_checks_source": snapshot.required_checks_source,
             },
             repository=args.repository,
             pull_request_number=pr_number,
@@ -3286,8 +3287,8 @@ def _run_respond_to_pr_ci(args: argparse.Namespace) -> int:
                     wait_deadline_reached = True
                     break
                 time.sleep(min(poll_interval_seconds, remaining))
-                refreshed_checks, refresh_reason = client.refresh_required_checks(
-                    pr_number, head_sha
+                refreshed_checks, refresh_reason, refresh_source = (
+                    client.refresh_required_checks(pr_number, head_sha)
                 )
                 if refreshed_checks is None:
                     observation = replace(
@@ -3301,7 +3302,7 @@ def _run_respond_to_pr_ci(args: argparse.Namespace) -> int:
                     observation = replace(
                         observation,
                         required_checks_status="available",
-                        required_check_source="gh pr checks --required",
+                        required_check_source=refresh_source,
                         required_checks=tuple(
                             CIRequiredCheck(
                                 name=item["name"],
@@ -3312,7 +3313,11 @@ def _run_respond_to_pr_ci(args: argparse.Namespace) -> int:
                             for item in refreshed_checks
                         ),
                     )
-                    snapshot = replace(snapshot, required_checks_reason=None)
+                    snapshot = replace(
+                        snapshot,
+                        required_checks_reason=refresh_reason,
+                        required_checks_source=refresh_source,
+                    )
                 assessment = assess_ci_observation(
                     observation, pull_request_draft=draft_status
                 )

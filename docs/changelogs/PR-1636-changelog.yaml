@@ -1,0 +1,49 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1636
+title: Collapse ordered structural edits into final state
+intent:
+  problem: Ordered PR items may update the same structural subject in separate steps, but the plan-wide proposal retains each step as a duplicate operation.
+  goal: Preserve each item-specific projection while compiling one deterministic net change from the pinned baseline to the final state.
+human-decisions: []
+structured_files: []
+files:
+  - path: packages/service/src/powdrr_service/planning/multipr_structrr.py
+    type: modified
+    span: {start_line: 22, end_line: 22}
+    summary: Import stable structural subject identity for net delta compilation.
+    rationale: Compare projected records by the same identity rules used by Structrr state projection.
+  - path: packages/service/src/powdrr_service/planning/multipr_structrr.py
+    type: modified
+    span: {start_line: 331, end_line: 338}
+    summary: Project ordered item batches before building the plan-wide proposal.
+    rationale: Derive the full-plan change from the pinned starting state and the final ordered state.
+  - path: packages/service/src/powdrr_service/planning/multipr_structrr.py
+    type: modified
+    span: {start_line: 342, end_line: 342}
+    summary: Compile the full proposal from the consolidated final-state delta.
+    rationale: Avoid duplicate operations when dependent PR items update one subject in sequence.
+  - path: packages/service/src/powdrr_service/planning/multipr_structrr.py
+    type: modified
+    span: {start_line: 800, end_line: 846}
+    summary: Add deterministic baseline-to-final delta generation across affected sections.
+    rationale: Represent each subject once in the complete proposal while retaining the final projected content and action.
+  - path: tests/test_planning_structrr.py
+    type: modified
+    span: {start_line: 2553, end_line: 2621}
+    summary: Verify dependent item edits compose into per-item snapshots and a single final full-plan operation.
+    rationale: Catch inconsistent projections when ordered PR items modify the same structural subject.
+  - path: docs/audits/planning-llm-audit.md
+    type: modified
+    span: {start_line: 738, end_line: 742}
+    summary: Record ordered structural delta compilation and retain the remaining milestone 4 test recommendations.
+    rationale: Keep the planning LLM audit aligned with current deterministic compilation behavior.
+entities: []
+entity_relationships: []
+invariants:
+  - id: full-proposal-is-baseline-to-final-delta
+    description: The complete structural proposal represents one net operation per changed subject from the pinned baseline to the final ordered state; each PR item retains its own predecessor snapshot.
+    action: added
+  - id: unordered-subject-edits-remain-rejected
+    description: Structural operations on the same subject in unordered plan items are rejected.
+    action: altered
+guidance: []

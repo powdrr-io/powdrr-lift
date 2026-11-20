@@ -19,7 +19,7 @@ from powdrr_service.structrr.actual_diff import (
     compile_actual_structrr_diff,
 )
 from powdrr_service.structrr.candidate_comparison import compare_candidate_snapshot
-from powdrr_service.structrr.design import project_sections
+from powdrr_service.structrr.design import project_sections, subject_identity
 from powdrr_service.structrr.proposal import ProposalRevision, compile_proposal_revision
 from powdrr_service.structrr.rebase import rebase_structrr_snapshot
 from powdrr_service.structrr.snapshot import snapshot_digest
@@ -328,10 +328,18 @@ def compile_multi_pr_proposal(
             },
         )
 
+    projected_full_state = dict(baseline_snapshot)
+    for item_id in item_by_id:
+        projected_full_state = _apply_sections(projected_full_state, grouped[item_id])
+    full_sections = _final_state_delta_sections(
+        baseline_snapshot,
+        projected_full_state,
+        tuple(all_sections),
+    )
     full = compile(
         f"{plan_id}:full",
         tuple(item_by_id.values()),
-        all_sections,
+        full_sections,
         baseline_snapshot,
         all_code_evidence,
     )
@@ -787,6 +795,53 @@ def _apply_sections(
 ) -> dict[str, Any]:
     """Use the shared desired-state transition semantics."""
     return project_sections(baseline, sections)
+
+
+def _final_state_delta_sections(
+    baseline: Mapping[str, Any],
+    final_state: Mapping[str, Any],
+    sections: Sequence[str],
+) -> dict[str, list[dict[str, Any]]]:
+    """Collapse ordered item operations into one baseline-to-final delta."""
+    result: dict[str, list[dict[str, Any]]] = {}
+    for section in sections:
+        collection = "source_subjects" if section == "files" else section
+        before_records = baseline.get(collection, [])
+        after_records = final_state.get(collection, [])
+        if not isinstance(before_records, list) or not isinstance(after_records, list):
+            raise ValueError(f"Structrr {collection} must contain identified records")
+        before = {
+            subject_identity(section, record): dict(record)
+            for record in before_records
+            if isinstance(record, Mapping)
+        }
+        after = {
+            subject_identity(section, record): dict(record)
+            for record in after_records
+            if isinstance(record, Mapping)
+        }
+        deltas: list[dict[str, Any]] = []
+        for identity in sorted(before.keys() | after.keys()):
+            original = before.get(identity)
+            target = after.get(identity)
+            if original == target:
+                continue
+            action = (
+                "added"
+                if original is None
+                else "removed"
+                if target is None
+                else "changed"
+            )
+            content = target if target is not None else original
+            assert content is not None
+            if section in STORY_SECTIONS:
+                deltas.append({"id": identity, "action": action, "content": content})
+            else:
+                deltas.append({**content, "action": action})
+        if deltas:
+            result[section] = deltas
+    return result
 
 
 def project_structural_operations(

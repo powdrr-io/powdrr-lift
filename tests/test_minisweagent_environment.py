@@ -253,8 +253,27 @@ def test_configuration_requires_valid_service_and_prevents_downgrade(
     monkeypatch.setenv("POWDRR_STRUCTRR_MODE", "enforce")
     with pytest.raises(ValueError, match="downgrade"):
         configure_source_environment({"environment": {"source_reference_mode": "off"}})
-    config: dict[str, Any] = {}
+    completion = "echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT"
+    config: dict[str, Any] = {
+        "agent": {"instance_template": f"first: {completion}\nsecond: {completion}"}
+    }
     assert configure_source_environment(config)
+    assert (
+        config["agent"]["instance_template"].count(
+            "printf '%s\\n' COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT "
+            "'{\"design_gaps\":[]}'"
+        )
+        == 2
+    )
+    assert completion not in config["agent"]["instance_template"]
+    custom_config: dict[str, Any] = {
+        "agent": {"instance_template": "Solve the assigned task."}
+    }
+    assert configure_source_environment(custom_config)
+    assert (
+        "Do not use the sentinel by itself"
+        in custom_config["agent"]["instance_template"]
+    )
     with pytest.raises(ValueError, match="endpoint"):
         StructrrLocalEnvironment(
             **{

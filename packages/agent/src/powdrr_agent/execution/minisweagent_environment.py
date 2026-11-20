@@ -12,6 +12,10 @@ from pydantic import field_validator
 from powdrr_agent.execution.source_reader import context_request
 
 _COMPLETION_MARKER = "COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT"
+_SOURCE_COMPLETION_COMMAND = (
+    "printf '%s\\n' COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT '{\"design_gaps\":[]}'"
+)
+_DEFAULT_COMPLETION_COMMAND = "echo COMPLETE_TASK_AND_SUBMIT_FINAL_OUTPUT"
 
 
 class StructrrLocalEnvironmentConfig(LocalEnvironmentConfig):
@@ -164,4 +168,28 @@ def configure_source_environment(config: dict[str, Any]) -> bool:
             or os.environ.get("POWDRR_STRUCTRR_ENDPOINT", ""),
         }
     )
+    if mode == "enforce":
+        _configure_source_completion_protocol(config)
     return True
+
+
+def _configure_source_completion_protocol(config: dict[str, Any]) -> None:
+    """Make MiniSWE's mandatory terminal instruction satisfy source validation."""
+    agent_config = config.setdefault("agent", {})
+    template = agent_config.get("instance_template")
+    if not isinstance(template, str):
+        raise ValueError(
+            "enforced source reference mode requires a MiniSWE instance template"
+        )
+    if _DEFAULT_COMPLETION_COMMAND in template:
+        template = template.replace(
+            _DEFAULT_COMPLETION_COMMAND, _SOURCE_COMPLETION_COMMAND
+        )
+    else:
+        template += (
+            "\n\n## Enforced source-reference completion\n\n"
+            "Finish by reporting the source design-gap JSON in the required final "
+            "submission. Run exactly this command: "
+            f"`{_SOURCE_COMPLETION_COMMAND}`. Do not use the sentinel by itself."
+        )
+    agent_config["instance_template"] = template

@@ -26,6 +26,7 @@ from powdrr_lift.workrr.coding_agent import (
     CodingAgentRunner,
     CodingAgentStatus,
     ImplementationRequest,
+    _working_paths,
 )
 from powdrr_lift.workrr.source_reference_validation import (
     SourceReferenceValidationContext,
@@ -607,28 +608,35 @@ def execute_coding_agent_attempt(
         ):
             raise ValueError("Validation context differs from the prepared source run")
         reference_context = execution.validation_context
-    validation = ValidationRunner(
-        profiles,
-        timeout_seconds=validation_timeout_seconds,
-        reference_context=reference_context,
-        command_wrapper=execution.protect_command if execution else None,
-        environment_overrides=execution.validation_environment() if execution else None,
-        reference_claims=execution.claims if execution else (),
-    ).run(request, attempt, worktree_root=worktree_root)
+
+    def run_validation() -> ValidationReport:
+        paths_before = _working_paths(worktree_root) if execution is not None else set()
+        report = ValidationRunner(
+            profiles,
+            timeout_seconds=validation_timeout_seconds,
+            reference_context=reference_context,
+            command_wrapper=execution.protect_command if execution else None,
+            environment_overrides=(
+                execution.validation_environment() if execution else None
+            ),
+            reference_claims=execution.claims if execution else (),
+        ).run(request, attempt, worktree_root=worktree_root)
+        if execution is not None:
+            cleanup_fixtures = getattr(
+                execution, "cleanup_generated_validation_fixtures", None
+            )
+            if callable(cleanup_fixtures):
+                cleanup_fixtures(paths_before)
+        return report
+
+    validation = run_validation()
     registered_corrections: tuple[Mapping[str, Any], ...] = ()
     if execution is not None:
         correction = execution.apply_registered_correction(attempt, validation)
         if correction is not None:
             registered_corrections = (correction,)
             if correction.get("status") == "applied":
-                validation = ValidationRunner(
-                    profiles,
-                    timeout_seconds=validation_timeout_seconds,
-                    reference_context=reference_context,
-                    command_wrapper=execution.protect_command,
-                    environment_overrides=execution.validation_environment(),
-                    reference_claims=execution.claims,
-                ).run(request, attempt, worktree_root=worktree_root)
+                validation = run_validation()
                 execution.record_registered_correction_candidate()
     runner.store.save_validation_report(validation)
     diff_check = subprocess.run(

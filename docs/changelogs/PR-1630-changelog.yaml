@@ -1,0 +1,96 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1630
+title: Keep regenerated fixtures from invalidating source runs
+intent:
+  problem: Source-run verification may regenerate golden fixture data in the candidate worktree, changing bytes after the worker completes and causing Powdrr to reject an otherwise valid implementation.
+  goal: Clean up newly generated fixture data after every validation pass, retain source-mutation rejection, and record cleanup in the durable source-run result.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/coding_agent_validation.py
+    type: modified
+    span: {start_line: 29, end_line: 29}
+    summary: Track source paths before each validation run.
+    rationale: Identify validation-created fixture outputs without confusing them with worker edits.
+  - path: src/powdrr_lift/workrr/coding_agent_validation.py
+    type: modified
+    span: {start_line: 611, end_line: 632}
+    summary: Run fixture cleanup after each validation pass.
+    rationale: Keep generated validation outputs from changing the accepted source candidate, including after a registered formatter correction reruns validation.
+  - path: src/powdrr_lift/workrr/coding_agent_validation.py
+    type: modified
+    span: {start_line: 639, end_line: 639}
+    summary: Reuse the guarded validation helper after a registered formatter correction.
+    rationale: Apply the same fixture cleanup to every validation pass.
+  - path: src/powdrr_lift/workrr/source_reference_run.py
+    type: modified
+    span: {start_line: 347, end_line: 357}
+    summary: Identify safe fixture data paths that repository validation may regenerate.
+    rationale: Restrict automatic cleanup to data files within fixture directories.
+  - path: src/powdrr_lift/workrr/source_reference_run.py
+    type: modified
+    span: {start_line: 583, end_line: 583}
+    summary: Store generated validation artifact paths on each source run.
+    rationale: Make cleanup results available for durable diagnostics.
+  - path: src/powdrr_lift/workrr/source_reference_run.py
+    type: modified
+    span: {start_line: 837, end_line: 837}
+    summary: Initialize the validation artifact diagnostic record.
+    rationale: Ensure every source run has a deterministic empty value before validation.
+  - path: src/powdrr_lift/workrr/source_reference_run.py
+    type: modified
+    span: {start_line: 1180, end_line: 1255}
+    summary: Restore tracked or remove untracked fixture artifacts created during validation.
+    rationale: Preserve the worker's exact candidate while retaining rejection of source changes and unsafe fixture paths.
+  - path: src/powdrr_lift/workrr/source_reference_run.py
+    type: modified
+    span: {start_line: 1620, end_line: 1620}
+    summary: Record generated validation artifact paths in the durable source-run result.
+    rationale: Make fixture cleanup visible in run diagnostics.
+  - path: src/powdrr_lift/workrr/source_reference_run.py
+    type: modified
+    span: {start_line: 1739, end_line: 1741}
+    summary: Include cleaned fixture paths in the source-run terminal record.
+    rationale: Preserve durable evidence of the validation cleanup.
+  - path: tests/test_source_reference_run.py
+    type: modified
+    span: {start_line: 78, end_line: 78}
+    summary: Allow source-run tests to create a tracked fixture baseline.
+    rationale: Exercise cleanup against committed generated fixture data.
+  - path: tests/test_source_reference_run.py
+    type: modified
+    span: {start_line: 96, end_line: 98}
+    summary: Add a tracked golden fixture to the source-run test repository.
+    rationale: Reproduce a validation command that rewrites committed fixture data.
+  - path: tests/test_source_reference_run.py
+    type: modified
+    span: {start_line: 1021, end_line: 1021}
+    summary: Add a validation-generated fixture scenario to source-run coverage.
+    rationale: Verify fixture side effects separately from source mutations.
+  - path: tests/test_source_reference_run.py
+    type: modified
+    span: {start_line: 1036, end_line: 1042}
+    summary: Configure the test verifier to rewrite a golden fixture.
+    rationale: Reproduce the candidate mutation observed in issue 917's failed run.
+  - path: tests/test_source_reference_run.py
+    type: modified
+    span: {start_line: 1045, end_line: 1045}
+    summary: Enable the tracked fixture baseline for the scenario.
+    rationale: Verify the tracked file is restored to its pre-validation bytes.
+  - path: tests/test_source_reference_run.py
+    type: modified
+    span: {start_line: 1109, end_line: 1111}
+    summary: Expect fixture regeneration to preserve candidate acceptance.
+    rationale: Ensure validation side effects do not turn a passing run into an invalid candidate.
+  - path: tests/test_source_reference_run.py
+    type: modified
+    span: {start_line: 1133, end_line: 1138}
+    summary: Verify generated fixture data is cleaned and recorded without accepting source mutations.
+    rationale: Prevent regressions in candidate integrity handling around repository verifiers.
+entities: []
+entity_relationships: []
+invariants:
+  - id: source-run-candidate-integrity-survives-fixture-generation
+    description: Validation may regenerate fixture data without changing the source candidate, while validation changes to source code remain visible and reject the candidate.
+    action: added
+guidance: []

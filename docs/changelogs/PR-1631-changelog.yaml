@@ -1,0 +1,28 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1631
+title: Record completed deterministic planner pagination work
+intent:
+  problem: The planning LLM audit still listed pagination and copied-field removal as in progress even though the implementation and verification had landed.
+  goal: Record the completed milestone and its concrete regression coverage so follow-up planner work starts at the next open milestone.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/audits/planning-llm-audit.md
+    type: modified
+    span: {start_line: 698, end_line: 698}
+    summary: Mark deterministic planner pagination and copied-field removal complete.
+    rationale: Keep the audit's implementation status aligned with the merged planner and identify the remaining semantic and evidence milestones.
+  - path: docs/audits/planning-llm-audit.md
+    type: modified
+    span: {start_line: 707, end_line: 715}
+    summary: Record the regression cases that verify deterministic continuation and lossless answer handling.
+    rationale: Make the milestone completion evidence traceable to focused tests.
+  - path: docs/audits/planning-llm-audit.md
+    type: modified
+    span: {start_line: 743, end_line: 746}
+    summary: Update the current milestone status summary.
+    rationale: Start subsequent implementation from the next incomplete planner milestone.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []

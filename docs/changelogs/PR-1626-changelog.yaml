@@ -1,0 +1,23 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1626
+title: Specify intent preserving scope recovery
+intent:
+  problem: A generated file omitted from a Powdrr plan can block a candidate before validation, even when the edit serves the accepted requirements.
+  goal: Give implementers a concrete specification for evidence based scope correction, candidate repair, and human intent decisions.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/plans/intent-preserving-scope-recovery.md
+    type: added
+    span: {start_line: 1, end_line: 237}
+    summary: Specify scope recovery from candidate quarantine through validation and publication.
+    rationale: Document the Gaterr regression, the code entry points, and the acceptance checks needed to implement recovery.
+entities:
+  - id: intent-preserving-scope-recovery-specification
+    type: Technical specification
+    action: added
+entity_relationships: []
+invariants: []
+guidance: []
+features: []
+proposed_prs: []

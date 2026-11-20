@@ -1,0 +1,104 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1639
+title: Validate requirement execution receipts before coverage
+intent:
+  problem: A model could cite an execution receipt typed as evidence without code verifying that the receipt was valid for the current requirement and pinned run.
+  goal: Validate receipt integrity and exact requirement/commit binding before receipt evidence reaches a coverage question or supports a complete answer.
+human-decisions: []
+structured_files: []
+files:
+  - path: packages/service/src/powdrr_service/planning/coverage.py
+    type: modified
+    span: {start_line: 24, end_line: 27}
+    summary: Import receipt parsing and requirement digest helpers for coverage validation.
+    rationale: Reuse the canonical receipt schema and requirement-binding algorithm.
+  - path: packages/service/src/powdrr_service/planning/coverage.py
+    type: modified
+    span: {start_line: 131, end_line: 133}
+    summary: Extend coverage answer binding with requirement, pinned commit, and receipt excerpt context.
+    rationale: Make deterministic receipt checks possible at the answer validation boundary.
+  - path: packages/service/src/powdrr_service/planning/coverage.py
+    type: modified
+    span: {start_line: 157, end_line: 175}
+    summary: Reject receipt evidence that fails exact requirement and commit validation.
+    rationale: Prevent a model answer from upgrading stale or unrelated receipt evidence to complete coverage.
+  - path: packages/service/src/powdrr_service/planning/coverage.py
+    type: modified
+    span: {start_line: 233, end_line: 262}
+    summary: Validate receipt excerpt digest, schema, identity, requirement digest, commits, and passed outcome.
+    rationale: Establish the receipt trust boundary deterministically.
+  - path: packages/service/src/powdrr_service/planning/coverage.py
+    type: modified
+    span: {start_line: 275, end_line: 277}
+    summary: Preserve supplied evidence uniqueness checks before filtering untrusted receipts.
+    rationale: Ensure duplicate evidence IDs cannot obscure which receipt is validated.
+  - path: packages/service/src/powdrr_service/planning/coverage.py
+    type: modified
+    span: {start_line: 280, end_line: 281}
+    summary: Track trusted evidence separately while building coverage context.
+    rationale: Keep invalid receipts out of the question input.
+  - path: packages/service/src/powdrr_service/planning/coverage.py
+    type: modified
+    span: {start_line: 287, end_line: 294}
+    summary: Omit malformed, stale, failed, or mismatched receipts from coverage evidence.
+    rationale: Prevent the LLM from citing receipts that do not prove the requirement at the pinned commit.
+  - path: packages/service/src/powdrr_service/planning/coverage.py
+    type: modified
+    span: {start_line: 298, end_line: 299}
+    summary: Build answer evidence maps only from validated coverage evidence.
+    rationale: Constrain citations to the exact evidence supplied to the model.
+  - path: packages/service/src/powdrr_service/planning/coverage.py
+    type: modified
+    span: {start_line: 456, end_line: 458}
+    summary: Supply exact receipt validation context to the coverage answer parser.
+    rationale: Enforce receipt trust before accepting a complete answer.
+  - path: packages/service/src/powdrr_service/planning/coverage.py
+    type: modified
+    span: {start_line: 469, end_line: 470}
+    summary: Allow accepted coverage to be revalidated with the same receipt context.
+    rationale: Keep result compilation safe if callers bypass the question parser.
+  - path: packages/service/src/powdrr_service/planning/coverage.py
+    type: modified
+    span: {start_line: 494, end_line: 496}
+    summary: Revalidate the answer against receipt context when constructing coverage results.
+    rationale: Prevent direct result construction from bypassing receipt provenance checks.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 2954, end_line: 2959}
+    summary: Pass pinned commit and validated evidence excerpts into coverage result construction.
+    rationale: Bind deterministic receipt validation to the active planner source snapshot.
+  - path: tests/test_requirement_execution_receipt.py
+    type: modified
+    span: {start_line: 6, end_line: 11}
+    summary: Import receipt validation assertion helpers.
+    rationale: Exercise the coverage parser's fail-closed receipt boundary.
+  - path: tests/test_requirement_execution_receipt.py
+    type: modified
+    span: {start_line: 29, end_line: 41}
+    summary: Parameterize invalid receipt binding cases across requirement, digest, commits, and outcome.
+    rationale: Cover the receipt fields that must match before they can prove coverage.
+  - path: tests/test_requirement_execution_receipt.py
+    type: modified
+    span: {start_line: 110, end_line: 110}
+    summary: Mutate each receipt binding field in turn for negative validation cases.
+    rationale: Ensure incorrect receipt contents are rejected after a valid receipt ID is recomputed.
+  - path: tests/test_requirement_execution_receipt.py
+    type: modified
+    span: {start_line: 130, end_line: 151}
+    summary: Verify invalid receipts cannot be cited directly or included in coverage question context.
+    rationale: Prove the LLM cannot use stale or mismatched execution results to claim completion.
+  - path: docs/audits/planning-llm-audit.md
+    type: modified
+    span: {start_line: 747, end_line: 751}
+    summary: Record deterministic receipt validation as part of the planner coverage boundary.
+    rationale: Keep the audit aligned with implemented protection and remaining semantic coverage judgment.
+entities: []
+entity_relationships: []
+invariants:
+  - id: only-valid-requirement-bound-receipts-prove-coverage
+    description: A receipt can support coverage only after its excerpt digest, schema and ID, requirement ID and digest, pinned source and candidate commits, and passed outcome are verified.
+    action: added
+  - id: invalid-receipts-are-not-model-context
+    description: Malformed, failed, stale, or mismatched execution receipts are omitted from coverage question evidence.
+    action: added
+guidance: []

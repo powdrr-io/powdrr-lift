@@ -335,6 +335,24 @@ def test_fidelity_and_equivalence_are_tagged_and_strict() -> None:
 
 
 def test_equivalent_duplicate_merge_keeps_both_source_anchors() -> None:
+    source_logic_a = {
+        "op": "conditional",
+        "condition": {"source_ref": "anchor-0001", "quote": "If enabled"},
+        "then": {
+            "op": "atom",
+            "source_ref": "anchor-0001",
+            "quote": "Keep each source anchor.",
+        },
+    }
+    source_logic_b = {
+        "op": "conditional",
+        "condition": {"source_ref": "anchor-0002", "quote": "If enabled"},
+        "then": {
+            "op": "atom",
+            "source_ref": "anchor-0002",
+            "quote": "Preserve all source anchors.",
+        },
+    }
     original = Requirement(
         "req-0001",
         "Keep each source anchor.",
@@ -343,6 +361,7 @@ def test_equivalent_duplicate_merge_keeps_both_source_anchors() -> None:
         (),
         (),
         source_validation_groups=(("validation:source-a", "conditional"),),
+        source_logic=(source_logic_a,),
     )
     duplicate = Requirement(
         "req-0002",
@@ -352,6 +371,7 @@ def test_equivalent_duplicate_merge_keeps_both_source_anchors() -> None:
         (),
         (),
         source_validation_groups=(("validation:source-b", "alternatives"),),
+        source_logic=(source_logic_b,),
     )
 
     merged = merge_equivalent_requirements(
@@ -364,6 +384,7 @@ def test_equivalent_duplicate_merge_keeps_both_source_anchors() -> None:
         ("validation:source-a", "conditional"),
         ("validation:source-b", "alternatives"),
     )
+    assert merged.source_logic == (source_logic_a, source_logic_b)
     with pytest.raises(PlanningSourceError, match="cannot be merged"):
         merge_equivalent_requirements(
             original, duplicate, EquivalenceDecision(False, "Partial overlap.")
@@ -620,6 +641,94 @@ def test_source_edit_invalidates_deterministic_extraction_windows() -> None:
 
     assert first_request.question.question_id != second_request.question.question_id
     assert first_request.question.input_digest != second_request.question.input_digest
+
+
+def test_requirement_extraction_preserves_source_bound_nested_logic() -> None:
+    text = (
+        "# Plan\n\nIf credentials are valid, return status 200 and include an "
+        "account ID; otherwise return status 401.\n"
+    )
+    segmented = segment_markdown_source(_document(text))
+    block = next(item for item in segmented.blocks if item.kind == "paragraph")
+    anchors = {item.id: item for item in segmented.anchors}
+    request = build_extract_requirements_requests(block, anchors=anchors)[0]
+    page_fact = next(
+        fact
+        for fact in request.accepted_facts
+        if fact.ref_id.startswith("source-window-")
+    )
+    anchor_id = page_fact.value["anchor_ids"][0]
+    answer = {
+        "records": [
+            {
+                "statement": (
+                    "Return the source-defined response for each credential case."
+                ),
+                "kind": "behavior",
+                "source_refs": [anchor_id],
+                "related_source_refs": [],
+                "source_logic": {
+                    "op": "conditional",
+                    "condition": {
+                        "source_ref": anchor_id,
+                        "quote": "If credentials are valid",
+                    },
+                    "then": {
+                        "op": "all_of",
+                        "children": [
+                            {
+                                "op": "atom",
+                                "source_ref": anchor_id,
+                                "quote": "return status 200",
+                            },
+                            {
+                                "op": "atom",
+                                "source_ref": anchor_id,
+                                "quote": "include an account ID",
+                            },
+                        ],
+                    },
+                    "else": {
+                        "op": "atom",
+                        "source_ref": anchor_id,
+                        "quote": "otherwise return status 401",
+                    },
+                },
+            }
+        ]
+    }
+
+    parsed = request.parse_answer(answer)
+    allocated, drafts = allocate_requirements(
+        parsed.records,
+        first_ordinal=1,
+        anchors=anchors,
+        ledger=segmented.instruction_ledger,
+    )
+
+    assert request.question.contract_version == 2
+    assert request.question.expected_answer_schema == "extract-requirements-answer-v3"
+    assert parsed.records[0]["source_logic"]["op"] == "conditional"
+    assert parsed.records[0]["source_logic"]["then"]["op"] == "all_of"
+    assert allocated[0].source_logic == (parsed.records[0]["source_logic"],)
+    assert drafts[0].source_logic == (parsed.records[0]["source_logic"],)
+    invalid = {
+        **answer,
+        "records": [
+            {
+                **answer["records"][0],
+                "source_logic": {
+                    **dict(answer["records"][0]["source_logic"]),
+                    "condition": {
+                        "source_ref": anchor_id,
+                        "quote": "credentials are always valid",
+                    },
+                },
+            }
+        ],
+    }
+    with pytest.raises(PlanningContractError, match="not an exact quote"):
+        request.parse_answer(invalid)
 
 
 def test_source_extraction_windows_keep_question_input_bounded() -> None:

@@ -1018,13 +1018,13 @@ def test_oversized_work_unit_answer_replays_as_a_smaller_question_group() -> Non
         ),
     )
     question = Question(
-        question_id="propose-units-v9-req-0057-example",
+        question_id="propose-units-v10-req-0057-example",
         kind="propose_work_units",
-        contract_version=9,
+        contract_version=10,
         subject_ids=("req-0057", "req-0058", "req-0059", "req-0060"),
         input_digest="sha256:" + "0" * 64,
         context_ref_ids=(),
-        expected_answer_schema="work-unit-proposals-v9",
+        expected_answer_schema="work-unit-proposals-v10",
         attempt=1,
     )
     event = PlanningCheckpoint.needs_answer(
@@ -1041,13 +1041,13 @@ def test_oversized_work_unit_answer_replays_as_a_smaller_question_group() -> Non
     )
     store.append(event, expected_parent_digest=None)
     single_question = Question(
-        question_id="propose-units-v9-req-0058-single",
+        question_id="propose-units-v10-req-0058-single",
         kind="propose_work_units",
-        contract_version=9,
+        contract_version=10,
         subject_ids=("req-0058",),
         input_digest="sha256:" + "1" * 64,
         context_ref_ids=(),
-        expected_answer_schema="work-unit-proposals-v9",
+        expected_answer_schema="work-unit-proposals-v10",
         attempt=1,
     )
     single_event = PlanningCheckpoint.needs_answer(

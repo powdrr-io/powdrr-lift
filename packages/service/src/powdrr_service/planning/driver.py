@@ -1301,7 +1301,7 @@ class SourceLedgerQuestionMachine:
         proposal_answers = {
             question_id: answer
             for question_id, answer in accepted_answers.items()
-            if question_id.startswith("propose-units-v9-")
+            if question_id.startswith("propose-units-v10-")
         }
         cache_key = hashlib.sha256(
             json.dumps(
@@ -1920,6 +1920,9 @@ class SourceLedgerQuestionMachine:
                             for group_id, relation in (
                                 requirement.source_validation_groups
                             )
+                        ],
+                        "source_logic": [
+                            dict(expression) for expression in requirement.source_logic
                         ],
                     }
                     for requirement in item_requirements

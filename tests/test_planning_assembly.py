@@ -637,6 +637,23 @@ def test_deterministic_item_description_copies_frozen_deliverable() -> None:
 
 def test_work_unit_question_has_a_parser_valid_example_and_exact_context() -> None:
     context, anchor = _context()
+    source_ref = context.requirements["req-0001"].source_refs[0]
+    source_logic = {
+        "op": "conditional",
+        "condition": {
+            "source_ref": source_ref,
+            "quote": "to validate Python behavior",
+        },
+        "then": {
+            "op": "atom",
+            "source_ref": source_ref,
+            "quote": "Add `Tests/Validator.swift`",
+        },
+    }
+    requirement = replace(
+        context.requirements["req-0001"], source_logic=(source_logic,)
+    )
+    context = replace(context, requirements={requirement.id: requirement})
     example_proposal = _proposal(context, anchor)
     example = {"records": [example_proposal]}
 
@@ -659,15 +676,20 @@ def test_work_unit_question_has_a_parser_valid_example_and_exact_context() -> No
 
     request.validate()
     assert request.question.kind == "propose_work_units"
-    assert request.question.contract_version == 9
-    assert request.question.expected_answer_schema == "work-unit-proposals-v9"
-    assert request.question.question_id.startswith("propose-units-v9-")
+    assert request.question.contract_version == 10
+    assert request.question.expected_answer_schema == "work-unit-proposals-v10"
+    assert request.question.question_id.startswith("propose-units-v10-")
     assert "requirement_coverage" in request.exact_question
     assert (
         "Do not schedule work or tests that already satisfy" in request.exact_question
     )
     assert "several strongly related requirements together" in request.exact_question
     assert "Do not create one unit per requirement" in request.exact_question
+    assert "preserve its nested Boolean conditions" in request.exact_question
+    requirement_fact = next(
+        fact for fact in request.accepted_facts if fact.ref_id == "requirement:req-0001"
+    )
+    assert requirement_fact.value["source_logic"] == [source_logic]
     assert "Powdrr derives each write's anchors" in request.exact_question
     assert "runtime are derived" in request.exact_question
     assert "return separate proposals" in request.exact_question

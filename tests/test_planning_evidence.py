@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import subprocess
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -582,6 +583,21 @@ def test_requirement_search_supplies_pinned_implementation_and_test_evidence(
 ) -> None:
     repository, commit = _repository(tmp_path)
     requirement, source = _requirement(commit)
+    source_logic = {
+        "op": "all_of",
+        "children": [
+            {
+                "op": "atom",
+                "source_ref": requirement.source_refs[0],
+                "quote": "The parser",
+            },
+            {
+                "op": "atom",
+                "source_ref": requirement.source_refs[0],
+                "quote": "trims surrounding whitespace.",
+            },
+        ],
+    }
     requirement = Requirement(
         requirement.id,
         "Parse payload payload values with the existing parser.",
@@ -590,6 +606,7 @@ def test_requirement_search_supplies_pinned_implementation_and_test_evidence(
         requirement.source_group_ids,
         requirement.related_requirement_ids,
         source_validation_groups=requirement.source_validation_groups,
+        source_logic=(source_logic,),
     )
 
     def find_document_symbols(
@@ -662,12 +679,16 @@ def test_requirement_search_supplies_pinned_implementation_and_test_evidence(
     )
     request.validate()
     service_request.validate()
+    assert service_request.question.contract_version == 2
+    assert service_request.question.expected_answer_schema == "coverage-answer-v2"
     requirement_context = next(
         item for item in service_request.accepted_facts if item.ref_id == requirement.id
     )
     assert requirement_context.value["source_validation_groups"] == [
         {"id": "group-conditional-1", "relation": "conditional"}
     ]
+    assert requirement_context.value["source_logic"] == [source_logic]
+    assert "source_logic" in service_request.exact_question
     assert service_request.question == request.question
     assert service_request.exact_question == request.exact_question
     assert "at most 300 characters" in request.exact_question
@@ -1040,6 +1061,26 @@ def test_coverage_contract_distinguishes_complete_partial_and_missing(
         supplied_evidence_ids=tuple(evidence),
     )
     requirement, _ = _requirement()
+    requirement = replace(
+        requirement,
+        source_logic=(
+            {
+                "op": "all_of",
+                "children": [
+                    {
+                        "op": "atom",
+                        "source_ref": requirement.source_refs[0],
+                        "quote": "The parser",
+                    },
+                    {
+                        "op": "atom",
+                        "source_ref": requirement.source_refs[0],
+                        "quote": "trims surrounding whitespace.",
+                    },
+                ],
+            },
+        ),
+    )
     assessment = create_requirement_coverage(
         requirement,
         partial,
@@ -1055,6 +1096,7 @@ def test_coverage_contract_distinguishes_complete_partial_and_missing(
         assessment.residual.source_validation_groups
         == requirement.source_validation_groups
     )
+    assert assessment.residual.source_logic == requirement.source_logic
     next_assessment = create_requirement_coverage(
         assessment.residual,
         partial,

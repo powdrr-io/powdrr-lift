@@ -34,6 +34,7 @@ class ResidualRequirement:
     source_group_ids: tuple[str, ...]
     related_requirement_ids: tuple[str, ...]
     source_validation_groups: tuple[tuple[str, str], ...] = ()
+    source_logic: tuple[Mapping[str, Any], ...] = ()
 
     def to_data(self) -> dict[str, Any]:
         return {
@@ -48,6 +49,7 @@ class ResidualRequirement:
                 {"id": group_id, "relation": relation}
                 for group_id, relation in self.source_validation_groups
             ],
+            "source_logic": [dict(item) for item in self.source_logic],
             "related_requirement_ids": list(self.related_requirement_ids),
         }
 
@@ -238,6 +240,7 @@ def build_requirement_coverage_request(
                 {"id": group_id, "relation": relation}
                 for group_id, relation in requirement.source_validation_groups
             ],
+            "source_logic": [dict(item) for item in requirement.source_logic],
         },
     )
     search_record = (
@@ -259,6 +262,7 @@ def build_requirement_coverage_request(
                 {"id": group_id, "relation": relation}
                 for group_id, relation in requirement.source_validation_groups
             ],
+            "source_logic": [dict(item) for item in requirement.source_logic],
         },
         "evidence": [item.to_data() for item in evidence_records],
         "repository_search": (
@@ -320,7 +324,7 @@ def build_requirement_coverage_request(
         question=Question(
             question_id=f"q-coverage-{input_digest[-16:]}",
             kind="assess_requirement_coverage",
-            contract_version=1,
+            contract_version=2,
             subject_ids=(requirement.id,),
             input_digest=input_digest,
             context_ref_ids=tuple(
@@ -328,14 +332,18 @@ def build_requirement_coverage_request(
                 + [requirement.id]
                 + ([] if search_record is None else [search_record.ref_id])
             ),
-            expected_answer_schema="coverage-answer-v1",
+            expected_answer_schema="coverage-answer-v2",
             attempt=1,
         ),
         exact_question=(
             "This source-validated requirement is the unit of assessment. Decide "
             "whether it is already implemented in the pinned repository. Use only "
             "the supplied code evidence and repository-search record. Search hits "
-            "are candidates; ignore irrelevant matches. If the supplied matches "
+            "are candidates; ignore irrelevant matches. If the requirement includes "
+            "source_logic, treat its exact quoted atoms and conditions as source "
+            "authority. Preserve nested all_of, any_of, ordered, and conditional "
+            "meaning when judging coverage; do not flatten branches or infer missing "
+            "conditions. If the supplied matches "
             "do not implement this behavior, mark it missing. Missing means this "
             "requirement is work to plan, not a reason to stop. Empty symbol "
             "matches do not establish absence on paths omitted by partial code-symbol "
@@ -436,5 +444,6 @@ def create_requirement_coverage(
         source_group_ids=requirement.source_group_ids,
         related_requirement_ids=requirement.related_requirement_ids,
         source_validation_groups=requirement.source_validation_groups,
+        source_logic=requirement.source_logic,
     )
     return RequirementCoverage(requirement.id, bound, residual)

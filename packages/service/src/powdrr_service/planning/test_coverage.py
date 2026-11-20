@@ -275,7 +275,16 @@ def build_test_coverage_request(
                                     "additionalProperties": False,
                                     "required": list(BEHAVIOR_DIMENSIONS),
                                     "properties": {
-                                        name: {"type": "string", "minLength": 1}
+                                        name: {
+                                            "type": "string",
+                                            "minLength": 1,
+                                            "description": (
+                                                "Use unresolved when neither source "
+                                                "evidence nor an explicit assumption "
+                                                "settles this dimension. Do not use "
+                                                "not_applicable to mean unknown."
+                                            ),
+                                        }
                                         for name in BEHAVIOR_DIMENSIONS
                                     },
                                 },
@@ -494,6 +503,19 @@ def build_test_coverage_request(
                     f"{path}/behavior_scenario/evidence",
                     "must cite at least one pinned source excerpt",
                 )
+            raw_dimensions = raw_behavior.get("dimensions")
+            unresolved_dimensions = (
+                [
+                    name
+                    for name in BEHAVIOR_DIMENSIONS
+                    if isinstance(raw_dimensions, Mapping)
+                    and isinstance(raw_dimensions.get(name), str)
+                    and raw_dimensions[name].strip().casefold()
+                    in {"unresolved", "unspecified"}
+                ]
+                if isinstance(raw_dimensions, Mapping)
+                else []
+            )
             behavior: dict[str, Any] = {
                 **dict(raw_behavior),
                 "schema_version": "behavior-scenario-v1",
@@ -507,6 +529,7 @@ def build_test_coverage_request(
                 "faithfulness_ref": {"fingerprint": f"sha256:{digest}"},
                 "routing": "include",
                 "capability_matrix": raw_behavior.get("capability_matrix"),
+                "unresolved_dimensions": unresolved_dimensions,
             }
             assumptions = behavior.get("assumptions")
             if isinstance(assumptions, Sequence) and not isinstance(
@@ -543,6 +566,17 @@ def build_test_coverage_request(
                         continue
                     normalized_assumptions.append(assumption)
                 behavior["assumptions"] = normalized_assumptions
+            unresolved_assumptions = set(unresolved_dimensions).intersection(
+                assumption.get("dimension")
+                for assumption in behavior.get("assumptions", [])
+                if isinstance(assumption, Mapping)
+                and isinstance(assumption.get("dimension"), str)
+            )
+            if unresolved_assumptions:
+                raise PlanningContractError(
+                    f"{path}/behavior_scenario/assumptions",
+                    "must not resolve dimensions also marked unresolved",
+                )
             try:
                 compiled_behavior = compile_behavior_scenarios([behavior])[0]
             except (TypeError, ValueError) as error:
@@ -575,7 +609,7 @@ def build_test_coverage_request(
             }
             for excerpt in source_excerpts
         ],
-        "contract_version": 5,
+        "contract_version": 6,
     }
     digest = hashlib.sha256(
         json.dumps(digest_data, sort_keys=True, separators=(",", ":")).encode()
@@ -584,14 +618,14 @@ def build_test_coverage_request(
         question=Question(
             question_id=question_id,
             kind="plan_test_coverage",
-            contract_version=5,
+            contract_version=6,
             subject_ids=(item_id,),
             input_digest=f"sha256:{digest}",
             context_ref_ids=(
                 *(excerpt.ref_id for excerpt in source_excerpts),
                 *(fact.ref_id for fact in facts),
             ),
-            expected_answer_schema="plan-test-coverage-v5",
+            expected_answer_schema="plan-test-coverage-v6",
             attempt=1,
         ),
         exact_question=(
@@ -612,7 +646,10 @@ def build_test_coverage_request(
             "Use not_applicable only "
             "when the pinned source evidence makes a dimension irrelevant; use "
             "an explicit assumption when repository conventions must resolve an "
-            "unspecified dimension. Do not add assumptions for dimensions marked "
+            "unspecified dimension. If the source and repository leave a dimension "
+            "unknown, set its value to the exact word unresolved; the planner will "
+            "carry it forward as an unresolved dimension. Never use not_applicable "
+            "to mean unknown. Do not add assumptions for dimensions marked "
             "not_applicable. Ground the scenario in the supplied source "
             "excerpts and cite only relevant excerpt IDs in evidence. Do not list "
             "source-defined behavior as an assumption; include an assumption only "

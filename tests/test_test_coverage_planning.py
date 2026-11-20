@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 import yaml
+from powdrr_service.planning.contracts import PlanningContractError
 from powdrr_service.planning.questions import SourceExcerpt
 from powdrr_service.planning.test_coverage import (
     build_test_coverage_request,
@@ -9,23 +10,27 @@ from powdrr_service.planning.test_coverage import (
 )
 
 
+def _dimensions() -> dict[str, str]:
+    return {
+        name: "not_applicable"
+        for name in (
+            "normal_result",
+            "error_behavior",
+            "continuation",
+            "unsupported_behavior",
+            "cancellation_cleanup",
+            "compatibility",
+            "negative_boundaries",
+        )
+    }
+
+
 def _behavior(evidence_ref: str = "anchor-ci") -> dict[str, object]:
     return {
         "subject": "The acceptance criterion behavior.",
         "given": "The source-defined preconditions hold.",
         "evidence": [evidence_ref],
-        "dimensions": {
-            name: "not_applicable"
-            for name in (
-                "normal_result",
-                "error_behavior",
-                "continuation",
-                "unsupported_behavior",
-                "cancellation_cleanup",
-                "compatibility",
-                "negative_boundaries",
-            )
-        },
+        "dimensions": _dimensions(),
         "capability_matrix": [],
         "assumptions": [],
         "validator": "Run the focused test for this behavior.",
@@ -87,8 +92,8 @@ def test_planner_assigns_stable_ids_to_llm_test_designs() -> None:
     planned = request.parse_answer(answer)
 
     assert request.question.kind == "plan_test_coverage"
-    assert request.question.contract_version == 5
-    assert request.question.expected_answer_schema == "plan-test-coverage-v5"
+    assert request.question.contract_version == 6
+    assert request.question.expected_answer_schema == "plan-test-coverage-v6"
     assert request.max_answer_chars == 8_000
     item_context = next(
         fact for fact in request.accepted_facts if fact.ref_id == "planned-pr:item-0001"
@@ -120,8 +125,80 @@ def test_planner_assigns_stable_ids_to_llm_test_designs() -> None:
     assert behavior["then"] == planned["required_test_cases"][0]["expected_outcome"]
 
 
+def test_unknown_test_dimension_is_carried_as_unresolved() -> None:
+    request = build_test_coverage_request(
+        {
+            "id": "item-unknown-dimension",
+            "title": "Handle unknown failure behavior",
+            "objective": "Design a source-grounded test.",
+            "scope": ["Exercise the behavior."],
+            "implementation_steps": ["Inspect existing behavior."],
+            "acceptance_criteria": ["The behavior remains source-faithful."],
+            "allowed_paths": ["src", "tests"],
+        },
+        source_excerpts=(
+            SourceExcerpt(
+                "anchor-unknown-dimension",
+                "The behavior is required, but error handling is not specified.",
+            ),
+        ),
+    )
+    dimensions = _dimensions()
+    dimensions["error_behavior"] = "unresolved"
+    behavior = _behavior("anchor-unknown-dimension")
+    behavior["dimensions"] = dimensions
+    answer = {
+        "cases": [
+            {
+                "test_type": "unit",
+                "scenario": "Exercise the required behavior.",
+                "expected_outcome": "The required behavior is preserved.",
+                "requirement_ids": [],
+                "behavior_scenario": behavior,
+            }
+        ]
+    }
+
+    planned = request.parse_answer(answer)
+
+    assert planned["required_test_cases"][0]["behavior_scenario"][
+        "unresolved_dimensions"
+    ] == ["error_behavior"]
+
+    contradictory_behavior = _behavior("anchor-unknown-dimension")
+    contradictory_behavior["dimensions"] = dimensions
+    contradictory_behavior["assumptions"] = [
+        {
+            "dimension": "error_behavior",
+            "resolution": "Use ValueError.",
+            "rationale": "Common library convention.",
+            "basis": "repository_convention",
+            "basis_reference": "the parser tests",
+            "confidence": "medium",
+        }
+    ]
+    contradictory = {
+        "cases": [
+            {
+                "test_type": "unit",
+                "scenario": "Exercise the required behavior.",
+                "expected_outcome": "The required behavior is preserved.",
+                "requirement_ids": [],
+                "behavior_scenario": contradictory_behavior,
+            }
+        ]
+    }
+    with pytest.raises(PlanningContractError, match="also marked unresolved"):
+        request.parse_answer(contradictory)
+
+
 def test_complete_typed_source_test_case_is_carried_without_restatement() -> None:
     criterion = "The account is locked after the configured failures."
+    source_behavior = _behavior("stale-untrusted-reference")
+    source_behavior["evidence"] = []
+    source_dimensions = _dimensions()
+    source_dimensions["error_behavior"] = "unresolved"
+    source_behavior["dimensions"] = source_dimensions
     source_case = {
         "id": "source-case-7",
         "description": criterion,
@@ -129,10 +206,7 @@ def test_complete_typed_source_test_case_is_carried_without_restatement() -> Non
         "test_type": "integration",
         "scenario": "Submit the configured number of invalid credentials.",
         "expected_outcome": "The account enters the locked state.",
-        "behavior_scenario": {
-            **_behavior("stale-untrusted-reference"),
-            "evidence": [],
-        },
+        "behavior_scenario": source_behavior,
     }
     source_excerpt = SourceExcerpt(
         "anchor-locked-account",
@@ -165,6 +239,7 @@ def test_complete_typed_source_test_case_is_carried_without_restatement() -> Non
     assert case["description"] == criterion
     assert case["scenario"] == source_case["scenario"]
     assert case["behavior_scenario"]["evidence"] == [source_excerpt.ref_id]
+    assert case["behavior_scenario"]["unresolved_dimensions"] == ["error_behavior"]
     assert case["behavior_scenario"]["when"] == source_case["scenario"]
 
 

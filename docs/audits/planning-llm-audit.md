@@ -695,7 +695,7 @@ check public API/test consumers explicitly; this audit changes none of them.
    the fixed output and its declared requirement IDs; its reason is rendered
    deterministically. Tests assert neither follow-up request is emitted and
    preserve scope and dependency identities.
-2. **In progress: remove model-controlled pagination and copied fields.** Source
+2. **Implemented: remove model-controlled pagination and copied fields.** Source
    requirement extraction now uses scheduler-owned fixed anchor windows, and the
    model returns only semantic records for its supplied window. Work-unit proposal
    progression now uses fixed groups plus deterministic singleton supplements;
@@ -704,8 +704,15 @@ check public API/test consumers explicitly; this audit changes none of them.
    shorter one. Runtime, component, and validation bindings are derived from
    known path and catalog facts. Phase answers omit the field when it is absent
    or has one possible value; choosing among multiple source phases remains a
-   semantic model decision. Verify no duplicate or skipped obligations,
-   source-edit invalidation, and oversized answers without lossy truncation.
+   semantic model decision. Verification covers exact obligation recovery after
+   fixed-group continuation and supplemental singleton requests, changed-source
+   digests for extraction windows, rejection of model-owned cursors, and oversized
+   corrections that stop or split without truncating semantic content. The
+   focused cases are in `test_work_unit_continuation_only_includes_uncovered_requirements`,
+   `test_missing_grouped_requirement_gets_a_supplemental_question`,
+   `test_source_edit_invalidates_deterministic_extraction_windows`,
+   `test_work_unit_answer_has_no_model_controlled_pagination`, and
+   `test_huge_answer_is_never_truncated_to_fit_a_correction`.
 3. **Carry accepted semantics directly.** Typed source requirements, phases, cases
    and observations bypass rediscovery. Exact, single-anchor imperative human
    setup text and complete typed source test semantics are now carried directly;
@@ -733,10 +740,10 @@ check public API/test consumers explicitly; this audit changes none of them.
    subject/source/candidate identities, latency/tokens/cost and gate consumer.
    Do not add a second planner to bypass deterministic compilation failures.
 
-The request catalog describes the audited revision, while milestones 1 and the
-source/work-unit/subject-pagination and deterministic binding portions of
-milestone 2 are implemented in the current planner. Multi-phase assignment and
-milestone 3 is partially implemented, and milestones 4–5 remain recommendations.
+The request catalog describes the audited revision. Milestones 1–2 are
+implemented in the current planner. Multi-phase assignment remains a semantic
+model decision; milestone 3 is partially implemented, and milestones 4–5 remain
+recommendations.
 Milestone 6 has baseline call accounting and per-question gate attribution;
 provider-reported cost and any decision to retain exact request/response content
 remain open.

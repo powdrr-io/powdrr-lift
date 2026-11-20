@@ -1,0 +1,324 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1646
+title: Repair stale PR validation before review
+intent:
+  problem: A worker can block a published PR because its committed validation inventory
+    is stale, even when the required CI checks pass, and can leave a validated draft
+    unreconciled.
+  goal: Deterministically refresh validation state and its changelog at the candidate
+    PR head, observe checks for that exact head, and continue recoverable PR checkpoints
+    without losing human-required stops.
+human-decisions: []
+structured_files: []
+files:
+- path: src/powdrr_lift/clean_pr_publisher.py
+  type: modified
+  span:
+    start_line: 683
+    end_line: 695
+  summary: Refresh validation inventory during clean PR publication and combine its
+    generated baseline and changelog in one publication push.
+  rationale: Ensure a published candidate carries fresh validation state at its committed
+    head.
+- path: src/powdrr_lift/clean_pr_publisher.py
+  type: modified
+  span:
+    start_line: 702
+    end_line: 703
+  summary: Refresh validation inventory during clean PR publication and combine its
+    generated baseline and changelog in one publication push.
+  rationale: Ensure a published candidate carries fresh validation state at its committed
+    head.
+- path: src/powdrr_lift/clean_pr_publisher.py
+  type: modified
+  span:
+    start_line: 706
+    end_line: 707
+  summary: Refresh validation inventory during clean PR publication and combine its
+    generated baseline and changelog in one publication push.
+  rationale: Ensure a published candidate carries fresh validation state at its committed
+    head.
+- path: src/powdrr_lift/clean_pr_publisher.py
+  type: modified
+  span:
+    start_line: 709
+    end_line: 709
+  summary: Refresh validation inventory during clean PR publication and combine its
+    generated baseline and changelog in one publication push.
+  rationale: Ensure a published candidate carries fresh validation state at its committed
+    head.
+- path: src/powdrr_lift/clean_pr_publisher.py
+  type: modified
+  span:
+    start_line: 764
+    end_line: 764
+  summary: Refresh validation inventory during clean PR publication and combine its
+    generated baseline and changelog in one publication push.
+  rationale: Ensure a published candidate carries fresh validation state at its committed
+    head.
+- path: src/powdrr_lift/clean_pr_publisher.py
+  type: modified
+  span:
+    start_line: 969
+    end_line: 970
+  summary: Refresh validation inventory during clean PR publication and combine its
+    generated baseline and changelog in one publication push.
+  rationale: Ensure a published candidate carries fresh validation state at its committed
+    head.
+- path: src/powdrr_lift/clean_pr_publisher.py
+  type: modified
+  span:
+    start_line: 1150
+    end_line: 1203
+  summary: Refresh validation inventory during clean PR publication and combine its
+    generated baseline and changelog in one publication push.
+  rationale: Ensure a published candidate carries fresh validation state at its committed
+    head.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 3996
+    end_line: 4007
+  summary: Route recoverable blocked PR checkpoints through the continuation workflow.
+  rationale: Allow deterministic PR recovery without interrupting human-required stops.
+- path: src/powdrr_lift/cli.py
+  type: modified
+  span:
+    start_line: 4011
+    end_line: 4014
+  summary: Route recoverable blocked PR checkpoints through the continuation workflow.
+  rationale: Allow deterministic PR recovery without interrupting human-required stops.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span:
+    start_line: 15
+    end_line: 15
+  summary: Repair stale PR validation baselines, reobserve exact-head CI, promote
+    validated drafts, and resume recoverable PR checkpoints.
+  rationale: Make review readiness depend on fresh validation and successful checks
+    observed at an unchanged PR head.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span:
+    start_line: 1805
+    end_line: 1805
+  summary: Repair stale PR validation baselines, reobserve exact-head CI, promote
+    validated drafts, and resume recoverable PR checkpoints.
+  rationale: Make review readiness depend on fresh validation and successful checks
+    observed at an unchanged PR head.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span:
+    start_line: 1819
+    end_line: 1832
+  summary: Repair stale PR validation baselines, reobserve exact-head CI, promote
+    validated drafts, and resume recoverable PR checkpoints.
+  rationale: Make review readiness depend on fresh validation and successful checks
+    observed at an unchanged PR head.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span:
+    start_line: 2228
+    end_line: 2232
+  summary: Repair stale PR validation baselines, reobserve exact-head CI, promote
+    validated drafts, and resume recoverable PR checkpoints.
+  rationale: Make review readiness depend on fresh validation and successful checks
+    observed at an unchanged PR head.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span:
+    start_line: 2258
+    end_line: 2263
+  summary: Repair stale PR validation baselines, reobserve exact-head CI, promote
+    validated drafts, and resume recoverable PR checkpoints.
+  rationale: Make review readiness depend on fresh validation and successful checks
+    observed at an unchanged PR head.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span:
+    start_line: 2265
+    end_line: 2266
+  summary: Repair stale PR validation baselines, reobserve exact-head CI, promote
+    validated drafts, and resume recoverable PR checkpoints.
+  rationale: Make review readiness depend on fresh validation and successful checks
+    observed at an unchanged PR head.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span:
+    start_line: 2277
+    end_line: 2277
+  summary: Repair stale PR validation baselines, reobserve exact-head CI, promote
+    validated drafts, and resume recoverable PR checkpoints.
+  rationale: Make review readiness depend on fresh validation and successful checks
+    observed at an unchanged PR head.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span:
+    start_line: 2285
+    end_line: 2288
+  summary: Repair stale PR validation baselines, reobserve exact-head CI, promote
+    validated drafts, and resume recoverable PR checkpoints.
+  rationale: Make review readiness depend on fresh validation and successful checks
+    observed at an unchanged PR head.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span:
+    start_line: 2295
+    end_line: 2302
+  summary: Repair stale PR validation baselines, reobserve exact-head CI, promote
+    validated drafts, and resume recoverable PR checkpoints.
+  rationale: Make review readiness depend on fresh validation and successful checks
+    observed at an unchanged PR head.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span:
+    start_line: 4362
+    end_line: 4362
+  summary: Repair stale PR validation baselines, reobserve exact-head CI, promote
+    validated drafts, and resume recoverable PR checkpoints.
+  rationale: Make review readiness depend on fresh validation and successful checks
+    observed at an unchanged PR head.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span:
+    start_line: 4388
+    end_line: 4389
+  summary: Repair stale PR validation baselines, reobserve exact-head CI, promote
+    validated drafts, and resume recoverable PR checkpoints.
+  rationale: Make review readiness depend on fresh validation and successful checks
+    observed at an unchanged PR head.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span:
+    start_line: 4537
+    end_line: 4577
+  summary: Repair stale PR validation baselines, reobserve exact-head CI, promote
+    validated drafts, and resume recoverable PR checkpoints.
+  rationale: Make review readiness depend on fresh validation and successful checks
+    observed at an unchanged PR head.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span:
+    start_line: 4600
+    end_line: 4600
+  summary: Repair stale PR validation baselines, reobserve exact-head CI, promote
+    validated drafts, and resume recoverable PR checkpoints.
+  rationale: Make review readiness depend on fresh validation and successful checks
+    observed at an unchanged PR head.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span:
+    start_line: 4603
+    end_line: 4604
+  summary: Repair stale PR validation baselines, reobserve exact-head CI, promote
+    validated drafts, and resume recoverable PR checkpoints.
+  rationale: Make review readiness depend on fresh validation and successful checks
+    observed at an unchanged PR head.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span:
+    start_line: 4633
+    end_line: 4633
+  summary: Repair stale PR validation baselines, reobserve exact-head CI, promote
+    validated drafts, and resume recoverable PR checkpoints.
+  rationale: Make review readiness depend on fresh validation and successful checks
+    observed at an unchanged PR head.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span:
+    start_line: 4642
+    end_line: 4644
+  summary: Repair stale PR validation baselines, reobserve exact-head CI, promote
+    validated drafts, and resume recoverable PR checkpoints.
+  rationale: Make review readiness depend on fresh validation and successful checks
+    observed at an unchanged PR head.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span:
+    start_line: 4662
+    end_line: 5069
+  summary: Repair stale PR validation baselines, reobserve exact-head CI, promote
+    validated drafts, and resume recoverable PR checkpoints.
+  rationale: Make review readiness depend on fresh validation and successful checks
+    observed at an unchanged PR head.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span:
+    start_line: 5208
+    end_line: 5209
+  summary: Repair stale PR validation baselines, reobserve exact-head CI, promote
+    validated drafts, and resume recoverable PR checkpoints.
+  rationale: Make review readiness depend on fresh validation and successful checks
+    observed at an unchanged PR head.
+- path: src/powdrr_lift/workrr/github_issue_queue.py
+  type: modified
+  span:
+    start_line: 5290
+    end_line: 5291
+  summary: Repair stale PR validation baselines, reobserve exact-head CI, promote
+    validated drafts, and resume recoverable PR checkpoints.
+  rationale: Make review readiness depend on fresh validation and successful checks
+    observed at an unchanged PR head.
+- path: tests/test_clean_pr_publisher.py
+  type: modified
+  span:
+    start_line: 11
+    end_line: 11
+  summary: Test stale validation inventory refresh during clean PR publication.
+  rationale: Prevent publication of a candidate with stale committed validation state.
+- path: tests/test_clean_pr_publisher.py
+  type: modified
+  span:
+    start_line: 42
+    end_line: 129
+  summary: Test stale validation inventory refresh during clean PR publication.
+  rationale: Prevent publication of a candidate with stale committed validation state.
+- path: tests/test_github_issue_queue.py
+  type: modified
+  span:
+    start_line: 3410
+    end_line: 3410
+  summary: Test exact-head validation refresh, PR readiness, and recovery of blocked
+    PR checkpoints.
+  rationale: Keep deterministic PR recovery working while preserving explicit human-required
+    blocks.
+- path: tests/test_github_issue_queue.py
+  type: modified
+  span:
+    start_line: 3452
+    end_line: 3487
+  summary: Test exact-head validation refresh, PR readiness, and recovery of blocked
+    PR checkpoints.
+  rationale: Keep deterministic PR recovery working while preserving explicit human-required
+    blocks.
+- path: tests/test_github_issue_queue.py
+  type: modified
+  span:
+    start_line: 3908
+    end_line: 3908
+  summary: Test exact-head validation refresh, PR readiness, and recovery of blocked
+    PR checkpoints.
+  rationale: Keep deterministic PR recovery working while preserving explicit human-required
+    blocks.
+- path: tests/test_github_issue_queue.py
+  type: modified
+  span:
+    start_line: 3920
+    end_line: 3998
+  summary: Test exact-head validation refresh, PR readiness, and recovery of blocked
+    PR checkpoints.
+  rationale: Keep deterministic PR recovery working while preserving explicit human-required
+    blocks.
+entities: []
+entity_relationships: []
+invariants:
+- id: review-readiness-requires-fresh-exact-head-validation
+  description: A PR that changes validation inputs is review-ready only when a fresh
+    committed inventory is verified at the exact observed PR head and required checks
+    pass for that unchanged head.
+  action: added
+- id: recoverable-pr-checkpoints-resume-deterministically
+  description: Recoverable blocked PR checkpoints are continued through deterministic
+    validation repair; checkpoints requiring human clarification remain blocked.
+  action: added
+guidance: []

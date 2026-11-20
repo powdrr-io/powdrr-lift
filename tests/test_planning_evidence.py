@@ -679,8 +679,8 @@ def test_requirement_search_supplies_pinned_implementation_and_test_evidence(
     )
     request.validate()
     service_request.validate()
-    assert service_request.question.contract_version == 2
-    assert service_request.question.expected_answer_schema == "coverage-answer-v2"
+    assert service_request.question.contract_version == 3
+    assert service_request.question.expected_answer_schema == "coverage-answer-v3"
     requirement_context = next(
         item for item in service_request.accepted_facts if item.ref_id == requirement.id
     )
@@ -1223,17 +1223,57 @@ def test_coverage_evidence_policy_and_request_context_are_strict(
         "both relevant implementation/configuration evidence and relevant test"
         in request.exact_question
     )
+    assert request.question.contract_version == 3
+    assert request.question.expected_answer_schema == "coverage-answer-v3"
+    assert request.valid_example == request.empty_example
+    assert request.valid_example["status"] == "missing"
+    assert "Examples demonstrate answer shape only" in request.exact_question
+    assert "Code/test co-occurrence alone does not prove coverage" in (
+        request.exact_question
+    )
     assert "if only tests match, mark it missing, not partial" in request.exact_question
-    assert request.valid_example == {
-        "status": "complete",
-        "evidence_ids": [implementation.id, test.id],
-        "reason": "Pinned implementation and relevant tests cover it.",
-    }
     assert set(request.question.context_ref_ids) == {
         implementation.id,
         test.id,
         requirement.id,
     }
+
+
+def test_irrelevant_passing_test_is_not_used_as_positive_coverage_example(
+    tmp_path: Path,
+) -> None:
+    repository, _ = _repository(tmp_path)
+    (repository / "tests/test_numeric_formatting.py").write_text(
+        "def test_numeric_formatting():\n    assert format(12, 'd') == '12'\n",
+        encoding="utf-8",
+    )
+    _git(repository, "add", "tests/test_numeric_formatting.py")
+    _git(repository, "commit", "-qm", "add unrelated passing test")
+    commit = _git(repository, "rev-parse", "HEAD")
+    requirement, source = _requirement(commit)
+    implementation = record_file_evidence(
+        repository, commit, "src/schema.py", kind="implementation", ordinal=1
+    )
+    unrelated_test = record_file_evidence(
+        repository, commit, "tests/test_numeric_formatting.py", kind="test", ordinal=2
+    )
+
+    request = build_requirement_coverage_request(
+        requirement,
+        source=source,
+        evidence=(implementation, unrelated_test),
+        repository_root=repository,
+    )
+
+    assert request.valid_example == request.empty_example
+    assert request.valid_example["evidence_ids"] == []
+    assert (
+        "test_numeric_formatting"
+        in request.repository_evidence[1].value["source_excerpt"]
+    )
+    assert "Code/test co-occurrence alone does not prove coverage" in (
+        request.exact_question
+    )
 
 
 def test_coverage_question_does_not_repeat_large_source_anchors(

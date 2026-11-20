@@ -319,6 +319,7 @@ def build_requirement_coverage_request(
     if search_record is not None:
         repository_context += (search_record,)
     digest_material = {
+        "contract_version": 3,
         "requirement": {
             "id": requirement.id,
             "statement": requirement.statement,
@@ -348,50 +349,24 @@ def build_requirement_coverage_request(
     receipt = next(
         (item for item in evidence_records if item.kind == "execution_receipt"), None
     )
-    implementation = next(
-        (item for item in evidence_records if item.kind == "implementation"), None
-    )
-    configuration = next(
-        (item for item in evidence_records if item.kind == "configuration"), None
-    )
-    test = next((item for item in evidence_records if item.kind == "test"), None)
+    negative_example = {
+        "status": "missing",
+        "evidence_ids": [],
+        "reason": "No supplied evidence establishes the requested behavior.",
+    }
     if receipt is not None:
         positive_example: Mapping[str, Any] = {
             "status": "complete",
             "evidence_ids": [receipt.id],
             "reason": "An observed execution receipt covers this requirement.",
         }
-    elif (implementation is not None or configuration is not None) and test is not None:
-        code_evidence = implementation or configuration
-        assert code_evidence is not None
-        positive_example = {
-            "status": "complete",
-            "evidence_ids": [code_evidence.id, test.id],
-            "reason": "Pinned implementation and relevant tests cover it.",
-        }
-    elif implementation is not None:
-        positive_example = {
-            "status": "partial",
-            "evidence_ids": [implementation.id],
-            "reason": "Implementation exists, but part of the obligation remains.",
-            "remaining_statement": "Add the specific missing behavior or test.",
-        }
     else:
-        positive_example = {
-            "status": "missing",
-            "evidence_ids": [],
-            "reason": "The inspected evidence has no matching implementation.",
-        }
-    negative_example = {
-        "status": "missing",
-        "evidence_ids": [],
-        "reason": "No matching implementation was found in the inspected evidence.",
-    }
+        positive_example = negative_example
     return QuestionRequest(
         question=Question(
             question_id=f"q-coverage-{input_digest[-16:]}",
             kind="assess_requirement_coverage",
-            contract_version=2,
+            contract_version=3,
             subject_ids=(requirement.id,),
             input_digest=input_digest,
             context_ref_ids=tuple(
@@ -399,14 +374,17 @@ def build_requirement_coverage_request(
                 + [requirement.id]
                 + ([] if search_record is None else [search_record.ref_id])
             ),
-            expected_answer_schema="coverage-answer-v2",
+            expected_answer_schema="coverage-answer-v3",
             attempt=1,
         ),
         exact_question=(
             "This source-validated requirement is the unit of assessment. Decide "
             "whether it is already implemented in the pinned repository. Use only "
             "the supplied code evidence and repository-search record. Search hits "
-            "are candidates; ignore irrelevant matches. If the requirement includes "
+            "are candidates; ignore irrelevant matches. Examples demonstrate answer "
+            "shape only and do not establish that supplied evidence is relevant. "
+            "Code/test co-occurrence alone does not prove coverage. If the "
+            "requirement includes "
             "source_logic, treat its exact quoted atoms and conditions as source "
             "authority. Preserve nested all_of, any_of, ordered, and conditional "
             "meaning when judging coverage; do not flatten branches or infer missing "

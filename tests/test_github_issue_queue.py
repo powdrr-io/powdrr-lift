@@ -3407,7 +3407,7 @@ def test_continue_awaiting_ci_rechecks_current_head_and_records_result(
         client.list_comments(100), "https://github.com/example/project/pull/123"
     )
     assert latest is not None
-    assert latest["ci_response_result"]["response_state"] == "awaiting_ci"
+    assert latest["ci_response_result"]["response_state"] == "awaiting_review"
     assert latest["ci_response_result"]["matches_queue_head"] is True
 
 
@@ -3447,6 +3447,42 @@ def test_awaiting_ci_recovers_publication_marker_without_completed_task_checkpoi
         )
         == "https://github.com/example/project/pull/1046"
     )
+
+
+def test_continue_recovers_blocked_issue_with_pr_checkpoint(tmp_path: Path) -> None:
+    client = FakeIssueClient()
+    client.issues.append(
+        QueueIssue(
+            918,
+            "Implement feature",
+            "",
+            "open",
+            (QUEUE_LABELS["blocked"],),
+            "https://github.com/example/project/issues/918",
+        )
+    )
+    client.comments.append(
+        (
+            918,
+            "Powdrr PR for issue #918: https://github.com/example/project/pull/1047",
+        )
+    )
+
+    report = continue_awaiting_ci_issue(
+        client=client,  # type: ignore[arg-type]
+        issue_number=918,
+        repo_root=tmp_path,
+        allow_blocked=True,
+    )
+
+    assert report.outcome == "awaiting_review"
+    assert QUEUE_LABELS["awaiting_review"] in client.get_issue(918).labels
+    assert QUEUE_LABELS["blocked"] not in client.get_issue(918).labels
+    latest = github_issue_queue._latest_ci_outcome_observation(
+        client.list_comments(918), "https://github.com/example/project/pull/1047"
+    )
+    assert latest is not None
+    assert latest["pull_request_ready_status"] == "ready"
 
 
 def test_continue_ci_human_checkpoint_preserves_human_route_until_checks_clear(
@@ -3869,7 +3905,7 @@ def test_required_ci_readiness_blocks_changed_validation_inputs(
     )
 
     assert observation["outcome"] == "blocked"
-    assert "refresh the committed validation baseline" in observation["reason"]
+    assert "fresh committed validation baseline" in observation["reason"]
     assert observation["validation_input_changes"]
     assert changed_file["filename"] in observation["validation_input_changes"]
     if previous_filename := changed_file.get("previous_filename"):
@@ -3879,6 +3915,85 @@ def test_required_ci_readiness_blocks_changed_validation_inputs(
         observation=observation,
     )
     assert '"validation_input_changes"' in checkpoint
+
+
+def test_required_ci_accepts_changed_validation_inputs_with_fresh_pr_baseline(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client = FakeIssueClient()
+    client.pull_request_files = [
+        {"filename": ".github/workflows/ci.yml", "status": "modified"}
+    ]
+    inventory = github_issue_queue._read_repository_validation_inventory(tmp_path)
+    assert inventory is not None
+    refreshed_digest = "refreshed-inventory-digest"
+    monkeypatch.setattr(
+        github_issue_queue,
+        "_pull_request_validation_inventory",
+        lambda **_kwargs: {
+            "checks": inventory["checks"],
+            "digest": refreshed_digest,
+            "input_paths": inventory["input_paths"],
+        },
+    )
+
+    observation = github_issue_queue._observe_required_ci_outcome(
+        client,  # type: ignore[arg-type]
+        "https://github.com/example/project/pull/123",
+        repo_root=tmp_path,
+        validation_inventory=inventory["checks"],
+        inventory_digest=inventory["digest"],
+        validation_input_paths=inventory["input_paths"],
+    )
+
+    assert observation["outcome"] == "awaiting_review"
+    assert observation["validation_input_changes"] == [".github/workflows/ci.yml"]
+    assert observation["validation_inventory_digest"] == refreshed_digest
+    assert observation["validation_baseline_refresh"] == {
+        "status": "fresh",
+        "digest": refreshed_digest,
+    }
+
+
+def test_observed_passing_draft_pr_is_marked_ready_for_review() -> None:
+    class DraftClient(FakeIssueClient):
+        is_draft = True
+        ready_calls = 0
+
+        def _invoke(
+            self, arguments: list[str] | tuple[str, ...], *, check: bool = True
+        ) -> subprocess.CompletedProcess[str]:
+            del check
+            if arguments[:2] == ["pr", "view"]:
+                return subprocess.CompletedProcess(
+                    ["gh", *arguments],
+                    0,
+                    json.dumps({"headRefOid": self.pr_head, "isDraft": self.is_draft}),
+                    "",
+                )
+            if arguments[:2] == ["pr", "ready"]:
+                self.ready_calls += 1
+                self.is_draft = False
+                return subprocess.CompletedProcess(["gh", *arguments], 0, "", "")
+            return super()._invoke(arguments, check=False)
+
+    client = DraftClient()
+    observation = {
+        "outcome": "awaiting_review",
+        "head_sha": client.pr_head,
+        "checks": [{"name": "test", "status": "passed"}],
+        "validation_input_changes": [],
+    }
+
+    result = github_issue_queue._mark_observed_pull_request_ready(
+        client,  # type: ignore[arg-type]
+        "https://github.com/example/project/pull/123",
+        observation,
+    )
+
+    assert result["outcome"] == "awaiting_review"
+    assert result["pull_request_ready_status"] == "ready"
+    assert client.ready_calls == 1
 
 
 def test_required_ci_matching_rejects_ambiguous_workflow_identity(

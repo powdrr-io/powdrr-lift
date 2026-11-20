@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 import yaml
 
+import powdrr_lift.clean_pr_publisher as clean_pr_publisher_module
 from powdrr_lift.clean_pr_publisher import (
     build_publication_authorization,
     normalize_clean_pr_publication_parameters,
@@ -36,6 +37,94 @@ def _authorization(source: Path, files: list[str]) -> dict[str, object]:
         lineage={"record_id": "source-run:test", "audit_passed": True},
         worktree_root=source,
     )
+
+
+def test_pr_preparation_refreshes_stale_validation_inventory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import powdrr_lift.workrr.feature_endpoint as feature_endpoint
+    import powdrr_lift.workrr.github_issue_queue as issue_queue
+    import powdrr_lift.workrr.task_agent as task_agent
+
+    root = tmp_path / "repo"
+    baseline = root / "docs/structrr/current/baseline-bootstrap.yaml"
+    baseline.parent.mkdir(parents=True)
+    baseline.write_text("validation_inventory: []\n", encoding="utf-8")
+    (root / ".github/workflows").mkdir(parents=True)
+    refreshed_document = {
+        "validation_inventory": [{"id": "validation:test"}],
+        "validation_context": {"fresh": True},
+        "active_intent": [],
+    }
+
+    def read_inventory(path: Path) -> dict[str, object] | None:
+        document = yaml.safe_load(
+            (path / "docs/structrr/current/baseline-bootstrap.yaml").read_text(
+                encoding="utf-8"
+            )
+        )
+        if document.get("validation_context", {}).get("fresh") is True:
+            return {"checks": [{"id": "validation:test"}], "digest": "fresh"}
+        return None
+
+    monkeypatch.setattr(
+        issue_queue, "_read_repository_validation_inventory", read_inventory
+    )
+    monkeypatch.setattr(
+        task_agent,
+        "_load_committed_issue_worker_structrr_baseline",
+        lambda *_args, **_kwargs: (
+            {"active_intent": [{"clause_id": "intent-1"}]},
+            None,
+        ),
+    )
+    monkeypatch.setattr(
+        task_agent,
+        "_bootstrap_issue_worker_structrr_baseline",
+        lambda *_args, **_kwargs: (refreshed_document, None),
+    )
+    monkeypatch.setattr(
+        task_agent,
+        "_merge_structrr_decision_sections",
+        lambda current, previous: {
+            **current,
+            "active_intent": previous["active_intent"],
+        },
+    )
+
+    def write_companions(document: object, path: Path, worktree: Path) -> None:
+        del document, worktree
+        path.with_suffix(".md").write_text("fresh report\n", encoding="utf-8")
+        path.with_suffix(".freshness.json").write_text("{}\n", encoding="utf-8")
+
+    monkeypatch.setattr(
+        feature_endpoint, "_write_baseline_companions", write_companions
+    )
+    monkeypatch.setattr(
+        clean_pr_publisher_module,
+        "_run",
+        lambda command, *, cwd: (
+            "b" * 40
+            if command[:3] == ["git", "rev-parse", "HEAD"]
+            else pytest.fail(f"unexpected git command: {command!r} in {cwd}")
+        ),
+    )
+
+    generated_paths = (
+        clean_pr_publisher_module._refresh_validation_baseline_for_publication(
+            root,
+            base_commit="a" * 40,
+        )
+    )
+
+    assert generated_paths == (
+        "docs/structrr/current/baseline-bootstrap.yaml",
+        "docs/structrr/current/baseline-bootstrap.md",
+        "docs/structrr/current/baseline-bootstrap.freshness.json",
+    )
+    document = yaml.safe_load(baseline.read_text(encoding="utf-8"))
+    assert document["validation_context"] == {"fresh": True}
+    assert document["active_intent"] == [{"clause_id": "intent-1"}]
 
 
 def test_workflow_context_fills_missing_explicit_publication_metadata() -> None:

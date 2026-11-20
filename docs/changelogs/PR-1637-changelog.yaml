@@ -1,0 +1,23 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1637
+title: Plan agent-owned GitHub worker protocol hardening
+intent:
+  problem: Interrupted worker attempts can leave inconsistent issue, pull request, CI, and dependency records that require manual bookkeeping.
+  goal: Define one protocol and assign responsibility for detecting and correcting discrepancies to the issue worker agent.
+human-decisions: []
+structured_files: []
+files:
+  - path: docs/plans/github-worker-protocol-hardening.md
+    type: added
+    span: {start_line: 1, end_line: 132}
+    summary: Audit the worker protocol and specify agent ownership, evidence requirements, implementation milestones, and acceptance criteria.
+    rationale: Address the inconsistencies observed after publication and across interrupted attempts.
+entities:
+  - id: github-worker-protocol-hardening-plan
+    type: Technical specification
+    action: added
+entity_relationships: []
+invariants: []
+guidance: []
+features: []
+proposed_prs: []

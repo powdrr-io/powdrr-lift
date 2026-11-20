@@ -1,0 +1,76 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1641
+title: Avoid misleading planner coverage examples
+intent:
+  problem: The coverage request implied that any implementation and test evidence pair was relevant, even when the test did not exercise the requirement.
+  goal: Ensure examples teach answer shape without asserting semantic relevance unless a trusted execution receipt proves coverage.
+human-decisions: []
+structured_files: []
+files:
+  - path: packages/service/src/powdrr_service/planning/coverage.py
+    type: modified
+    span: {start_line: 322, end_line: 322}
+    summary: Include the coverage contract version in its input digest.
+    rationale: Ensure changed prompt semantics invalidate prior coverage answers.
+  - path: packages/service/src/powdrr_service/planning/coverage.py
+    type: modified
+    span: {start_line: 352, end_line: 356}
+    summary: Define a neutral missing example instead of selecting the first implementation and test evidence.
+    rationale: Evidence ordering and co-occurrence cannot establish relevance.
+  - path: packages/service/src/powdrr_service/planning/coverage.py
+    type: modified
+    span: {start_line: 364, end_line: 378}
+    summary: Use a complete example only with a validated receipt and bump the coverage question contract to version 3.
+    rationale: Neither implementation/test presence nor prior prompt versions establish coverage-example relevance.
+  - path: packages/service/src/powdrr_service/planning/coverage.py
+    type: modified
+    span: {start_line: 364, end_line: 364}
+    summary: Select a complete example only when validated execution receipt evidence is present.
+    rationale: A trusted observation is the deterministic basis available for an asserted complete example.
+  - path: packages/service/src/powdrr_service/planning/coverage.py
+    type: modified
+    span: {start_line: 369, end_line: 369}
+    summary: Bump the question contract to version 3.
+    rationale: Consumers must not reuse answers created under the previous example semantics.
+  - path: packages/service/src/powdrr_service/planning/coverage.py
+    type: modified
+    span: {start_line: 377, end_line: 377}
+    summary: Advertise the version 3 coverage answer schema.
+    rationale: Bind answer parsing to the revised question contract.
+  - path: packages/service/src/powdrr_service/planning/coverage.py
+    type: modified
+    span: {start_line: 384, end_line: 387}
+    summary: State that examples show answer shape only and code/test co-occurrence does not prove coverage.
+    rationale: Make the prompt's evidence relevance boundary explicit.
+  - path: tests/test_planning_evidence.py
+    type: modified
+    span: {start_line: 682, end_line: 683}
+    summary: Expect the version 3 contract in the service coverage request.
+    rationale: Verify planner requests use the current answer semantics.
+  - path: tests/test_planning_evidence.py
+    type: modified
+    span: {start_line: 1226, end_line: 1233}
+    summary: Assert the neutral example and evidence relevance instructions in the coverage context test.
+    rationale: Preserve the fail-closed example behavior and prompt boundary.
+  - path: tests/test_planning_evidence.py
+    type: modified
+    span: {start_line: 1227, end_line: 1231}
+    summary: Remove assertions that treated the first implementation and test as a complete example.
+    rationale: Those records may be unrelated to the requirement.
+  - path: tests/test_planning_evidence.py
+    type: modified
+    span: {start_line: 1242, end_line: 1278}
+    summary: Add a passing but unrelated test and verify it is not presented as positive coverage evidence.
+    rationale: Prevent lexical or evidence-kind co-occurrence from endorsing an irrelevant test.
+  - path: docs/audits/planning-llm-audit.md
+    type: modified
+    span: {start_line: 751, end_line: 756}
+    summary: Record the coverage example correction and identify remaining semantic relevance cases.
+    rationale: Keep the planner interaction audit aligned with the current implementation and remaining work.
+entities: []
+entity_relationships: []
+invariants:
+  - id: coverage-examples-do-not-assert-unverified-relevance
+    description: Coverage examples do not claim arbitrary implementation/test evidence is relevant; only trusted execution receipts provide a complete example.
+    action: added
+guidance: []

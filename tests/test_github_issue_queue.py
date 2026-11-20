@@ -813,6 +813,123 @@ def test_dependency_result_is_checked_once_per_plan_node(
     assert len(checks) == 1
 
 
+@pytest.mark.parametrize(
+    ("marker_issue", "merged", "pull_request_body", "expected"),
+    [
+        (100, True, "Closes #100", True),
+        (100, False, "Closes #100", False),
+        (100, True, "Closes #999", False),
+        (101, True, "Closes #100", False),
+    ],
+)
+def test_dependency_recovers_a_merged_published_pr_without_task_checkpoint(
+    marker_issue: int,
+    merged: bool,
+    pull_request_body: str,
+    expected: bool,
+) -> None:
+    client = FakeIssueClient()
+    issue = QueueIssue(
+        100,
+        "Base work",
+        github_issue_queue._issue_pointer_body(
+            "feature-v1",
+            "base",
+            "docs/plans/feature.yaml",
+            PLAN_COMMIT,
+            repository=client.repository,
+        ),
+        "closed",
+        (QUEUE_LABELS["awaiting_review"], _plan_label("feature-v1")),
+        "https://github.com/example/project/issues/100",
+    )
+    client.comments.append(
+        (
+            issue.number,
+            f"Powdrr PR for issue #{marker_issue}: "
+            "https://github.com/example/project/pull/123",
+        )
+    )
+    client.pull_requests[123] = {
+        "merged": merged,
+        "merge_commit_sha": "d" * 40 if merged else None,
+        "body": pull_request_body,
+    }
+
+    fulfilled = github_issue_queue._dependency_is_fulfilled(
+        issue,
+        {issue.number: issue},
+        client=client,  # type: ignore[arg-type]
+        plan=plan(),
+        dependency_id="base",
+    )
+
+    assert fulfilled is expected
+    assert client.pull_request_reads.get(123, 0) == (1 if marker_issue == 100 else 0)
+
+
+def test_worker_promotes_next_item_from_merged_publication_without_task_checkpoint(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path
+    (root / "docs/workflows/base").mkdir(parents=True)
+    (root / "docs/workflows/followup").mkdir(parents=True)
+    client = FakeIssueClient()
+    publish_plan_issues(
+        plan=plan(),
+        plan_path="docs/plans/feature.yaml",
+        plan_commit=PLAN_COMMIT,
+        client=client,  # type: ignore[arg-type]
+    )
+    base_issue = client.issues[0]
+    client.update_issue(base_issue, state="closed")
+    client.comments.append(
+        (
+            base_issue.number,
+            f"Powdrr PR for issue #{base_issue.number}: "
+            "https://github.com/example/project/pull/123",
+        )
+    )
+    client.pull_requests[123] = {
+        "merged": True,
+        "merge_commit_sha": "d" * 40,
+        "body": f"Closes #{base_issue.number}",
+    }
+    executed: list[str] = []
+
+    def load_plan(
+        _path: str, _commit: str, *, repo_root: str | Path
+    ) -> ReviewedExecutionPlan:
+        assert Path(repo_root) == root
+        return plan()
+
+    def run_task(
+        _directory: Path,
+        workflow_id: str,
+        _worker_id: str,
+        item: PlannedWorkItem,
+        _plan: ReviewedExecutionPlan,
+        _fulfilled_without_pr_dependencies: tuple[str, ...],
+        checkpoint: TaskCheckpointCallback,
+    ) -> int:
+        executed.append(workflow_id)
+        _checkpoint_completed_pr(checkpoint, item)
+        return 0
+
+    report = run_worker_once(
+        client=client,  # type: ignore[arg-type]
+        repo_root=root,
+        worker_id="worker-after-merge",
+        run_task=run_task,
+        plan_loader=load_plan,
+    )
+
+    assert report.outcome == "awaiting_review"
+    assert report.item_id == "followup"
+    assert executed == ["followup"]
+    assert QUEUE_LABELS["awaiting_review"] in client.issues[1].labels
+
+
 def test_plan_validation_rejects_unknown_dependency_and_cycle() -> None:
     text = """
 schema: https://powdrr.io/schemas/github-issue-execution-plan-v1

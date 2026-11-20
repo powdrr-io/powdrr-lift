@@ -1,0 +1,29 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1635
+title: Recover merged PR dependencies after interrupted task finalization
+intent:
+  problem: An issue worker can publish an implementation PR and then fail before writing its completed task checkpoint. After the PR is merged and GitHub closes the issue, later plan items remain blocked because dependency resolution requires that missing checkpoint.
+  goal: Recover dependency completion from the issue's plan pointer, Powdrr's issue-specific published-PR marker, and a same-repository PR that is merged with a valid merge commit and closes that exact issue.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 5056, end_line: 5221}
+    summary: Fulfill a closed plan dependency from its issue-specific publication marker when the completed task checkpoint was interrupted, requiring a merged same-repository PR that closes the issue.
+    rationale: Let the queue recover from post-publication worker failures without treating manually closed issues, unrelated PRs, or unmerged PRs as completed work.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 816, end_line: 930}
+    summary: Cover dependency recovery and next-item promotion from a merged linked PR when the task checkpoint is missing, including negative cases for unmerged, unrelated, or mismatched PR evidence.
+    rationale: Prevent a published and merged implementation from leaving downstream plan work blocked after a worker finalization error.
+entities: []
+entity_relationships: []
+invariants:
+  - id: merged-publication-recovers-plan-dependency
+    description: When a plan issue is closed and its latest explicit Powdrr publication marker names a same-repository PR that is merged with a valid merge commit and closes that exact issue, dependency resolution may recover completion even if the completed task checkpoint is missing.
+    action: added
+  - id: incomplete-publication-never-fulfills-dependency
+    description: An unmerged PR, an issue-mismatched publication marker, an unrelated PR body, a missing merge commit, or an issue closed without a linked published PR does not fulfill the dependency.
+    action: added
+guidance: []

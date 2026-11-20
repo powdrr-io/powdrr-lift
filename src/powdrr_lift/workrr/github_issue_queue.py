@@ -1788,7 +1788,9 @@ def run_worker_once(
                     task_record = _read_local_task_checkpoint(root, issue.number)
                     pull_request_url = _pull_request_url_from_task_record(
                         task_record
-                    ) or _latest_checkpoint_pull_request_url(comments)
+                    ) or _latest_checkpoint_pull_request_url(
+                        comments, issue_number=issue.number
+                    )
                     ci_response_result = _ci_response_result_from_task_record(
                         task_record
                     )
@@ -2214,7 +2216,9 @@ def continue_awaiting_ci_issue(
     if issue.state != "open":
         raise GitHubIssueQueueError(f"issue #{issue_number} is not open")
     comments = client.list_comments(issue_number)
-    pull_request_url = _latest_checkpoint_pull_request_url(comments)
+    pull_request_url = _latest_checkpoint_pull_request_url(
+        comments, issue_number=issue_number
+    )
     if pull_request_url is None:
         raise GitHubIssueQueueError(
             f"issue #{issue_number} has no published PR checkpoint to observe"
@@ -2297,7 +2301,9 @@ def continue_awaiting_ci_issue(
 def has_ci_human_checkpoint(*, client: GitHubIssueClient, issue_number: int) -> bool:
     """Return whether the latest published-PR checkpoint asks for CI human action."""
     comments = client.list_comments(issue_number)
-    pull_request_url = _latest_checkpoint_pull_request_url(comments)
+    pull_request_url = _latest_checkpoint_pull_request_url(
+        comments, issue_number=issue_number
+    )
     if pull_request_url is None:
         return False
     observation = _latest_ci_outcome_observation(comments, pull_request_url)
@@ -2437,7 +2443,7 @@ def _continue_manual_prerequisite_issue_locked(
     elif return_code == 0:
         pull_request_url = (
             _pull_request_url_from_task_record(latest_local_checkpoint)
-            or _latest_checkpoint_pull_request_url(comments)
+            or _latest_checkpoint_pull_request_url(comments, issue_number=issue.number)
             or str(checkpoint["pull_request_url"])
         )
         inventory = _read_repository_validation_inventory(repo_root)
@@ -3294,7 +3300,9 @@ def _requeue_merged_plan_amendments(
                 f"{pending['pull_request_number']}"
             )
         if url is None:
-            url = _latest_checkpoint_pull_request_url(comments)
+            url = _latest_checkpoint_pull_request_url(
+                comments, issue_number=issue.number
+            )
         number = _same_repository_pull_request_number(url, client.repository)
         if number is not None:
             repairs[number] = {"issue": issue}
@@ -3866,7 +3874,7 @@ def _task_checkpoint_payloads(
 
 
 def _latest_checkpoint_pull_request_url(
-    comments: Sequence[Mapping[str, Any]],
+    comments: Sequence[Mapping[str, Any]], *, issue_number: int
 ) -> str | None:
     for comment in reversed(comments):
         body = comment.get("body")
@@ -3885,6 +3893,21 @@ def _latest_checkpoint_pull_request_url(
         pull_request_url = output_state.get("pull_request_url")
         if isinstance(pull_request_url, str):
             return pull_request_url
+    # PR publication is recorded independently from task completion. A later
+    # CI-observation failure can leave the task checkpoint incomplete even
+    # though the PR was successfully created and linked on the issue.
+    marker_pattern = re.compile(
+        rf"^Powdrr PR for issue #{issue_number}: "
+        r"(https://github\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/pull/\d+)\s*$",
+        re.MULTILINE,
+    )
+    for comment in reversed(comments):
+        body = comment.get("body")
+        if not isinstance(body, str):
+            continue
+        match = marker_pattern.search(body)
+        if match is not None:
+            return match.group(1)
     return None
 
 

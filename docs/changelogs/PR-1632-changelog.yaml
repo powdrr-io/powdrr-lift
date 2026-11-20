@@ -77,6 +77,16 @@ files:
     span: {start_line: 420, end_line: 540}
     summary: Verify refreshed check sources flow through CI observation.
     rationale: Keep the durable checkpoint accurate when required-check policy is unavailable during a wait.
+  - path: src/powdrr_lift/workrr/github_issue_queue.py
+    type: modified
+    span: {start_line: 3876, end_line: 3911}
+    summary: Recover a published PR URL from the matching issue's durable PR comment when task completion was not checkpointed.
+    rationale: Let CI continuation reconcile an already-published PR after a later workflow step failed.
+  - path: tests/test_github_issue_queue.py
+    type: modified
+    span: {start_line: 3297, end_line: 3332}
+    summary: Verify CI continuation recovers and records a PR referenced only by the durable publication comment.
+    rationale: Prevent completed implementation PRs from becoming unrecoverable when the task checkpoint is incomplete.
 entities: []
 entity_relationships: []
 invariants:
@@ -94,5 +104,8 @@ invariants:
     action: added
   - id: free-github-pr-check-fallback
     description: When GitHub hides required-check policy, CI observation uses all checks reported for the exact PR head, records their source, and remains blocked if no usable checks are available.
+    action: added
+  - id: published-pr-checkpoint-recovery
+    description: CI continuation can recover the published PR URL from the worker's issue comment if a later workflow failure prevented task completion from being checkpointed.
     action: added
 guidance: []

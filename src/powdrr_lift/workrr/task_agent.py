@@ -2861,9 +2861,37 @@ def _append_issue_reference_to_pr_body(
     if branch.endswith("-plan-amendment") or "-plan-amendment-" in branch:
         return action
     parameters = dict(action.parameters)
+    closing_reference = f"Closes #{issue_number}"
+    operation = parameters.get("operation")
+    if operation == "pr_publish_clean":
+        raw_context = parameters.get("workflow_context")
+        if isinstance(raw_context, Mapping):
+            context = dict(raw_context)
+            sections_key = next(
+                (
+                    key
+                    for key in ("pr-description-sections", "pr_description_sections")
+                    if key in context
+                ),
+                None,
+            )
+            raw_sections = context.get(sections_key) if sections_key else None
+            if isinstance(raw_sections, Mapping):
+                sections = dict(raw_sections)
+                content = sections.get("objective")
+                if isinstance(content, str):
+                    if re.search(rf"(?im)^\s*closes\s+#{issue_number}\s*$", content):
+                        return action
+                    sections["objective"] = (
+                        f"{content.rstrip()}\n\n{closing_reference}"
+                    ).lstrip()
+                    context[sections_key] = sections
+                    parameters["workflow_context"] = context
+                    return WorkflowAction(
+                        kind=action.kind, tool=action.tool, parameters=parameters
+                    )
     body_value = parameters.get("body")
     body = body_value if isinstance(body_value, str) else ""
-    closing_reference = f"Closes #{issue_number}"
     if re.search(rf"(?im)^\s*closes\s+#{issue_number}\s*$", body):
         return action
     parameters["body"] = f"{body.rstrip()}\n\n{closing_reference}".lstrip()
@@ -3973,7 +4001,19 @@ class _TaskWorkflowExecutionStrategy:
         )
         action = _append_issue_reference_to_pr_body(
             action,
-            issue_number=getattr(self.config, "github_issue_number", None),
+            issue_number=(
+                getattr(self.config, "github_issue_number", None)
+                or self.task.input_state.get("github_issue_number")
+                or (
+                    self.task.input_state.get("proposed_pr_context", {}).get(
+                        "github_issue_number"
+                    )
+                    if isinstance(
+                        self.task.input_state.get("proposed_pr_context"), Mapping
+                    )
+                    else None
+                )
+            ),
         )
         action = _append_plan_repair_metadata_to_pr_body(
             action,

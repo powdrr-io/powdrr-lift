@@ -2,8 +2,8 @@ schema: https://powdrr.io/schema/changelog-v2
 change_id: 1632
 title: Route policy-denied source edits through scope review
 intent:
-  problem: A MiniSWE attempt that changed out-of-scope files was marked policy_denied, but source-run finalization returned early before reporting the scope violation. Post-worker reconciliation then misclassified it as invalid_candidate, so exact-path scope review never ran. Scope review then rejected generated fixtures because it compared a resolved file path against an unresolved macOS temporary-directory alias.
-  goal: Route policy-denied edits into scope review, review generated outputs using producer and fixture-test evidence, compare canonical paths safely, and persist review failures and decisions for diagnosis.
+  problem: A MiniSWE attempt that changed out-of-scope files was marked policy_denied, but source-run finalization returned early before reporting the scope violation. Post-worker reconciliation then misclassified it as invalid_candidate, so exact-path scope review never ran. Scope review then rejected generated fixtures because it compared a resolved file path against an unresolved macOS temporary-directory alias. After implementation succeeded, clean PR publication ignored the appended issue-closing reference because it rendered the body from structured description sections.
+  goal: Route policy-denied edits into scope review, review generated outputs using producer and fixture-test evidence, compare canonical paths safely, persist review failures and decisions, and ensure published issue-worker PRs identify their issue in the rendered body.
 human-decisions: []
 structured_files: []
 files:
@@ -37,6 +37,16 @@ files:
     span: {start_line: 150, end_line: 255}
     summary: Cover generated-output review evidence, canonicalized checkout-root containment, and diagnostics for paths without sufficient provenance.
     rationale: Ensure fixture outputs can reach exact-path review and unreviewable paths are reported explicitly.
+  - path: src/powdrr_lift/workrr/task_agent.py
+    type: modified
+    span: {start_line: 2850, end_line: 2905}
+    summary: Add issue-closing references to the structured description used by clean PR publication.
+    rationale: Ensure CI observation can associate a newly published issue-worker PR with its originating issue.
+  - path: tests/test_workflow_task_agent.py
+    type: modified
+    span: {start_line: 300, end_line: 355}
+    summary: Verify clean PR publication renders the issue-closing reference into its body.
+    rationale: Prevent regressions where the structured publication template discards the issue reference.
 entities: []
 entity_relationships: []
 invariants:
@@ -45,5 +55,8 @@ invariants:
     action: added
   - id: scope-review-outcomes-are-durable
     description: Each policy-denied scope review records whether paths were approved, rejected, unreviewable, or the review failed, including the affected paths and error details.
+    action: added
+  - id: issue-worker-pull-request-identifies-its-issue
+    description: A clean implementation PR published for a GitHub issue includes a closing reference to that issue in the rendered PR body.
     action: added
 guidance: []

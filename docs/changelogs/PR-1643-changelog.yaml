@@ -14,7 +14,7 @@ files:
     rationale: Establish shared authoritative state primitives for protocol consumers.
   - path: tests/test_github_worker_state.py
     type: added
-    span: {start_line: 1, end_line: 76}
+    span: {start_line: 1, end_line: 75}
     summary: Cover failed attempts after publication, ambiguous candidates, stale and unbound CI, legacy unknown evidence, and serialization.
     rationale: Prevent inconsistent or unbound evidence from advancing work-item state.
 entities:

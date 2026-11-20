@@ -1,0 +1,106 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1629
+title: Preserve unresolved planner test dimensions
+intent:
+  problem: Planner test-design requests had no explicit unresolved state for a behavior dimension, so uncertainty could be lost or misrepresented as not_applicable.
+  goal: Carry canonical unresolved dimensions into the typed behavior scenario and invalidate answers created under the older test-design contract.
+human-decisions: []
+structured_files: []
+files:
+  - path: packages/service/src/powdrr_service/planning/test_coverage.py
+    type: modified
+    span: {start_line: 278, end_line: 287}
+    summary: Tell the test-design provider how to represent unresolved dimensions.
+    rationale: Keep unknown meaning explicit and prevent it from being marked not_applicable.
+  - path: packages/service/src/powdrr_service/planning/test_coverage.py
+    type: modified
+    span: {start_line: 506, end_line: 518}
+    summary: Derive unresolved dimensions from canonical unresolved values.
+    rationale: Convert the semantic answer marker into the typed downstream gate field.
+  - path: packages/service/src/powdrr_service/planning/test_coverage.py
+    type: modified
+    span: {start_line: 532, end_line: 532}
+    summary: Attach unresolved dimensions to compiled behavior scenarios.
+    rationale: Preserve unresolved meaning for handoff validation and review.
+  - path: packages/service/src/powdrr_service/planning/test_coverage.py
+    type: modified
+    span: {start_line: 569, end_line: 579}
+    summary: Reject assumptions that contradict an unresolved dimension.
+    rationale: Do not accept a scenario that simultaneously says its behavior is unknown and resolved by a default.
+  - path: packages/service/src/powdrr_service/planning/test_coverage.py
+    type: modified
+    span: {start_line: 612, end_line: 612}
+    summary: Bind test-design input identity to contract version 6.
+    rationale: Ensure cached version 5 answers are invalidated.
+  - path: packages/service/src/powdrr_service/planning/test_coverage.py
+    type: modified
+    span: {start_line: 621, end_line: 621}
+    summary: Assign version 6 to test-design questions.
+    rationale: Prevent replay of answers that predate unresolved-dimension handling.
+  - path: packages/service/src/powdrr_service/planning/test_coverage.py
+    type: modified
+    span: {start_line: 628, end_line: 628}
+    summary: Name the version 6 answer schema.
+    rationale: Mark the current semantic contract explicitly.
+  - path: packages/service/src/powdrr_service/planning/test_coverage.py
+    type: modified
+    span: {start_line: 649, end_line: 652}
+    summary: Instruct the provider to return unresolved when evidence and assumptions do not decide a dimension.
+    rationale: Stop unknown meaning from being silently represented as not_applicable.
+  - path: tests/test_test_coverage_planning.py
+    type: modified
+    span: {start_line: 5, end_line: 5}
+    summary: Import the planning contract error for contradictory-answer validation.
+    rationale: Assert that unresolved dimensions cannot also be resolved by assumptions.
+  - path: tests/test_test_coverage_planning.py
+    type: modified
+    span: {start_line: 13, end_line: 27}
+    summary: Extract a typed behavior-dimension fixture helper.
+    rationale: Reuse dimensions while testing unresolved output cases.
+  - path: tests/test_test_coverage_planning.py
+    type: modified
+    span: {start_line: 33, end_line: 33}
+    summary: Use the shared behavior-dimension fixture.
+    rationale: Keep the test fixture consistent with new scenario cases.
+  - path: tests/test_test_coverage_planning.py
+    type: modified
+    span: {start_line: 95, end_line: 96}
+    summary: Expect test-design contract version 6.
+    rationale: Verify the new answer contract is active.
+  - path: tests/test_test_coverage_planning.py
+    type: modified
+    span: {start_line: 128, end_line: 194}
+    summary: Test unresolved dimension propagation and contradictory assumptions.
+    rationale: Ensure planner output preserves unknown meaning and rejects conflicting interpretations.
+  - path: tests/test_test_coverage_planning.py
+    type: modified
+    span: {start_line: 197, end_line: 201}
+    summary: Mark an exact source test case's error behavior unresolved.
+    rationale: Verify deterministic source carry-forward retains unresolved dimensions.
+  - path: tests/test_test_coverage_planning.py
+    type: modified
+    span: {start_line: 209, end_line: 209}
+    summary: Use the updated typed behavior fixture in the source case.
+    rationale: Exercise unresolved semantic carry-through from source.
+  - path: tests/test_test_coverage_planning.py
+    type: modified
+    span: {start_line: 242, end_line: 242}
+    summary: Assert exact source carry-forward preserves the unresolved dimension.
+    rationale: Prevent source-authored unknowns from being normalized away.
+  - path: docs/audits/planning-llm-audit.md
+    type: modified
+    span: {start_line: 85, end_line: 91}
+    summary: Record the version 6 unresolved-dimension behavior.
+    rationale: Keep the LLM audit aligned with the planner contract and downstream gates.
+  - path: docs/audits/planning-llm-audit.md
+    type: modified
+    span: {start_line: 714, end_line: 715}
+    summary: Update milestone 3 implementation status.
+    rationale: Record explicit unresolved scenario dimensions as carried semantics.
+entities: []
+entity_relationships: []
+invariants:
+  - id: unresolved-planner-test-dimensions-remain-visible
+    description: A canonical unresolved or unspecified behavior dimension is preserved in the behavior scenario's unresolved_dimensions and is never silently dropped or translated to not_applicable.
+    action: added
+guidance: []

@@ -82,6 +82,13 @@ requirements, and test-design requirement facts carry that typed relation
 through, so downstream questions do not need to infer conditional,
 alternative, ordered, or all-together relationships again from prose.
 
+Scenario-dimension update: test-design answers that use the canonical
+`unresolved` or `unspecified` value for a behavior dimension now carry that
+dimension into the typed scenario's `unresolved_dimensions`. The test-design
+question contract is version 6, so prior version 5 answers are invalidated. The
+existing handoff surfaces unresolved dimensions and source-reference compilation
+rejects them where a resolved behavior case is required.
+
 Telemetry attribution update: each local provider-call record now carries a
 per-question contract identity (kind and contract version), expected answer
 schema, stable subject IDs, source/context reference IDs, attempt number, and the
@@ -704,6 +711,8 @@ check public API/test consumers explicitly; this audit changes none of them.
    setup text and complete typed source test semantics are now carried directly;
    semantic setup and test-design requests remain for other forms. Requirement
    validation group relations now carry through coverage and test-design facts.
+   Canonical unresolved test dimensions now remain unresolved through the typed
+   behavior scenario and are visible to downstream gates.
    Preserve remaining conditional/Boolean source semantics and scenario dimensions.
    Unknown meaning stops or goes to review rather than silently becoming
    context/not_applicable.

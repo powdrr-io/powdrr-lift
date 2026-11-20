@@ -2,8 +2,8 @@ schema: https://powdrr.io/schema/changelog-v2
 change_id: 1632
 title: Route policy-denied source edits through scope review
 intent:
-  problem: A MiniSWE attempt that changed out-of-scope files was marked policy_denied, but source-run finalization returned early before reporting the scope violation. Post-worker reconciliation then misclassified it as invalid_candidate, so exact-path scope review never ran.
-  goal: Surface out-of-scope paths for the existing scope review even when the worker attempt is policy-denied, and avoid reconciling incomplete attempts.
+  problem: A MiniSWE attempt that changed out-of-scope files was marked policy_denied, but source-run finalization returned early before reporting the scope violation. Post-worker reconciliation then misclassified it as invalid_candidate, so exact-path scope review never ran. Once review ran, generated fixture files without a direct test reference were excluded, and review failures were not persisted.
+  goal: Route policy-denied edits into scope review, review generated outputs using producer and fixture-test evidence, and persist review failures and decisions for diagnosis.
 human-decisions: []
 structured_files: []
 files:
@@ -27,10 +27,23 @@ files:
     span: {start_line: 608, end_line: 650}
     summary: Cover policy-denied scope reporting and incomplete candidate snapshots.
     rationale: Prevent regressions in source-run routing and candidate finalization.
+  - path: src/powdrr_lift/workrr/source_reference_dispatch.py
+    type: modified
+    span: {start_line: 126, end_line: 300}
+    summary: Include generated outputs supported by fixture tests in exact-path review and persist review outcomes and exceptions.
+    rationale: Avoid rejecting necessary generated fixture outputs and retain concrete evidence when scope recovery cannot proceed.
+  - path: tests/test_source_reference_dispatch.py
+    type: modified
+    span: {start_line: 150, end_line: 240}
+    summary: Cover generated-output review evidence and diagnostics for paths without sufficient provenance.
+    rationale: Ensure fixture outputs can reach exact-path review and unreviewable paths are reported explicitly.
 entities: []
 entity_relationships: []
 invariants:
   - id: policy-denied-scope-changes-reach-scope-review
     description: An incomplete source worker attempt that changed paths outside accepted scope is reported as a policy violation with its exact out-of-scope paths; reconciliation does not replace that diagnosis.
+    action: added
+  - id: scope-review-outcomes-are-durable
+    description: Each policy-denied scope review records whether paths were approved, rejected, unreviewable, or the review failed, including the affected paths and error details.
     action: added
 guidance: []

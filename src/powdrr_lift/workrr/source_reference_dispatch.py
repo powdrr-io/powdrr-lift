@@ -132,12 +132,38 @@ def _review_scope_additions(
     design: Mapping[str, Any],
     reviewer: WorkflowLLMClient,
     protected_paths: Sequence[str] = (),
+    diagnostics: dict[str, Any] | None = None,
 ) -> tuple[dict[str, Any], ...]:
     """Approve only exact tracked outputs tied to accepted work and repository use."""
     rejected = sorted(set(changed_paths) - set(allowed_paths))
     if not rejected:
         return ()
     evidence: dict[str, dict[str, Any]] = {}
+    test_context: list[dict[str, str]] = []
+    for source_path in allowed_paths:
+        if not any(part in source_path.lower() for part in ("test", "verify")):
+            continue
+        source = _git(repo_root, "show", f"{base_commit}:{source_path}")
+        if len(source) > MAX_DESIGN_BYTES:
+            continue
+        text = source.decode("utf-8", errors="replace")
+        fixture_line = next(
+            (
+                line.strip()[:300]
+                for line in text.splitlines()
+                if "fixture" in line.lower()
+            ),
+            None,
+        )
+        if fixture_line is not None:
+            test_context.append(
+                {
+                    "evidence_id": f"source-test-context:{source_path}",
+                    "path": source_path,
+                    "role": "test_or_verifier",
+                    "excerpt": fixture_line,
+                }
+            )
     for path in rejected:
         parsed = PurePosixPath(path)
         if (
@@ -201,9 +227,11 @@ def _review_scope_additions(
                         ),
                     }
                 )
-        if not any(item["role"] == "test_or_verifier" for item in references):
-            continue
         if not any(item["role"] == "producer_or_consumer" for item in references):
+            continue
+        if not any(item["role"] == "test_or_verifier" for item in references):
+            references.extend(test_context)
+        if not any(item["role"] == "test_or_verifier" for item in references):
             continue
         evidence_id = f"scope-path:{path}"
         evidence[path] = {
@@ -213,7 +241,19 @@ def _review_scope_additions(
             "accepted_source_references": references,
         }
     if not evidence:
+        if diagnostics is not None:
+            diagnostics.update(
+                status="no_reviewable_paths",
+                changed_paths=list(rejected),
+                candidate_paths=[],
+            )
         return ()
+    if diagnostics is not None:
+        diagnostics.update(
+            status="reviewing",
+            changed_paths=list(rejected),
+            candidate_paths=sorted(evidence),
+        )
     prompt = {
         "accepted_objective": design.get("objective", ""),
         "accepted_criteria": design.get("acceptance_criteria", []),
@@ -266,10 +306,14 @@ def _review_scope_additions(
     )
     decisions = decision.get("decisions")
     if not isinstance(decisions, list):
+        if diagnostics is not None:
+            diagnostics["status"] = "invalid_response"
         return ()
     approved: dict[str, dict[str, Any]] = {}
     for item in decisions:
         if not isinstance(item, Mapping):
+            if diagnostics is not None:
+                diagnostics["status"] = "invalid_response"
             return ()
         path_value = item.get("path")
         evidence_ids = item.get("evidence_ids")
@@ -278,6 +322,8 @@ def _review_scope_additions(
             or path_value not in evidence
             or not isinstance(evidence_ids, list)
         ):
+            if diagnostics is not None:
+                diagnostics["status"] = "invalid_response"
             return ()
         path = path_value
         valid_ids = {
@@ -295,6 +341,8 @@ def _review_scope_additions(
         if item.get("decision") == "authorize_exact_path":
             reason = item.get("reason")
             if not isinstance(reason, str) or not reason.strip():
+                if diagnostics is not None:
+                    diagnostics["status"] = "invalid_response"
                 return ()
             approved[path] = {
                 "path": path,
@@ -302,6 +350,11 @@ def _review_scope_additions(
                 "evidence_ids": sorted(set(evidence_ids)),
                 "reason": reason.strip(),
             }
+    if diagnostics is not None:
+        diagnostics.update(
+            status="approved_exact_paths" if approved else "review_rejected_paths",
+            decisions=[approved[path] for path in sorted(approved)],
+        )
     return tuple(approved[path] for path in sorted(approved))
 
 
@@ -760,6 +813,10 @@ def dispatch_source_reference_task(
                 data.get("outcome") == "policy_violation"
                 and attempt.get("status") == "policy_denied"
             ):
+                scope_review: dict[str, Any] = {
+                    "attempt_id": attempt_id,
+                    "changed_paths": list(attempt.get("out_of_scope_paths", ())),
+                }
                 try:
                     scope_decisions = _review_scope_additions(
                         repo_root,
@@ -770,20 +827,24 @@ def dispatch_source_reference_task(
                         design,
                         review_client,
                         protected_paths=(*test_sources, *run.request.protected_paths),
+                        diagnostics=scope_review,
                     )
-                except (PowdrrExecutionError, RuntimeError, ValueError):
+                except Exception as error:
+                    scope_review.update(
+                        status="review_failed",
+                        error_type=type(error).__name__,
+                        error=str(error)[:1000],
+                    )
                     scope_decisions = ()
                 scope_approved = tuple(str(item["path"]) for item in scope_decisions)
                 if scope_decisions:
                     effective_allowed_paths = tuple(
                         sorted({*effective_allowed_paths, *scope_approved})
                     )
-                    coordinator["scope_recovery"] = {
-                        "status": "approved_exact_paths",
-                        "attempt_id": attempt_id,
-                        "decisions": list(scope_decisions),
-                    }
-                    _write_coordinator(root, coordinator)
+                    scope_review["status"] = "approved_exact_paths"
+                    scope_review["decisions"] = list(scope_decisions)
+                coordinator["scope_recovery"] = scope_review
+                _write_coordinator(root, coordinator)
             recoverable = (
                 data.get("outcome") == "validation_failed"
                 and attempt.get("status") == "completed"

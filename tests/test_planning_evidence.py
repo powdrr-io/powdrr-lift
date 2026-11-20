@@ -679,8 +679,8 @@ def test_requirement_search_supplies_pinned_implementation_and_test_evidence(
     )
     request.validate()
     service_request.validate()
-    assert service_request.question.contract_version == 3
-    assert service_request.question.expected_answer_schema == "coverage-answer-v3"
+    assert service_request.question.contract_version == 4
+    assert service_request.question.expected_answer_schema == "coverage-answer-v4"
     requirement_context = next(
         item for item in service_request.accepted_facts if item.ref_id == requirement.id
     )
@@ -1223,12 +1223,18 @@ def test_coverage_evidence_policy_and_request_context_are_strict(
         "both relevant implementation/configuration evidence and relevant test"
         in request.exact_question
     )
-    assert request.question.contract_version == 3
-    assert request.question.expected_answer_schema == "coverage-answer-v3"
+    assert request.question.contract_version == 4
+    assert request.question.expected_answer_schema == "coverage-answer-v4"
     assert request.valid_example == request.empty_example
     assert request.valid_example["status"] == "missing"
     assert "Examples demonstrate answer shape only" in request.exact_question
     assert "Code/test co-occurrence alone does not prove coverage" in (
+        request.exact_question
+    )
+    assert "repeats requirement words but describes a different meaning" in (
+        request.exact_question
+    )
+    assert "observes the exact required behavior on a relevant input" in (
         request.exact_question
     )
     assert "if only tests match, mark it missing, not partial" in request.exact_question
@@ -1272,6 +1278,69 @@ def test_irrelevant_passing_test_is_not_used_as_positive_coverage_example(
         in request.repository_evidence[1].value["source_excerpt"]
     )
     assert "Code/test co-occurrence alone does not prove coverage" in (
+        request.exact_question
+    )
+
+
+@pytest.mark.parametrize(
+    ("implementation_source", "test_source", "test_name"),
+    [
+        (
+            "def trim_whitespace(raw: str) -> str:\n"
+            "    # Trim surrounding whitespace.\n"
+            "    return raw.lstrip()\n",
+            "def test_trim_surrounding_whitespace():\n"
+            '    assert trim_whitespace(" value ") == "value "\n',
+            "test_trim_surrounding_whitespace",
+        ),
+        (
+            "def trim_whitespace(raw: str) -> str:\n    return raw.strip()\n",
+            "def test_trim_surrounding_whitespace():\n"
+            '    assert trim_whitespace("plain") == "plain"\n',
+            "test_trim_surrounding_whitespace",
+        ),
+    ],
+    ids=("same-words-wrong-meaning", "passing-assertion-wrong-observation"),
+)
+def test_semantically_irrelevant_passing_assertions_do_not_prove_coverage(
+    tmp_path: Path,
+    implementation_source: str,
+    test_source: str,
+    test_name: str,
+) -> None:
+    repository, _ = _repository(tmp_path)
+    (repository / "src/schema.py").write_text(implementation_source, encoding="utf-8")
+    (repository / "tests/test_schema.py").write_text(test_source, encoding="utf-8")
+    _git(repository, "add", "src/schema.py", "tests/test_schema.py")
+    _git(repository, "commit", "-qm", "add semantically weak coverage evidence")
+    commit = _git(repository, "rev-parse", "HEAD")
+
+    namespace: dict[str, Any] = {}
+    exec(implementation_source, namespace)
+    exec(test_source, namespace)
+    namespace[test_name]()
+
+    requirement, source = _requirement(commit)
+    implementation = record_file_evidence(
+        repository, commit, "src/schema.py", kind="implementation", ordinal=1
+    )
+    test = record_file_evidence(
+        repository, commit, "tests/test_schema.py", kind="test", ordinal=2
+    )
+    request = build_requirement_coverage_request(
+        requirement,
+        source=source,
+        evidence=(implementation, test),
+        repository_root=repository,
+    )
+
+    assert request.valid_example == request.empty_example
+    assert request.valid_example["evidence_ids"] == []
+    assert (
+        "test_trim_surrounding_whitespace"
+        in request.repository_evidence[1].value["source_excerpt"]
+    )
+    assert "observes the exact required behavior on a relevant input" in (
         request.exact_question
     )
 

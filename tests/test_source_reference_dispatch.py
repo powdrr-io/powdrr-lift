@@ -34,6 +34,168 @@ def test_missing_validation_is_reported_as_structured_failure() -> None:
     }
 
 
+def test_scope_review_approves_exact_generated_artifact_with_source_evidence(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "generator.py").write_text('OUTPUT = "golden.json"\n')
+    (repo / "test_fixtures.py").write_text('FIXTURE = "golden.json"\n')
+    (repo / "golden.json").write_text('{"before": true}\n')
+    git(repo, "init", "-b", "main")
+    git(repo, "add", ".")
+    git(
+        repo,
+        "-c",
+        "user.name=Test",
+        "-c",
+        "user.email=test@example.com",
+        "commit",
+        "-m",
+        "base",
+    )
+    base = git(repo, "rev-parse", "HEAD")
+    candidate = tmp_path / "candidate"
+    git(repo, "worktree", "add", "--detach", str(candidate), base)
+    (candidate / "golden.json").write_text('{"before": true, "after": true}\n')
+
+    class ScopeReviewer:
+        def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
+            request = json.loads(messages[-1]["content"])
+            assert "accepted_criteria" in request
+            assert "candidate_diff" in request["candidate_paths"]["golden.json"]
+            return {
+                "decisions": [
+                    {
+                        "path": "golden.json",
+                        "decision": "authorize_exact_path",
+                        "evidence_ids": [
+                            "scope-path:golden.json",
+                            "source-reference:generator.py:golden.json",
+                            "source-reference:test_fixtures.py:golden.json",
+                        ],
+                        "reason": (
+                            "The accepted step requires a generated fixture update."
+                        ),
+                    }
+                ]
+            }
+
+    assert dispatch._review_scope_additions(
+        repo,
+        candidate,
+        base,
+        ("generator.py", "test_fixtures.py"),
+        ("golden.json",),
+        {
+            "acceptance_criteria": ["Update generated fixture metadata"],
+            "implementation_steps": ["Regenerate golden.json"],
+        },
+        ScopeReviewer(),
+    ) == (
+        {
+            "path": "golden.json",
+            "decision": "authorize_exact_path",
+            "evidence_ids": [
+                "scope-path:golden.json",
+                "source-reference:generator.py:golden.json",
+                "source-reference:test_fixtures.py:golden.json",
+            ],
+            "reason": "The accepted step requires a generated fixture update.",
+        },
+    )
+
+
+def test_scope_review_rejects_unbound_evidence_ids(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "generator.py").write_text('OUTPUT = "golden.json"\n')
+    (repo / "test_fixtures.py").write_text('FIXTURE = "golden.json"\n')
+    (repo / "golden.json").write_text('{"before": true}\n')
+    git(repo, "init", "-b", "main")
+    git(repo, "add", ".")
+    git(
+        repo,
+        "-c",
+        "user.name=Test",
+        "-c",
+        "user.email=test@example.com",
+        "commit",
+        "-m",
+        "base",
+    )
+    base = git(repo, "rev-parse", "HEAD")
+    candidate = tmp_path / "candidate"
+    git(repo, "worktree", "add", "--detach", str(candidate), base)
+    (candidate / "golden.json").write_text('{"after": true}\n')
+
+    class UnboundReviewer:
+        def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
+            return {
+                "decisions": [
+                    {
+                        "path": "golden.json",
+                        "decision": "authorize_exact_path",
+                        "evidence_ids": ["invented"],
+                        "reason": "The model says it is needed.",
+                    }
+                ]
+            }
+
+    assert (
+        dispatch._review_scope_additions(
+            repo,
+            candidate,
+            base,
+            ("generator.py", "test_fixtures.py"),
+            ("golden.json",),
+            {"acceptance_criteria": ["Update fixture"], "implementation_steps": []},
+            UnboundReviewer(),
+        )
+        == ()
+    )
+
+
+def test_scope_review_rejects_artifact_without_test_consumer(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "generator.py").write_text('OUTPUT = "golden.json"\n')
+    (repo / "golden.json").write_text('{"before": true}\n')
+    git(repo, "init", "-b", "main")
+    git(repo, "add", ".")
+    git(
+        repo,
+        "-c",
+        "user.name=Test",
+        "-c",
+        "user.email=test@example.com",
+        "commit",
+        "-m",
+        "base",
+    )
+    base = git(repo, "rev-parse", "HEAD")
+    candidate = tmp_path / "candidate"
+    git(repo, "worktree", "add", "--detach", str(candidate), base)
+    (candidate / "golden.json").write_text('{"after": true}\n')
+
+    class NeverApprove:
+        def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
+            raise AssertionError("candidate without a consumer must not reach review")
+
+    assert (
+        dispatch._review_scope_additions(
+            repo,
+            candidate,
+            base,
+            ("generator.py",),
+            ("golden.json",),
+            {"acceptance_criteria": [], "implementation_steps": []},
+            NeverApprove(),
+        )
+        == ()
+    )
+
+
 @pytest.mark.parametrize(
     "health",
     [None, {"mode": "observe", "passed": True}, {"mode": "enforce", "passed": False}],

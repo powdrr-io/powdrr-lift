@@ -1,5 +1,5 @@
 schema: https://powdrr.io/schema/changelog-v2
-change_id: 1637
+change_id: 1638
 title: Align source-reference completion with MiniSWE instructions
 intent:
   problem: Enforced source-reference handoffs require a JSON design-gap report after the completion sentinel, but MiniSWE's task template instructed workers to submit the sentinel alone, causing completed work to fail validation.

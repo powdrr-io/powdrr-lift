@@ -959,6 +959,10 @@ def build_work_unit_proposal_request(
                 "id": requirement_id,
                 "statement": context.requirements[requirement_id].statement,
                 "source_refs": list(context.requirements[requirement_id].source_refs),
+                "source_logic": [
+                    dict(expression)
+                    for expression in context.requirements[requirement_id].source_logic
+                ],
                 **(
                     {
                         "story_refs": [
@@ -1047,7 +1051,15 @@ def build_work_unit_proposal_request(
     )
     input_facts: dict[str, Any] = {
         "requirements": [
-            context.requirements[item].statement for item in requirement_ids
+            {
+                "id": item,
+                "statement": context.requirements[item].statement,
+                "source_logic": [
+                    dict(expression)
+                    for expression in context.requirements[item].source_logic
+                ],
+            }
+            for item in requirement_ids
         ],
         "requirement_coverage": [
             {
@@ -1090,13 +1102,13 @@ def build_work_unit_proposal_request(
         question_identity["maximum_proposals"] = maximum_proposals
     question_key = _digest(question_identity)[-12:]
     question = Question(
-        question_id=f"propose-units-v9-{requirement_ids[0]}-{question_key}",
+        question_id=f"propose-units-v10-{requirement_ids[0]}-{question_key}",
         kind="propose_work_units",
-        contract_version=9,
+        contract_version=10,
         subject_ids=tuple(requirement_ids),
-        input_digest=_digest({"schema_version": 9, **input_facts}),
+        input_digest=_digest({"schema_version": 10, **input_facts}),
         context_ref_ids=all_refs,
-        expected_answer_schema="work-unit-proposals-v9",
+        expected_answer_schema="work-unit-proposals-v10",
         attempt=1,
     )
     request_context = replace(
@@ -1155,6 +1167,10 @@ def build_work_unit_proposal_request(
             "requirement, evidence, or source IDs. Component, validation, and "
             "runtime are derived from supplied catalogs and planned paths. Split "
             "different implementation runtimes into separate units. "
+            "If a requirement includes source_logic, preserve its nested Boolean "
+            "conditions and exact quoted source clauses in the unit's deliverables "
+            "and acceptance criteria; do not flatten conditional branches into "
+            "unconditional or simultaneous behavior. "
             "A .sh file is a shell write even when it supports validation; do not "
             "label a production script as a test to merge it with another runtime. "
             "When the preferred_implementation_runtimes fact is supplied, prefer "

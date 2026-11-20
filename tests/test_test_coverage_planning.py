@@ -60,6 +60,23 @@ def test_planner_assigns_stable_ids_to_llm_test_designs() -> None:
                 "source_validation_groups": [
                     {"id": "validation:ci:1", "relation": "alternatives"}
                 ],
+                "source_logic": [
+                    {
+                        "op": "all_of",
+                        "children": [
+                            {
+                                "op": "atom",
+                                "source_ref": "anchor-ci",
+                                "quote": "CI runs",
+                            },
+                            {
+                                "op": "atom",
+                                "source_ref": "anchor-ci",
+                                "quote": "on pull requests.",
+                            },
+                        ],
+                    }
+                ],
             },
             {
                 "id": "req-test-command",
@@ -92,11 +109,14 @@ def test_planner_assigns_stable_ids_to_llm_test_designs() -> None:
     planned = request.parse_answer(answer)
 
     assert request.question.kind == "plan_test_coverage"
-    assert request.question.contract_version == 7
-    assert request.question.expected_answer_schema == "plan-test-coverage-v7"
+    assert request.question.contract_version == 8
+    assert request.question.expected_answer_schema == "plan-test-coverage-v8"
     assert "source_validation_groups" in request.exact_question
     assert "do not require all alternatives in one run" in request.exact_question
     assert "mark the relevant dimension unresolved instead of guessing" in (
+        request.exact_question
+    )
+    assert "preserve its nested all_of, any_of, ordered, and conditional structure" in (
         request.exact_question
     )
     assert request.max_answer_chars == 8_000
@@ -106,6 +126,9 @@ def test_planner_assigns_stable_ids_to_llm_test_designs() -> None:
     assert item_context.value["requirements"][0]["source_validation_groups"] == [
         {"id": "validation:ci:1", "relation": "alternatives"}
     ]
+    source_logic_context = item_context.value["requirements"][0]["source_logic"]
+    assert source_logic_context[0]["op"] == "all_of"
+    assert source_logic_context[0]["children"][1]["quote"] == "on pull requests."
     assert [case["id"] for case in planned["required_test_cases"]] == [
         "AC-01",
         "AC-02",

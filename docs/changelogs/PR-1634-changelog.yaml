@@ -1,0 +1,87 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1634
+title: Carry source-bound Boolean logic through planning
+intent:
+  problem: Requirement prose and flat source relations can lose nested conditions, alternatives, and ordering as planner stages transform accepted source facts.
+  goal: Capture bounded nested logic as exact source-quoted atoms and carry it through requirement review, coverage, work-unit planning, and test design.
+human-decisions: []
+structured_files: []
+files:
+  - path: packages/service/src/powdrr_service/planning/source_logic.py
+    type: added
+    span: {start_line: 1, end_line: 172}
+    summary: Parse a bounded Boolean expression tree and bind every leaf and condition to an exact supplied source quote.
+    rationale: Keep nested meaning explicit and verifiable while leaving interpretation of source language to the planner model.
+  - path: packages/service/src/powdrr_service/planning/source.py
+    type: modified
+    span: {start_line: 28, end_line: 1440}
+    summary: Accept optional source logic during extraction, validate its bounds and source quotes, and preserve it through fidelity, equivalence, allocation, and deduplication.
+    rationale: Ensure later planner stages receive accepted source semantics instead of having to reconstruct them from prose.
+  - path: packages/service/src/powdrr_service/planning/coverage.py
+    type: modified
+    span: {start_line: 65, end_line: 270}
+    summary: Carry source logic into coverage facts and residual requirements.
+    rationale: Preserve nested conditions and alternatives through coverage decisions.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 1301, end_line: 1928}
+    summary: Include source logic in test-design requirements and recognize the updated work-unit question contract.
+    rationale: Keep accepted answers and cache selection aligned with the revised planner inputs.
+  - path: packages/service/src/powdrr_service/planning/test_coverage.py
+    type: modified
+    span: {start_line: 185, end_line: 680}
+    summary: Validate and include source logic in test-design context, prompts, and contract version 8.
+    rationale: Make generated scenarios preserve nested source conditions and Boolean relationships.
+  - path: packages/service/src/powdrr_service/planning/assembly.py
+    type: modified
+    span: {start_line: 959, end_line: 1175}
+    summary: Include source logic in work-unit proposal facts and move the proposal contract to version 10.
+    rationale: Keep implementation deliverables and acceptance criteria aligned with nested source semantics.
+  - path: tests/test_planning_source.py
+    type: modified
+    span: {start_line: 640, end_line: 732}
+    summary: Verify source-quoted nested logic is accepted, retained, and rejected when a quote is invented.
+    rationale: Guard the extraction and allocation boundary against unsupported source semantics.
+  - path: tests/test_planning_evidence.py
+    type: modified
+    span: {start_line: 1, end_line: 300}
+    summary: Verify coverage context and residual requirements preserve source logic.
+    rationale: Catch loss of nested semantics during evidence processing.
+  - path: tests/test_test_coverage_planning.py
+    type: modified
+    span: {start_line: 1, end_line: 740}
+    summary: Verify source logic reaches test-design facts under contract version 8.
+    rationale: Ensure test design uses the accepted expression tree.
+  - path: tests/test_planning_assembly.py
+    type: modified
+    span: {start_line: 650, end_line: 710}
+    summary: Verify work-unit proposals include source logic and use contract version 10.
+    rationale: Protect semantic propagation into implementation planning.
+  - path: tests/test_planning_service.py
+    type: modified
+    span: {start_line: 1010, end_line: 1055}
+    summary: Update accepted work-unit answer fixtures to contract version 10.
+    rationale: Keep service-level reconstruction tests aligned with the current proposal contract.
+  - path: tests/test_benchmark_planning_scale.py
+    type: modified
+    span: {start_line: 1, end_line: 400}
+    summary: Update planning scale fixtures to the work-unit proposal contract version 10.
+    rationale: Keep scale coverage aligned with the current planner contract.
+  - path: docs/audits/planning-llm-audit.md
+    type: modified
+    span: {start_line: 718, end_line: 735}
+    summary: Record source-bound Boolean logic propagation and retain semantic review for ambiguous or unsupported trees.
+    rationale: Keep the audit aligned with the implementation and its remaining LLM judgment boundaries.
+entities: []
+entity_relationships: []
+invariants:
+  - id: source-logic-leaves-are-source-bound
+    description: Every source_logic atom and conditional condition quotes text present in an allowed source anchor.
+    action: added
+  - id: source-logic-is-bounded
+    description: Source logic is bounded by maximum nesting depth, node count, child count, and quote length.
+    action: added
+  - id: alternatives-retain-source-meaning
+    description: Any_of represents a source-authorized alternative and is not converted into simultaneous obligations.
+    action: added
+guidance: []

@@ -720,12 +720,16 @@ check public API/test consumers explicitly; this audit changes none of them.
    validation group relations now carry through coverage and test-design facts.
    Test-design instructions now define how all-together, ordered, alternatives,
    and conditional relations must affect scenarios; contract version 7 invalidates
-   earlier answers that did not receive this direction. Nested Boolean scope that
-   cannot be represented by these flat relations remains unresolved work.
+   earlier answers that did not receive this direction. Requirement extraction now
+   optionally captures nested all_of, any_of, ordered, and conditional logic as a
+   bounded source_logic tree. Every atom and condition must be an exact quote from
+   a cited source anchor; coverage and test-design facts carry the tree, and their
+   contracts invalidate earlier answers. Choosing the tree remains semantic work;
+   malformed, unsupported, or ambiguous logic must stop or go to review.
    Canonical unresolved test dimensions now remain unresolved through the typed
    behavior scenario and are visible to downstream gates.
-   Define a typed representation for nested conditional/Boolean source semantics
-   before removing further semantic review.
+   Continue closing gaps between accepted source logic and executable coverage;
+   do not remove semantic review solely because a typed tree exists.
    Unknown meaning stops or goes to review rather than silently becoming
    context/not_applicable.
 4. **Compile formal dependency/structural cases.** Typed resource use and exact

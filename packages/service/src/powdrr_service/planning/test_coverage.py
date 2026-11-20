@@ -185,6 +185,20 @@ def build_test_coverage_request(
             normalized_requirement["source_validation_groups"] = [
                 dict(group) for group in groups
             ]
+        source_logic = requirement.get("source_logic", ())
+        if (
+            not isinstance(source_logic, Sequence)
+            or isinstance(source_logic, (str, bytes))
+            or not all(isinstance(expression, Mapping) for expression in source_logic)
+        ):
+            raise PlanningContractError(
+                f"/requirements/{index}/source_logic",
+                "must be a list of typed source logic expressions",
+            )
+        if source_logic:
+            normalized_requirement["source_logic"] = [
+                dict(expression) for expression in source_logic
+            ]
         normalized_requirements.append(normalized_requirement)
     if len({entry["id"] for entry in normalized_requirements}) != len(
         normalized_requirements
@@ -609,7 +623,7 @@ def build_test_coverage_request(
             }
             for excerpt in source_excerpts
         ],
-        "contract_version": 7,
+        "contract_version": 8,
     }
     digest = hashlib.sha256(
         json.dumps(digest_data, sort_keys=True, separators=(",", ":")).encode()
@@ -618,14 +632,14 @@ def build_test_coverage_request(
         question=Question(
             question_id=question_id,
             kind="plan_test_coverage",
-            contract_version=7,
+            contract_version=8,
             subject_ids=(item_id,),
             input_digest=f"sha256:{digest}",
             context_ref_ids=(
                 *(excerpt.ref_id for excerpt in source_excerpts),
                 *(fact.ref_id for fact in facts),
             ),
-            expected_answer_schema="plan-test-coverage-v7",
+            expected_answer_schema="plan-test-coverage-v8",
             attempt=1,
         ),
         exact_question=(
@@ -653,6 +667,11 @@ def build_test_coverage_request(
             "relationship changes the observable behavior. Use the supplied source "
             "excerpt to retain the actual condition and branch meaning; if it is "
             "unclear, mark the relevant dimension unresolved instead of guessing. "
+            "If accepted requirement facts include source_logic, preserve its "
+            "nested all_of, any_of, ordered, and conditional structure in the test "
+            "scenarios. Treat exact quoted atoms and conditions as source authority; "
+            "do not flatten conditions or turn any_of alternatives into simultaneous "
+            "requirements. "
             "Use not_applicable only "
             "when the pinned source evidence makes a dimension irrelevant; use "
             "an explicit assumption when repository conventions must resolve an "

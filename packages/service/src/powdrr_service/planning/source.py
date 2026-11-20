@@ -19,6 +19,7 @@ from powdrr_service.planning.questions import (
     QuestionRequest,
     SourceExcerpt,
 )
+from powdrr_service.planning.source_logic import SourceLogicError, parse_source_logic
 from powdrr_service.planning.story_allocation import StoryPlanRef
 
 MAX_SOURCE_BLOCK_CHARS = 8_000
@@ -27,6 +28,24 @@ MAX_REQUIREMENT_ANCHORS_PER_PAGE = 8
 MAX_REQUIREMENTS_PER_EXTRACTION_PAGE = MAX_CLAUSES_PER_SOURCE_BLOCK
 _SHA_RE = re.compile(r"^[0-9a-f]{40,64}$")
 _REQUIREMENT_KINDS = frozenset({"behavior", "constraint", "acceptance", "human_setup"})
+_SOURCE_LOGIC_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "required": ["op"],
+    "properties": {
+        "op": {"enum": ["atom", "all_of", "any_of", "ordered", "conditional"]},
+        "source_ref": {"type": "string", "minLength": 1},
+        "quote": {"type": "string", "minLength": 1},
+        "children": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 8,
+            "items": {"type": "object"},
+        },
+        "condition": {"type": "object"},
+        "then": {"type": "object"},
+        "else": {"type": "object"},
+    },
+}
 _ENUMERATION_SCHEMA: dict[str, Any] = {
     "type": "object",
     "additionalProperties": False,
@@ -56,6 +75,7 @@ _ENUMERATION_SCHEMA: dict[str, Any] = {
                         "type": "array",
                         "items": {"type": "string"},
                     },
+                    "source_logic": _SOURCE_LOGIC_SCHEMA,
                 },
             },
         },
@@ -284,6 +304,7 @@ class Requirement:
     related_requirement_ids: tuple[str, ...]
     story_refs: tuple[StoryPlanRef, ...] = ()
     source_validation_groups: tuple[tuple[str, str], ...] = ()
+    source_logic: tuple[Mapping[str, Any], ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -292,6 +313,7 @@ class RequirementDraft:
     kind: str
     source_refs: tuple[str, ...]
     related_source_refs: tuple[str, ...]
+    source_logic: tuple[Mapping[str, Any], ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -746,6 +768,7 @@ def parse_requirement_page(
     *,
     allowed_source_refs: set[str],
     page_anchor_ids: Sequence[str],
+    source_text_by_ref: Mapping[str, str] | None = None,
 ) -> RequirementExtractionPage:
     """Validate semantic records against a scheduler-owned source window."""
     _exact_fields(value, {"records"}, "/")
@@ -765,9 +788,16 @@ def parse_requirement_page(
         pointer = f"/records/{index}"
         if not isinstance(record, Mapping):
             raise PlanningContractError(pointer, "must be an object")
-        _exact_fields(
-            record, {"statement", "kind", "source_refs", "related_source_refs"}, pointer
-        )
+        required_fields = {
+            "statement",
+            "kind",
+            "source_refs",
+            "related_source_refs",
+        }
+        if not required_fields <= set(record) or set(record) - (
+            required_fields | {"source_logic"}
+        ):
+            raise PlanningContractError(pointer, "has missing or unknown fields")
         statement = _text(record["statement"], f"{pointer}/statement")
         kind = _text(record["kind"], f"{pointer}/kind")
         if kind not in _REQUIREMENT_KINDS:
@@ -791,14 +821,24 @@ def parse_requirement_page(
                 f"{pointer}/source_refs",
                 "direct source references must belong to the supplied page window",
             )
-        parsed.append(
-            {
-                "statement": statement,
-                "kind": kind,
-                "source_refs": refs,
-                "related_source_refs": related,
-            }
-        )
+        parsed_record: dict[str, Any] = {
+            "statement": statement,
+            "kind": kind,
+            "source_refs": refs,
+            "related_source_refs": related,
+        }
+        if "source_logic" in record:
+            try:
+                parsed_record["source_logic"] = parse_source_logic(
+                    record["source_logic"],
+                    source_text_by_ref=source_text_by_ref or {},
+                    allowed_source_refs=set(refs + related),
+                )
+            except SourceLogicError as error:
+                raise PlanningContractError(
+                    f"{pointer}/source_logic", str(error)
+                ) from error
+        parsed.append(parsed_record)
     return RequirementExtractionPage(tuple(parsed))
 
 
@@ -924,6 +964,7 @@ def build_extract_requirements_request(
     accepted_facts = (*anchor_facts, page_fact)
     input_digest = _digest_json(
         {
+            "contract_version": 2,
             "block": source_block_input_digest(block),
             "anchor_registry": [
                 {"id": item.ref_id, "value": dict(item.value)} for item in anchor_facts
@@ -932,12 +973,20 @@ def build_extract_requirements_request(
         }
     )
     allowed_source_refs = set(page)
+    source_text_by_ref = {
+        ref: block.text[
+            anchors[ref].start_offset - block.start_offset : anchors[ref].end_offset
+            - block.start_offset
+        ]
+        for ref in page
+    }
 
     def parse(answer: Mapping[str, Any]) -> RequirementExtractionPage:
         return parse_requirement_page(
             answer,
             allowed_source_refs=allowed_source_refs,
             page_anchor_ids=page,
+            source_text_by_ref=source_text_by_ref,
         )
 
     schema = {
@@ -952,7 +1001,8 @@ def build_extract_requirements_request(
         question_kind="extract_requirements",
         subject_id=block.id,
         input_digest=input_digest,
-        schema_name="extract-requirements-answer-v2",
+        schema_name="extract-requirements-answer-v3",
+        contract_version=2,
         prompt=(
             "Which independently checkable obligations do these source anchors impose? "
             "This question covers only the supplied source window. Return every "
@@ -961,7 +1011,12 @@ def build_extract_requirements_request(
             "the supplied page-window anchor IDs. related_source_refs may cite "
             "another anchor in this same page only when the relationship is "
             "explicit. Return at most 64 records. Return records only; the "
-            "scheduler owns page boundaries and progression."
+            "scheduler owns page boundaries and progression. When an obligation "
+            "contains nested all_of/any_of/conditional or ordered logic, include "
+            "source_logic as a bounded tree. Every atom and condition must cite an "
+            "exact quote and supplied anchor; do not paraphrase Boolean conditions. "
+            "Use any_of only when the source says one alternative is sufficient. "
+            "Omit source_logic for a simple independent obligation."
         ),
         field_definitions={
             "records": (
@@ -973,6 +1028,10 @@ def build_extract_requirements_request(
             "related_source_refs": (
                 "Other anchors in this page that explicitly qualify or "
                 "cross-reference the obligation; otherwise use an empty array."
+            ),
+            "source_logic": (
+                "Optional nested all_of, any_of, ordered, or conditional expression "
+                "with exact quoted atoms and condition text."
             ),
         },
         excerpts=(excerpt,),
@@ -1061,12 +1120,17 @@ def build_fidelity_request(
         raise PlanningSourceError("requirement references an unknown source anchor")
     fact = ContextRecord(
         requirement.id,
-        {"statement": requirement.statement, "kind": requirement.kind},
+        {
+            "statement": requirement.statement,
+            "kind": requirement.kind,
+            "source_logic": [dict(item) for item in requirement.source_logic],
+        },
     )
     input_digest = _digest_json(
         {
             "requirement": requirement.id,
             "statement": requirement.statement,
+            "source_logic": [dict(item) for item in requirement.source_logic],
             "anchors": [
                 source_block_input_digest(_block_for_anchor(segmented, ref))
                 for ref in requirement.source_refs
@@ -1086,11 +1150,14 @@ def build_fidelity_request(
         question_kind="check_requirement_fidelity",
         subject_id=requirement.id,
         input_digest=input_digest,
-        schema_name="requirement-fidelity-v1",
+        schema_name="requirement-fidelity-v2",
+        contract_version=2,
         prompt=(
             "Does this statement preserve the cited obligation without adding or "
             "removing behavior? Accept or provide one corrected statement. "
-            "The obligation cannot be deleted."
+            "The obligation cannot be deleted. If source_logic is supplied, preserve "
+            "its exact conditions and Boolean relationships; do not flatten or omit "
+            "a branch while revising the statement."
         ),
         field_definitions={
             "decision": "accept or revise.",
@@ -1131,8 +1198,22 @@ def build_equivalence_request(
     if len(excerpts) != len(refs):
         raise PlanningSourceError("requirement references an unknown source anchor")
     facts = (
-        ContextRecord(first.id, {"statement": first.statement, "kind": first.kind}),
-        ContextRecord(second.id, {"statement": second.statement, "kind": second.kind}),
+        ContextRecord(
+            first.id,
+            {
+                "statement": first.statement,
+                "kind": first.kind,
+                "source_logic": [dict(item) for item in first.source_logic],
+            },
+        ),
+        ContextRecord(
+            second.id,
+            {
+                "statement": second.statement,
+                "kind": second.kind,
+                "source_logic": [dict(item) for item in second.source_logic],
+            },
+        ),
     )
     digest = _digest_json(
         {
@@ -1148,10 +1229,13 @@ def build_equivalence_request(
         question_kind="compare_requirement_equivalence",
         subject_id=f"{first.id}-{second.id}",
         input_digest=digest,
-        schema_name="requirement-equivalence-v1",
+        schema_name="requirement-equivalence-v2",
+        contract_version=2,
         prompt=(
             "Do these requirements impose the same complete obligation? "
-            "Partial overlap is not equivalence."
+            "Partial overlap is not equivalence. Compare any supplied source_logic "
+            "trees as part of the obligation; materially different conditions, "
+            "branches, or operators make requirements non-equivalent."
         ),
         field_definitions={
             "equivalent": "True only when both preserve the same full obligation.",
@@ -1178,11 +1262,11 @@ def allocate_requirement(
 ) -> Requirement:
     if ordinal < 1:
         raise PlanningSourceError("requirement ordinal must be positive")
-    _exact_fields(
-        record,
-        {"statement", "kind", "source_refs", "related_source_refs"},
-        "/",
-    )
+    required_fields = {"statement", "kind", "source_refs", "related_source_refs"}
+    if not required_fields <= set(record) or set(record) - (
+        required_fields | {"source_logic"}
+    ):
+        raise PlanningContractError("/", "has missing or unknown fields")
     statement = _text(record["statement"], "/statement")
     kind = _text(record["kind"], "/kind")
     if kind not in _REQUIREMENT_KINDS:
@@ -1219,6 +1303,24 @@ def allocate_requirement(
                 "source validation group has conflicting relations"
             )
     source_validation_groups = tuple(sorted(group_relations.items()))
+    source_logic = record.get("source_logic")
+    if source_logic is not None:
+        if not isinstance(source_logic, Mapping):
+            raise PlanningContractError("/source_logic", "must be a typed expression")
+        logic_refs = set(refs + tuple(record.get("related_source_refs", ())))
+        source_text_by_ref = {
+            ref: ledger.source.text[anchors[ref].start_offset : anchors[ref].end_offset]
+            for ref in logic_refs
+            if ref in anchors
+        }
+        try:
+            source_logic = parse_source_logic(
+                source_logic,
+                source_text_by_ref=source_text_by_ref,
+                allowed_source_refs=logic_refs,
+            )
+        except SourceLogicError as error:
+            raise PlanningContractError("/source_logic", str(error)) from error
     return Requirement(
         id=f"req-{ordinal:04d}",
         statement=statement,
@@ -1227,6 +1329,7 @@ def allocate_requirement(
         source_group_ids=groups,
         related_requirement_ids=tuple(record.get("related_requirement_ids", ())),
         source_validation_groups=source_validation_groups,
+        source_logic=() if source_logic is None else (source_logic,),
     )
 
 
@@ -1251,7 +1354,11 @@ def allocate_requirements(
         requirements.append(allocated)
         drafts.append(
             RequirementDraft(
-                allocated.statement, allocated.kind, allocated.source_refs, related_refs
+                allocated.statement,
+                allocated.kind,
+                allocated.source_refs,
+                related_refs,
+                allocated.source_logic,
             )
         )
     return tuple(requirements), tuple(drafts)
@@ -1283,6 +1390,10 @@ def deduplicate_requirement_records(
             deduplicated.append(record)
             continue
         existing = deduplicated[existing_index]
+        if existing.get("source_logic") != record.get("source_logic"):
+            raise PlanningSourceError(
+                "duplicate source requirement has conflicting source logic"
+            )
         existing["related_source_refs"] = list(
             dict.fromkeys(
                 [
@@ -1313,12 +1424,26 @@ def merge_equivalent_requirements(
                 retained.source_validation_groups + duplicate.source_validation_groups
             )
         ),
+        source_logic=_merge_source_logic(retained.source_logic, duplicate.source_logic),
         related_requirement_ids=tuple(
             dict.fromkeys(
                 retained.related_requirement_ids + duplicate.related_requirement_ids
             )
         ),
     )
+
+
+def _merge_source_logic(
+    *expressions: tuple[Mapping[str, Any], ...],
+) -> tuple[Mapping[str, Any], ...]:
+    merged: list[Mapping[str, Any]] = []
+    seen: set[str] = set()
+    for expression in (item for group in expressions for item in group):
+        key = json.dumps(expression, sort_keys=True, separators=(",", ":"))
+        if key not in seen:
+            merged.append(dict(expression))
+            seen.add(key)
+    return tuple(merged)
 
 
 def source_block_input_digest(block: SourceBlock) -> str:
@@ -1348,6 +1473,7 @@ def _source_question_request[AnswerT](
     empty_example: Mapping[str, Any],
     schema: Mapping[str, Any],
     parse: Any,
+    contract_version: int = 1,
     excerpt: SourceExcerpt | None = None,
     excerpts: Sequence[SourceExcerpt] = (),
     accepted_facts: Sequence[ContextRecord] = (),
@@ -1365,7 +1491,7 @@ def _source_question_request[AnswerT](
         question=Question(
             question_id=question_id,
             kind=question_kind,
-            contract_version=1,
+            contract_version=contract_version,
             subject_ids=(subject_id,),
             input_digest=input_digest,
             context_ref_ids=refs,

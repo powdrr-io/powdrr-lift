@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from dataclasses import replace
 
 import pytest
 from powdrr_service.planning.contracts import PlanningContractError
@@ -63,6 +64,9 @@ def test_receipt_coverage_requires_exact_requirement_and_run_binding(
         statement=requirement.statement,
         kind=requirement.kind,
         source_refs=requirement.source_refs,
+        source_group_ids=(),
+        source_validation_groups=(),
+        source_logic=(),
     )
     receipt = RequirementExecutionReceipt.observed(
         requirement_id=requirement.id,
@@ -203,3 +207,94 @@ def test_verification_adapter_requires_explicit_requirement_and_tree_binding() -
         assert "different candidate tree" in str(error)
     else:
         raise AssertionError("candidate tree mismatch was accepted")
+
+
+def test_receipt_binding_includes_typed_source_logic_and_validation_groups() -> None:
+    text = "# Plan\n\nTrim whitespace and preserve its order.\n"
+    commit = "a" * 40
+    document = PinnedSourceDocument(
+        repository="owner/repo",
+        commit_sha=commit,
+        path="docs/plan.md",
+        blob_sha="b" * 40,
+        content_sha256=hashlib.sha256(text.encode()).hexdigest(),
+        text=text,
+    )
+    source = segment_markdown_source(document)
+    block = next(item for item in source.blocks if item.kind == "paragraph")
+    anchor = block.anchor_ids[0]
+    source_logic = {
+        "op": "all_of",
+        "children": [
+            {"op": "atom", "source_ref": anchor, "quote": "Trim whitespace"},
+            {"op": "atom", "source_ref": anchor, "quote": "preserve its order"},
+        ],
+    }
+    requirement = Requirement(
+        "req-0001",
+        "Trim whitespace and preserve its order.",
+        "functional",
+        (anchor,),
+        ("validation:clause-01:1",),
+        (),
+        source_validation_groups=(("validation:clause-01:1", "all_together"),),
+        source_logic=(source_logic,),
+    )
+    requirement_digest = requirement_coverage_digest(
+        requirement_id=requirement.id,
+        statement=requirement.statement,
+        kind=requirement.kind,
+        source_refs=requirement.source_refs,
+        source_group_ids=requirement.source_group_ids,
+        source_validation_groups=requirement.source_validation_groups,
+        source_logic=requirement.source_logic,
+    )
+    receipt = RequirementExecutionReceipt.observed(
+        requirement_id=requirement.id,
+        requirement_digest=requirement_digest,
+        source_commit=commit,
+        candidate_commit=commit,
+        oracle_id="oracle:trim-order",
+        oracle_digest="sha256:" + "c" * 64,
+        command_digest="sha256:" + "d" * 64,
+        outcome="passed",
+        run_id="github:run/789",
+        artifact_refs=("artifact:run/789/result.json",),
+    )
+    excerpt = json.dumps(receipt.to_data(), sort_keys=True) + "\n"
+    evidence = Evidence(
+        "evidence-0001",
+        commit,
+        "artifacts/receipt.json",
+        1,
+        1,
+        hashlib.sha256(excerpt.encode()).hexdigest(),
+        "execution_receipt",
+    )
+
+    accepted = build_requirement_coverage_request(
+        requirement,
+        source=source,
+        evidence=(evidence,),
+        evidence_excerpts={evidence.id: excerpt},
+    )
+    changed_requirement = replace(
+        requirement,
+        source_logic=(
+            {
+                "op": "any_of",
+                "children": list(source_logic["children"]),
+            },
+        ),
+    )
+    stale = build_requirement_coverage_request(
+        changed_requirement,
+        source=source,
+        evidence=(evidence,),
+        evidence_excerpts={evidence.id: excerpt},
+    )
+
+    assert accepted.valid_example["status"] == "complete"
+    assert evidence.id in accepted.question.context_ref_ids
+    assert stale.valid_example == stale.empty_example
+    assert evidence.id not in stale.question.context_ref_ids

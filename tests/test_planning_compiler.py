@@ -717,6 +717,27 @@ def _fixture() -> tuple[ReviewedExecutionPlan, PlanningManifest, Any]:
                 "statement": "Implement the behavior.",
                 "kind": "behavior",
                 "source_refs": ["anchor-01"],
+                "source_group_ids": ["validation:clause-01:1"],
+                "source_validation_groups": [
+                    {"id": "validation:clause-01:1", "relation": "all_together"}
+                ],
+                "source_logic": [
+                    {
+                        "op": "all_of",
+                        "children": [
+                            {
+                                "op": "atom",
+                                "source_ref": "anchor-01",
+                                "quote": "source",
+                            },
+                            {
+                                "op": "atom",
+                                "source_ref": "anchor-01",
+                                "quote": "source",
+                            },
+                        ],
+                    }
+                ],
                 "related_requirement_ids": [],
             }
         ],
@@ -815,6 +836,25 @@ def test_compiler_round_trips_plan_and_emits_linked_artifacts() -> None:
                 statement="Implement the behavior.",
                 kind="behavior",
                 source_refs=("anchor-01",),
+                source_group_ids=("validation:clause-01:1",),
+                source_validation_groups=(("validation:clause-01:1", "all_together"),),
+                source_logic=(
+                    {
+                        "op": "all_of",
+                        "children": [
+                            {
+                                "op": "atom",
+                                "source_ref": "anchor-01",
+                                "quote": "source",
+                            },
+                            {
+                                "op": "atom",
+                                "source_ref": "anchor-01",
+                                "quote": "source",
+                            },
+                        ],
+                    },
+                ),
             ),
         }
     ]

@@ -2709,6 +2709,16 @@ class SourceLedgerQuestionMachine:
                         "statement": requirement.statement,
                         "kind": requirement.kind,
                         "source_refs": list(requirement.source_refs),
+                        "source_group_ids": list(requirement.source_group_ids),
+                        "source_validation_groups": [
+                            {"id": group_id, "relation": relation}
+                            for group_id, relation in (
+                                requirement.source_validation_groups
+                            )
+                        ],
+                        "source_logic": [
+                            dict(expression) for expression in requirement.source_logic
+                        ],
                         **(
                             {
                                 "story_refs": [
@@ -3197,6 +3207,9 @@ def _requirement_bound_execution_receipt_answer(
         statement=requirement.statement,
         kind=requirement.kind,
         source_refs=requirement.source_refs,
+        source_group_ids=requirement.source_group_ids,
+        source_validation_groups=requirement.source_validation_groups,
+        source_logic=requirement.source_logic,
     )
     if not receipt.proves_coverage(
         requirement_id=requirement.id,

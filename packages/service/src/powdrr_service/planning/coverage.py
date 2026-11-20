@@ -251,6 +251,9 @@ def _receipt_proves_requirement(
         statement=requirement.statement,
         kind=requirement.kind,
         source_refs=requirement.source_refs,
+        source_group_ids=requirement.source_group_ids,
+        source_validation_groups=requirement.source_validation_groups,
+        source_logic=requirement.source_logic,
     )
     return receipt.proves_coverage(
         requirement_id=requirement.id,

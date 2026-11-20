@@ -347,6 +347,7 @@ def test_unavailable_optional_invariant_review_is_recorded_without_blocking_audi
     assert reviews[0]["decision"]["outcome"] == "unknown"
     assert reviews[0]["available_evidence"]
     assert reviews[0]["required_gate_evidence"] is False
+    assert reviews[0]["decision_specification"]["required"] is False
 
 
 def test_flexible_owners_and_suspicious_extra_placements_need_fresh_review() -> None:
@@ -367,6 +368,20 @@ def test_flexible_owners_and_suspicious_extra_placements_need_fresh_review() -> 
     )
     assert reviewed.status == "passed"
     report_reviews = reviewed.to_data()["reviews"]
+    assert (
+        next(item for item in report_reviews if item["purpose"] == "flexible_owner")[
+            "decision_specification"
+        ]["required"]
+        is True
+    )
+    assert (
+        next(
+            item
+            for item in report_reviews
+            if item["purpose"] == "invariant_preservation"
+        )["decision_specification"]["required"]
+        is False
+    )
     assert (
         next(item for item in report_reviews if item["purpose"] == "flexible_owner")[
             "required_gate_evidence"
@@ -486,6 +501,7 @@ def test_incomplete_or_stale_semantic_review_receipts_are_not_reused() -> None:
     receipt = receipts[0]
     stale = json.loads(json.dumps(receipt))
     stale["decision"]["predicate_version"] = "older-policy"
+    stale["decision_specification"]["predicate_version"] = "older-policy"
     stale["evidence_locations"] = []
 
     judge = Judge()

@@ -1,0 +1,83 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1622
+title: Bind optional reviews as non-required decisions
+intent:
+  problem: Optional invariant review records are marked non-gating externally but their embedded decision specification still says the decision is required.
+  goal: Bind requirement mode into the decision specification and receipt identity so optional invariant advice cannot be mistaken for required evidence or reuse a decision produced under the previous policy.
+human-decisions: []
+structured_files: []
+files:
+  - path: packages/service/src/powdrr_service/structrr/reference_validation.py
+    type: modified
+    span: {start_line: 38, end_line: 38}
+    summary: Advance the owner-review policy revision.
+    rationale: Invalidate receipts created before required-mode binding was corrected.
+  - path: packages/service/src/powdrr_service/structrr/reference_validation.py
+    type: modified
+    span: {start_line: 152, end_line: 153}
+    summary: Accept requirement mode when building a review specification.
+    rationale: Let optional invariant advice be explicitly declared non-required.
+  - path: packages/service/src/powdrr_service/structrr/reference_validation.py
+    type: modified
+    span: {start_line: 167, end_line: 167}
+    summary: Bind the requirement mode into the decision specification.
+    rationale: Tell the judge whether the semantic decision is required for the gate.
+  - path: packages/service/src/powdrr_service/structrr/reference_validation.py
+    type: modified
+    span: {start_line: 174, end_line: 174}
+    summary: Require specification equality when reusing a receipt.
+    rationale: Prevent a receipt produced under a different required mode from being reused.
+  - path: packages/service/src/powdrr_service/structrr/reference_validation.py
+    type: modified
+    span: {start_line: 196, end_line: 196}
+    summary: Include the decision specification in reused records.
+    rationale: Preserve the exact requirement and policy binding with the cached decision.
+  - path: packages/service/src/powdrr_service/structrr/reference_validation.py
+    type: modified
+    span: {start_line: 326, end_line: 326}
+    summary: Include the decision specification in new review records.
+    rationale: Make later receipt validation possible without reconstructing prior prompt context.
+  - path: packages/service/src/powdrr_service/structrr/reference_validation.py
+    type: modified
+    span: {start_line: 643, end_line: 643}
+    summary: Mark unavailable optional reviews as non-required.
+    rationale: Keep requirement semantics explicit when no review client is available.
+  - path: packages/service/src/powdrr_service/structrr/reference_validation.py
+    type: modified
+    span: {start_line: 724, end_line: 729}
+    summary: Set the requirement mode for each review purpose.
+    rationale: Treat optional invariant reviews as non-required and mandatory owner reviews as required.
+  - path: tests/test_structrr_reference_validation.py
+    type: modified
+    span: {start_line: 350, end_line: 350}
+    summary: Assert unavailable invariant decisions are non-required.
+    rationale: Verify unknown optional reviews retain the correct requirement mode.
+  - path: tests/test_structrr_reference_validation.py
+    type: modified
+    span: {start_line: 371, end_line: 384}
+    summary: Assert required mode for owner and invariant reviews.
+    rationale: Verify mandatory flexible-owner decisions and optional invariant advice use distinct requirement modes.
+  - path: tests/test_structrr_reference_validation.py
+    type: modified
+    span: {start_line: 504, end_line: 504}
+    summary: Mutate the stored policy in a stale receipt.
+    rationale: Ensure a receipt from an older policy revision is rejected.
+entities:
+  - id: optional-source-review-requirement-binding
+    type: Function
+    action: added
+  - id: optional-source-review-requirement-binding-tests
+    type: Regression test
+    action: added
+entity_relationships:
+  - id: review-requirement-binding-is-covered
+    type: verifies
+    source: optional-source-review-requirement-binding-tests
+    target: optional-source-review-requirement-binding
+    action: added
+    description: Tests verify optional and required decisions use separate requirement modes and older receipts are rejected.
+invariants:
+  - id: optional-review-specifications-are-not-required
+    description: Invariant-preservation review specifications set required to false; required owner-adequacy specifications set it to true; cached receipts are reused only when the full specification matches.
+    action: added
+guidance: []

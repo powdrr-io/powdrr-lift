@@ -45,5 +45,5 @@ invariants:
     action: added
   - id: unordered-subject-edits-remain-rejected
     description: Structural operations on the same subject in unordered plan items are rejected.
-    action: preserved
+    action: altered
 guidance: []

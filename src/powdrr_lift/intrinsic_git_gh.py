@@ -697,15 +697,17 @@ def _gh_command(parameters: Mapping[str, Any]) -> list[str]:
                 command.extend(["--jq", ".url"])
     elif operation in {"pr_create", "pr_publish_clean"}:
         body = parameters.get("body")
-        command = [
-            "pr",
-            "create",
-            "--draft",
-            "--title",
-            _required_text(parameters.get("title"), "title"),
-            "--body",
-            _required_text(body, "body"),
-        ]
+        command = ["pr", "create"]
+        if operation == "pr_create":
+            command.append("--draft")
+        command.extend(
+            [
+                "--title",
+                _required_text(parameters.get("title"), "title"),
+                "--body",
+                _required_text(body, "body"),
+            ]
+        )
         if parameters.get("base") is not None:
             command.extend(["--base", _branch_name(parameters.get("base"))])
         head = parameters.get(

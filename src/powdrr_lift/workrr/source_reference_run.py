@@ -1287,14 +1287,15 @@ class SourceReferenceRun:
     def finalize_worker(self, attempt: CodingAgentAttempt) -> None:
         self._last_attempt = attempt
         self.verify_inputs()
-        if attempt.status is not CodingAgentStatus.COMPLETED:
-            return
         if attempt.out_of_scope_paths:
             paths = ", ".join(sorted(attempt.out_of_scope_paths))
             raise SourceRunFailure(
                 "policy_violation",
                 f"Source worker changed paths outside accepted scope: {paths}",
             )
+        if attempt.status is not CodingAgentStatus.COMPLETED:
+            self._candidate_after_worker = self._candidate_state()
+            return
         if attempt.worker_committed:
             raise SourceRunFailure(
                 "policy_violation",

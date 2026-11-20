@@ -182,6 +182,7 @@ def test_scope_review_rejects_artifact_without_test_consumer(tmp_path: Path) -> 
         def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
             raise AssertionError("candidate without a consumer must not reach review")
 
+    diagnostics: dict[str, Any] = {}
     assert (
         dispatch._review_scope_additions(
             repo,
@@ -191,9 +192,84 @@ def test_scope_review_rejects_artifact_without_test_consumer(tmp_path: Path) -> 
             ("golden.json",),
             {"acceptance_criteria": [], "implementation_steps": []},
             NeverApprove(),
+            diagnostics=diagnostics,
         )
         == ()
     )
+    assert diagnostics["status"] == "no_reviewable_paths"
+    assert diagnostics["candidate_paths"] == []
+
+
+def test_scope_review_considers_generated_outputs_with_fixture_tree_test_context(
+    tmp_path: Path,
+) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "generator.py").write_text('OUTPUT = "statement.bin"\n')
+    (repo / "test_fixtures.py").write_text('FIXTURES = Path("fixtures")\n')
+    (repo / "fixtures").mkdir()
+    (repo / "fixtures" / "statement.bin").write_bytes(b"before")
+    git(repo, "init", "-b", "main")
+    git(repo, "add", ".")
+    git(
+        repo,
+        "-c",
+        "user.name=Test",
+        "-c",
+        "user.email=test@example.com",
+        "commit",
+        "-m",
+        "base",
+    )
+    base = git(repo, "rev-parse", "HEAD")
+    candidate_real = tmp_path / "candidate-real"
+    git(repo, "worktree", "add", "--detach", str(candidate_real), base)
+    candidate = tmp_path / "candidate"
+    candidate.symlink_to(candidate_real, target_is_directory=True)
+    (candidate / "fixtures" / "statement.bin").write_bytes(b"after")
+
+    class GeneratedOutputReviewer:
+        def complete_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:
+            request = json.loads(messages[-1]["content"])
+            evidence = request["candidate_paths"]["fixtures/statement.bin"]
+            assert [
+                item["role"] for item in evidence["accepted_source_references"]
+            ] == [
+                "producer_or_consumer",
+                "test_or_verifier",
+            ]
+            return {
+                "decisions": [
+                    {
+                        "path": "fixtures/statement.bin",
+                        "decision": "authorize_exact_path",
+                        "evidence_ids": [
+                            "scope-path:fixtures/statement.bin",
+                            "source-reference:generator.py:statement.bin",
+                            "source-test-context:test_fixtures.py",
+                        ],
+                        "reason": "The accepted generator updates this fixture.",
+                    }
+                ]
+            }
+
+    diagnostics: dict[str, Any] = {}
+    decisions = dispatch._review_scope_additions(
+        repo,
+        candidate,
+        base,
+        ("generator.py", "test_fixtures.py"),
+        ("fixtures/statement.bin",),
+        {
+            "acceptance_criteria": ["Update generated attestation fixtures"],
+            "implementation_steps": ["Regenerate the crypto fixtures"],
+        },
+        GeneratedOutputReviewer(),
+        diagnostics=diagnostics,
+    )
+
+    assert decisions[0]["path"] == "fixtures/statement.bin"
+    assert diagnostics["status"] == "approved_exact_paths"
 
 
 @pytest.mark.parametrize(

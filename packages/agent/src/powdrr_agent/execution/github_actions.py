@@ -48,6 +48,7 @@ class GitHubActionsSnapshot:
     observed_at: str | None = None
     required_checks: tuple[Mapping[str, Any], ...] | None = None
     required_checks_reason: str | None = None
+    required_checks_source: str | None = None
     logs_by_job: Mapping[str, CIJobLogEvidence] | None = None
 
 
@@ -335,9 +336,11 @@ class GitHubActionsClient:
                         f"{check_run_id}"
                     )
                 annotations[check_run_id] = tuple(values)
-        required_checks, required_checks_reason = self._required_checks(
-            pull_request_number
-        )
+        (
+            required_checks,
+            required_checks_reason,
+            required_checks_source,
+        ) = self._required_checks(pull_request_number)
         confirmed_pr = self._object(
             f"repos/{self.repository}/pulls/{pull_request_number}", "pull request"
         )
@@ -359,6 +362,7 @@ class GitHubActionsClient:
             observed_at=datetime.now(UTC).isoformat(),
             required_checks=required_checks,
             required_checks_reason=required_checks_reason,
+            required_checks_source=required_checks_source,
             logs_by_job=logs_by_job,
         )
 
@@ -411,36 +415,91 @@ class GitHubActionsClient:
 
     def _required_checks(
         self, pull_request_number: int
-    ) -> tuple[tuple[Mapping[str, Any], ...] | None, str | None]:
-        result = self._run(
-            [
-                self.executable,
-                "pr",
-                "checks",
-                str(pull_request_number),
-                "--repo",
-                self.repository,
-                "--required",
-                "--json",
-                "name,state,workflow",
-            ],
+    ) -> tuple[
+        tuple[Mapping[str, Any], ...] | None,
+        str | None,
+        str | None,
+    ]:
+        common = [
+            self.executable,
+            "pr",
+            "checks",
+            str(pull_request_number),
+            "--repo",
+            self.repository,
+            "--json",
+            "name,state,workflow",
+        ]
+        required_result = self._run(
+            [*common[:6], "--required", *common[6:]],
             capture_output=True,
             text=True,
             check=False,
         )
         # gh returns 8 for a valid observation while one or more checks are pending.
-        if result.returncode not in (0, 8):
-            return None, "GitHub did not make required-check policy available"
+        policy_reason = self._check_result_error(
+            required_result,
+            unavailable_message="GitHub did not make required-check policy available",
+        )
+        if policy_reason is None:
+            checks, parse_error = self._parse_check_results(required_result.stdout)
+            if checks:
+                return checks, None, "gh pr checks --required"
+            policy_reason = parse_error or "GitHub reported no required checks"
+
+        # GitHub Free does not expose branch-protection policy for private repos.
+        # Fall back to every check GitHub reports for this exact PR head.
+        all_result = self._run(
+            common,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        all_error = self._check_result_error(
+            all_result,
+            unavailable_message="GitHub could not report PR checks",
+        )
+        if all_error is None:
+            checks, parse_error = self._parse_check_results(all_result.stdout)
+            if checks:
+                return (
+                    checks,
+                    f"Required-check policy unavailable ({policy_reason}); "
+                    "using all checks reported for this PR.",
+                    "gh pr checks (all reported)",
+                )
+            all_error = parse_error or "GitHub reported no PR checks"
+        return (
+            None,
+            f"{policy_reason}; all-check fallback unavailable: {all_error}",
+            None,
+        )
+
+    @staticmethod
+    def _check_result_error(
+        result: subprocess.CompletedProcess[str], *, unavailable_message: str
+    ) -> str | None:
+        if result.returncode in (0, 8):
+            return None
+        detail = result.stderr.strip() or result.stdout.strip()
+        return (
+            f"{unavailable_message}: {detail[:300]}" if detail else unavailable_message
+        )
+
+    @staticmethod
+    def _parse_check_results(
+        output: str,
+    ) -> tuple[tuple[Mapping[str, Any], ...], str | None]:
         try:
-            raw = json.loads(result.stdout)
+            raw = json.loads(output)
         except json.JSONDecodeError:
-            return None, "GitHub returned malformed required-check data"
-        if not isinstance(raw, list) or not raw:
-            return None, "GitHub reported no required checks; policy is unknown"
+            return (), "GitHub returned malformed check data"
+        if not isinstance(raw, list):
+            return (), "GitHub returned malformed check data"
         checks: list[Mapping[str, Any]] = []
         for item in raw:
             if not isinstance(item, Mapping):
-                return None, "GitHub returned malformed required-check data"
+                return (), "GitHub returned malformed check data"
             name = item.get("name")
             state = item.get("state")
             workflow = item.get("workflow")
@@ -449,38 +508,54 @@ class GitHubActionsClient:
                 or not name.strip()
                 or not isinstance(state, str)
             ):
-                return None, "GitHub returned incomplete required-check data"
+                return (), "GitHub returned incomplete check data"
             if workflow is not None and not isinstance(workflow, str):
-                return None, "GitHub returned malformed required-check data"
+                return (), "GitHub returned malformed check data"
             checks.append(dict(item))
         return tuple(checks), None
 
     def refresh_required_checks(
         self, pull_request_number: int, expected_head_sha: str
-    ) -> tuple[tuple[Mapping[str, Any], ...] | None, str | None]:
+    ) -> tuple[
+        tuple[Mapping[str, Any], ...] | None,
+        str | None,
+        str | None,
+    ]:
         """Refresh required statuses only if the PR still has the pinned head."""
         try:
             before = self._object(
                 f"repos/{self.repository}/pulls/{pull_request_number}", "pull request"
             )
         except GitHubActionsError as error:
-            return None, f"could not confirm PR head before check refresh: {error}"
+            return (
+                None,
+                f"could not confirm PR head before check refresh: {error}",
+                None,
+            )
         head = before.get("head")
         head_sha = head.get("sha") if isinstance(head, Mapping) else None
         if head_sha != expected_head_sha:
-            return None, "pull request head changed while waiting for required checks"
-        checks, reason = self._required_checks(pull_request_number)
+            return (
+                None,
+                "pull request head changed while waiting for required checks",
+                None,
+            )
+        checks, reason, source = self._required_checks(pull_request_number)
         try:
             after = self._object(
                 f"repos/{self.repository}/pulls/{pull_request_number}", "pull request"
             )
         except GitHubActionsError as error:
-            return None, f"could not confirm PR head after check refresh: {error}"
+            return None, f"could not confirm PR head after check refresh: {error}", None
         head = after.get("head")
         confirmed_sha = head.get("sha") if isinstance(head, Mapping) else None
         if confirmed_sha != expected_head_sha:
-            return None, "pull request head changed while waiting for required checks"
-        return checks, reason
+            return (
+                None,
+                "pull request head changed while waiting for required checks",
+                None,
+            )
+        return checks, reason, source
 
     def get_issue(self, issue_number: int) -> Mapping[str, Any]:
         return self._object(f"repos/{self.repository}/issues/{issue_number}", "issue")

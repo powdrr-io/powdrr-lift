@@ -197,7 +197,8 @@ def normalize_ci_observation(
     raw_required = snapshot.get("required_checks")
     required_checks: list[CIRequiredCheck] = []
     required_status: Literal["available", "unavailable"] = "unavailable"
-    required_source = None
+    raw_source = snapshot.get("required_checks_source")
+    required_source = raw_source if isinstance(raw_source, str) else None
     if isinstance(raw_required, (tuple, list)) and raw_required:
         for item in raw_required:
             if not isinstance(item, Mapping):
@@ -223,7 +224,8 @@ def normalize_ci_observation(
             )
         if required_checks:
             required_status = "available"
-            required_source = "gh pr checks --required"
+            if required_source is None:
+                required_source = "gh pr checks --required"
     jobs = normalize_github_snapshot(snapshot)
     tested_shas = {job.tested_sha for job in jobs if job.tested_sha is not None}
     return CIObservation(

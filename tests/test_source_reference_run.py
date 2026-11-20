@@ -605,6 +605,49 @@ def test_completed_source_worker_cannot_retain_out_of_scope_changes(
         run.finalize_worker(attempt)
 
 
+def test_policy_denied_source_worker_surfaces_out_of_scope_paths_for_review(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    run = prepare(tmp_path, monkeypatch, run_id="denied-scope")
+    attempt = CodingAgentAttempt(
+        attempt_id=run.run_id,
+        request_id=run.run_id,
+        provider="minisweagent",
+        status=CodingAgentStatus.POLICY_DENIED,
+        exit_code=0,
+        changed_paths=("retry.py", "fixtures/golden.json"),
+        out_of_scope_paths=("fixtures/golden.json",),
+        error="worker changed paths outside the implementation request",
+    )
+
+    with pytest.raises(SourceRunFailure) as failure:
+        run.finalize_worker(attempt)
+
+    assert failure.value.outcome == "policy_violation"
+    assert "fixtures/golden.json" in str(failure.value)
+    assert run._candidate_after_worker is None
+
+
+def test_noncompleted_source_worker_freezes_candidate_state(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    run = prepare(tmp_path, monkeypatch, run_id="failed-candidate")
+    (run.workspace_root / "retry.py").write_text(CANDIDATE, encoding="utf-8")
+    attempt = CodingAgentAttempt(
+        attempt_id=run.run_id,
+        request_id=run.run_id,
+        provider="minisweagent",
+        status=CodingAgentStatus.POLICY_DENIED,
+        exit_code=0,
+        changed_paths=("retry.py",),
+        diff_fingerprint="sha256:policy-denied-candidate",
+    )
+
+    run.finalize_worker(attempt)
+
+    assert run._candidate_after_worker == run._candidate_state()
+
+
 def test_completed_source_worker_accepts_prevalidated_supporting_edits(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

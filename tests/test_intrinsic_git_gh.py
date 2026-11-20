@@ -144,7 +144,7 @@ def test_gh_intrinsic_operations_have_expected_commands() -> None:
         "-f",
         "side=RIGHT",
     ]
-    assert intrinsic_command(
+    pr_create_command = intrinsic_command(
         {
             "operation": "pr_create",
             "title": "Add feature",
@@ -153,7 +153,9 @@ def test_gh_intrinsic_operations_have_expected_commands() -> None:
             "head": "workflow/demo",
         },
         tool="gh",
-    )[-4:] == ["--base", "main", "--head", "workflow/demo"]
+    )
+    assert "--draft" in pr_create_command
+    assert pr_create_command[-4:] == ["--base", "main", "--head", "workflow/demo"]
     assert intrinsic_command(
         {
             "operation": "pr_publish_clean",
@@ -202,6 +204,7 @@ def test_gh_intrinsic_operations_have_expected_commands() -> None:
         },
         tool="gh",
     )
+    assert "--draft" not in templated_command
     template_body = (
         "## Objective\n\nImplement the reviewed feature.\n\n"
         "## Scope\n\nUpdate approved files.\n\n"

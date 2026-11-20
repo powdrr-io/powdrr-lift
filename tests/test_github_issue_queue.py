@@ -3294,6 +3294,44 @@ def test_continue_awaiting_ci_rechecks_current_head_and_records_result(
     assert latest["ci_response_result"]["matches_queue_head"] is True
 
 
+def test_awaiting_ci_recovers_publication_marker_without_completed_task_checkpoint(
+    tmp_path: Path,
+) -> None:
+    client = FakeIssueClient()
+    client.issues.append(
+        QueueIssue(
+            917,
+            "Implement feature",
+            "",
+            "open",
+            (QUEUE_LABELS["awaiting_ci"],),
+            "https://github.com/example/project/issues/917",
+        )
+    )
+    client.comments.append(
+        (
+            917,
+            "Powdrr PR for issue #917: https://github.com/example/project/pull/1046",
+        )
+    )
+
+    report = continue_awaiting_ci_issue(
+        client=client,  # type: ignore[arg-type]
+        issue_number=917,
+        repo_root=tmp_path,
+    )
+
+    assert report.outcome == "awaiting_review"
+    assert QUEUE_LABELS["awaiting_review"] in client.get_issue(917).labels
+    assert QUEUE_LABELS["awaiting_ci"] not in client.get_issue(917).labels
+    assert (
+        github_issue_queue._latest_checkpoint_pull_request_url(
+            client.list_comments(917), issue_number=917
+        )
+        == "https://github.com/example/project/pull/1046"
+    )
+
+
 def test_continue_ci_human_checkpoint_preserves_human_route_until_checks_clear(
     tmp_path: Path,
 ) -> None:

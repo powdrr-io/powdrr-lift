@@ -71,6 +71,7 @@ from powdrr_lift.workrr.llm import (
 from powdrr_lift.workrr.task_agent import (
     WorkflowTaskAgentConfig,
     _append_inline_plan_adjustments_to_pr_body,
+    _append_issue_reference_to_pr_body,
     _append_plan_repair_metadata_to_pr_body,
     _apply_task_edits,
     _build_workflow_client,
@@ -308,6 +309,37 @@ def test_pr_body_discloses_inline_plan_adjustments_to_reviewer() -> None:
     assert "Step 4 updates repository CI." in updated.parameters["body"]
     assert ".github/workflows/ci.yml" in updated.parameters["body"]
     assert action.parameters["body"] == "## Summary\n\nAdd the verification workflow."
+
+
+def test_clean_publication_issue_reference_is_added_to_rendered_description() -> None:
+    sections = {
+        "objective": "Deliver the planned implementation.",
+        "scope": "Implement the reviewed work item.",
+        "implementation_details": "Update the schema and policy.",
+        "acceptance_criteria": "Meet the reviewed acceptance criteria.",
+        "validation": "The repository verification passed.",
+        "advisory_test_quality_notes": "None.",
+    }
+    action = WorkflowAction(
+        kind="invoke_tool",
+        tool="gh",
+        parameters={
+            "operation": "pr_publish_clean",
+            "body": "This body is not used when structured sections are present.",
+            "workflow_context": {"pr-description-sections": sections},
+        },
+    )
+
+    updated = _append_issue_reference_to_pr_body(action, issue_number=917)
+    updated_context = updated.parameters["workflow_context"]
+    updated_sections = updated_context["pr-description-sections"]
+
+    assert updated_sections["objective"].endswith("Closes #917")
+    assert sections["objective"] == "Deliver the planned implementation."
+    from powdrr_lift.clean_pr_publisher import render_standard_pr_description
+
+    rendered = render_standard_pr_description(updated_sections)
+    assert "Closes #917" in rendered
 
 
 def test_plan_amendment_pr_body_includes_typed_repair_manifest(

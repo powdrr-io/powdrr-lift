@@ -1,5 +1,5 @@
 schema: https://powdrr.io/schema/changelog-v2
-change_id: 1625
+change_id: 1626
 title: Specify intent preserving scope recovery
 intent:
   problem: A generated file omitted from a Powdrr plan can block a candidate before validation, even when the edit serves the accepted requirements.

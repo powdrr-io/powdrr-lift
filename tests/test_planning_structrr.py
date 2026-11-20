@@ -2550,6 +2550,75 @@ def test_structural_compilation_projects_predecessor_subjects() -> None:
     )
 
 
+def test_ordered_structural_updates_compile_to_one_final_delta() -> None:
+    first = {
+        "operation_id": "item-01:entities:entity-01",
+        "item_id": "item-01",
+        "section": "entities",
+        "subject_id": "entity-01",
+        "action": "changed",
+        "content": {"id": "entity-01", "name": "Renamed module"},
+    }
+    second = {
+        "operation_id": "item-02:entities:entity-01",
+        "item_id": "item-02",
+        "section": "entities",
+        "subject_id": "entity-01",
+        "action": "changed",
+        "content": {"id": "entity-01", "description": "Updated behavior"},
+    }
+
+    proposal = compile_structrr_plan(
+        plan_id="plan-01",
+        baseline_snapshot={
+            "entities": [
+                {
+                    "id": "entity-01",
+                    "type": "module",
+                    "name": "Original module",
+                    "description": "Original behavior",
+                }
+            ]
+        },
+        items=[
+            {"id": "item-01", "dependencies": [], "allowed_paths": ["src/a.py"]},
+            {
+                "id": "item-02",
+                "dependencies": ["item-01"],
+                "allowed_paths": ["src/b.py"],
+            },
+        ],
+        item_order=["item-01", "item-02"],
+        operations=[first, second],
+        source_ref="plan.md#sha256:abc",
+    )
+
+    assert proposal.item_baselines["item-02"]["entities"] == [
+        {
+            "id": "entity-01",
+            "type": "module",
+            "name": "Renamed module",
+            "description": "Original behavior",
+        }
+    ]
+    assert proposal.expected_final_snapshot["entities"] == [
+        {
+            "id": "entity-01",
+            "type": "module",
+            "name": "Renamed module",
+            "description": "Updated behavior",
+        }
+    ]
+    assert len(proposal.full_proposal.operations) == 1
+    assert proposal.full_proposal.operations[0].content == {
+        "id": "entity-01",
+        "type": "module",
+        "name": "Renamed module",
+        "description": "Updated behavior",
+        "action": "changed",
+    }
+
+
 def test_unordered_items_cannot_claim_the_same_structural_subject() -> None:
     operation = {
         "section": "entities",

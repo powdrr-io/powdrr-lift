@@ -735,7 +735,11 @@ check public API/test consumers explicitly; this audit changes none of them.
 4. **Compile formal dependency/structural cases.** Typed resource use and exact
    planned deltas derive edges/operations. Existing deterministic candidate
    relevance and desired-content proposals now share one validated request; new
-   subjects still need semantic content proposals.
+   subjects still need semantic content proposals. Ordered structural edits across
+   PR items now compile to one deterministic baseline-to-final delta while each
+   item retains its predecessor snapshot; unordered edits to the same subject still
+   fail. Continue testing false path/name correlations, dynamic/partial symbol
+   coverage, graph cycles, superseded source and contradictory projected states.
    Test false path/name correlations, dynamic/partial symbol coverage, graph cycles,
    superseded source and contradictory projected states.
 5. **Improve coverage/oracle evidence before removing semantic reviews.** Use

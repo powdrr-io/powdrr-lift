@@ -1,0 +1,36 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1632
+title: Route policy-denied source edits through scope review
+intent:
+  problem: A MiniSWE attempt that changed out-of-scope files was marked policy_denied, but source-run finalization returned early before reporting the scope violation. Post-worker reconciliation then misclassified it as invalid_candidate, so exact-path scope review never ran.
+  goal: Surface out-of-scope paths for the existing scope review even when the worker attempt is policy-denied, and avoid reconciling incomplete attempts.
+human-decisions: []
+structured_files: []
+files:
+  - path: src/powdrr_lift/workrr/coding_agent_validation.py
+    type: modified
+    span: {start_line: 603, end_line: 605}
+    summary: Reconcile source candidates only after a completed worker attempt.
+    rationale: Prevent an incomplete or policy-denied attempt from being replaced by a misleading candidate-finalization error.
+  - path: src/powdrr_lift/workrr/source_reference_run.py
+    type: modified
+    span: {start_line: 1290, end_line: 1291}
+    summary: Remove the early return that hid out-of-scope paths on incomplete attempts.
+    rationale: Allow a policy-denied worker's changed paths to be classified before returning from finalization.
+  - path: src/powdrr_lift/workrr/source_reference_run.py
+    type: modified
+    span: {start_line: 1296, end_line: 1298}
+    summary: Report out-of-scope paths before handling incomplete attempts and snapshot other incomplete candidates.
+    rationale: Route policy-denied out-of-scope changes into the existing exact-path scope review while keeping unrelated incomplete candidates immutable.
+  - path: tests/test_source_reference_run.py
+    type: modified
+    span: {start_line: 608, end_line: 650}
+    summary: Cover policy-denied scope reporting and incomplete candidate snapshots.
+    rationale: Prevent regressions in source-run routing and candidate finalization.
+entities: []
+entity_relationships: []
+invariants:
+  - id: policy-denied-scope-changes-reach-scope-review
+    description: An incomplete source worker attempt that changed paths outside accepted scope is reported as a policy violation with its exact out-of-scope paths; reconciliation does not replace that diagnosis.
+    action: added
+guidance: []

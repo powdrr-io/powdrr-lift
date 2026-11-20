@@ -7360,7 +7360,7 @@ def run_workflow_task(
                     file=stderr,
                 )
                 return 1
-            print("No ready agent task found.", file=stderr)
+            print(_no_ready_agent_task_diagnostic(workflow), file=stderr)
             return 1
 
         execution_base_commit: str | None = None
@@ -7860,6 +7860,43 @@ def _select_task(
             raise ValueError(f"Task is not a ready agent task: {task_id}")
         return selected
     return ready_tasks[0] if ready_tasks else None
+
+
+def _no_ready_agent_task_diagnostic(workflow: WorkflowInstance) -> str:
+    """Explain why an unfinished workflow has no agent task to execute."""
+    unresolved = [
+        task
+        for task in workflow.tasks
+        if task.assignee_type is AssigneeType.AGENT
+        and task.status
+        not in {
+            TaskStatus.COMPLETED,
+            TaskStatus.CLOSED,
+            TaskStatus.SUPERCEDED,
+            TaskStatus.ABANDONED,
+        }
+    ]
+    if not unresolved:
+        return (
+            "No ready agent task found; the workflow has no unresolved agent tasks "
+            "but is not considered finished. Inspect workflow task records."
+        )
+
+    details: list[str] = []
+    for task in unresolved[:8]:
+        upstream = ", ".join(task.upstream_task_ids) or "none"
+        details.append(
+            f"{task.task_id} (status={task.status.value}, upstream={upstream})"
+        )
+    remaining = len(unresolved) - len(details)
+    suffix = f"; and {remaining} more" if remaining else ""
+    return (
+        "No ready agent task found; unresolved agent tasks: "
+        + "; ".join(details)
+        + suffix
+        + ". A locked task may be left by an interrupted or failed run; inspect its "
+        "durable task/process checkpoint before resuming."
+    )
 
 
 def _load_task_process_catalog(repo_root: Path) -> ProcessCatalog:

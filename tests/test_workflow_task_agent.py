@@ -83,6 +83,7 @@ from powdrr_lift.workrr.task_agent import (
     _issue_worker_pr_changelog,
     _issue_worker_structrr_context,
     _list_worktree_files,
+    _no_ready_agent_task_diagnostic,
     _normalize_execute_pr_coding_attempt,
     _open_final_workflow_pull_request,
     _publish_workflow_progress,
@@ -95,6 +96,37 @@ from powdrr_lift.workrr.task_agent import (
     _workflow_file_command_error,
     run_workflow_task,
 )
+
+
+def test_no_ready_agent_task_diagnostic_reports_locked_task_and_dependencies(
+    tmp_path: Path,
+) -> None:
+    workflow = WorkflowInstance.create(
+        tmp_path / "workflow",
+        (
+            WorkflowTask(
+                task_id="implementation",
+                status=TaskStatus.LOCKED,
+                description="Implement the change",
+                complexity=TaskComplexity.HIGH,
+                input_state={},
+            ),
+            WorkflowTask(
+                task_id="review",
+                status=TaskStatus.OPEN,
+                description="Review the change",
+                complexity=TaskComplexity.LOW,
+                input_state={},
+                upstream_task_ids=("implementation",),
+            ),
+        ),
+    )
+
+    diagnostic = _no_ready_agent_task_diagnostic(workflow)
+
+    assert "implementation (status=locked, upstream=none)" in diagnostic
+    assert "review (status=open, upstream=implementation)" in diagnostic
+    assert "durable task/process checkpoint" in diagnostic
 
 
 def test_issue_worker_changelog_validates_against_the_published_branch(

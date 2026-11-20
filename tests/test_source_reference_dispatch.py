@@ -222,8 +222,10 @@ def test_scope_review_considers_generated_outputs_with_fixture_tree_test_context
         "base",
     )
     base = git(repo, "rev-parse", "HEAD")
+    candidate_real = tmp_path / "candidate-real"
+    git(repo, "worktree", "add", "--detach", str(candidate_real), base)
     candidate = tmp_path / "candidate"
-    git(repo, "worktree", "add", "--detach", str(candidate), base)
+    candidate.symlink_to(candidate_real, target_is_directory=True)
     (candidate / "fixtures" / "statement.bin").write_bytes(b"after")
 
     class GeneratedOutputReviewer:

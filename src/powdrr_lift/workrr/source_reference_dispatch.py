@@ -185,7 +185,7 @@ def _review_scope_additions(
         if (
             target.is_symlink()
             or not target.is_file()
-            or not target.resolve().is_relative_to(candidate)
+            or not target.resolve().is_relative_to(candidate.resolve())
         ):
             continue
         baseline_mode = stat.S_IMODE(int(baseline.decode().split(" ", 1)[0], 8))

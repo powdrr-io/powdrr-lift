@@ -96,6 +96,7 @@ def _requirement(commit: str = "a" * 40) -> tuple[Requirement, Any]:
         (block.anchor_ids[0],),
         ("group-conditional-1",),
         (),
+        source_validation_groups=(("group-conditional-1", "conditional"),),
     )
     return requirement, segmented
 
@@ -588,6 +589,7 @@ def test_requirement_search_supplies_pinned_implementation_and_test_evidence(
         requirement.source_refs,
         requirement.source_group_ids,
         requirement.related_requirement_ids,
+        source_validation_groups=requirement.source_validation_groups,
     )
 
     def find_document_symbols(
@@ -660,6 +662,12 @@ def test_requirement_search_supplies_pinned_implementation_and_test_evidence(
     )
     request.validate()
     service_request.validate()
+    requirement_context = next(
+        item for item in service_request.accepted_facts if item.ref_id == requirement.id
+    )
+    assert requirement_context.value["source_validation_groups"] == [
+        {"id": "group-conditional-1", "relation": "conditional"}
+    ]
     assert service_request.question == request.question
     assert service_request.exact_question == request.exact_question
     assert "at most 300 characters" in request.exact_question
@@ -1043,6 +1051,10 @@ def test_coverage_contract_distinguishes_complete_partial_and_missing(
     assert assessment.residual.id == "req-0001-residual-0002"
     assert assessment.residual.source_refs == requirement.source_refs
     assert assessment.residual.source_group_ids == requirement.source_group_ids
+    assert (
+        assessment.residual.source_validation_groups
+        == requirement.source_validation_groups
+    )
     next_assessment = create_requirement_coverage(
         assessment.residual,
         partial,

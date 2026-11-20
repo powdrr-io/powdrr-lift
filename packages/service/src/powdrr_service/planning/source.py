@@ -283,6 +283,7 @@ class Requirement:
     source_group_ids: tuple[str, ...]
     related_requirement_ids: tuple[str, ...]
     story_refs: tuple[StoryPlanRef, ...] = ()
+    source_validation_groups: tuple[tuple[str, str], ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -1205,6 +1206,19 @@ def allocate_requirement(
         if clause is not None and clause.validation_group_id is not None:
             groups_set.add(clause.validation_group_id)
     groups = tuple(sorted(groups_set))
+    group_relations: dict[str, str] = {}
+    for clause_id in clause_ids:
+        clause = clauses.get(clause_id)
+        if clause is None or clause.validation_group_id is None:
+            continue
+        previous_relation = group_relations.setdefault(
+            clause.validation_group_id, clause.validation_relation
+        )
+        if previous_relation != clause.validation_relation:
+            raise PlanningSourceError(
+                "source validation group has conflicting relations"
+            )
+    source_validation_groups = tuple(sorted(group_relations.items()))
     return Requirement(
         id=f"req-{ordinal:04d}",
         statement=statement,
@@ -1212,6 +1226,7 @@ def allocate_requirement(
         source_refs=refs,
         source_group_ids=groups,
         related_requirement_ids=tuple(record.get("related_requirement_ids", ())),
+        source_validation_groups=source_validation_groups,
     )
 
 
@@ -1292,6 +1307,11 @@ def merge_equivalent_requirements(
         source_refs=tuple(dict.fromkeys(retained.source_refs + duplicate.source_refs)),
         source_group_ids=tuple(
             dict.fromkeys(retained.source_group_ids + duplicate.source_group_ids)
+        ),
+        source_validation_groups=tuple(
+            dict.fromkeys(
+                retained.source_validation_groups + duplicate.source_validation_groups
+            )
         ),
         related_requirement_ids=tuple(
             dict.fromkeys(

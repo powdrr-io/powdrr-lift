@@ -1,0 +1,146 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1628
+title: Carry source validation relations into planner questions
+intent:
+  problem: The planner retained validation group IDs but dropped their conditional, alternative, ordered, or all-together relation before constructing coverage and test-design requests.
+  goal: Carry accepted source validation relations with requirement facts through coverage assessment, residual requirements, and test-design questions.
+human-decisions: []
+structured_files: []
+files:
+  - path: packages/service/src/powdrr_service/planning/source.py
+    type: modified
+    span: {start_line: 286, end_line: 286}
+    summary: Add typed source validation relations to allocated requirements.
+    rationale: Preserve the relation paired with each stable source group ID.
+  - path: packages/service/src/powdrr_service/planning/source.py
+    type: modified
+    span: {start_line: 1209, end_line: 1221}
+    summary: Resolve validation group relations from cited source clauses.
+    rationale: Carry only relations grounded in the requirement's pinned source anchors and reject conflicting group metadata.
+  - path: packages/service/src/powdrr_service/planning/source.py
+    type: modified
+    span: {start_line: 1229, end_line: 1229}
+    summary: Attach resolved group relations to each requirement.
+    rationale: Make the source relation available to downstream planning phases.
+  - path: packages/service/src/powdrr_service/planning/source.py
+    type: modified
+    span: {start_line: 1311, end_line: 1315}
+    summary: Preserve validation relations when equivalent requirements merge.
+    rationale: Keep provenance relations from both source requirements.
+  - path: packages/service/src/powdrr_service/planning/coverage.py
+    type: modified
+    span: {start_line: 36, end_line: 36}
+    summary: Retain source validation relations on residual requirements.
+    rationale: Do not lose source logic when coverage identifies remaining work.
+  - path: packages/service/src/powdrr_service/planning/coverage.py
+    type: modified
+    span: {start_line: 47, end_line: 50}
+    summary: Serialize validation relations with residual requirement facts.
+    rationale: Make the typed relations available in durable planning data.
+  - path: packages/service/src/powdrr_service/planning/coverage.py
+    type: modified
+    span: {start_line: 237, end_line: 240}
+    summary: Include validation relations in coverage request context.
+    rationale: Let coverage assessment use accepted source logic directly.
+  - path: packages/service/src/powdrr_service/planning/coverage.py
+    type: modified
+    span: {start_line: 258, end_line: 261}
+    summary: Bind validation relations into the coverage input digest.
+    rationale: Invalidate an earlier coverage answer if its accepted source relation changes.
+  - path: packages/service/src/powdrr_service/planning/coverage.py
+    type: modified
+    span: {start_line: 438, end_line: 438}
+    summary: Carry relations into newly created residual requirements.
+    rationale: Preserve source semantics through partial coverage updates.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 1915, end_line: 1924}
+    summary: Include validation relations in test-design requirement facts.
+    rationale: Pass accepted source logic into test planning instead of asking the model to reconstruct it.
+  - path: packages/service/src/powdrr_service/planning/test_coverage.py
+    type: modified
+    span: {start_line: 149, end_line: 149}
+    summary: Permit typed source relations in requirement facts.
+    rationale: Keep source relation metadata when normalizing test-design inputs.
+  - path: packages/service/src/powdrr_service/planning/test_coverage.py
+    type: modified
+    span: {start_line: 162, end_line: 188}
+    summary: Validate and carry known validation group IDs and relations.
+    rationale: Reject malformed group metadata while preserving valid accepted semantics.
+  - path: tests/test_planning_source.py
+    type: modified
+    span: {start_line: 6, end_line: 6}
+    summary: Import dataclass replacement for the source ledger fixture.
+    rationale: Build a test ledger with the resolved relation metadata.
+  - path: tests/test_planning_source.py
+    type: modified
+    span: {start_line: 398, end_line: 433}
+    summary: Verify requirement allocation preserves its source relation.
+    rationale: Catch relation loss between cited anchors and the requirement record.
+  - path: tests/test_planning_source.py
+    type: modified
+    span: {start_line: 339, end_line: 345}
+    summary: Verify equivalent requirement merging keeps source relations.
+    rationale: Preserve distinct source relation provenance across explicit merges.
+  - path: tests/test_planning_source.py
+    type: modified
+    span: {start_line: 354, end_line: 354}
+    summary: Add a second source relation to the merge fixture.
+    rationale: Ensure merge coverage includes differing group relations.
+  - path: tests/test_planning_source.py
+    type: modified
+    span: {start_line: 363, end_line: 366}
+    summary: Assert relation provenance survives merge.
+    rationale: Protect the merged requirement's complete source relation set.
+  - path: tests/test_planning_evidence.py
+    type: modified
+    span: {start_line: 99, end_line: 99}
+    summary: Add a conditional group to the coverage fixture.
+    rationale: Exercise conditional relation propagation in coverage review.
+  - path: tests/test_planning_evidence.py
+    type: modified
+    span: {start_line: 592, end_line: 592}
+    summary: Preserve group relation in the reconstructed test requirement.
+    rationale: Keep source relation data in the evidence test fixture.
+  - path: tests/test_planning_evidence.py
+    type: modified
+    span: {start_line: 665, end_line: 670}
+    summary: Assert coverage request facts contain the relation.
+    rationale: Prevent coverage prompts from dropping accepted conditional semantics.
+  - path: tests/test_planning_evidence.py
+    type: modified
+    span: {start_line: 1054, end_line: 1057}
+    summary: Assert partial-coverage residuals retain source relations.
+    rationale: Keep source semantics across requirement revisions.
+  - path: tests/test_test_coverage_planning.py
+    type: modified
+    span: {start_line: 55, end_line: 57}
+    summary: Add alternative group metadata to the test-design fixture.
+    rationale: Exercise typed source relation inputs to test planning.
+  - path: tests/test_test_coverage_planning.py
+    type: modified
+    span: {start_line: 93, end_line: 98}
+    summary: Assert test-design request facts preserve the group relation.
+    rationale: Verify the model receives source logic without restating it.
+  - path: docs/audits/planning-llm-audit.md
+    type: modified
+    span: {start_line: 79, end_line: 84}
+    summary: Record implementation of source relation carry-through.
+    rationale: Keep the audit aligned with current planner request inputs.
+  - path: docs/audits/planning-llm-audit.md
+    type: modified
+    span: {start_line: 705, end_line: 707}
+    summary: Update milestone 3 progress.
+    rationale: Mark validation relation propagation as implemented while retaining open semantic work.
+  - path: docs/audits/planning-llm-audit.md
+    type: modified
+    span: {start_line: 730, end_line: 733}
+    summary: Update the remaining milestone status.
+    rationale: Record milestone 3 as partially implemented.
+entities: []
+entity_relationships: []
+invariants:
+  - id: planner-requirements-retain-source-validation-relations
+    description: Any source validation group attached to cited requirement clauses retains its stable ID and relation through requirement allocation, coverage assessment, residual revision, equivalent merge, and test-design input construction.
+    action: added
+guidance: []

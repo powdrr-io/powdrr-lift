@@ -33,6 +33,7 @@ class ResidualRequirement:
     source_refs: tuple[str, ...]
     source_group_ids: tuple[str, ...]
     related_requirement_ids: tuple[str, ...]
+    source_validation_groups: tuple[tuple[str, str], ...] = ()
 
     def to_data(self) -> dict[str, Any]:
         return {
@@ -43,6 +44,10 @@ class ResidualRequirement:
             "kind": self.kind,
             "source_refs": list(self.source_refs),
             "source_group_ids": list(self.source_group_ids),
+            "source_validation_groups": [
+                {"id": group_id, "relation": relation}
+                for group_id, relation in self.source_validation_groups
+            ],
             "related_requirement_ids": list(self.related_requirement_ids),
         }
 
@@ -229,6 +234,10 @@ def build_requirement_coverage_request(
             "statement": requirement.statement,
             "kind": requirement.kind,
             "source_group_ids": list(requirement.source_group_ids),
+            "source_validation_groups": [
+                {"id": group_id, "relation": relation}
+                for group_id, relation in requirement.source_validation_groups
+            ],
         },
     )
     search_record = (
@@ -246,6 +255,10 @@ def build_requirement_coverage_request(
             "kind": requirement.kind,
             "source_refs": list(requirement.source_refs),
             "source_group_ids": list(requirement.source_group_ids),
+            "source_validation_groups": [
+                {"id": group_id, "relation": relation}
+                for group_id, relation in requirement.source_validation_groups
+            ],
         },
         "evidence": [item.to_data() for item in evidence_records],
         "repository_search": (
@@ -422,5 +435,6 @@ def create_requirement_coverage(
         source_refs=requirement.source_refs,
         source_group_ids=requirement.source_group_ids,
         related_requirement_ids=requirement.related_requirement_ids,
+        source_validation_groups=requirement.source_validation_groups,
     )
     return RequirementCoverage(requirement.id, bound, residual)

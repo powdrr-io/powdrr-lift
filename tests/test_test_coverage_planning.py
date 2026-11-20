@@ -52,6 +52,9 @@ def test_planner_assigns_stable_ids_to_llm_test_designs() -> None:
             {
                 "id": "req-ci-trigger",
                 "statement": "The workflow runs on pull requests.",
+                "source_validation_groups": [
+                    {"id": "validation:ci:1", "relation": "alternatives"}
+                ],
             },
             {
                 "id": "req-test-command",
@@ -87,6 +90,12 @@ def test_planner_assigns_stable_ids_to_llm_test_designs() -> None:
     assert request.question.contract_version == 5
     assert request.question.expected_answer_schema == "plan-test-coverage-v5"
     assert request.max_answer_chars == 8_000
+    item_context = next(
+        fact for fact in request.accepted_facts if fact.ref_id == "planned-pr:item-0001"
+    )
+    assert item_context.value["requirements"][0]["source_validation_groups"] == [
+        {"id": "validation:ci:1", "relation": "alternatives"}
+    ]
     assert [case["id"] for case in planned["required_test_cases"]] == [
         "AC-01",
         "AC-02",

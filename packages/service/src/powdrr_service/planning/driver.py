@@ -1912,7 +1912,16 @@ class SourceLedgerQuestionMachine:
                 existing_test_paths=test_paths,
                 source_excerpts=excerpts,
                 requirements=tuple(
-                    {"id": requirement.id, "statement": requirement.statement}
+                    {
+                        "id": requirement.id,
+                        "statement": requirement.statement,
+                        "source_validation_groups": [
+                            {"id": group_id, "relation": relation}
+                            for group_id, relation in (
+                                requirement.source_validation_groups
+                            )
+                        ],
+                    }
                     for requirement in item_requirements
                 ),
             )

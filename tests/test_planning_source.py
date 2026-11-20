@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import subprocess
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -335,7 +336,13 @@ def test_fidelity_and_equivalence_are_tagged_and_strict() -> None:
 
 def test_equivalent_duplicate_merge_keeps_both_source_anchors() -> None:
     original = Requirement(
-        "req-0001", "Keep each source anchor.", "constraint", ("anchor-0001",), (), ()
+        "req-0001",
+        "Keep each source anchor.",
+        "constraint",
+        ("anchor-0001",),
+        (),
+        (),
+        source_validation_groups=(("validation:source-a", "conditional"),),
     )
     duplicate = Requirement(
         "req-0002",
@@ -344,6 +351,7 @@ def test_equivalent_duplicate_merge_keeps_both_source_anchors() -> None:
         ("anchor-0002",),
         (),
         (),
+        source_validation_groups=(("validation:source-b", "alternatives"),),
     )
 
     merged = merge_equivalent_requirements(
@@ -352,6 +360,10 @@ def test_equivalent_duplicate_merge_keeps_both_source_anchors() -> None:
 
     assert merged.id == original.id
     assert merged.source_refs == ("anchor-0001", "anchor-0002")
+    assert merged.source_validation_groups == (
+        ("validation:source-a", "conditional"),
+        ("validation:source-b", "alternatives"),
+    )
     with pytest.raises(PlanningSourceError, match="cannot be merged"):
         merge_equivalent_requirements(
             original, duplicate, EquivalenceDecision(False, "Partial overlap.")
@@ -381,6 +393,42 @@ def test_requirement_ids_are_code_owned_and_related_anchors_are_retained() -> No
     assert requirements[0].id == "req-0007"
     assert requirements[0].source_refs == (second.anchor_ids[0],)
     assert drafts[0].related_source_refs == (first.anchor_ids[0],)
+
+
+def test_requirement_allocation_carries_source_validation_relations() -> None:
+    segmented = segment_markdown_source(
+        _document("The parser handles timeouts and network failures.\n")
+    )
+    clause = segmented.instruction_ledger.clauses[0]
+    grouped_clause = replace(
+        clause,
+        validation_group_id="validation:instruction-001:1",
+        validation_relation="conditional",
+    )
+    ledger = replace(segmented.instruction_ledger, clauses=(grouped_clause,))
+    segmented = replace(segmented, instruction_ledger=ledger)
+    anchor = next(
+        item for item in segmented.anchors if item.clause_id == clause.clause_id
+    )
+
+    requirements, _drafts = allocate_requirements(
+        [
+            {
+                "statement": "Handle parser timeouts.",
+                "kind": "behavior",
+                "source_refs": [anchor.id],
+                "related_source_refs": [],
+            }
+        ],
+        first_ordinal=1,
+        anchors={item.id: item for item in segmented.anchors},
+        ledger=segmented.instruction_ledger,
+    )
+
+    assert requirements[0].source_group_ids == ("validation:instruction-001:1",)
+    assert requirements[0].source_validation_groups == (
+        ("validation:instruction-001:1", "conditional"),
+    )
 
 
 def test_exact_duplicate_extractions_merge_related_refs_without_merging_locations() -> (

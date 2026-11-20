@@ -1,0 +1,61 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1643
+title: Test planner coverage against semantic false positives
+intent:
+  problem: Coverage evidence can repeat requirement wording while describing different behavior, or contain passing assertions that never observe the required behavior.
+  goal: Keep weak semantic evidence from being mistaken for proof and direct the planner to assess meaning and observed behavior.
+human-decisions: []
+structured_files: []
+files:
+  - path: packages/service/src/powdrr_service/planning/coverage.py
+    type: modified
+    span: {start_line: 322, end_line: 322}
+    summary: Include the revised semantic relevance prompt contract in the input digest.
+    rationale: Invalidate answers created before the adversarial evidence guidance.
+  - path: packages/service/src/powdrr_service/planning/coverage.py
+    type: modified
+    span: {start_line: 369, end_line: 369}
+    summary: Advance the coverage question contract version.
+    rationale: Make the semantic guidance update part of the answer contract.
+  - path: packages/service/src/powdrr_service/planning/coverage.py
+    type: modified
+    span: {start_line: 377, end_line: 377}
+    summary: Advance the coverage answer schema identifier.
+    rationale: Prevent reuse of answers produced under the previous prompt semantics.
+  - path: packages/service/src/powdrr_service/planning/coverage.py
+    type: modified
+    span: {start_line: 387, end_line: 390}
+    summary: Tell the model that word overlap and passing assertions do not prove coverage without a relevant observation.
+    rationale: Preserve the remaining semantic judgment while stating its relevant evidence criteria explicitly.
+  - path: tests/test_planning_evidence.py
+    type: modified
+    span: {start_line: 682, end_line: 683}
+    summary: Expect the version 4 coverage contract in service requests.
+    rationale: Keep contract consumers aligned with the updated prompt.
+  - path: tests/test_planning_evidence.py
+    type: modified
+    span: {start_line: 1226, end_line: 1227}
+    summary: Assert the version 4 schema for coverage requests.
+    rationale: Guard the revised answer contract.
+  - path: tests/test_planning_evidence.py
+    type: modified
+    span: {start_line: 1234, end_line: 1239}
+    summary: Assert explicit prompt rules for repeated words and relevant passing-test observations.
+    rationale: Keep coverage instructions focused on behavior rather than lexical similarity or test status.
+  - path: tests/test_planning_evidence.py
+    type: modified
+    span: {start_line: 1285, end_line: 1347}
+    summary: Add passing evidence cases with same-word/different-meaning behavior and assertions that omit or contradict the required observation.
+    rationale: Prove these weak evidence pairs do not become positive examples and that the sample assertions themselves execute.
+  - path: docs/audits/planning-llm-audit.md
+    type: modified
+    span: {start_line: 753, end_line: 759}
+    summary: Record the new adversarial evidence cases and clarify that relevance remains a model judgment.
+    rationale: Keep the audit aligned with the implementation and remaining boundary.
+entities: []
+entity_relationships: []
+invariants:
+  - id: weak-semantic-evidence-does-not-prove-requirement-coverage
+    description: Coverage requests do not treat shared wording or a passing but irrelevant assertion as proof of the required behavior.
+    action: added
+guidance: []

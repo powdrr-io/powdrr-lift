@@ -750,10 +750,13 @@ check public API/test consumers explicitly; this audit changes none of them.
    the coverage question or support a complete answer. The model cannot promote
    a malformed or stale receipt to coverage. Without a trusted receipt, coverage
    examples no longer imply that the first implementation/test pair is relevant;
-   the prompt explicitly reserves that judgment for the supplied evidence. Tests
-   cover an irrelevant passing test, partial implementation, and unavailable
-   indexing. Still test repeated words with wrong meaning and an assertion that
-   executes but proves the wrong observation.
+   the prompt explicitly reserves that judgment for the supplied evidence and
+   warns that repeated words or a passing assertion without the required
+   observation do not establish coverage. Tests exercise same-word/different-
+   meaning evidence and passing assertions that omit or contradict the required
+   behavior, alongside irrelevant tests, partial implementation and unavailable
+   indexing. Semantic relevance remains a model judgment; these cases prevent
+   examples and prompt wording from treating weak evidence as proof.
 6. **Bound and instrument the remaining semantic work.** Preserve checkpoints and
    local parser/schema gates; distinguish member questions, batches, seeded results,
    output repairs and actual HTTP/provider calls. Track request builder/policy,

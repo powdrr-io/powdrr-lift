@@ -1,5 +1,5 @@
 schema: https://powdrr.io/schema/changelog-v2
-change_id: 1632
+change_id: 1633
 title: Preserve source validation relations in planner test design
 intent:
   problem: Planner test-design facts already carried source validation relations, but the model instructions did not explain how those accepted relations should constrain test scenarios.

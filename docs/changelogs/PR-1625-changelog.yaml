@@ -1,0 +1,63 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1625
+title: Skip advisory reviews for AST-identical candidates
+intent:
+  problem: Optional invariant-preservation reviews call a model even when all acquired Python syntax trees are unchanged.
+  goal: Use deterministic AST comparison to skip advisory model review when source behavior has no syntactic delta, while preserving explicit unknown behavioral evidence.
+human-decisions: []
+structured_files: []
+files:
+  - path: packages/service/src/powdrr_service/structrr/reference_validation.py
+    type: modified
+    span: {start_line: 595, end_line: 618}
+    summary: Detect source syntax changes across acquired baseline and candidate files.
+    rationale: AST equality provides a deterministic no-change check; incomplete or unparsable snapshots conservatively retain review.
+  - path: packages/service/src/powdrr_service/structrr/reference_validation.py
+    type: modified
+    span: {start_line: 999, end_line: 1007}
+    summary: Run optional invariant review only after a source AST change.
+    rationale: Avoid unnecessary advisory review for annotation-only, comment-only, or otherwise AST-identical changes.
+  - path: tests/test_structrr_reference_validation.py
+    type: modified
+    span: {start_line: 336, end_line: 336}
+    summary: Exercise unknown advisory review with changed executable code.
+    rationale: Keep optional review coverage when candidate behavior may have changed.
+  - path: tests/test_structrr_reference_validation.py
+    type: modified
+    span: {start_line: 353, end_line: 362}
+    summary: Verify AST-identical edits skip optional model review.
+    rationale: Confirm comment-only changes make no review request and do not claim behavioral proof.
+  - path: tests/test_structrr_reference_validation.py
+    type: modified
+    span: {start_line: 738, end_line: 738}
+    summary: Update expected first-pass review count.
+    rationale: Account for deterministic omission of the invariant advisory when initial source is unchanged.
+  - path: tests/test_structrr_reference_validation.py
+    type: modified
+    span: {start_line: 742, end_line: 742}
+    summary: Update expected repeated-pass review count.
+    rationale: Confirm only the required flexible-owner decision is cached for unchanged source.
+  - path: tests/test_structrr_reference_validation.py
+    type: modified
+    span: {start_line: 748, end_line: 748}
+    summary: Update expected changed-caller review count.
+    rationale: Include the newly applicable advisory when adding a caller changes the AST.
+entities:
+  - id: ast-bound-invariant-review-filter
+    type: Function
+    action: added
+  - id: ast-bound-invariant-review-filter-tests
+    type: Regression test
+    action: added
+entity_relationships:
+  - id: ast-review-filter-is-covered
+    type: verifies
+    source: ast-bound-invariant-review-filter-tests
+    target: ast-bound-invariant-review-filter
+    action: added
+    description: Tests verify comments do not trigger optional review, executable changes still do, and review remains non-proof.
+invariants:
+  - id: unchanged-source-does-not-invoke-advisory-review
+    description: Optional invariant review is skipped only when the complete acquired source snapshot parses and every changed Python file has an AST identical to baseline; missing or unparsable evidence keeps the review path enabled.
+    action: added
+guidance: []

@@ -3993,13 +3993,25 @@ def _run_github_issue_worker_continue(args: argparse.Namespace) -> int:
     repo_root = resolve_repo_root(args.repo_root)
     client = GitHubIssueClient(args.repository)
     issue = client.get_issue(args.issue_number)
-    if QUEUE_LABELS["awaiting_ci"] in issue.labels or (
-        QUEUE_LABELS["awaiting_human"] in issue.labels
-        and has_ci_human_checkpoint(client=client, issue_number=args.issue_number)
+    blocked_recovery = QUEUE_LABELS[
+        "blocked"
+    ] in issue.labels and not has_ci_human_checkpoint(
+        client=client, issue_number=args.issue_number
+    )
+    if (
+        QUEUE_LABELS["awaiting_ci"] in issue.labels
+        or blocked_recovery
+        or (
+            QUEUE_LABELS["awaiting_human"] in issue.labels
+            and has_ci_human_checkpoint(client=client, issue_number=args.issue_number)
+        )
     ):
         try:
             report = continue_awaiting_ci_issue(
-                client=client, issue_number=args.issue_number, repo_root=repo_root
+                client=client,
+                issue_number=args.issue_number,
+                repo_root=repo_root,
+                allow_blocked=blocked_recovery,
             )
         except GitHubIssueQueueError as error:
             print(str(error), file=sys.stderr)

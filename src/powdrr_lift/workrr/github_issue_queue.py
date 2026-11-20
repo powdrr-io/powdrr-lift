@@ -12,6 +12,7 @@ import json
 import os
 import posixpath
 import re
+import shutil
 import subprocess
 import tempfile
 import threading
@@ -1801,6 +1802,7 @@ def run_worker_once(
                     observation = _observe_required_ci_outcome(
                         client,
                         pull_request_url,
+                        repo_root=root,
                         validation_inventory=(
                             inventory["checks"] if inventory is not None else None
                         ),
@@ -1814,6 +1816,20 @@ def run_worker_once(
                             comments, pull_request_url
                         ),
                     )
+                    if observation["outcome"] == "awaiting_review":
+                        observation = _mark_observed_pull_request_ready(
+                            client, pull_request_url, observation
+                        )
+                        if observation.get("pull_request_ready_status") == "ready":
+                            if ci_response_result is not None:
+                                ci_response_result = {
+                                    **ci_response_result,
+                                    "response_state": "awaiting_review",
+                                    "response_reason": (
+                                        "Current PR checks passed; "
+                                        "the draft was marked ready for review."
+                                    ),
+                                }
                     ci_outcome = str(observation["outcome"])
                     _append_ci_outcome_checkpoint(
                         client=client,
@@ -2209,7 +2225,11 @@ def continue_manual_prerequisite_issue(
 
 
 def continue_awaiting_ci_issue(
-    *, client: GitHubIssueClient, issue_number: int, repo_root: str | Path
+    *,
+    client: GitHubIssueClient,
+    issue_number: int,
+    repo_root: str | Path,
+    allow_blocked: bool = False,
 ) -> WorkerReport:
     """Refresh the required-check outcome for a published implementation PR."""
     issue = client.get_issue(issue_number)
@@ -2235,9 +2255,15 @@ def continue_awaiting_ci_issue(
         QUEUE_LABELS["awaiting_human"] in issue.labels
         and human_prerequisite is not None
     )
-    if not (awaiting_ci or awaiting_human):
+    blocked_recovery = (
+        allow_blocked
+        and QUEUE_LABELS["blocked"] in issue.labels
+        and human_prerequisite is None
+    )
+    if not (awaiting_ci or awaiting_human or blocked_recovery):
         raise GitHubIssueQueueError(
-            f"issue #{issue_number} is not awaiting CI or a CI human prerequisite"
+            f"issue #{issue_number} is not awaiting CI, a CI human prerequisite, "
+            "or recoverable PR observation"
         )
     inventory = _read_repository_validation_inventory(repo_root)
     if inventory is None and (Path(repo_root) / ".github/workflows").is_dir():
@@ -2248,6 +2274,7 @@ def continue_awaiting_ci_issue(
     observation = _observe_required_ci_outcome(
         client,
         pull_request_url,
+        repo_root=repo_root,
         validation_inventory=(inventory["checks"] if inventory is not None else None),
         inventory_digest=inventory["digest"] if inventory is not None else None,
         validation_input_paths=(
@@ -2255,12 +2282,24 @@ def continue_awaiting_ci_issue(
         ),
         previous_observation=previous_observation,
     )
+    if observation["outcome"] == "awaiting_review":
+        observation = _mark_observed_pull_request_ready(
+            client, pull_request_url, observation
+        )
     ci_response_result = (
         previous_observation.get("ci_response_result")
         if previous_observation is not None
         and isinstance(previous_observation.get("ci_response_result"), Mapping)
         else None
     )
+    if observation.get("pull_request_ready_status") == "ready" and ci_response_result:
+        ci_response_result = {
+            **ci_response_result,
+            "response_state": "awaiting_review",
+            "response_reason": (
+                "Current PR checks passed; the draft was marked ready for review."
+            ),
+        }
     _append_ci_outcome_checkpoint(
         client=client,
         issue=issue,
@@ -4320,6 +4359,7 @@ def _observe_required_ci_outcome(
     *,
     validation_inventory: Sequence[Mapping[str, Any]] | None,
     inventory_digest: str | None,
+    repo_root: str | Path | None = None,
     validation_input_paths: Sequence[str] | None = None,
     previous_observation: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
@@ -4345,7 +4385,8 @@ def _observe_required_ci_outcome(
             inventory_digest,
         )
     head_result = client._invoke(
-        ["pr", "view", str(number), "--json", "headRefOid"], check=False
+        ["pr", "view", str(number), "--json", "headRefOid,headRefName"],
+        check=False,
     )
     if head_result.returncode != 0:
         return _stale_ci_outcome_observation(
@@ -4493,6 +4534,47 @@ def _observe_required_ci_outcome(
     validation_input_changes = _validation_input_changes(
         changed_paths, validation_input_paths
     )
+    validation_baseline_refresh = None
+    if validation_input_changes:
+        refreshed_inventory = (
+            _pull_request_validation_inventory(
+                repo_root=repo_root,
+                pull_request_number=number,
+                expected_head=head_sha,
+            )
+            if repo_root is not None
+            else None
+        )
+        if refreshed_inventory is None and repo_root is not None:
+            refreshed_head = _refresh_pull_request_validation_baseline(
+                client=client,
+                repo_root=repo_root,
+                pull_request_number=number,
+                expected_head=head_sha,
+            )
+            if refreshed_head is not None and refreshed_head != head_sha:
+                return _observe_required_ci_outcome(
+                    client,
+                    pull_request_url,
+                    repo_root=repo_root,
+                    validation_inventory=validation_inventory,
+                    inventory_digest=inventory_digest,
+                    validation_input_paths=validation_input_paths,
+                    previous_observation=previous_observation,
+                )
+            if refreshed_head == head_sha:
+                refreshed_inventory = _pull_request_validation_inventory(
+                    repo_root=repo_root,
+                    pull_request_number=number,
+                    expected_head=head_sha,
+                )
+        if refreshed_inventory is not None:
+            validation_inventory = refreshed_inventory["checks"]
+            inventory_digest = refreshed_inventory["digest"]
+            validation_baseline_refresh = {
+                "status": "fresh",
+                "digest": refreshed_inventory["digest"],
+            }
     confirmed_result = client._invoke(
         ["pr", "view", str(number), "--json", "headRefOid"], check=False
     )
@@ -4515,11 +4597,11 @@ def _observe_required_ci_outcome(
             inventory_digest=inventory_digest,
             validation_input_changes=validation_input_changes,
         )
-    if validation_input_changes:
+    if validation_input_changes and validation_baseline_refresh is None:
         outcome = "blocked"
         reason = (
-            "the PR changes validation inputs; refresh the committed validation "
-            "baseline before review"
+            "the PR changes validation inputs and does not contain a fresh committed "
+            "validation baseline"
         )
     elif validation_inventory is None:
         outcome = "blocked"
@@ -4548,7 +4630,7 @@ def _observe_required_ci_outcome(
     else:
         outcome = "blocked"
         reason = "GitHub returned an unrecognized required-check state"
-    return _ci_outcome_observation(
+    observation = _ci_outcome_observation(
         outcome,
         head_sha,
         checks,
@@ -4557,6 +4639,9 @@ def _observe_required_ci_outcome(
         inventory_digest,
         validation_input_changes,
     )
+    if validation_baseline_refresh is not None:
+        observation["validation_baseline_refresh"] = validation_baseline_refresh
+    return observation
 
 
 def _normalized_required_check_status(state: str) -> str:
@@ -4572,6 +4657,414 @@ def _normalized_required_check_status(state: str) -> str:
 def _required_check_inventory_match_is_valid(check: Mapping[str, Any]) -> bool:
     match = check.get("inventory_match")
     return isinstance(match, Mapping) and match.get("status") == "matched"
+
+
+def _pull_request_validation_inventory(
+    *,
+    repo_root: str | Path | None,
+    pull_request_number: int,
+    expected_head: str,
+) -> dict[str, Any] | None:
+    """Read a committed inventory only after validating it against the PR head."""
+    if repo_root is None:
+        return None
+    root = Path(repo_root).resolve()
+    temporary_root = Path(tempfile.mkdtemp(prefix="powdrr-pr-validation-"))
+    worktree = temporary_root / "head"
+    reference = (
+        f"refs/powdrr/validation-observation/{pull_request_number}-{expected_head[:12]}"
+    )
+    added = False
+    try:
+        fetched = subprocess.run(
+            [
+                "git",
+                "-C",
+                str(root),
+                "fetch",
+                "--no-tags",
+                "origin",
+                f"+refs/pull/{pull_request_number}/head:{reference}",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if fetched.returncode != 0:
+            return None
+        fetched_head = subprocess.run(
+            ["git", "-C", str(root), "rev-parse", "--verify", reference],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if fetched_head.returncode != 0 or fetched_head.stdout.strip() != expected_head:
+            return None
+        checkout = subprocess.run(
+            [
+                "git",
+                "-C",
+                str(root),
+                "worktree",
+                "add",
+                "--detach",
+                str(worktree),
+                reference,
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if checkout.returncode != 0:
+            return None
+        added = True
+        return _read_repository_validation_inventory(worktree)
+    finally:
+        if added:
+            subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(root),
+                    "worktree",
+                    "remove",
+                    "--force",
+                    str(worktree),
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        subprocess.run(
+            ["git", "-C", str(root), "update-ref", "-d", reference],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        shutil.rmtree(temporary_root, ignore_errors=True)
+
+
+def _refresh_pull_request_validation_baseline(
+    *,
+    client: GitHubIssueClient,
+    repo_root: str | Path,
+    pull_request_number: int,
+    expected_head: str,
+) -> str | None:
+    """Commit a refreshed inventory to a same-repository PR branch if stale."""
+    metadata_result = client._invoke(
+        [
+            "pr",
+            "view",
+            str(pull_request_number),
+            "--json",
+            "headRefOid,headRefName,headRepository,baseRefName,title",
+        ],
+        check=False,
+    )
+    if metadata_result.returncode != 0:
+        return None
+    try:
+        metadata = json.loads(metadata_result.stdout)
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(metadata, Mapping) or metadata.get("headRefOid") != expected_head:
+        return None
+    branch = metadata.get("headRefName")
+    base_branch = metadata.get("baseRefName")
+    title = metadata.get("title")
+    repository = metadata.get("headRepository")
+    repository_name = (
+        repository.get("nameWithOwner") if isinstance(repository, Mapping) else None
+    )
+    if (
+        not isinstance(branch, str)
+        or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._/-]*", branch) is None
+        or ".." in branch.split("/")
+        or not isinstance(base_branch, str)
+        or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._/-]*", base_branch) is None
+        or ".." in base_branch.split("/")
+        or not isinstance(title, str)
+        or not title.strip()
+        or repository_name != client.repository
+    ):
+        return None
+
+    root = Path(repo_root).resolve()
+    temporary_root = Path(tempfile.mkdtemp(prefix="powdrr-pr-validation-refresh-"))
+    worktree = temporary_root / "head"
+    reference = (
+        f"refs/powdrr/validation-refresh/{pull_request_number}-{expected_head[:12]}"
+    )
+    added = False
+    try:
+        fetched = subprocess.run(
+            [
+                "git",
+                "-C",
+                str(root),
+                "fetch",
+                "--no-tags",
+                "origin",
+                f"+refs/pull/{pull_request_number}/head:{reference}",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if fetched.returncode != 0:
+            return None
+        fetched_head = subprocess.run(
+            ["git", "-C", str(root), "rev-parse", "--verify", reference],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if fetched_head.returncode != 0 or fetched_head.stdout.strip() != expected_head:
+            return None
+        checkout = subprocess.run(
+            [
+                "git",
+                "-C",
+                str(root),
+                "worktree",
+                "add",
+                "--detach",
+                str(worktree),
+                reference,
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if checkout.returncode != 0:
+            return None
+        added = True
+        if _read_repository_validation_inventory(worktree) is not None:
+            return expected_head
+
+        from powdrr_lift.workrr.feature_endpoint import _write_baseline_companions
+        from powdrr_lift.workrr.task_agent import (
+            _bootstrap_issue_worker_structrr_baseline,
+            _load_committed_issue_worker_structrr_baseline,
+            _merge_structrr_decision_sections,
+        )
+
+        previous, _previous_manifest = _load_committed_issue_worker_structrr_baseline(
+            worktree,
+            base_commit=expected_head,
+        )
+        current, _current_manifest = _bootstrap_issue_worker_structrr_baseline(
+            worktree,
+            proposed={"plan_id": "pr-validation-baseline-refresh"},
+            base_commit=expected_head,
+        )
+        refreshed = _merge_structrr_decision_sections(current, previous)
+        baseline_path = worktree / "docs/structrr/current/baseline-bootstrap.yaml"
+        baseline_path.write_text(
+            yaml.safe_dump(refreshed, sort_keys=False, allow_unicode=False),
+            encoding="utf-8",
+        )
+        _write_baseline_companions(refreshed, baseline_path, worktree)
+        if _read_repository_validation_inventory(worktree) is None:
+            return None
+        from powdrr_lift.clean_pr_publisher import _ensure_pull_request_changelog
+
+        pull_request_url = (
+            f"https://github.com/{client.repository}/pull/{pull_request_number}"
+        )
+        _ensure_pull_request_changelog(
+            worktree,
+            pull_request_url=pull_request_url,
+            base=base_branch,
+            title=title,
+            description_sections=None,
+            branch=branch,
+            push_to_remote=False,
+        )
+        baseline_paths = (
+            "docs/structrr/current/baseline-bootstrap.yaml",
+            "docs/structrr/current/baseline-bootstrap.md",
+            "docs/structrr/current/baseline-bootstrap.freshness.json",
+        )
+        staged = subprocess.run(
+            ["git", "-C", str(worktree), "add", "--", *baseline_paths],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if staged.returncode != 0:
+            return None
+        committed = subprocess.run(
+            [
+                "git",
+                "-C",
+                str(worktree),
+                "commit",
+                "-m",
+                "Refresh validation inventory baseline",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if committed.returncode != 0:
+            return None
+        changed = subprocess.run(
+            [
+                "git",
+                "-C",
+                str(worktree),
+                "diff",
+                "--name-only",
+                f"{expected_head}..HEAD",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        changed_paths = set(changed.stdout.splitlines())
+        allowed_generated_paths = {
+            *baseline_paths,
+            f"docs/changelogs/PR-{pull_request_number}-changelog.yaml",
+        }
+        if (
+            changed.returncode != 0
+            or not set(baseline_paths).issubset(changed_paths)
+            or not changed_paths.issubset(allowed_generated_paths)
+        ):
+            return None
+        pushed = subprocess.run(
+            [
+                "git",
+                "-C",
+                str(worktree),
+                "push",
+                "origin",
+                f"HEAD:refs/heads/{branch}",
+            ],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if pushed.returncode != 0:
+            return None
+        return subprocess.run(
+            ["git", "-C", str(worktree), "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+    except (OSError, RuntimeError, ValueError):
+        return None
+    finally:
+        if added:
+            subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(root),
+                    "worktree",
+                    "remove",
+                    "--force",
+                    str(worktree),
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        subprocess.run(
+            ["git", "-C", str(root), "update-ref", "-d", reference],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        shutil.rmtree(temporary_root, ignore_errors=True)
+
+
+def _mark_observed_pull_request_ready(
+    client: GitHubIssueClient,
+    pull_request_url: str | None,
+    observation: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Mark a draft ready only after the exact observed head passed all gates."""
+    checks = observation.get("checks")
+    if (
+        observation.get("outcome") != "awaiting_review"
+        or not isinstance(checks, list)
+        or not checks
+        or any(
+            not isinstance(check, Mapping) or check.get("status") != "passed"
+            for check in checks
+        )
+    ):
+        return {
+            **observation,
+            "outcome": "blocked",
+            "reason": "PR readiness requires passing checks on the observed head",
+        }
+    changes = observation.get("validation_input_changes", [])
+    refresh = observation.get("validation_baseline_refresh")
+    if changes and (
+        not isinstance(refresh, Mapping) or refresh.get("status") != "fresh"
+    ):
+        return {
+            **observation,
+            "outcome": "blocked",
+            "reason": "PR readiness requires a fresh committed validation baseline",
+        }
+    number = _same_repository_pull_request_number(pull_request_url, client.repository)
+    expected_head = observation.get("head_sha")
+    if number is None or not isinstance(expected_head, str):
+        return {
+            **observation,
+            "outcome": "blocked",
+            "reason": "cannot publish review readiness without the observed PR head",
+        }
+
+    def current_pr() -> Mapping[str, Any] | None:
+        result = client._invoke(
+            ["pr", "view", str(number), "--json", "headRefOid,isDraft"],
+            check=False,
+        )
+        if result.returncode != 0:
+            return None
+        try:
+            value = json.loads(result.stdout)
+        except json.JSONDecodeError:
+            return None
+        return value if isinstance(value, Mapping) else None
+
+    current = current_pr()
+    if current is None or current.get("headRefOid") != expected_head:
+        return {
+            **observation,
+            "outcome": "blocked",
+            "reason": "PR head changed before it could be marked ready for review",
+        }
+    if current.get("isDraft") is True:
+        marked = client._invoke(["pr", "ready", str(number)], check=False)
+        if marked.returncode != 0:
+            return {
+                **observation,
+                "outcome": "blocked",
+                "reason": "GitHub could not mark the validated PR ready for review: "
+                + marked.stderr.strip()[:500],
+            }
+        current = current_pr()
+        if current is None or current.get("headRefOid") != expected_head:
+            return {
+                **observation,
+                "outcome": "blocked",
+                "reason": "PR head changed while it was being marked ready for review",
+            }
+        if current.get("isDraft") is True:
+            return {
+                **observation,
+                "outcome": "blocked",
+                "reason": "GitHub left the validated PR in draft state",
+            }
+    return {**observation, "pull_request_ready_status": "ready"}
 
 
 def _ci_outcome_observation(
@@ -4712,6 +5205,8 @@ def _render_ci_outcome_checkpoint(
         "observed_at": observation.get("observed_at"),
         "validation_inventory_digest": observation.get("validation_inventory_digest"),
         "validation_input_changes": observation.get("validation_input_changes", []),
+        "validation_baseline_refresh": observation.get("validation_baseline_refresh"),
+        "pull_request_ready_status": observation.get("pull_request_ready_status"),
         "outcome": observation.get("outcome"),
         "required_checks": observation.get("checks", []),
         "reason": observation.get("reason", ""),
@@ -4792,6 +5287,8 @@ def _latest_ci_outcome_observation(
             "observed_at": payload.get("observed_at"),
             "validation_inventory_digest": payload.get("validation_inventory_digest"),
             "validation_input_changes": payload.get("validation_input_changes", []),
+            "validation_baseline_refresh": payload.get("validation_baseline_refresh"),
+            "pull_request_ready_status": payload.get("pull_request_ready_status"),
             "checks": payload.get("required_checks", []),
             "reason": payload.get("reason", ""),
             "refresh_succeeded": payload.get("refresh_succeeded", True),

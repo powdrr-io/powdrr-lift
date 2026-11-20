@@ -680,18 +680,33 @@ def publish_clean_pull_request(
                 )
             if staged:
                 _run(["git", "commit", "-m", commit_message], cwd=publication_root)
+            generated_baseline_paths = _refresh_validation_baseline_for_publication(
+                publication_root,
+                base_commit=publication_start,
+            )
+            if generated_baseline_paths:
+                _run(
+                    ["git", "add", "--", *generated_baseline_paths],
+                    cwd=publication_root,
+                )
+                _run(
+                    ["git", "commit", "-m", "Refresh validation inventory baseline"],
+                    cwd=publication_root,
+                )
             committed = set(
                 _run(
                     ["git", "diff", "--name-only", f"{publication_start}..HEAD"],
                     cwd=publication_root,
                 ).splitlines()
             )
-            if staged and committed != set(files):
+            expected_committed = set(staged) | set(generated_baseline_paths)
+            if (staged or generated_baseline_paths) and committed != expected_committed:
                 raise PowdrrExecutionError(
                     "Clean publication commit contains paths outside the approved "
-                    f"file set: {sorted(committed ^ set(files))!r}."
+                    "candidate and generated baseline set: "
+                    f"{sorted(committed ^ expected_committed)!r}."
                 )
-            if not staged and committed:
+            if not staged and not generated_baseline_paths and committed:
                 raise PowdrrExecutionError(
                     "Clean publication found unexpected commits on an unchanged "
                     f"publication request: {sorted(committed)!r}."
@@ -746,6 +761,7 @@ def _ensure_pull_request_changelog(
     title: str,
     description_sections: Mapping[str, Any] | None,
     branch: str,
+    push_to_remote: bool = True,
 ) -> None:
     match = re.search(r"/pull/(\d+)(?:$|[?#])", pull_request_url)
     if match is None:
@@ -950,7 +966,8 @@ def _ensure_pull_request_changelog(
             ["git", "commit", "-m", f"Add PR-{pr_number} changelog descriptor"],
             cwd=publication_root,
         )
-        _run(["git", "push", "origin", branch], cwd=publication_root)
+        if push_to_remote:
+            _run(["git", "push", "origin", branch], cwd=publication_root)
 
 
 def _span_pair(value: object) -> tuple[int, int] | None:
@@ -1128,6 +1145,60 @@ def _copy_publication_files(
             raise PowdrrExecutionError(
                 f"Publication path is not a regular file: {relative!r}."
             )
+
+
+def _refresh_validation_baseline_for_publication(
+    publication_root: Path,
+    *,
+    base_commit: str,
+) -> tuple[str, ...]:
+    """Refresh and validate the committed inventory when candidate files stale it."""
+    baseline_relative = "docs/structrr/current/baseline-bootstrap.yaml"
+    baseline_path = publication_root / baseline_relative
+    if (
+        not baseline_path.is_file()
+        or not (publication_root / ".github/workflows").is_dir()
+    ):
+        return ()
+
+    from powdrr_lift.workrr.github_issue_queue import (
+        _read_repository_validation_inventory,
+    )
+
+    if _read_repository_validation_inventory(publication_root) is not None:
+        return ()
+
+    from powdrr_lift.workrr.feature_endpoint import _write_baseline_companions
+    from powdrr_lift.workrr.task_agent import (
+        _bootstrap_issue_worker_structrr_baseline,
+        _load_committed_issue_worker_structrr_baseline,
+        _merge_structrr_decision_sections,
+    )
+
+    previous, _previous_manifest = _load_committed_issue_worker_structrr_baseline(
+        publication_root,
+        base_commit=base_commit,
+    )
+    current, _current_manifest = _bootstrap_issue_worker_structrr_baseline(
+        publication_root,
+        proposed={"plan_id": "pr-preparation-validation-baseline"},
+        base_commit=_run(["git", "rev-parse", "HEAD"], cwd=publication_root).strip(),
+    )
+    refreshed = _merge_structrr_decision_sections(current, previous)
+    baseline_path.write_text(
+        yaml.safe_dump(refreshed, sort_keys=False, allow_unicode=False),
+        encoding="utf-8",
+    )
+    _write_baseline_companions(refreshed, baseline_path, publication_root)
+    if _read_repository_validation_inventory(publication_root) is None:
+        raise PowdrrExecutionError(
+            "PR preparation could not produce a fresh committed validation inventory."
+        )
+    return (
+        baseline_relative,
+        "docs/structrr/current/baseline-bootstrap.md",
+        "docs/structrr/current/baseline-bootstrap.freshness.json",
+    )
 
 
 def _create_or_update_pull_request(

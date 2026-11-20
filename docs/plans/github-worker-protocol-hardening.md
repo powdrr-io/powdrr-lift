@@ -59,6 +59,74 @@ including continuation, unattended scans, and replacement of an expired owner.
 > waiting on a legitimate external condition, and reassess when it changes.
 > Request only the decision or capability that requires another authority.
 
+### Durable ownership across restarts
+
+The coordinator keeps an authoritative work-item record in the shared worker
+store, keyed by repository, issue number, plan ID, item ID, and accepted input
+contract digest. The record survives worker process replacement and contains
+the current owner generation, lease/heartbeat data, last confirmed remote
+observations, unresolved discrepancies, pending effect identities, linked PR
+identities, and the evidence version used for the last decision. Local
+worktrees and GitHub labels remain projections.
+
+An owner generation fences mutations. A replacement agent takes ownership
+only after confirming that the previous owner no longer holds the shared
+coordination lock. It reads the same work-item record and refreshes GitHub
+observations before acting. It can adopt verified effects from an earlier
+generation, but cannot let that generation make further writes. A live owner
+keeps the record while waiting on CI, review, access, or a human decision.
+The agent remains accountable for re-evaluating the item when the waiting
+condition changes. The record is retired only when the work item is verified
+fulfilled or an authorized cancellation is recorded.
+
+For the current single-host deployment, the record and fencing token are
+stored atomically under the shared Git common directory and coordinated by
+the existing process lock. Any future multi-host deployment must provide
+shared atomic storage and fencing before it can own queue items. If the
+record is corrupt, missing, or cannot be written, the agent reports that
+specific capability failure and keeps the item discoverable. It does not
+silently declare the item unowned or fulfilled.
+
+### Milestone pass conditions
+
+Every milestone must satisfy its listed conditions in automated tests and
+produce evidence that later milestones can consume.
+
+1. **Define authoritative observations and outcomes.** Pass when the versioned
+   model distinguishes attempt result from item state, represents unknown
+   remote outcomes and pending effects, and binds evidence to work identity,
+   contract digest, PR identity, head, and check policy. Golden cases for the
+   Gaterr #909 sequence, duplicate PR candidates, stale CI, and legacy
+   unbound markers must yield one expected state each. Unknown or conflicting
+   evidence must not produce fulfillment.
+2. **Make reconciliation part of agent execution.** Pass when an unattended
+   replacement agent acquires a higher owner generation, finds work with
+   missing or stale queue labels, refreshes observations, and either
+   converges the item or keeps a concrete unresolved condition in its durable
+   record. Tests must prove an expired generation cannot mutate after
+   replacement, a live generation is not stolen, and an identical subsequent
+   scan makes no remote writes.
+3. **Harden remote effects and local durability.** Pass when fault injection
+   at each GitHub mutation boundary, including a lost success response,
+   results in at most one logical issue, branch publication, PR, and
+   checkpoint for the operation identity. A retry must discover and bind an
+   existing effect before creating another. Compare-and-swap tests must show
+   that unrelated human edits survive and stale worker writes are rejected.
+4. **Apply the model to CI, amendments, and dependency readiness.** Pass when
+   a dependency is released only for a verified merge of the accepted
+   contract into the intended integration history or an authorized no-op.
+   Tests must hold it for closed-but-unmerged PRs, old-contract merges, stale
+   heads, uncertain publication, and multiple matching PRs. A partial plan
+   amendment must retain its full impacted item set and prevent promotion
+   until each affected item is reconciled.
+5. **Prove convergence before retiring legacy paths.** Pass when observation
+   mode reports old-versus-new decisions for the same evidence snapshot,
+   rollout thresholds are met across a documented sample, and discrepancy
+   metrics show duplicate effects, stale writes, unresolved duration, and
+   unexplained decisions within agreed bounds. Remove a legacy path only
+   after all its observed outcomes have an equivalent decision in the shared
+   model and fault-injection coverage passes.
+
 Human authority includes merging where review is required, changing accepted
 intent, resolving a substantive choice between competing candidates, and
 granting missing access. The agent owns diagnosis, evidence preservation,

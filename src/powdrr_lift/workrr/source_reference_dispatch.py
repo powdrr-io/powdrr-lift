@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 import re
+import stat
 import subprocess
 import tempfile
 from collections.abc import Mapping, Sequence
@@ -120,6 +121,188 @@ def _correction_failure_summary(data: Mapping[str, Any]) -> dict[str, Any]:
             else None
         ),
     }
+
+
+def _review_scope_additions(
+    repo_root: Path,
+    candidate: Path,
+    base_commit: str,
+    allowed_paths: tuple[str, ...],
+    changed_paths: Sequence[str],
+    design: Mapping[str, Any],
+    reviewer: WorkflowLLMClient,
+    protected_paths: Sequence[str] = (),
+) -> tuple[dict[str, Any], ...]:
+    """Approve only exact tracked outputs tied to accepted work and repository use."""
+    rejected = sorted(set(changed_paths) - set(allowed_paths))
+    if not rejected:
+        return ()
+    evidence: dict[str, dict[str, Any]] = {}
+    for path in rejected:
+        parsed = PurePosixPath(path)
+        if (
+            "\\" in path
+            or parsed.is_absolute()
+            or ".." in parsed.parts
+            or any(
+                scope == "."
+                or path == scope
+                or path.startswith(scope.rstrip("/") + "/")
+                for scope in protected_paths
+            )
+        ):
+            continue
+        baseline = _git(repo_root, "ls-tree", "-z", base_commit, "--", path)
+        if not baseline or baseline.split(b" ", 1)[0] not in {b"100644", b"100755"}:
+            continue
+        target = candidate.joinpath(*parsed.parts)
+        if (
+            target.is_symlink()
+            or not target.is_file()
+            or not target.resolve().is_relative_to(candidate)
+        ):
+            continue
+        baseline_mode = stat.S_IMODE(int(baseline.decode().split(" ", 1)[0], 8))
+        if stat.S_IMODE(target.stat().st_mode) != baseline_mode:
+            continue
+        diff = subprocess.run(
+            ["git", "diff", "--no-ext-diff", base_commit, "--", path],
+            cwd=candidate,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if diff.returncode or len(diff.stdout.encode()) > 24_000:
+            continue
+        basename = parsed.name
+        references: list[dict[str, str]] = []
+        for source_path in allowed_paths:
+            source = _git(repo_root, "show", f"{base_commit}:{source_path}")
+            if len(source) > MAX_DESIGN_BYTES:
+                continue
+            text = source.decode("utf-8", errors="replace")
+            if basename in text:
+                references.append(
+                    {
+                        "evidence_id": f"source-reference:{source_path}:{basename}",
+                        "path": source_path,
+                        "role": (
+                            "test_or_verifier"
+                            if any(
+                                part in source_path.lower()
+                                for part in ("test", "verify")
+                            )
+                            else "producer_or_consumer"
+                        ),
+                        "excerpt": next(
+                            line.strip()[:300]
+                            for line in text.splitlines()
+                            if basename in line
+                        ),
+                    }
+                )
+        if not any(item["role"] == "test_or_verifier" for item in references):
+            continue
+        if not any(item["role"] == "producer_or_consumer" for item in references):
+            continue
+        evidence_id = f"scope-path:{path}"
+        evidence[path] = {
+            "evidence_id": evidence_id,
+            "candidate_diff": diff.stdout,
+            "baseline_mode": baseline.decode().split(" ", 1)[0],
+            "accepted_source_references": references,
+        }
+    if not evidence:
+        return ()
+    prompt = {
+        "accepted_objective": design.get("objective", ""),
+        "accepted_criteria": design.get("acceptance_criteria", []),
+        "implementation_steps": design.get("implementation_steps", []),
+        "allowed_paths": list(allowed_paths),
+        "candidate_paths": evidence,
+        "instruction": (
+            "For each candidate path, approve it only when this exact diff is "
+            "necessary to satisfy an accepted criterion or implementation step. "
+            "A path name, agent claim, or small diff alone is not sufficient. "
+            "Reject protected tests, unrelated changes, and unsupported claims."
+        ),
+    }
+    decision = complete_json(
+        reviewer,
+        [
+            {"role": "system", "content": "Return only the requested JSON."},
+            {"role": "user", "content": json.dumps(prompt, sort_keys=True)},
+        ],
+        response_schema={
+            "type": "object",
+            "required": ["decisions"],
+            "additionalProperties": False,
+            "properties": {
+                "decisions": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "required": ["path", "decision", "evidence_ids", "reason"],
+                        "additionalProperties": False,
+                        "properties": {
+                            "path": {"type": "string", "enum": sorted(evidence)},
+                            "decision": {
+                                "type": "string",
+                                "enum": [
+                                    "authorize_exact_path",
+                                    "repair_candidate",
+                                ],
+                            },
+                            "evidence_ids": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                            },
+                            "reason": {"type": "string", "minLength": 1},
+                        },
+                    },
+                }
+            },
+        },
+    )
+    decisions = decision.get("decisions")
+    if not isinstance(decisions, list):
+        return ()
+    approved: dict[str, dict[str, Any]] = {}
+    for item in decisions:
+        if not isinstance(item, Mapping):
+            return ()
+        path_value = item.get("path")
+        evidence_ids = item.get("evidence_ids")
+        if (
+            not isinstance(path_value, str)
+            or path_value not in evidence
+            or not isinstance(evidence_ids, list)
+        ):
+            return ()
+        path = path_value
+        valid_ids = {
+            evidence[path]["evidence_id"],
+            *(
+                reference["evidence_id"]
+                for reference in evidence[path]["accepted_source_references"]
+            ),
+        }
+        if any(
+            not isinstance(value, str) or value not in valid_ids
+            for value in evidence_ids
+        ):
+            return ()
+        if item.get("decision") == "authorize_exact_path":
+            reason = item.get("reason")
+            if not isinstance(reason, str) or not reason.strip():
+                return ()
+            approved[path] = {
+                "path": path,
+                "decision": "authorize_exact_path",
+                "evidence_ids": sorted(set(evidence_ids)),
+                "reason": reason.strip(),
+            }
+    return tuple(approved[path] for path in sorted(approved))
 
 
 def _git(root: Path, *arguments: str, data: bytes | None = None) -> bytes:
@@ -461,6 +644,7 @@ def dispatch_source_reference_task(
         "continuations": 0,
         "source_reference_artifact_root": str(root),
         "source_reference_mode": "enforce",
+        "scope_recovery": None,
     }
     checkout_commit = _git(repo_root, "rev-parse", "HEAD").decode().strip()
     try:
@@ -473,6 +657,7 @@ def dispatch_source_reference_task(
         attempt_records: list[dict[str, Any]] = []
         seed_candidate_files: dict[str, str | None] = {}
         correction_context: dict[str, Any] | None = None
+        effective_allowed_paths = tuple(allowed_paths)
         previous_failure_fingerprint: str | None = None
         coordinator: dict[str, Any] = {
             "schema_version": CORRECTION_SCHEMA,
@@ -503,7 +688,7 @@ def dispatch_source_reference_task(
                 accepted_design=design,
                 base_commit=base_commit,
                 objective=objective,
-                allowed_paths=allowed_paths,
+                allowed_paths=effective_allowed_paths,
                 profiles=profiles,
                 artifact_root=attempt_root / "runs",
                 run_id=attempt_id,
@@ -570,10 +755,39 @@ def dispatch_source_reference_task(
             _write_coordinator(root, coordinator)
             if outcome.accepted:
                 break
+            scope_decisions: tuple[dict[str, Any], ...] = ()
+            if (
+                data.get("outcome") == "policy_violation"
+                and attempt.get("status") == "policy_denied"
+            ):
+                try:
+                    scope_decisions = _review_scope_additions(
+                        repo_root,
+                        candidate,
+                        base_commit,
+                        effective_allowed_paths,
+                        tuple(attempt.get("out_of_scope_paths", ())),
+                        design,
+                        review_client,
+                        protected_paths=(*test_sources, *run.request.protected_paths),
+                    )
+                except (PowdrrExecutionError, RuntimeError, ValueError):
+                    scope_decisions = ()
+                scope_approved = tuple(str(item["path"]) for item in scope_decisions)
+                if scope_decisions:
+                    effective_allowed_paths = tuple(
+                        sorted({*effective_allowed_paths, *scope_approved})
+                    )
+                    coordinator["scope_recovery"] = {
+                        "status": "approved_exact_paths",
+                        "attempt_id": attempt_id,
+                        "decisions": list(scope_decisions),
+                    }
+                    _write_coordinator(root, coordinator)
             recoverable = (
                 data.get("outcome") == "validation_failed"
                 and attempt.get("status") == "completed"
-            )
+            ) or bool(scope_decisions)
             if not recoverable:
                 if data.get("outcome") == "submitted_without_progress":
                     coordinator.update(
@@ -625,18 +839,25 @@ def dispatch_source_reference_task(
                 )
                 _write_coordinator(root, coordinator)
                 break
-            correction_context = {
-                "schema_version": CORRECTION_SCHEMA,
-                "previous_attempt_id": attempt_id,
-                "failure_fingerprint": failure_fingerprint,
-                "failed_checks": _correction_failure_summary(data),
-                "permitted_candidate_files": sorted(seed_candidate_files),
-                "required_correction": (
-                    "Repair the exact candidate validation failures while preserving "
-                    "the accepted source design, independent tests, original base, "
-                    "and all protected files."
-                ),
-            }
+                correction_context = {
+                    "schema_version": CORRECTION_SCHEMA,
+                    "previous_attempt_id": attempt_id,
+                    "failure_fingerprint": failure_fingerprint,
+                    "failed_checks": _correction_failure_summary(data),
+                    "permitted_candidate_files": sorted(seed_candidate_files),
+                    "authorized_scope_additions": list(scope_approved),
+                    "required_correction": (
+                        "Continue the accepted implementation and run all normal "
+                        "validation checks. The runtime approved only these exact "
+                        f"additional paths: {', '.join(scope_approved)}. "
+                        if scope_approved
+                        else (
+                            "Repair the exact candidate validation failures while "
+                            "preserving the accepted source design, independent "
+                            "tests, original base, and all protected files."
+                        )
+                    ),
+                }
             coordinator.update(
                 status="correction_pending",
                 correction_of=attempt_id,
@@ -666,6 +887,7 @@ def dispatch_source_reference_task(
             attempt_budget=max_correction_attempts,
             correction_coordinator=str(root / "coordinator.json"),
             error=data.get("error"),
+            scope_recovery=coordinator.get("scope_recovery"),
         )
         if data.get("outcome") != "accepted":
             return result

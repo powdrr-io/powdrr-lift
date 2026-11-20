@@ -146,7 +146,7 @@ def build_test_coverage_request(
     normalized_criteria = tuple(
         value.strip() for value in cast(Sequence[str], criteria)
     )
-    normalized_requirements: list[dict[str, str]] = []
+    normalized_requirements: list[dict[str, Any]] = []
     for index, requirement in enumerate(requirements):
         requirement_id = requirement.get("id")
         statement = requirement.get("statement")
@@ -159,9 +159,33 @@ def build_test_coverage_request(
             raise PlanningContractError(
                 f"/requirements/{index}", "must include a non-empty id and statement"
             )
-        normalized_requirements.append(
-            {"id": requirement_id.strip(), "statement": statement.strip()}
-        )
+        groups = requirement.get("source_validation_groups", ())
+        if (
+            not isinstance(groups, Sequence)
+            or isinstance(groups, (str, bytes))
+            or not all(
+                isinstance(group, Mapping)
+                and set(group) == {"id", "relation"}
+                and isinstance(group.get("id"), str)
+                and group["id"].strip()
+                and group.get("relation")
+                in {"all_together", "ordered", "alternatives", "conditional"}
+                for group in groups
+            )
+        ):
+            raise PlanningContractError(
+                f"/requirements/{index}/source_validation_groups",
+                "must contain source group IDs and known relations",
+            )
+        normalized_requirement: dict[str, Any] = {
+            "id": requirement_id.strip(),
+            "statement": statement.strip(),
+        }
+        if groups:
+            normalized_requirement["source_validation_groups"] = [
+                dict(group) for group in groups
+            ]
+        normalized_requirements.append(normalized_requirement)
     if len({entry["id"] for entry in normalized_requirements}) != len(
         normalized_requirements
     ):

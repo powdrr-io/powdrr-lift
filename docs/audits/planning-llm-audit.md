@@ -76,6 +76,12 @@ version 2. The model no longer chooses whether or where to continue. The
 detailed request catalog below preserves the audited source snapshot and its
 historical schemas.
 
+Source-relation update: allocated requirements now retain each referenced
+validation group's stable ID and relation. Coverage assessment facts, residual
+requirements, and test-design requirement facts carry that typed relation
+through, so downstream questions do not need to infer conditional,
+alternative, ordered, or all-together relationships again from prose.
+
 Telemetry attribution update: each local provider-call record now carries a
 per-question contract identity (kind and contract version), expected answer
 schema, stable subject IDs, source/context reference IDs, attempt number, and the
@@ -696,8 +702,9 @@ check public API/test consumers explicitly; this audit changes none of them.
 3. **Carry accepted semantics directly.** Typed source requirements, phases, cases
    and observations bypass rediscovery. Exact, single-anchor imperative human
    setup text and complete typed source test semantics are now carried directly;
-   semantic setup and test-design requests remain for other forms. Preserve
-   conditional/Boolean source relations and scenario dimensions.
+   semantic setup and test-design requests remain for other forms. Requirement
+   validation group relations now carry through coverage and test-design facts.
+   Preserve remaining conditional/Boolean source semantics and scenario dimensions.
    Unknown meaning stops or goes to review rather than silently becoming
    context/not_applicable.
 4. **Compile formal dependency/structural cases.** Typed resource use and exact
@@ -720,9 +727,10 @@ check public API/test consumers explicitly; this audit changes none of them.
 The request catalog describes the audited revision, while milestones 1 and the
 source/work-unit/subject-pagination and deterministic binding portions of
 milestone 2 are implemented in the current planner. Multi-phase assignment and
-milestones 3–5 remain recommendations. Milestone 6 has baseline call accounting
-and per-question gate attribution; provider-reported cost and any decision to
-retain exact request/response content remain open.
+milestone 3 is partially implemented, and milestones 4–5 remain recommendations.
+Milestone 6 has baseline call accounting and per-question gate attribution;
+provider-reported cost and any decision to retain exact request/response content
+remain open.
 Later changes should be separately reviewable and retain pinned intent, private
 verification, full scenario closure and explicit human decision boundaries.
 

@@ -21,6 +21,8 @@ steps:
         - Describe one concrete discovery and the directly affected subjects. Do not widen impact to the whole plan.
         - Prefer a dependency correction when an existing dependency is missing or wrong. Use update_item only when the reviewed item text itself prevents correct execution.
         - For update_item, return a complete replacement item for the same item ID, preserving its workflow ID and workflow file. Do not invent a new ID or change requirement allocation.
+        - For update_item, include target_item only when the affected item is ambiguous; the runtime binds a single item from discovery.item_ids and replacement_items.
+        - When target_item is supplied, it must be the exact existing item ID being replaced.
         - "Each operation object must use the exact key `operation` (never `op`) and one of: add_item, update_item, retire_item, set_dependency, update_requirement, assign_setup."
         - Preserve dependencies, planned paths, implementation steps, setup instructions, and inline adjustments unless the cited evidence establishes that one is defective.
         - Return no setup, requirement, unit, or Structrr replacements unless concrete evidence and supplied IDs require them.
@@ -62,6 +64,7 @@ steps:
                 required: [operation]
                 properties:
                   operation: {type: string, enum: [add_item, update_item, retire_item, set_dependency, update_requirement, assign_setup]}
+                  target_item: {type: string, description: Exact existing plan item ID to update when the runtime cannot bind a unique item from the discovery and replacement items.}
             replacement_items:
               type: object
               additionalProperties:

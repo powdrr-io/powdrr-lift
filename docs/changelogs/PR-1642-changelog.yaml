@@ -1,0 +1,68 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1642
+title: Bind plan repair to a unique affected item
+intent:
+  problem: A plan-repair judge can identify one affected item and return its replacement while omitting the operation target; the runtime then rejects the repair even though discovery and replacement data uniquely identify the item.
+  goal: Bind an unambiguous update target deterministically from trusted plan evidence and require an explicit target only when the evidence leaves multiple choices.
+human-decisions: []
+structured_files: []
+files:
+  - path: packages/service/src/powdrr_service/planning/repair_service.py
+    type: modified
+    span: {start_line: 227, end_line: 232}
+    summary: Pass discovery item IDs and replacement item IDs to operation binding.
+    rationale: Give the runtime trusted inputs needed to resolve a unique update target.
+  - path: packages/service/src/powdrr_service/planning/repair_service.py
+    type: modified
+    span: {start_line: 716, end_line: 720}
+    summary: Supply trusted discovery and replacement target IDs to the operation binder.
+    rationale: Let deterministic code resolve targets from the reviewed evidence.
+  - path: packages/service/src/powdrr_service/planning/repair_service.py
+    type: modified
+    span: {start_line: 724, end_line: 736}
+    summary: Identify update operations whose target needs binding and calculate possible item matches.
+    rationale: Restrict automatic binding to cases with one unambiguous target.
+  - path: packages/service/src/powdrr_service/planning/repair_service.py
+    type: modified
+    span: {start_line: 748, end_line: 748}
+    summary: Read an explicit target_item when the judge supplies one.
+    rationale: Support explicit target selection when the runtime cannot infer a unique item.
+  - path: packages/service/src/powdrr_service/planning/repair_service.py
+    type: modified
+    span: {start_line: 750, end_line: 767}
+    summary: Bind unique inferred targets or return an actionable ambiguity error, then validate the target against the reviewed plan.
+    rationale: Allow clear repairs to proceed without model-authored IDs and prevent invalid targets from being applied.
+  - path: packages/service/src/powdrr_service/planning/repair_service.py
+    type: modified
+    span: {start_line: 769, end_line: 771}
+    summary: Include the invalid item ID in unknown-target diagnostics.
+    rationale: Make repair failures debuggable when an explicit target is not in the reviewed plan.
+  - path: packages/service/src/powdrr_service/resources/processes/amend-plan-and-open-pr.yaml
+    type: modified
+    span: {start_line: 24, end_line: 25}
+    summary: Explain when an explicit target_item is needed and how the runtime resolves a unique target.
+    rationale: Keep the repair judge aligned with the deterministic target-binding behavior.
+  - path: packages/service/src/powdrr_service/resources/processes/amend-plan-and-open-pr.yaml
+    type: modified
+    span: {start_line: 67, end_line: 67}
+    summary: Describe the optional target_item field in the repair operation schema.
+    rationale: Give the judge a supported way to select an existing item when evidence does not determine one unique target.
+  - path: tests/test_plan_repair_process.py
+    type: modified
+    span: {start_line: 29, end_line: 29}
+    summary: Verify update_item's optional target_item field is accepted by the process schema.
+    rationale: Keep explicit target selection available without requiring model-generated identity metadata.
+  - path: tests/test_plan_repair_process.py
+    type: modified
+    span: {start_line: 31, end_line: 31}
+    summary: Verify update_item may omit target_item when the runtime can bind it.
+    rationale: Protect the self-correcting unique-target path.
+  - path: tests/test_plan_repair_service.py
+    type: modified
+    span: {start_line: 179, end_line: 211}
+    summary: Cover unique target inference, explicit target selection, and an actionable ambiguity error.
+    rationale: Ensure repair application is self-correcting when evidence is unique and fails clearly when it is not.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []

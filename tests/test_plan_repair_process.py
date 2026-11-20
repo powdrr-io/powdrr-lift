@@ -26,8 +26,9 @@ def test_plan_repair_process_uses_typed_operation_key() -> None:
     ]
 
     jsonschema.validate(
-        {"operation": "update_item", "item_id": "item-0004"}, operation_schema
+        {"operation": "update_item", "target_item": "item-0004"}, operation_schema
     )
+    jsonschema.validate({"operation": "update_item"}, operation_schema)
     try:
         jsonschema.validate(
             {"op": "update_item", "item_id": "item-0004"}, operation_schema

@@ -176,6 +176,39 @@ def test_shared_repair_service_binds_cas_and_preserves_unrelated_item() -> None:
     assert repaired.manifest["latest_repair"]["repair_id"].startswith("repair-")
 
 
+def test_model_update_item_target_is_bound_from_unique_discovery_and_replacement() -> (
+    None
+):
+    request = _request()
+    request["operations"][0].pop("item_id")
+
+    repaired = apply_repair_request(_draft(), request, compile_candidate=_compile)
+
+    assert repaired.manifest["latest_repair"]["affected_item_ids"] == ["item-01"]
+
+
+def test_model_update_item_can_name_an_explicit_target() -> None:
+    request = _request()
+    operation = request["operations"][0]
+    operation["target_item"] = operation.pop("item_id")
+
+    repaired = apply_repair_request(_draft(), request, compile_candidate=_compile)
+
+    assert repaired.manifest["latest_repair"]["affected_item_ids"] == ["item-01"]
+
+
+def test_update_item_without_a_unique_target_returns_actionable_error() -> None:
+    request = _request()
+    del request["operations"][0]["item_id"]
+    request["replacement_items"] = {}
+
+    with pytest.raises(
+        PlanRepairServiceError,
+        match="update_item target is ambiguous; provide target_item",
+    ):
+        apply_repair_request(_draft(), request, compile_candidate=_compile)
+
+
 def test_shared_repair_service_rejects_model_supplied_cas_digest() -> None:
     request = _request()
     request["operations"][0]["expected_digest"] = "sha256:" + "0" * 64

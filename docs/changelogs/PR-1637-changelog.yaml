@@ -1,0 +1,38 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1637
+title: Align source-reference completion with MiniSWE instructions
+intent:
+  problem: Enforced source-reference handoffs require a JSON design-gap report after the completion sentinel, but MiniSWE's task template instructed workers to submit the sentinel alone, causing completed work to fail validation.
+  goal: Make enforced source-reference sessions provide a completion command that submits the required JSON report, including when a custom MiniSWE task template is configured.
+human-decisions: []
+structured_files: []
+files:
+  - path: packages/agent/src/powdrr_agent/execution/minisweagent_environment.py
+    type: modified
+    span: {start_line: 15, end_line: 18}
+    summary: Define the JSON-bearing completion command for enforced source-reference sessions.
+    rationale: Match the worker's terminal action to the JSON report parsed by the runtime.
+  - path: packages/agent/src/powdrr_agent/execution/minisweagent_environment.py
+    type: modified
+    span: {start_line: 171, end_line: 172}
+    summary: Apply source-reference completion instructions only in enforced mode.
+    rationale: Keep the required submission protocol scoped to sessions whose runtime validates design-gap reports.
+  - path: packages/agent/src/powdrr_agent/execution/minisweagent_environment.py
+    type: modified
+    span: {start_line: 174, end_line: 195}
+    summary: Rewrite the stock sentinel-only instruction or add the correct instruction to a custom task template.
+    rationale: Prevent completed source workers from submitting an invalid sentinel-only result.
+  - path: tests/test_minisweagent_environment.py
+    type: modified
+    span: {start_line: 256, end_line: 259}
+    summary: Set up a template containing MiniSWE's stock completion command.
+    rationale: Exercise replacement of the conflicting instruction.
+  - path: tests/test_minisweagent_environment.py
+    type: modified
+    span: {start_line: 261, end_line: 276}
+    summary: Verify stock and custom templates receive the JSON-bearing completion protocol.
+    rationale: Prevent regressions in both packaged and repository-specific MiniSWE templates.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []

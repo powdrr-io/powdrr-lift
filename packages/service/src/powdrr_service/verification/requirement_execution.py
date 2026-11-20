@@ -9,7 +9,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Literal
 
-RECEIPT_SCHEMA = "requirement-execution-receipt-v1"
+RECEIPT_SCHEMA = "requirement-execution-receipt-v2"
 ReceiptOutcome = Literal["passed", "failed", "blocked", "not_run"]
 _DIGEST = re.compile(r"sha256:[a-f0-9]{64}")
 _COMMIT = re.compile(r"[a-f0-9]{40}|[a-f0-9]{64}")
@@ -137,13 +137,23 @@ def requirement_coverage_digest(
     statement: str,
     kind: str,
     source_refs: Sequence[str],
+    source_group_ids: Sequence[str],
+    source_validation_groups: Sequence[tuple[str, str]],
+    source_logic: Sequence[Mapping[str, Any]],
 ) -> str:
-    """Bind a receipt to accepted requirement wording and its cited anchors."""
+    """Bind a receipt to the full typed requirement used by coverage assessment."""
     payload = {
+        "schema": "requirement-coverage-binding-v2",
         "requirement_id": requirement_id,
         "statement": statement,
         "kind": kind,
         "source_refs": list(source_refs),
+        "source_group_ids": list(source_group_ids),
+        "source_validation_groups": [
+            {"id": group_id, "relation": relation}
+            for group_id, relation in source_validation_groups
+        ],
+        "source_logic": [dict(expression) for expression in source_logic],
     }
     return "sha256:" + hashlib.sha256(_canonical(payload)).hexdigest()
 

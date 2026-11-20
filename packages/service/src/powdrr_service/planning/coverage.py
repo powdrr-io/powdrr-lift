@@ -251,6 +251,9 @@ def _receipt_proves_requirement(
         statement=requirement.statement,
         kind=requirement.kind,
         source_refs=requirement.source_refs,
+        source_group_ids=requirement.source_group_ids,
+        source_validation_groups=requirement.source_validation_groups,
+        source_logic=requirement.source_logic,
     )
     return receipt.proves_coverage(
         requirement_id=requirement.id,
@@ -319,7 +322,7 @@ def build_requirement_coverage_request(
     if search_record is not None:
         repository_context += (search_record,)
     digest_material = {
-        "contract_version": 3,
+        "contract_version": 4,
         "requirement": {
             "id": requirement.id,
             "statement": requirement.statement,
@@ -366,7 +369,7 @@ def build_requirement_coverage_request(
         question=Question(
             question_id=f"q-coverage-{input_digest[-16:]}",
             kind="assess_requirement_coverage",
-            contract_version=3,
+            contract_version=4,
             subject_ids=(requirement.id,),
             input_digest=input_digest,
             context_ref_ids=tuple(
@@ -374,7 +377,7 @@ def build_requirement_coverage_request(
                 + [requirement.id]
                 + ([] if search_record is None else [search_record.ref_id])
             ),
-            expected_answer_schema="coverage-answer-v3",
+            expected_answer_schema="coverage-answer-v4",
             attempt=1,
         ),
         exact_question=(
@@ -384,7 +387,10 @@ def build_requirement_coverage_request(
             "are candidates; ignore irrelevant matches. Examples demonstrate answer "
             "shape only and do not establish that supplied evidence is relevant. "
             "Code/test co-occurrence alone does not prove coverage. If the "
-            "requirement includes "
+            "evidence repeats requirement words but describes a different meaning, "
+            "it is not coverage. A passing test is not proof unless its assertion "
+            "observes the exact required behavior on a relevant input. "
+            "If the requirement includes "
             "source_logic, treat its exact quoted atoms and conditions as source "
             "authority. Preserve nested all_of, any_of, ordered, and conditional "
             "meaning when judging coverage; do not flatten branches or infer missing "

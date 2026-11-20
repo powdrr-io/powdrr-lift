@@ -1,0 +1,116 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1644
+title: Bind execution receipts to the full typed requirement
+intent:
+  problem: Requirement execution receipts were bound to the requirement ID, wording, kind, and source references but not its typed source logic or validation groups.
+  goal: Invalidate a receipt when the Boolean conditions or validation-group semantics of its requirement change, and carry those fields through the persisted plan and workflow descriptor.
+human-decisions: []
+structured_files: []
+files:
+  - path: packages/service/src/powdrr_service/verification/requirement_execution.py
+    type: modified
+    span: {start_line: 12, end_line: 12}
+    summary: Advance the requirement execution receipt schema to version 2.
+    rationale: Make the expanded requirement binding explicit and reject old receipt payloads.
+  - path: packages/service/src/powdrr_service/verification/requirement_execution.py
+    type: modified
+    span: {start_line: 140, end_line: 142}
+    summary: Require all typed requirement fields as digest inputs.
+    rationale: Ensure callers cannot silently fall back to the old incomplete identity.
+  - path: packages/service/src/powdrr_service/verification/requirement_execution.py
+    type: modified
+    span: {start_line: 144, end_line: 144}
+    summary: Describe the digest as binding the full typed requirement.
+    rationale: Keep the receipt contract intent clear at its definition.
+  - path: packages/service/src/powdrr_service/verification/requirement_execution.py
+    type: modified
+    span: {start_line: 146, end_line: 146}
+    summary: Version the canonical requirement binding digest.
+    rationale: Make the expanded digest structure explicit.
+  - path: packages/service/src/powdrr_service/verification/requirement_execution.py
+    type: modified
+    span: {start_line: 151, end_line: 156}
+    summary: Add source groups, group relations, and typed source logic to the digest payload.
+    rationale: Invalidate receipts whenever requirement semantics or their grouping changes.
+  - path: packages/service/src/powdrr_service/planning/coverage.py
+    type: modified
+    span: {start_line: 254, end_line: 256}
+    summary: Validate receipt digests against the full requirement used in coverage assessment.
+    rationale: Prevent stale receipts from proving coverage after typed source conditions change.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 2712, end_line: 2721}
+    summary: Persist typed source groups and logic on planning manifest requirements.
+    rationale: Preserve the exact semantics needed to reproduce a requirement digest after planning.
+  - path: packages/service/src/powdrr_service/planning/driver.py
+    type: modified
+    span: {start_line: 3210, end_line: 3212}
+    summary: Compute observed-run receipt bindings from the full in-memory requirement.
+    rationale: Keep runtime receipt checks aligned with the persisted and compiled requirement identity.
+  - path: packages/service/src/powdrr_service/planning/compiler.py
+    type: modified
+    span: {start_line: 601, end_line: 613}
+    summary: Compile workflow requirement bindings from source groups, validation relations, and source logic.
+    rationale: Carry the same digest identity across the planner to implementation handoff.
+  - path: packages/service/src/powdrr_service/planning/compiler.py
+    type: modified
+    span: {start_line: 1234, end_line: 1272}
+    summary: Validate typed source-group and source-logic fields in planning manifests.
+    rationale: Reject malformed or inconsistent requirement identity data before compilation.
+  - path: tests/test_requirement_execution_receipt.py
+    type: modified
+    span: {start_line: 5, end_line: 5}
+    summary: Import dataclass replacement for the changed-requirement regression.
+    rationale: Construct a variant with the same stable identity and different typed semantics.
+  - path: tests/test_requirement_execution_receipt.py
+    type: modified
+    span: {start_line: 210, end_line: 300}
+    summary: Add a regression proving a receipt for one source-logic tree is rejected for a changed tree.
+    rationale: Verify typed requirement changes invalidate receipt-backed complete coverage.
+  - path: tests/test_planning_compiler.py
+    type: modified
+    span: {start_line: 720, end_line: 740}
+    summary: Add typed source groups and logic to the compiler fixture.
+    rationale: Exercise end-to-end propagation in generated workflow descriptors.
+  - path: tests/test_planning_compiler.py
+    type: modified
+    span: {start_line: 839, end_line: 857}
+    summary: Assert the generated workflow digest includes typed requirement fields.
+    rationale: Prevent regressions that drop semantics during compilation.
+  - path: tests/test_requirement_execution_receipt.py
+    type: modified
+    span: {start_line: 67, end_line: 69}
+    summary: Supply all typed fields when computing simple receipt test digests.
+    rationale: Keep digest call sites explicit under the version 2 contract.
+  - path: tests/test_planning_execution_receipts.py
+    type: modified
+    span: {start_line: 31, end_line: 33}
+    summary: Supply empty typed fields for requirements without grouped logic in manifest tests.
+    rationale: Keep digest call sites explicit under the version 2 contract.
+  - path: tests/test_planning_execution_receipts.py
+    type: modified
+    span: {start_line: 133, end_line: 135}
+    summary: Supply empty typed fields for unpassed receipt producer tests.
+    rationale: Keep digest call sites explicit under the version 2 contract.
+  - path: docs/audits/planning-llm-audit.md
+    type: modified
+    span: {start_line: 11, end_line: 15}
+    summary: Record full typed requirement binding and the lack of a production receipt artifact producer.
+    rationale: Keep milestone status aligned with current code and highlight the remaining end-to-end gap.
+  - path: docs/audits/planning-llm-audit.md
+    type: modified
+    span: {start_line: 319, end_line: 322}
+    summary: Update the audited receipt digest fields to include typed source semantics.
+    rationale: Document the complete identity protected by receipt validation.
+  - path: docs/audits/planning-llm-audit.md
+    type: modified
+    span: {start_line: 343, end_line: 347}
+    summary: Note that receipt conversion and manifest publication have no production caller.
+    rationale: Distinguish available utilities from end-to-end artifact production.
+entities: []
+entity_relationships: []
+invariants:
+  - id: receipt-requirement-binding-covers-full-typed-semantics
+    description: A receipt digest changes with source group identities, validation relations, or source_logic.
+    action: added
+guidance: []

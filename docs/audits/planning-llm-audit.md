@@ -8,8 +8,11 @@ consolidation, exact-source human setup, and complete typed source test-case
 carry-forward with per-case requirement bindings propagated to generated
 workflow descriptors are implemented in the active planning path. P04 now has a
 deterministic shortcut for explicitly supplied, typed requirement execution
-receipts that pass exact requirement, source/candidate, oracle, command, and
-evidence binding. Semantic classification remains necessary for other evidence.
+receipts that bind the full typed requirement, including validation groups and
+source_logic, plus source/candidate, oracle, command, and evidence. Semantic
+classification remains necessary for other evidence. The receipt adapter and
+manifest writer currently have no production call site; artifacts must still be
+produced externally.
 Other work in milestones 2–6 is still proposed.
 
 Audited revision: `cfc0b514c43c1d14269147a03e5d7ec5ec5cc739`, fetched from
@@ -313,9 +316,10 @@ Preserve unknown/incomplete search separately, and do not convert search failure
 into either complete or universally absent. A deterministic receipt shortcut is
 now available only for one explicitly requirement-keyed `execution_receipt`.
 The versioned receipt validates a stable content-derived ID, exact requirement
-digest (ID, accepted wording, kind, and source refs), pinned source and candidate
-commits, oracle ID/digest, command digest, passed outcome, run ID, and artifact
-references. The generic Evidence record independently validates the receipt
+digest (ID, accepted wording, kind, source refs, source groups, validation-group
+relations, and source_logic), pinned source and candidate commits, oracle
+ID/digest, command digest, passed outcome, run ID, and artifact references. The
+generic Evidence record independently validates the receipt
 excerpt against its pinned commit, path, line range, and content digest.
 Search-derived receipts and ambiguous multiple receipts do not take this
 shortcut. Arbitrary implementation and test evidence still require semantic
@@ -336,8 +340,11 @@ coverage path as complete. `plan` and `plan-resume` now discover the named
 GitHub Actions runs for the exact pinned commit. An explicit JSON manifest path
 can override discovery. The loader pins the manifest base commit, validates each
 receipt and evidence digest, and supplies records only under explicit
-requirement IDs. Missing artifacts or unavailable discovery leave the normal
-semantic coverage path in place; they are not evidence of missing behavior.
+requirement IDs. The adapter and manifest writer are utility functions only:
+repository-wide call-site inspection found no production producer that turns
+`VerificationEvidence` into the named artifact. Missing artifacts or unavailable
+discovery leave the normal semantic coverage path in place; they are not evidence
+of missing behavior.
 Planner-generated workflow descriptors now carry the exact requirement IDs and
 digests allocated to each item, derived from its work units and accepted
 requirement records. This supplies stable planner-owned bindings to downstream
@@ -750,10 +757,13 @@ check public API/test consumers explicitly; this audit changes none of them.
    the coverage question or support a complete answer. The model cannot promote
    a malformed or stale receipt to coverage. Without a trusted receipt, coverage
    examples no longer imply that the first implementation/test pair is relevant;
-   the prompt explicitly reserves that judgment for the supplied evidence. Tests
-   cover an irrelevant passing test, partial implementation, and unavailable
-   indexing. Still test repeated words with wrong meaning and an assertion that
-   executes but proves the wrong observation.
+   the prompt explicitly reserves that judgment for the supplied evidence and
+   warns that repeated words or a passing assertion without the required
+   observation do not establish coverage. Tests exercise same-word/different-
+   meaning evidence and passing assertions that omit or contradict the required
+   behavior, alongside irrelevant tests, partial implementation and unavailable
+   indexing. Semantic relevance remains a model judgment; these cases prevent
+   examples and prompt wording from treating weak evidence as proof.
 6. **Bound and instrument the remaining semantic work.** Preserve checkpoints and
    local parser/schema gates; distinguish member questions, batches, seeded results,
    output repairs and actual HTTP/provider calls. Track request builder/policy,

@@ -224,7 +224,12 @@ def apply_repair_request(
         )
         for item_id, raw in replacement_items.items()
     }
-    bound_operations = _bind_operations(draft, raw_operations)
+    bound_operations = _bind_operations(
+        draft,
+        raw_operations,
+        discovery_item_ids=raw_discovery["item_ids"],
+        replacement_item_ids=tuple(items),
+    )
     try:
         patch = build_plan_repair_patch(
             draft,
@@ -708,10 +713,27 @@ def write_repaired_artifacts(
 
 
 def _bind_operations(
-    draft: RepairDraft, operations: Sequence[Any]
+    draft: RepairDraft,
+    operations: Sequence[Any],
+    *,
+    discovery_item_ids: Any,
+    replacement_item_ids: Sequence[str],
 ) -> tuple[Mapping[str, Any], ...]:
     """Bind compare-and-swap digests and allocations from the loaded revision."""
     by_id = {item.item_id: item for item in draft.plan.items}
+    candidate_ids = (
+        set(discovery_item_ids) & set(replacement_item_ids)
+        if isinstance(discovery_item_ids, list)
+        and all(isinstance(item_id, str) for item_id in discovery_item_ids)
+        else set()
+    )
+    unresolved_updates = sum(
+        isinstance(operation, Mapping)
+        and operation.get("operation") == "update_item"
+        and not operation.get("item_id")
+        and not operation.get("target_item")
+        for operation in operations
+    )
     bound: list[Mapping[str, Any]] = []
     for raw in operations:
         if not isinstance(raw, Mapping):
@@ -723,10 +745,30 @@ def _bind_operations(
                 "repair request cannot supply compare-and-swap digests"
             )
         if kind == "update_item":
+            target_item = operation.pop("target_item", None)
             item_id = operation.get("item_id")
-            item = by_id.get(item_id) if isinstance(item_id, str) else None
+            if target_item is not None:
+                if item_id is not None:
+                    raise PlanRepairServiceError(
+                        "update_item must use target_item, not item_id"
+                    )
+                item_id = target_item
+                operation["item_id"] = item_id
+            elif item_id is None:
+                if unresolved_updates == 1 and len(candidate_ids) == 1:
+                    item_id = next(iter(candidate_ids))
+                    operation["item_id"] = item_id
+                else:
+                    raise PlanRepairServiceError(
+                        "update_item target is ambiguous; provide target_item"
+                    )
+            if not isinstance(item_id, str) or not item_id.strip():
+                raise PlanRepairServiceError("update_item requires a target_item")
+            item = by_id.get(item_id)
             if item is None:
-                raise PlanRepairServiceError("update_item references an unknown item")
+                raise PlanRepairServiceError(
+                    f"update_item references an unknown item_id: {item_id}"
+                )
             operation["expected_digest"] = item_content_digest(item)
             if "replacement_unit_ids" in operation:
                 raise PlanRepairServiceError(

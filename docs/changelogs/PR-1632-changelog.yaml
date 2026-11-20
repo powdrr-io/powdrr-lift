@@ -1,0 +1,33 @@
+schema: https://powdrr.io/schema/changelog-v2
+change_id: 1632
+title: Preserve source validation relations in planner test design
+intent:
+  problem: Planner test-design facts already carried source validation relations, but the model instructions did not explain how those accepted relations should constrain test scenarios.
+  goal: Direct test design to preserve source relation semantics and invalidate answers produced under the previous prompt contract.
+human-decisions: []
+structured_files: []
+files:
+  - path: packages/service/src/powdrr_service/planning/test_coverage.py
+    type: modified
+    span: {start_line: 612, end_line: 628}
+    summary: Bump the test-design question contract to version 7.
+    rationale: Prevent accepted answers from the previous semantic instructions from being reused.
+  - path: packages/service/src/powdrr_service/planning/test_coverage.py
+    type: modified
+    span: {start_line: 645, end_line: 657}
+    summary: Explain how source validation relations constrain test scenarios.
+    rationale: Use already accepted all-together, ordered, alternatives, and conditional meaning instead of leaving the model to infer or ignore it.
+  - path: tests/test_test_coverage_planning.py
+    type: modified
+    span: {start_line: 94, end_line: 101}
+    summary: Verify the new contract version and source-relation prompt guidance.
+    rationale: Catch regressions that omit or weaken relation guidance in future test-design requests.
+  - path: docs/audits/planning-llm-audit.md
+    type: modified
+    span: {start_line: 721, end_line: 730}
+    summary: Record the relation-guidance improvement and retain nested Boolean source semantics as open work.
+    rationale: Keep the audit aligned with the implemented boundary and the remaining gap.
+entities: []
+entity_relationships: []
+invariants: []
+guidance: []

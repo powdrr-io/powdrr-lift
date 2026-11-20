@@ -92,8 +92,13 @@ def test_planner_assigns_stable_ids_to_llm_test_designs() -> None:
     planned = request.parse_answer(answer)
 
     assert request.question.kind == "plan_test_coverage"
-    assert request.question.contract_version == 6
-    assert request.question.expected_answer_schema == "plan-test-coverage-v6"
+    assert request.question.contract_version == 7
+    assert request.question.expected_answer_schema == "plan-test-coverage-v7"
+    assert "source_validation_groups" in request.exact_question
+    assert "do not require all alternatives in one run" in request.exact_question
+    assert "mark the relevant dimension unresolved instead of guessing" in (
+        request.exact_question
+    )
     assert request.max_answer_chars == 8_000
     item_context = next(
         fact for fact in request.accepted_facts if fact.ref_id == "planned-pr:item-0001"

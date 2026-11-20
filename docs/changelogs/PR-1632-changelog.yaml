@@ -87,6 +87,11 @@ files:
     span: {start_line: 3297, end_line: 3332}
     summary: Verify CI continuation recovers and records a PR referenced only by the durable publication comment.
     rationale: Prevent completed implementation PRs from becoming unrecoverable when the task checkpoint is incomplete.
+  - path: tests/test_workflow_task_agent.py
+    type: modified
+    span: {start_line: 1980, end_line: 2053}
+    summary: Verify the issue worker attaches the issue-closing reference on the actual clean publication path.
+    rationale: Ensure the CI observer can associate a newly published implementation PR with its originating issue.
 entities: []
 entity_relationships: []
 invariants:

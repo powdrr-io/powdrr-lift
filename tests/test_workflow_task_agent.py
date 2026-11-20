@@ -1982,7 +1982,14 @@ def test_clean_pr_publish_result_is_recorded_like_pr_create(
         lambda *args, **_kwargs: recorded.append(args[5]),
     )
     strategy = task_agent._TaskWorkflowExecutionStrategy(
-        config=cast(Any, SimpleNamespace(verbose=False)),
+        config=cast(
+            Any,
+            SimpleNamespace(
+                verbose=False,
+                github_issue_number=917,
+                github_repository="example/repo",
+            ),
+        ),
         workflow=workflow,
         task=task,
         repo_root=tmp_path,
@@ -2008,6 +2015,16 @@ def test_clean_pr_publish_result_is_recorded_like_pr_create(
                 "operation": "pr_publish_clean",
                 "files_to_publish": ["src/example.py"],
                 "publication_branch": "powdrr/feature-v1-pr-01",
+                "workflow_context": {
+                    "pr-description-sections": {
+                        "objective": "Deliver the planned implementation.",
+                        "scope": "Implement the reviewed work item.",
+                        "implementation_details": "Update the source.",
+                        "acceptance_criteria": "The behavior is correct.",
+                        "validation": "The test suite passed.",
+                        "advisory_test_quality_notes": "None.",
+                    }
+                },
             },
         )
     )
@@ -2022,6 +2039,18 @@ def test_clean_pr_publish_result_is_recorded_like_pr_create(
         if plan_amendment
         else "powdrr/feature-v1-pr-01-implementation-stable-run-id"
     )
+    published_sections = published_parameters[0]["workflow_context"][
+        "pr-description-sections"
+    ]
+    if plan_amendment:
+        assert published_sections["objective"] == "Deliver the planned implementation."
+    else:
+        from powdrr_lift.clean_pr_publisher import (
+            normalize_clean_pr_publication_parameters,
+        )
+
+        normalized = normalize_clean_pr_publication_parameters(published_parameters[0])
+        assert "Closes #917" in normalized["description_sections"]["objective"]
 
 
 def test_implementation_pr_after_amendment_uses_a_distinct_branch(

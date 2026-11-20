@@ -28,6 +28,9 @@ def _manifest_data(commit: str = "a" * 40) -> dict[str, Any]:
         statement="Implement expected behavior.",
         kind="functional",
         source_refs=("anchor-0001",),
+        source_group_ids=(),
+        source_validation_groups=(),
+        source_logic=(),
     )
     receipt = RequirementExecutionReceipt.observed(
         requirement_id="req-0001",
@@ -127,6 +130,9 @@ def test_receipt_manifest_producer_rejects_unpassed_receipts(tmp_path: Path) -> 
         statement="Implement expected behavior.",
         kind="functional",
         source_refs=("anchor-0001",),
+        source_group_ids=(),
+        source_validation_groups=(),
+        source_logic=(),
     )
     receipt = RequirementExecutionReceipt.observed(
         requirement_id="req-0001",

@@ -598,6 +598,19 @@ def _requirement_bindings_for_item(
                     statement=str(requirement["statement"]),
                     kind=str(requirement["kind"]),
                     source_refs=tuple(str(ref) for ref in requirement["source_refs"]),
+                    source_group_ids=tuple(
+                        str(group_id)
+                        for group_id in requirement.get("source_group_ids", [])
+                    ),
+                    source_validation_groups=tuple(
+                        (str(group["id"]), str(group["relation"]))
+                        for group in requirement.get("source_validation_groups", [])
+                    ),
+                    source_logic=tuple(
+                        expression
+                        for expression in requirement.get("source_logic", [])
+                        if isinstance(expression, Mapping)
+                    ),
                 ),
             }
         )
@@ -1218,6 +1231,45 @@ def _validate_manifest(value: Mapping[str, Any]) -> None:
             raise PlanningCompilationError(
                 "requirement references an unknown related requirement"
             )
+        source_group_ids = _string_refs(
+            requirement.get("source_group_ids", []),
+            "requirement source_group_ids",
+            allow_empty=True,
+        )
+        raw_validation_groups = requirement.get("source_validation_groups", [])
+        if not isinstance(raw_validation_groups, list) or not all(
+            isinstance(group, Mapping) and set(group) == {"id", "relation"}
+            for group in raw_validation_groups
+        ):
+            raise PlanningCompilationError(
+                "requirement source_validation_groups are malformed"
+            )
+        validation_groups: list[tuple[str, str]] = []
+        for group in raw_validation_groups:
+            group_id, relation = group.get("id"), group.get("relation")
+            if (
+                not isinstance(group_id, str)
+                or not group_id.strip()
+                or not isinstance(relation, str)
+                or relation
+                not in {"all_together", "ordered", "alternatives", "conditional"}
+            ):
+                raise PlanningCompilationError(
+                    "requirement source_validation_groups are malformed"
+                )
+            validation_groups.append((group_id, relation))
+        validation_group_ids = [group_id for group_id, _relation in validation_groups]
+        if len(validation_group_ids) != len(set(validation_group_ids)) or set(
+            source_group_ids
+        ) != set(validation_group_ids):
+            raise PlanningCompilationError(
+                "requirement source validation group identities are inconsistent"
+            )
+        source_logic = requirement.get("source_logic", [])
+        if not isinstance(source_logic, list) or not all(
+            isinstance(expression, Mapping) for expression in source_logic
+        ):
+            raise PlanningCompilationError("requirement source_logic is malformed")
     coverage = {item["requirement_id"]: item for item in value["coverage"]}
     if set(coverage) != requirement_ids:
         raise PlanningCompilationError("each requirement needs one coverage record")

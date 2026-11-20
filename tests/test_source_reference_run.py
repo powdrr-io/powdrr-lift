@@ -75,6 +75,7 @@ def prepare(
     native: bool = False,
     run_id: str = "run-1",
     profile_code: str | None = None,
+    fixture_file: bool = False,
     post_worker_reconciler: Any = None,
     readonly_support_files: dict[str, str] | None = None,
     seed_candidate_files: dict[str, str | None] | None = None,
@@ -92,6 +93,9 @@ def prepare(
         (root / "retry.py").write_text(BASELINE)
         (root / "docs").mkdir()
         (root / "docs" / "guide.md").write_text("original guidance\n")
+        if fixture_file:
+            (root / "fixtures").mkdir()
+            (root / "fixtures" / "golden.json").write_text("{}\n")
         git(root, "add", ".")
         git(root, "commit", "-m", "baseline")
     document = {
@@ -1014,6 +1018,7 @@ def test_linux_bubblewrap_command_hides_private_and_bounds_writes(
         "missing_context",
         "design_gap",
         "mutating_validation",
+        "generated_fixture_validation",
         "no_progress",
     ],
 )
@@ -1028,8 +1033,16 @@ def test_native_fake_model_end_to_end_protects_private_inputs_and_validates_owne
             "from pathlib import Path; p=Path('retry.py'); "
             "p.write_text(p.read_text()+'\\n# changed by tests\\n')"
             if scenario == "mutating_validation"
+            else (
+                "from pathlib import Path; "
+                "Path('fixtures/golden.json').write_text("
+                + repr('{"generated": true}\n')
+                + ")"
+            )
+            if scenario == "generated_fixture_validation"
             else None
         ),
+        fixture_file=scenario == "generated_fixture_validation",
     )
     candidate = (
         BASELINE
@@ -1093,7 +1106,9 @@ def test_native_fake_model_end_to_end_protects_private_inputs_and_validates_owne
         )
 
     result = run.execute(infer)
-    assert result.accepted is (scenario == "success"), result.to_data()
+    assert result.accepted is (
+        scenario in {"success", "generated_fixture_validation"}
+    ), result.to_data()
     assert len(requests) == len(commands), result.to_data()
     if scenario not in {"design_gap", "missing_context", "no_progress"}:
         assert result.to_data()["context_delivery"]["complete"]
@@ -1115,6 +1130,12 @@ def test_native_fake_model_end_to_end_protects_private_inputs_and_validates_owne
         (run.workspace_root / "retry.py").write_text(candidate + "\n# later edit\n")
         with pytest.raises(ValueError, match="Candidate changed"):
             run.verify_candidate()
+    if scenario == "generated_fixture_validation":
+        assert result.accepted, result.to_data()
+        assert (run.workspace_root / "fixtures" / "golden.json").read_text() == "{}\n"
+        run.verify_candidate()
+        terminal = json.loads((run.private_root / "terminal.json").read_text())
+        assert terminal["validation_generated_artifacts"] == ["fixtures/golden.json"]
     with pytest.raises(ValueError, match="twice"):
         run.execute(infer)
 

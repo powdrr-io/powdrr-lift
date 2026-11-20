@@ -344,6 +344,17 @@ def _out_of_scope_paths(
     )
 
 
+def _is_validation_fixture_data_path(relative: str) -> bool:
+    """Identify data outputs that repository verifiers commonly regenerate."""
+    path = PurePosixPath(relative)
+    return (
+        not path.is_absolute()
+        and all(part not in {"", ".", ".."} for part in path.parts)
+        and "fixtures" in path.parts
+        and path.suffix.lower() in {".bin", ".json", ".yaml", ".yml"}
+    )
+
+
 def bind_story_route_evidence(
     route_evidence: Mapping[str, Any],
     handoff: CompiledSourceReferenceHandoff,
@@ -569,6 +580,7 @@ class SourceReferenceRun:
         Callable[[SourceReferenceRun], Mapping[str, Any] | None] | None
     )
     reconciliation: Mapping[str, Any] | None
+    validation_generated_artifacts: tuple[str, ...]
 
     @classmethod
     def prepare(
@@ -822,6 +834,7 @@ class SourceReferenceRun:
         self._candidate_after_worker = None
         self._post_worker_reconciler = post_worker_reconciler
         self.reconciliation = None
+        self.validation_generated_artifacts = ()
         self._configuration = {
             "schema_version": POLICY,
             "mode": "enforce",
@@ -1163,6 +1176,82 @@ class SourceReferenceRun:
                 str(p) for p in paths if p.resolve().is_relative_to(self.workspace_root)
             )
         }
+
+    def cleanup_generated_validation_fixtures(
+        self, paths_before_validation: set[str]
+    ) -> tuple[str, ...]:
+        """Remove newly-created fixture outputs without masking code mutations.
+
+        Repository verification commands sometimes regenerate fixture data as
+        part of checking that generators are stable. Those outputs are
+        validation artifacts, not worker edits; leaving them in the worktree
+        makes the post-validation candidate differ from the submitted
+        candidate. Only newly-dirty regular data files below a fixtures
+        directory are cleaned. Existing worker edits and source changes remain
+        visible to the candidate integrity check.
+        """
+        changed = _working_paths(self.workspace_root, output=_paths_output)
+        generated = tuple(
+            sorted(
+                relative
+                for relative in changed - paths_before_validation
+                if _is_validation_fixture_data_path(relative)
+            )
+        )
+        self.validation_generated_artifacts = generated
+        for relative in generated:
+            target = self.workspace_root / relative
+            if target.is_symlink():
+                raise SourceRunFailure(
+                    "invalid_candidate",
+                    f"Validation created an unsafe fixture artifact: {relative}",
+                )
+            if not target.parent.resolve().is_relative_to(
+                self.workspace_root.resolve()
+            ):
+                raise SourceRunFailure(
+                    "invalid_candidate",
+                    f"Validation created an escaping fixture artifact: {relative}",
+                )
+            tracked = (
+                subprocess.run(
+                    ["git", "ls-files", "--error-unmatch", "--", relative],
+                    cwd=self.workspace_root,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                ).returncode
+                == 0
+            )
+            if tracked:
+                result = subprocess.run(
+                    [
+                        "git",
+                        "restore",
+                        "--source=HEAD",
+                        "--staged",
+                        "--worktree",
+                        "--",
+                        relative,
+                    ],
+                    cwd=self.workspace_root,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                if result.returncode:
+                    raise SourceRunFailure(
+                        "invalid_candidate",
+                        f"Could not restore generated fixture artifact {relative}",
+                    )
+            elif target.exists():
+                if not target.is_file():
+                    raise SourceRunFailure(
+                        "invalid_candidate",
+                        f"Validation created an unsafe fixture artifact: {relative}",
+                    )
+                target.unlink()
+        return generated
 
     def check(self) -> ReferenceValidationReport:
         self.verify_inputs()
@@ -1528,6 +1617,7 @@ class SourceReferenceRun:
             "context_delivery": None,
             "reconciliation": None,
             "registered_corrections": [],
+            "validation_generated_artifacts": [],
         }
         try:
             self.verify_inputs()
@@ -1646,6 +1736,9 @@ class SourceReferenceRun:
             result["error"] = str(error)
         finally:
             result["reconciliation"] = self.reconciliation
+            result["validation_generated_artifacts"] = list(
+                self.validation_generated_artifacts
+            )
             result["attempt"] = result["attempt"] or (
                 self._last_attempt.to_data() if self._last_attempt else None
             )

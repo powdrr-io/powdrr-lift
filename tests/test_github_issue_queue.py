@@ -207,7 +207,9 @@ def test_abandoned_published_pr_resumes_ci_observation(tmp_path: Path) -> None:
     )
 
     github_issue_queue._recover_published_pull_request(
-        client=client, issue=issue, claim_path=claim_path
+        client=client,  # type: ignore[arg-type]
+        issue=issue,
+        claim_path=claim_path,
     )
 
     claim = json.loads(claim_path.read_text(encoding="utf-8"))
@@ -241,7 +243,9 @@ def test_abandoned_publication_with_multiple_prs_stays_unresolved(
     )
 
     github_issue_queue._recover_published_pull_request(
-        client=client, issue=issue, claim_path=claim_path
+        client=client,  # type: ignore[arg-type]
+        issue=issue,
+        claim_path=claim_path,
     )
 
     claim = json.loads(claim_path.read_text(encoding="utf-8"))
